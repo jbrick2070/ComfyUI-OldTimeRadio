@@ -37,34 +37,27 @@ story source combined is quite complex. I'm not expecting anything exact."* So:
   credits (*"a point-size-less bitmap hero is unacceptable"*, Fable risk #3): that
   ruling optimised for how the card looks, and it was killing FULLY RENDERED
   episodes at the credits stage on any box without DejaVu/consola/Menlo. An ugly
-  card ships; a `CreditsDataError` ships nothing. **Coded 2026-09-11** --
-  `_load_font` degrades to PIL's embedded font and logs the remedy. Generalise the
-  principle: a missing PRESENTATION resource degrades, it never refuses.
+  card ships; a `CreditsDataError` ships nothing. The principle generalises: a
+  missing PRESENTATION resource degrades, it never refuses.
 - **Prompts are hand-crafted per model and CHARACTER-BUDGETED.** Do not swashbuckle
   them. Adding conditional nuance spends budget that does not exist and reintroduces
   the per-prompt subtleties the operator has already rejected; removing words edits a
   tuned recipe. Both directions are closed.
 
-## 1. The sequence -- ARC, then CODE, then TEST ON ALL FOUR
+## 1. The sequence
 
-Operator, 2026-09-11: *"arcs -- rebase go-forward to strategically optimise: arc,
-code, test on all 4."* That is the spine of this file, and an arc IS coding.
+**Tonight: four machines qualify ONE frozen commit.** The 5080 and RunPod are driven
+from the coder window; the 4060 and the Mac are driven by Cowork natively on those
+boxes, from
+[NATIVE_PLAN_4060_AND_MAC.md](2026-09-11-four-machine-test-wave/NATIVE_PLAN_4060_AND_MAC.md).
 
-**But the honest optimisation is not a straight line, and pretending otherwise costs
-a day.** Tonight's wave does not depend on any arc below -- it qualifies the scopes
-fix and gathers evidence -- and it is itself the EVIDENCE SOURCE several arcs need.
-Serialising everything behind "all arcs done" would idle four machines tonight and
-then arc blind tomorrow. So:
+**Tomorrow begins in `otr/obs/`, not in the editor.** Count what landed against the
+legs promised, read the four phone-homes, and triage any crash-class failure FIRST.
+Only when that triage is empty does coding resume -- and the render-affecting items
+held back for the wave land before any new build starts.
 
-| Phase | What | Why here |
-|---|---|---|
-| **A. ARC now** | 3.3 orphan occupancy, 3.5 per-beat reload, Sci-Fi cap value, runtime pack writes (all Tier 1), then Tier 2 rows that need no live evidence. | Crash/OOM class first, per the bar. Costs no GPU and no money, so it runs alongside the wave without competing for anything. |
-| **B. CODE what each arc converges on** | Implement, one CLI review per change, focused + full suite compared against baseline IDs **and normalized payloads**, then push. | An arc that never becomes a diff bought nothing. |
-| **C. TEST on all four** | The wave in section 2. **Freeze one hash first.** | Four machines qualify ONE commit. Every render-path push after the freeze adds a suspect to the one leg that must pass. |
-| **D. The evidence-fed arcs** | 3.8 fonts (needs the Mac's text leg), 3.4 clean-install (needs the 4060 and RunPod pull steps), and the visual-continuity A/B (needs several rolled styles side by side). | Arcing these BEFORE the wave re-derives what the wave will hand you for free. |
-
-**The one ordering rule that matters:** anything render-affecting either lands before
-the freeze or waits for phase D. Nothing render-affecting goes in between.
+**The one ordering rule:** anything render-affecting either landed before the freeze
+or waits. Nothing render-affecting goes in between.
 
 ## 2. Tonight -- the four-machine wave (the TEST phase)
 
@@ -96,9 +89,8 @@ ingest audio, and reading TTS text or checking a waveform is not listening).
 
 | Defect | State | Next action |
 |---|---|---|
-| PBUG-20260911-03 scopes path | Code fixed, offline-qualified, pushed. NOT closed. | 5080 Leg A. Nothing left to code. |
-| Sci-Fi repair-turn cap VALUE | Half open. The CATCH shipped 2026-09-11 -- an overflow on the repair turn no longer kills the episode. The remaining half is that `_draft_fits_repair_turn` still predicts fit against a flat `HARD_VRAM_CONTEXT_LIMIT` rather than the transport's real window. | RENDER-AFFECTING: the cap decides repair-vs-cold-regeneration, so it changes which script comes back. Not before a wave. It is also not one fix -- local, GGUF-native and OpenRouter each resolve capacity differently -- so it needs an arc, not a constant swap. |
-| OpenRouter catalog cache | Half of this row SHIPPED (`d912188f`): the billing ledger now lives under `otr_state_dir()` with a copy-forward. What remains is the CATALOG cache at `_otr_openrouter_backend.py:792`, still inside the pack. **And it is worse than "gets wiped": a registry-installed pack can NEVER WARM IT.** `refresh_catalog_cache` has zero callers in `nodes/` -- nothing self-warms -- and its only caller, `scripts/otr_openrouter_refresh.py`, is stripped by `.comfyignore:94` (`scripts/*`) and never allow-listed back. So every registry user with OpenRouter enabled silently runs at `DEFAULT_CONTEXT_WINDOW = 8192` instead of the model's real window, and the empty-cache sentinel tells them to "run refresh_catalog_cache", which they have no way to do. Not crash-class -- it truncates output. Cheap: allow-list the refresh script, which is render-inert (`.comfyignore` changes what SHIPS, not what renders, and only `pyproject.toml` fires a publish). |
+| Sci-Fi repair-turn cap VALUE | `_draft_fits_repair_turn` predicts fit against a flat `HARD_VRAM_CONTEXT_LIMIT` rather than the transport's real window, so a too-generous estimate sends a draft that does not fit. | RENDER-AFFECTING: the cap decides repair-vs-cold-regeneration, so it changes which script comes back. Not before a wave. It is also not one fix -- local, GGUF-native and OpenRouter each resolve capacity differently -- so it needs an arc, not a constant swap. |
+| OpenRouter catalog cache | The catalog cache at `_otr_openrouter_backend.py:792` is written inside the installed pack. **And it is worse than "gets wiped": a registry-installed pack can NEVER WARM IT.** `refresh_catalog_cache` has zero callers in `nodes/` -- nothing self-warms -- and its only caller, `scripts/otr_openrouter_refresh.py`, is stripped by `.comfyignore:94` (`scripts/*`) and never allow-listed back. So every registry user with OpenRouter enabled silently runs at `DEFAULT_CONTEXT_WINDOW = 8192` instead of the model's real window, and the empty-cache sentinel tells them to "run refresh_catalog_cache", which they have no way to do. Not crash-class -- it truncates output. Cheap: allow-list the refresh script, which is render-inert (`.comfyignore` changes what SHIPS, not what renders, and only `pyproject.toml` fires a publish). |
 
 ## 4. Qualification coverage still owed
 
@@ -115,6 +107,7 @@ publication must exist in `otr/obs`.
 | Second model family | One/three/six acts on a compatible installed family. Verify actual runtime IDs. |
 | Original credits | One fresh Original publication: observed creative model agrees across wire, saved ledger and rendered credit. Only live proof is pending. |
 | Listening | Opening/middle/ending on at least two publications including a six-act. Operator's ear only. |
+| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. No new Ghost schema field. Needs a CUDA host. |
 | 5.7 chunked music | Full canonical on `otr_8gb_fastwan` (**that is the real profile id -- "fastwan_8gb" appears nowhere on disk, and the profile is status `draft`**) with long opening/closing cues, to prove the existing chunked-music repair. One leg, not a design row. |
 | Inherited regression debt | **Load-bearing, not a footnote** -- it is what makes any "suite is green" claim mean something. Re-ground 51 OTR and 10 Bible failures against baseline IDs **and normalized payloads**. The Bible strict metadata validator separately has 149 unchanged issues. Never quarantine silently; never call the suite all-green. |
 
@@ -132,29 +125,21 @@ model/quantization/profile, prompt ID, elapsed time, memory and loads, all repai
 attempts, requested vs actual acts and cast, ledger seals and final paths. Preserve
 terminal failure evidence before asserting anything. Keep the full denominator.
 
-## 5. The remaining work, after the arcs (2026-09-11)
+## 5. The remaining work
 
-Eight arcs ran r1 with one reviewer each (codex), and every verdict was then verified
-against the real files before anything was folded in. **41 of 42 panel claims held.**
-Anchors had been built from adversarially-verified grounding and were STILL wrong in
-seven of eight cases -- establishing the facts and reasoning correctly from them are
-different skills, and that gap is what the arcs caught.
+Every row was re-grounded against current code and put to a file-grounded reviewer
+before landing here. Arc receipts, if a row's history is wanted:
+`kibitz-runs/2026-09-11-arc-*/r1/` and `docs/2026-09-11-arcs/*/`.
 
-**r2 was judged unnecessary on all eight.** Each row now turns on a decision, a
-measurement, or a concrete diff -- not on a design argument. Running r2 would be
-ceremony. Receipts: `kibitz-runs/2026-09-11-arc-*/r1/`, anchors in
-`docs/2026-09-11-arcs/*/`.
-
-### 5A. CODE IT -- fork settled or collapsed
+### 5A. CODE IT -- the fork is settled
 
 | Row | What to write |
 |---|---|
-| 3.1 Ghost Half-B | Fork already ruled by the operator (`OTR_STANDING_RULINGS.md:759`, 2026-09-03): extend with the beat's own dialogue. Implement the existing ruling. |
+| 3.1 Ghost Half-B, LLM tier | The DETERMINISTIC tier is in: the beat's own text now ranks `meta.key_objects`, with a negation guard. Its measured ceiling is 26.3% of beats, so what remains is the tier the operator actually chose -- extend the batched Ghost author so a beat naming no listed object still gets a physical-artifact subject. Rules: photographable thing only, never an abstraction; beat reference RANKS, never SOURCES; a noun named only inside a negation is not an artifact. Not a new retry loop and not a gate. |
 | 3.6 Shakespeare | Keystone design settled by a full kibitz arc on 2026-08-03: compile source speech deterministically, never generate it. `_otr_source_document.py` already provides the artifact. Wiring, not design. |
 | 3.7 meta ownership | Fork NONE. Fix the stale comments; the ownership split is already correct in code. |
-| Sci-Fi cap VALUE | A correct per-provider value already exists in `cache_entry["context_cap"]`. Thread it instead of the flat constant. **RENDER-AFFECTING** -- lands after a wave, never before a freeze. |
 | 3.2 composer | Fork NONE, no crash risk. Fix the stale docs. |
-| 2.4 audit tail, model-root | **DO NOT RIP -- the panel was wrong here and the check is recorded so nobody re-derives it.** `resolve_hf_model_path()` is genuinely uncalled, but `comfy_models_dir()` IS called, by `resolve_hf_model_path` itself -- a dead CHAIN, not two free symbols. More importantly the archive rules it PARKED: *"the third convention, `_otr_paths.comfy_models_dir()` / `OTR_MODELS_DIR`, stays parked (cursor r3: do not open a third env in this diff)"*, and a FOURTH spelling exists in `_otr_image_engines/flux2_klein.py:209-215` -- *"when the merge happens it has four owners to retire, not three."* Ripping one of four owners of an unfinished consolidation is exactly the half-removal the operator's *"an orphan is ripped 100% or wired back in"* directive forbids. This row is the four-owner merge, or it is nothing. |
+| 2.4 audit tail, model-root | The four-owner model-root merge, or nothing. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `flux2_klein.py:209-215`. Refusal reasoning recorded in `afe3bfed`. |
 
 ### 5B. NEEDS A MEASUREMENT OR A DECISION, not another round
 
@@ -165,14 +150,6 @@ ceremony. Receipts: `kibitz-runs/2026-09-11-arc-*/r1/`, anchors in
 | 2.4 voice/credits | **The instrument does not fit the defect.** `high_band_edge_ratio` detects edge squeal; PBUG-20260902-03 documents a SUSTAINED TONE, and an independent synthetic reproduction of the exact documented frequencies scored ~0 against the real function. Closing this means designing and empirically qualifying a NEW whole-clip speech-shape scorer that does not exist anywhere in the tree. Real work, for a non-crash defect -- weigh against the bar before starting. |
 | 2.4 source | Blocked on the operator's digest ruling (section 6). |
 | 3.4 clean install | r1 verdict was **yes-with-fixes** -- the only one. Keep the existing download scope; the early-tool-check proposal needs narrowing. Low priority, non-crash. |
-
-### 5C. CLOSED, DISSOLVED, OR NOT CODE
-
-| Row | Disposition |
-|---|---|
-| 3.8 fonts | **DISSOLVED by the arc.** The shared-resolver side does not survive: the four resolvers have genuinely different jobs (measured-monospace, libass-declared-family, deliberately-refusing-branded, proportional-unmeasured), and a unified Python table would not close the real gap because captions and titles are drawn by libass, which never sees the Python side. Removed. It did surface one real operator decision -- see section 6. |
-| A2 follow-up | **CLOSED.** Both sub-items already deliberate and tested; the row text was stale. |
-| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication. Needs a CUDA host. No code, no arc. |
 
 ## 6. Blocked on the operator -- each unblocks with one word
 
