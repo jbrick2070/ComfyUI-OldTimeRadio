@@ -297,3 +297,59 @@ licensing and installability, and those have not changed.
 Operator on scope, the same day: *"we just need it to run and produce music and
 not fail the episode."* It does, once the attention backend is right (section 8
 / PBUG-20260907-11).
+
+---
+
+## 10. A pulled checkout is not the Comfy Desktop runtime copy
+
+**Observed 2026-09-10 on the M4 / 16 GB My Story trial.** Pulling the Git
+checkout under `Documents/otr-mac/repo` did not update the separate extension
+copy loaded by Comfy Desktop under its instance `custom_nodes` directory.  The
+first canonical API preflight failed closed with a useful mismatch:
+`OTR_LedgerScriptWriter` had 37 saved widget values but the live server exposed
+only 33 serialized slots.  No prompt was queued.
+
+For this installation layout, update the runtime copy as well and restart
+ComfyUI before using the new canonical graph.  Confirm the restart by fetching
+the live object schema or by running the canonical API preflight; a successful
+My Story generation must report 37 writer widgets and zero workflow drift.
+Refreshing only the browser canvas is not sufficient because Python node
+classes are imported at server startup.
+
+Do not work around a stale schema by editing the canonical JSON or trimming its
+widget vector.  The mismatch is deployment state, not workflow corruption.
+
+### My Story retry evidence from the same trial
+
+The first generated act invented a fourth speaker, `Voice (Female)`, outside
+the supplied three-person cast (Ada Mercer, Eli Ward and Jonah Pike).  The
+typed act validator rejected attempt 1 and the bounded repair attempt rewrote
+the act using only the admitted cast.  This is expected repair-path evidence,
+not permission to weaken speaker validation: without the rejection, CastLock
+would receive an unowned speaking role and could not guarantee a distinct
+available voice.
+
+The run also showed why publication remains the only PASS signal.  Its first
+server process ended after ledger cleanup but before TTS, still rendering or an
+artifact in `otr/obs/`; the saved input and pending ledger are recovery
+evidence, not a delivered episode.  A retry with one updated server reproduced
+the same boundary.  The macOS kernel then supplied the missing evidence:
+`memorystatus` killed `python3.13` as the largest compressed process at
+19,163 MB.  This was an operating-system memory kill, which explains the bare
+process exit and absent Python traceback.
+
+Qwen3.5-4B on MPS therefore is not safe for this particular My Story plus
+per-line cleanup workload on the measured 16 GB host, even though shorter
+canonical episodes previously published with the same writer.  Do not repeat
+the identical route after this receipt; select a smaller Mac-offered writer and
+keep the remaining proven Mac dropdowns, then require a real `otr/obs/`
+publication before changing the matrix.  Process residency across many local
+model calls matters more here than the model's static weight size.
+
+The immediate smaller-writer fallback also failed closed, for a different and
+useful reason.  `unsloth/Llama-3.2-3B-Instruct` was not already cached; its
+auto-fetch requires the 6.4 GB payload plus the loader's 5 GB safety margin,
+while this host had only 8.5 GB free.  The loader raised
+`InsufficientDiskSpaceError` before downloading anything.  At this point a
+continued local trial requires an explicit storage-cleanup decision; do not
+silently delete model caches merely to make a qualification run proceed.
