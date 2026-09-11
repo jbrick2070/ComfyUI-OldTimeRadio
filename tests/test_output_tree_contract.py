@@ -47,6 +47,11 @@ def out_root(tmp_path, monkeypatch):
 _EPISODE_HELPERS = [
     P.otr_audio_dir, P.otr_stills_dir, P.otr_portraits_dir,
     P.otr_videos_dir, P.otr_composited_dir,
+    # otr_clips_dir was added by the 2026-06-18 durable-clips migration and
+    # never pinned here -- so the one tier created BY the every-asset-under-
+    # its-episode directive was the one tier this contract did not cover.
+    # Added 2026-09-11 alongside the scopes re-homing, which inherits it.
+    P.otr_clips_dir,
 ]
 _NOARG_HELPERS = [
     P.otr_episodes_root, P.otr_obs_dir, P.otr_state_dir,
@@ -69,6 +74,24 @@ def test_noarg_helpers_inside_contract(helper, out_root):
     p = helper()
     rel = p.resolve().relative_to((out_root / "otr").resolve())
     assert rel.parts[0] in ("episodes", "obs")
+
+
+@pytest.mark.parametrize("helper", _EPISODE_HELPERS,
+                         ids=lambda h: h.__name__)
+@pytest.mark.parametrize("nav", [".", "...", "...."])
+def test_navigation_token_episode_id_raises_loud(helper, nav, out_root):
+    """A dots-only episode_id is a NAVIGATION token and must be refused.
+
+    ".." is caught as a traversal token, but a SINGLE dot was not: pathlib
+    collapses it, so `episodes/./composited` resolved to `episodes/composited`
+    -- outside any episode, yet still inside `otr/episodes`, so the output-tree
+    contract accepted it and every ledger walker would have read that directory
+    as an episode of its own. Found 2026-09-11 while re-homing the scopes video
+    onto this authority (PBUG-20260911-03); the caller hands over a
+    workflow-supplied id, so the gate belongs here, not at the caller.
+    """
+    with pytest.raises(P.OtrPathContractError):
+        helper(nav)
 
 
 @pytest.mark.parametrize("helper", _EPISODE_HELPERS,

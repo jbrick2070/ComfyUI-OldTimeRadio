@@ -32,7 +32,6 @@ import re as _re
 import math
 import os
 import sys
-import tempfile
 import time as _time
 
 import numpy as np
@@ -448,6 +447,43 @@ class SceneAwareScopes:
             raise ValueError("OTR_SceneAwareScopes: empty manifest (no clips) "
                              "-- fail early rather than render an empty file.")
 
+        # THE SCOPES MP4 IS A DURABLE EPISODE ASSET, so it is written under the
+        # episode that owns it (PBUG-20260911-03, 2026-09-11). It used to land in
+        # `episodes/_shared/tmp` -- the janitor-swept SCRATCH tier -- with an
+        # ambient system-temp fallback underneath it, so a retained
+        # deliverable sat in the one directory whose contract is "sweepable", and
+        # a fallback could put it outside the output tree entirely. That is the
+        # same defect the 2026-06-18 migration fixed for the per-beat clips
+        # (`otr_clips_dir`); this node was missed because it renders AFTER the
+        # manifest exists rather than inside render_driver.
+        #
+        # `otr_composited_dir` is the validated per-episode authority. It RAISES
+        # OtrPathContractError on an empty, reserved or traversing id, which is
+        # exactly the behavior the fix requires: a render that cannot be placed
+        # under its episode FAILS -- it never diverts to shared or system temp.
+        # The manifest's `episode_id` is the rename-proofed identity
+        # (render_driver.resolve_episode_id_for_clip_persistence), the same one
+        # `otr_clips_dir` consumes, so the scopes file lands beside the clips it
+        # was drawn for. Resolved HERE, before the ffprobe plan and the frame
+        # loop, so a bad identity costs no render work.
+        try:
+            from ._otr_paths import otr_composited_dir
+        except ImportError:                      # flat (sys.path) load
+            from _otr_paths import otr_composited_dir  # type: ignore
+        episode_id = str(manifest.get("episode_id") or "").strip()
+        out_dir = otr_composited_dir(episode_id)
+        # The id ALSO becomes part of the filename, so it is reduced to a safe
+        # token (2026-09-05). `clip_manifest_json` is a workflow STRING, so
+        # `episode_id` is caller-chosen; unsanitized it is joined into
+        # `otr_scopes_{key}_{ts}.mp4` below and separators or `..` walk the write
+        # back out of the directory the authority just validated. A filename
+        # cannot hold a separator, so whitelist rather than reject: this is a
+        # LABEL, and a stripped one still renders. The label NEVER chooses the
+        # directory -- `otr_composited_dir` is handed the RAW id above, so the
+        # raising identity gate decides placement and a sanitized token can
+        # never quietly invent an episode of its own.
+        key = _re.sub(r"[^A-Za-z0-9_.-]", "_", episode_id).strip("._-") or "scopes"
+
         out_w, out_h = int(out_w), int(out_h)
         fps = 25  # HARD-LOCK 25 across planner / analysis / encode
         # The seven lines that used to live here found ffmpeg, LOWER-CASED its
@@ -458,17 +494,6 @@ class SceneAwareScopes:
 
         plan, total = plan_scope_frames(manifest, out_w, out_h, ffprobe=probe,
                                         landscape_bars=landscape_bars)
-        # THE MANIFEST'S episode_id BECOMES A FILENAME, so it is reduced to a
-        # safe token first (2026-09-05). `clip_manifest_json` is a workflow
-        # STRING, so `episode_id` is caller-chosen; unsanitized it is joined
-        # into `otr_scopes_{key}_{ts}.mp4` below and separators or `..` walk the
-        # write out of the tmp tier -- on Windows the `otr_scopes_` prefix does
-        # not stop it, because `..` collapses lexically before the filesystem
-        # sees the path. A filename cannot hold a separator, so whitelist rather
-        # than reject: this is a label, and a stripped one still renders.
-        key = _re.sub(r"[^A-Za-z0-9_.-]", "_",
-                      str(manifest.get("episode_id") or "scopes")).strip("._-") or "scopes"
-
         # -- audio analysis (optional; absent -> zero arrays, NOT _analyze) --
         if audio is not None:
             import torch  # lazy (ComfyUI runtime only)
@@ -546,25 +571,21 @@ class SceneAwareScopes:
                         yield frame
 
         ts = _time.strftime("%Y%m%d_%H%M%S")
-        # OH-2 hygiene: write the scopes intermediate to the OTR-controlled scratch
-        # tier (otr/episodes/_shared/tmp -- the OH-3 janitor sweeps it), NEVER the
-        # ambient system temp dir. A server NOT booted via the soak launcher leaves
-        # TEMP unrepointed, so gettempdir() lands otr_scopes_*.mp4 in
-        # %LOCALAPPDATA%\Temp and trips the soak hygiene gate even though the render
-        # is fine (2026-06-30). The downstream OTR_PostUpscaleProcgenBlend consumes
-        # this path; cleanup is the janitor's -- never delete it in the producer.
-        try:
-            try:
-                from ._otr_paths import otr_shared_tmp_dir
-            except ImportError:                      # flat (sys.path) load
-                from _otr_paths import otr_shared_tmp_dir  # type: ignore
-            _tmp_root = str(otr_shared_tmp_dir())
-            os.makedirs(_tmp_root, exist_ok=True)
-        except Exception as _tmp_exc:                # noqa: BLE001
-            _tmp_root = tempfile.gettempdir()
-            log.warning("[SceneAwareScopes] OTR tmp tier unavailable (%s); "
-                        "falling back to %s (test/headless only)", _tmp_exc, _tmp_root)
-        out_path = os.path.join(_tmp_root, f"otr_scopes_{key}_{ts}.mp4")
+        # `out_dir` was validated against the episode identity at entry. Create it
+        # HERE, at the write, so a failed render never leaves an empty directory
+        # behind -- and let a makedirs failure RAISE. There is deliberately no
+        # except branch: the old one caught everything and rerouted the write to
+        # the ambient system temp dir, which is the defect PBUG-20260911-03
+        # records. An asset that cannot be written under its own episode is a
+        # failed render, not a render to somewhere else.
+        #
+        # The timestamp keeps a re-run from clobbering the previous asset, and
+        # the downstream OTR_PostUpscaleProcgenBlend consumes the RETURNED path
+        # rather than globbing, so accumulated runs never confuse it. Nothing
+        # sweeps this tier: the janitor is scoped to `_shared/tmp` alone, which
+        # is precisely why the file belongs here.
+        os.makedirs(out_dir, exist_ok=True)
+        out_path = os.path.join(str(out_dir), f"otr_scopes_{key}_{ts}.mp4")
         log.info("[SceneAwareScopes] %d frames @ %dx%d 25fps -> %s",
                  total, out_w, out_h, out_path)
         try:

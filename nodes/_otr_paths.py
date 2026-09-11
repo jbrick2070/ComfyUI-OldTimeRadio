@@ -421,6 +421,21 @@ def _validate_episode_id(episode_id: str) -> str:
     if any(t in eid for t in ("/", "\\", "..", "\x00")):
         raise OtrPathContractError(
             "episode_id %r contains a path separator/traversal token" % eid)
+    if set(eid) == {"."}:
+        # A dots-only id is a NAVIGATION token, not a name. "." collapses
+        # lexically, so `episodes/./composited` resolves to
+        # `episodes/composited` -- a directory that still passes
+        # _validate_contract (its first part is "episodes") while sitting
+        # OUTSIDE any episode, where every ledger walker over
+        # otr_episodes_root() would read it AS one. ".." is caught by the
+        # separator/traversal test above; a single dot is not, because the
+        # substring test looks for ".." and finds nothing. Measured 2026-09-11
+        # while re-homing the scopes video (PBUG-20260911-03): before this
+        # guard, otr_composited_dir(".") returned <output>/otr/episodes/
+        # composited and was accepted.
+        raise OtrPathContractError(
+            "episode_id %r is a path-navigation token, not an episode name"
+            % eid)
     if is_reserved_episode_entry(eid):
         raise OtrPathContractError(
             "episode_id %r is a reserved system entry (%s is never an "
@@ -572,13 +587,30 @@ def otr_clips_dir(episode_id: str) -> Path:
 
 
 def otr_composited_dir(episode_id: str) -> Path:
-    """Per-episode VideoComposite intermediate dir:
+    """Per-episode video-chain intermediate dir:
     ``<output>/otr/episodes/<episode_id>/composited/``.
 
-    Holds the composited mp4 written by VideoComposite as
-    ``<episode_id>.mp4``. Downstream OTR_PostUpscaleProcgenBlend reads
-    from here and writes the final blended deliverable to
-    ``otr_obs_dir()``.
+    CURRENT TENANT (2026-09-11): the scene-aware scopes video,
+    ``otr_scopes_<label>_<ts>.mp4``, written by OTR_SceneAwareScopes and
+    read by OTR_PostUpscaleProcgenBlend as its third blend input.
+
+    It was RE-TENANTED deliberately, so read this before adding a third
+    writer. The original tenant was OTR_VideoComposite's
+    ``<episode_id>.mp4``; that node was DELETED 2026-06-07 and nothing
+    has written this tier since 2026-06-06, so the name describes the
+    era, not the occupant. The scopes video moved in under
+    PBUG-20260911-03: it is a RETAINED deliverable that had been living
+    in ``episodes/_shared/tmp``, the janitor-swept scratch tier, behind
+    an ambient system-temp fallback. The episode ROOT is arguably the
+    better semantic home -- the rest of the video chain writes flat
+    there -- but it has no validated helper, and minting one was not on
+    the table. This helper already carries the two guards the fix needs:
+    ``_validate_episode_id`` (raises on empty, reserved or traversing
+    ids) and ``_validate_contract``. A misnamed but GUARDED home beat an
+    unguarded one; renaming the tier is a separate, larger change.
+
+    NOT swept: the janitor is scoped to ``_shared/tmp`` alone, which is
+    the whole reason an episode asset belongs here rather than there.
 
     HISTORY (queue item 8, 2026-08-08): a standalone OTR_RTXUpscale
     stage used to sit in between, reading this dir and writing 1080p

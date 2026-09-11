@@ -146,6 +146,12 @@ def test_blend_two_input_unchanged_when_no_scopes():
 def test_silent_encode_no_audio_stream(tmp_path, monkeypatch):
     import json
     import subprocess
+    # PBUG-20260911-03: the producer now writes under the OWNING EPISODE. Pin the
+    # output root, or `episode_id="enc"` below resolves against the real ComfyUI
+    # tree and this test mints a phantom `episodes/enc/` in the operator's
+    # production workspace on every suite run. Harmless before the fix only
+    # because `_shared/tmp` is a reserved entry every episode walker skips.
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
     monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
     m = {"episode_id": "enc", "fps": 25, "total_target_frames": 40,
          "clips": [{"order": 0, "shot_id": "s1", "engine_id": "humo",
@@ -163,7 +169,7 @@ def test_silent_encode_no_audio_stream(tmp_path, monkeypatch):
     os.remove(path)
 
 
-def test_scopes_span_master_audio_no_blend_clamp_bug406(monkeypatch):
+def test_scopes_span_master_audio_no_blend_clamp_bug406(tmp_path, monkeypatch):
     """BUG-LOCAL-406: the scopes track must span the full MASTER-audio length, not
     the beats-only total_target_frames. The downstream §4D 3-input blend uses
     shortest=1, so a scopes input shorter than the master clamps the whole blended
@@ -172,6 +178,9 @@ def test_scopes_span_master_audio_no_blend_clamp_bug406(monkeypatch):
     `audio` input, so it pads the plan tail to the master length."""
     import json
     import torch
+    # See test_silent_encode_no_audio_stream: pin the output root so the real
+    # producer resolves `episode_id="ext"` inside tmp_path (PBUG-20260911-03).
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
     monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
     captured = {}
 
@@ -198,3 +207,102 @@ def test_scopes_span_master_audio_no_blend_clamp_bug406(monkeypatch):
         out_w=160, out_h=90)
     assert captured["total"] == 125          # extended from beats(50) to master(125)
     assert captured["gen_n"] == 125          # frames render across the full span
+
+
+# --------------------------------------------------------------------------- #
+# PBUG-20260911-03 -- the scopes MP4 is a DURABLE EPISODE ASSET.
+#
+# Before 2026-09-11 the real producer wrote it into `episodes/_shared/tmp`, the
+# janitor-swept SCRATCH tier, and fell back to the ambient system temp dir if
+# the OTR tmp authority raised. Five retained scopes files from five separate
+# episodes were found stranded there. No test asserted WHERE the file landed --
+# only that a file existed -- which is why the defect survived a hygiene repair
+# that specifically targeted this node. These tests pin the DESTINATION.
+# --------------------------------------------------------------------------- #
+def _scopes_manifest(episode_id):
+    m = {"fps": 25, "total_target_frames": 40,
+         "clips": [{"order": 0, "shot_id": "s1", "engine_id": "humo",
+                    "path": "/fake/portrait.mp4", "target_frame_count": 40,
+                    "start_s": 0.0, "exists": True}]}
+    if episode_id is not None:
+        m["episode_id"] = episode_id
+    return m
+
+
+def test_real_producer_writes_under_its_owning_episode(tmp_path, monkeypatch):
+    """The returned path is a real file under the VALIDATED per-episode
+    authority for the manifest's own episode_id -- beside the clips it was drawn
+    for, and provably not in shared scratch or the ambient system temp dir."""
+    import json
+    import tempfile
+    from nodes import _otr_paths as P
+
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
+    captured = {}
+
+    from nodes._otr_shared import scope_draw as _sd
+
+    def _fake_encode(gen, total, out, w, h, fps, ffmpeg):
+        captured["n"] = sum(1 for _ in gen)
+        os.makedirs(os.path.dirname(out), exist_ok=True)
+        with open(out, "wb") as fh:          # a real, nonempty artifact
+            fh.write(b"scopes-placeholder-bytes" * 64)
+
+    monkeypatch.setattr(_sd, "encode_silent_mp4", _fake_encode)
+
+    eid = "signal_lost_the_bay_area_table_20260911_074902"
+    out = sc.SceneAwareScopes().render_scopes(
+        json.dumps(_scopes_manifest(eid)), audio=None, out_w=160, out_h=90)
+    path = Path(out["result"][0]).resolve()
+
+    assert path.is_file() and path.stat().st_size > 0
+    assert path.parent == P.otr_composited_dir(eid).resolve()
+    # the episode segment is the SAME identity the durable clips tier uses
+    assert path.parent.parent.name == P.otr_clips_dir(eid).parent.name == eid
+    # and emphatically NOT the two places it used to go. (pytest's own tmp_path
+    # lives INSIDE the ambient temp dir, so "not under gettempdir()" would be
+    # trivially false here -- the real property is that the file is not dropped
+    # loose in the ambient temp ROOT, and that it stays inside the pinned tree.)
+    assert P.otr_shared_tmp_dir().resolve() not in path.parents
+    assert path.parent != Path(tempfile.gettempdir()).resolve()
+    assert Path(tmp_path).resolve() in path.parents
+
+
+def test_real_producer_refuses_a_manifest_with_no_episode_id(tmp_path, monkeypatch):
+    """An unplaceable render FAILS. It must never invent an `episodes/scopes/`
+    directory, and must never divert to shared or system temp -- that reroute IS
+    the recorded defect."""
+    import json
+    import tempfile
+    from nodes import _otr_paths as P
+
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
+
+    for bad in (None, "", "   ", "_shared"):
+        with pytest.raises(P.OtrPathContractError):
+            sc.SceneAwareScopes().render_scopes(
+                json.dumps(_scopes_manifest(bad)), audio=None, out_w=160, out_h=90)
+
+    assert not (Path(tmp_path) / "otr" / "episodes" / "scopes").exists()
+    stray = list(Path(tempfile.gettempdir()).glob("otr_scopes_*.mp4"))
+    assert not stray, "refused render leaked to the ambient temp dir: %r" % stray
+
+
+def test_real_producer_separator_id_raises_rather_than_sanitizing_a_new_episode(
+        tmp_path, monkeypatch):
+    """The filename sanitizer must never choose the DIRECTORY. `a/b` collapses to
+    the perfectly legal token `a_b`; if the sanitized label reached the path
+    authority it would silently create `episodes/a_b/`. The RAW id goes to the
+    authority, so this raises instead."""
+    import json
+    from nodes import _otr_paths as P
+
+    monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
+    monkeypatch.setattr(sc, "_probe_is_portrait", lambda p, f, c: True)
+
+    with pytest.raises(P.OtrPathContractError):
+        sc.SceneAwareScopes().render_scopes(
+            json.dumps(_scopes_manifest("a/b")), audio=None, out_w=160, out_h=90)
+    assert not (Path(tmp_path) / "otr" / "episodes" / "a_b").exists()

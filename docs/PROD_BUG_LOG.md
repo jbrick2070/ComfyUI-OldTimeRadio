@@ -14512,7 +14512,9 @@ No audition was possible. Full hashes/logs/pixels/OBS file:
 
 ## PBUG-20260911-03 -- scopes video persists outside its owning episode
 
-- Status: OPEN, no production fix in this documentation handoff.
+- Status: CODE FIXED and offline-qualified 2026-09-11. A live canonical
+  requalification is still owed before this is called closed -- the fix is
+  proven by executable coverage and the full suite, not yet by a render.
 - Live evidence: the same canonical09 server log records SceneAwareScopes
   rendering 3580frames to output/otr/episodes/_shared/tmp/
   otr_scopes_signal_lost_the_bay_area_table_20260911_074902_20260911_080240.mp4.
@@ -14529,9 +14531,69 @@ No audition was possible. Full hashes/logs/pixels/OBS file:
   otr_composited_dir(manifest episode_id) authority; remove the scratch/system
   fallback, preserve the consumer contract and all existing files. No post-hoc
   move, episode rename change, new path owner or story gate.
-- Verification owed: real producer path under the active episode, invalid-ID/
-  path-failure behavior, no shared/system-temp fallback, and a full canonical
-  scopes/episode/OBS disk receipt. Update obsolete test_node_temp_hygiene.py
-  expectations with the production fix. No executable coverage or live fix is
-  claimed yet. Existing Bible01.02 class (12.66 cross-reference) is indexed with
-  this OPEN occurrence; portable contract/test expansion belongs to that chunk.
+- Applied fix (nodes/otr_scene_aware_scopes.py): the episode identity is
+  resolved at entry, before the ffprobe plan and the frame loop, through
+  otr_composited_dir(manifest episode_id). The shared-scratch selection and the
+  system-temp fallback are both gone, and `import tempfile` went with them; the
+  string "gettempdir" no longer appears in the producer. os.makedirs moved to the
+  write site so a failed render leaves no empty directory. The RAW manifest id
+  goes to the authority so its raising identity gate decides placement; the
+  regex-sanitized `key` is a FILENAME label only. That split matters: "a/b"
+  sanitizes to the perfectly legal token "a_b", so a sanitized label reaching the
+  authority would have silently created a bogus episode directory instead of
+  raising.
+- Measured, not assumed -- `key` ALSO seeds the deterministic idle-scope RNG
+  (_rng at nodes/otr_scene_aware_scopes.py:65). Old and new derivations were
+  compared across 18 inputs including every realistic episode id: ZERO seed
+  drift, so rendered pixels are unchanged. This was a render-path refactor and
+  the pixel-identity claim is a measurement, not a judgement.
+- Second defect found and fixed in the same chunk (nodes/_otr_paths.py):
+  _validate_episode_id ACCEPTED a dots-only id. otr_composited_dir(".") returned
+  <output>/otr/episodes/composited -- outside any episode, yet still passing
+  _validate_contract because its first part is "episodes" -- where every ledger
+  walker over otr_episodes_root() would have read it as an episode. ".." was
+  caught as a traversal token; a single "." was not. Pre-existing in the
+  authority, newly REACHABLE because the scopes node now routes a
+  workflow-supplied id through it, so the guard belongs at the authority.
+- Test-side defect found and fixed: both real-producer scopes tests left
+  OTR_OUTPUT_DIR unpinned with episode ids "enc" and "ext". Harmless while the
+  output went to _shared/tmp (a reserved entry every walker skips); after the
+  re-homing they would have minted phantom episodes in the operator's REAL
+  production tree on every suite run. Both are now pinned to tmp_path.
+- Executable coverage added: three real-producer DESTINATION tests
+  (tests/test_video_scene_aware_scopes.py) asserting the returned path's parent
+  equals otr_composited_dir(eid), that the episode segment matches the durable
+  clips identity, and that refusal raises rather than inventing episodes/scopes/
+  or leaking to temp; the navigation-token contract test across every
+  per-episode helper; and otr_clips_dir added to the output-tree contract's
+  helper list -- an inherited gap, since the 2026-06-18 durable-clips migration
+  created that tier and never pinned it. tests/test_node_temp_hygiene.py now
+  encodes the asset-owner contract instead of requiring shared scratch, and bans
+  the temp resolver by source string: its _JOIN_GETTEMP_OTR regex only ever
+  matched a one-line join(), so it could not see this node's two-step fallback
+  and never guarded the bug it was named for.
+- Offline qualification: full OTR suite 14,471 passed / 51 inherited failures /
+  183 skipped / 1 xfailed, exit 2 from the known-failure guard. Failure
+  IDENTITIES and normalized payloads compared against the committed baseline
+  docs/2026-09-11-my-story-frame-ownership/tests/frame_ownership_full.xml --
+  zero new failures, zero payload drift, nothing quarantined. The +5 passes are
+  the new tests. Reviewers: root grounding (five dimensions with adversarial
+  verification) plus a finished-diff Sonnet 5 QA that returned Clean and
+  independently confirmed the one focused-run failure
+  (test_the_blend_answers_empty_rather_than_echoing) is inherited by stashing
+  the diff and reproducing it on origin/v2.0-alpha. No Cursor lane ran; no
+  consensus is claimed.
+- Consumer contract preserved: node 93 still receives the returned path over
+  link 273 and only resolves + stats it, so a composited/ path satisfies exactly
+  what _shared/tmp did. Node 93's canonical `bypass` widget is true today, in
+  which case it returns before reading the path at all. No canonical JSON,
+  widget, wiring or node change was needed or made; otr_canonical.json is
+  byte-identical at sha256 d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c.
+- Verification still owed: a full canonical live receipt showing the scopes path
+  under its episode, the final episode assets and OBS publication, with the
+  consumer exercised bypassed AND blending. Until that runs this is a coded,
+  regression-qualified fix -- not a live-proven one.
+- The five stranded files from five earlier episodes are PRESERVED in
+  episodes/_shared/tmp. They are prior evidence; nothing was moved or deleted.
+  Bible01.02 (12.66 cross-reference) is updated from OPEN occurrence to fixed,
+  and the portable contract this taught is promoted as its own rule.
