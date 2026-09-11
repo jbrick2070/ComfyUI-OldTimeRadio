@@ -431,7 +431,10 @@ else:
 # that is not there, which is the exact failure the paragraph above exists to
 # prevent. Verified against the PUBLISHED bundle rather than the repo, because
 # .comfyignore decides what ships: workflows/ contains exactly
-# otr_canonical.json and its otr_canonical.jpg thumbnail. otr_story_only.json
+# otr_canonical.json. Its otr_canonical.jpg gallery thumbnail was deleted
+# 2026-09-11 (operator call): the still was an 8/22-era frame grab, three
+# weeks older than the graph it advertised. The template still lists and
+# opens; only the card image is gone. otr_story_only.json
 # and the workflows/variants/ tree were deleted 2026-09-07 while the canonical
 # is being proven on Apple Silicon, so the gallery serves ONE template and this
 # line names one. `otr_4060_floor` remains a valid PROFILE id for
