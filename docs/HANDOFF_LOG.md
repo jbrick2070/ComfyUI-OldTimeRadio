@@ -1,3 +1,27 @@
+## 2026-09-11 -- attempt06 published; Terra/Luna trace remaining source misses
+
+Full canonical on5f7329fa, prompt201bb7a8-de1b-46e6-967f-371546f3b7dc,
+published Dinner Table Remembrances in11:17,78seconds. Submitted graph identical
+to05; before/after code and canonical checks pass. Source FAIL: girlfriend and
+requested dramatic ending omitted before cleanup; final source editor returns
+edits:[] with1595/131072 prompt fit. No accepted correction was lost. Actual
+voices/credits agree; b1 adds an extra adult despite a correct two-adult prompt.
+
+Terra traced P0 preferred/conflict downgrades, full source transport and applied
+rewrite ownership. Luna audited bounded cleanup; root grounded final arithmetic:
+38 calls,12 repair proposals in six two-attempt rows, zero retained text changes,
+nine rows conserved. No extra loops or source gates. Six total attempts,
+three writing failures/three source-defective publications/zero source-qualified.
+Complete receipts and pixels:2026-09-11-my-story-5080-qualification/pairlock_06_*.
+
+Server stopped selectively after archival; port empty,2066MiB desktop. No other
+machine contacted. Mac/4060 held; RunPod unauthenticated/no rental. No code edit
+during live. GO_FORWARD now queues grounded source-authority/final-act review,
+then coding/finished Sonnet/regression before any further live run. Do not
+restart completed06 or present a prompt ambiguity as a proved model-failure cause.
+
+---
+
 ## 2026-09-11 -- attempt05 publishes; source-field correction qualified offline
 
 Nemo pair on18569a3b (executable d2837e45) completed the full canonical in10:29,

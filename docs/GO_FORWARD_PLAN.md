@@ -92,28 +92,30 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 attempt06 on the pushed
-source-field correction.** Verify the checkout matches origin and the final
-qualification receipt before boot. Offline code/review evidence is complete in
-`docs/2026-09-11-my-story-source-field-followup/qualification_receipt.md`;
-it does not establish live source recovery.
+**Next action: grounded review of source priority and final-act instructions
+inside the existing My Story author/correction owners.** Attempt06 completed;
+do not restart it. Full source reaches the calls and returned corrections are
+not lost, but the model repeatedly returns unchanged drafts with missing source
+actions/ending. Review P0 required/preferred/conflict semantics, P2's explicit
+plan.ending_state versus the global ending on the last act, and the generic
+act-scope caveat. Root writes a code-grounded anchor; independent reviewers
+converge before any design-bearing revision. Use the appropriate R1-R4 arc
+for a new design choice, then finished Sonnet QA and regressions before live.
+Keep changes inside existing calls and fixed budgets; no separate checker,
+chunker, forced story substring, extra retries, gate or model-quality promise.
 
-Use the real canonical/shipped full API runner,
-same pairlock_05 source, installed Mistral Nemo pair, NF4/SDPA, sampling and
-otr_w45_still_pan. Compare submitted graphs05/06 for unexpected differences.
-Inspect actual source-edit fields, applied corrections, final spoken source,
-voice/credits and pixels. Preserve any failure before another run; never reset
-an exhausted budget. Preventing an invalid alias alone does not guarantee
-semantic recovery or correct image generation.
+No further GPU run until that decision/coding/QA completes. Keep the image
+failure separate: accepted two-adult prompts reached the renderer, but05 added
+a child and06 added an adult. Do not claim a prompt edit guarantees pixels or
+invent a dropped-prompt defect. Any visual implementation needs its own grounded
+scope; do not expand the source-writer fix into a new image architecture.
 
-Keep all FIVE recovery attempts across recorded revisions: three writing
-failures and two source-defective publications, ZERO source-qualified episodes.
-Four use Qwen, one Nemo. Attempt05 receipt and complete artifacts are at
-`docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md`.
-Both adults sharing the meal, distinct absent girlfriend, requested ending,
-preserved metadata, delivered voice/credits, inspected prompts/pixels and zero
-between-act music remain required qualification evidence. Publication alone
-is insufficient. Later stress coverage and fresh Original credits remain open.
+Six recorded full canonical attempts: three writing failures and three
+source-defective publications, ZERO source-qualified episodes. Four Qwen and
+two Nemo runs. Evidence: `docs/2026-09-11-my-story-5080-qualification/pairlock_06_receipt.md`.
+The pushed source-field conformance correction remains5f7329fa with full
+offline/regression receipts; live06 returned no edits and did not establish
+semantic recovery. Later stress coverage and Original credits remain open.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

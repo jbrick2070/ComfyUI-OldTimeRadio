@@ -23,6 +23,7 @@ tests/fixtures/comfyui_gguf_6ea2651/loader.py -whitespace
 # In particular, do not rewrite Windows log/XML line endings after hashing.
 docs/2026-09-11-my-story-source-field-followup/** -text
 docs/2026-09-11-my-story-5080-qualification/pairlock_05_* -text
+docs/2026-09-11-my-story-5080-qualification/pairlock_06_* -text
 
 # Binary files - never touch line endings
 *.wav binary

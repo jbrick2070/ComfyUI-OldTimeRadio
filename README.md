@@ -19,15 +19,15 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
-**My Story qualification:** five full canonical 5080 recovery attempts across
-recorded revisions produced three writing failures and two publications with
-source defects. The fifth, using Mistral Nemo, delivered correct voice credits
-but omitted requested story details and added a child in one image. That is
-zero source-qualified recovery episodes. See the
-[fifth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md)
-and [GO_FORWARD](docs/GO_FORWARD_PLAN.md) for repair QA and the next qualification.
+**My Story qualification:** six full canonical 5080 recovery attempts across
+recorded revisions produced three writing failures and three publications with
+source defects. The latest Mistral Nemo run delivered correct voice credits,
+but its correction calls left requested story details missing and an image
+added an extra adult. Zero source-qualified recovery episodes. See the
+[sixth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_06_receipt.md)
+and [GO_FORWARD](docs/GO_FORWARD_PLAN.md) for the next grounded review.
 Existing model-matrix proof retains its recorded platform/scope; it does not
-establish source fidelity for the repaired My Story flow. The
+establish source fidelity for My Story. The
 [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md) remain recorded.
 
 100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
@@ -651,12 +651,11 @@ than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
 
 **My Story on the 5080:** four Qwen3.5-4B/NF4 recovery attempts produced three
-treatment-writing failures and one source-defective publication. A fifth run
-with Mistral Nemo/NF4 published with correct voice credits but still missed
-source facts and generated an extra child in one image. Total: five attempts,
-two publications, zero source-qualified episodes. Preserve the older matrix's
-platform-specific proof; this campaign does not promote source fidelity. See
-[the actual receipts](docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md)
+treatment-writing failures and one source-defective publication. Two later
+Mistral Nemo/NF4 attempts published with correct voice credits but still missed
+source actions/ending and generated extra people. Total: six attempts, three
+publications, zero source-qualified episodes. The older matrix's platform proof
+is unchanged. See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_06_receipt.md)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 
 

@@ -14367,6 +14367,23 @@ offsets. Application rules, two-call budget and qualified=false stay intact.
 Bible11.39 covers real LMFE alias exclusion/all4 keys and applied-rewrite
 conservation. This is a contract repair, not proof missing facts/pixels recover.
 
+### PBUG-20260910-03 follow-up -- pairlock_06 is unchanged, not a lost rewrite
+
+Full canonical on5f7329fa, prompt201bb7a8-de1b-46e6-967f-371546f3b7dc,
+published with source omissions and one extra adult in pixels. Final editor
+saw all four source fields/nine spoken rows,1595tokens against131072 context,
+and returned edits:[] on its first call. No invalid alias recurred, but no
+nonempty source edit was exercised. Native enum conformance remains verified
+offline; this is not semantic recovery. P0/P1/P2 already weakened or omitted
+explicit actions/ending; correction owners returned unchanged artifacts and
+the pipeline retained them. Terra/root traced complete source transport and
+application. Root/Luna verified38 bounded cleanup/source calls and unchanged
+spoken text; no dropped accepted correction or budget reset demonstrated.
+Actual two-adult image prompts reached dispatch, but b1 shows a third adult.
+Source priority/last-act instruction ambiguities require grounded review;
+they are not yet a demonstrated cause or a justification for new rejection.
+See pairlock_06_receipt.md, full ledger/history/logs and inspected scene PNGs.
+
 ### PBUG-20260910-05 follow-up -- cleanup scope authorizer omitted native binding
 
 In the same published pairlock_02, the authorizer returned already_spoken with

@@ -1,5 +1,34 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- attempt06 completed; source authority review next
+
+Completed instructions, verbatim:
+
+**Next action: ONE fresh full canonical 5080 attempt06 on the pushed
+source-field correction.** Verify the checkout matches origin and the final
+qualification receipt before boot. Offline code/review evidence is complete in
+`docs/2026-09-11-my-story-source-field-followup/qualification_receipt.md`;
+it does not establish live source recovery.
+
+Use the real canonical/shipped full API runner,
+same pairlock_05 source, installed Mistral Nemo pair, NF4/SDPA, sampling and
+otr_w45_still_pan. Compare submitted graphs05/06 for unexpected differences.
+Inspect actual source-edit fields, applied corrections, final spoken source,
+voice/credits and pixels. Preserve any failure before another run; never reset
+an exhausted budget. Preventing an invalid alias alone does not guarantee
+semantic recovery or correct image generation.
+
+Keep all FIVE recovery attempts across recorded revisions: three writing
+failures and two source-defective publications, ZERO source-qualified episodes.
+Four use Qwen, one Nemo. Attempt05 receipt and complete artifacts are at
+`docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md`.
+Both adults sharing the meal, distinct absent girlfriend, requested ending,
+preserved metadata, delivered voice/credits, inspected prompts/pixels and zero
+between-act music remain required qualification evidence. Publication alone
+is insufficient. Later stress coverage and fresh Original credits remain open.
+
+---
+
 ## 2026-09-11 -- source-field offline qualification completed
 
 Completed instruction, verbatim:

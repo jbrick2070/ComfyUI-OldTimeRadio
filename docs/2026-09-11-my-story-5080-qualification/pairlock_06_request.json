@@ -1,0 +1,53 @@
+{
+  "canonical_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runner": "scripts/otr_canonical_api_run.py",
+  "profile": "otr_w45_still_pan",
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+    "story_characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+    "story_plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+    "story_setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+    "story_author": "",
+    "num_characters": 2,
+    "act_count": "1",
+    "visual_style": "roll (any style)"
+  },
+  "quant_policy": "bnb_nf4",
+  "scope": "Full canonical through audio, video and obs publication; no workflow substitute, replay or partial target.",
+  "source_note": "Fresh explicit recovery inputs based on the committed 4060 dinner/pair-lock failure; not a claim to reproduce an unarchived exact earlier request.",
+  "runpod": "not started; current session has no authenticated RunPod API or console access",
+  "mac_4060": "held; no contact",
+  "actual_sampling": {
+    "creativity": "balanced",
+    "temperature": 0.85,
+    "top_p": 0.95,
+    "min_p": 0.05,
+    "repetition_penalty": 1.03
+  },
+  "creative_model": "mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)",
+  "technical_model": "mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)",
+  "code_commit": "5f7329fa6bd03c5a182f31a79189e79bd0d02f4b",
+  "executable_code_revision": "5f7329fa6bd03c5a182f31a79189e79bd0d02f4b",
+  "previous_attempts": [
+    "pairlock_01",
+    "pairlock_02",
+    "pairlock_03",
+    "pairlock_04",
+    "pairlock_05"
+  ],
+  "status": "success",
+  "created_utc": "2026-09-11T11:58:13.175902+00:00",
+  "run_label": "5080_pairlock_06_source_fields",
+  "changed_control": "Qualified source-field schema and quote-coordinate clarification; same raw source, graph, model pair, profile and configured sampling as attempt05.",
+  "model_dependent_differences": "Same Mistral model pair as05; stochastic generation still varies, so one result is not a causal guarantee.",
+  "desktop_memory_before_boot_mib": 2129,
+  "prompt_identical_to_attempt05": true,
+  "prompt_id": "201bb7a8-de1b-46e6-967f-371546f3b7dc",
+  "terminal_utc": "2026-09-11T12:09:47.408108+00:00",
+  "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_table_remembrances_20260911_050508\\audio\\signal_lost_dinner_table_remembrances_20260911_050508_ledger.json",
+  "ledger_sha256": "59e6ad9a0263614b134a717287d3a864b79a54c1e4581174b07c909bc94753de",
+  "code_unchanged_during_run": true,
+  "submitted_prompt_identical_to_attempt05": true
+}
