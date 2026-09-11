@@ -29,14 +29,35 @@ all 27 stills and inspected credits:
 The 87,722,712-byte OBS file remains visible at:
 `C:/Users/jeffr/Documents/ComfyUI/output/otr/obs/the_bay_area_table_20260911_074902__shst__stpa__zimg__idx2__unk__g412__sa3_final.mp4`.
 
-## Next action
+## SUPERSEDED 2026-09-11 -- read HANDOFF_LOG's top entry instead
 
-Take Sprint1 in GO_FORWARD: **OPEN PBUG-20260911-03**, retained scopes video under
-shared/tmp. Use the existing episode path authority at the actual producer;
-this is not the already-fixed pending-to-final rename bug. No fix was started.
-Sprint2 addresses the observed visual-continuity cause at existing owners, then
-full canonical stress, Original-credit publication and listening evidence follow.
-All coding and actual finished Sonnet QA precede further generation.
+**This file describes the state BEFORE that day's coding and is kept as the
+handoff it was, not as current status.** Everything in "Next action" below is
+done or closed; taking it at face value would redo finished work.
+
+What changed, in one line each -- full receipt in
+[HANDOFF_LOG](docs/HANDOFF_LOG.md):
+
+* **PBUG-20260911-03 is FIXED**, not open. The scopes video writes through
+  `otr_composited_dir(manifest episode_id)`; two further defects it exposed were
+  fixed with it. Live requalification is still owed.
+* **Sprint 2 (visual continuity) is CLOSED with no code change.** Three arcs all
+  returned "no" and four operator constraints disqualified the remedy they
+  converged on. See
+  [ARC_CLOSED](docs/2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md). The
+  pack and the story are a COMBINATION; exactness is not the goal.
+* **Seven crash/durability fixes shipped**, suite at 14,529 passed / 51 inherited
+  / zero drift, wave frozen at `f5f40bd4`.
+* **Tested HEAD below (9367f2fd) is long stale.** Verify against origin.
+
+The original next-action text, preserved:
+
+> Take Sprint1 in GO_FORWARD: **OPEN PBUG-20260911-03**, retained scopes video under
+> shared/tmp. Use the existing episode path authority at the actual producer;
+> this is not the already-fixed pending-to-final rename bug. No fix was started.
+> Sprint2 addresses the observed visual-continuity cause at existing owners, then
+> full canonical stress, Original-credit publication and listening evidence follow.
+> All coding and actual finished Sonnet QA precede further generation.
 
 The Bible indexes this OPEN incident under existing 01.02 (12.66 related) and
 records 09's source outcome under 11.39. Its 344 parsed rules and tests are unchanged.

@@ -1,3 +1,85 @@
+## 2026-09-11 -- seven crash/durability fixes; wave frozen at f5f40bd4
+
+The receipt for the day's code, so the plan can stop carrying it. Every fix below was
+proven in BOTH directions: the guard was neutered and the tests confirmed to FAIL
+without it. A guard never shown to fail has only been run, not tested -- promoted to
+Bug Bible 01.06 the same day, from a hygiene guard that passed for months while the
+defect it was named for was present.
+
+**Shipped, in order:**
+
+1. **PBUG-20260911-03, scopes path.** `OTR_SceneAwareScopes` rendered a RETAINED
+   scopes MP4 into `episodes/_shared/tmp` -- the janitor-swept scratch tier -- behind
+   an ambient system-temp fallback. Five stranded files from five episodes were sitting
+   there. It now resolves its episode identity at entry and writes through
+   `otr_composited_dir(manifest episode_id)`, with no fallback. `key` also seeds the
+   idle-scope RNG, so old and new derivations were compared across 18 inputs: ZERO seed
+   drift, rendered pixels unchanged -- measured, not asserted.
+2. **A dots-only episode id** was accepted by `_validate_episode_id` and collapsed to
+   `<output>/otr/episodes/composited` -- outside any episode, yet still passing the
+   output-tree contract, where every ledger walker would have read it as one.
+3. **Both real-producer scopes tests** ran with an unpinned `OTR_OUTPUT_DIR`, so after
+   the re-homing they would have minted phantom episodes in the live production tree on
+   every suite run.
+4. **A repair-turn prompt overflow** left `_run_markup_ladder` uncaught and killed the
+   episode mid-writing. The first version of that fix RETRIED IN PLACE and broke the
+   attempt/call-count invariant two layers up (`box["calls"] == len(attempt_trace)`),
+   turning one crash into a later one while all six of its tests stayed green -- they
+   drove the ladder below the counter. Corrected so the overflow consumes its rung, and
+   the test that would have caught it was added.
+5. **A failed ffmpeg spawn** escaped `OTRSilentComposite`'s ValueError-only catch --
+   `subprocess.run` raises OSError -- and discarded a FULLY RENDERED episode: script,
+   cast, voices, audio master and every clip already paid for. Now degrades exactly as
+   the neighbouring ValueError branch already did. `ExecutableNotAllowed` is a
+   RuntimeError and stays fatal; a test pins that.
+6. **A missing font** raised `CreditsDataError` and killed the episode at the credits.
+   Reversed by operator ruling -- *"don't assume people have fonts installed; I'm open
+   to some bad formatting as long as it doesn't crash"* -- so it degrades to PIL's
+   embedded font and logs the remedy. This reverses the earlier documented no-fallback
+   policy deliberately.
+7. **The cloud-media billing ledger** lived inside the installed pack, where a registry
+   update wipes it, and it is the only copy of real spend history. Moved to
+   `otr_state_dir()` with a one-time copy-forward. Caught before shipping: that module
+   had NO logger, so the migration branch would have raised NameError on the first real
+   migration while every test stayed green.
+
+**Also shipped:** the deterministic tier of Ghost Half B -- `resolve_crux_kernel` now
+ranks `meta.key_objects` by whether the beat's own text names one, with a negation
+guard for the "isn't just some dusty list of truck routes" case and a sentence-bounded
+lookback. Measured ceiling 26.3% of beats; the LLM extension tier is still owed. And a
+router-dropdown test that skipped on a cold cache now brings its own catalog, which
+closes an archived follow-up that had called it "a machine-local lie".
+
+**Regression:** 14,529 passed / 51 inherited failures / 183 skipped / 1 xfailed, exit 2
+from the known-failure guard. Failure identities AND normalized payloads compared
+against `2026-09-11-my-story-frame-ownership/tests/frame_ownership_full.xml`: zero new
+failures, zero drift, nothing quarantined. Bible in a clean worktree: 39 passed / 10
+inherited, zero real payload drift.
+
+**Reviews.** Eight design arcs ran r1 with one file-grounded reviewer each; every
+verdict was then verified against the real files. 41 of 42 claims held, and SEVEN OF
+EIGHT driver anchors were wrong despite being built from adversarially-verified
+grounding. r2 was judged unnecessary on all eight -- each row had collapsed into a
+decision, a measurement or a concrete diff. Receipts: `kibitz-runs/2026-09-11-arc-*/`.
+
+**Two rows dissolved and two deletes were refused**, which is the day's real yield:
+3.8 fonts dissolved (the four resolvers have different jobs, and a unified Python table
+could not close the gap because libass never sees the Python side); the packwrites fork
+collapsed (`otr_state_dir()` already existed); Fable's janitor row did not survive
+grounding (the janitor sweeps that directory generically; 35 MB, 0 h old); and the
+audit-tail "zero callers, rip it" was refused because the archive PARKED it and it is
+four owners, not two -- ripping two would leave a consolidation half-done, which the
+operator's "an orphan is ripped 100% or wired back in" rule forbids.
+
+**One stale ruling corrected.** The 2026-09-03 Half B ruling told the reader to reorder
+`GHOST_V3_DROP_ORDER`; the code had already been reordered the same day by `6f1de820`
+and the ruling's text was never updated. A reader trusting it would redo finished work
+or restore an order that was deliberately fixed.
+
+**Wave frozen at `f5f40bd4`** -- a CODE freeze; later commits are documentation only.
+Nothing render-affecting lands after it without a re-freeze. The Sci-Fi cap VALUE is
+code-ready and deliberately held back for exactly that reason.
+
 ## 2026-09-11 -- canonical09 publishes; pending-only handoff to Opus
 
 Stale guidance cleanup: five obsolete entry points/backup instructions removed;

@@ -170,7 +170,10 @@ actual published frames -- not in the logs. Report what you SEE.
 
 Leg C -- note every place a Linux/macOS box needed something the Windows path did
 not (fonts installed, ffmpeg build features, PyAV limitations). This feeds the
-shared font-resolution design row (3.8) which is still open.
+credits-degradation proof. (Row 3.8, a shared font resolver, DISSOLVED on
+2026-09-11: the four resolvers have genuinely different jobs and a unified
+Python table could not close the gap anyway, because captions and titles are
+drawn by libass, which never sees the Python side. Do not report against it.)
 
 Findings go in docs/. Do not push. Phone home.
 ```
