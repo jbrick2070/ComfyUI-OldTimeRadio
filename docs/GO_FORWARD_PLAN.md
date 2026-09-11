@@ -148,8 +148,10 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 1. The independent 4060 report is received at
    `docs/2026-09-10-my-story-4060/`, against tested implementation `0327850a`.
    It records four full technical all-stills publications, two correct P1
-   fail-closed stops, and zero source-qualified outputs. The Mac result remains
-   pending. The operator owns those machines; preserve their repo updates and
+   fail-closed stops, and zero source-qualified outputs. The Mac report is now
+   received in `MAC_LESSONS_LEARNED.md` section 10: stale loaded extension,
+   two OS memory kills, and a correctly refused uncached-model download.
+   The operator owns those machines; preserve their repo updates and
    keep one production-code editor.
    RunPod latest sync is also pending: the stopped existing host refused a
    sync-only resume for lack of a free GPU. Before any further authorized pod
@@ -170,23 +172,48 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 
 ### A1R -- My Story live source-fidelity and structured-output closure
 
-1. Bind only P1's local creative callable through its existing
+The cross-machine triage is at `docs/2026-09-11-my-story-cross-machine/triage.md`;
+its R1-R4 review is in progress. This file remains the only work queue. Root
+owns production edits. Reviewers are read-only, with an independent reader at
+each design step and a CLI review of each finished code chunk before push.
+
+1. First isolate mutable grammar state per generation while retaining reusable
+   tokenizer preprocessing. This is a confirmed static defect, not an established
+   cause of the Mac kill: the failing My Story cleanup route did not bind a
+   grammar. Remove implicit array/string limits from provider-capacity authoring
+   while retaining explicit schema constraints and real repetition detection.
+   Then bind only P1's local creative callable through its existing
    `_otr_bind_schema(StoryTreatment)` seam. Preserve P2/P3's original callable,
    all three fail-closed attempts, and no generic JSON repair.
-2. Replace the one-act boolean between-acts prompt claim with the actual
-   `max(0, act_count - 1)` boundary count in P0/P1. Reject an interstitial claim
-   when the selected count is one.
-3. Carry direct listener facts through P0/P1/P2/P3, ShotLock/ImageDirector,
-   cleanup, and final TTS. Reject and bounded-repair direct contradictions,
-   invented major events, solitude/separation, or source setting/action
-   replacement. Do not make this a language, safety, length, or quality gate.
-4. Add durable source-fidelity receipts and make publication eligibility consume
-   them. Regression fixtures cover the living-mother contradiction, one-act
-   music, P2 pair-lock replacement, inverse visual staging, and cleanup changing
-   a valid short coda.
-5. Requalify with one canonical one-act pair-lock all-stills publication after
+2. Verify zero between-act music in the full canonical one-act recovery after
+   the remaining source repairs. The boundary code receipt is in HANDOFF_LOG;
+   do not reopen it as uncoded work or add a keyword rejection of planning prose.
+3. Constrain shared cleanup to verified complaints, conserving speech outside
+   authorized spans. Resolve whole-line false accusations without suppressing
+   legitimate direction-to-speech repairs. Do not infer an extra-edit bug from
+   five model-dirty rows versus six edits without the pattern-only row receipt.
+4. Preserve raw listener source through P0/P1/P2/P3, cleanup and the actual
+   MetaBrief visual prompt owners. Review the source-versus-candidate check and
+   existing bounded repair integration before code. Source quotations establish
+   identity; they do not prove semantic fidelity. Distinguish shared story scenes
+   from neutral portraits. Carry truthful, artifact-bound check receipts through
+   final speech and visual prompts without an invented late publication gate.
+   Operator follow-up: let the first model organize large input into a working
+   brief and smaller passes as needed. Preserve original fields and complete
+   source coverage; summaries are derived material. The model organizes while
+   the actual tokenizer/provider measures fit. Review measured progressive
+   reading and non-progress handling; never silently discard an unread tail.
+   A2's real native-capacity correction is a prerequisite for this adaptive
+   reading work, rather than building around the stale 8192-token estimate.
+5. Instrument the Mac generation/retirement boundary before attributing its OS
+   kill to a particular allocation. Existing MPS cache flushing is already
+   present. Preserve epoch/orphan-worker protections and correct disk admission;
+   do not delete models or prescribe an unqualified replacement writer.
+6. Requalify with one canonical one-act pair-lock all-stills publication after
    focused/full/Bible checks. Accepted text, visual prompts, final TTS, and the
-   eligibility receipt must preserve the shared-table facts.
+   source-check receipts must preserve the shared-table facts. Then repeat on
+   the common repaired commit using each machine's proven installed routes.
+   Verify the Mac's actual loaded extension and live 37-slot schema after restart.
 
 Observability follow-up after A1R: phase-label pre-image `MISSING-STILL`,
 downgrade successful same-file rename re-resolution, and suppress LTX-open

@@ -343,6 +343,11 @@ def _sha256(text: str) -> str:
     return hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
 
 
+def _interstitial_count(act_count: int, include_act_breaks: bool) -> int:
+    """Music belongs to boundaries between acts, never to the checkbox alone."""
+    return max(0, act_count - 1) if include_act_breaks else 0
+
+
 def _resolve_seed() -> int:
     """Episode seed. Honours OTR_EPISODE_SEED when pinned, else OS entropy."""
     try:
@@ -427,10 +432,10 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                 "THEIR SETTINGS:\n"
                 "- characters requested: %d\n"
                 "- acts: %d\n"
-                "- music between acts: %s\n\n"
+                "- music cues between acts: %d\n\n"
                 "Interpret it now."
                 % (fields, requested, act_count,
-                   "yes" if include_act_breaks else "no")
+                   _interstitial_count(act_count, include_act_breaks))
             )},
         ],
         schema=StoryInterpretation,
@@ -476,12 +481,12 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
                 "THE INTERPRETATION:\n%s\n\n"
                 "SELECTED ACTS: %d (binding). REQUESTED SPEAKING CHARACTERS: %d "
                 "(flexible, announcer excluded).\n"
-                "Let the supplied story guide the cast; preserve its people. Music between acts: %s.\n"
+                "Let the supplied story guide the cast; preserve its people. Music cues between acts: %d.\n"
                 "Plan the episode now."
                 % (_SI.project_payload(bundle, "")["full_text"],
                    json.dumps(interp.model_dump(), ensure_ascii=False, indent=2),
                    act_count, requested_characters,
-                   "yes" if include_act_breaks else "no")
+                   _interstitial_count(act_count, include_act_breaks))
             )},
         ],
         schema=StoryTreatment,
@@ -754,6 +759,7 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
 
     # --- one scene and one shot per act ----------------------------------
     inter_seq = 0
+    inter_wanted = _interstitial_count(len(acts), include_act_breaks)
     for act in acts:
         scene_id = "s%02d" % act.n
         shot_id = "shot_%03d" % act.n
@@ -781,7 +787,7 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
             line_rows.append(row)
             beat(row, scene_id)
         # An interstitial cue after every act but the last.
-        if include_act_breaks and act is not acts[-1]:
+        if inter_seq < inter_wanted:
             cue = frame.music_inter[inter_seq] if inter_seq < len(frame.music_inter) else ""
             sentinel = _music_sentinel(shot_id, "music_inter")
             line_rows.append(sentinel)
@@ -828,7 +834,7 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
         {"proposal_index": i, "description": cue,
          "disposition": "unused_surplus" if include_act_breaks else "act_breaks_disabled"}
         for i, cue in enumerate(frame.music_inter)
-        if not include_act_breaks or i >= max(0, len(acts) - 1)
+        if i >= inter_wanted
     ]
 
     # The authorship receipt: every voiced row's text must be a verbatim
@@ -1047,7 +1053,7 @@ def run_my_story_episode(
 
         # --- P3 frame --------------------------------------------------------
         attribution = _SI.attribution_sentence(author)
-        inter_wanted = max(0, len(acts) - 1) if include_act_breaks else 0
+        inter_wanted = _interstitial_count(len(acts), include_act_breaks)
         with _helper_ctx(slot_scheduler, "my_story_frame"):
             frame = _pass_frame(creative_fn, pack, bundle, treatment,
                                 attribution=attribution, inter_wanted=inter_wanted,

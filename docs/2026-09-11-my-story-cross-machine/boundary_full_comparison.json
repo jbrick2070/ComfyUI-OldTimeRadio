@@ -1,0 +1,43 @@
+{
+  "baseline": "my_story_music_final_full.xml",
+  "candidate": "my_story_boundary_full.xml",
+  "baseline_counts": {
+    "passed": 14129,
+    "failure": 54,
+    "error": 0,
+    "skipped": 183,
+    "xfailed": 1
+  },
+  "candidate_counts": {
+    "passed": 14134,
+    "failure": 54,
+    "error": 0,
+    "skipped": 183,
+    "xfailed": 1
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies"
+  ],
+  "status_changes": [],
+  "new_tests": [
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[False-1]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[False-2]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[False-3]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[False-6]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[True-1]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[True-2]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[True-3]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[True-6]",
+    "tests.test_my_story_runner::test_zero_boundaries_preserves_all_unused_cue_proposals[1-True-unused_surplus]",
+    "tests.test_my_story_runner::test_zero_boundaries_preserves_all_unused_cue_proposals[3-False-act_breaks_disabled]"
+  ],
+  "removed_tests": [
+    "tests.test_my_story_runner::test_breaks_off_preserves_all_unused_cue_proposals",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[1-True]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[3-False]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[3-True]",
+    "tests.test_my_story_runner::test_the_music_cues_anchor_to_real_sentinel_rows[6-True]"
+  ]
+}

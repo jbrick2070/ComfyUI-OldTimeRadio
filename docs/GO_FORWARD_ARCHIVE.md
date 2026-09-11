@@ -1,5 +1,19 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- A1R boundary implementation moved to receipt
+
+Completed pending item, preserved verbatim:
+
+2. Replace the one-act boolean between-acts prompt claim with the actual
+   `max(0, act_count - 1)` boundary count when breaks are enabled. Reuse it in
+   P0/P1/frame/assembly; do not add a keyword rejection of planning prose.
+
+Evidence and validation: docs/2026-09-11-my-story-cross-machine/boundary_receipt.md.
+The full canonical recovery remains pending in GO_FORWARD; code closure is
+not being relabelled as a new full media result.
+
+---
+
 **Archived, never deleted.** `docs/GO_FORWARD_PLAN.md` is FORWARD-ONLY by its own
 first line, and its 2026-08-16 self-audit found the rule broken in the most
 misleading way available: *"the bulk of the remaining length is DONE narrative

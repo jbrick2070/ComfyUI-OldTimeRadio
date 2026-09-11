@@ -1,0 +1,30 @@
+{
+  "baseline": "my_story_boundary_bible_baseline.xml",
+  "candidate": "my_story_boundary_bible_candidate.xml",
+  "baseline_counts": {
+    "passed": 29,
+    "failure": 11,
+    "error": 0,
+    "skipped": 11,
+    "xfailed": 3
+  },
+  "candidate_counts": {
+    "passed": 30,
+    "failure": 10,
+    "error": 0,
+    "skipped": 11,
+    "xfailed": 3
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "status_changes": [
+    {
+      "id": ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+      "before": "failure",
+      "after": "passed"
+    }
+  ],
+  "new_tests": [],
+  "removed_tests": []
+}

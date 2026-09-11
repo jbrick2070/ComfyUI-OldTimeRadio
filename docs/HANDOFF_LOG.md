@@ -1,3 +1,33 @@
+## 2026-09-11 -- cross-machine triage and one-act boundary correction
+
+Read the 4060 and Mac evidence from 2499b411 and the Mac host-scope correction
+0404aa86. GO_FORWARD remains the work queue; root owns production edits.
+Source-preserving authoring, shared cleanup, P1 grammar and Mac diagnostics are
+under R1-R4 review with Gemini 3.8 Flash (High) and Cursor Grok 4.6 High.
+The user also requested adaptive first-pass briefing: actual native capacity
+must be corrected before sizing reading passes; preserve the original source.
+
+Closed the deterministic PBUG-20260910-04 producer mismatch: one helper now
+drives music-boundary counts in P0/P1, frame and assembly. No new rejection
+gate, widget or workflow edit. Surplus proposals remain recorded. BUG-11.62
+is promoted in the separate survival-guide repo with executable coverage.
+
+72 focused tests pass. Full suite: 14,134 passed, the same 54 baseline failures,
+183 skipped, 1 xfailed; no new failures or worsened assertions. One existing
+dictionary failure only changed display order. Clean-OTR Bible: candidate
+30 passed/10 pre-existing failures versus baseline 29/11, both 11 skipped and
+3 xfailed. Canonical validation passes, hash unchanged. Single finished-diff
+CLI reviewer approved core code and caught a Bible coverage-prefix omission;
+that was fixed and verified. Receipts: docs/2026-09-11-my-story-cross-machine/.
+
+No new live render or full source-fidelity qualification is claimed. Current
+My Story cleanup does not bind LMFE, so its static cache defect cannot be
+called the cause or cure of the Mac OS kill. The kill is scoped to the measured
+M4/16 GB host. Raw final Mac logs and the specific 4060 cleanup-row receipt are
+still absent from the shared repository.
+
+---
+
 ## 2026-09-11 03:03 UTC -- HEAD 691325f (v2.0-alpha) -- 4060 evidence / 5080 core handoff
 
 Did:

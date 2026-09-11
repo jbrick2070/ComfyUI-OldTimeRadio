@@ -14089,7 +14089,8 @@ for promotion from the Windows box. Each is portable beyond OTR:
 
 ## PBUG-20260910-04 -- one selected act is prompted as music "between acts"
 
-- promotion: pending focused verification and Bug Bible/index comparison. This
+- promotion: BUG-11.62, focused/full regression and clean-OTR Bug Bible
+  comparison complete. This
   is not PBUG-20260825-01, which concerns invalid 7/8-act topology rather than
   a valid one-act control being projected as an impossible narrative boundary.
 - surfaced: 4060 Steps 118, 119, and 121. The selected count was one and
@@ -14099,13 +14100,20 @@ for promotion from the Windows box. Each is portable beyond OTR:
   between-acts music whenever it is true, even when `act_count=1`.
   Assembly/P3 already derive the actual boundary count as
   `max(0, act_count - 1)`.
-- fix: compute and pass the actual boundary count in P0/P1 and reject a
-  between-act/interstitial assertion when it is zero. Preserve legitimate
-  `N - 1` interstitials for multi-act stories.
-- verification: one-act prompt/response fixtures contain zero between-act
-  claims and no interstitial rows; 3/6-act fixtures retain exactly `N - 1`
-  when breaks are enabled; breaks-off remains zero.
-- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+- fix: one shared boundary-count helper now feeds P0/P1, frame and assembly.
+  Prompts state the actual numeric count. No prose keyword gate is added;
+  compatible story language must not be rejected to compensate for a false
+  input projection. Surplus cue proposals remain recorded.
+- verification: 72 focused My Story runner tests pass, including 1/2/3/6 acts
+  with breaks on/off, exact prompt counts, real sentinel anchors, clean freeze
+  and zero-boundary surplus receipts. Log: tmp/my_story_boundary_focused.log.
+- status: CODE QUALIFIED -- 14,134 passed, the same 54 baseline failures,
+  183 skipped, 1 xfailed; no new failure IDs or worsened assertions. One
+  existing assertion only reordered dictionary comparison display. Bible:
+  candidate 30 passed/10 pre-existing failures versus baseline 29/11.
+  Gemini 3.8 Flash (High) reviewed the finished diff; its Bible coverage-prefix
+  finding was fixed and checked. Receipts: docs/2026-09-11-my-story-cross-machine/.
+  Canonical full-media recovery on the common repaired commit remains pending.
 
 ## PBUG-20260910-05 -- My Story P1 bypasses its available local schema binder
 

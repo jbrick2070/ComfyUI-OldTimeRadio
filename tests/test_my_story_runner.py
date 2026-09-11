@@ -102,6 +102,7 @@ class Slots:
     def __init__(self, author="A. Listener", acts=1, cast=("Ada", "Tom"),
                  inter=0, interpretation=None):
         self.calls = []
+        self.prompts = []
         self._acts = acts
         self._cast = cast
         self._inter = inter
@@ -124,10 +125,12 @@ class Slots:
 
     def creative(self, messages, *, temperature=0.0, max_new_tokens=None, **kw):
         self.calls.append(("creative", messages[0]["content"][:40]))
+        self.prompts.append(messages)
         return self._answer(messages)
 
     def technical(self, messages, *, temperature=0.0, max_new_tokens=None, **kw):
         self.calls.append(("technical", messages[0]["content"][:40]))
+        self.prompts.append(messages)
         return self._answer(messages)
 
 
@@ -285,13 +288,23 @@ def test_every_line_carries_a_role_the_freeze_accepts():
         assert row["speaker_role"] in ALLOWED_SPEAKER_ROLES, row
 
 
-@pytest.mark.parametrize("acts,breaks", [(1, True), (3, True), (3, False), (6, True)])
+@pytest.mark.parametrize("acts", [1, 2, 3, 6])
+@pytest.mark.parametrize("breaks", [True, False])
 def test_the_music_cues_anchor_to_real_sentinel_rows(acts, breaks):
     from nodes import _otr_freeze_cascade as LFC
     from nodes._otr_writer_tail import _stamp_story_style_receipt
 
     slots = Slots(acts=acts, inter=acts - 1)
     led, parts = _run(slots, act_count=acts, include_act_breaks=breaks)
+    wanted = acts - 1 if breaks else 0
+    for messages in slots.prompts[:2]:
+        assert "music cues between acts: %d" % wanted in messages[1]["content"].lower()
+    assert "Interstitial cues wanted: %d." % wanted in slots.prompts[-1][1]["content"]
+    interstitials = [c for c in led.data["music"] if c["placement"] == "interstitial"]
+    assert len(interstitials) == wanted
+    assert [c["anchor_line_id"].split("_music")[0] for c in interstitials] == [
+        "shot_%03d" % n for n in range(1, wanted + 1)
+    ]
     # Normal metadata supplied by the writer tail at this component boundary.
     led.data["meta"]["episode_title"] = parts.final_title_override
     _stamp_story_style_receipt(led.data["meta"], contract=None, scaffold_enabled=False)
@@ -835,10 +848,16 @@ def test_missing_metadata_optional_frame_and_numbering_reach_readonly_freeze():
     assert FC._readonly_structural_validation(led.data) == []
 
 
-def test_breaks_off_preserves_all_unused_cue_proposals():
-    led, _ = _run(Slots(acts=3, inter=4), act_count=3, include_act_breaks=False)
+@pytest.mark.parametrize("acts,breaks,reason", [
+    (3, False, "act_breaks_disabled"),
+    (1, True, "unused_surplus"),
+])
+def test_zero_boundaries_preserves_all_unused_cue_proposals(acts, breaks, reason):
+    led, _ = _run(Slots(acts=acts, inter=4), act_count=acts, include_act_breaks=breaks)
     assert all(c["placement"] != "interstitial" for c in led.data["music"])
-    assert len(led.data["meta"]["my_story"]["music_cue_disposition"]) == 4
+    disposition = led.data["meta"]["my_story"]["music_cue_disposition"]
+    assert len(disposition) == 4
+    assert all(cue["disposition"] == reason for cue in disposition)
 
 
 def test_speakable_coverage_repairs_only_last_act_with_full_dialogue():
