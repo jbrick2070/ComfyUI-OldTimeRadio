@@ -1,0 +1,15 @@
+{
+  "reason": "operator permits flexible character counts; strict-character scope withdrawn",
+  "launched_calls": 2,
+  "completed_calls": 0,
+  "interrupted": [
+    "antigravity r1",
+    "cursor r1"
+  ],
+  "rounds_not_run": [
+    "r2",
+    "r3",
+    "r4"
+  ],
+  "full_arc_complete": false
+}

@@ -1,3 +1,28 @@
+## 2026-09-11 00:44 UTC -- My Story A1 pushed for concurrent device trials
+
+Operator requested immediate push so the 4060 and Mac can try the same code.
+A1 uses supplied story fields only (no RSS), flexible character count and selected
+acts. Existing full-artifact typed repairs, voice assignment, shared cleanup and
+read-only freeze are reused. Optional metadata/frame/cues no longer reject the
+story. Source label, cleanup-title parity, attribution and durable attempt/count
+receipts are fixed. Primary provider/cancel errors survive a secondary save failure.
+No My Story per-story/per-pass timer exists; known HF capacity work remains A2.
+
+199 focused tests pass. Last completed full run: 14,667 JUnit-reported tests,
+53 pre-existing failures,0 errors, 184 skipped, 502.751 s, zero new IDs versus S4. Final
+full rerun after review fixes is RUNNING, not yet qualified. Bug Bible: 23 passed,
+27 skipped, 3 xfailed. Canonical validation passed; hash/23 nodes, 63 links, 37 writer widgets
+unchanged. Two CLI finished-diff reviews completed and root grounded fixes.
+
+Code is pushed at the operator's requested timing before remaining full/live
+proof completes. The5080 server is booting for the exact lighthouse component;
+no new frozen-ledger or publication PASS is claimed.4060/Mac results are pending.
+Main queue remains GO_FORWARD; receipts in 2026-09-10-my-story-a1 and review arc
+in 2026-09-10-my-story-next. Strict-character A3 proposal was withdrawn following
+latest operator correction; its two R1 calls were interrupted, not a full arc.
+Inherited diff.txt/diff_utf8.txt preserved. No tag, promotion or version bump.
+
+---
 ## 2026-09-10 22:44 UTC -- My Story Sprint 4 implementation verified
 
 Codex completed Claude's interrupted implementation from `c7cbf45b` on

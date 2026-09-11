@@ -6263,3 +6263,685 @@ comparison, then commit and push the qualified chunk. Read the scoped receipt
 in [My Story Sprint 4](2026-09-10-my-story-s4/review_judgment.md).
 
 | **4. Complete creator path** -- final verification | Compare the final run against detached baseline `c7cbf45b`; preserve unrelated baseline failures, then commit and push together. | Full comparison, canonical links/widgets, Bug Bible, encoding/AST and HEAD == origin. |
+
+
+## 2026-09-10 -- retired duplicate D0 pickup instructions
+
+The new R1 review found these shipped steps still presented as upcoming in section 0. Preserved verbatim; GO_FORWARD now points to its active priority sprints.
+
+| **1st** | **Opus cleanup (DONE `e562e146`) -> My Story (sprints 3-5 above)** | The shared code is clean as of 2026-09-10; now currentize the source-bank docs, complete the independent design, build a full graph creator path, then add optional App presentation and finish qualification. Both linked plans are priority #1. |
+
+**The next concrete step is sprint 3: Codex My Story D0 from HEAD `e562e146`
+(sprints 1-2 landed 2026-09-10).**
+
+
+## Superseded A plan - 2026-09-10 count-control correction
+
+Operator: all stories must respect the selected act and character counts; those controls vary per run. The following pre-code proposal was superseded, not implemented.
+
+### Sprint A -- remove unnecessary My Story gates and prove the ledger
+
+1. Audit every My Story refusal against the latest operator contract. Keep
+   only readable artifacts, unambiguous identities/references and usable ledger
+   data, with the existing structured repair ladder before terminal failure.
+   Planning counts, requirement/conflict bookkeeping, descriptive metadata,
+   binary gender, two speakers per act and exact frame cue counts are not ledger
+   requirements. Keep the raw listener input intact; record unresolved fidelity
+   differences honestly without claiming their wishes were all satisfied.
+   Actual empty voice stock is a concrete casting failure; a predicted count
+   from the request/interpretation must not reject before actual allocation.
+   Do not consolidate the listener's people or cycle duplicate voices to hide it.
+2. Act-count policy: requested acts remain prompt guidance and a
+   recorded control. An accepted treatment with a different number of valid,
+   sequential acts is not rejected solely for that difference. Preserve all
+   authored acts. Record requested and actual counts explicitly; derive frame
+   interstitial requirements from actual accepted acts. Audit all downstream
+   count consumers before implementation so requested/effective values cannot
+   disagree about ledger topology. Preserve requested/planned/actual counts
+   separately in meta.my_story. gen_params_initial.act_count remains request
+   evidence, never delivered topology authority. Ordered slot numbers may be
+   normalized before acceptance with original numbers recorded; no Python prose
+   merge, trim or fabrication. Do not add a hard actual-act maximum: the widget's
+   1..6 request range is not permission to discard a usable larger treatment.
+3. Reuse Sci-Fi's existing ProviderCapacityMessages with max_new_tokens=None
+   for every My Story pass, including inherited typed-repair prompts. Remove
+   My Story's fixed 1200/1800/1600/700 output ceilings; do not call them story
+   targets or use them as a hidden act maximum. The shared structured helper
+   already preserves the container and its markers through schema injection
+   and repair. Record budget_mode=provider_capacity and concrete capacity facts.
+   Keep the existing bounded structured repair ladder for actual ledger-shape
+   defects. Trace the real shared clean/cleanup/freeze path and test its repair
+   ownership. Do not make clean-ledger acceptance depend on another bank's
+   story-generation stages or retrofit a separate repair system.
+4. Do not broadly turn on the local schema binder as a quick fix: the shared
+   structured helper does not currently invoke it, and the installed LMFE
+   parser silently caps otherwise unbounded arrays at 20. That would create
+   an undeclared dialogue-line ceiling. No grammar/cardinality project belongs
+   to this sprint.
+5. Remove the misleading longest-input-field blame from the capacity message.
+   Audit the SHARED context owners in a distinct A2 chunk, with no My Story
+   bypass: _otr_model_catalog.resolve_context_cap, its config scanner,
+   _otr_model_loader and _otr_generation_budget. Cached Qwen advertises 262144
+   positions in text_config; the project currently imposes 8192. Predicted VRAM
+   estimates are not the same as native context or actual allocated GGUF n_ctx.
+   Preserve explicit operator settings, full prompts and truthful provider/OOM/
+   cancellation failures. Do not rename an estimated refusal as a real OOM.
+   Resolve nested text config and the canonical cache root, preserve native model
+   configuration, and include effective capacity in resident reuse identity.
+   A2 must not let a larger native maximum become a new pre-load VRAM veto.
+6. Frame omissions may use existing downstream producers: StableAudioTheme
+   composes blank music prompts from the shared brief. Use actual act boundaries;
+   retain unused cue proposals in receipts and disclose their disposition, never
+   silently discard them. Add the existing deterministic attribution sentence
+   before sealing when absent; that operator-authorized credit is not invented
+   story prose. Pass an absent title override as None so the shared title producer
+   can run. Preserve genuine content-owned cleanup/reseal; do not skip it because
+   raw listener input is immutable.
+7. Update D1, My Story guide, schemas, prompts, examples, repair instructions,
+   tests and GO_FORWARD in the same behavior change. D1's old exact-count clauses
+   are superseded by the latest ruling; label its old wiring fingerprint as the
+   design baseline and add the implemented fingerprint. A1 is the story/ledger
+   policy chunk and first live proof; A2 is shared capacity honesty, followed by
+   the applicable regression and live checks. No speculative broad rewrite.
+
+A1 implementation details (all in the existing runner, pack and tests):
+
+- Optional descriptive fields default empty; missing gender is empty/other,
+  never female by default. Free classification strings do not impose enums on
+  optional interpretation notes. Preserve raw accepted artifacts in receipts.
+- meta.my_story.counts has requested_acts, planned_acts, actual_acts,
+  requested_characters, planned_characters, actual_characters. Capture original
+  model act numbers in meta.my_story.act_number_normalization; normalize ordered
+  treatment slots and the corresponding act replies before sealing. No call to
+  compute_episode_budget for delivered My Story acts.
+- Genuine nonempty cast identity and in-cast dialogue requirements remain
+  repairable. Canonicalize unambiguous case/whitespace speaker spelling to its
+  accepted cast identity. Monologues are valid; final episode-wide unheard
+  speakers still get the existing final-act repair before a ledger failure.
+  Both the act validator and cumulative coverage use the existing public
+  clean_spoken_text predicate, matching shared voice coverage: stage directions
+  alone do not count as speech. This routes the existing repair, not a new gate.
+- Remove frame's verbatim-credit veto. After frame acceptance, append the
+  existing attribution_sentence to the outro only when absent, then seal that
+  adjusted frame. Omitted/blank optional frame text creates no empty spoken row.
+  MyStoryTailParts.final_title_override becomes optional; preserve a nonblank
+  accepted title, and pass None only when truly missing/blank.
+  If shared cleanup supplies a missing title after the ordinary title pass,
+  synchronize the final ledger title into canon and its file before consistency
+  checks/serialization. My Story's news payload headline uses that final title,
+  too. No new title-generation call or treatment-title rejection.
+- Pass include_act_breaks explicitly into assembly. With breaks on, emit one
+  uniquely anchored cue for each actual boundary, using its ordered supplied
+  description or an empty prompt for the existing composer. With breaks off,
+  emit no interstitials. Record unused proposals and why in music_cue_disposition;
+  the complete original frame stays in the acceptance receipt. Component proof
+  validates cue topology, not downstream music synthesis.
+
+A2 implementation boundary (shared owners, separately tested and reviewed):
+
+- Parse advertised_context from the loaded text decoder configuration, preferring
+  nested text_config over wrapper fields. Curated context values remain estimate
+  metadata. A positive explicit OTR_HARD_VRAM_CONTEXT_LIMIT remains a user limit;
+  native capacity is not an allocation instruction. Keep allocated GGUF n_ctx
+  and its current allocation/reuse contract.
+- Resolve the canonical HF root before discovery; finalize native capacity from
+  AutoConfig after snapshot resolution, including first download. Remove the
+  architecture mutation that changes max_position_embeddings to an estimate.
+  Store effective capacity and source separately from vram_priced_ctx; do not
+  price a short dynamic-cache HF call as the maximum advertised allocation.
+- Use one HF reuse key containing the runtime policy and normalized explicit
+  context setting at both lookup and publication. Keep epoch guards. Real GGUF
+  reuse_key already includes allocated n_ctx and must not be rewritten.
+- Remove the adapter rule rejecting a model solely because its window is smaller
+  than the project estimate. Generation fit uses actual/configured capacity,
+  never a minimum model-size rule. Default output-room minimum is one token;
+  retain explicit atomic-patch require_full contracts and no prompt truncation.
+- This chunk fixes known local HF capacity, which covers the cached models in
+  the live proof. Unknown-capacity and remote estimate transport changes remain
+  a separate follow-up in this main plan: passing None currently breaks local
+  arithmetic or invokes Transformers' default 20-token output, while omitting
+  remote max_tokens changes spend reservation. Do not disguise those paths as
+  fixed, silently weaken accounting, manufacture 8192 as known capacity, or
+  rewrite the VRAM estimator. Record any retained estimate as such. Keep explicit
+  runtime settings and provider outcomes truthful.
+
+Tests: valid requested-one/actual-two treatment reaches assembly; actual cue
+topology is coherent with breaks on/off; input and attribution preserved;
+longer dialogue, monologue acts, omitted optional metadata, other/unknown gender
+and blank music prompts are not rejected for planning preferences; provider-capacity
+markers survive base/typed repair and no My Story output ceiling returns; genuine broken
+references/required fields route to existing repairs and do not masquerade as
+success. Exercise real production ledger setters and shared freeze, not only
+a copied validator. Preserve baseline failures rather than adding quarantines.
+
+Dry-run proof: load the actual canonical JSON, apply sanctioned runtime settings
+through the existing applier, submit full prompt targeting freeze 62, and
+record input, workflow hash, model/context, request, prompt id and durable ledger.
+Require actual freeze verdict/receipt, intact input authority/authorship,
+nonempty valid ledger tables and no content mutation outside the approved
+transaction. `/history` success alone is insufficient: freeze may return a
+needs-rerun verdict without a node exception. Start with one requested act and
+the exact failed input, then three and six requested acts to exercise topology;
+report actual counts, never manufacture a target duration.
+
+This component evidence is not a full-media/preflight/publication PASS. The
+optional App and 1/3/6 publication matrix remain later qualification work.
+
+
+
+## Superseded fragmented pickup context - 2026-09-10
+
+Moved verbatim after source-grounded audit. Active constraints and genuinely open qualification items were retained in GO_FORWARD; old completion/version fragments are not instructions to repeat work.
+
+## STANDING RULINGS LIFTED FROM ARCHIVED SECTIONS (2026-09-09)
+
+**These are verbatim from sections moved to `docs/GO_FORWARD_ARCHIVE.md`.**
+They are here because the archive rule says a ruling must survive the move,
+and because the rule's own suggested grep MISSES most of them -- it found
+zero hits in 770 lines that in fact carried 29. Do not re-litigate any of
+these without the operator; the archive holds the full context.
+
+| the pending sweep deleting what it could not READ (Fable finding 2) | `31dc6861` |
+| replay import trusting a ledger the manifest never verified (Fable finding 3) | `14c6a6db` |
+
+---
+
+
+**THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
+prior session optimised a number that was never the blocker.
+
+---
+
+  ripping one symbol from it DEMOTED the Lemmy voice route and had to be reverted)
+  and `nodes/_otr_source_grounding.py` (its siblings are ruling-protected).
+
+---
+
+field annotations, and overrides of a base in ANOTHER installed pack are all invisible
+to it. Grep for the PATTERN, never the name.
+
+---
+
+
+Operator: Mac and AMD ship images only (ruling 2026-09-01), and he is "not hopeful".
+Landed: the credits font, the llama-cpp hint and four platform guards. Owed, in order:
+
+---
+
+**HARD CONSTRAINT, carried from today.** A dropdown entry is a promise the
+model will load. Do NOT widen any `device_backends` on reasoning alone -- the
+z_image and ltx widenings in step 1 are EXPERIMENTS to be measured on Apple
+
+---
+
+   finds NO caller that passes one -- the adapter is dead code. A first run
+   therefore fetches ~20 GB behind a node that never moves. Before the
+   nuke-and-reinstall test this is not cosmetic: without it we cannot tell
+
+---
+
+
+### B. The publish -- operator's call, and it gates everything user-facing
+
+---
+
+   `pyproject.toml` AUTO-FIRES the publish, and `(node_id, version)` is uniquely
+   indexed -- a burned version string never returns.
+5. **Bundle `static-ffmpeg` into that same bump.** It is the only zero-friction
+
+---
+
+   template -> press Run -> touch nothing but the mouse.
+   **Never delete:** `D:\otr-4060-testing` (the checkout), the private evidence
+   tree, or `ComfyUI-Shared\models` unless explicitly cleared.
+
+---
+
+   the paragraph below that said neither existed is superseded.
+8. ~~SDXL adapter only if item 7 fails.~~ Item 7 did not fail. **Do not build it.**
+9. Still the rule, and it held: a dropdown entry is a promise. Every widening
+
+---
+
+   script on any cold cache. This is the single highest-value action in this file.
+   Operator's call (a `pyproject.toml` edit auto-fires the publish).
+2. **The size badge understates every row by about half, and it is now measured
+
+---
+
+offer it. Installing alpha.25 in the clean-install drill required opening the
+version chip and picking the exact string by hand -- the operator's own
+guidance, "you can still install flagged you just need to click to see the
+
+---
+
+**THE LEAD THAT FOLLOWS FROM IT, and it is a good one.** The LLM lane downloads
+just as much and has never been the differing file, because it goes through
+`huggingface_hub.snapshot_download` -- a declared dependency, present in every
+
+---
+
+retry on a 36.8 GB first fetch that previously restarted a 12 GB file from zero
+and was measured stalling for 50 seconds; the operator's token on transfers; and
+the library's redirect handling instead of ours. Those were separately-recorded
+
+---
+
+tried first; this is the documented async fallback, not a request to relay
+through the operator.
+
+---
+
+
+Operator, 2026-09-07: *"do not save the 3 jsons just note them, they will be
+saved later"* / *"I'm not saving a duplicate json until all testing is done with
+all machines."* No profile JSON was added. Do not add them; do not promote them.
+
+---
+
+the current writer default and the licence-clean music bed, so `still_pan` has
+never run with `q354b` + `sa3`. It must not be promoted until one episode does.
+That run is the cheapest missing evidence in the set and the 4060 keeps it.
+
+---
+
+
+**Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
+*"I'm not sure we need to regression test every combo at this stage."* Three
+
+---
+
+
+## 2. ONE JSON OR TWO -- the operator's question, answered
+
+Operator, 2026-09-07: *"my goal is I run it on cuda, mac, it works everywhere --
+not all dropdowns -- but want ONE json to work. If that's impossible we need two
+
+---
+
+
+**Recommended shape, in the operator's own words** (*"if cuda is available use
+it, if not ... it automatically finds it"*):
+
+---
+
+only selectable policy on Apple Silicon -- and `none` is what does not fit.
+A Mac operator has no in-UI move.
+
+**Three real options, operator's call:**
+
+---
+
+
+**No episode reached `otr/obs/`, so by the operator's own standard this leg did
+not pass.** Two runs were started; the first died when its host session
+
+---
+
+   GitHub credentials (no `gh`, no keychain entry, no SSH key). The commit is
+   `a7ab7011`; a `git format-patch` of it was handed to the operator directly.
+   It is the tokenizers install-brick fix, PBUG-20260907-05 -- the highest
+
+---
+
+   ComfyUI install**, `.28` included.
+2. **Do not re-install this pack from the registry onto a working box** until
+   `.29` (or later) is the served version. It will brick the boot, and because
+
+---
+
+   `pycairo` dependency installs on Windows only -- so the shipped default could
+   never render on macOS **or Linux**. Now `viz_green`.
+3. **ffmpeg was never a declared dependency.** The run died at the mp4 encode
+   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
+
+---
+
+
+Both valid, non-silent, unclipped. **The numbers do not separate them on
+quality**, and at 2 cues an episode the saving is ~40 s of a ~24 min run -- ~3%,
+
+---
+
+native default", and Comfy-Org's own default for the checkpoint this pack loads
+is `cfg=1`. Operator, 2026-09-07: *"we just need it to run and produce music and
+not fail the episode."* It does.
+
+---
+
+1. **`2.0.0-alpha.29` and everything after it are committed but NOT pushed** --
+   this rented Mac has no GitHub credentials. Patches were handed to the operator
+   directly. The tokenizers fix is the urgent one: **every currently published
+
+---
+
+
+
+## 2026-09-10 -- superseded strict-character proposal, operator correction
+
+The operator clarified that character counts can vary with the supplied story,
+as on Public Domain and Shakespeare. This snapshot is superseded: no all-bank
+strict-character rewrite is authorized by the current queue. Acts remain selected.
+The A3 R1 calls and in-progress A1 final suite were interrupted for this correction.
+
+## WHERE TO PICK UP
+
+**Active owner: Codex, 2026-09-10, `v2.0-alpha`.** One shared-file editor.
+**GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
+below are the source of truth. Kibitz round inputs/finals are review snapshots
+and judgments are receipts; they never become a competing work queue.
+
+**Next action:** implement Sprint A1 below, then run the real My Story
+writer/ledger dry run and regressions. The completed R1-R4 judgments, including
+the latest binding-count correction, are in 2026-09-10-my-story-next/. The older queue below
+is outside this campaign. The earlier D1 arc is complete and is not being repeated;
+this arc reviews the new failure-policy ruling, live evidence and credits work.
+
+| Sprint | Remaining work | Required evidence |
+|---|---|---|
+| **A. My Story ledger proof** | Respect selected act/character counts through existing LLM repairs; remove unrelated rejection gates and preserve the listener's material. | Focused/full/Bible regression results and real canonical component ledgers, with freeze verdicts. |
+| **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
+| **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
+| **5. Optional App + qualification** | Native App form/player and full media/browser qualification after A-C. | D1 section 11 component vs publication evidence, App/Graph switching, saved parameters, playback/history, cancellation and errors. |
+
+### Operator contract
+
+- Reuse existing model calls, ledger assembly contracts, shared writer tail,
+  LLM ledger repair and freeze. My Story supplies the listener's material.
+- Selected act and speaking-character counts are binding for every story; the
+  user can vary those controls per run (latest operator correction, 2026-09-10).
+  Character counts exclude the announcer. Do not accept different counts merely
+  by recording them, or confuse variable controls with model discretion.
+- No duration, word-count or story-length rejection. Only defects required
+  for a usable ledger justify a story failure, after the existing applicable
+  LLM repair path has tried. Real provider, storage and cancellation outcomes
+  remain truthful. The operator explicitly accepts a real out-of-memory failure
+  when a run is too ambitious. Do not replace that with predictive story-size
+  rejection or silently shorten their material.
+- My Story has a supplied human byline or a neutral listener attribution.
+  It never credits Jeffrey Brick by default. Original should credit the actual
+  creative model. Preserve genuine source authors in adaptation banks.
+- Scope and fix the credits hero title crossing into column 2. The prior Mac
+  hardware handoff acceptance does not prohibit this newly requested fix.
+- Review these next sprints through R1-R4, then regress and test My Story in a
+  real writer/ledger dry run before spending on full media qualification.
+
+### Grounded state and the first live failure
+
+The real canonical has 23 nodes, 63 links, 37 writer widgets, and delivery
+link 291 from writer 1 to mux 85. No new nodes or controls are needed here.
+
+A canonical component submission used the complete converted graph and native
+`partial_execution_targets: ["62"]`: validator 63 -> writer 1 -> freeze 62.
+It did not slice the graph or render audio/video. A fully validated capability
+profile populated from the real canonical changed only writer `llm_device`
+from mps to cuda; every other saved setting was retained.
+
+Prompt `e11e5d86-2dda-41fa-b942-bb927a754b83` used local Qwen3.5-4B in both
+slots. Input/draft admission succeeded. The treatment produced two acts for
+requested one; one typed repair repeated two. `_make_treatment_validator`
+rejected the count and the run stopped before assembly in 113.09 s. No clean
+ledger or publication is claimed. This is a count refusal, not a timing limit.
+Request/profile receipts are in `2026-09-10-my-story-live/`; the admitted
+draft and failed ledger remain in the authoritative output tree.
+
+The shared tail already runs `_otr_clean_transaction`, `run_ledger_clean`
+(creative) and `run_ledger_cleanup` (technical) before freeze. Do not duplicate
+these inside My Story. Content-owned canonical text/receipt ownership must
+survive any accepted repair. Missing-speaker repairs already occur in the
+last act's typed ladder; do not bolt an unsealed generic repair onto the end.
+
+### Sprint A -- respect the selected structure and prove the ledger
+
+The latest operator correction supersedes the earlier proposal to accept a
+requested-one/actual-two treatment. Selected act and speaking-character counts
+are binding and variable per run. Length in words or minutes remains free.
+The announcer is outside the character count. A count mismatch must go through
+LLM structural repair, not silently ship different counts or lose story material.
+
+A1 implementation in the existing runner, pack and shared tail:
+
+1. Keep exact selected act and character counts on the accepted treatment.
+   Use the selected request, not the interpretation's guessed cast_plan.planned,
+   as count authority. Interpretation notes remain advisory. Preserve raw input,
+   selected controls, model-proposed counts and accepted counts separately.
+   Do not let exclusive notes silently override the selected numeric control;
+   the model must adapt the input into that structure and disclose conflicts.
+   Do not add a hardcoded count or duration; use the current run's controls.
+2. Fix the repair context at the existing treatment repair-factory seam. The
+   live treatment returned two acts for one, and repeated that after one typed
+   repair. That generic repair sees only the first 400 characters of the failed
+   response, before the acts. Supply the complete failed treatment together
+   with the original listener input and selected counts. Explicitly direct the
+   model to reorganize all story events into the selected acts and cast while
+   preserving the listener's material. No Python prose merge, truncation, silent
+   cast deletion, or fabrication. Keep the shared bounded structured ladder;
+   no new retry engine, and no claim every provider can always repair it.
+   Preserve original message roles and append the full failed parsed artifact;
+   do not repeat listener input already present in that prompt. Apply the same
+   local full-artifact repair context to last-act coverage failures, so their
+   dialogue beyond character400 is available for the repair. JSON/schema errors
+   continue through the existing typed prompts; no global echo-limit change.
+3. Planning arithmetic, requirement/conflict bookkeeping, optional descriptive
+   metadata, binary gender, two speakers per act and exact frame cue proposals
+   are not ledger requirements. Remove those extra rejection gates. Keep
+   nonempty unique cast identities, in-cast dialogue and speakable episode-wide
+   coverage. Normalize unambiguous case/whitespace spelling. Record source
+   fidelity discrepancies honestly; do not claim contradictory wishes all met.
+   Missing gender remains empty/other, never female by default. Actual voice
+   allocation exhaustion remains a real failure, never a predicted request veto.
+   Remove the old required-name membership veto when those names cannot fit the
+   selected count; disclose the reconciliation in receipts. Reserve ANNOUNCER
+   for the frame to prevent duplicate identity/lookup collisions.
+4. Normalize ordered treatment numbers after count-valid acceptance and before
+   act generation; record original numbers. Normalize accepted act replies to
+   their requested slot before assembly/seal. Preserve all accepted story text.
+   Use clean_spoken_text in BOTH act validation and cumulative coverage, matching
+   shared voice coverage. Stage directions alone do not mark a person heard.
+   The existing last-act typed repair gives unheard cast their spoken lines.
+5. Reuse Sci-Fi's ProviderCapacityMessages with max_new_tokens=None for every
+   My Story pass and inherited typed repair. Remove fixed 1200/1800/1600/700
+   ceilings. Record budget_mode=provider_capacity and capacity facts. Remove
+   longest-input-field blame and retain truthful shared capacity errors. Do not
+   broadly enable the local schema binder: installed LMFE defaults otherwise
+   unbounded arrays to 20 unless configured; that is a separate grammar project.
+6. Frame text and music descriptions are optional. Add the existing deterministic
+   attribution_sentence once when absent, before the accepted frame snapshot and
+   seal. Keep the original frame proposal in the receipt. Skip blank spoken rows
+   before assigning line numbers/boundaries. MyStoryTailParts.final_title_override
+   is optional: a nonblank accepted title wins; missing/blank passes None to the
+   shared producer. If shared cleanup fills the title later, synchronize the
+   ledger's final title to canon/file before consistency and serialization, and
+   use it in My Story's news headline. No extra title call or title rejection.
+7. Pass include_act_breaks explicitly to assembly. Actual accepted acts (which
+   now match the selected count) own boundary topology. Breaks on emits one cue
+   per boundary, using ordered supplied descriptions or an empty prompt for
+   StableAudioTheme's existing composer. Breaks off emits none. Retain surplus
+   proposals with their disposition; do not hide them or reject the story.
+8. Reuse the shared clean transaction, creative ledger_clean, technical cleanup,
+   reconciliation and freeze. Do not bypass content ownership or add a separate
+   repair/finalizer system. Counts, treatment and final rows must agree. Keep
+   gen_params_initial as selected-control evidence. No compute_episode_budget
+   call is needed for My Story. A read-only cross-bank count-contract audit
+   identifies any existing exceptions to the operator's all-stories ruling;
+   record exact gaps here before widening code scope, never claim untested parity.
+9. Update D1, guide, schemas, prompt examples/repair instructions and tests in
+   the same change. Label D1's old wiring fingerprint historical and record the
+   implemented one. No new nodes/widgets/wiring expected; verify current shape.
+
+Receipt: meta.my_story.counts records requested_acts, proposed_acts,
+accepted_acts, actual_acts, requested_characters, planned_characters,
+proposed_characters, accepted_characters and actual_characters. Failed treatment
+proposals and repairs retain full input/artifact authority. act_number_normalization
+records bookkeeping changes; music_cue_disposition records every unused proposal.
+Actual character count excludes the announcer. Required counts are compared at
+acceptance; telemetry is not permission to ship a mismatch.
+
+A2 implementation boundary (shared owners, separate qualified chunk):
+
+- Fix known native HF capacity in _otr_model_catalog, _otr_model_loader,
+  _otr_generation_budget and the adapter precondition. Parse the actual loaded
+  decoder config, nested text_config before wrapper fields. Curated8192 is an
+  estimate; cached Qwen advertises262144. Preserve explicit user context settings,
+  native model configuration and real provider/OOM/cancellation failures.
+- Resolve the canonical HF root before discovery; finalize capacity from actual
+  AutoConfig after snapshot resolution, including first download. Remove mutation
+  of max_position_embeddings to an estimate. Native maximum is not allocation.
+  Store effective capacity/source separately from vram_priced_ctx; keep HF's
+  weights-only estimate and explicit runtime/VRAM policy unchanged.
+- Include normalized explicit context setting in the same HF reuse key at lookup
+  and publication; preserve epoch guards. Allocated GGUF n_ctx already owns its
+  capacity and reuse_key; do not rewrite it.
+- Remove the minimum-model-window rejection against a project estimate. Fit full
+  prompts against actual/configured capacity, one-token default output-room
+  minimum; retain explicit atomic require_full contracts and no truncation.
+- Unknown-capacity and remote-estimate transport changes remain a separately
+  disclosed follow-up here. None currently breaks local arithmetic/defaults20,
+  and omitting remote max_tokens changes spend reservation. Do not claim those
+  paths fixed, disguise estimates as known capacity or weaken accounting.
+
+Tests and real proof:
+- Requested1/model2 is repaired to1 while preserving the story events; selected
+  character mismatch similarly reaches the existing repair with FULL failed
+  treatment and user input. Correct counts need no repair. Irreparable structure
+  remains an honest failure after the ladder, never a differently sized success.
+- Vary requested1/3/6 and character counts across fixtures; actual scenes/cast
+  match controls. Include monologue acts, missing optional metadata/gender/title,
+  blank music proposals, breaks on/off, surplus cue receipts and unique anchors.
+- Exercise final-act speakable coverage repair without regenerating earlier acts;
+  real ledger setters, saved JSON and shared cleanup/freeze, not copied validators.
+- Verify ProviderCapacityMessages markers and None at actual base/repair slot
+  invocation; preserve existing input/draft/byline and other-bank regression tests.
+- Live component: load real canonical, existing sanctioned runtime applier, full
+  prompt targeting freeze62. Start with exact failed one-act/two-character input,
+  then selected3 and6 acts. Record requested/actual counts, inputs, workflow hash,
+  model/context, prompt id, durable ledger and actual freeze verdict. History
+  success alone is insufficient. No duration target or timing rejection.
+
+These are component proofs, not App/full-media/publication PASS. Native App,
+browser playback/history and the publication matrix remain later qualification.
+
+### A3 -- align the remaining banks with the count controls
+
+The latest all-stories ruling supersedes historical count-as-suggestion policies.
+This work follows My Story's first proof and needs its own grounded coding/wiring
+review before changing the other lane owners. It is pending, not covered by a
+My Story-only test result. The shared controls permit 1..10 characters and 1..6
+acts; the canonical currently selects two characters and one act. Announcer is
+excluded and any cameo consumes a character slot.
+
+A3 bounded implementation proposal (review through its own R1-R4 before code):
+
+1. Sci-Fi uses one parsed dramatic SCENE per selected act: _build_envelope
+   sets scene_count=act_count; assembly emits one scene/shot per parsed SCENE.
+   Its preamble/outro have no scene IDs. Do not count total shots, music cues,
+   dialogue lines or legacy beats as acts; do not invent an extra grouping.
+2. Restore selected count at Sci-Fi pitch and treatment generation/validation,
+   through their existing typed repair factories. Pitch.cast_size currently
+   caps8 despite UI10; remove that stale limit coherently. Update pack and
+   runtime prompts together: exact selected count, announcer excluded, cameo
+   occupies a selected slot. Retain full failed treatment in count repair,
+   original source/treatment context and complete events; no Python cast trim.
+3. Inside Sci-Fi's existing four-attempt markup ladder compare parsed dramatic
+   scenes with envelope.scene_count before normal acceptance. Feed mismatches
+   into the existing repair with the entire rejected draft; ask it to regroup
+   the same events/dialogue. Keep existing prompt-capacity handling and receipt
+   of any cold regeneration. No added model stage or retry engine.
+4. Check both scene count and actual distinct dramatic speaker count before
+   salvage acceptance too. Salvage can adopt unknown speakers and remove silent
+   locked names; that must not bypass selected numeric controls. Preserve its
+   established equal-count identity-substitution policy and honest annotations;
+   this scope does not rewrite the salvage parser. Continued count mismatch
+   after the existing ladder remains an honest structural failure.
+5. Legacy casting and OutlineRequest independently cap6, although both use the
+   ten-preset shared stock. Remove the obsolete clamp and align both paths with
+   supported controls and actual inventory. Preserve exact-count Original front,
+   selected legacy arc phases, source-name reconciliation and shared missing-
+   speaker repair. Beat count stays separate/advisory. Reuse existing count
+   helpers and pool authority; no parallel cast owner or uncaught seven-person
+   outline failure. Verify legacy one-act/ten-character coverage without
+   inventing extra acts.
+6. Cameo LEMMY occupies one selected character slot. On a decided cameo hit
+   with selected1, permit him alone (legacy already does), rather than silently
+   add a person or cancel the decision. Adaptation exclusions remain unchanged.
+   Ten character voices plus Bark ANNOUNCER genuinely exhaust the shared ten
+   presets: preserve truthful inventory failure without shrinking the user's
+   selected count or introducing predictive story-length rejection. No voice
+   reuse/reassignment policy change belongs in this item.
+7. Update episode_shape receipts to selected/accepted/actual counts and remove
+   contradictory gating=False and request-only comments. The shared character
+   tooltip changes with all-bank alignment. Existing workflow values/positions
+   and links stay unchanged; if implementation needs a schema change, update
+   actual workflows/otr_canonical.json in that same commit and audit it.
+8. Prove acts1/3/6, cast1/7/10 across affected owners; repeated mismatch cannot
+   pass salvage, wrong-count repair sees full story, LEMMY hit/count1, legacy
+   ten-person casting plus CastLock replay, one-act heard coverage and genuine
+   Bark-announcer exhaustion. Replace contradictory expectations in
+   test_cast_size_is_a_request and off-shape artifact acceptance tests. Run
+   full suite + Bug Bible + one finished-diff CLI review before commit/push.
+
+Source fidelity conflicts remain visible. Count receipts never license a
+mismatch. No word/time caps or prose-quality campaign. GO_FORWARD remains the
+only queue; A3 review documents are dated snapshots and judgments.
+
+## 2026-09-10 -- A1 implementation shipped for operator cross-device trials
+
+Implementation instructions below are complete; final regression/live verification
+remain pending in GO_FORWARD. Operator requested immediate push for4060/Mac.
+
+### Grounded state and the first live failure
+
+The real canonical has 23 nodes, 63 links, 37 writer widgets, and delivery
+link 291 from writer 1 to mux 85. No new nodes or controls are needed here.
+
+A canonical component submission used the complete converted graph and native
+`partial_execution_targets: ["62"]`: validator 63 -> writer 1 -> freeze 62.
+It did not slice the graph or render audio/video. A fully validated capability
+profile populated from the real canonical changed only writer `llm_device`
+from mps to cuda; every other saved setting was retained.
+
+Prompt `e11e5d86-2dda-41fa-b942-bb927a754b83` used local Qwen3.5-4B in both
+slots. Input/draft admission succeeded. The treatment produced two acts for
+requested one; one typed repair repeated two. `_make_treatment_validator`
+rejected the count and the run stopped before assembly in 113.09 s. No clean
+ledger or publication is claimed. This is a count refusal, not a timing limit.
+Request/profile receipts are in `2026-09-10-my-story-live/`; the admitted
+draft and failed ledger remain in the authoritative output tree.
+
+The shared tail already runs `_otr_clean_transaction`, `run_ledger_clean`
+(creative) and `run_ledger_cleanup` (technical) before freeze. Do not duplicate
+these inside My Story. Content-owned canonical text/receipt ownership must
+survive any accepted repair. Missing-speaker repairs already occur in the
+last act's typed ladder; do not bolt an unsealed generic repair onto the end.
+
+### Sprint A -- selected acts, flexible cast and a usable ledger
+
+A1 implementation is under verification. Latest operator clarification:
+character count is flexible, including My Story; retain selected acts. Never
+reject or trim the story merely to make its cast match a requested number.
+
+1. Keep selected act count through the existing treatment repair. Supply the
+   complete failed parsed treatment/act with original source context, preserving
+   people, events, relationships and ending. No Python story trimming or new
+   retry engine. Requested character count stays guidance; named/exclusive notes
+   guide the cast. Accepted cast identities must be unique and nonempty, with
+   ANNOUNCER reserved for the frame and actual voice allocation still truthful.
+2. Remove planning arithmetic/conflict bookkeeping/optional metadata, gender,
+   monologue and frame/cue rejection gates. Normalize unambiguous speaker spelling
+   and ordered act slots. Shared clean_spoken_text owns heard coverage, with the
+   existing last-act repair for unheard cast. Source differences remain receipts.
+3. Reuse ProviderCapacityMessages and max_new_tokens=None throughout base/repair
+   calls; keep shared capacity/provider/cancel/OOM errors. Frame/cue proposals may
+   be empty; actual boundaries and include_act_breaks own emitted interstitials.
+   Retain unused proposals. Ensure attribution once before seal, including when
+   already spoken in the coda. No default Jeffrey Brick author attribution.
+4. Reuse the shared writer cleanup/freeze. Synchronize a cleanup-supplied title
+   to canon/file/wire/news. Label news metadata from bank source_material_label
+   (Listener story idea), never RSS Auto-Fetch. No source fetch is introduced.
+5. Persist requested/proposed/accepted/actual acts and requested/planned/proposed/
+   accepted/actual character counts. Full attempt outputs (including fenced JSON)
+   and errors remain durable. A failed save must not mask a primary provider or
+   cancellation error; a successful run still fails if final save cannot persist.
+6. Finish focused/full/Bible regression comparison and one finished-diff CLI
+   review for the clarified contract. Real canonical component proof follows;
+   no live PASS from fixtures. No node/widget/wiring changes expected; audit it.

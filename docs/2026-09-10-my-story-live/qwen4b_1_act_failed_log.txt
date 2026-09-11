@@ -1,0 +1,312 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[1m[33m[WARNING][0m On windows we are currently forcing single GPU mode in ComfyUI due to a Nvidia related issue, if you want to disable this use: --cuda-device all
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path clip C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusers C:\ComfyUI-Models\diffusers
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path gligen C:\ComfyUI-Models\gligen
+[32m[INFO][0m Adding extra search path hypernetworks C:\ComfyUI-Models\hypernetworks
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path photomaker C:\ComfyUI-Models\photomaker
+[32m[INFO][0m Adding extra search path style_models C:\ComfyUI-Models\style_models
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path unet C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path vae_approx C:\ComfyUI-Models\vae_approx
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Adding extra search path download_model_base C:\ComfyUI-Models
+[32m[INFO][0m Adding extra search path custom_nodes C:\Users\jeffr\Documents\ComfyUI\custom_nodes
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path upscale_models C:\Users\jeffr\Documents\ComfyUI\models\upscale_models
+[32m[INFO][0m Adding extra search path latent_upscale_models C:\ComfyUI-Models\latent_upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Setting output directory to: C:\Users\jeffr\Documents\ComfyUI\output
+[32m[INFO][0m Setting user directory to: C:\Users\jeffr\Documents\ComfyUI
+[START] Security scan
+[DONE] Security scan
+## ComfyUI-Manager: installing dependencies done.
+** ComfyUI startup time: 2026-09-10 15:46:32.203
+** Platform: Windows
+** Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+** Python executable: C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe
+** ComfyUI Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** ComfyUI Base Folder Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** User directory: C:\Users\jeffr\Documents\ComfyUI
+** ComfyUI-Manager config path: C:\Users\jeffr\Documents\ComfyUI\__manager\config.ini
+** Log path: C:\Users\jeffr\Documents\ComfyUI\comfyui.log
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    1.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    3.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: Potential Error in code: Torch already imported, torch should never be imported before this point.
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'int8_linear', 'na3d', 'quantize_and_rotate_rowwise', 'quantize_int8_rowwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 16275 MB, total RAM 64957 MB
+[32m[INFO][0m pytorch version: 2.10.0+cu130
+[32m[INFO][0m Set vram state to: NORMAL_VRAM
+[32m[INFO][0m Device: cuda:0 NVIDIA GeForce RTX 5080 Laptop GPU : cudaMallocAsync
+[32m[INFO][0m Using async weight offloading with 2 streams
+[32m[INFO][0m Enabled pinned memory 25982.0
+[32m[INFO][0m working around nvidia conv3d memory bug.
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+[32m[INFO][0m aimdo: src/control.c:269:INFO:comfy-aimdo NVML pressure enabled
+[32m[INFO][0m aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 5080 Laptop GPU runtime_luid=00000000:00014e21 dxgi_luid=00000000:00014e21
+[32m[INFO][0m aimdo: src/control.c:284:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 5080 Laptop GPU (VRAM: 16275 MB)
+[32m[INFO][0m DynamicVRAM support detected and enabled
+[32m[INFO][0m Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+[32m[INFO][0m ComfyUI version: 0.35.1
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfyui-frontend-package version: 1.51.10
+[32m[INFO][0m comfyui-workflow-templates version: 0.11.59
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.11
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m [Prompt Server] web root: C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\comfyui_frontend_package\static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m No OpenGL_accelerate module loaded: Acceleration disabled
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+[DMM] Data Media Machine v3.7: loaded 31/31 nodes
+[DMM] Graceful disconnect handler installed
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m ### Loading: ComfyUI-Impact-Pack (V8.28.3)
+[32m[INFO][0m [Impact Pack] Wildcard total size (0.00 MB) is within cache limit (50.00 MB). Using full cache mode.
+[32m[INFO][0m [Impact Pack] Wildcards loading done.
+W0910 15:46:41.774000 5936 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+[32m[INFO][0m ### Loading: ComfyUI-Manager (V3.40)
+[32m[INFO][0m [ComfyUI-Manager] network_mode: offline
+[32m[INFO][0m [ComfyUI-Manager] ComfyUI per-queue preview override detected (PR #11261). Manager's preview method feature is disabled. Use ComfyUI's --preview-method CLI option or 'Settings > Execution > Live preview method'.
+[32m[INFO][0m ### ComfyUI Revision: 5920 [856a922b] *DETACHED | Released on '2026-09-10'
+[32m[INFO][0m [ComfyUI-Manager] All startup tasks have been completed.
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+⚡ SeedVR2 optimizations check: SageAttention ✅ | Flash Attention ❌ | Triton ✅
+💡 Optional: pip install flash-attn
+🔧 Conv3d workaround active: PyTorch 2.10.0, cuDNN 91200 (fixing VAE 3x memory bug)
+📊 Initial CUDA memory: 14.60GB free / 15.89GB total
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:35: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:268: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\manual_sigmas.py
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\dmm_ascii_art.py
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\websocket_image_save.py
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-MiniMax-H3-Turbo
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OTR-UpstreamStoryLab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-data-media-machine
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-GGUF
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-KJNodes
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-LTXVideo
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-videohelpersuite
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-AnimateDiff-Evolved
+[32m[INFO][0m    0.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Nvidia_RTX_Nodes_ComfyUI
+[32m[INFO][0m    0.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-impact-pack
+[32m[INFO][0m    0.6 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m    1.4 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-kokorotts
+[32m[INFO][0m   11.8 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-SeedVR2_VideoUpscaler
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8000
+[32m[INFO][0m got prompt
+[32m[INFO][0m [my_story] saved story input 338a61c2bb72 -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_shared\state\story_drafts\338a61c2bb72d546464c235721b285697ce9193d8036c3cbcd8d89bc26d4e609\input.json
+[32m[INFO][0m [OTR_WorkflowValidator] story input for node 1: 338a61c2bb72 (created)
+[32m[INFO][0m OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[32m[INFO][0m OTR_WorkflowValidator: OK -- 23 nodes, 63 links, strict_unknown_types=True, path='C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json', widget_vector_drift=0
+[1m[33m[WARNING][0m [OTR.assets] announcer_image_model=z_image_turbo not downloaded: this role's video lane viz_mxc_cpu mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] music_image_model=z_image_turbo not downloaded: this role's video lane viz_green mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] character_image_model=z_image_turbo not downloaded: this role's video lane viz_camera mints no still (accepts_still=False), so its image weights are provably unused
+[1m[33m[WARNING][0m [OTR.assets] viz_camera: automatic visual-weight coverage unavailable; existing adapter checks remain
+[1m[33m[WARNING][0m [OTR.assets] viz_green: automatic visual-weight coverage unavailable; existing adapter checks remain
+[1m[33m[WARNING][0m [OTR.assets] viz_mxc_cpu: automatic visual-weight coverage unavailable; existing adapter checks remain
+[32m[INFO][0m [OTR.assets] EXISTING checkpoints/stable_audio_3_small_music.safetensors bytes=2270384940 native=C:\ComfyUI-Models\checkpoints\stable_audio_3_small_music.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/t5gemma_b_b_ul2.safetensors bytes=1187264003 native=C:\ComfyUI-Models\text_encoders\t5gemma_b_b_ul2.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] READY engines=stable_audio_3 files=2 (availability only; render/GPU/publish success not qualified)
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story input 338a61c2bb72 (verified) -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_shared\state\story_drafts\338a61c2bb72d546464c235721b285697ce9193d8036c3cbcd8d89bc26d4e609\input.json
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story: 4 creative field(s), draft 338a61c2bb72 (unattributed)
+[32m[INFO][0m [OTR_LedgerScriptWriter] start: creative_model='Qwen/Qwen3.5-4B', technical_model='Qwen/Qwen3.5-4B', act_count=1, num_characters=2, creativity='balanced' (temp=0.85 top_p=0.95), seed_source=my_story_fields, episode_title='', perfect_run_spacesaver=False
+[32m[INFO][0m [Ledger] saved pending_20260910_154830_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] skeleton ledger saved up front: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260910_154830\audio\pending_20260910_154830_ledger.json
+[32m[INFO][0m [PendingSweep] BUG-LOCAL-290: deleted 25 empty pending dir(s) (scanned=421 skipped_too_young=6 skipped_has_lines=390 skipped_no_ledger=0 skipped_unreadable=0 errors=0).
+[32m[INFO][0m [OTR_LedgerScriptWriter] BUG-LOCAL-290 pending sweep: deleted 25 stale dir(s) before run start.
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_interpret' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [OTR_HF_ENV] HF_HOME='C:\\ComfyUI-Models\\huggingface' HF_HUB_CACHE='C:\\ComfyUI-Models\\huggingface\\hub' (source=os.environ); exported to os.environ
+[32m[INFO][0m Loading LLM model: Qwen/Qwen3.5-4B (quantized=False)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved Qwen/Qwen3.5-4B -> C:\ComfyUI-Models\huggingface\hub\models--Qwen--Qwen3.5-4B\snapshots\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]
+Loading weights: 100%|██████████| 426/426 [00:00<00:00, 5824.43it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (7.3s) - first generate will not stall
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.6 tok/s | 4.1s | ...  "kind": "cast",       "source_field": "characters",       "strength": "required"     }, 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 16.8 tok/s | 7.6s | ...  "kind": "event",       "source_field": "plot",       "strength": "required"     },     {
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 17.3 tok/s | 11.1s | ..."event",       "source_field": "plot",       "strength": "required"     },     {       "id
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 17.7 tok/s | 14.5s | ...  "source_field": "plot",       "strength": "required"     },     {       "id": "no-supern
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 18.7 tok/s | 17.2s | ..."plot",       "strength": "required"     },     {       "id": "isolated-lighthouse",      
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 19.4 tok/s | 19.8s | ...: "required"     },     {       "id": "stormy-night",       "text": "The story takes place
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 19.9 tok/s | 22.5s | ... "required"     },     {       "id": "1930s-era",       "text": "The story is set in the 1
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 20.4 tok/s | 25.1s | ...uired"     }   ],   "named_cast": [     {       "name": "Mara",       "notes": "A woman in
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 20.7 tok/s | 27.9s | ...   {       "name": "Jon",       "notes": "A man in his forties.",       "stated_gender": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 20.9 tok/s | 30.6s | ...    "planned": 2,     "exclusive": true,     "reason": "The user explicitly requested only
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 704 tok | 21.1 tok/s | 33.3s | ...ptions": [     "The ferry is approaching the lighthouse at the start of the story.",     "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 747 tok | 21.3 tok/s | 35.1s | ....",     "The story ends immediately after the ferry turns away."   ],   "conflicts": [] } 
+[32m[INFO][0m [my_story] filled 3 unstated detail(s): The ferry is approaching the lighthouse at the start of the story.; The jammed bell is the primary obstacle preventing the warning from being sent.; The story ends immediately after the ferry turns away.
+[32m[INFO][0m [Ledger] saved pending_20260910_154830_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 1/3: base call at temperature=0.850
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 20.7 tok/s | 3.1s | ...stion": "Can a pair of stubborn keepers overcome their differences to save a ship from the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 21.3 tok/s | 6.0s | ...my night in October",   "cast": [     {       "name": "Mara",       "role": "The pragmatic
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 21.9 tok/s | 8.8s | ...       "gender": "female",       "age_band": "30s",       "register": "practical, sharp", 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 22.3 tok/s | 11.5s | ...man in his forties who sees the world through habit and old superstitions rather than pure
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 22.3 tok/s | 14.4s | ...nostalgic",       "timbre": "rough, gravelly, resonant"     }   ],   "acts": [     {      
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 21.6 tok/s | 17.8s | ... gaslight",       "turns": [         "Jon warns Mara that the ferry is visible through the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 21.1 tok/s | 21.3s | ...",         "Mara threatens to work alone if he does not unlock the mechanism immediately."
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 20.7 tok/s | 24.8s | ...l resolution where they stop fighting and start working together.",       "scene_setting":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 20.4 tok/s | 28.3s | ..."Mara uses her wrench to manually reset the internal pawl that had seized.",         "They
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 20.2 tok/s | 31.7s | ...       "ending_state": "The warning bell rings loudly, signaling the sea to clear."     } 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 684 tok | 20.0 tok/s | 34.1s | ...the grey expanse, leaving the two keepers breathing heavy in the silence that follows." } 
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_treatment' attempt 1 failed: acts has 2 entries; 1 were requested | raw head: { "title": "The Fog's Edge", "logline": "Two lighthouse keepers clash over a broken bell mechanism until they unite to warn a stranded vessel.", "dramatic_question": "Can a pair of stubborn keepers overcome their differences to save a ship from the sea?", "setting": "The isolated stone lantern room of Blackwood Point Lighthouse", "time_of_day": "the dead of a stormy night in October", "cast": [ { ...
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 2/3: typed repair at temperature=0.100
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@8192, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.9 tok/s | 3.8s | ...stion": "Can a pair of stubborn keepers overcome their differences to save a ship from the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 20.2 tok/s | 6.3s | ...rmy night in October",   "cast": [     {       "name": "Mara",       "role": "Young keeper
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 21.4 tok/s | 9.0s | ...nder": "female",       "age_band": "30s",       "register": "practical",       "timbre": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 22.1 tok/s | 11.6s | ...es in ritual and old ways, speaking slowly with a gravelly tone.",       "gender": "male",
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 22.5 tok/s | 14.2s | ...  }   ],   "acts": [     {       "n": 1,       "purpose": "Establish the conflict over the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 22.8 tok/s | 16.8s | ...refuses to budge.",         "Mara insists on using oil and leverage to force the mechanism
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 23.0 tok/s | 19.5s | ...e bell, claiming the storm will pass without warning."       ],       "ending_state": "The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 23.2 tok/s | 22.1s | ...he ship.",       "scene_setting": "The lantern room, rain lashing the glass",       "turns
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 23.3 tok/s | 24.7s | ...th Jon's knowledge of the internal springs.",         "Together they successfully free the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 23.4 tok/s | 27.3s | ...s clearly as the ferry turns away from the rocks."     }   ],   "ending": "The ferry turns
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 665 tok | 23.5 tok/s | 28.3s | ..., and the two keepers stand together, exhausted but relieved, watching the storm pass." } 
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_treatment' attempt 2 (repair) failed: acts has 2 entries; 1 were requested | raw head: { "title": "The Bell's Heart", "logline": "Two lighthouse keepers clash over a broken bell mechanism until they unite to warn a stranded vessel.", "dramatic_question": "Can a pair of stubborn keepers overcome their differences to save a ship from the sea?", "setting": "The isolated stone lantern room of Blackwood Point Lighthouse", "time_of_day": "the dead of a stormy night in October", "cast": [ ...
+[1m[31m[ERROR][0m [OTR_StructuredCall] 'my_story_treatment' exhausted the retry ladder after 2 attempt(s); raising StructuredCallFailedError
+[1m[31m[ERROR][0m !!! Exception during processing !!! [OTR_StructuredCall] 'my_story_treatment' failed after 2 attempt(s); disposition=primary_ladder_exhausted; last error -> PostValidationError: acts has 2 entries; 1 were requested
+[1m[31m[ERROR][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 545, in execute
+    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 344, in get_output_data
+    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 318, in _async_map_node_over_list
+    await process_inputs(input_dict, i)
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 306, in process_inputs
+    result = f(**inputs)
+             ^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\OTR_LedgerScriptWriter.py", line 3643, in run
+    _parts = _lane_runner(
+             ^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 1070, in run_my_story_episode
+    treatment = _pass_treatment(
+                ^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 568, in _pass_treatment
+    return _call(
+           ^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 428, in _call
+    return structured_call(**kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_structured_call.py", line 1268, in structured_call
+    raise StructuredCallFailedError(
+C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio.nodes._otr_structured_call.StructuredCallFailedError: [OTR_StructuredCall] 'my_story_treatment' failed after 2 attempt(s); disposition=primary_ladder_exhausted; last error -> PostValidationError: acts has 2 entries; 1 were requested
+
+[32m[INFO][0m [32mPrompt executed in 113.09 seconds[0m

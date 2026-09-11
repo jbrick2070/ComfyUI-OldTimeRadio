@@ -501,3 +501,25 @@ def test_title_regen_falls_back_to_outline(tmp_path, monkeypatch):
     assert regen_calls == [1]
     assert ctx.led.data["meta"]["episode_title"] == "Signal at the Light"
     assert ctx.led.data["meta"]["title_source"] == "outline_fallback"
+
+
+def test_my_story_cleanup_title_reaches_canon_file_wire_and_news(tmp_path, monkeypatch):
+    from nodes import _otr_ledger_cleanup as cleanup, _otr_canon as canon_module
+    regen = _spy_title_regen(monkeypatch)
+    ctx = _make_ctx(tmp_path, monkeypatch)
+    ctx.resolved.update(episode_title="", seed_source="my_story_fields")
+    ctx.outline_view.title = ""
+    ctx.canon.title = ""
+    ctx.meta["source_bank"] = "my_story"
+    ctx.source_bank_row.source_bank_id = "my_story"
+    monkeypatch.setattr(cleanup, "_llm_episode_title", lambda *_: "The Unsent Signal")
+    out = OTR_LedgerScriptWriter()._run_writer_tail(ctx)
+    title = ctx.led.data["meta"]["episode_title"]
+    assert title and regen == [1]
+    assert ctx.canon.title == title
+    assert json.loads((ctx.episode_root / canon_module.EPISODE_CANON_FILENAME).read_text(encoding="utf-8"))["title"] == title
+    assert json.loads(out[1])["meta"]["episode_title"] == title
+    assert json.loads(Path(ctx.led.path).read_text(encoding="utf-8"))["meta"]["episode_title"] == title
+    assert json.loads(out[2])[0]["headline"] == title
+    assert json.loads(out[2])[0]["source"] == "Listener story idea"
+    assert ctx.led.data["meta"]["title_source"] == "ledger_cleanup"

@@ -1,0 +1,82 @@
+{
+  "date": "2026-09-10",
+  "authoritative_plan": "docs/GO_FORWARD_PLAN.md",
+  "input_sha256": "1d61f56a84c445d1b64b35632e55c92cf2056b3ff995a56feb3e2ccbaa6f7691",
+  "driver": "codex",
+  "rounds": [
+    "r1",
+    "r2",
+    "r3",
+    "r4"
+  ],
+  "reviewers": [
+    "antigravity",
+    "cursor"
+  ],
+  "claude_excluded": "operator reported exhausted monthly credits",
+  "models": {
+    "antigravity": "Gemini 3.8 Flash (High)",
+    "cursor": "cursor-grok-4.6-high"
+  },
+  "profiles": "disabled; stale overlay; real runtime invariants in plan/anchors",
+  "completed_calls": 8,
+  "round_receipts": {
+    "r1": {
+      "input_sha256": "1d61f56a84c445d1b64b35632e55c92cf2056b3ff995a56feb3e2ccbaa6f7691",
+      "final_sha256": "49bbafa14d012463953a53a92decb597065ce5d026621b6b595cfa2c50335998",
+      "go_forward_sha256": "1efeef036f2de39568f299de5ff9ae3786c331308988c61bbe1c1a520e4dc305",
+      "reviewers": {
+        "antigravity": "rc0",
+        "cursor": "rc0"
+      }
+    },
+    "r2": {
+      "input_sha256": "49bbafa14d012463953a53a92decb597065ce5d026621b6b595cfa2c50335998",
+      "final_sha256": "6fbb3932fcd05e4b3dfdd125f04103088e65e5b9ce0dd8196af8e69fcde602c2",
+      "go_forward_sha256": "27e39fad538403f4b8adee09a12c156b48a6dc7336d4111a9d717ec57c2228bf",
+      "reviewers": {
+        "antigravity": "rc0",
+        "cursor": "rc0"
+      },
+      "parallel_cursor_folder": "kibitz-runs\\2026-09-10-my-story-next-cursor\\r2"
+    },
+    "r3": {
+      "input_sha256": "6fbb3932fcd05e4b3dfdd125f04103088e65e5b9ce0dd8196af8e69fcde602c2",
+      "final_sha256": "4617b7050cde9cb4bd321405efd1427cce5c73922bce5ee0a9bed5965d8d2b5b",
+      "go_forward_sha256": "21c4bb10021af53d3d5bf7831956c39fd8de722424c00526b0214b28a7b0683d",
+      "reviewers": {
+        "antigravity": "rc0",
+        "cursor": "rc0"
+      },
+      "parallel_cursor_folder": "kibitz-runs\\2026-09-10-my-story-next-cursor\\r3",
+      "before_operator_correction_sha256": "b362473e27551d5512b71e7defb77da07257a220dfd8d31c80332dc87efe3184",
+      "operator_amendment": "selected act/character counts binding; root-grounded amendment before renewed R4"
+    },
+    "r4": {
+      "input_sha256": "4617b7050cde9cb4bd321405efd1427cce5c73922bce5ee0a9bed5965d8d2b5b",
+      "final_sha256": "6c0c47be19f0ed9ba8c5b83303054bc70f1fd6d42ca45d080aa14d4ae20e1995",
+      "go_forward_sha256": "e74df5766b5c94b28ab2e3f3c1aac14df5455e5d341d60d30b635c6a3e9d5840",
+      "folder": "kibitz-runs\\2026-09-10-my-story-next-counts\\r4",
+      "reviewers": {
+        "antigravity": "rc0",
+        "cursor": "rc0"
+      },
+      "parallel_cursor_folder": "kibitz-runs\\2026-09-10-my-story-next-counts-cursor\\r4"
+    }
+  },
+  "launched_calls": 10,
+  "interrupted_calls": [
+    {
+      "round": "r4",
+      "lanes": [
+        "antigravity",
+        "cursor"
+      ],
+      "reason": "operator clarified selected counts are binding while reviews were running",
+      "folder": "kibitz-runs/2026-09-10-my-story-next/r4",
+      "cursor_folder": "kibitz-runs/2026-09-10-my-story-next-cursor/r4"
+    }
+  ],
+  "actual_spend": "not exposed by local CLI tools",
+  "status": "R1-R4 completed; operator amended count contract before renewed R4; two initial R4 calls interrupted"
+}

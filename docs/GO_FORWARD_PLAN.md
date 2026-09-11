@@ -87,20 +87,243 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 ## WHERE TO PICK UP
 
 **Active owner: Codex, 2026-09-10, `v2.0-alpha`.** One shared-file editor.
-Next action: prove My Story's real-model ledger through the existing shared
-freeze, then complete the optional native App and publication qualification.
-Read [the Sprint 4 receipt](2026-09-10-my-story-s4/receipt.json) for measured
-code/test state and [its review](2026-09-10-my-story-s4/review_judgment.md).
+**GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
+below are the source of truth. Kibitz round inputs/finals are review snapshots
+and judgments are receipts; they never become a competing work queue.
+
+**Next action:** finish the running final regression and real My Story
+writer/ledger dry run; operator 4060/Mac trials may run against the pushed code. The completed R1-R4 judgments are in
+2026-09-10-my-story-next/; the later flexible-character amendment is recorded in
+2026-09-10-my-story-a1/operator_amendment.md. The older queue below is outside this campaign. The earlier D1 arc is complete and is not being repeated;
+this arc reviews the new failure-policy ruling, live evidence and credits work.
 
 | Sprint | Remaining work | Required evidence |
 |---|---|---|
-| **5. Optional App view + qualification** | Prove a real model's user-input ledger through the existing freeze first. Add native App form and final player/report on the canonical, then qualify graph use, App/Graph switching, saved parameters, playback/history, cancellation and errors. | Actual model/ledger/asset/browser receipts under D1 section 11; distinguish component-only evidence from published episodes and record limits. |
+| **A. My Story ledger proof** | Respect selected acts and a flexible story-led cast through existing LLM repairs; remove unrelated rejection gates and preserve the listener's material. | Focused/full/Bible regression results and real canonical component ledgers, with freeze verdicts. |
+| **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
+| **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
+| **5. Optional App + qualification** | Native App form/player and full media/browser qualification after A-C. | D1 section 11 component vs publication evidence, App/Graph switching, saved parameters, playback/history, cancellation and errors. |
 
-Build from [D1](2026-09-10-my-story-d1-design.md) and
-[the accepted scope](2026-09-10-my-story-app-scope.md). Do not repeat their
-R1-R4 design campaigns. Obtain one independent finished-diff review for the
-next code chunk. Reuse existing calls, ledger ownership and production paths;
-the user's emphasis is proving their own story yields a clean ledger.
+### Operator contract
+
+- Reuse existing model calls, ledger assembly contracts, shared writer tail,
+  LLM ledger repair and freeze. My Story supplies the listener's material.
+- Selected act count remains binding and varies per run. The latest operator
+  clarification makes character count flexible, as on Public Domain/Shakespeare:
+  My Story preserves the supplied people and records requested/actual counts.
+  The announcer is excluded. No RSS or random source is used for My Story.
+- No duration, word-count or story-length rejection. Only defects required
+  for a usable ledger justify a story failure, after the existing applicable
+  LLM repair path has tried. Real provider, storage and cancellation outcomes
+  remain truthful. The operator explicitly accepts a real out-of-memory failure
+  when a run is too ambitious. Do not replace that with predictive story-size
+  rejection or silently shorten their material.
+- My Story has a supplied human byline or a neutral listener attribution.
+  It never credits Jeffrey Brick by default. Original should credit the actual
+  creative model. Preserve genuine source authors in adaptation banks.
+- Scope and fix the credits hero title crossing into column 2. The prior Mac
+  hardware handoff acceptance does not prohibit this newly requested fix.
+- Review these next sprints through R1-R4, then regress and test My Story in a
+  real writer/ledger dry run before spending on full media qualification.
+
+### Sprint A -- finish qualification of the My Story ledger
+
+**Current validation:** 199 focused tests pass. Last completed full suite has
+53 pre-existing failures and zero new IDs versus S4. Final full rerun after
+small review fixes is running; Bug Bible: 23 passed, 27 skipped, 3 xfailed. The operator
+requested an immediate push so 4060 and Mac can try the same implementation.
+No cross-device or live clean-ledger PASS is claimed. Receipts:
+2026-09-10-my-story-a1/. Implementation details are archived, not work to redo.
+
+1. Finish the running final regression and compare IDs with S4/pre-change
+   baselines; never quarantine new failures. Append its measured receipt.
+2. Run exact prior lighthouse input through the actual canonical full graph,
+   native partial_execution_targets62 (validator63 -> writer1 -> freeze62).
+   Use the sanctioned runtime applier to change mps to cuda on the 5080. Check
+   durable freeze verdict, actual source fields/byline/counts and output path.
+   Previous failure receipt: 2026-09-10-my-story-live/qwen4b_1_act_receipt.json.
+3. Vary acts 3/6 and requested characters 1/4 with the same two named people,
+   confirming flexible requested/actual cast receipts and selected act counts.
+   These are ledger component proofs, not media/publication qualification.
+4. Collect operator 4060/Mac results against the pushed commit; do not invent
+   remote results. Keep one code editor while separate machines run trials.
+
+A2 implementation boundary (shared owners, separate qualified chunk):
+
+- Fix known native HF capacity in _otr_model_catalog, _otr_model_loader,
+  _otr_generation_budget and the adapter precondition. Parse the actual loaded
+  decoder config, nested text_config before wrapper fields. Curated8192 is an
+  estimate; cached Qwen advertises262144. Preserve explicit user context settings,
+  native model configuration and real provider/OOM/cancellation failures.
+- Resolve the canonical HF root before discovery; finalize capacity from actual
+  AutoConfig after snapshot resolution, including first download. Remove mutation
+  of max_position_embeddings to an estimate. Native maximum is not allocation.
+  Store effective capacity/source separately from vram_priced_ctx; keep HF's
+  weights-only estimate and explicit runtime/VRAM policy unchanged.
+- Include normalized explicit context setting in the same HF reuse key at lookup
+  and publication; preserve epoch guards. Allocated GGUF n_ctx already owns its
+  capacity and reuse_key; do not rewrite it.
+- Remove the minimum-model-window rejection against a project estimate. Fit full
+  prompts against actual/configured capacity, one-token default output-room
+  minimum; retain explicit atomic require_full contracts and no truncation.
+- Unknown-capacity and remote-estimate transport changes remain a separately
+  disclosed follow-up here. None currently breaks local arithmetic/defaults20,
+  and omitting remote max_tokens changes spend reservation. Do not claim those
+  paths fixed, disguise estimates as known capacity or weaken accounting.
+
+Tests and real proof:
+- Requested1/model2 acts repair to1 while retaining all material; irreparable
+  act structure fails honestly after the existing ladder. Character-count
+  differences alone accept without repair, with truthful requested/actual counts.
+- Vary acts1/3/6 and requested/actual casts, including fewer/more characters than
+  requested, exclusive named cast, monologues and missing optional metadata.
+  Include real ledger disk/wire/seals, full-artifact last-act coverage repair,
+  cue surplus/breaks, source labels and supplied/neutral bylines.
+- Preserve provider-capacity markers through actual base/repair slot invocation.
+- Live component loads real canonical and sanctioned runtime applier, full prompt
+  targeting freeze62. Start with the exact failed one-act lighthouse input, then
+  selected3 and6 acts. Record full fields, workflow/model/context, prompt id,
+  requested/actual counts, durable ledger and actual freeze verdict. No timing
+  or length rejection; history success alone is insufficient.
+
+These are component proofs, not App/full-media/publication PASS. Native App,
+browser playback/history and the publication matrix remain later qualification.
+
+### A3 -- other-bank act-count consistency (separate follow-up)
+
+The proposed all-bank strict-character rewrite is withdrawn by the latest
+operator clarification. Preserve Public Domain/Shakespeare and other banks'
+existing flexible casts. Do not change their casting or voice-inventory policy
+as part of My Story. The interrupted strict-count R1 artifacts are historical.
+
+Selected acts still need a bounded check in Sci-Fi's existing markup repair:
+its envelope maps each selected act to one dramatic SCENE, but normal and
+salvage acceptance currently ignore scene count. Review this act-only change
+before code, using the whole failed draft and existing ladder. Do not count
+preamble/outro shots as acts, trim dialogue, change salvage cast policy or add
+word/duration rejection. Legacy acts already follow selected arc phases.
+
+### Sprint B -- Original creative-model credit
+
+The current Original default is generic machine attribution in `banks.json`.
+A read-only scan of 2,165 ledgers, including 210 Original-family ledgers, found
+no spoken Jeffrey/Jeffery author attribution in Original. Three actual name
+credits were Public Domain adaptations of Jeffrey A. Brick's Cradle Protocol;
+one verified published example is The Nursery Feed, 20260830_052646. This does
+not identify which episode the operator heard. Preserve that true provenance.
+
+Credit the creative models used to generate the story, with finishing models
+recorded separately. The scheduler builds a fresh generation closure per call;
+after it returns successfully, retain only JSON primitives in an episode-local
+journal: helper, slot, provider, requested identity, executed identity and
+whether that identity was reported. Never retain a cache/model/tokenizer/closure
+reference, and never count a generation exception as a successful call.
+
+Local/GGUF model_id, Comfy Credits slug and Google google_model identify the
+executed request, not independently verified server versions. OpenRouter needs
+a fresh response-local receipt carried through retries and model-gone fallback.
+Its process-global resolved_models_snapshot is NOT a valid per-call source:
+missing model preserves a prior identity, extraction records before validation,
+and fallback can change the successful slug. Do not use snapshot deltas.
+
+Separate concept/drafting/framing helpers from ledger_clean and cast repair.
+The journal proves calls returned, not accepted authorship; use the exact printed
+wording "Story generation models used: <identities>" for Original, with a
+separate finishing-model record. Keep concrete IDs durable, use an existing
+truthful display label if available, otherwise the concrete ID. No invented
+name map, character cap that hides contributors, or generic replacement for a
+known identity. Unknown identity reads "model identity unreported".
+
+Stamp the Original-only credits_source_line beside final slot telemetry, after
+writing calls and before the lane finalizer, script_json serialization and
+terminal save. Existing rendering consumes that field. Preserve My Story's
+human byline and other banks' true source authors. No spoken-story rewrite,
+new model calls, widgets or wiring. Do not claim cleanup-only models authored
+the original premise, or that every returned draft became accepted content.
+
+B implementation contract:
+
+- Preserve generate_fn(...) -> str. OpenRouterBackend.generate and _extract_text
+  accept an optional receipt_out dictionary; each make_openrouter_generate_fn
+  invocation allocates a fresh dictionary and passes it through the successful
+  retry/fallback. Publish its primitive copy on that fresh closure only after
+  text extraction AND the cloud runaway check succeed. Scheduler reads it just
+  after base returns. No str subclass, process-global lookup or contextvar needed.
+- Scheduler successful_model_calls is a per-run list of primitive dictionaries:
+  helper, slot, provider, configured, requested, executed, reported. Existing
+  attempt counters stay unchanged. Stamp meta.model_call_provenance with version1,
+  calls, generation_models, finishing_models and unclassified_helpers. No entry
+  on generation exception; a returned invalid draft is still only a returned
+  call, never labelled accepted authorship.
+- Credit only creative-slot calls under these real scheduler helpers:
+  build_news_briefs, lock_cast, generate_outline, compose_line, generate_title,
+  compose_news_coda, compose_announcer_intro, compose_announcer_outro,
+  announcer_intro_rewrite. Original concept/select inherit build_news_briefs;
+  structured_call names original_concept/original_select are not scheduler names.
+  ledger_clean, ledger_cleanup and cast_coverage_repair are finishing. Remaining
+  support helpers (dramatic_state, build_continuity_ledger, story_brief_reflection,
+  produced_story_summary, derive_produced_open_brief) stay recorded separately;
+  unknown helper names are disclosed, never silently credited as story creation.
+- Deduplicate generation identities in first-successful-call order and join with
+  comma-space. Include an explicit unreported entry when needed. Overwrite the
+  earlier generic default ONLY when meta.source_bank == "original"; do not use
+  the nonexistent bank id original_radio, and do not use setdefault. Stamp before
+  finalizer/serialization. Existing aggregate remote cost telemetry stays separate.
+
+Tests: local/remote identities; creative/technical and generation/finishing
+separation; same alias returns A then B; missing identity after a known one;
+model-gone fallback; interleaved schedulers; failed generation; weak references
+to unloaded models clear while journal survives; terminal file/wire/rendered
+credit parity; other banks' attribution unchanged.
+
+### Sprint C -- credits hero title containment
+
+The published Lantern proof at `2026-09-10-mac-final/README.md` and
+`2026-09-10-mac-final/images/credits.png` shows the long title crossing `CAST & VOICES`.
+`otr_credits_roll._flow_col1` shrinks to `_PT_HERO_MIN` then draws the full
+title as one line. Metadata already clamps to the column; the hero does not.
+
+Keep short-title appearance when it fits. At the font floor, wrap the full
+title within column 1 using measured glyph widths and split a single overlong
+token without losing characters. Existing `_wrap` and the video title-card
+wrapper both allow a single overlong token to overflow; neither can be reused
+unchanged. Use the existing font loader and width/height measurements; no font
+resolver refactor, title rewriting, truncation or cross-column drawing.
+
+Advance y by the complete rendered hero height before subtitle, tag and metadata.
+The existing `_draw_col1` scratch measurement, spacing tiers and disclosed
+ledger-row abridgment must see the same wrapped layout. Do not clamp only the
+visible draw while the measurement pass still assumes one line.
+
+Tests/visual proof: short Lightning title, exact long Lantern title, an unbroken
+long token, and scaled canvases. Verify every title glyph stays in its column,
+subtitle/metadata follow without overlap, and the existing footer-fit policy
+still works. Existing clearly marked FRAMES/VRAM/REV abridgment is allowed
+when added title height requires it; SEED/COMMIT and the full title remain.
+Do not add a two-line ellipsis policy. Implement measured wrapping in
+_flow_col1, splitting overlong tokens; every draw line advances by _fh(font), so
+scratch and paint share the exact result. Render through the actual credits function with real fonts and
+inspect the PNG at normal and low resolution; no full episode rerender needed
+to qualify this bounded layout change. Preserve old published assets.
+
+### Verification and delivery per chunk
+
+Use the real Windows venv, UTF-8, pytest without cache provider. Run focused
+tests, full suite against the measured baseline, and the Bug Bible. A chunk
+changing node schema/wiring/widgets also changes the canonical in the same
+commit and reruns link/widget/validator audits. These three scoped changes are
+expected not to need new graph controls; verify rather than assume.
+
+One editor. Obtain one finished-diff independent CLI review after code. Record
+live-backed production failures under the production-log/Bible admission
+rules; do not invent production bugs from test fixtures. Commit and push each
+qualified chunk together to `v2.0-alpha`; verify HEAD equals origin plus
+encoding, nonempty files and touched Python AST. No tag/release/promotion.
+
+GO_FORWARD remains pending work only. Move completion receipts to HANDOFF_LOG
+and the archive; retain the operator rulings without presenting finished work
+as the next task. Native App/player and full media qualification follow these
+sprints, and the older numbered queue remains outside this campaign.
 
 **Scope cut (operator, 2026-09-10): no replay-system work.** Reusing saved
 input means a fresh generation. No old-bundle migration, saved-episode
@@ -120,8 +343,9 @@ requirements; this is not part of clean-audio P1 and does not block priority #1.
 After priority #1, resume the **five-act forced-Ghost canonical publication
 proof in row 2.2**, then follow section 0. Read the newest entry in
 `docs/HANDOFF_LOG.md` and `docs/2026-09-10-mac-final/README.md` before starting.
-The Mac font check is not a pending gate. Preserve the accepted title and
-credits; do not reopen their appearance during the hardware handoff.
+The Mac font check is not a pending gate. Its appearance acceptance applied
+to that completed hardware handoff. Preserve its published assets; the new
+Sprint C explicitly authorizes fixing the long-title layout in future output.
 
 **Recovery gate:** verify the nine Mac videos and their episode folders are
 copied off the rental before retiring it. The manifest is
@@ -321,185 +545,38 @@ receipt in `docs/HANDOFF_LOG.md`. Completed narrative goes to
 ---
 
 
-## STANDING RULINGS LIFTED FROM ARCHIVED SECTIONS (2026-09-09)
-
-**These are verbatim from sections moved to `docs/GO_FORWARD_ARCHIVE.md`.**
-They are here because the archive rule says a ruling must survive the move,
-and because the rule's own suggested grep MISSES most of them -- it found
-zero hits in 770 lines that in fact carried 29. Do not re-litigate any of
-these without the operator; the archive holds the full context.
-
-| the pending sweep deleting what it could not READ (Fable finding 2) | `31dc6861` |
-| replay import trusting a ledger the manifest never verified (Fable finding 3) | `14c6a6db` |
-
----
-
-
-**THE METHOD WORTH KEEPING:** read `status_reason`, never infer from counts. Every
-prior session optimised a number that was never the blocker.
-
----
-
-  ripping one symbol from it DEMOTED the Lemmy voice route and had to be reverted)
-  and `nodes/_otr_source_grounding.py` (its siblings are ruling-protected).
-
----
-
-field annotations, and overrides of a base in ANOTHER installed pack are all invisible
-to it. Grep for the PATTERN, never the name.
-
----
-
-
-Operator: Mac and AMD ship images only (ruling 2026-09-01), and he is "not hopeful".
-Landed: the credits font, the llama-cpp hint and four platform guards. Owed, in order:
-
----
-
-**HARD CONSTRAINT, carried from today.** A dropdown entry is a promise the
-model will load. Do NOT widen any `device_backends` on reasoning alone -- the
-z_image and ltx widenings in step 1 are EXPERIMENTS to be measured on Apple
-
----
-
-   finds NO caller that passes one -- the adapter is dead code. A first run
-   therefore fetches ~20 GB behind a node that never moves. Before the
-   nuke-and-reinstall test this is not cosmetic: without it we cannot tell
-
----
-
-
-### B. The publish -- operator's call, and it gates everything user-facing
-
----
-
-   `pyproject.toml` AUTO-FIRES the publish, and `(node_id, version)` is uniquely
-   indexed -- a burned version string never returns.
-5. **Bundle `static-ffmpeg` into that same bump.** It is the only zero-friction
-
----
-
-   template -> press Run -> touch nothing but the mouse.
-   **Never delete:** `D:\otr-4060-testing` (the checkout), the private evidence
-   tree, or `ComfyUI-Shared\models` unless explicitly cleared.
-
----
-
-   the paragraph below that said neither existed is superseded.
-8. ~~SDXL adapter only if item 7 fails.~~ Item 7 did not fail. **Do not build it.**
-9. Still the rule, and it held: a dropdown entry is a promise. Every widening
-
----
-
-   script on any cold cache. This is the single highest-value action in this file.
-   Operator's call (a `pyproject.toml` edit auto-fires the publish).
-2. **The size badge understates every row by about half, and it is now measured
-
----
-
-offer it. Installing alpha.25 in the clean-install drill required opening the
-version chip and picking the exact string by hand -- the operator's own
-guidance, "you can still install flagged you just need to click to see the
-
----
-
-**THE LEAD THAT FOLLOWS FROM IT, and it is a good one.** The LLM lane downloads
-just as much and has never been the differing file, because it goes through
-`huggingface_hub.snapshot_download` -- a declared dependency, present in every
-
----
-
-retry on a 36.8 GB first fetch that previously restarted a 12 GB file from zero
-and was measured stalling for 50 seconds; the operator's token on transfers; and
-the library's redirect handling instead of ours. Those were separately-recorded
-
----
-
-tried first; this is the documented async fallback, not a request to relay
-through the operator.
-
----
-
-
-Operator, 2026-09-07: *"do not save the 3 jsons just note them, they will be
-saved later"* / *"I'm not saving a duplicate json until all testing is done with
-all machines."* No profile JSON was added. Do not add them; do not promote them.
-
----
-
-the current writer default and the licence-clean music bed, so `still_pan` has
-never run with `q354b` + `sa3`. It must not be promoted until one episode does.
-That run is the cheapest missing evidence in the set and the 4060 keeps it.
-
----
-
-
-**Combinatorial coverage is explicitly NOT the plan.** Operator, 2026-09-07:
-*"I'm not sure we need to regression test every combo at this stage."* Three
-
----
-
-
-## 2. ONE JSON OR TWO -- the operator's question, answered
-
-Operator, 2026-09-07: *"my goal is I run it on cuda, mac, it works everywhere --
-not all dropdowns -- but want ONE json to work. If that's impossible we need two
-
----
-
-
-**Recommended shape, in the operator's own words** (*"if cuda is available use
-it, if not ... it automatically finds it"*):
-
----
-
-only selectable policy on Apple Silicon -- and `none` is what does not fit.
-A Mac operator has no in-UI move.
-
-**Three real options, operator's call:**
-
----
-
-
-**No episode reached `otr/obs/`, so by the operator's own standard this leg did
-not pass.** Two runs were started; the first died when its host session
-
----
-
-   GitHub credentials (no `gh`, no keychain entry, no SSH key). The commit is
-   `a7ab7011`; a `git format-patch` of it was handed to the operator directly.
-   It is the tokenizers install-brick fix, PBUG-20260907-05 -- the highest
-
----
-
-   ComfyUI install**, `.28` included.
-2. **Do not re-install this pack from the registry onto a working box** until
-   `.29` (or later) is the served version. It will brick the boot, and because
-
----
-
-   `pycairo` dependency installs on Windows only -- so the shipped default could
-   never render on macOS **or Linux**. Now `viz_green`.
-3. **ffmpeg was never a declared dependency.** The run died at the mp4 encode
-   telling a Mac user to run `winget install ffmpeg`. Now `imageio-ffmpeg`.
-
----
-
-
-Both valid, non-silent, unclipped. **The numbers do not separate them on
-quality**, and at 2 cues an episode the saving is ~40 s of a ~24 min run -- ~3%,
-
----
-
-native default", and Comfy-Org's own default for the checkpoint this pack loads
-is `cfg=1`. Operator, 2026-09-07: *"we just need it to run and produce music and
-not fail the episode."* It does.
-
----
-
-1. **`2.0.0-alpha.29` and everything after it are committed but NOT pushed** --
-   this rented Mac has no GitHub credentials. Patches were handed to the operator
-   directly. The tokenizers fix is the urgent one: **every currently published
+## Carried constraints and open qualification work
+
+The former fragment list is preserved verbatim in GO_FORWARD_ARCHIVE, with its
+full historical context. Keep these constraints while executing the queue:
+
+- Read registry status_reason; finding counts do not identify the blocker.
+  Version bumps publish and remain the operator's decision.
+- Preserve ruling-protected resolved-request, source-grounding and IndexTTS2
+  runtime-fingerprint files. Inspect registrations, annotations, aliases and
+  external overrides before declaring code dead.
+- A dropdown entry promises measured platform support. Do not widen support
+  from reasoning alone or revive the conditional SDXL adapter project.
+- Destructive clean-install drills need inventory and approval. Never delete
+  D:/otr-4060-testing, private evidence or ComfyUI-Shared/models without explicit
+  clearance. Record manual steps; zero manual steps is the qualification target.
+- Keep one shipping JSON; do not create or promote duplicate configuration
+  variants. Test representative combinations, not every possible combination.
+- Use direct agent handoff or the documented asynchronous handoff, rather than
+  asking the operator to relay work.
+
+Still pending, after the current My Story priority and in the existing queue:
+
+- The 4060 still_pan + Qwen3.5-4B + Stable Audio3 combination proof and requested
+  16 GB comparison. Lane-level qualification does not prove this combination;
+  see 4060_PORTABILITY_ANSWER.md and row5.2.
+- Automatic device selection for the one-JSON goal remains a deferred design
+  question. Current writer/upscale choices do not implement it; no immediate
+  three-widget change is implied by the old proposal.
+- Mac repeatability and the existing AMD ladder still require their own evidence.
+  Published Mac image/diffusion work supersedes the old images-only prohibition.
+- Stable Audio3 recipe listening remains deferred. Preserve defaults until the
+  listening decision; a default change requires CUDA re-baselining.
 
 ---
 
@@ -533,7 +610,7 @@ remain in force for the remaining queue.
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **Opus cleanup (DONE `e562e146`) -> My Story (sprints 3-5 above)** | The shared code is clean as of 2026-09-10; now currentize the source-bank docs, complete the independent design, build a full graph creator path, then add optional App presentation and finish qualification. Both linked plans are priority #1. |
+| **1st** | **My Story: Sprints A, B, C, then separate qualification** | Execute WHERE TO PICK UP. That section is the authoritative next coding plan; D0/D1 and the initial graph implementation are archived completion receipts, not tasks to restart. |
 | **2nd** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
@@ -575,8 +652,7 @@ accepted ledger malformed and fails closed. The stored object already carries `m
 makes "applied identically to writer output, replay and the deterministic path"
 achievable in one commit.
 
-**The next concrete step is sprint 3: Codex My Story D0 from HEAD `e562e146`
-(sprints 1-2 landed 2026-09-10).**
+**The next concrete step is the R1-R4 review of Sprints A-C under WHERE TO PICK UP, followed by Sprint A coding and a real canonical writer/ledger dry run.**
 Row 2.2 resumes after the combined priority #1 programme. Its build
 specification and superseded plumbing directions are archived;
 do not add a new field or redirect the v3 renderer to the v2 admission key.

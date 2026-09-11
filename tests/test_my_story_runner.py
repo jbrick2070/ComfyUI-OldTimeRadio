@@ -132,13 +132,14 @@ class Slots:
 
 
 def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
-         include_act_breaks=True, idea="a keeper hears a voice"):
+         include_act_breaks=True, idea="a keeper hears a voice", raw_num_characters=None):
     from nodes import production_ledger as PL
 
+    raw_requested = num_characters if raw_num_characters is None else raw_num_characters
     bundle = SI.build_bundle(
         SI.capture_raw(idea=idea, characters="Ada, the keeper. Tom.",
                        author=author),
-        SI.StoryRequest(num_characters=num_characters, act_count=str(act_count),
+        SI.StoryRequest(num_characters=raw_requested, act_count=str(act_count),
                         include_act_breaks=include_act_breaks,
                         source_bank_requested="my_story",
                         visual_style_requested="viz_camera"),
@@ -154,7 +155,7 @@ def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
             "kind": "user_story",
             "story_input": bundle.as_dict(),
             "draft_digest": bundle.digest,
-            "requested_num_characters": num_characters,
+            "requested_num_characters": raw_requested,
             "story_author": bundle.normalized.author,
         },
     }
@@ -220,18 +221,14 @@ def test_a_stated_gender_is_carried_and_never_guessed_from_a_name():
     assert ada["gender"] == "female"
 
 
-def test_the_requested_and_actual_counts_are_both_recorded():
-    """Neither is a gate, and the difference is only visible if both are kept.
-
-    A request of five that casts two is an ordinary outcome: the person named
-    two people and said only these, so the named cast outranks the number.
-    """
-    slots = Slots(cast=("Ada", "Tom"),
+def test_selected_and_delivered_counts_match_while_plan_remains_evidence():
+    slots = Slots(cast=("Ada", "Tom", "Mabel"),
                   interpretation=_interpretation(planned=2, exclusive=True))
-    led, _ = _run(slots, num_characters=5)
-    contract = led.data["meta"]["cast_contract"]
-    assert contract["num_characters_request"] == 5
-    assert contract["num_characters_locked"] == 2
+    led, _ = _run(slots, num_characters=3)
+    counts = led.data["meta"]["my_story"]["counts"]
+    assert counts["planned_characters"] == 2
+    assert counts["requested_characters"] == counts["actual_characters"] == 3
+    assert led.data["meta"]["cast_contract"]["num_characters_locked"] == 3
 
 
 def test_the_assumptions_the_model_made_are_kept_on_the_ledger():
@@ -263,18 +260,21 @@ def test_an_unattributed_story_says_a_listener_and_names_nobody():
     assert receipt["author"] == ""
 
 
-def test_the_frame_is_rejected_when_it_drops_the_attribution():
-    """A paraphrased name is the wrong name, so the check is verbatim."""
-    validator = MS._make_frame_validator("Tonight's story is by Ada.", 0)
-    good = MS.StoryFrame(**_frame("Tonight's story is by Ada."))
-    assert validator(good) is None
-    bad = MS.StoryFrame(**_frame("Tonight's tale comes from Ada."))
-    assert "attribution sentence is missing" in validator(bad)
+def test_missing_frame_credit_is_appended_once_without_retry():
+    from nodes._otr_content_authorship import validate_receipt
+    class MissingCredit(Slots):
+        def _answer(self, messages):
+            if "announcer's frame" in messages[0]["content"]:
+                return json.dumps({"announcer_outro": ["Good night."]})
+            return super()._answer(messages)
+    slots = MissingCredit()
+    led, _ = _run(slots)
+    text = " ".join(row.get("text", "") for row in led.data["lines"])
+    assert text.count(slots._attr) == 1
+    assert len(slots.calls) == 4
+    assert slots._attr not in str(led.data["meta"]["my_story"]["frame_proposal"])
+    validate_receipt(led.data)
 
-
-# ---------------------------------------------------------------------------
-# the ledger the rest of the pipeline consumes
-# ---------------------------------------------------------------------------
 
 def test_every_line_carries_a_role_the_freeze_accepts():
     from nodes._otr_ledger_freeze import ALLOWED_SPEAKER_ROLES
@@ -431,12 +431,13 @@ def test_a_speaker_outside_the_cast_is_refused():
 
 
 @pytest.mark.parametrize("planned", [2, 9])
-def test_a_cast_plan_larger_than_the_voice_stock_is_reported_not_rendered(planned):
-    validator = MS._make_interpret_validator(requested=2, voice_capacity=3)
-    interp = MS.StoryInterpretation(**_interpretation(
-        planned=planned, named=tuple("ABCDEFGHI")))
-    with pytest.raises(MS.MyStoryCastError, match="voices"):
-        validator(interp)
+def test_cast_plan_estimates_do_not_reject_a_usable_selected_cast(planned):
+    slots = Slots(interpretation=_interpretation(planned=planned, named=tuple("ABCDEFGHI")))
+    led, _ = _run(slots)
+    story = led.data["meta"]["my_story"]
+    assert story["counts"]["actual_characters"] == 2
+    assert story["counts"]["planned_characters"] == planned
+    assert story["fidelity_discrepancies"]
 
 
 @pytest.mark.parametrize("failed_save,checkpoint", [(1, "preamble"), (2, "act 1")])
@@ -455,54 +456,72 @@ def test_assembly_stops_when_an_incremental_save_fails(monkeypatch, failed_save,
         MS._assemble(led, treatment, [MS.ActScript(**_act())],
                      MS.StoryFrame(**_frame(SI.attribution_sentence("A. Listener"))),
                      MS._assign_voices(treatment, random.Random(123)),
-                     owner_bank="my_story",
+                     owner_bank="my_story", include_act_breaks=True,
                      interpretation=MS.StoryInterpretation(**_interpretation()))
     assert len(calls) == failed_save
 
 
-def test_an_impossible_cast_fails_before_any_creative_call():
-    """Terminal, and BEFORE the expensive passes -- the ladder already asked
-    for a smaller cast and the model did not deliver one."""
-    from nodes import production_ledger as PL
-
-    slots = Slots(interpretation=_interpretation(planned=99,
-                                                 named=tuple("ABCDEFGHIJ")))
-    bundle = SI.build_bundle(SI.capture_raw(idea="x"),
-                             SI.StoryRequest(num_characters=99))
-    led = PL.new_ledger(episode_id=None)
-    with pytest.raises(MS.MyStoryError) as caught:
-        MS.run_my_story_episode(
-            payload={}, pack=RT.resolve_story_pack("my_story"),
-            resolved={"act_count": 1, "include_act_breaks": True,
-                      "num_characters": 99, "creative_writing_model": "c",
-                      "technical_model": "t", "lemmy_force": None,
-                      "source_meta": {"story_input": bundle.as_dict(),
-                                      "requested_num_characters": 99,
-                                      "story_author": ""}},
-            led=led, meta=led.data.setdefault("meta", {}),
-            creative_fn=slots.creative, technical_fn=slots.technical,
-            slot_scheduler=None,
-            source_bank_row=RT.require_runnable_bank("my_story"),
-            episode_root=None, episode_id=led.episode_id)
-    assert "voices in stock" in str(caught.value)
-    assert [kind for kind, _ in slots.calls] == ["technical"]
+def test_actual_voice_allocation_exhaustion_names_the_character(monkeypatch):
+    import random
+    monkeypatch.setattr(MS._POOLS, "open_voice_pool", lambda taken: [])
+    with pytest.raises(MS.MyStoryCastError, match="character 1.*Ada"):
+        MS._assign_voices(MS.StoryTreatment(**_treatment()), random.Random(123))
 
 
-def test_exclusive_named_cast_overrides_an_oversized_numeric_request():
+def test_exclusive_named_cast_can_exceed_the_requested_character_count():
     slots = Slots(interpretation=_interpretation(planned=2, exclusive=True))
-    led, _ = _run(slots, num_characters=99)
-    assert len(led.data["cast"]) == 3  # two characters plus announcer
+    led, _ = _run(slots, num_characters=1)
+    assert len(led.data["cast"]) == 3  # two story characters plus announcer
+    assert led.data["meta"]["my_story"]["fidelity_discrepancies"] == []
+    assert len(slots.calls) == 4  # no cast-count repair
 
 
-@pytest.mark.parametrize("names", [("ADA", "Tom"), ("Ada", "Ada")])
-def test_treatment_cannot_rename_or_duplicate_required_people(names):
-    check = MS._make_treatment_validator(MS.StoryInterpretation(**_interpretation()), 1)
+@pytest.mark.parametrize("requested,cast", [
+    (1, ("Ada", "Tom", "Mabel")),
+    (4, ("Ada", "Tom")),
+])
+@pytest.mark.parametrize("acts", [1, 3, 6])
+def test_flexible_cast_records_requested_and_actual_counts_without_retry(requested, cast, acts):
+    from nodes._otr_content_authorship import validate_receipt
+    from nodes import _otr_freeze_cascade as FC
+    slots = Slots(acts=acts, cast=cast)
+    led, _ = _run(slots, act_count=acts, num_characters=requested)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    counts = saved["meta"]["my_story"]["counts"]
+    assert counts["requested_characters"] == requested
+    assert counts["accepted_characters"] == counts["actual_characters"] == len(cast)
+    assert counts["requested_acts"] == counts["actual_acts"] == acts
+    assert len(slots.calls) == acts + 3
+    assert FC._readonly_structural_validation(saved) == []
+    validate_receipt(saved)
+
+
+@pytest.mark.parametrize("raw_request", [-1, 0, 12])
+def test_character_receipts_keep_raw_api_request_after_hint_normalization(raw_request):
+    class ObservedSlots(Slots):
+        def _answer(self, messages):
+            if "work out what they actually want" in messages[0]["content"]:
+                assert "distinct voices available" not in messages[-1]["content"]
+            return super()._answer(messages)
+    led, _ = _run(ObservedSlots(), num_characters=max(1, min(10, raw_request)),
+                  raw_num_characters=raw_request)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    assert saved["meta"]["my_story"]["counts"]["requested_characters"] == raw_request
+    assert saved["meta"]["cast_contract"]["num_characters_request"] == raw_request
+    assert saved["meta"]["my_story"]["counts"]["actual_characters"] == 2
+
+
+@pytest.mark.parametrize("names", [("Ada", "Ada"), ("ANNOUNCER", "Tom")])
+def test_treatment_rejects_ambiguous_or_reserved_cast_identities(names):
+    check = MS._make_treatment_validator(1)
     assert check(MS.StoryTreatment(**_treatment(cast=names)))
 
 
-def test_act_speaker_identity_is_exact():
+def test_act_speaker_spelling_normalizes_to_the_accepted_cast():
     check = MS._make_act_validator(MS.StoryTreatment(**_treatment()), 1, ())
-    assert check(MS.ActScript(**_act(speakers=("ADA", "Tom"))))
+    act = MS.ActScript(**_act(speakers=("  ADA  ", "tom")))
+    assert check(act) is None
+    assert [line.speaker for line in act.lines] == ["Ada", "Tom", "Ada"]
 
 
 def test_cast_pool_import_is_relative_first_for_comfy_package_loading():
@@ -521,7 +540,8 @@ def test_all_user_fields_reach_treatment_and_the_full_plan_reaches_acts():
         captured.append(messages[-1]["content"])
         return json.dumps(_treatment())
     treatment = MS._pass_treatment(treatment_slot, RT.resolve_story_pack("my_story"),
-        bundle, MS.StoryInterpretation(**_interpretation()), act_count=1, include_act_breaks=True)
+        bundle, MS.StoryInterpretation(**_interpretation()), act_count=1,
+        requested_characters=2, include_act_breaks=True)
     assert all(value in captured[0] for value in ("IDEA-A", "CAST-B", "PLOT-C", "SETTING-D"))
     def act_slot(messages, **kw):
         captured.append(messages[-1]["content"])
@@ -548,16 +568,18 @@ def test_a_failed_act_retries_only_that_act():
     assert len(led.data["meta"]["my_story"]["pass_receipts"]) == 7
 
 
-def test_no_room_is_terminal_and_identifies_the_longest_field():
+def test_capacity_failure_keeps_shared_facts_without_input_field_blame():
     from nodes._otr_generation_budget import GenerationContextOverflowError
     calls = []
+    error = GenerationContextOverflowError("prompt 2048 exceeds context 2048", phase="prompt_no_room")
     def slot(*a, **kw):
         calls.append(True)
-        raise GenerationContextOverflowError("prompt 2048 exceeds context 2048", phase="prompt_no_room")
+        raise error
     bundle = SI.build_bundle(SI.capture_raw(idea="x", plot="long plot " * 50), SI.StoryRequest())
-    with pytest.raises(MS.MyStoryInputTooLongError, match="Plot ideas"):
+    with pytest.raises(GenerationContextOverflowError) as caught:
         MS._pass_interpret(slot, RT.resolve_story_pack("my_story"), bundle,
-                           requested=2, act_count=1, include_act_breaks=True, voice_capacity=20)
+                          requested=2, act_count=1, include_act_breaks=True)
+    assert caught.value is error
     assert calls == [True]
 
 
@@ -647,3 +669,185 @@ def test_errors_name_this_lane_and_not_a_sibling():
     would send the next reader to the wrong module."""
     error = MS.MyStoryError("interpret", "something went wrong")
     assert str(error).startswith("[my_story] pass 'interpret'")
+
+
+@pytest.mark.parametrize("acts,characters", [(1, 1), (3, 2), (6, 4)])
+def test_full_treatment_repair_preserves_material_and_matches_variable_controls(acts, characters):
+    from nodes._otr_content_authorship import validate_receipt
+    cast = ("Ada", "Tom", "Mabel", "Ruth")[:characters]
+    marker = "THE BELL SOUNDS AND THE FERRY TURNS AWAY"
+    class CountRepair(Slots):
+        repairs = 0
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                prior = [m for m in messages if m["role"] == "assistant"]
+                if prior:
+                    self.repairs += 1
+                    assert marker in prior[-1]["content"]
+                    assert prior[-1]["content"].index(marker) > 400
+                    assert "a keeper hears a voice" in messages[1]["content"]
+                    assert f"exactly {acts} acts" in messages[-1]["content"]
+                    assert "character count is flexible" in messages[-1]["content"]
+                    result = _treatment(acts, cast)
+                else:
+                    result = _treatment(acts + 1, (*cast, "Extra"))
+                result["ending"] = marker
+                result["acts"][-1]["ending_state"] = marker
+                return "```json\n" + json.dumps(result) + "\n```"
+            return super()._answer(messages)
+    slots = CountRepair(acts=acts, cast=cast)
+    led, _ = _run(slots, act_count=acts, num_characters=characters)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert slots.repairs == 1
+    assert story["counts"]["proposed_acts"] == acts + 1
+    assert story["counts"]["proposed_characters"] == characters + 1
+    assert story["counts"]["actual_acts"] == acts
+    assert story["counts"]["actual_characters"] == characters
+    assert story["treatment"]["ending"] == marker
+    assert len(saved["scenes"]) == acts
+    assert len([c for c in saved["music"] if c["placement"] == "interstitial"]) == acts - 1
+    assert len({r["shot_id"] for r in saved["shots"]}) == len(saved["shots"])
+    assert saved["meta"]["my_story"] == led.data["meta"]["my_story"]
+    validate_receipt(saved)
+
+
+def test_count_repair_exhaustion_remains_an_honest_failed_ledger(tmp_path):
+    from nodes._otr_structured_call import StructuredCallFailedError
+    class FencedSlots(Slots):
+        def _answer(self, messages):
+            return "```json\n" + super()._answer(messages) + "\n```"
+    slots = FencedSlots(acts=2)
+    with pytest.raises(StructuredCallFailedError, match="selected count is 1"):
+        _run(slots, act_count=1)
+    assert len(slots.calls) == 3  # interpretation, treatment, one typed repair
+    path, = tmp_path.rglob("*_ledger.json")
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert story["counts"]["actual_acts"] is None
+    assert story["counts"]["proposed_acts"] == 2
+    assert [a["status"] for a in story["attempts"] if a["pass_id"] == "treatment"] == ["failed", "failed"]
+
+
+@pytest.mark.parametrize("error", [RuntimeError("provider interrupted"), KeyboardInterrupt()])
+@pytest.mark.parametrize("raise_on_save", [False, True])
+def test_failed_receipt_save_preserves_the_original_failure(monkeypatch, caplog, error, raise_on_save):
+    from nodes import production_ledger as PL
+    class FailingSlot(Slots):
+        def _answer(self, messages):
+            def fail_save(self):
+                if raise_on_save:
+                    raise OSError("storage unavailable")
+                return None
+            monkeypatch.setattr(PL.Ledger, "save", fail_save)
+            raise error
+    with pytest.raises(type(error)) as caught:
+        _run(FailingSlot())
+    assert caught.value is error
+    assert "attempt history did not persist" in caplog.text
+
+
+def test_successful_story_cannot_hide_a_failed_final_receipt_save(monkeypatch):
+    from nodes import production_ledger as PL
+    real_save = PL.Ledger.save
+    def fail_final(self):
+        story = self.data.get("meta", {}).get("my_story", {})
+        counts = story.get("counts", {})
+        if counts.get("actual_acts") and counts.get("proposed_acts"):
+            return None
+        return real_save(self)
+    monkeypatch.setattr(PL.Ledger, "save", fail_final)
+    # A caller may already be handling an unrelated error: it must not make a
+    # successful runner suppress its own failed save via inherited exc_info().
+    try:
+        raise ValueError("an earlier caller operation failed")
+    except ValueError:
+        with pytest.raises(MS.MyStoryError, match="attempt history"):
+            _run(Slots())
+
+
+def test_attribution_already_in_the_coda_is_not_appended_again():
+    class CodaCredit(Slots):
+        def _answer(self, messages):
+            if "announcer's frame" in messages[0]["content"]:
+                frame = _frame(self._attr)
+                frame["announcer_intro"] = ["Good evening."]
+                frame["coda"] = self._attr
+                return json.dumps(frame)
+            return super()._answer(messages)
+    slots = CodaCredit()
+    led, _ = _run(slots)
+    assert sum(slots._attr in row.get("text", "") for row in led.data["lines"]) == 1
+
+
+def test_missing_metadata_optional_frame_and_numbering_reach_readonly_freeze():
+    from nodes import _otr_freeze_cascade as FC
+    class Sparse(Slots):
+        def _answer(self, messages):
+            system = messages[0]["content"]
+            if "radio dramatist" in system:
+                return json.dumps({"cast": [{"name": "Ada"}, {"name": "Tom", "gender": "other"}],
+                                   "acts": [{"n": 2}, {"n": 3}]})
+            if "one act of a radio drama" in system:
+                self._act_seen += 1
+                return json.dumps(_act(90, ("Ada",) if self._act_seen == 1 else ("Tom",)))
+            if "announcer's frame" in system:
+                return json.dumps({"announcer_intro": ["", "Hello."],
+                                   "announcer_outro": [""], "music_inter": ["", "unused cue"]})
+            return super()._answer(messages)
+    led, parts = _run(Sparse(acts=2), act_count=2)
+    assert parts.final_title_override is None
+    assert not next(c for c in led.data["cast"] if c["name"] == "Ada")["gender"]
+    assert led.data["meta"]["my_story"]["treatment"]["cast"][0]["gender"] == ""
+    story = led.data["meta"]["my_story"]
+    assert story["act_number_normalization"]["replies"] == [{"original": 90, "slot": 1}, {"original": 90, "slot": 2}]
+    assert story["music_cue_disposition"] == [{"proposal_index": 1, "description": "unused cue", "disposition": "unused_surplus"}]
+    intro = next(r for r in led.data["lines"] if r.get("text") == "Hello.")
+    assert intro["boundary"] == "shot_start"
+    assert FC._readonly_structural_validation(led.data) == []
+
+
+def test_breaks_off_preserves_all_unused_cue_proposals():
+    led, _ = _run(Slots(acts=3, inter=4), act_count=3, include_act_breaks=False)
+    assert all(c["placement"] != "interstitial" for c in led.data["music"])
+    assert len(led.data["meta"]["my_story"]["music_cue_disposition"]) == 4
+
+
+def test_speakable_coverage_repairs_only_last_act_with_full_dialogue():
+    class CoverageRepair(Slots):
+        second_calls = 0
+        def _answer(self, messages):
+            if "one act of a radio drama" in messages[0]["content"]:
+                prior = [m for m in messages if m["role"] == "assistant"]
+                if prior:
+                    assert "ENDING MARKER" in prior[-1]["content"]
+                    assert "Tom" in messages[-1]["content"]
+                    self.second_calls += 1
+                    return json.dumps(_act(2))
+                self._act_seen += 1
+                result = _act(self._act_seen, ("Ada",))
+                result["lines"][0]["text"] = "The bell is waiting. " * 40 + "ENDING MARKER"
+                result["lines"].append({"speaker": "Tom", "text": "(pauses)"})
+                return json.dumps(result)
+            return super()._answer(messages)
+    slots = CoverageRepair(acts=2)
+    led, _ = _run(slots, act_count=2)
+    assert slots._act_seen == 2 and slots.second_calls == 1
+    assert [a["status"] for a in led.data["meta"]["my_story"]["attempts"] if a["pass_id"] == "act_2"] == ["failed", "accepted"]
+
+
+def test_provider_capacity_contract_reaches_every_slot_and_typed_repair():
+    class CapacitySlots(Slots):
+        def creative(self, messages, *, max_new_tokens, **kw):
+            assert max_new_tokens is None
+            assert messages._otr_output_budget_mode == "provider_capacity"
+            assert messages._otr_prompt_must_fit is True
+            return super().creative(messages, max_new_tokens=max_new_tokens, **kw)
+        technical = creative
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                return json.dumps(_treatment(1 if any(m["role"] == "assistant" for m in messages) else 2))
+            return super()._answer(messages)
+    led, _ = _run(CapacitySlots())
+    assert all(p["budget_mode"] == "provider_capacity" and p["max_new_tokens"] is None
+               for p in led.data["meta"]["my_story"]["pass_receipts"] if p["model_id"] != "python")

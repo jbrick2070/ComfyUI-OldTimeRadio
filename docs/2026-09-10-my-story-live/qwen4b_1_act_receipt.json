@@ -1,0 +1,33 @@
+{
+  "scope": "canonical writer -> shared freeze only; no audio/video/publication",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runtime_changes": [
+    [
+      "1",
+      "llm_device",
+      "mps",
+      "cuda"
+    ]
+  ],
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Two lighthouse keepers must get a warning bell working before a ferry enters the fog.",
+    "story_characters": "Mara, a woman in her thirties, and Jon, a man in his forties. Only these two characters speak, apart from the announcer.",
+    "story_plot": "They find a jammed bell mechanism, disagree about the repair, then work together to sound the warning. The ferry turns safely away. No supernatural explanation.",
+    "story_setting": "An isolated coastal lighthouse in the 1930s, during one stormy night.",
+    "story_author": "",
+    "num_characters": 2,
+    "act_count": "1",
+    "visual_style": "roll (any style)"
+  },
+  "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "prompt_id": "e11e5d86-2dda-41fa-b942-bb927a754b83",
+  "queued_at_unix": 1789080509.5288565,
+  "outcome": "FAILED before assembly: requested 1 act, treatment and typed repair both returned 2",
+  "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260910_154830\\audio\\pending_20260910_154830_ledger.json",
+  "ledger_sha256": "7c39aa0eeedb7f0556120b49409338b7ada612524094bfff58ccf8f081da0cb2",
+  "history_receipt": "qwen4b_1_act_failed_history.json",
+  "freeze_executed": false,
+  "media_or_publication": false
+}

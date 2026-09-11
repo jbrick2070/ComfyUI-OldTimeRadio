@@ -5,7 +5,7 @@ machine found: a feed item, an archive post, a public-domain text, a spark
 drawn from a deck. This one starts from what a person typed, and that changes
 the shape of the work. The first pass is not a summariser, it is an INTERPRETER
 -- it decides which of their words are requirements and which are asides, then
-records what it had to assume. Everything downstream is bound by that reading.
+records what it had to assume. Selected acts bind; character count is guidance.
 
 THE PASS GRAPH, and why it is shaped this way:
 
@@ -22,16 +22,15 @@ which asks for the whole play in one markup artifact and retries the WHOLE play
 when the markup breaks. Here a failed act retries only itself: an act is a
 bounded thing to ask for and a bounded thing to lose.
 
-THE PERSON'S WORDS ARE THE AUTHORITY. Their names are carried verbatim into the
-treatment and out to the cast rows; a gender they stated is honoured, and one
-they did not state is never guessed from the sound of a name. Where they asked
-for something the form cannot do, the interpretation records it as a conflict
-with what the story will do instead -- never a silent drop.
+THE PERSON'S WORDS ARE THE SOURCE. The model adapts their material into the
+selected acts, with a flexible cast guided by their story. A gender they did not state is
+never guessed from a name. Interpretation notes and detected source conflicts
+remain in the receipt; requested and actual character counts stay separate.
 
 WHAT THIS LANE DOES NOT DO. It runs no cameo roll: the cast belongs to the
 person who described it, and a house cameo they did not ask for would overrule
 them. It declares no `line_composer_system` seam, which routes the freeze to
-`content_owned_readonly` -- their accepted text is verified, never rewritten.
+`content_owned_readonly` -- accepted text and authorized cleanup are verified.
 It never refuses a story for its length, its language or its taste.
 
 UTF-8, no BOM, ASCII source.
@@ -42,8 +41,8 @@ import hashlib
 import json
 import logging
 import random
-from dataclasses import dataclass, field
-from typing import Any, Callable, Literal, Mapping, Optional
+from dataclasses import dataclass
+from typing import Any, Callable, Mapping
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -52,14 +51,20 @@ try:
     from . import _otr_casting as _OTRCAST
     from . import _otr_story_input as _SI
     from . import _otr_word_delivery as _OTRWD
-    from ._otr_structured_call import structured_call
+    from ._otr_structured_call import structured_call, PostValidationError
+    from ._otr_generation_budget import ProviderCapacityMessages
+    from ._otr_script_prep import clean_spoken_text
+    from ._otr_json import parse_first_json_object
     from ._otr_repair_prompts import make_dispatching_repair_factory
 except ImportError:  # pragma: no cover -- flat / standalone test import
     import _otr_canon as _OTRC  # type: ignore
     import _otr_casting as _OTRCAST  # type: ignore
     import _otr_story_input as _SI  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
-    from _otr_structured_call import structured_call  # type: ignore
+    from _otr_structured_call import structured_call, PostValidationError  # type: ignore
+    from _otr_generation_budget import ProviderCapacityMessages  # type: ignore
+    from _otr_script_prep import clean_spoken_text  # type: ignore
+    from _otr_json import parse_first_json_object  # type: ignore
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
 
 try:
@@ -74,16 +79,6 @@ MY_STORY_SCHEMA = "my_story_v1"
 
 ANNOUNCER_NAME = "ANNOUNCER"
 ANNOUNCER_CHAR_ID = "announcer"
-
-#: Per-pass output ceilings. Ceilings, never targets: the transport's own
-#: context arithmetic decides what actually fits, and nothing here asks for a
-#: length. A story is as long as it turns out to be.
-_MAX_NEW_TOKENS = {
-    "interpret": 1200,
-    "treatment": 1800,
-    "act": 1600,
-    "frame": 700,
-}
 
 #: Base / structural-retry temperatures. The retry rung is always LOWER: a
 #: structural failure is answered with less entropy, not more.
@@ -118,29 +113,20 @@ class MyStoryCastError(MyStoryError):
     """The cast cannot be built or cannot be heard."""
 
 
-class MyStoryInputTooLongError(MyStoryError):
-    """The submission cannot fit the model's context with room to answer.
-
-    Terminal by construction: the arithmetic that refused it is deterministic,
-    so a re-roll re-derives the identical refusal. The message names the
-    longest field so there is something actionable to shorten.
-    """
-
-
 # ---------------------------------------------------------------------------
 # P0 -- interpretation
 # ---------------------------------------------------------------------------
 
 class Requirement(BaseModel):
-    id: str = Field(min_length=1)
-    text: str = Field(min_length=1)
-    kind: Literal["cast", "relationship", "setting", "outcome", "event", "tone", "other"] = "other"
-    source_field: Literal["idea", "characters", "plot", "setting"] = "idea"
-    strength: Literal["required", "preferred"] = "required"
+    id: str = ""
+    text: str = ""
+    kind: str = "other"
+    source_field: str = "idea"
+    strength: str = "required"
 
 
 class NamedCast(BaseModel):
-    name: str = Field(min_length=1)
+    name: str = ""
     notes: str = ""
     stated_gender: str = ""
     speaking: bool = True
@@ -149,12 +135,7 @@ class NamedCast(BaseModel):
     @field_validator("stated_gender", mode="before")
     @classmethod
     def _norm_gender(cls, value):
-        """Only male/female survive; anything else means "they did not say".
-
-        NEVER a guess. A hedge, a blank, or a word the bank does not know is
-        an absence of information, and the treatment chooses freely rather
-        than inheriting a coin flip dressed as a fact.
-        """
+        """Normalize stated vocabulary without inventing or erasing a gender."""
         if value is None:
             return ""
         try:
@@ -162,7 +143,7 @@ class NamedCast(BaseModel):
         except ImportError:  # pragma: no cover -- flat load
             from _otr_roster_gender import canonical_bank_gender  # type: ignore
         canon = str(canonical_bank_gender(value) or "").strip().lower()
-        return canon if canon in ("male", "female") else ""
+        return canon
 
 
 class CastPlan(BaseModel):
@@ -207,8 +188,8 @@ class StoryInterpretation(BaseModel):
 class CastMember(BaseModel):
     name: str = Field(min_length=1)
     role: str = ""
-    character_description: str = Field(min_length=1)
-    gender: str = "female"
+    character_description: str = ""
+    gender: str = ""
     age_band: str = "n/a"
     # `speech_register`, not `register`: the bare name shadows a pydantic
     # BaseModel attribute and pydantic warns about it at class construction.
@@ -222,13 +203,7 @@ class CastMember(BaseModel):
     @field_validator("gender", mode="before")
     @classmethod
     def _canonical_gender(cls, value):
-        """Fix the spelling; never invent the answer.
-
-        The voice stock is binary, so a hedge cannot be cast. Rather than
-        failing the whole treatment over one unusable word, an unrecognised
-        value is left for the post-validator to report by name -- the model
-        is told which character it hedged on and asked again.
-        """
+        """Fix synonyms; missing/other values use the shared open voice pool."""
         try:
             from ._otr_roster_gender import canonical_bank_gender
         except ImportError:  # pragma: no cover -- flat load
@@ -251,10 +226,10 @@ class ActPlan(BaseModel):
 
 
 class StoryTreatment(BaseModel):
-    title: str = Field(min_length=1)
+    title: str = ""
     logline: str = ""
-    dramatic_question: str = Field(min_length=1)
-    setting: str = Field(min_length=1)
+    dramatic_question: str = ""
+    setting: str = ""
     time_of_day: str = "night"
     cast: "list[CastMember]" = Field(min_length=1)
     acts: "list[ActPlan]" = Field(min_length=1)
@@ -284,11 +259,11 @@ class ActScript(BaseModel):
 # ---------------------------------------------------------------------------
 
 class StoryFrame(BaseModel):
-    announcer_intro: "list[str]" = Field(min_length=1)
-    announcer_outro: "list[str]" = Field(min_length=1)
-    coda: str = Field(min_length=1)
-    music_open: str = Field(min_length=1)
-    music_close: str = Field(min_length=1)
+    announcer_intro: "list[str]" = Field(default_factory=list)
+    announcer_outro: "list[str]" = Field(default_factory=list)
+    coda: str = ""
+    music_open: str = ""
+    music_close: str = ""
     music_inter: "list[str]" = Field(default_factory=list)
 
 
@@ -309,7 +284,7 @@ class MyStoryOutlineView:
 class MyStoryTailParts:
     outline_view: MyStoryOutlineView
     canon: Any
-    final_title_override: str
+    final_title_override: str | None
     run_story_spine: bool = False
     refine_active: bool = False
     my_story_meta: "dict | None" = None
@@ -341,11 +316,7 @@ def _helper_ctx(slot_scheduler: Any, name: str):
 
 
 def _ledger_meta(led: Any) -> dict:
-    """The LIVE meta mapping.
-
-    Reacquired after every save rather than held: ``Ledger.save()`` rebinds
-    ``led.data``, so a retained alias silently stops being the ledger.
-    """
+    """Read metadata from the current ledger, including transaction rollback."""
     return led.data.setdefault("meta", {})
 
 
@@ -388,106 +359,58 @@ def _resolve_seed() -> int:
     return random.SystemRandom().getrandbits(32)
 
 
-def _capacity_failure(exc: BaseException) -> bool:
-    """Did this failure mean "the prompt leaves no room"?"""
-    try:
-        from ._otr_generation_budget import (
-            CAPACITY_PHASE_PROMPT_NO_ROOM, CAPACITY_ERRORS)
-    except ImportError:  # pragma: no cover -- flat load
-        from _otr_generation_budget import (  # type: ignore
-            CAPACITY_PHASE_PROMPT_NO_ROOM, CAPACITY_ERRORS)
-    cause = exc
-    for _ in range(4):
-        if isinstance(cause, CAPACITY_ERRORS):
-            return getattr(cause, "phase", "") == CAPACITY_PHASE_PROMPT_NO_ROOM
-        cause = getattr(cause, "__cause__", None)
-        if cause is None:
-            return False
-    return False
+def _call(pass_id: str, bundle: Any, *, attempt_receipts=None, **kwargs) -> Any:
+    """Use the shared capacity contract and retain actual attempt evidence."""
+    del bundle
+    kwargs["prompt"] = ProviderCapacityMessages(kwargs["prompt"])
+    kwargs["max_new_tokens"] = None
+
+    def completed(number, raw, error):
+        if attempt_receipts is not None:
+            attempt_receipts.append({
+                "pass_id": pass_id, "attempt": number, "raw_output": raw,
+                "status": "accepted" if error is None else "failed",
+                "error": None if error is None else str(error),
+            })
+
+    return structured_call(on_attempt_complete=completed, **kwargs)
 
 
-def _longest_field(bundle: Any) -> str:
-    """Which field to suggest shortening, for a no-room refusal."""
-    norm = bundle.normalized
-    best, size = "", 0
-    for name in _SI.CREATIVE_FIELDS:
-        value = getattr(norm, name, "") or ""
-        if len(value) > size:
-            best, size = name, len(value)
-    return _SI.FIELD_LABELS.get(best, best)
+def _full_artifact_repair(instruction: str):
+    """Give existing post-validation repair the entire parsed draft to revise.
 
-
-def _call(pass_id: str, bundle: Any, **kwargs) -> Any:
-    """One structured pass, with the no-room refusal made legible.
-
-    Every other failure keeps its own type and message: this wrapper exists
-    only so a person who pasted too much text is told to shorten it, instead
-    of reading a token-arithmetic message about a context window.
+    The generic repair's 400-character echo cannot show the end of a treatment
+    or an act. Keep this at the authoring seam; all other typed repairs remain
+    shared, and the same post-validator still decides acceptance.
     """
-    try:
-        return structured_call(**kwargs)
-    except Exception as exc:  # noqa: BLE001 -- re-raised, never swallowed
-        if _capacity_failure(exc):
-            raise MyStoryInputTooLongError(
-                pass_id,
-                "your story input does not leave the writer model enough room "
-                "to answer. Shorten it -- '%s' is the longest field -- or "
-                "pick a model with a larger context. (%s)"
-                % (_longest_field(bundle), exc),
-            ) from exc
-        raise
+    typed = make_dispatching_repair_factory()
+
+    def repair(*, original_prompt, failed_output, error):
+        if not isinstance(error, PostValidationError):
+            return typed(original_prompt=original_prompt,
+                         failed_output=failed_output, error=error)
+        return [
+            *[dict(message) for message in original_prompt],
+            {"role": "assistant", "content": failed_output},
+            {"role": "user", "content": (
+                "Repair the complete draft above. %s\n"
+                "The validation problem is: %s\n"
+                "Preserve its story events, relationships and ending while "
+                "correcting the structure. Return the complete corrected JSON "
+                "object, with no commentary."
+                % (instruction, error)
+            )},
+        ]
+    return repair
 
 
 # ---------------------------------------------------------------------------
-# P0 -- interpret
+# P0 -- interpret (planning notes, not another admission gate)
 # ---------------------------------------------------------------------------
-
-def _make_interpret_validator(requested: int, voice_capacity: int):
-    def check(model: StoryInterpretation) -> "str | None":
-        requirement_ids = [row.id for row in model.requirements]
-        if len(set(requirement_ids)) != len(requirement_ids):
-            return "requirement ids must be unique"
-        seen = set()
-        for row in model.named_cast:
-            key = _norm_ws(row.name).casefold()
-            if not key:
-                return "a named_cast entry has an empty name"
-            if key in seen:
-                return "named_cast lists %r twice; each person once" % row.name
-            seen.add(key)
-        required = model.required_speakers()
-        plan = model.cast_plan
-        expected = (len(required) if plan.exclusive
-                    else max(len(required), int(requested)))
-        expected = max(1, expected)
-        if expected > voice_capacity:
-            # Capacity cannot be repaired by dropping the listener's cast.
-            # Check the authoritative count before repairing model arithmetic.
-            raise MyStoryCastError(
-                "interpret", "this story needs %d speaking characters and "
-                "only %d distinct voices in stock. Ask for fewer characters, "
-                "or name fewer people." % (expected, voice_capacity)
-            )
-        if int(plan.planned) != expected:
-            return (
-                "cast_plan.planned is %d but should be %d (%d required "
-                "speaking name(s), %d requested, exclusive=%s)"
-                % (plan.planned, expected, len(required), requested,
-                   plan.exclusive)
-            )
-        for conflict in model.conflicts:
-            if conflict.requirement_id not in requirement_ids:
-                return "conflict must name an existing requirement id"
-            if not conflict.resolution.strip():
-                return ("conflict %r has no resolution; say what the story "
-                        "will do instead" % conflict.requirement_id)
-        return None
-    return check
-
 
 def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                     act_count: int, include_act_breaks: bool,
-                    voice_capacity: int) -> StoryInterpretation:
+                    attempt_receipts=None) -> StoryInterpretation:
     norm = bundle.normalized
     fields = "\n\n".join(
         "%s:\n%s" % (_SI.FIELD_LABELS[name].upper(), getattr(norm, name))
@@ -495,7 +418,7 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
     )
     base, retry = _TEMP["interpret"]
     return _call(
-        "interpret", bundle,
+        "interpret", bundle, attempt_receipts=attempt_receipts,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_interpret_system")},
             {"role": "user", "content": (
@@ -503,11 +426,10 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                 "THEIR SETTINGS:\n"
                 "- characters requested: %d\n"
                 "- acts: %d\n"
-                "- music between acts: %s\n"
-                "- distinct voices available: %d\n\n"
+                "- music between acts: %s\n\n"
                 "Interpret it now."
                 % (fields, requested, act_count,
-                   "yes" if include_act_breaks else "no", voice_capacity)
+                   "yes" if include_act_breaks else "no")
             )},
         ],
         schema=StoryInterpretation,
@@ -515,8 +437,6 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
         base_temperature=base,
         structural_retry_temperature=retry,
         repair_prompt_factory=make_dispatching_repair_factory(),
-        post_validator=_make_interpret_validator(requested, voice_capacity),
-        max_new_tokens=_MAX_NEW_TOKENS["interpret"],
         max_attempts=3,
         helper_name="my_story_interpret",
     )
@@ -526,66 +446,53 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
 # P1 -- treatment
 # ---------------------------------------------------------------------------
 
-def _make_treatment_validator(interp: StoryInterpretation, act_count: int):
-    required = interp.required_speakers()
-    stated = interp.gender_by_name()
-    planned = max(1, int(interp.cast_plan.planned))
-
+def _make_treatment_validator(act_count: int):
     def check(model: StoryTreatment) -> "str | None":
         names = model.names()
-        if len(names) != planned:
-            return ("cast has %d entries; the interpretation planned %d"
-                    % (len(names), planned))
-        folded = {_norm_ws(n).casefold() for n in names}
+        folded = {_norm_ws(name).casefold() for name in names}
         if len(folded) != len(names) or "" in folded:
             return "cast names must be nonempty and unique"
-        for want in required:
-            if want not in names:
-                return ("the cast is missing %r, who they asked for by name"
-                        % want)
-        for member in model.cast:
-            if member.gender not in ("male", "female"):
-                return ("%s has gender %r; every character must be cast male "
-                        "or female, because each voice in stock is one or the "
-                        "other" % (member.name, member.gender))
-            want = stated.get(member.name.strip())
-            if want and member.gender != want:
-                return ("%s is %s in their notes but %r here; honour what "
-                        "they stated" % (member.name, want, member.gender))
+        if ANNOUNCER_NAME.casefold() in folded:
+            return "ANNOUNCER is reserved for the frame; give story characters distinct names"
+        problems = []
         if len(model.acts) != act_count:
-            return ("acts has %d entries; %d were requested"
-                    % (len(model.acts), act_count))
-        for i, act in enumerate(model.acts, 1):
-            if int(act.n) != i:
-                return "acts must be numbered 1..%d in order" % act_count
-        return None
+            problems.append("acts has %d entries; the selected count is %d"
+                            % (len(model.acts), act_count))
+        return "; ".join(problems) or None
     return check
 
 
 def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
-                    *, act_count: int, include_act_breaks: bool) -> StoryTreatment:
+                    *, act_count: int, requested_characters: int,
+                    include_act_breaks: bool, attempt_receipts=None) -> StoryTreatment:
     base, retry = _TEMP["treatment"]
     return _call(
-        "treatment", bundle,
+        "treatment", bundle, attempt_receipts=attempt_receipts,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_treatment_system")},
             {"role": "user", "content": (
                 "THEIR IDEA, AS WRITTEN:\n\n%s\n\n"
                 "THE INTERPRETATION:\n%s\n\n"
-                "Acts requested: %d. Music between acts: %s.\n"
+                "SELECTED ACTS: %d (binding). REQUESTED SPEAKING CHARACTERS: %d "
+                "(flexible, announcer excluded).\n"
+                "Let the supplied story guide the cast; preserve its people. Music between acts: %s.\n"
                 "Plan the episode now."
                 % (_SI.project_payload(bundle, "")["full_text"],
                    json.dumps(interp.model_dump(), ensure_ascii=False, indent=2),
-                   act_count, "yes" if include_act_breaks else "no")
+                   act_count, requested_characters,
+                   "yes" if include_act_breaks else "no")
             )},
         ],
         schema=StoryTreatment,
         slot_fn=creative_fn,
         base_temperature=base,
         structural_retry_temperature=retry,
-        repair_prompt_factory=make_dispatching_repair_factory(),
-        post_validator=_make_treatment_validator(interp, act_count),
-        max_new_tokens=_MAX_NEW_TOKENS["treatment"],
+        repair_prompt_factory=_full_artifact_repair(
+            "Reorganize the treatment into exactly %d acts. The requested "
+            "character count is flexible; preserve the listener's people, "
+            "story material, relationships and ending; change the act grouping to fit."
+            % act_count),
+        post_validator=_make_treatment_validator(act_count),
         max_attempts=3,
         helper_name="my_story_treatment",
     )
@@ -597,23 +504,20 @@ def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
 
 def _make_act_validator(treatment: StoryTreatment, n: int,
                         must_speak: "tuple[str, ...]"):
-    allowed = set(treatment.names())
-    solo = len(treatment.cast) == 1
+    allowed = {_norm_ws(name).casefold(): name for name in treatment.names()}
 
     def check(model: ActScript) -> "str | None":
-        if int(model.n) != n:
-            return "this is act %d, not act %d" % (n, model.n)
         heard: "set[str]" = set()
         for line in model.lines:
-            key = line.speaker
+            key = _norm_ws(line.speaker).casefold()
             if key not in allowed:
                 return ("%r is not in the cast; the speakers are %s"
                         % (line.speaker, ", ".join(treatment.names())))
             if not _norm_ws(line.text):
                 return "%s has an empty line" % line.speaker
-            heard.add(key)
-        if not solo and len(heard) < 2:
-            return "an act needs at least two people speaking"
+            line.speaker = allowed[key]
+            if clean_spoken_text(line.text).strip():
+                heard.add(line.speaker)
         missing = [name for name in must_speak if name not in heard]
         if missing:
             return (
@@ -639,7 +543,7 @@ def _prior_digest(prev: "ActScript | None", plan: "ActPlan | None") -> str:
 def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
               plan: ActPlan, prev: "ActScript | None",
               prev_plan: "ActPlan | None", *, must_speak: "tuple[str, ...]",
-              is_last: bool) -> ActScript:
+              is_last: bool, attempt_receipts=None) -> ActScript:
     base, retry = _TEMP["act"]
     cast_block = "\n".join(
         "- %s (%s, %s): %s" % (c.name, c.gender, c.role or "in the story",
@@ -653,7 +557,7 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
                       " This is the LAST act, so they must speak here."
                       if is_last else ""))
     return _call(
-        "act_%d" % plan.n, bundle,
+        "act_%d" % plan.n, bundle, attempt_receipts=attempt_receipts,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_act_system")},
             {"role": "user", "content": (
@@ -673,9 +577,11 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
         slot_fn=creative_fn,
         base_temperature=base,
         structural_retry_temperature=retry,
-        repair_prompt_factory=make_dispatching_repair_factory(),
+        repair_prompt_factory=_full_artifact_repair(
+            "Keep this one act and the locked treatment cast. Give the "
+            "unheard cast named in the validation problem actual spoken "
+            "dialogue; stage directions are not speech."),
         post_validator=_make_act_validator(treatment, plan.n, must_speak if is_last else ()),
-        max_new_tokens=_MAX_NEW_TOKENS["act"],
         max_attempts=3,
         helper_name="my_story_act_%d" % plan.n,
     )
@@ -685,30 +591,11 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
 # P3 -- the frame
 # ---------------------------------------------------------------------------
 
-def _make_frame_validator(attribution: str, inter_wanted: int):
-    def check(model: StoryFrame) -> "str | None":
-        if any(not text.strip() for text in (
-                *model.announcer_intro, *model.announcer_outro, model.coda,
-                model.music_open, model.music_close, *model.music_inter)):
-            return "frame lines and music descriptions must not be blank"
-        spoken = " ".join(list(model.announcer_intro) + list(model.announcer_outro))
-        if _norm_ws(attribution) not in _norm_ws(spoken):
-            return (
-                "the attribution sentence is missing. Include it VERBATIM in "
-                "the intro or the outro: %r" % attribution
-            )
-        if len(model.music_inter) != inter_wanted:
-            return ("music_inter has %d cue(s); exactly %d are wanted"
-                    % (len(model.music_inter), inter_wanted))
-        return None
-    return check
-
-
 def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
-                *, attribution: str, inter_wanted: int) -> StoryFrame:
+                *, attribution: str, inter_wanted: int, attempt_receipts=None) -> StoryFrame:
     base, retry = _TEMP["frame"]
     return _call(
-        "frame", bundle,
+        "frame", bundle, attempt_receipts=attempt_receipts,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_frame_system")},
             {"role": "user", "content": (
@@ -724,8 +611,6 @@ def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
         base_temperature=base,
         structural_retry_temperature=retry,
         repair_prompt_factory=make_dispatching_repair_factory(),
-        post_validator=_make_frame_validator(attribution, inter_wanted),
-        max_new_tokens=_MAX_NEW_TOKENS["frame"],
         max_attempts=3,
         helper_name="my_story_frame",
     )
@@ -815,7 +700,8 @@ def _music_sentinel(shot_id: str, role: str, seq: int = 0) -> dict:
 
 def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
               frame: StoryFrame, cast_rows: "list[dict]", *,
-              owner_bank: str, interpretation: StoryInterpretation) -> None:
+              owner_bank: str, interpretation: StoryInterpretation,
+              include_act_breaks: bool) -> None:
     """Emit all five ledger hierarchies. Timing stays unset -- SceneSequencer owns it."""
     char_id_by_name = {
         _norm_ws(r["name"]).casefold(): r["char_id"]
@@ -856,7 +742,7 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
         "generation_prompt": frame.music_open, "placement": "opening",
         "anchor_line_id": opening["line_id"],
     })
-    for k, text in enumerate(frame.announcer_intro):
+    for k, text in enumerate(text for text in frame.announcer_intro if text.strip()):
         row = spoken("shot_000_b%d" % (k + 1), "shot_000", ANNOUNCER_CHAR_ID,
                      "announcer", ANNOUNCER_NAME, text,
                      "shot_start" if k == 0 else "beat_start")
@@ -894,8 +780,8 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
             line_rows.append(row)
             beat(row, scene_id)
         # An interstitial cue after every act but the last.
-        if act is not acts[-1] and inter_seq < len(frame.music_inter):
-            cue = frame.music_inter[inter_seq]
+        if include_act_breaks and act is not acts[-1]:
+            cue = frame.music_inter[inter_seq] if inter_seq < len(frame.music_inter) else ""
             sentinel = _music_sentinel(shot_id, "music_inter")
             line_rows.append(sentinel)
             inter_seq += 1
@@ -913,6 +799,8 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
                       "description": "postamble"})
     k = 0
     for text in list(frame.announcer_outro) + [frame.coda]:
+        if not text.strip():
+            continue
         k += 1
         row = spoken("%s_b%d" % (post_shot, k), post_shot, ANNOUNCER_CHAR_ID,
                      "announcer", ANNOUNCER_NAME, text,
@@ -935,6 +823,12 @@ def _assemble(led: Any, treatment: StoryTreatment, acts: "list[ActScript]",
 
     meta = _ledger_meta(led)
     meta.setdefault("source_bank", owner_bank)
+    meta.setdefault("my_story", {})["music_cue_disposition"] = [
+        {"proposal_index": i, "description": cue,
+         "disposition": "unused_surplus" if include_act_breaks else "act_breaks_disabled"}
+        for i, cue in enumerate(frame.music_inter)
+        if not include_act_breaks or i >= max(0, len(acts) - 1)
+    ]
 
     # The authorship receipt: every voiced row's text must be a verbatim
     # constituent of an artifact we accepted. This is what the read-only
@@ -1003,7 +897,7 @@ def run_my_story_episode(
     act_count = int(resolved.get("act_count") or 1)
     include_act_breaks = bool(resolved.get("include_act_breaks", True))
     requested = max(1, int(resolved.get("num_characters") or 1))
-    raw_requested = int(source_meta.get("requested_num_characters") or requested)
+    raw_requested = int(bundle.request.num_characters)
     author = str(source_meta.get("story_author") or "")
 
     seed = _resolve_seed()
@@ -1018,6 +912,7 @@ def run_my_story_episode(
                 tokens: "int | None") -> None:
         receipts.append({"pass_id": pass_id, "model_id": model_id,
                          "temp": temp, "max_new_tokens": tokens,
+                         "budget_mode": "python" if model_id == "python" else "provider_capacity",
                          "status": "completed"})
 
     creative_model = str(resolved.get("creative_writing_model") or "")
@@ -1027,9 +922,17 @@ def run_my_story_episode(
         "schema_version": MY_STORY_SCHEMA,
         "seed": seed,
         "draft_digest": bundle.digest,
+        "attempts": [],
+        "counts": {
+            "requested_acts": act_count, "proposed_acts": None,
+            "accepted_acts": None, "actual_acts": None,
+            "requested_characters": raw_requested, "planned_characters": None,
+            "proposed_characters": None, "accepted_characters": None,
+            "actual_characters": None,
+        },
         "notes": [
             "The person's own typed fields are the sole source.",
-            "Requested and actual counts are telemetry, never gates.",
+            "Selected acts bind treatment acceptance; character count is flexible guidance.",
         ],
     }
     meta["my_story"] = story
@@ -1042,137 +945,201 @@ def run_my_story_episode(
         log.info("[my_story] the cameo setting does not apply on this bank: "
                  "the cast is the listener's own")
 
-    # --- P0 interpret ----------------------------------------------------
-    voice_capacity = len(_POOLS.open_voice_pool(set()))
-    # Interpret first: an exclusive named cast overrides the numeric request.
-    # The post-validator refuses a truly uncastable plan before creative work.
-    with _helper_ctx(slot_scheduler, "my_story_interpret"):
-        interp = _pass_interpret(
-            technical_fn, pack, bundle, requested=raw_requested,
-            act_count=act_count, include_act_breaks=include_act_breaks,
-            voice_capacity=voice_capacity)
-    receipt("interpret", technical_model, _TEMP["interpret"][0],
-            _MAX_NEW_TOKENS["interpret"])
-    story["interpretation"] = interp.model_dump(mode="json")
-    story["cast_plan"] = interp.cast_plan.model_dump(mode="json")
-    if interp.assumptions:
-        log.info("[my_story] filled %d unstated detail(s): %s",
-                 len(interp.assumptions), "; ".join(interp.assumptions[:3]))
-    if interp.conflicts:
-        for conflict in interp.conflicts:
-            log.warning("[my_story] could not honour %r as written: %s -- "
-                        "the story will %s", conflict.requirement_id,
-                        conflict.why, conflict.resolution)
-    _require_ledger_save(led, "the story interpretation")
+    primary_error: BaseException | None = None
+    try:
+        # --- P0 interpret ----------------------------------------------------
+        # Interpretation records intent; selected acts own the act structure.
+        with _helper_ctx(slot_scheduler, "my_story_interpret"):
+            interp = _pass_interpret(
+                technical_fn, pack, bundle, requested=requested,
+                act_count=act_count, include_act_breaks=include_act_breaks,
+                attempt_receipts=story["attempts"])
+        receipt("interpret", technical_model, _TEMP["interpret"][0],
+                None)
+        story["interpretation"] = interp.model_dump(mode="json")
+        story["cast_plan"] = interp.cast_plan.model_dump(mode="json")
+        story["counts"]["planned_characters"] = interp.cast_plan.planned
+        if interp.assumptions:
+            log.info("[my_story] filled %d unstated detail(s): %s",
+                     len(interp.assumptions), "; ".join(interp.assumptions[:3]))
+        if interp.conflicts:
+            for conflict in interp.conflicts:
+                log.warning("[my_story] could not honour %r as written: %s -- "
+                            "the story will %s", conflict.requirement_id,
+                            conflict.why, conflict.resolution)
+        _require_ledger_save(led, "the story interpretation")
 
-    # --- P1 treatment ----------------------------------------------------
-    with _helper_ctx(slot_scheduler, "my_story_treatment"):
-        treatment = _pass_treatment(
-            creative_fn, pack, bundle, interp,
-            act_count=act_count, include_act_breaks=include_act_breaks)
-    receipt("treatment", creative_model, _TEMP["treatment"][0],
-            _MAX_NEW_TOKENS["treatment"])
-    story["treatment"] = treatment.model_dump(mode="json")
-    _require_ledger_save(led, "the treatment")
+        # --- P1 treatment ----------------------------------------------------
+        with _helper_ctx(slot_scheduler, "my_story_treatment"):
+            treatment = _pass_treatment(
+                creative_fn, pack, bundle, interp,
+                act_count=act_count, requested_characters=requested,
+                include_act_breaks=include_act_breaks, attempt_receipts=story["attempts"])
+        receipt("treatment", creative_model, _TEMP["treatment"][0],
+                None)
+        story["treatment_proposal"] = treatment.model_dump(mode="json")
+        story["counts"].update(accepted_acts=len(treatment.acts),
+                               accepted_characters=len(treatment.cast))
+        story["act_number_normalization"] = {
+            "treatment": [{"original": plan.n, "slot": i}
+                          for i, plan in enumerate(treatment.acts, 1)],
+            "replies": [],
+        }
+        for i, plan in enumerate(treatment.acts, 1):
+            plan.n = i
+        names = {_norm_ws(c.name).casefold(): c for c in treatment.cast}
+        discrepancies = []
+        for person in interp.named_cast:
+            member = names.get(_norm_ws(person.name).casefold())
+            if person.required and person.speaking and member is None:
+                discrepancies.append({"name": person.name, "kind": "named_speaker_not_in_selected_cast"})
+            elif member is not None and person.stated_gender and person.stated_gender != member.gender:
+                discrepancies.append({"name": person.name, "kind": "stated_gender_differs",
+                                      "stated": person.stated_gender, "accepted": member.gender})
+        story["fidelity_discrepancies"] = discrepancies
+        story["treatment"] = treatment.model_dump(mode="json")
+        _require_ledger_save(led, "the treatment")
 
-    # --- P2 acts, one call each ------------------------------------------
-    acts: "list[ActScript]" = []
-    heard: "set[str]" = set()
-    everyone = list(treatment.names())
-    for index, plan in enumerate(treatment.acts):
-        is_last = index == len(treatment.acts) - 1
-        # Only the LAST act carries the requirement; earlier acts are merely
-        # told who has not spoken, so the story can hold someone back for
-        # effect without the ladder fighting it.
-        unheard = tuple(n for n in everyone if n not in heard)
-        must_speak = unheard
-        prev = acts[-1] if acts else None
-        prev_plan = treatment.acts[index - 1] if index else None
-        with _helper_ctx(slot_scheduler, "my_story_act_%d" % plan.n):
-            act = _pass_act(creative_fn, pack, bundle, treatment, plan, prev,
-                            prev_plan, must_speak=must_speak, is_last=is_last)
-        acts.append(act)
-        for line in act.lines:
-            key = _norm_ws(line.speaker).casefold()
-            for name in everyone:
-                if _norm_ws(name).casefold() == key:
-                    heard.add(name)
-        receipt("act_%d" % plan.n, creative_model, _TEMP["act"][0],
-                _MAX_NEW_TOKENS["act"])
-        story["acts_accepted"] = len(acts)
-        _require_ledger_save(led, "act %d" % plan.n)
+        # --- P2 acts, one call each ------------------------------------------
+        acts: "list[ActScript]" = []
+        heard: "set[str]" = set()
+        everyone = list(treatment.names())
+        for index, plan in enumerate(treatment.acts):
+            is_last = index == len(treatment.acts) - 1
+            # Only the LAST act carries the requirement; earlier acts are merely
+            # told who has not spoken, so the story can hold someone back for
+            # effect without the ladder fighting it.
+            unheard = tuple(n for n in everyone if n not in heard)
+            must_speak = unheard
+            prev = acts[-1] if acts else None
+            prev_plan = treatment.acts[index - 1] if index else None
+            with _helper_ctx(slot_scheduler, "my_story_act_%d" % plan.n):
+                act = _pass_act(creative_fn, pack, bundle, treatment, plan, prev,
+                                prev_plan, must_speak=must_speak, is_last=is_last,
+                                attempt_receipts=story["attempts"])
+            story["act_number_normalization"]["replies"].append(
+                {"original": act.n, "slot": plan.n})
+            act.n = plan.n
+            acts.append(act)
+            for line in act.lines:
+                if not clean_spoken_text(line.text).strip():
+                    continue
+                key = _norm_ws(line.speaker).casefold()
+                for name in everyone:
+                    if _norm_ws(name).casefold() == key:
+                        heard.add(name)
+            receipt("act_%d" % plan.n, creative_model, _TEMP["act"][0],
+                    None)
+            story["acts_accepted"] = len(acts)
+            _require_ledger_save(led, "act %d" % plan.n)
 
-    # Every character the treatment cast must be heard. The freeze fails an
-    # episode with a silent cast member, and failing there would waste the
-    # whole render; this says so now, and names them.
-    silent = [name for name in everyone if name not in heard]
-    if silent:
-        raise MyStoryCastError(
-            "acts",
-            "%s never speaks in the finished story. Every character in the "
-            "cast must be heard." % ", ".join(repr(n) for n in silent),
+        # Every character the treatment cast must be heard. The freeze fails an
+        # episode with a silent cast member, and failing there would waste the
+        # whole render; this says so now, and names them.
+        silent = [name for name in everyone if name not in heard]
+        if silent:
+            raise MyStoryCastError(
+                "acts",
+                "%s never speaks in the finished story. Every character in the "
+                "cast must be heard." % ", ".join(repr(n) for n in silent),
+            )
+
+        # --- P3 frame --------------------------------------------------------
+        attribution = _SI.attribution_sentence(author)
+        inter_wanted = max(0, len(acts) - 1) if include_act_breaks else 0
+        with _helper_ctx(slot_scheduler, "my_story_frame"):
+            frame = _pass_frame(creative_fn, pack, bundle, treatment,
+                                attribution=attribution, inter_wanted=inter_wanted,
+                                attempt_receipts=story["attempts"])
+        receipt("frame", creative_model, _TEMP["frame"][0], None)
+        story["frame_proposal"] = frame.model_dump(mode="json")
+        spoken_frame = " ".join(frame.announcer_intro + frame.announcer_outro + [frame.coda])
+        if _norm_ws(attribution) not in _norm_ws(spoken_frame):
+            frame.announcer_outro.append(attribution)
+        story["frame"] = frame.model_dump(mode="json")
+        story["attribution"] = _SI.attribution_receipt(author)
+
+        # --- P4 voices (no model call) ---------------------------------------
+        cast_rows = _assign_voices(treatment, rng)
+        receipt("voices", "python", 0.0, None)
+
+        # --- P5 assemble (no model call) -------------------------------------
+        _assemble(led, treatment, acts, frame, cast_rows, interpretation=interp,
+                  include_act_breaks=include_act_breaks,
+                  owner_bank=str(getattr(source_bank_row, "source_bank_id", "")
+                                 or "my_story"))
+        receipt("assemble", "python", 0.0, None)
+
+        # `_assemble` saves, and Ledger.save() rebinds led.data -- reacquire.
+        meta = _ledger_meta(led)
+        story = meta.setdefault("my_story", story)
+        story["counts"].update(actual_acts=len(led.data.get("scenes") or []),
+                               actual_characters=_OTRCAST.count_locked_characters(
+                                   led.data.get("cast") or []))
+        story["pass_receipts"] = receipts
+        story["delivery_telemetry"] = _OTRWD.stamp_actual(
+            led.data, stage="my_story_assembled")
+
+        # The cameo contract this lane never rolled, stamped rather than omitted
+        # so a reader can tell a declined cameo from one never considered.
+        meta["cast_contract"] = _OTRCAST.content_owned_cast_contract(
+            source_bank_id=str(getattr(source_bank_row, "source_bank_id", "")
+                               or "my_story"),
+            num_characters_request=raw_requested,
+            num_characters_locked=_OTRCAST.count_locked_characters(
+                led.data.get("cast") or []),
+            decision=None,
         )
+        _require_ledger_save(led, "the My Story receipts")
 
-    # --- P3 frame --------------------------------------------------------
-    attribution = _SI.attribution_sentence(author)
-    inter_wanted = (act_count - 1) if (include_act_breaks and act_count > 1) else 0
-    with _helper_ctx(slot_scheduler, "my_story_frame"):
-        frame = _pass_frame(creative_fn, pack, bundle, treatment,
-                            attribution=attribution, inter_wanted=inter_wanted)
-    receipt("frame", creative_model, _TEMP["frame"][0], _MAX_NEW_TOKENS["frame"])
-    story["frame"] = frame.model_dump(mode="json")
-    story["attribution"] = _SI.attribution_receipt(author)
+        canon = _OTRC.episode_canon_from_outline_dict({
+            "title": treatment.title,
+            "premise": treatment.dramatic_question,
+            "setting": treatment.setting,
+            "time_of_day": treatment.time_of_day or "night",
+            "sound_palette": [],
+        })
+        log.info("[my_story] complete: seed=%s cast=%d acts=%d by=%r",
+                 seed, len(treatment.cast), len(acts), author or "(a listener)")
+        return MyStoryTailParts(
+            outline_view=MyStoryOutlineView(
+                premise=treatment.dramatic_question,
+                title=treatment.title,
+                setting=treatment.setting,
+            ),
+            canon=canon,
+            final_title_override=treatment.title if treatment.title.strip() else None,
+            run_story_spine=False,
+            refine_active=False,
+            my_story_meta=story,
+        )
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        for attempt in story["attempts"]:
+            if attempt["pass_id"] != "treatment":
+                continue
+            try:
+                proposed = parse_first_json_object(attempt["raw_output"])
+            except (ValueError, TypeError):
+                continue
+            if isinstance(proposed, dict):
+                for field, key in (("acts", "proposed_acts"), ("cast", "proposed_characters")):
+                    if story["counts"][key] is None and isinstance(proposed.get(field), list):
+                        story["counts"][key] = len(proposed[field])
+        try:
+            _require_ledger_save(led, "the My Story attempt history")
+        except Exception as save_error:
+            if primary_error is None:
+                raise
+            # Preserve the original provider/cancellation failure while making
+            # the missing durable receipt explicit in both traceback and log.
+            if hasattr(primary_error, "add_note"):
+                primary_error.add_note("My Story attempt history also failed to persist: %s" % save_error)
+            log.error("[my_story] attempt history did not persist during failure: %s",
+                      save_error, exc_info=True)
 
-    # --- P4 voices (no model call) ---------------------------------------
-    cast_rows = _assign_voices(treatment, rng)
-    receipt("voices", "python", 0.0, None)
-
-    # --- P5 assemble (no model call) -------------------------------------
-    _assemble(led, treatment, acts, frame, cast_rows, interpretation=interp,
-              owner_bank=str(getattr(source_bank_row, "source_bank_id", "")
-                             or "my_story"))
-    receipt("assemble", "python", 0.0, None)
-
-    # `_assemble` saves, and Ledger.save() rebinds led.data -- reacquire.
-    meta = _ledger_meta(led)
-    story = meta.setdefault("my_story", story)
-    story["pass_receipts"] = receipts
-    story["delivery_telemetry"] = _OTRWD.stamp_actual(
-        led.data, stage="my_story_assembled")
-
-    # The cameo contract this lane never rolled, stamped rather than omitted
-    # so a reader can tell a declined cameo from one never considered.
-    meta["cast_contract"] = _OTRCAST.content_owned_cast_contract(
-        source_bank_id=str(getattr(source_bank_row, "source_bank_id", "")
-                           or "my_story"),
-        num_characters_request=raw_requested,
-        num_characters_locked=_OTRCAST.count_locked_characters(
-            led.data.get("cast") or []),
-        decision=None,
-    )
-    _require_ledger_save(led, "the My Story receipts")
-
-    canon = _OTRC.episode_canon_from_outline_dict({
-        "title": treatment.title,
-        "premise": treatment.dramatic_question,
-        "setting": treatment.setting,
-        "time_of_day": treatment.time_of_day or "night",
-        "sound_palette": [],
-    })
-    log.info("[my_story] complete: seed=%s cast=%d acts=%d by=%r",
-             seed, len(treatment.cast), len(acts), author or "(a listener)")
-    return MyStoryTailParts(
-        outline_view=MyStoryOutlineView(
-            premise=treatment.dramatic_question,
-            title=treatment.title,
-            setting=treatment.setting,
-        ),
-        canon=canon,
-        final_title_override=treatment.title,
-        run_story_spine=False,
-        refine_active=False,
-        my_story_meta=story,
-    )
 
 
 __all__ = [
@@ -1183,7 +1150,6 @@ __all__ = [
     "MY_STORY_SCHEMA",
     "MyStoryCastError",
     "MyStoryError",
-    "MyStoryInputTooLongError",
     "MyStoryOutlineView",
     "MyStoryTailParts",
     "NamedCast",

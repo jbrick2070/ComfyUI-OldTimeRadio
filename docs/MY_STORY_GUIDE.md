@@ -9,10 +9,13 @@ on this bank. The established model-call/retry, voice, ledger and downstream
 production machinery is reused. The My Story front interprets your request,
 plans it, writes one act at a time and adds the announcer's frame.
 
-Pick one to six acts and a visual style, then queue the normal graph. Named
-speaking characters take precedence over the numeric character request. If
-you specify only those people, the cast stays exclusive. Each character needs
-a distinct available voice. The house cameo roll does not apply.
+Select one to six acts and request one to ten speaking characters, then queue
+the normal graph. The act count is binding. Character count is flexible, as on
+adaptation banks: the supplied story guides the cast, and the ledger records
+requested and actual counts separately. The announcer is excluded. The model
+repairs a mismatched act plan using its complete draft, preserving the people,
+events and ending. Each character needs a distinct available voice. The house
+cameo roll does not apply. There is no word-count or duration rejection.
 
 Your input is saved before generation under the shared state directory:
 `otr/episodes/_shared/state/story_drafts/<digest>/input.json`. Identical input
@@ -20,9 +23,11 @@ and controls reuse that draft; a fresh run generates a new episode. Cancellation
 or a later failure leaves the admitted input in place. Linked fields are saved
 when their evaluated values reach the writer.
 
-The model's context must fit the input, instructions and response. If it cannot,
-the error identifies the longest input field and asks you to shorten it or
-choose a model with more context. Input is not silently truncated.
+Generation uses the existing provider-capacity path, including repairs. Input
+and failed parsed drafts are not silently truncated; actual provider capacity,
+storage failures, cancellation and out-of-memory outcomes remain explicit.
+Optional descriptions, monologue acts and missing frame text do not reject the
+story. The existing ledger cleanup and freeze still verify a usable result.
 
 Clear `source_ref`, `replay_from`, and any source-snapshot manifest when using
 My Story. Other banks do not read the four dedicated Story fields; clear those
@@ -32,6 +37,8 @@ The graph's delivery wire requires an actual published file in `otr/obs/` and
 its recorded path in the matching episode ledger. An archived render alone is
 not successful My Story delivery.
 
-Qualification status: offline creator-path checks are in Sprint 4. The native
-App view, browser playback/history and one-, three-, and six-act live model
-publication receipts belong to Sprint 5 and are not yet claimed here.
+Qualification status: the initial local one-act trial stopped at a treatment
+count mismatch before a ledger could freeze. The revised repair/count behavior
+is under regression and component verification; no new live PASS is claimed
+until its receipt exists. Native App, browser playback/history and full-media
+publication qualification remain pending in GO_FORWARD_PLAN.md.

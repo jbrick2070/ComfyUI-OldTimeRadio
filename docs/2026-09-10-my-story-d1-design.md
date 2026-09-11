@@ -1,12 +1,19 @@
 # My Story -- D1 independent bank design
 
-Date: 2026-09-10. Status: Sprint 4 implementation under final verification.
+Date: 2026-09-10. Status: Sprint 4 shipped; A1 count/repair revision under verification.
+GO_FORWARD_PLAN.md is the active plan. Selected acts remain binding. The latest
+operator correction makes character count flexible, guided by the supplied story.
 Sprint 5 native App and live publication qualification remain pending.
 
-Baseline: `v2.0-alpha` HEAD `75bb405b` == origin. Canonical SHA-256
+Historical design baseline (not current wiring): `v2.0-alpha` HEAD `75bb405b` == origin. Canonical SHA-256
 `b24221b6f672a99cfe6448684ef79d08dc832051dea7c66c050c04b6f4465629`
 (23 nodes, 62 links, last_link_id 290, writer node 1 carries 33 widgets and
 34 input descriptors, gate_in at input slot 32, replay_from at 33).
+
+Implemented S4 fingerprint: canonical SHA-256
+`d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c`,
+23 nodes, 63 links, last_link_id291; writer1 has37 widgets. Delivery link291
+connects writer script_json to mux85 input10. A1 adds no graph controls.
 
 Scope authority: `docs/2026-09-10-my-story-app-scope.md` (R1-R4 converged) plus
 two operator additions received 2026-09-10 while D0 was in flight:
@@ -169,7 +176,8 @@ Appended AFTER `replay_from`, in this order, all `STRING`, default `""`:
 | `story_author` | no | Story by (optional) | who the story is attributed to |
 
 `custom_premise` keeps its slot (4) and is the general idea ("Story input").
-`num_characters` (1) and `act_count` (6) keep their meaning.
+`num_characters` (slot1) is requested guidance, announcer excluded; actual cast
+follows the supplied story. `act_count` (slot6) remains binding.
 
 Widget vector: 33 -> 37 values on node 1; input descriptors 34 -> 38 (four
 `{"widget": {"name": ...}}` entries appended after `replay_from`). The scope
@@ -347,16 +355,17 @@ model work.
 
 All LLM passes go through `_otr_structured_call.structured_call` (schema,
 retry ladder, typed repair) with the slot fns the writer hands the runner.
-Per-pass budgets are `max_new_tokens`; the transport's own
-`fit_output_tokens` decides whether the measured prompt leaves room. A
-`prompt_no_room` failure is TERMINAL and is re-raised as
-`MyStoryInputTooLongError` naming the longest field and the measured
-prompt/context numbers. Nothing is truncated; no fixed character quota is
-invented.
+Every pass uses shared ProviderCapacityMessages and max_new_tokens=None,
+including inherited typed repairs. No private fixed output ceiling or longest-
+field blame. Shared provider/capacity/storage/cancellation outcomes stay truthful.
+A My Story repair factory preserves original message roles and the FULL failed
+parsed treatment/act for post-validation repair; other typed errors reuse the
+shared dispatch. Counts and source material are explicit repair context. There
+is no outer retry loop and no Python shortening of story prose.
 
-### P0 `interpret` (technical slot, structured, max_new_tokens 1200)
+### P0 `interpret` (technical slot, structured, provider capacity)
 
-Input: the labelled projection of the bundle, `num_characters` (raw request),
+Input: the labelled projection of the bundle, `num_characters` (normalized hint),
 `act_count`, `include_act_breaks`.
 
 ```
@@ -380,14 +389,12 @@ when the listener says only these people; record assumptions; a constraint
 that cannot be honoured is recorded in `conflicts` with the resolution the
 story will take, never dropped silently.
 
-Post-validator (Python): every `required` named cast member with
-`speaking=true` is unique by name; `planned` = `len(required speaking)` when
-`exclusive`, else `max(len(required speaking), requested)`; `planned` must be
->= 1 and <= the open voice pool size (`config.cast_pools.open_voice_pool(set())`
-length) -- a plan that exceeds the voice stock is a terminal
-`MyStoryCastError` BEFORE any creative call, with the number in the message.
+Interpretation is advisory metadata. Planning arithmetic, duplicate requirement
+ids, conflict bookkeeping and predicted voice demand do not reject generation.
+Selected acts bind; named/exclusive story notes guide the flexible cast.
+Raw input and interpretation remain durable; conflicts are disclosed.
 
-### P1 `treatment` (creative slot, structured, max_new_tokens 1800)
+### P1 `treatment` (creative slot, structured, provider capacity)
 
 Input: the interpretation (JSON), the raw projection, `act_count`,
 `include_act_breaks`.
@@ -400,18 +407,20 @@ StoryTreatment
   setting: str
   time_of_day: str
   cast: list[CastMember{name, role, character_description,
-                        gender: male|female, age_band, register, timbre}]
+                        gender: str (empty when unstated), age_band, register, timbre}]
   acts: list[ActPlan{n, purpose, scene_setting, turns: list[str], ending_state}]
   ending: str
 ```
 
-Post-validator: `len(cast) == cast_plan.planned`; every required speaking
-name is present verbatim; when the listener stated a gender it is honoured;
-`len(acts) == act_count`; act numbers 1..N in order. `gender` is canonicalised
-through `_otr_roster_gender.canonical_bank_gender` before the Literal check
-(shared vocabulary, not a new map).
+Post-validator: act count equals the selected control. Character count is
+flexible; cast names are nonempty and unique, with ANNOUNCER reserved for the
+frame. A full-draft LLM repair reorganizes mismatched acts without removing people.
+Named-source discrepancies are recorded, not turned into contradictory gates.
+Gender uses shared synonym normalization; missing remains empty/other. Title,
+dramatic question, setting and cast descriptions are optional. After acceptance,
+ordered act numbers normalize to1..N with original numbers retained.
 
-### P2 `acts` (creative slot, structured, ONE CALL PER ACT, max_new_tokens 1600)
+### P2 `acts` (creative slot, structured, ONE CALL PER ACT, provider capacity)
 
 Input per call: the treatment (JSON), the act plan for THIS act, a bounded
 digest of the previous act (its last four lines and its `ending_state`), the
@@ -424,11 +433,11 @@ ActScript
   lines: list[Line{speaker, text}]        # nonempty; 6..40 is prompt guidance only
 ```
 
-Post-validator: `n` matches; every `speaker` is a treatment cast name
-(exact); at least two distinct speakers unless the treatment has one cast
-member; no empty text; consecutive same-speaker lines are allowed (merged at
-assembly). A failed act retries its own call only; earlier accepted acts are
-kept.
+Post-validator: every speaker resolves unambiguously to an accepted cast name
+(case/whitespace normalized), with nonempty text. Monologues are valid. The
+accepted reply number normalizes to its requested slot before assembly. Failed
+acts repair only themselves; earlier accepted acts are retained. Post-validation
+repair receives complete failed dialogue, not a400-character prefix.
 
 Cast coverage (review fold: the freeze's Phase 10 hard-fails any cast row
 with zero lines, the early repair pass is inline-only, and the sci-fi lane
@@ -436,27 +445,30 @@ closes the same gap with its own equality gate): every act call receives the
 list of cast members NOT YET HEARD; for the LAST act that list is a
 post-validator REQUIREMENT (every unheard member must speak), so the ladder
 and the typed repair run before anything is assembled. After the last act is
-accepted, a pure check asserts the union of speakers across all acts equals
+accepted, a pure check asserts the union of speakers with actual speakable text across all acts equals
 the treatment cast (minus the announcer); a violation is a terminal
 `MyStoryCastError` naming the silent character, raised before P3/P4/P5.
 
-### P3 `frame` (creative slot, structured, max_new_tokens 700)
+### P3 `frame` (creative slot, structured, provider capacity)
 
 Input: title, logline, the attribution sentence (section 6), whether inter-act
-music cues are wanted (`include_act_breaks and act_count > 1`).
+music cues are wanted (`include_act_breaks and len(accepted_acts) > 1`).
 
 ```
 StoryFrame
-  announcer_intro: list[str]   # nonempty; 1..3 is prompt guidance only
-  announcer_outro: list[str]   # nonempty; 1..2 is prompt guidance only
+  announcer_intro: list[str]   # optional
+  announcer_outro: list[str]   # optional
   coda: str                    # one closing line
   music_open: str              # cue description
   music_close: str
-  music_inter: list[str]       # exactly act_count-1 cues when wanted, else []
+  music_inter: list[str]       # optional proposals; assembly owns topology
 ```
 
-Post-validator: attribution sentence present verbatim in intro or outro when
-supplied (mechanically provable); `music_inter` length as required.
+Frame fields are optional. Append the deterministic attribution once when
+absent, before snapshot/seal; retain the original proposal. Skip blank spoken
+rows before numbering. Emit one cue per accepted act boundary with breaks on,
+using supplied descriptions or blank prompts for the existing music composer;
+breaks off emits none. Record surplus proposals and their disposition.
 
 ### P4 `voices` (pure Python)
 
@@ -524,7 +536,7 @@ schema, not a copied pass):
   entry and `stamp_actual(led.data, stage="my_story_assembled")` after
   assembly.
 * `meta["cast_contract"] = content_owned_cast_contract(...)` with
-  `num_characters_request` = the RAW request (from `source_meta`) and
+  `num_characters_request` = the RAW request (from the admitted StoryRequest) and
   `num_characters_locked` = the locked count; `meta["my_story"]` receipt:
   `{"schema_version": "my_story_v1", "seed", "interpretation", "treatment",
   "acts_accepted": N, "frame", "cast_plan", "attribution", "pass_receipts",
@@ -537,58 +549,57 @@ schema, not a copied pass):
 Return `MyStoryTailParts(outline_view=MyStoryOutlineView(premise=
 dramatic_question, title=title, setting=setting), canon=
 episode_canon_from_outline_dict({title, premise, setting, time_of_day,
-sound_palette: []}), final_title_override=title, run_story_spine=False,
+sound_palette: []}), final_title_override=title or None, run_story_spine=False,
 tail_finalizer=None)`. The writer builds `WriterTailContext`; the tail keeps
-its precedence (typed `episode_title` > override > regen).
+its precedence (typed `episode_title` > nonblank override > regen). Cleanup-filled
+titles synchronize to canon/file/news before final consistency and serialization.
 
 ### Retry and failure boundaries
 
 | pass | retry | terminal |
 |---|---|---|
-| interpret | structured ladder (3 attempts, typed repair) | ladder exhausted; cast plan exceeds voice stock; prompt no room |
+| interpret | structured ladder (3 attempts, typed repair) | ladder exhausted for unusable schema; prompt no room |
 | treatment | ladder | ladder exhausted; prompt no room |
 | act k | ladder for act k only | ladder exhausted for act k; prompt no room |
-| frame | ladder | ladder exhausted (attribution missing after repair); prompt no room |
+| frame | ladder | ladder exhausted for unusable schema; prompt no room |
 | voices/assemble | none (deterministic) | invariant violation (a Python bug, raised loud) |
 
-No pass falls back to another pipeline. `output_limit` and
-`decode_degeneracy` re-roll inside the ladder as today; `prompt_no_room`
-never re-rolls.
+No pass falls back to another pipeline. Shared capacity-error retry policy
+remains authoritative; prompt_no_room never rerolls. Count postvalidation skips
+a same-prompt reroll and takes the existing typed repair directly. A second
+count mismatch exhausts that ladder; max_attempts3 does not promise three calls.
 
 ## 4. Sizes and budgets
 
-* Story size is `act_count` 1..6 only. Each act is one scene and one call.
-* Prompt sizing is real arithmetic at the transport (`fit_output_tokens`
-  with the resolved context: HF tokenizer length, GGUF `gguf_n_ctx`, or the
-  provider estimate). The runner adds NO second quota. A no-room refusal
-  surfaces the measured numbers and the longest field so the listener can
-  shorten it.
-* Reference per-pass ceilings (`max_new_tokens`): interpret 1200, treatment
-  1800, act 1600, frame 700. These are output ceilings, never targets;
-  actual words are telemetry (`word_budget.policy = actual_count_only`).
+Selected act count is1..6; requested speaking characters1..10, excluding the
+announcer. Actual cast size follows the story; words and minutes are observations. Every pass uses
+provider capacity rather than fixed per-pass output ceilings. Real capacity and
+OOM outcomes remain explicit. Known native-HF capacity honesty is a separate A2
+chunk; unknown/remote estimates are disclosed pending work in GO_FORWARD.
 
 ## 5. Character count and act breaks
 
-* `num_characters` stays a REQUEST. Raw value preserved at
-  `source_meta.requested_num_characters` before the legacy clamp; the clamp
-  stays for every other consumer.
-* Precedence: explicit named speaking cast > numeric request. `exclusive`
-  cast pins the count to the names. Otherwise the LLM fills unnamed roles up
-  to `max(named, requested)`. Requested and locked counts are both recorded
-  in `cast_contract`; the plan's `reason` explains a difference in prose.
-* Incidental names are not forced into speaking roles (`speaking=false`).
-* `include_act_breaks` is honoured: true and `act_count > 1` -> one
-  interstitial cue between acts; false -> none. The original lane's inline
-  behaviour is not inherited.
+Selected acts own the act structure. Character count is flexible: preserve the
+listener's people and exclusive cast notes instead of trimming or padding a
+cast to the requested number. Raw controls remain in the input digest.
+Use shared count_locked_characters for delivered count; announcer excluded.
+
+meta.my_story.counts records requested/proposed/accepted/actual acts and
+requested/planned/proposed/accepted/actual characters. Complete attempt outputs,
+errors and acceptance results persist even when repair fails. Original act
+numbers and normalized slots, original/adjusted frames and unused music cue
+proposals remain in the receipt. Actual accepted topology drives interstitials,
+with include_act_breaks respected. Final acts match selection; accepted and actual
+cast counts agree with each other, even when different from the requested count.
 
 ## 6. Attribution (operator addition)
 
 * `story_author` is optional free text. Blank means "a listener".
 * The attribution sentence is authored by Python, not the model:
   `"Tonight's story is by {author}."` when supplied, else
-  `"Tonight's story comes from one of our listeners."` The frame pass must
-  carry it verbatim in the intro (preferred) or outro; the post-validator
-  checks it mechanically.
+  `"Tonight's story comes from one of our listeners."` The frame is asked to
+  carry it verbatim; Python appends it once when absent before acceptance is
+  sealed. Missing verbatim credit does not spend another LLM repair.
 * Printed credit: `meta["credits_source_line"]` is overridden to
   `"a story by {author}, produced by machine for this broadcast"` when
   supplied; otherwise the bank default (section 1.1) stands. The override is
@@ -717,7 +728,7 @@ what the freeze re-verifies.
 | pass graph | concept x3 -> select -> compat briefs -> INLINE outline/beat/line composer | dossier -> pitch -> treatment -> news read -> whole-play markup -> casting LLM -> assemble | interpret -> treatment -> one structured call PER ACT -> frame -> Python voices -> assemble |
 | slot assignment | creative: concept, select; technical: briefs; then inline | technical: dossier, news read, casting; creative: pitch, treatment, script | technical: interpret; creative: treatment, acts, frame; Python: voices, assemble |
 | artifacts | ConceptPitches, SelectedConcept, OriginalBriefsModel (interpreter-compat shape) | Dossier, Pitch, Treatment, FinalDraft (markup), CastingVoices | StoryInterpretation, StoryTreatment, ActScript[N], StoryFrame, cast rows (no LLM casting artifact) |
-| retry boundaries | ladder per pass; inline composer per line | ladder per pass; markup ladder over the whole play | ladder per pass; an act retries alone; frame attribution is a post-validator |
+| retry boundaries | ladder per pass; inline composer per line | ladder per pass; markup ladder over the whole play | shared ladder per pass; full-draft count/coverage repair; missing frame credit appended before sealing |
 | ledger-write strategy | writer inline: skeleton lines then per-line updates | runner assembles all five hierarchies after the whole play parses | runner assembles preamble, then per act incrementally, then postamble; authorship receipt over four typed artifacts |
 
 The interfaces shared on purpose: the runner keyword signature, the tail
@@ -744,8 +755,8 @@ New:
   `validate_anyway=False` still admits.
 * `tests/test_my_story_runner.py` -- fake slot fns returning canned JSON:
   pass order and slots, requirement retention (named cast and constraints
-  survive into treatment/acts), cast plan precedence, voice-stock terminal
-  error, per-act retry isolation, attribution sentence required, act-break
+  survive into treatment/acts), selected acts and flexible cast, actual voice-stock
+  exhaustion, per-act retry isolation, attribution appended once, act-break
   cues, assembly row contract (roles, boundaries, sentinels, music rows),
   authorship receipt validates, `stamp_actual` present, cast contract with
   `decision=None`, read-only freeze structural validation passes on the

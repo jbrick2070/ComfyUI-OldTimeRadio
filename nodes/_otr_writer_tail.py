@@ -1403,6 +1403,17 @@ class WriterTailMixin:
         if _clean_window is not None:
             _clean_window.reconcile()
 
+        # Cleanup may supply the title after J.5 fell through an empty outline.
+        # Read after reconciliation so rollback, canon and delivery agree.
+        meta = led.data.setdefault("meta", {})
+        cleaned_title = str(meta.get("episode_title") or "")
+        if cleaned_title and cleaned_title != final_title:
+            final_title = cleaned_title
+            title_source = "ledger_cleanup"
+            meta["title_source"] = title_source
+            canon.title = final_title
+            _OTRC.write_episode_canon(episode_root, canon)
+
         # PBUG-20260802-02 repair, right here and nowhere else: this is the
         # LAST point before the freeze cascade node runs, and (per the
         # comment below) the last thing that touches canonical `text` --
@@ -1549,12 +1560,14 @@ class WriterTailMixin:
             outline, resolved["news_seed"], resolved["seed_source"],
             source_label=(
                 "Original (LLM)"
-                if resolved["seed_source"] == "original_llm" else ""
+                if resolved["seed_source"] == "original_llm"
+                else (str(_bank_defaults.get("source_material_label") or "Listener story idea")
+                      if resolved["seed_source"] == "my_story_fields" else "")
             ),
             origin_label=str(_bank_defaults.get("hud_origin_label") or ""),
             headline_override=(
                 final_title
-                if resolved["seed_source"] == "original_llm" else ""
+                if resolved["seed_source"] in ("original_llm", "my_story_fields") else ""
             ),
         )
 
