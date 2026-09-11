@@ -27,7 +27,8 @@ def row(beat_id="b001", role="announcer_visual", engine="ltx_8gb", exists=True):
 
 
 def manifest(*rows):
-    return {"episode_id": "health-regression", "clips": list(rows)}
+    return {"episode_id": "health-regression", "clips": list(rows),
+            "roles_effective": {row["role"]: "ltx_8gb" for row in rows}}
 
 
 class LtxOpenHealthTests(unittest.TestCase):

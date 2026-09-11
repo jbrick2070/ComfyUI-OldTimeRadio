@@ -1,0 +1,78 @@
+[
+  {
+    "path": "nodes/OTR_LedgerScriptWriter.py",
+    "sha256": "78ae20345de969674c4942b96d4bcae04a79f79c142ae9118e878ac75b012f1c"
+  },
+  {
+    "path": "nodes/_otr_constrained_generate.py",
+    "sha256": "86d42979753dbe681c59c3b5c0adff5adab98ae06c05543087dd06205c210cf9"
+  },
+  {
+    "path": "nodes/_otr_model_loader.py",
+    "sha256": "7191976d61e0385847ea6cdcf0958bfb1cb3d62f13d5ed4f2ebd6a8410580b9a"
+  },
+  {
+    "path": "nodes/_otr_openrouter_backend.py",
+    "sha256": "67ba2c51a65ad6f1def747c25d59b085134a79c182f12fe116dc7188f3c65457"
+  },
+  {
+    "path": "nodes/_otr_story_source.py",
+    "sha256": "fef71c1f2f7ce79fb20fd9f40b30e78a759dd9842ae8b943cc54cef60695927d"
+  },
+  {
+    "path": "nodes/_otr_video_engines/render_driver.py",
+    "sha256": "ea44326a65f75c2febf83a3d2f4eb43e68c8854f353e981b58b5f6531a40e571"
+  },
+  {
+    "path": "nodes/_otr_writer_tail.py",
+    "sha256": "1db457436468bdfbc6b7b7a3a5f6dbcac60f367d2234368a79b9c11393314d69"
+  },
+  {
+    "path": "nodes/_vram_log.py",
+    "sha256": "a41e29d2040d294df9142dc516379d399c9f445b0bff863cb9618bb962fecd3a"
+  },
+  {
+    "path": "nodes/otr_credits_roll.py",
+    "sha256": "5035d005c23bbb8fe7d3aa06f3be70a91d38553457b9f2d108cea2a43fcceef3"
+  },
+  {
+    "path": "nodes/otr_image_gen_dispatcher.py",
+    "sha256": "ffd7445ba7cb8337c2b336b582dc3491c905f97ea1d85059389fc056be55ae54"
+  },
+  {
+    "path": "nodes/otr_meta_brief_image_prompt.py",
+    "sha256": "db3b6a536718031d7833f807a6af4172de0e1d84e0cc531312948e5555085a68"
+  },
+  {
+    "path": "tests/test_constrained_generate.py",
+    "sha256": "213a1ac546b06355ba189975c7396f262880251be16742198363bbc35a76d5a3"
+  },
+  {
+    "path": "tests/test_credits_roll_spec.py",
+    "sha256": "4dc4877062b86ce42876b1cfc79f022c71e7e81e323cbeb263b2fca111c9cef0"
+  },
+  {
+    "path": "tests/test_generation_budget.py",
+    "sha256": "eb989fbcc66f0aa6a3979c4adfec519991a7cb1c9486a7ea13fb22e28e39d4e9"
+  },
+  {
+    "path": "tests/test_ltx_open_health.py",
+    "sha256": "8a85adc2de486138a2463b3f23c15e3e71c4b344ffd20e93af2667621900ef4e"
+  },
+  {
+    "path": "tests/test_ltx_open_health_stdlib.py",
+    "sha256": "b67da7e7411d43c362ec9595c4f3f3cde9ba699d900ced1f0a8a38288956cf6f"
+  },
+  {
+    "path": "tests/test_memory_observation.py",
+    "sha256": "2ce9f72c08861f93227a05dacf60120dbcb5e6d0f1f1d631a10c0851785bb765"
+  },
+  {
+    "path": "tests/test_my_story_visual_source.py",
+    "sha256": "c2d1446fee8d582676891501972c406bd7a8794382825e663bd2db2060f929af"
+  },
+  {
+    "path": "tests/test_original_model_credit.py",
+    "sha256": "411ebb06930b1ea2a35ca1dedad8fab3ac2b6e26de5ca2488925eab805877130"
+  }
+]

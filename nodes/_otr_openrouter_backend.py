@@ -1196,6 +1196,7 @@ class OpenRouterBackend:
         stop: Any = None,
         response_format: dict | None = None,
         grammar: str | None = None,
+        receipt_out: dict | None = None,
         **_ignored: Any,
     ) -> str:
         """Run one remote chat completion and return the decoded string.
@@ -1203,6 +1204,8 @@ class OpenRouterBackend:
         `model` is the cache_entry returned by `load()`. Enforces the
         cost ceiling BEFORE the call (C6), retries transient failures a
         bounded number of times, then aborts cleanly (C5)."""
+        if receipt_out is not None:
+            receipt_out.clear()
         require_full_output = bool(getattr(
             messages, "_otr_require_full_output_budget", False,
         ))
@@ -1375,6 +1378,7 @@ class OpenRouterBackend:
             text = self._post_with_retries(
                 base_url=base_url, api_key=api_key, payload=payload, slug=slug,
                 fail_on_output_limit=fail_on_output_limit,
+                receipt_out=receipt_out,
             )
         except OpenRouterModelGoneError as gone:
             # The operator's chosen model was DELETED. If this call came through
@@ -1401,6 +1405,7 @@ class OpenRouterBackend:
             text = self._post_with_retries(
                 base_url=base_url, api_key=api_key, payload=payload, slug=fb_clean,
                 fail_on_output_limit=fail_on_output_limit,
+                receipt_out=receipt_out,
             )
 
         # Account actual spend (best-effort; falls back to the estimate).
@@ -1445,6 +1450,7 @@ class OpenRouterBackend:
     def _post_with_retries(
         self, *, base_url: str, api_key: str, payload: dict, slug: str,
         fail_on_output_limit: bool = False,
+        receipt_out: dict | None = None,
     ) -> str:
         timeout_s = _int_env("OPENROUTER_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OPENROUTER_MAX_RETRIES", DEFAULT_MAX_RETRIES)
@@ -1486,6 +1492,7 @@ class OpenRouterBackend:
                 return self._extract_text(
                     result, slug=slug,
                     fail_on_output_limit=fail_on_output_limit,
+                    receipt_out=receipt_out,
                 )
 
             last_snippet = self._error_snippet(result)
@@ -1563,6 +1570,7 @@ class OpenRouterBackend:
     @staticmethod
     def _extract_text(
         result: dict, *, slug: str, fail_on_output_limit: bool = False,
+        receipt_out: dict | None = None,
     ) -> str:
         body = result.get("json") or {}
         if otr_env.get("OPENROUTER_DEBUG_RAW") == "1":
@@ -1617,6 +1625,15 @@ class OpenRouterBackend:
                 f"OpenRouter {slug} returned empty message content "
                 f"(finish_reason={choices[0].get('finish_reason')!r})."
             )
+        if receipt_out is not None:
+            reported = body.get("model")
+            reported = reported.strip() if isinstance(reported, str) else ""
+            receipt_out.update({
+                "requested_model_id": slug,
+                "executed_model_id": reported or None,
+                "reported_model_id": reported or None,
+                "identity_basis": "response_model" if reported else "unreported",
+            })
         return content
 
     @staticmethod
@@ -1675,6 +1692,9 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
 
     def generate_fn(messages, *, temperature=None, max_new_tokens=None,
                     stop=None, response_format=None, grammar=None):
+        # A reusable closure must never expose a prior response after a failure.
+        generate_fn._otr_response_model_receipt = None
+        receipt = {}
         # A per-call response_format (e.g. structured_call passing
         # json_object on an un-schema'd creative call) overrides the bound
         # one; otherwise the closure's bound response_format (S4 json_schema)
@@ -1691,6 +1711,7 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
             stop=stop,
             response_format=rf,
             grammar=g,
+            receipt_out=receipt,
         )
         # CLOUD RUNAWAY GUARD (2026-08-13). A remote call has no token loop to
         # attach a StoppingCriteria to, so this cannot save the spend -- but it
@@ -1704,6 +1725,7 @@ def make_openrouter_generate_fn(cache_entry: dict, *, response_format: dict | No
                 assert_no_verbatim_cycle,
             )
         assert_no_verbatim_cycle(_reply, label="openrouter")
+        generate_fn._otr_response_model_receipt = dict(receipt)
         return _reply
 
     # Markers so structured_call can detect a remote fn and whether it

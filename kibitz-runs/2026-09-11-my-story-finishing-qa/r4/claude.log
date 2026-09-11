@@ -1,0 +1,4 @@
+STDOUT:
+Review written to `kibitz-runs/2026-09-11-my-story-finishing-qa/r4/claude.md`.
+
+**Verdict: yes-with-fixes.** Every specific claim in F2/B/C/Mac/O2 checked out against the real source (retry caps, receipt/identity basis logic, hero-title wrap math, memory-snapshot call sites, LTX health states) — I traced each to exact file:line and matched it against the new tests. The one genuine finding: `diff.txt`/`diff_utf8.txt` are stray untracked files in the repo root containing an unrelated, already-fixed-and-logged bug (PBUG-20260909-04's font fix), not this campaign's diff — worth deleting before the next commit since they could mislead a future reviewer. Everything else is either already-disclosed pending status (Bible check, live qualification, hardware) or a cosmetic non-issue.

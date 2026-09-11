@@ -19,6 +19,20 @@ changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
 ## 1. Define ownership before implementation
 
+Finishing campaign (2026-09-11): source corrections must replace the artifact
+at its existing author, with helper repairs counted inside a fixed budget.
+Hash the current source plus resolved scene context for cached descendants;
+carry later prompt transforms separately from semantic claims. A returned model
+call proves observed participation, not accepted authorship: preserve response-local
+identity and separate generation from finishing credits. Text containment needs
+actual painted bounds and the same vertical flow in measurement and drawing.
+Health applicability comes from frozen requested routing, not a role name or an
+empty offender list. Nullable independent allocation observations are evidence,
+not proof that a particular object caused an OS kill. See finishing_receipt.md,
+PBUG-20260911-01, PBUG-20260910-03 and the PBUG-20260906-03 addendum.
+
+
+
 Cross-machine diagnostic follow-up (2026-09-11): an image missing before the
 image phase is a typed deferral, while a missing render input remains a failure.
 Pass diagnostic phase explicitly without changing the request or its hash.

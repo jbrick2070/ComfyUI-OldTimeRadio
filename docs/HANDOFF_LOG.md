@@ -1,3 +1,29 @@
+## 2026-09-11 -- My Story finishing coding complete; canonical recovery next
+
+F2 visual source corrections, actual Original generation-model credits, hero-title
+containment, Mac allocation observations and frozen-intent opener diagnostics are
+implemented. Final Sonnet/high QA read all revised owners and found no new code
+must-fix. Its unrelated inherited-file cleanup suggestion was rejected; explicit
+staging preserves those files. Independent code and Bible reviews were grounded.
+No extra report-only checker or recursive source compactor was introduced.
+
+Final focused: 287 passed/one live-Metal skip. Full: 14,361 passed/51 unchanged failures/
+183 skipped/one xfailed; IDs and normalized assertions match F1 baseline. Controlled
+Bible: 33 passed/10 unchanged failures/11 skipped/3 xfailed versus 30/13/11/3. Three guards
+fail at baseline and pass on candidate; 343 entries, 146 unchanged metadata issues.
+Canonical validator/roundtrip/live widget+link audit passes: 23 nodes / 63 links / 37 writer
+widgets; no schema/wiring change. Exact 19-file reviewed snapshot and judgments:
+kibitz-runs/2026-09-11-my-story-finishing-qa/r4/. Component proof, comparisons and
+CPU credits images: docs/2026-09-11-my-story-cross-machine/finishing_receipt.md.
+
+Completed implementation contracts are archived verbatim. GO_FORWARD now starts
+with fresh full canonical 5080 source recovery and stress coverage. RunPod is authorized
+only with authenticated current access/current checkout; no rented compute started.
+Mac/4060 stay idle until the operator's explicit release tomorrow. No new episode,
+source-qualified image, Mac memory cure or README model proof is claimed here.
+
+---
+
 ## 2026-09-11 -- F1 bounded source correction wired and qualified
 
 My Story P0-P3 now receive exact raw source and apply actual corrected artifacts

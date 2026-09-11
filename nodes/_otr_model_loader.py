@@ -63,8 +63,10 @@ except ImportError:  # pragma: no cover -- flat test imports
 # version of this line took three tests red.
 try:
     from . import _otr_writer_heartbeat as _OTRHB  # type: ignore
+    from . import _vram_log as _memory_log
 except ImportError:  # loaded with nodes/ on sys.path
     import _otr_writer_heartbeat as _OTRHB  # type: ignore
+    import _vram_log as _memory_log
 
 try:
     from ._otr_generation_budget import (
@@ -1553,8 +1555,8 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
 
     Canonical sequence (matches reference_chained_backend_teardown):
         1. model.to("cpu")           -- move weights off the GPU.
-        2. del cache_entry           -- drop references so gc can reap.
-        3. gc.collect()              -- purge Python-side refs.
+        2. del entry                 -- drop this function's entry reference.
+        3. gc.collect()              -- collect unreachable Python objects.
         4. torch.cuda.empty_cache()  -- return free blocks to allocator.
         5. torch.cuda.ipc_collect()  -- release inter-process CUDA IPC
                                         handles. CRITICAL when LLM load
@@ -1564,18 +1566,18 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
                                         when the byte budget fits.
         6. torch.cuda.synchronize()  -- let in-flight ops finish.
 
-    ON APPLE SILICON steps 4-6 have a Metal counterpart (``torch.mps``) that
-    was missing until 2026-09-08. Steps 1-3 were always right there; without
-    4-6 the allocator simply never gave the memory back, and since this
-    teardown runs between stages that each free the LLM for the next model, an
-    episode's 8-12 legitimate load/unload cycles of a 8.7 GB writer grew the
-    pool until the OS killed the process. See PBUG-20260908-03.
+    On Apple Silicon the existing Metal flush returns free allocator blocks.
+    Neither deleting entry nor collecting proves all model references are gone:
+    this function's model variable and the caller can still own references.
+    Snapshot labels describe retirement stages, not a proven memory cure.
 
     Never raises -- a teardown failure should NOT propagate as a node
     error.
     """
     import gc
 
+    model_id = entry.get("model_id") if entry is not None else None
+    _memory_log.memory_snapshot("llm_retirement_before", model_id=model_id)
     if entry is not None:
         if entry.get("provider") == "gguf_native":
             try:
@@ -1593,6 +1595,7 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
                 model.to("cpu")
             except Exception as exc:  # noqa: BLE001
                 log.debug("[OTR_ModelLoader] model.to(cpu) failed: %s", exc)
+    _memory_log.memory_snapshot("llm_retirement_after_cpu_move", model_id=model_id)
     del entry
     gc.collect()
 
@@ -1610,13 +1613,8 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
             except Exception as exc:  # noqa: BLE001
                 log.debug("[OTR_ModelLoader] synchronize skipped: %s", exc)
         elif getattr(torch, "mps", None) and torch.backends.mps.is_available():
-            # STEPS 4-6 HAD NO METAL COUNTERPART, AND THAT KILLED A MACHINE
-            # THREE TIMES (2026-09-08). Everything above this line is already
-            # correct on Apple Silicon: the entry is detached, `model.to("cpu")`
-            # runs, and gc.collect() reaps it -- a trace confirmed there is no
-            # leaked reference anywhere in this path. But dropping the Python
-            # object does NOT return the memory: PyTorch's MPS caching allocator
-            # keeps its reserved pool, and nothing here ever asked it not to.
+            # Emptying the allocator returns free blocks. It does not establish
+            # that this function or its caller released every model reference.
             #
             # WHAT IT ACTUALLY COSTS -- and this paragraph was WRONG for a day,
             # so read the correction rather than the original story. It said the
@@ -1653,6 +1651,7 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
                 log.debug("[OTR_ModelLoader] mps synchronize skipped: %s", exc)
     except ImportError:
         pass
+    _memory_log.memory_snapshot("llm_retirement_after_allocator_flush", model_id=model_id)
 
 
 def unload_llm() -> int:
@@ -2466,6 +2465,7 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                     tokenizer,
                     f"llm:{cache_entry.get('model_id', '<unknown>')}"),
             )
+        _memory_log.memory_snapshot("base_generation_returned", model_id=cache_entry.get("model_id"))
         # Strip prompt prefix from decoded output.
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
@@ -2658,6 +2658,7 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                     tokenizer,
                     f"polish:{cache_entry.get('model_id', '<unknown>')}"),
             )
+        _memory_log.memory_snapshot("polish_generation_returned", model_id=cache_entry.get("model_id"))
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
         if _deadline_guard.hit:

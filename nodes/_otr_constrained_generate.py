@@ -39,6 +39,7 @@ from pydantic import BaseModel
 
 from . import _otr_lmfe_compat  # compat shim; ensure_lmfe_transformers_compat() called inside factory below
 from . import _otr_writer_heartbeat as _OTRHB
+from . import _vram_log as _memory_log
 from ._otr_generation_budget import (
     GenerationDegeneracyError, GenerationContextOverflowError,
     PromptContextOverflowError, fit_output_tokens,
@@ -343,6 +344,7 @@ def make_constrained_generate_fn(
                 streamer=streamer,
             )
 
+        _memory_log.memory_snapshot("constrained_generation_returned", model_id=cache_entry.get("model_id"))
         prompt_len = inputs["input_ids"].shape[1]
         decoded = tokenizer.decode(
             out[0][prompt_len:],

@@ -10,9 +10,8 @@ the shared `otr_runtime.log` in a structured format that
 
 Design rules
 ------------
-- CUDA-absent safe. Every public function is a no-op when torch.cuda is not
-  available. This keeps the orchestrator importable on CI machines and on
-  the sandbox used for AST regression tests.
+- CUDA-absent safe. Legacy CUDA snapshots retain their numeric-zero contract;
+  memory_snapshot independently observes process RSS and optional MPS counters.
 - No heavy imports at module load time. torch is imported lazily inside
   each function so importing this module costs nothing.
 - Peak counter reset is opt-in. The caller decides when a new phase begins;
@@ -35,9 +34,10 @@ Usage (from a node method)
 
 from __future__ import annotations
 
+import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 log = logging.getLogger("OTR")
 
@@ -104,6 +104,43 @@ def vram_snapshot(label: str) -> dict:
         )
     except Exception as exc:
         log.debug("vram_snapshot(%s) failed: %s", label, exc)
+    return result
+
+
+def memory_snapshot(label: str, *, model_id: str | None = None) -> dict:
+    """Observe RSS and MPS allocations without changing allocation or policy.
+
+    Missing counters are unknown, not zero. These snapshots mark actual native
+    generation returns and model-retirement stages; they do not prove that all
+    references were released or diagnose an OS kill. Imports remain lazy.
+    """
+    result = {"timestamp_utc": datetime.now(timezone.utc).isoformat(),
+              "phase": label, "pid": os.getpid(),
+              "model_id": model_id if isinstance(model_id, str) else None,
+              "process_rss_bytes": None, "mps_current_bytes": None,
+              "mps_driver_bytes": None}
+    try:
+        import psutil
+        result["process_rss_bytes"] = int(psutil.Process().memory_info().rss)
+    except Exception:
+        pass
+    try:
+        import torch
+        if getattr(torch, "mps", None) and torch.backends.mps.is_available():
+            for key, counter in (("mps_current_bytes", "current_allocated_memory"),
+                                 ("mps_driver_bytes", "driver_allocated_memory")):
+                try:
+                    result[key] = int(getattr(torch.mps, counter)())
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        line = "MEMORY_SNAPSHOT " + json.dumps(result, ensure_ascii=True, sort_keys=True)
+        _write_runtime_log(line)
+        log.info(line)
+    except Exception:
+        pass  # Observational logging must never break the owning operation.
     return result
 
 _CLEANUP_CALLBACKS = []

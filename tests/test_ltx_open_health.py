@@ -7,7 +7,8 @@ from nodes._otr_video_engines import render_driver as rd
 
 
 def _manifest(rows):
-    return {"episode_id": "e", "clips": rows}
+    return {"episode_id": "e", "clips": rows,
+            "roles_effective": {row["role"]: "ltx_video" for row in rows}}
 
 
 def _row(beat_id, role, engine_id, exists=True):
@@ -88,3 +89,50 @@ def test_build_clip_manifest_nonstrict_does_not_raise(monkeypatch):
     man = rd.build_clip_manifest(result, episode_id="e")   # must not raise
     assert man["n_beats"] == 1
     assert man["clips"][0]["role"] == "announcer_visual"
+    assert man["ltx_open_health"]["status"] == "unknown"
+
+
+@pytest.mark.parametrize("engine", sorted(rd._LTX_OPEN_ENGINES))
+def test_each_intended_ltx_engine_has_healthy_actual_artifact(engine):
+    man = _manifest([_row("b1", "announcer_visual", engine)])
+    man["roles_effective"]["announcer_visual"] = engine
+    report = {}
+    assert rd.check_ltx_open_health(man, strict=True, report_out=report) == []
+    assert report["status"] == "healthy"
+
+
+@pytest.mark.parametrize("intent,expected", [("still_pan", "not_requested"),
+                                             (None, "unknown"), ("unmapped_engine", "unknown")])
+def test_only_proven_ltx_intent_demands_an_ltx_open(intent, expected, caplog):
+    man = _manifest([_row("b1", "announcer_visual", "still_pan")])
+    man["roles_effective"] = {"announcer_visual": intent}
+    report = {}
+    assert rd.check_ltx_open_health(man, strict=True, report_out=report) == []
+    assert report["status"] == expected
+    assert "LTX-OPEN HEALTH" not in caplog.text
+
+
+def test_actual_ltx_without_intent_cannot_establish_health():
+    man = {"clips": [_row("b1", "announcer_visual", "ltx_video")]}
+    report = {}
+    assert rd.check_ltx_open_health(man, strict=True, report_out=report) == []
+    assert report["status"] == "unknown"
+
+
+def test_manifest_uses_frozen_effective_intent_not_picked_or_mutated_shot(tmp_path):
+    path = tmp_path / "clip.mp4"
+    path.write_bytes(b"observed clip")
+    result = {"ledger": {"video": {
+        "roles": {"announcer_visual": "ltx_video"},
+        "roles_effective": {"announcer_visual": "still_pan"},
+        "shots": [{"shot_id": "s1", "role": "announcer_visual", "engine_id": "ltx_video"}],
+    }}, "clips": {"s1": {"engine_id": "still_pan", "path": str(path)}}}
+    man = rd.build_clip_manifest(result)
+    assert man["roles_effective"] == {"announcer_visual": "still_pan"}
+    assert man["ltx_open_health"]["status"] == "not_requested"
+    result["ledger"]["video"]["roles_effective"]["announcer_visual"] = "ltx_video"
+    assert man["roles_effective"]["announcer_visual"] == "still_pan"
+    failed = rd.build_clip_manifest(result)
+    assert failed["ltx_open_health"]["status"] == "degraded"
+    with pytest.raises(rd.RenderFloorError):
+        rd.check_ltx_open_health(failed, strict=True)

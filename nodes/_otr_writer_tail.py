@@ -448,6 +448,54 @@ def _apply_intro_rewrite_result(
         )
 
 
+_GENERATION_CREDIT_HELPERS = frozenset({
+    "build_news_briefs", "lock_cast", "generate_outline", "compose_line",
+    "generate_title", "compose_news_coda", "compose_announcer_intro",
+    "compose_announcer_outro", "announcer_intro_rewrite",
+})
+_FINISHING_CREDIT_HELPERS = frozenset({
+    "ledger_clean", "ledger_cleanup", "cast_coverage_repair",
+})
+_SUPPORT_CREDIT_HELPERS = frozenset({
+    "dramatic_state", "build_continuity_ledger", "story_brief_reflection",
+    "produced_story_summary", "derive_produced_open_brief",
+})
+
+
+def _stamp_model_call_provenance(meta, slot_scheduler):
+    fields = (
+        "helper", "slot", "provider", "configured_model_id", "requested_model_id",
+        "executed_model_id", "reported_model_id", "identity_basis",
+    )
+    calls = [
+        {key: row.get(key) if isinstance(row.get(key), str) else None for key in fields}
+        for row in getattr(slot_scheduler, "successful_model_calls", [])
+        if isinstance(row, dict)
+    ]
+    receipt = {"version": 1, "calls": calls, "generation_models": [],
+               "finishing_models": [], "support_models": [], "unclassified_helpers": []}
+    for call in calls:
+        helper = call["helper"]
+        if helper in _GENERATION_CREDIT_HELPERS and call["slot"] == "creative":
+            bucket = "generation_models"
+        elif helper in _FINISHING_CREDIT_HELPERS:
+            bucket = "finishing_models"
+        elif helper in _SUPPORT_CREDIT_HELPERS:
+            bucket = "support_models"
+        else:
+            if helper not in receipt["unclassified_helpers"]:
+                receipt["unclassified_helpers"].append(helper)
+            continue
+        model = call["executed_model_id"] or "model identity unreported"
+        if model not in receipt[bucket]:
+            receipt[bucket].append(model)
+    meta["model_call_provenance"] = receipt
+    if meta.get("source_bank") == "original":
+        meta["credits_source_line"] = "Story generation models used: " + (
+            ", ".join(receipt["generation_models"]) or "none recorded"
+        )
+
+
 def _stamp_final_slot_telemetry(
     *, meta, resolved, slot_scheduler, pipeline_id: str,
     title_source: str,
@@ -462,6 +510,7 @@ def _stamp_final_slot_telemetry(
     meta["slot_transitions_by_phase"] = [
         dict(record) for record in slot_scheduler.slot_transitions_by_phase
     ]
+    _stamp_model_call_provenance(meta, slot_scheduler)
     if _LANES.is_dispatched(pipeline_id):
         # Custom runners name every structured pass through helper_context.
         # Derive rows from that executed journal; never claim legacy phases.

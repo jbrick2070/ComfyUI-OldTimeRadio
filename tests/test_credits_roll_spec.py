@@ -148,6 +148,102 @@ def test_hero_is_episode_title_subtitle_is_signal_lost():
     assert "1920x1080" in lay["meta_strip"]
 
 
+def _paint_hero(title, w, h):
+    """Observe the real paint pass, after the existing scratch/footer ladder."""
+    led = _led()
+    led["meta"]["episode_title"] = title
+    layout = cr.build_credits_layout(led, w=w, h=h, manifest={"clips": []})
+    draw = cr._scratch_draw(w, h)
+    painted = []
+
+    class RecordedDraw:
+        def __getattr__(self, name):
+            return getattr(draw, name)
+
+        def text(self, xy, text, **kwargs):
+            painted.append((text, xy, kwargs["font"], draw.textbbox(xy, text, font=kwargs["font"])))
+            return draw.text(xy, text, **kwargs)
+
+    x, top = int(cr._COL1_X * h / cr._REF_H), int(cr._MARGIN_TOP * h / cr._REF_H)
+    bottom = cr._draw_col1(RecordedDraw(), x, top, layout, w, h)
+    measured = cr._draw_col1(cr._scratch_draw(w, h), x, top, layout, w, h)
+    assert measured == bottom
+    subtitle_at = next(i for i, row in enumerate(painted) if row[0] == "SIGNAL LOST")
+    return layout, painted[:subtitle_at], painted[subtitle_at], bottom
+
+
+@pytest.mark.parametrize("w,h", [(832, 480), (1280, 720), (1920, 1080), (3840, 2160)])
+@pytest.mark.parametrize("title", [
+    "LIGHTNING MAC PROOF 2", "THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES",
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZABCDEFGHIJKLMNOPQRSTUVWXYZ",
+    "A\u0301" * 42,
+])
+def test_hero_complete_glyphs_stay_in_column_and_subtitle_follows(title, w, h):
+    layout, lines, subtitle, _ = _paint_hero(title, w, h)
+    left = int(cr._COL1_X * h / cr._REF_H)
+    right = left + int(cr._COL1_W * h / cr._REF_H)
+    assert "".join(row[0] for row in lines).replace(" ", "") == layout["hero"].replace(" ", "")
+    for text, xy, font, bounds in lines:
+        assert left <= bounds[0] <= bounds[2] <= right, (text, bounds, left, right)
+        assert not text.startswith("\u0301")
+    for previous, current in zip(lines, lines[1:]):
+        assert previous[3][3] <= current[3][1]
+    assert max(row[3][3] for row in lines) <= subtitle[3][1]
+
+
+def test_short_hero_keeps_its_existing_position_font_and_whitespace():
+    title = "LIGHTNING  MAC PROOF 2"
+    _, lines, _, _ = _paint_hero(title, 1920, 1080)
+    draw = cr._scratch_draw(1920, 1080)
+    old_pt = cr._autoshrink_pt(draw, title, cr._COL1_W, cr._PT_HERO_MAX,
+                              cr._PT_HERO_MIN, cr._load_font)
+    assert len(lines) == 1
+    assert lines[0][0] == title
+    assert lines[0][1] == (cr._COL1_X, cr._MARGIN_TOP)
+    assert lines[0][2].size == old_pt
+
+
+@pytest.mark.parametrize("symbol", ["\U0001f44d\U0001f3fd", "\U0001f1fa\U0001f1f8",
+                                   "A\u0301", "\U0001f469\u200d\U0001f4bb"])
+def test_hero_wrap_keeps_modified_and_joined_symbols_together(symbol):
+    draw = cr._scratch_draw(1920, 1080)
+    font = cr._load_font(48)
+    left, _, right, _ = draw.textbbox((0, 0), symbol, font=font)
+    lines = cr._hero_lines(draw, symbol * 3, font, max(0, right) - min(0, left))
+    assert lines == [symbol] * 3
+
+
+@pytest.mark.parametrize("w,h", [(832, 480), (1280, 720), (1920, 1080), (3840, 2160)])
+def test_live_lantern_title_preserves_footer_policy(w, h):
+    _, _, _, bottom = _paint_hero("THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES", w, h)
+    assert bottom <= h - int(56 * h / cr._REF_H)
+
+
+def test_hero_negative_bearing_uses_actual_font_bounds(monkeypatch):
+    from PIL import ImageFont
+    candidates = [r"C:\Windows\Fonts\ariali.ttf", "DejaVuSans-Oblique.ttf",
+                  "/System/Library/Fonts/Supplemental/Arial Italic.ttf"]
+    for path in candidates:
+        try:
+            ImageFont.truetype(path, 48)
+            break
+        except OSError:
+            continue
+    else:
+        pytest.skip("No real italic font installed for overhang proof")
+    monkeypatch.setenv("OTR_CREDITS_FONT", path)
+    cr._FONT_CACHE.clear()
+    try:
+        _, lines, subtitle, _ = _paint_hero("J" * 45 + " A\u0301" * 12, 1920, 1080)
+        assert any(cr._scratch_draw(1920, 1080).textbbox((0, 0), row[0], font=row[2])[0] < 0
+                   for row in lines)
+        assert all(cr._COL1_X <= row[3][0] <= row[3][2] <= cr._COL1_X + cr._COL1_W
+                   for row in lines)
+        assert max(row[3][3] for row in lines) <= subtitle[3][1]
+    finally:
+        cr._FONT_CACHE.clear()
+
+
 def test_missing_title_or_identity_raises():
     # The no-fallback contract, updated for the display swap: the strip's
     # inputs are episode_title, visual_style and source_bank. meta.style (the

@@ -133,7 +133,7 @@ def _content_hash(obj) -> str:
 
 
 def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_version,
-                      kind="", w=0, h=0, *, anchor="") -> str:
+                      kind="", w=0, h=0, *, anchor="", source_context_hash="") -> str:
     """The dispatch dedup key (PASS-IMG MUST-FIX #5). A change in ANY field ->
     new key -> regen -> new content hash -> B's mesh cache invalidates.
 
@@ -153,6 +153,8 @@ def request_cache_key(role, object_id, prompt_hash, seed, engine_id, engine_vers
     ]
     if anchor:
         parts.append(str(anchor))
+    if source_context_hash:
+        parts.append({"source_context_hash": str(source_context_hash)})
     return _content_hash(parts)
 
 
@@ -919,6 +921,8 @@ def merge_jump_still_requests(ledger, objects, required_scene_targets):
                 "refusing an ambiguous duplicate object." % oid)
         clone = dict(base)
         clone["object_id"] = oid
+        if base.get("kind") == "scene_character":
+            clone["source_scene_scope"] = "scene_character"
         # THE FIXED-SEED LANES LOSE THEIR FIXED SEED HERE, DELIBERATELY.
         # ``resolve_object_seed`` pins seed 4242 for ``kind == "scene_open"``
         # and for the radio-face object ids, so that the BOOKEND is one
@@ -966,6 +970,8 @@ class _NormalizedPrompt(NamedTuple):
     banana_result: object
     banana_receipt: object
     prompt_hash: str
+    base_prompt_hash: str = ""
+    normalization_receipt: object = None
 
 
 def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
@@ -992,8 +998,11 @@ def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
     portrait that is never rendered must NOT contribute to a rendered-work
     metric.
     """
-    prompt = append_visual_safety_clause(str(raw_prompt or ""))
+    base_prompt = str(raw_prompt or "")
+    base_hash = _prompt_content_hash(base_prompt)
+    prompt = append_visual_safety_clause(base_prompt)
     _pre_style = prompt
+    safety_hash = _prompt_content_hash(prompt)
     if vstyle is not None:
         # Imported HERE, with the same package/flat fallback the dispatch loop
         # uses, because `_otr_visual_styles` is not a module-level import in
@@ -1009,6 +1018,7 @@ def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
     styled = prompt != _pre_style
     # The write-back hash: post-style, PRE-banana. See the NamedTuple docstring.
     pre_banana_hash = _prompt_content_hash(prompt) if styled else ""
+    style_hash = _prompt_content_hash(prompt)
     if banana_on:
         bres = _banana.apply(
             prompt, variety_key=banana_key,
@@ -1018,8 +1028,61 @@ def normalize_prompt_for_render(raw_prompt, *, vstyle, banana_on, banana_key,
     else:
         bres = None
         receipt = _banana.off_receipt(prompt, variety_key=banana_key)
+    final_hash = _prompt_content_hash(prompt)
+    normalization = {
+        "hash_format": "sha256_json_string_ascii", "base_prompt_hash": base_hash,
+        "safety_prompt_hash": safety_hash, "style_prompt_hash": style_hash,
+        "final_prompt_hash": final_hash, "final_prompt": prompt,
+        "safety_changed": safety_hash != base_hash, "style_changed": styled,
+        "banana_changed": final_hash != style_hash,
+        "final_changed": final_hash != base_hash,
+        "source_qualified": False,
+    }
     return _NormalizedPrompt(prompt, styled, pre_banana_hash, bres, receipt,
-                             _prompt_content_hash(prompt))
+                             final_hash, base_hash, normalization)
+
+
+def _current_source_context_hash(ledger, obj):
+    """Rejoin the current frozen scene; an old payload cannot certify a new source."""
+    if (str(obj.get("kind") or "") != "scene_character"
+            and obj.get("source_scene_scope") != "scene_character"):
+        return ""
+    meta = ledger.get("meta") or {}
+    if not isinstance(meta.get("my_story"), dict):
+        return ""
+    from .otr_meta_brief_image_prompt import _iter_beat_lines, _scene_source_context
+    from ._otr_story_source import candidate_sha256
+    lines = ledger.get("lines") or []
+    line = next((row for bid, row in _iter_beat_lines(lines)
+                 if bid == str(obj.get("beat_id") or "")), {})
+    context = _scene_source_context(meta, ledger.get("cast") or [], lines, obj, line, ledger)
+    return candidate_sha256(context) if context is not None else ""
+
+
+def _source_rewrite_for_render(obj, normalized, source_context_hash):
+    """Bind current source evidence to the actual dispatch input, never a cached claim."""
+    original = obj.get("source_rewrite")
+    if not isinstance(original, dict):
+        return None
+    receipt = json.loads(json.dumps(original, ensure_ascii=True))
+    matched = (bool(source_context_hash)
+               and receipt.get("base_prompt_hash") == normalized.base_prompt_hash
+               and receipt.get("source_context_hash") == obj.get("source_context_hash")
+               == source_context_hash)
+    receipt.update({
+        "base_matches_rewrite": matched,
+        "dispatch_base_prompt_hash": normalized.base_prompt_hash,
+        "dispatch_source_context_hash": source_context_hash,
+        "final_prompt_hash": normalized.prompt_hash,
+        "final_prompt": normalized.text,
+        "normalization": normalized.normalization_receipt,
+        "qualified": False,
+        "dispatch_disposition": (
+            "stale_source_receipt" if not matched else
+            "transformed_after_source_operation" if normalized.normalization_receipt["final_changed"]
+            else "source_operation_retained"),
+    })
+    return receipt
 
 
 def verify_replay_images(ledger: dict):
@@ -1290,6 +1353,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             obj.get("prompt"), vstyle=_vstyle, banana_on=_banana_on,
             banana_key=_banana_key, source=source)
         prompt = _norm.text
+        source_context_hash = _current_source_context_hash(ledger, obj)
+        source_rewrite = _source_rewrite_for_render(obj, _norm, source_context_hash)
         _styled_now = _norm.styled
         # THE NEGATIVE FOR THIS ROW, resolved once and recorded (operator
         # 2026-08-17: "lock them in the ledger"). Composed, never precedence --
@@ -1538,7 +1603,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         eng_version = str(getattr(_safe_engine(engine_id), "engine_version", "1"))
         key = request_cache_key(role, oid, prompt_hash, seed, engine_id,
                                 eng_version, kind=kind, w=obj_w, h=obj_h,
-                                anchor=anchor_hash if reference_image else "")
+                                anchor=anchor_hash if reference_image else "",
+                                source_context_hash=source_context_hash)
         if key in cache_index:
             # Cache HIT (pass-02 Gem-2): the hit must STILL materialize into
             # the CURRENT episode's stills/ + append a fresh ledger row --
@@ -1588,6 +1654,10 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 # anchor stamp above: this row is a copy of an older one, and a
                 # conditional stamp would inherit a stale receipt.
                 fresh.update(banana_rcpt)
+                # Copies of historical rows must never inherit an older source
+                # operation, including when the current object carries none.
+                fresh["source_context_hash"] = source_context_hash
+                fresh["source_rewrite"] = source_rewrite
                 if char_id:
                     fresh["char_id"] = char_id
                 if beat_id:
@@ -1825,6 +1895,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # Banana receipt (six keys), on the fresh-generation row exactly as on
         # the cache-hit row -- both are the durable ledger record.
         row.update(banana_rcpt)
+        row["source_context_hash"] = source_context_hash
+        row["source_rewrite"] = source_rewrite
         if char_id:
             row["char_id"] = char_id
         if beat_id:
@@ -2118,6 +2190,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     "content_hash": (r.get("content_hash")
                                      or r.get("portrait_content_hash")),
                     "prompt_hash": r.get("prompt_hash"),
+                    "source_context_hash": r.get("source_context_hash", ""),
+                    "source_rewrite": r.get("source_rewrite"),
                     "provenance": r.get("provenance"),
                     # The banana receipt rides the manifest so an operator can
                     # audit the route without opening the ledger.

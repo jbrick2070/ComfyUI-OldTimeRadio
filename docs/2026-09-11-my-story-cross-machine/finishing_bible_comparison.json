@@ -1,0 +1,32 @@
+{
+  "baseline": {
+    "passed": 30,
+    "failed": 13,
+    "skipped": 11,
+    "xfailed": 3,
+    "sha256": "e3bf94910e17ab678d3aec825a8bedc2107ea7d54560ffc62e5b7fddf781ca84"
+  },
+  "candidate": {
+    "passed": 33,
+    "failed": 10,
+    "skipped": 11,
+    "xfailed": 3,
+    "sha256": "ddc4a3540819a2fdd4e9ee31179ca2c50fe00f8f9c6085453fcd577f8731e3ad"
+  },
+  "new_failures": [],
+  "resolved_failures": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_credits_hero_containment_has_real_font_and_footer_coverage",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_open_health_requires_frozen_intent_and_reports_unknown"
+  ],
+  "normalization": "memory addresses, pytest directory numbers, timestamps, source line numbers, baseline/candidate checkout names",
+  "presentation_only_payload_changes": [
+    ".TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof",
+    ".TestPhase01Paths::test_no_deep_dirname_chains",
+    ".TestPhase01Paths::test_output_nodes_use_folder_paths",
+    ".TestPhase07VRAM::test_vram_flush_after_unload",
+    ".TestPhase09Subprocess::test_popen_has_cleanup"
+  ],
+  "changed_failure_meanings": [],
+  "presentation_note": "The five payload diffs are only py_files fixture repr truncation caused by baseline/candidate path length. Assertion messages and offending lists match; no changed failure meaning."
+}

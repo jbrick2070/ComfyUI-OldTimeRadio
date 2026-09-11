@@ -715,6 +715,57 @@ def _autoshrink_pt(draw, text, max_w, hi, lo, mkfont):
     return max(lo, pt)
 
 
+def _hero_clusters(text):
+    """Keep base/mark and joined glyph sequences intact when breaking a token."""
+    import unicodedata
+    cluster = ""
+    for char in text:
+        modifier = "\U0001f3fb" <= char <= "\U0001f3ff"
+        flag_pair = (len(cluster) == 1 and "\U0001f1e6" <= cluster <= "\U0001f1ff"
+                     and "\U0001f1e6" <= char <= "\U0001f1ff")
+        if cluster and (unicodedata.category(char).startswith("M")
+                        or modifier or flag_pair
+                        or char == "\u200d" or cluster.endswith("\u200d")):
+            cluster += char
+        else:
+            if cluster:
+                yield cluster
+            cluster = char
+    if cluster:
+        yield cluster
+
+
+def _hero_lines(draw, text, font, max_w):
+    """Wrap the complete title using drawn bounds, including font overhang."""
+    def fits(value):
+        left, _, right, _ = draw.textbbox((0, 0), value, font=font)
+        return max(0, right) - min(0, left) <= max_w
+
+    if fits(text):
+        return [text]
+    lines, current = [], ""
+    for word in text.split():
+        candidate = current + " " + word if current else word
+        if fits(candidate):
+            current = candidate
+            continue
+        if current:
+            lines.append(current)
+            current = ""
+        # A word can be wider than the column by itself. Break between glyph
+        # clusters, without losing letters or emitting an ellipsis.
+        for cluster in _hero_clusters(word):
+            if current and not fits(current + cluster):
+                lines.append(current)
+                current = ""
+            current += cluster
+        # An indivisible glyph always advances the loop, even on a canvas too
+        # narrow to display it at the existing legibility floor.
+    if current:
+        lines.append(current)
+    return lines or [""]
+
+
 def _draw_grid(draw, x, y, header, rows, h, *, label_w=None, gaps=1.0):
     """Bracket header + dim-label/bright-value rows. Returns new y."""
     from PIL import ImageFont  # noqa: F401
@@ -938,14 +989,26 @@ def _flow_col1(d, x, top, layout, w, h, note_lines, gaps=1.0):
         return max(1, int(_sc(pt, h) * gaps))
 
     y = top
-    # hero (auto-shrink to col1 width)
+    # Preserve the old short-title size, then wrap at the same legibility floor.
+    # The measurement and paint passes both use this exact glyph layout.
     hero = layout["hero"]
-    hero_pt = _autoshrink_pt(d, hero, int(_COL1_W * sx),
+    hero_width = int(_COL1_W * sx)
+    hero_pt = _autoshrink_pt(d, hero, hero_width,
                              _sc(_PT_HERO_MAX, h), _sc(_PT_HERO_MIN, h),
                              lambda p: _load_font(p))
     fh = _load_font(hero_pt)
-    d.text((x, y), hero, fill=_rgba(_TEAL), font=fh)
-    y += _fh(fh)
+    while hero_pt > _sc(_PT_HERO_MIN, h):
+        left, _, right, _ = d.textbbox((0, 0), hero, font=fh)
+        if max(0, right) - min(0, left) <= hero_width:
+            break
+        hero_pt = max(_sc(_PT_HERO_MIN, h), hero_pt - 2)
+        fh = _load_font(hero_pt)
+    for line in _hero_lines(d, hero, fh, hero_width):
+        left, top_ink, right, bottom = d.textbbox((0, 0), line, font=fh)
+        # Positive bearings already fit and keep their original position.
+        draw_y = y - min(0, top_ink)
+        d.text((x - min(0, left), draw_y), line, fill=_rgba(_TEAL), font=fh)
+        y = max(y + _fh(fh), draw_y + bottom)
     # subtitle "SIGNAL LOST" at 50%
     fs = _load_font(max(8, hero_pt // 2))
     d.text((x, y), layout["subtitle"], fill=_rgba(_TEAL), font=fs)

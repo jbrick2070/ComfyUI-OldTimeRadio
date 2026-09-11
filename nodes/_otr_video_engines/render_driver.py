@@ -6039,21 +6039,20 @@ _LTX_OPEN_ENGINES = frozenset(
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})
 
 
-def check_ltx_open_health(manifest, *, strict=None):
-    """BUG-LOCAL-413 guard -- surface a radio-OPEN beat (announcer / music
-    console opener, incl. the synthetic b000 music_open) that did NOT render on
-    an LTX engine. The 6/15 ``eye_of_the_storm`` open was SOFT because the
-    episode rendered ZERO LTX clips and the open fell to the by-design procgen /
-    still_motion floor at raw 1472x832 (no upscale) -- a SILENT degrade. This
-    makes it LOUD: every offending open beat logs a warning; with strict mode
-    (env ``OTR_LTX_OPEN_STRICT=1`` or ``strict=True``) it RAISES so a build can
-    never ship a procgen-fallback open unnoticed. Pure read of the manifest
-    (never touches audio); the procgen floor STAYS the safety net -- this only
-    surfaces the degrade, it does not remove the fallback. Returns the list of
-    offending open rows (empty == healthy)."""
+def check_ltx_open_health(manifest, *, strict=None, report_out=None):
+    """Compare frozen role intent with delivered radio-open artifacts.
+
+    Only an intended LTX route owes an LTX artifact. Missing/unmapped intent
+    stays unknown; intentional stills are outside that requirement. The return
+    remains the offending-row list, but empty does not establish health. An
+    optional primitive report carries those distinctions into the manifest.
+    Without report_out this reads the manifest without mutating it or audio.
+    """
     if strict is None:
         strict = otr_env.get("OTR_LTX_OPEN_STRICT", "0") == "1"
-    bad = []
+    bad, observations = [], []
+    frozen = (manifest or {}).get("roles_effective")
+    frozen = frozen if isinstance(frozen, dict) else {}
     for row in (manifest or {}).get("clips") or []:
         role = str(row.get("role") or "")
         bid = str(row.get("beat_id") or "")
@@ -6062,8 +6061,13 @@ def check_ltx_open_health(manifest, *, strict=None):
         if not is_open:
             continue
         eid = str(row.get("engine_id") or "")
-        if eid in _LTX_OPEN_ENGINES and row.get("exists"):
-            continue                      # healthy: a real LTX open clip
+        intended = frozen.get(role)
+        intended = intended if isinstance(intended, str) and intended.strip() else None
+        observation = {"shot_id": row.get("shot_id"), "beat_id": bid,
+                       "role": role, "engine_id": eid,
+                       "intended_engine_id": intended,
+                       "exists": bool(row.get("exists"))}
+        observations.append(observation)
         if _receipt.is_sanctioned_gap(row):
             # C6 (2026-08-28): a SANCTIONED open beat is not a health failure.
             # This check hunts an open that fell to the procgen/still floor
@@ -6075,17 +6079,35 @@ def check_ltx_open_health(manifest, *, strict=None):
                 "[OTR.render_driver] LTX-OPEN: radio-open beat %s was "
                 "SANCTIONED (the image model refused its still) -- floored by "
                 "design, not a health failure.", bid or row.get("shot_id"))
+            observation["status"] = "sanctioned"
             continue
-        bad.append({"shot_id": row.get("shot_id"), "beat_id": bid,
-                    "role": role, "engine_id": eid,
-                    "exists": bool(row.get("exists"))})
+        if not intended or not (intended in _LTX_OPEN_ENGINES
+                                or intended in _vreg.CAPABILITIES
+                                or _vreg.is_registered(intended)):
+            observation["status"] = "unknown"
+            _LOG.info("[OTR.render_driver] LTX-OPEN intent UNKNOWN for beat %s role=%s; actual=%r",
+                      bid or row.get("shot_id"), role, eid)
+            continue
+        if intended not in _LTX_OPEN_ENGINES:
+            observation["status"] = "not_requested"
+            continue
+        if eid in _LTX_OPEN_ENGINES and row.get("exists"):
+            observation["status"] = "healthy"
+            continue
+        observation["status"] = "degraded"
+        bad.append(dict(observation))
         _LOG.warning(
             "[OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open "
-            "beat %s role=%s rendered on %r (exists=%s) -- NOT an LTX engine; "
-            "the open is the procgen/still floor (soft open). Expected one of "
+            "beat %s role=%s intended=%r rendered on %r (exists=%s). Expected an existing artifact from "
             "%r. Set OTR_LTX_OPEN_STRICT=1 to fail the build.",
-            bid or row.get("shot_id"), role, eid, bool(row.get("exists")),
+            bid or row.get("shot_id"), role, intended, eid, bool(row.get("exists")),
             tuple(sorted(_LTX_OPEN_ENGINES)))
+    states = {row["status"] for row in observations}
+    status = next((state for state in ("degraded", "unknown", "sanctioned", "healthy")
+                   if state in states), "not_requested")
+    if report_out is not None:
+        report_out.clear()
+        report_out.update(version=1, status=status, rows=observations)
     if bad and strict:
         raise RenderFloorError(
             "LTX-OPEN HEALTH strict (BUG-LOCAL-413): %d radio-open beat(s) fell "
@@ -6683,6 +6705,7 @@ def build_clip_manifest(result, *, episode_id=""):
         "timeline_frame_source": timeline_source,
         "timeline_duration_s": timeline_duration_s,
         "engine_histogram": hist,
+        "roles_effective": frozen_route_from_ledger(led),
         "clips": rows,
     }
     # THE ONE SANCTIONED REUSE, GIVEN A FRAME-DOMAIN WINDOW (no-mirror step 2).
@@ -6704,8 +6727,10 @@ def build_clip_manifest(result, *, episode_id=""):
             manifest["closing_theme_frame_window"] = window
     # BUG-LOCAL-413 guard: LOUD-warn (opt-in strict raises) if a radio-open beat
     # fell to the procgen/still floor instead of an LTX engine -- so the 6/15
-    # silent soft-open can never ship unnoticed. Read-only; fallback untouched.
-    check_ltx_open_health(manifest)
+    # silent soft-open can never ship unnoticed. Persist intent/actual evidence;
+    # the rendered artifacts and frozen audio remain untouched.
+    manifest["ltx_open_health"] = {}
+    check_ltx_open_health(manifest, report_out=manifest["ltx_open_health"])
     return manifest
 
 

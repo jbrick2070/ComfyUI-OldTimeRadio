@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "passed": 14283,
+    "failed": 51,
+    "skipped": 183,
+    "xfailed": 1,
+    "sha256": "2f9bc449698547c82295e76404c3b6ef60444860781856b5c35fe5c0ab2498fc"
+  },
+  "candidate": {
+    "passed": 14361,
+    "failed": 51,
+    "skipped": 183,
+    "xfailed": 1,
+    "sha256": "986a29cc8801330184ffd4c6a6171820b40c95a4b2c62c9ed6ac7d3bf68cec71"
+  },
+  "new_failures": [],
+  "resolved_failures": [],
+  "changed_failure_payloads": [],
+  "normalization": "memory addresses, pytest directory numbers, timestamps, source line numbers, baseline/candidate checkout names"
+}

@@ -22,6 +22,8 @@ import json
 import logging
 import re
 
+from pydantic import BaseModel, ConfigDict, Field, StrictStr
+
 try:
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat test imports
@@ -1641,8 +1643,155 @@ def _build_char_scene_request(char: dict, meta: dict, setting: str,
     )
 
 
+class _SceneSourcePrompt(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    prompt: StrictStr = Field(min_length=1)
+
+
+def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
+    """Exact raw source and a structural scene join, never a presence classifier."""
+    from ._otr_story_source import raw_fields_from_ledger
+    ledger = ledger_context or {"meta": meta, "cast": cast, "lines": lines or []}
+    raw = raw_fields_from_ledger(ledger)
+    if raw is None:
+        return None
+    bid = str(target.get("beat_id") or "")
+    beats = [row for row in ledger.get("beats", []) if isinstance(row, dict)]
+    beat = next((row for row in beats if str(row.get("beat_id") or "") == bid
+                 or bid in [str(value) for value in row.get("line_ids", [])]), {})
+    shot_id = str(beat.get("shot_id") or line.get("shot_id") or "")
+    shot = next((row for row in ledger.get("shots", [])
+                 if isinstance(row, dict) and str(row.get("shot_id") or "") == shot_id), {})
+    scene_id = str(beat.get("scene_id") or shot.get("scene_id") or line.get("scene_id") or "")
+    scene = next((row for row in ledger.get("scenes", [])
+                  if isinstance(row, dict) and str(row.get("scene_id") or "") == scene_id), {})
+    scene_line_ids = {
+        str(lid) for row in beats
+        if (scene_id and str(row.get("scene_id") or "") == scene_id)
+        or (not scene_id and shot_id and str(row.get("shot_id") or "") == shot_id)
+        for lid in row.get("line_ids", [])
+    }
+    semantic_keys = ("line_id", "beat_id", "shot_id", "scene_id", "char_id", "speaker",
+                     "speaker_role", "text", "beat_intent", "traits", "arc_phase")
+
+    def scene_line(row):
+        return {key: row[key] for key in semantic_keys if key in row}
+
+    ordered_lines = [scene_line(row) for row in (lines or []) if isinstance(row, dict)
+                     and (str(row.get("line_id") or "") in scene_line_ids
+                          or (shot_id and str(row.get("shot_id") or "") == shot_id))]
+    if not ordered_lines and line:
+        ordered_lines = [scene_line(line)]
+    speakers = {str(row.get("char_id") or "") for row in ordered_lines}
+    cid = str(target.get("char_id") or "")
+    companions = [
+        {"char_id": str(row.get("char_id") or ""), "name": str(row.get("name") or ""),
+         "appearance": _appearance_for_char([row], str(row.get("char_id") or "")),
+         "speaks_in_scene": str(row.get("char_id") or "") in speakers}
+        for row in cast if isinstance(row, dict) and row.get("char_id")
+        and str(row.get("char_id")) != cid
+        and str(row.get("name") or "").strip().upper() != "ANNOUNCER"
+        and not row.get("_synthetic_announcer")
+    ]
+    context = {
+        "scope": "scene_character", "beat_id": bid, "target_char_id": cid,
+        "resolved_setting": _read_setting(meta),
+        "target_character": next(({
+            "char_id": cid, "name": str(row.get("name") or ""),
+            "appearance": _appearance_for_char([row], cid)}
+            for row in cast if isinstance(row, dict) and str(row.get("char_id") or "") == cid), {}),
+        "beat": dict(beat), "current_line": scene_line(line), "shot": dict(shot),
+        "scene": dict(scene), "ordered_scene_dialogue": ordered_lines,
+        "candidate_companions": companions,
+        "working_treatment": (meta.get("my_story") or {}).get("treatment"),
+    }
+    # A primitive copy prevents later pipeline mutation from changing the receipt.
+    return json.loads(json.dumps({"raw_fields": raw, "scene": context}, ensure_ascii=False))
+
+
+def _rewrite_char_scene_from_source(meta, ce, setting, line, warnings, cid, *,
+                                    max_reseed, vstyle, source_context, source_slot_fn,
+                                    source_model_id, source_binding_model_id,
+                                    source_receipts):
+    from ._otr_story_brief_helpers import NO_TEXT_CLAUSE, compose_still_prompt
+    from ._otr_story_source import candidate_sha256, rewrite_story_source
+    initial = compose_still_prompt(
+        meta, kind="scene_character", role="character_video", char_entry=ce, style=vstyle)
+    candidate = {"prompt": initial}
+    # The shared operation supplies source and scene context once. Do not repeat
+    # the full source inside visual_request and artificially consume its capacity.
+    request = _build_char_scene_request(ce, meta, setting, line, style=vstyle)
+    context = dict(source_context["scene"])
+    context["visual_request"] = request
+    context_hash = candidate_sha256(source_context)
+    journal = source_receipts if source_receipts is not None else []
+
+    def validate(result):
+        if not result.prompt.strip():
+            return "Return a nonempty scene prompt."
+
+    try:
+        try:
+            corrected, receipt = rewrite_story_source(
+                source_context["raw_fields"], candidate, source_slot_fn,
+                schema=_SceneSourcePrompt, receipts=journal,
+                pass_id="scene_%s" % source_context["scene"]["beat_id"],
+                post_validator=validate, configured_model_id=source_model_id,
+                max_attempts=min(2, max(0, int(max_reseed)) + 1),
+                instruction=("This artifact is a scene still prompt. Return JSON with only the "
+                             "prompt field. Apply source corrections directly, including required "
+                             "companions in this moment; preserve the target face and compatible "
+                             "visual elaboration. Do not force every act speaker into every frame. "
+                             "The visual_request supplies framing and style instructions; its "
+                             "request for a plain line is superseded by this JSON contract."),
+                author_context=context)
+        finally:
+            if journal:
+                journal[-1].update(scope="scene_character", scene_context=source_context["scene"],
+                                   source_context_hash=context_hash,
+                                   binding_model_id=source_binding_model_id)
+    except BaseException:
+        # No payload reaches the dispatcher on this path. Preserve server-log
+        # evidence without claiming a saved image row or replacing the real error.
+        try:
+            if journal:
+                log.error("[OTR_MetaBriefImagePromptGen] SOURCE_REWRITE_FAILED %s",
+                          json.dumps(journal[-1], ensure_ascii=True, sort_keys=True, allow_nan=False))
+        except BaseException:
+            pass  # A failing diagnostic must not mask the active provider/cancel error.
+        raise
+    prompt = corrected.prompt if corrected is not None else initial
+    source = "char_scene_source_rewrite" if corrected is not None else "char_scene_source_unresolved"
+    if corrected is None:
+        warnings.append(f"char-scene source correction unresolved for {cid}; retaining scene template")
+    # The candidate was already composed with appearance and style. Re-prepending
+    # that appearance now can restore a source contradiction the model corrected.
+    # Only the no-text render constraint is added after the combined operation.
+    finished = prompt if prompt.endswith(NO_TEXT_CLAUSE) else f"{prompt}, {NO_TEXT_CLAUSE}"
+    receipt.update({
+        "scope": "scene_character", "scene_context": source_context["scene"],
+        "source_context_hash": context_hash,
+        "output_sha256": candidate_sha256({"prompt": prompt}),
+        "applied": corrected is not None and prompt != initial,
+        "retained_prompt": finished, "base_prompt_hash": _content_hash(finished),
+        "finishing": {"input_prompt_hash": _content_hash(prompt),
+                      "output_prompt_hash": _content_hash(finished),
+                      "changed": prompt != finished,
+                      "stages": ["no_text"]},
+    })
+    if corrected is not None:
+        receipt["status"] = "rewritten" if prompt != initial else "unchanged"
+    # A loader entry is the requested/normalized binding, not response-local
+    # execution evidence (a remote provider may route to another model).
+    receipt["binding_model_id"] = source_binding_model_id
+    return finished, source
+
+
 def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
-                               warnings, cid, max_reseed=2, vstyle=None):
+                               warnings, cid, max_reseed=2, vstyle=None, *,
+                               source_context=None, source_slot_fn=None,
+                               source_model_id=None, source_binding_model_id=None,
+                               source_receipts=None):
     """Compose one beat-aware character still prompt without content gates.
 
     A writer LLM may refine the visual description. Empty, malformed, or failed
@@ -1650,6 +1799,12 @@ def _compose_char_scene_prompt(meta, char_entry, setting, line, llm_fn,
     authoring cannot abort an otherwise publishable episode.
     """
     ce = char_entry if isinstance(char_entry, dict) else {}
+    if source_context is not None:
+        return _rewrite_char_scene_from_source(
+            meta, ce, setting, line, warnings, cid, max_reseed=max_reseed,
+            vstyle=vstyle, source_context=source_context, source_slot_fn=source_slot_fn,
+            source_model_id=source_model_id, source_binding_model_id=source_binding_model_id,
+            source_receipts=source_receipts)
     prompt = ""
     source = "char_scene_template"
     said = str((line or {}).get("text") or "").strip()
@@ -1879,7 +2034,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                          fps: int = 25, still_aspects=None,
                          mesh_fodder_roles=None, talking_roles=None,
                          still_word_roles=None, video_models=None,
-                         portrait_free_roles=None, identity_roles=None):
+                         portrait_free_roles=None, identity_roles=None,
+                         ledger_context=None, source_slot_fn=None, source_model_id=None,
+                         source_binding_model_id=None):
     """ONE versioned image-object payload: ``{"version": 1, "objects": [...]}``
     (still-spine ST-2 / pass-02 item 1: portraits MIGRATED to the object
     schema in the same patch; no dual-schema shims).
@@ -2344,9 +2501,16 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
             if tgt["kind"] == "scene_character":
                 _ce = _cast_by_id.get(_cid)
                 _ln = _line_by_beat.get(tgt["beat_id"], {})
+                _source_context = _scene_source_context(
+                    meta, roster, lines, tgt, _ln, ledger_context)
+                _source_receipts = []
                 sprompt, _csrc = _compose_char_scene_prompt(
                     meta, _ce, setting, _ln, llm_fn, warnings, _cid,
-                    vstyle=_vstyle)
+                    max_reseed=max_reseed, vstyle=_vstyle,
+                    source_context=_source_context, source_slot_fn=source_slot_fn,
+                    source_model_id=source_model_id,
+                    source_binding_model_id=source_binding_model_id,
+                    source_receipts=_source_receipts)
                 _src = _csrc
                 _sfield = "cast:appearance"
             else:
@@ -2376,6 +2540,9 @@ def derive_image_prompts(cast: list, meta: dict, *, llm_fn=None, max_reseed: int
                 "visual_style": _vstyle.style_id,
                 "prompt_field_source": _sfield,
             }
+            if tgt["kind"] == "scene_character" and _source_receipts:
+                _obj["source_rewrite"] = _source_receipts[-1]
+                _obj["source_context_hash"] = _source_receipts[-1]["source_context_hash"]
             if _cid:
                 _obj["char_id"] = _cid     # traceability; engine resolves by role
                 # IDENTITY TRANSPORT (2026-08-26). A scene_character still seeds
@@ -2536,7 +2703,19 @@ class OTRMetaBriefImagePromptGen:
             log_story_brief_disposition(meta, "flux_portrait", log)
         except Exception:  # noqa: BLE001
             pass
-        llm_fn = _resolve_writer_llm(meta, warnings)
+        source_slot_fn = None
+        source_model_id = None
+        source_binding_model_id = None
+        if isinstance(meta.get("my_story"), dict):
+            from . import otr_shot_lock as _sl
+            # Resolve the existing technical owner once; the string wrapper remains
+            # for portraits, while scene corrections keep exact fit/schema support.
+            source_slot_fn, source_binding_model_id = _sl._resolve_writer_llm_binding(meta, warnings)
+            source_model_id = _sl.writer_model_id_from_meta(meta)
+            llm_fn = (_sl._writer_call_at(source_slot_fn, _sl.WRITER_REPLY_TOKENS_DEFAULT)
+                      if source_slot_fn is not None else None)
+        else:
+            llm_fn = _resolve_writer_llm(meta, warnings)
         payload, warn2 = derive_image_prompts(
             cast, meta, llm_fn=llm_fn,
             consistency_gate_warn_only=False,   # widget removed 2026-08-28
@@ -2549,6 +2728,9 @@ class OTRMetaBriefImagePromptGen:
             portrait_free_roles=_portrait_free_roles_from_policy(
                 image_policy_json),
             identity_roles=_identity_roles_from_policy(image_policy_json),
+            ledger_context=led, source_slot_fn=source_slot_fn,
+            source_model_id=source_model_id,
+            source_binding_model_id=source_binding_model_id,
         )  # aspects + mesh-fodder + talking + still_word + identity roles + video_models ride in image_policy_json
         warnings.extend(warn2)
 

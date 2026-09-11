@@ -81,7 +81,8 @@ def _complete_repair(*, original_prompt, failed_output, error):
 
 def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
                          pass_id, post_validator=None, slot_scheduler=None,
-                         configured_model_id=None, instruction="", author_context=None):
+                         configured_model_id=None, instruction="", author_context=None,
+                         max_attempts=SOURCE_REWRITE_ATTEMPTS):
     """Return (usable correction or None, receipt), with TWO calls at most.
 
     A pass id names one episode-local operation, not a revision counter.
@@ -89,6 +90,11 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
     retains the original when None is returned. Schema validity is not semantic
     proof; a receipt records the operation and actual changes, never PASS.
     """
+    if isinstance(max_attempts, bool) or not isinstance(max_attempts, int):
+        raise TypeError("source rewrite max_attempts must be an integer")
+    if max_attempts < 1:
+        raise ValueError("source rewrite max_attempts must be positive")
+    attempt_limit = min(SOURCE_REWRITE_ATTEMPTS, max_attempts)
     raw = _raw_values(raw_fields)
     documents = build_raw_documents(raw)
     prior = next((row for row in receipts if row.get("pass_id") == pass_id), None)
@@ -104,7 +110,7 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
         "source_scope": "whole", "input_sha256": candidate_sha256(candidate),
         "output_sha256": candidate_sha256(candidate), "applied": False,
         "configured_model_id": configured_model_id, "executed_model_id": None,
-        "attempt_limit": SOURCE_REWRITE_ATTEMPTS, "attempts": [],
+        "attempt_limit": attempt_limit, "attempts": [],
         "status": "preparing", "qualified": False,  # application is not semantic proof
     }
     receipts.append(receipt)
@@ -177,7 +183,7 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
                 prompt=prompt, schema=schema, slot_fn=observed,
                 post_validator=post_validator, base_temperature=0.35,
                 structural_retry_temperature=0.15, repair_prompt_factory=_complete_repair,
-                max_attempts=SOURCE_REWRITE_ATTEMPTS, max_new_tokens=None,
+                max_attempts=attempt_limit, max_new_tokens=None,
                 helper_name=helper, on_attempt_complete=completed)
     except StructuredCallFailedError as error:
         cause = error.last_error

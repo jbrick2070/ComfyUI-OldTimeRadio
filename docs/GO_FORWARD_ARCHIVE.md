@@ -7258,3 +7258,336 @@ Tests and real proof:
 
 These are component proofs, not App/full-media/publication PASS. Native App,
 browser playback/history and the publication matrix remain later qualification.
+
+
+## 2026-09-11 -- completed My Story finishing implementation queue
+
+Archived verbatim after final Sonnet/full/Bible code qualification. Live work remains in GO_FORWARD.
+
+## WHERE TO PICK UP
+
+**Active campaign owner: Codex, `v2.0-alpha`.** Continue coding; no hardware
+handoff is being activated. Root is the sole production-code owner in the
+primary Windows checkout. Other reviewers are read-only. F2, Original model
+credit B, title containment C and Mac/O2 diagnostics are implemented. Root is
+running combined final Sonnet/full/Bible qualification before live testing.
+**GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
+below are the source of truth. Kibitz round inputs/finals are review snapshots
+and judgments are receipts; they never become a competing work queue.
+
+**Latest operator ruling: finish coding first.** Coordination automation is
+paused. Do not prepare or send handoff/hardware prompts, contact the Mac/4060,
+or start any four-machine live test until ALL current repair-campaign coding
+is complete. Once coding is complete, Jeffrey has authorized this window to
+test the 5080 and RunPod, then stop rented compute. Mac/4060 wait until tomorrow
+and additionally require Jeffrey's explicit go-ahead.
+Development regression checks remain part of each code chunk. Close included
+A1R/A2 implementation, Original credit B, credits-title C and retained Mac/O2
+diagnostics. A3, optional App and the older backlog remain separately scoped.
+
+**Source repair amendment (operator, current coding session):** "I JUST NEED A
+CHECKER+REWRITER" and "WE [CAN'T] HAVE AN INFINITE LOOP." Source fidelity work
+must produce and apply corrected text, not spend a model call solely producing
+a verdict. Use a fixed attempt budget at the owning artifact/ledger repair seam;
+do not recursively recheck a rewrite or restart its budget. When repair cannot
+produce a usable result, retain usable accepted text with an unresolved receipt.
+Only the existing structural ledger contract can refuse it. This supersedes the
+report-only source reviewer and final report/rollback portions of the earlier
+R3/R4 design; those snapshots are historical. The operator also said "I DONT
+NEED CHNKER" followed by "I JUST NEED A CHECKER+REWRITER." Do not introduce
+a separate recursive source organizer/compactor with another model budget.
+Keep the full raw source in the existing author/correction calls and report
+actual capacity failures honestly. Sonnet still reviews finished code.
+
+**Next action:** finish combined Sonnet/full/Bible qualification for the
+implemented F2, Mac/O2 and B/C changes, commit/push, then run the actual canonical
+one-act source recovery. Address concrete review/regression defects before GPU
+work. No new architecture campaign or standalone source organizer is needed.
+The six-leg receipt is
+`docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
+end-to-end source-qualified My Story output exists. Keep each tested code
+revision distinct; an earlier passing run is not proof of the final correction.
+The completed R1-R4 judgments are in 2026-09-10-my-story-next/; the later
+flexible-character amendment is recorded in
+2026-09-10-my-story-a1/operator_amendment.md. The older queue below is outside
+this campaign. The earlier D1 arc is complete and is not being repeated; this
+arc reviews the new failure-policy ruling, live evidence and credits work.
+
+| Sprint | Remaining work | Required evidence |
+|---|---|---|
+| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, and final spoken text; qualify the repaired P1 binding. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and source-check receipts preserve the supplied facts. |
+| **A2. Capacity qualification/follow-up** | Verify the corrected native route live with the canonical recovery; separately resolve unknown-capacity and remote estimates. | Actual loaded capacity, exact prompt fit, explicit setting and truthful runtime receipts. |
+| **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
+| **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
+| **5. Optional App + qualification** | Native App form/player and full media/browser qualification after A-C. | D1 section 11 component vs publication evidence, App/Graph switching, saved parameters, playback/history, cancellation and errors. |
+
+### Operator contract
+
+- Reuse existing model calls, ledger assembly contracts, shared writer tail,
+  LLM ledger repair and freeze. My Story supplies the listener's material.
+- Selected act count remains binding and varies per run. The latest operator
+  clarification makes character count flexible, as on Public Domain/Shakespeare:
+  My Story preserves the supplied people and records requested/actual counts.
+  The announcer is excluded. No RSS or random source is used for My Story.
+- For `act_count=1`, the interstitial count is zero. P0/P1 must not request,
+  infer, or retain between-acts music or events in a one-act story.
+- Explicit listener facts are protected data, not creative suggestions. P0, P1,
+  P2, P3, visual planning, and cleanup may elaborate only without removing,
+  replacing, or contradicting directly supplied people, relationship, presence,
+  setting, action, or ending facts.
+- Technical publication eligibility is separate from source qualification.
+  Persist source-repair receipts for accepted authored text, visual planning,
+  cleanup and final spoken text. Record delivered source and actual applied
+  changes; partial or unresolved work is not PASS. Combine checking and rewriting
+  at the existing owner, with a fixed retry budget and no extra model-only
+  verification loop, late publication veto or subjective prose-quality gate.
+- No duration, word-count or story-length rejection. Only defects required
+  for a usable ledger justify a story failure, after the existing applicable
+  LLM repair path has tried. Real provider, storage and cancellation outcomes
+  remain truthful. The operator explicitly accepts a real out-of-memory failure
+  when a run is too ambitious. Do not replace that with predictive story-size
+  rejection or silently shorten their material.
+- My Story has a supplied human byline or a neutral listener attribution.
+  It never credits Jeffrey Brick by default. Original should credit the actual
+  creative model. Preserve genuine source authors in adaptation banks.
+- Scope and fix the credits hero title crossing into column 2. The prior Mac
+  hardware handoff acceptance does not prohibit this newly requested fix.
+- Review these next sprints through R1-R4, then regress before full canonical
+  recovery through otr/obs. Writer/ledger component checks remain diagnostics.
+
+### Sprint A -- finish qualification of the My Story ledger
+
+1. The independent 4060 report is received at
+   `docs/2026-09-10-my-story-4060/`, against tested implementation `0327850a`.
+   It records four full technical all-stills publications, two correct P1
+   fail-closed stops, and zero source-qualified outputs. The Mac report is now
+   received in `MAC_LESSONS_LEARNED.md` section 10: stale loaded extension,
+   two OS memory kills, and a correctly refused uncached-model download.
+   The operator owns those machines; preserve their repo updates and
+   keep one production-code editor.
+   RunPod latest sync is also pending: the stopped existing host refused a
+   sync-only resume for lack of a free GPU. Before any further authorized pod
+   trial, pull current v2.0-alpha; its last tested checkout is 0327850a, while
+   the music-parent correction is f829c920. Preserve its receipts and volume.
+2. Close the remaining A1R cleanup/source/visual repairs. Do not spend further baseline media legs on the
+   known-unprotected My Story implementation; use focused checks until the
+   repair is ready for a fresh canonical recovery leg.
+3. Qualify exact native prompt fit and loaded capacity during canonical
+   recovery after A1R. Implement the reviewed Original model credit and
+   credits title containment sprints. The new App and full media qualification
+   follow them.
+4. The shared cleaner copied listener attribution into an adjacent intro on
+   both local and RunPod baseline runs. The accepted frame has the sentence
+   once, and the final seals account for the authorized cleanup rewrite. Keep
+   that live evidence available for the credit work; do not claim this music
+   correction fixes the shared cleaner or rewrite story prose in Python.
+
+### A1R -- My Story live source-fidelity and structured-output closure
+
+The cross-machine triage is at `docs/2026-09-11-my-story-cross-machine/triage.md`;
+its R1-R4 review has converged at kibitz-runs/2026-09-10-my-story-cross-machine/r4/.
+The judgments and complete r3/final.md are implementation specifications, not a
+second queue. This file remains the only work queue. The active code owner
+listed above owns production edits. Reviewers are read-only, with an independent reader at
+each design step and a CLI review of each finished code chunk before push.
+
+2. Verify zero between-act music in the full canonical one-act recovery after
+   the remaining source repairs. The boundary code receipt is in HANDOFF_LOG;
+   do not reopen it as uncoded work or add a keyword rejection of planning prose.
+4. Carry raw listener source and actual scene context through the MetaBrief
+   visual prompt owners, with bounded corrections inside the existing attempt
+   budget. Distinguish shared story scenes from neutral portraits. Carry truthful,
+   artifact-bound receipts through final visual prompts without an invented late
+   publication gate. Source quotations establish identity, not semantic fidelity.
+   Unknown capacity is not measured fit; never substitute the historical
+   8192-token estimate for proof. The earlier separate adaptive organizer proposal
+   is superseded by the operator's bounded checker+rewriter amendment above.
+5. Instrument the Mac generation/retirement boundary before attributing its OS
+   kill to a particular allocation. Existing MPS cache flushing is already
+   present. Preserve epoch/orphan-worker protections and correct disk admission;
+   do not delete models or prescribe an unqualified replacement writer.
+6. Requalify with one canonical one-act pair-lock all-stills publication after
+   focused/full/Bible checks. Accepted text, visual prompts, final TTS, and the
+   source-check receipts must preserve the shared-table facts. Then repeat on
+   the common repaired commit using each machine's proven installed routes.
+   Verify the Mac's actual loaded extension and live 37-slot schema after restart.
+
+Observability follow-up after A1R: classify LTX-open health by planned and actual
+engine. Intentional still_pan is valid; a requested LTX route falling back is
+not, and absent intent is unknown. Diagnostic O1/O3 completion receipts live in
+HANDOFF_LOG and the cross-machine receipt folder.
+
+### Stress coverage after the independent reports
+
+Operator, 2026-09-11: one successful final-fix run is useful, but it is not a
+stress test. Collect the other machines' actual receipts first, then fill the
+gaps on a recorded common implementation. The counts below are planned test
+coverage, never story admission limits. Do not report these as completed.
+
+**One canonical, full qualification (operator clarification, 2026-09-11):**
+Every qualifying stress run starts from workflows/otr_canonical.json and runs
+through audio, video and publication to otr/obs. Use the shipped canonical API
+runner without --workflow, replay substitution or partial_execution_targets.
+The approved runtime applier may configure the actual machine, and the normal
+creative inputs supply My Story. Record those changes; do not build another
+graph. Writer/freeze-only checks are component diagnostics and do not count as
+full canonical qualification, even when they load the real full graph.
+
+| Coverage | Planned additional evidence |
+|---|---|
+| Repeatability | Three fresh six-act Jeffrey/Codex runs on the final correction, spanning a clean boot and resident reuse where the actual runtime permits it. Record load/reuse events rather than assuming a cache hit. |
+| Source and cast variety | Three contrasting manual stories: a one-act monologue, a three-act ensemble, and a detailed six-act source. Include requested/actual cast differences, supplied and neutral bylines, and act breaks on/off. Preserve the source people and ending. |
+| Model diversity | Three runs at one/three/six acts on a second installed, compatible model family. Count another machine's run only when its receipt proves that family, code revision, controls and ledger outcome. |
+| Full pipeline | Require durable ledger, audio/video assets and the final file in otr/obs for the qualifying runs above. Inspect credits and play representative opening, middle and ending sections on at least two completed episodes, including a six-act case. A writer/freeze result cannot satisfy this row. |
+
+Record every attempt, including failures: exact source fields, code/canonical
+hashes, runtime/model settings, prompt ID, elapsed time, observed memory/load
+behavior, repair attempts, requested/actual counts, ledger verdict and seals,
+and output paths. Keep interrupted or pre-fix runs visible but separate. Report
+the denominator and failure classes; never rerun until a lucky pass and hide
+the failed attempts. Do not turn elapsed time, prose length or character-count
+differences into rejection gates. Real provider, memory, storage and cancellation
+outcomes remain truthful; applicable ledger defects use the existing repairs.
+
+Use component checks only to diagnose a specific failure; keep them outside
+the qualifying stress-run count. Use the real canonical graph and sanctioned
+runtime profiles for every leg. Keep
+4060/Mac under their existing task owners; do not resume rented compute merely
+to fill a duplicate cell. New findings go through the existing live-evidence
+and root-fix process. A2 or another subsequent implementation change requires
+clearly labelled requalification of its affected cases, not relabelling old
+results as if they ran new code.
+
+MRKT's 4060 campaign remains exactly one act per GUI Run. Its one-act pair-lock
+recovery proof is a repair gate, not a substitute for the authorized 3/6-act
+stress coverage on another host.
+
+### A2 -- remaining qualification and capacity follow-up
+
+During the next repaired canonical recovery, record actual loaded native
+capacity, exact schema-enriched prompt tokens and explicit context settings.
+Component regression checks are not a model load or a full publication.
+
+Unknown native capacity and remote-estimate transport changes still need a
+separate scoped decision: local budget arithmetic expects numeric capacity,
+and omitting remote max_tokens changes spend reservation. Do not disguise
+estimates as known capacity or weaken accounting. Sci-Fi's existing
+_draft_fits_repair_turn still uses a character estimate and the legacy
+HARD_VRAM_CONTEXT_LIMIT export; assess that follow-up separately.
+
+### A3 -- other-bank act-count consistency (separate follow-up)
+
+The proposed all-bank strict-character rewrite is withdrawn by the latest
+operator clarification. Preserve Public Domain/Shakespeare and other banks'
+existing flexible casts. Do not change their casting or voice-inventory policy
+as part of My Story. The interrupted strict-count R1 artifacts are historical.
+
+Selected acts still need a bounded check in Sci-Fi's existing markup repair:
+its envelope maps each selected act to one dramatic SCENE, but normal and
+salvage acceptance currently ignore scene count. Review this act-only change
+before code, using the whole failed draft and existing ladder. Do not count
+preamble/outro shots as acts, trim dialogue, change salvage cast policy or add
+word/duration rejection. Legacy acts already follow selected arc phases.
+
+### Sprint B -- Original creative-model credit
+
+The current Original default is generic machine attribution in `banks.json`.
+A read-only scan of 2,165 ledgers, including 210 Original-family ledgers, found
+no spoken Jeffrey/Jeffery author attribution in Original. Three actual name
+credits were Public Domain adaptations of Jeffrey A. Brick's Cradle Protocol;
+one verified published example is The Nursery Feed, 20260830_052646. This does
+not identify which episode the operator heard. Preserve that true provenance.
+
+Credit the creative models used to generate the story, with finishing models
+recorded separately. The scheduler builds a fresh generation closure per call;
+after it returns successfully, retain only JSON primitives in an episode-local
+journal: helper, slot, provider, requested identity, executed identity and
+whether that identity was reported. Never retain a cache/model/tokenizer/closure
+reference, and never count a generation exception as a successful call.
+
+Local/GGUF model_id, Comfy Credits slug and Google google_model identify the
+executed request, not independently verified server versions. OpenRouter needs
+a fresh response-local receipt carried through retries and model-gone fallback.
+Its process-global resolved_models_snapshot is NOT a valid per-call source:
+missing model preserves a prior identity, extraction records before validation,
+and fallback can change the successful slug. Do not use snapshot deltas.
+
+Separate concept/drafting/framing helpers from ledger_clean and cast repair.
+The journal proves calls returned, not accepted authorship; use the exact printed
+wording "Story generation models used: <identities>" for Original, with a
+separate finishing-model record. Keep concrete IDs durable, use an existing
+truthful display label if available, otherwise the concrete ID. No invented
+name map, character cap that hides contributors, or generic replacement for a
+known identity. Unknown identity reads "model identity unreported".
+
+Stamp the Original-only credits_source_line beside final slot telemetry, after
+writing calls and before the lane finalizer, script_json serialization and
+terminal save. Existing rendering consumes that field. Preserve My Story's
+human byline and other banks' true source authors. No spoken-story rewrite,
+new model calls, widgets or wiring. Do not claim cleanup-only models authored
+the original premise, or that every returned draft became accepted content.
+
+B implementation contract:
+
+- Preserve generate_fn(...) -> str. OpenRouterBackend.generate and _extract_text
+  accept an optional receipt_out dictionary; each make_openrouter_generate_fn
+  invocation allocates a fresh dictionary and passes it through the successful
+  retry/fallback. Publish its primitive copy on that fresh closure only after
+  text extraction AND the cloud runaway check succeed. Scheduler reads it just
+  after base returns. No str subclass, process-global lookup or contextvar needed.
+- Scheduler successful_model_calls is a per-run list of primitive dictionaries:
+  helper, slot, provider, configured, requested, executed, reported. Existing
+  attempt counters stay unchanged. Stamp meta.model_call_provenance with version1,
+  calls, generation_models, finishing_models and unclassified_helpers. No entry
+  on generation exception; a returned invalid draft is still only a returned
+  call, never labelled accepted authorship.
+- Credit only creative-slot calls under these real scheduler helpers:
+  build_news_briefs, lock_cast, generate_outline, compose_line, generate_title,
+  compose_news_coda, compose_announcer_intro, compose_announcer_outro,
+  announcer_intro_rewrite. Original concept/select inherit build_news_briefs;
+  structured_call names original_concept/original_select are not scheduler names.
+  ledger_clean, ledger_cleanup and cast_coverage_repair are finishing. Remaining
+  support helpers (dramatic_state, build_continuity_ledger, story_brief_reflection,
+  produced_story_summary, derive_produced_open_brief) stay recorded separately;
+  unknown helper names are disclosed, never silently credited as story creation.
+- Deduplicate generation identities in first-successful-call order and join with
+  comma-space. Include an explicit unreported entry when needed. Overwrite the
+  earlier generic default ONLY when meta.source_bank == "original"; do not use
+  the nonexistent bank id original_radio, and do not use setdefault. Stamp before
+  finalizer/serialization. Existing aggregate remote cost telemetry stays separate.
+
+Tests: local/remote identities; creative/technical and generation/finishing
+separation; same alias returns A then B; missing identity after a known one;
+model-gone fallback; interleaved schedulers; failed generation; weak references
+to unloaded models clear while journal survives; terminal file/wire/rendered
+credit parity; other banks' attribution unchanged.
+
+### Sprint C -- credits hero title containment
+
+The published Lantern proof at `2026-09-10-mac-final/README.md` and
+`2026-09-10-mac-final/images/credits.png` shows the long title crossing `CAST & VOICES`.
+`otr_credits_roll._flow_col1` shrinks to `_PT_HERO_MIN` then draws the full
+title as one line. Metadata already clamps to the column; the hero does not.
+
+Keep short-title appearance when it fits. At the font floor, wrap the full
+title within column 1 using measured glyph widths and split a single overlong
+token without losing characters. Existing `_wrap` and the video title-card
+wrapper both allow a single overlong token to overflow; neither can be reused
+unchanged. Use the existing font loader and width/height measurements; no font
+resolver refactor, title rewriting, truncation or cross-column drawing.
+
+Advance y by the complete rendered hero height before subtitle, tag and metadata.
+The existing `_draw_col1` scratch measurement, spacing tiers and disclosed
+ledger-row abridgment must see the same wrapped layout. Do not clamp only the
+visible draw while the measurement pass still assumes one line.
+
+Tests/visual proof: short Lightning title, exact long Lantern title, an unbroken
+long token, and scaled canvases. Verify every title glyph stays in its column,
+subtitle/metadata follow without overlap, and the existing footer-fit policy
+still works. Existing clearly marked FRAMES/VRAM/REV abridgment is allowed
+when added title height requires it; SEED/COMMIT and the full title remain.
+Do not add a two-line ellipsis policy. Implement measured wrapping in
+_flow_col1, splitting overlong tokens; every draw line advances by _fh(font), so
+scratch and paint share the exact result. Render through the actual credits function with real fonts and
+inspect the PNG at normal and low resolution; no full episode rerender needed
+to qualify this bounded layout change. Preserve old published assets.

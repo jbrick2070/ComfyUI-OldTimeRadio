@@ -132,6 +132,7 @@ from ._otr_generation_budget import (
 )
 from ._otr_text_metrics import canonical_word_count, set_line_text_metrics
 from . import _otr_writer_heartbeat as _OTRHB
+from . import _vram_log as _memory_log
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
 
@@ -598,6 +599,30 @@ class _SlotScheduler:
         self.slot_calls_by_helper: dict[str, dict[str, int]] = {}
         self.slot_transitions_by_phase: list[dict] = []
         self._current_helper: str | None = None
+        # Episode-local successful returns only; never retain model handles.
+        self.successful_model_calls: list[dict] = []
+
+    def _record_successful_model_call(self, slot, helper, entry, base):
+        def identity(value):
+            return value if isinstance(value, str) and value.strip() else None
+
+        provider = identity(entry.get("provider")) or "local"
+        requested = identity(entry.get({
+            "comfy_credits": "slug", "google_api": "google_model",
+        }.get(provider, "model_id")))
+        executed, reported, basis = requested, None, "request_identity"
+        if provider == "openrouter":
+            receipt = getattr(base, "_otr_response_model_receipt", None) or {}
+            requested = identity(receipt.get("requested_model_id")) or identity(entry.get("slug"))
+            reported = identity(receipt.get("reported_model_id"))
+            executed = reported
+            basis = "response_model" if reported else "unreported"
+        self.successful_model_calls.append({
+            "helper": identity(helper), "slot": slot, "provider": provider,
+            "configured_model_id": identity(self.ids[slot]),
+            "requested_model_id": requested, "executed_model_id": executed,
+            "reported_model_id": reported, "identity_basis": basis,
+        })
 
     def _account_and_get_entry(self, slot: str, *, count_generation: bool = True) -> dict:
         """Acquire the configured slot and record actual model transitions.
@@ -721,6 +746,7 @@ class _SlotScheduler:
                 messages, *, temperature, max_new_tokens, stop=None,
                 response_format=None,
             ):
+                helper = scheduler._current_helper
                 cache_entry = scheduler._account_and_get_entry(slot)
                 base = _build_truncating_generate_fn(
                     cache_entry,
@@ -734,7 +760,9 @@ class _SlotScheduler:
                 }
                 if response_format is not None:
                     kwargs["response_format"] = response_format
-                return base(messages, **kwargs)
+                output = base(messages, **kwargs)
+                scheduler._record_successful_model_call(slot, helper, cache_entry, base)
+                return output
 
             def inspect_fit(messages, *, max_new_tokens, **kwargs):
                 if any(transport_markers[marker] for marker in (
@@ -1067,6 +1095,7 @@ def _build_truncating_generate_fn(
                     out = model.generate(**inputs, **gen_kwargs)
                 else:
                     raise
+        _memory_log.memory_snapshot("writer_generation_returned", model_id=cache_entry.get("model_id"))
         prompt_len = inputs["input_ids"].shape[1]
         generated_ids = out[0][prompt_len:]
         try:

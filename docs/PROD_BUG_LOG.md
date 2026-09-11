@@ -14143,7 +14143,12 @@ for promotion from the Windows box. Each is portable beyond OTR:
 - verification: a P1-only binder-once seam test; a malformed-output
   fail-closed control; and a repeated canonical one-act treatment on the
   corrected implementation.
-- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+- status: CODE QUALIFIED, OPEN FOR LIVE CLOSURE. The shared-core binder is
+  implemented; grammar_receipt.md records 197 focused passes and the full
+  14,154-pass regression with no new failures, controlled Bible comparison,
+  canonical audit and finished-diff reviews. No repeated real-model publication
+  on this correction has yet qualified source fidelity. The 4060 stays held
+  until the operator authorizes its next run.
 
 ### PBUG-20260829-14 addendum -- My Story coda was falsely rewritten
 
@@ -14166,3 +14171,56 @@ for promotion from the Windows box. Each is portable beyond OTR:
   on hold until all campaign coding is complete. Promoted as Bible 11.64 with
   executable coverage. This is distinct from protected Python-owned facts in
   BUG-12.103; that earlier protection remains.
+
+
+## PBUG-20260911-01 -- credits hero overruns column one at its font floor
+
+Status: CODE AND CPU LAYOUT PROOF QUALIFIED; existing published evidence anchors admission.
+The operator explicitly reopened this previously accepted appearance for repair.
+The published Mac Lantern receipt (docs/2026-09-10-mac-final/README.md:35 and
+images/credits.png) shows THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES colliding
+with CAST & VOICES. Publication SHA256:
+986d2cb71576ce8ac73cf14850f5fecd85dbf460dc7e4fc875c107348f8b88d4.
+
+Root cause: _flow_col1 autoshrank only to _PT_HERO_MIN, then drew one unbounded
+line. The neighboring metadata already had a different containment policy.
+The hero now wraps full text at the existing floor using actual glyph bounds,
+accounts for negative bearings and cluster boundaries, and advances the same
+scratch/paint vertical flow before subtitle/metadata. Existing footer/abridgment
+policy remains. No title truncation or new font resolver is introduced.
+
+Coverage: tests/test_credits_roll_spec.py uses real fonts, the exact live title,
+short Lightning, overlong tokens, combining/modified/joined symbols, italic
+bearings and 480/720/1080/2160 canvases. Actual production painter images at 1080/480
+were inspected. Receipt: 2026-09-11-my-story-cross-machine/finishing_receipt.md.
+Bible 12.160 executes the production wrapping helpers and pins real-font coverage.
+An indivisible glyph wider than the entire canvas remains an explicit physical
+layout limitation; no unbounded-input containment claim is made.
+
+### PBUG-20260906-03 addendum -- frozen stills intent falsely diagnosed as LTX failure
+
+The committed 4060_DRILL_LOG.md Step 121 and 2026-09-10-my-story-4060/README.md
+record five LTX-OPEN HEALTH warnings on the published pair-lock visual leg
+signal_lost_los_angeles_dinner_pair_lock_visual_leg_20260910_193857, with 13
+still_pan clips. This is a false diagnostic on completed media, not failed LTX.
+The earlier entry's missing ltx_8gb allowlist member was a distinct prior cause.
+
+The current classifier copies frozen roles_effective into the manifest and
+compares requested and delivered routes/artifact existence. It persists healthy,
+not_requested, unknown, sanctioned and degraded separately. Missing intent is
+unknown even with an actual LTX artifact; intentional registered stills are not
+requested. Strict mode rejects only actual requested degradation. Tests exercise
+the real classifier/manifest, copied intent, all six LTX IDs and unchanged routing.
+Bible 12.161 is anchored to this live recurrence. Code qualified; fresh full
+canonical diagnostics still await the next recovery leg.
+
+### PBUG-20260910-03 addendum -- visual source owner implemented, live closure remains open
+
+F2 now applies bounded source corrections through the existing scene author,
+with full raw source and current scene context. Receipts follow actual prompt
+finishing, cache reads and jump descendants. Two context/cache omissions found
+in independent code review were fixed before QA; they are not new production IDs.
+Step 120 supports authored dinner preserved but visual staging inverted; Step 121
+also lost the authored pair lock and must not be described as source-qualified.
+The combined Sonnet/full/Bible receipt is in finishing_receipt.md. Publication,
+spoken facts and image pixels still need fresh canonical recovery on this code.

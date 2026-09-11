@@ -1,0 +1,35 @@
+[
+  {
+    "file": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\credits_hero_proof_20260911\\stills\\lantern_1080.png",
+    "title": "THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES",
+    "canvas": [
+      1920,
+      1080
+    ],
+    "bytes": 228424,
+    "source": "credits regression ledger fixture; exact historical hero titles; CPU layout proof only",
+    "sha256": "2fd4c9c0668e65cc3c8e3c95889a97793ea50a42a97659507cad39362800eb00"
+  },
+  {
+    "file": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\credits_hero_proof_20260911\\stills\\lantern_480.png",
+    "title": "THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES",
+    "canvas": [
+      832,
+      480
+    ],
+    "bytes": 83396,
+    "source": "credits regression ledger fixture; exact historical hero titles; CPU layout proof only",
+    "sha256": "6bee217a35849bf7985efc28a46991e7c1dcc279626e4a64c119f8f90a968914"
+  },
+  {
+    "file": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\credits_hero_proof_20260911\\stills\\lightning_1080.png",
+    "title": "LIGHTNING MAC PROOF 2",
+    "canvas": [
+      1920,
+      1080
+    ],
+    "bytes": 215265,
+    "source": "credits regression ledger fixture; exact historical hero titles; CPU layout proof only",
+    "sha256": "04643cbd90306184313424a291a8f3deb211194b624830728ee00fdb684876ca"
+  }
+]

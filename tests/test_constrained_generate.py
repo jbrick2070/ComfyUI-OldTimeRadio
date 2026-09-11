@@ -370,6 +370,10 @@ def _reusable_native_closure(kind, monkeypatch, outcome):
 ])
 def test_each_actual_generation_has_fresh_collectible_history(kind, outcome, monkeypatch):
     import gc
+    from nodes import _vram_log
+    observations = []
+    monkeypatch.setattr(_vram_log, "memory_snapshot",
+                        lambda phase, **kwargs: observations.append(phase))
     fn, entry, model, refs, knobs = _reusable_native_closure(kind, monkeypatch, outcome)
     messages = [{"role": "user", "content": "A structured reply."}]
     if outcome == "error":
@@ -384,6 +388,9 @@ def test_each_actual_generation_has_fresh_collectible_history(kind, outcome, mon
         fn(messages, temperature=.2, max_new_tokens=100)
     fn(messages, temperature=.2, max_new_tokens=100)
     assert model.calls == (3 if outcome == "min_p" else 2)
+    assert observations == [
+        ("writer" if kind == "writer" else "constrained") + "_generation_returned"
+    ] * (1 if outcome == "error" else 2)
     assert set(entry["_otr_lmfe_constraint_cache"]) == {"tokenizer", "tokenizer_data"}
     assert not hasattr(fn, "prefix_allowed_tokens_fn")
     gc.collect()

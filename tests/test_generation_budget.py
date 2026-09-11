@@ -71,6 +71,13 @@ def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(r
     from nodes import _otr_constrained_generate as constrained
     from nodes._otr_generation_budget import ProviderCapacityMessages
     entry, runs, moves, refs, generated = _exact_prompt_entry(monkeypatch)
+    from nodes import _vram_log
+    observed = []
+    def observe(phase, **fields):
+        # Actual generation has returned, while the output is still available.
+        assert len(generated) == 1
+        observed.append((phase, fields))
+    monkeypatch.setattr(_vram_log, "memory_snapshot", observe)
     messages = ProviderCapacityMessages([
         {"role": "system", "content": "Keep the complete supplied source."},
         {"role": "user", "content": "Beginning " + "source text " * 850 + " END MARKER"},
@@ -79,6 +86,7 @@ def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(r
     assert measured["fits"] and measured["prompt_tokens"] > 8192
     assert measured["capacity_known"] and measured["context_cap"] == 32768
     assert not moves and not generated
+    assert not observed  # Fit inspection must not pretend a generation returned.
     gc.collect()
     assert all(ref() is None for ref in refs)
     factories = {"writer": writer._build_truncating_generate_fn,
@@ -86,6 +94,7 @@ def test_native_fit_and_generation_use_identical_cpu_prompt_without_truncation(r
                  "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
     result = factories[route](entry)(messages, temperature=.2, max_new_tokens=None)
     assert result == '{"value":"ok"}'
+    assert observed == [(route + "_generation_returned", {"model_id": entry["model_id"]})]
     assert runs[0] == runs[1] == generated[0][0]
     assert generated[0][1] == measured["effective_output_tokens"]
     assert moves == ["cpu"]
