@@ -105,10 +105,17 @@ The slug pickers are **passive**: choosing a slug in `openrouter_slot_a_model` d
 The slug dropdowns are built from an on-disk cache, never a live network call (so opening the node menu is always instant and offline-safe). Until you refresh it, the pickers show only a recommended default plus an `(enable OpenRouter)` / `(no OpenRouter models cached …)` sentinel. Populate it with the refresh script:
 
 ```
-C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe scripts\otr_openrouter_refresh.py
+<your ComfyUI python> scripts/otr_openrouter_refresh.py
 ```
 
-It fetches the live [openrouter.ai/models](https://openrouter.ai/models) list and writes `models/openrouter_models.json` (per-machine, git-ignored). Re-run it whenever you want to see newly added models. A failed/offline run keeps your existing cache and never crashes. Reload the node (or restart ComfyUI) to see the refreshed list.
+Use the same interpreter that runs ComfyUI (`.venv\Scripts\python.exe` on Windows,
+`.venv/bin/python` on Mac/Linux) -- it writes the cache the node dropdowns read, so a
+different python writes one the server never looks at.
+
+It fetches the live [openrouter.ai/models](https://openrouter.ai/models) list and writes
+`otr/episodes/_shared/cache/openrouter/openrouter_models.json` **inside your own ComfyUI
+output folder** (per-machine, never versioned). It used to live inside the pack
+directory, where a registry update wiped it on every install. Re-run it whenever you want to see newly added models. A failed/offline run keeps your existing cache and never crashes. Reload the node (or restart ComfyUI) to see the refreshed list.
 
 ## Narrowing the slug list (optional filters)
 

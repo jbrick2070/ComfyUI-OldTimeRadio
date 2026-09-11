@@ -785,12 +785,49 @@ _CATALOG_STALE_AFTER_S = 7 * 24 * 3600  # older than a week -> "stale" (still us
 
 
 def _catalog_cache_path() -> Path:
-    """``<repo>/models/openrouter_models.json`` (in-repo, git-ignored). This
-    module lives in ``nodes/``, so the repo root is two parents up. Override
-    the directory via ``OTR_OPENROUTER_CACHE_DIR`` (tests / relocation)."""
+    """Where the discovery cache lives. NEVER raises -- see the last paragraph.
+
+    ``<ComfyUI output>/otr/episodes/_shared/cache/openrouter/openrouter_models.json``
+    by default, overridable with ``OTR_OPENROUTER_CACHE_DIR`` (tests / relocation).
+
+    IT USED TO LIVE AT ``<repo>/models/`` -- INSIDE THE INSTALLED PACK -- and a
+    registry update replaces that directory, so every update silently threw the
+    warmed catalog away. The user then ran at ``DEFAULT_CONTEXT_WINDOW`` (8192)
+    instead of each model's real window until they re-ran the refresh script, and
+    the empty-cache sentinel told them to run a script that, until 2026-09-11, was
+    not even in the bundle.
+
+    `otr_shared_cache_dir()` is the right tier by its own contract -- "a cache
+    entry is NEVER the only copy" -- which this satisfies exactly: the catalog is
+    rebuilt wholesale by one idempotent `refresh_catalog_cache()` call, nothing
+    treats it as a source of truth, and a missing one degrades to an empty catalog
+    rather than an error. It is also NOT janitor-swept: `_otr_janitor` sweeps
+    ``episodes/_shared/tmp`` only and refuses any other root.
+
+    NO COPY-FORWARD, deliberately. A cold cache after this move is a designed,
+    safe state (empty catalog, a logged context fallback, never a raise), so
+    migrating the old file is a separable nicety rather than part of the fix.
+
+    THIS FUNCTION MUST NOT RAISE. It is read while building node dropdowns, and
+    `otr_shared_cache_dir()` validates the output-tree contract, so it CAN throw
+    where the old pure-Path version could not. A failure falls back to the old
+    in-pack location: worse, but identical to the behaviour that shipped for
+    months, and a dropdown that cannot build is a broken node.
+    """
     override = _env("OTR_OPENROUTER_CACHE_DIR")
-    base = Path(override) if override else Path(__file__).resolve().parent.parent / "models"
-    return base / _CATALOG_FILENAME
+    if override:
+        return Path(override) / _CATALOG_FILENAME
+    try:
+        try:
+            from ._otr_paths import otr_shared_cache_dir
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            from _otr_paths import otr_shared_cache_dir  # type: ignore
+        return Path(otr_shared_cache_dir()) / "openrouter" / _CATALOG_FILENAME
+    except Exception as exc:  # noqa: BLE001 -- a dropdown must still build
+        log.warning(
+            "[OpenRouter] could not resolve the shared cache dir (%s); falling "
+            "back to the in-pack cache, which a registry update will wipe.", exc)
+        return Path(__file__).resolve().parent.parent / "models" / _CATALOG_FILENAME
 
 
 def _empty_catalog(source: str) -> dict:
@@ -810,8 +847,12 @@ def load_catalog_cache() -> dict:
     network. Missing file -> empty(source='missing'); unreadable / corrupt /
     wrong-shape -> empty(source='corrupt'). On success: schema_version,
     fetched_at, source, count, models[]."""
-    path = _catalog_cache_path()
     try:
+        # RESOLVED INSIDE THE GUARD, not above it. This runs while node dropdowns
+        # are built, where nothing may raise, and the resolver now consults the
+        # output-tree contract rather than doing pure Path math -- so the call
+        # itself has to be covered, not just the read that follows it.
+        path = _catalog_cache_path()
         if not path.is_file():
             return _empty_catalog("missing")
         data = json.loads(path.read_text(encoding="utf-8"))
