@@ -45,10 +45,33 @@ def _tone(sr, dur_s=0.25, freq=220.0):
 # --------------------------------------------------------------------------- #
 # the bug, and the fix, through pack_audio_batch
 # --------------------------------------------------------------------------- #
-def test_pack_raises_on_mixed_rates_reproduces_bug():
+def test_pack_RESAMPLES_the_mixed_rate_cast_instead_of_aborting():
+    """The live bug, and the fix this file's own docstring already described.
+
+    RESTORED 2026-09-11. The `resample_audio` helper named in the docstring was
+    retired along with the ref-less bark fallback that called it, and this test
+    was reduced to pinning the ValueError -- so the file has been contradicting
+    its own opening paragraph ever since. `pack_audio_batch` now owns the
+    conversion, which is the one place every caller passes through."""
     clips = [_tone(_INDEX_SR), _tone(_BARK_SR)]  # one index line + one bark fallback
-    with pytest.raises(ValueError, match="mixed sample rates"):
-        pack_audio_batch(clips, sample_rate=_INDEX_SR, mono=True)
+    packed = pack_audio_batch(clips, sample_rate=_INDEX_SR, mono=True)
+
+    assert int(packed["sample_rate"]) == _INDEX_SR
+    assert int(packed["waveform"].shape[0]) == 2, (
+        "a cast line was dropped; losing recorded dialogue is a worse render "
+        "than converting it")
+
+
+def test_the_DOWNSAMPLED_clip_keeps_its_duration():
+    """24k -> 22.05k is a real engine pairing here, and it is the direction
+    where a non-anti-aliased fallback would show. Duration is the property every
+    downstream consumer reads."""
+    packed = pack_audio_batch(
+        [_tone(_BARK_SR, dur_s=0.25)], sample_rate=_INDEX_SR, mono=True)
+    got = int(packed["waveform"].shape[-1])
+    expected = int(_INDEX_SR * 0.25)
+    assert abs(got - expected) <= 64, (
+        "resampled to %d samples, expected ~%d at %d Hz" % (got, expected, _INDEX_SR))
 
 
 if __name__ == "__main__":

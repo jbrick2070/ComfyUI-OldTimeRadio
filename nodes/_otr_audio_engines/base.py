@@ -21,18 +21,26 @@ Import-time is side-effect-free (no IO, no network, no CUDA) per C-5.
 """
 from __future__ import annotations
 
+import logging
 import os
 from typing import Iterable, Optional
 
 import torch
 
-from .._otr_audio_utils import canonical_audio, mono_safe
+from .._otr_audio_utils import (
+    ResampleUnavailable, canonical_audio, mono_safe, resample_to_rate)
 from .._otr_resolved_request import assert_audio_batch_contract, empty_audio_batch
 
 try:
     from .._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+
+#: This module had NO logger until 2026-09-11. A `log.` call added here
+#: without one raises NameError on the very path it was meant to make
+#: survivable -- exactly the trap caught before shipping in the
+#: cloud-media billing migration earlier the same day.
+log = logging.getLogger("OTR")
 
 _DEFAULT_SR = 24000
 
@@ -233,10 +241,58 @@ def pack_audio_batch(
     sr = int(sample_rate) if sample_rate else rates[0]
     mismatched = {r for r in rates if r != sr}
     if mismatched:
-        raise ValueError(
-            f"pack_audio_batch: mixed sample rates {sorted(set(rates))}; "
-            f"resample to one rate before packing"
+        # RESAMPLE TO THE DECLARED RATE. This used to raise, and the raise cost a
+        # whole role's render AFTER every line had already been generated and
+        # paid for -- `OTRVoiceNodeBase.generate()` wraps the per-line loop in
+        # try/finally with no except, so it left the node and ended the prompt.
+        #
+        # IT HAS HAPPENED LIVE. `eda8590c` (2026-06-05) records a real cast
+        # crashing on exactly this message with rates [22050, 24000], and the fix
+        # then was the same one made here: resample to the primary rate. That fix
+        # lived at one caller and was retired with the branch that called it, so
+        # the hazard came back to a path nothing guarded.
+        #
+        # IT IS NOT A SILENT WRONG RENDER, which is the only thing that earns a
+        # raise here. Resampling is deterministic and content-preserving: the
+        # line says the same words, from the same engine, in the same voice. The
+        # ONLY thing that changes is the sample grid, and every consumer
+        # downstream (`assert_audio_batch_contract`, the slicer, the mux) demands
+        # exactly the one rate this produces.
+        #
+        # The caller that passes `sample_rate=` is DECLARING the target, which is
+        # what makes this unambiguous rather than a guess. It is logged at
+        # WARNING with both rates so a persistently mismatched engine is still
+        # visible as a defect worth fixing at its source.
+        log.warning(
+            "[pack_audio_batch] mixed sample rates %s; resampling to the "
+            "declared %d Hz. An engine returning a rate other than the one the "
+            "caller declared is worth fixing at the engine, but it is not worth "
+            "discarding audio that is already rendered.",
+            sorted(set(rates)), sr,
         )
+        try:
+            waveforms = [
+                resample_to_rate(w, r, sr) if r != sr else w
+                for w, r in zip(waveforms, rates)
+            ]
+        except ResampleUnavailable as exc:
+            # THE RAISE COMES BACK when conversion genuinely cannot happen, and
+            # that is not a retreat from "only an out of memory should fail" --
+            # it is the carve-out that outranks it. Everything below this line
+            # LABELS the batch with `sr`, so shipping unconverted samples under
+            # that label is a silently WRONG render: a 22,050 Hz line labelled
+            # 24,000 Hz plays 8.8% fast and pitch-shifted, and the slicer, the
+            # mux and the duration gates all read the label rather than the
+            # samples. A rough episode is acceptable; a wrong one is not.
+            #
+            # In practice this is unreachable: the conversion needs numpy and
+            # torch, both core, and falls back to linear interpolation when
+            # scipy is absent. It exists so that "never silently wrong" is
+            # structural rather than a hope.
+            raise ValueError(
+                f"pack_audio_batch: mixed sample rates {sorted(set(rates))} and "
+                f"they could not be converted to the declared {sr} Hz: {exc}"
+            ) from exc
 
     channels = waveforms[0].shape[1]
     for w in waveforms:

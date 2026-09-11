@@ -43,9 +43,16 @@ def test_multi_line_right_pads_to_max_and_keeps_values():
     assert_audio_batch_contract(out, where="test")
 
 
-def test_mixed_sample_rate_raises():
-    with pytest.raises(ValueError):
-        pack_audio_batch([_audio([1.0], sr=24000), _audio([2.0], sr=16000)])
+def test_mixed_sample_rate_resamples_to_the_declared_rate():
+    """CHANGED 2026-09-11: this pinned a ValueError, and that raise cost a whole
+    role's render AFTER every line had been generated (live precedent: eda8590c).
+    Operator: "only an out of memory should fail". Resampling is deterministic
+    and content-preserving, so it is not the silent-wrong-render case that would
+    earn a raise -- and when conversion genuinely cannot happen, it still does."""
+    out = pack_audio_batch(
+        [_audio([1.0], sr=24000), _audio([2.0], sr=16000)], sample_rate=24000)
+    assert int(out["sample_rate"]) == 24000
+    assert int(out["waveform"].shape[0]) == 2, "a line was dropped"
 
 
 def test_stereo_input_downmixed_to_mono_by_default():
