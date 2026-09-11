@@ -132,16 +132,66 @@ def test_routers_are_not_smuggled_into_the_pointer_set():
         assert router not in cat.OPENROUTER_CURATED_ALIASES, router
 
 
-def test_routers_appear_in_both_slot_dropdowns_and_auto_leads(monkeypatch):
+def _write_synthetic_catalog(cache_dir):
+    """A catalog cache this test OWNS, so the dropdown never depends on whatever
+    the host last fetched. Shape mirrors tests/test_openrouter_catalog_rows.py."""
+    import json
+
+    models = [
+        {"id": r, "name": r, "context_length": 32768,
+         "architecture": {"modality": "text->text"},
+         "pricing": {"prompt": "0.000001", "completion": "0.000002"}}
+        for r in cat.OPENROUTER_CURATED_ROUTERS
+    ] + [
+        {"id": "anthropic/claude-opus-4.8", "name": "Claude Opus 4.8",
+         "context_length": 200000, "architecture": {"modality": "text->text"},
+         "pricing": {"prompt": "0.000015", "completion": "0.000075"}},
+        {"id": "deepseek/deepseek-v4-pro", "name": "DeepSeek V4 Pro",
+         "context_length": 131072, "architecture": {"modality": "text->text"},
+         "pricing": {"prompt": "0.0000004", "completion": "0.0000016"}},
+        {"id": "google/gemini-3.1-pro", "name": "Gemini 3.1 Pro",
+         "context_length": 1000000, "architecture": {"modality": "text->text"},
+         "pricing": {"prompt": "0.00000125", "completion": "0.000005"}},
+    ]
+    payload = {
+        "schema_version": orb.CATALOG_SCHEMA_VERSION,
+        "fetched_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": "test", "count": len(models), "models": models,
+    }
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    (cache_dir / "openrouter_models.json").write_text(
+        json.dumps(payload), encoding="utf-8")
+
+
+def test_routers_appear_in_both_slot_dropdowns_and_auto_leads(monkeypatch, tmp_path):
     """Both routers reachable in A and B, with `openrouter/auto` LEADING each --
-    it is the recommended default for both slots now."""
+    it is the recommended default for both slots now.
+
+    Brings its OWN catalog (2026-09-11). This used to read whatever catalog the
+    host happened to have cached and `pytest.skip` on a cold one, so the assertion
+    only ran on a box that had fetched recently -- and the suite's pass/skip counts
+    moved with machine state, which makes "the suite is green" mean different things
+    on different machines. That matters when four machines report numbers the same
+    night. The synthetic catalog is the idiom already proven in
+    tests/test_openrouter_catalog_rows.py::enabled_cached.
+    """
     monkeypatch.setenv("OPENROUTER_API_KEY", "test-key")
     monkeypatch.delenv("OTR_OPENROUTER_MODEL_ALLOWLIST", raising=False)
     monkeypatch.delenv("OTR_OPENROUTER_PROVIDER_FILTER", raising=False)
+    monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))
+    _write_synthetic_catalog(tmp_path)
     for slot in ("a", "b"):
         choices = cat.openrouter_catalog_dropdown_choices(slot)
-        if len(choices) <= 2:
-            pytest.skip("cold catalog cache on this box; dropdown is sentinel-led")
+        # NOT a length check. An EMPTY cache also returns three entries --
+        # "(enable OpenRouter)", "openrouter/auto", "(no OpenRouter models
+        # cached -- run refresh_catalog_cache)" -- so `len(choices) > 2` passes
+        # on a cold cache and guards nothing. Measured, not assumed: that exact
+        # three-entry sentinel list was reproduced against an empty cache dir
+        # before this assertion was written. Assert the cold sentinel is ABSENT
+        # and a real catalogued id is PRESENT.
+        assert not [c for c in choices if "no OpenRouter models cached" in c], (
+            "the synthetic catalog did not reach the dropdown -- this test must "
+            "never fall back to the host's cache: %r" % (choices,))
         for router in cat.OPENROUTER_CURATED_ROUTERS:
             assert router in choices, (slot, router)
         # `openrouter/auto` now LEADS both slots -- it is the recommended
