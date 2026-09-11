@@ -18,6 +18,35 @@ written to be self-contained: do not assume the reader has seen this conversatio
 
 ---
 
+## Before anything: the frozen head, and one flag
+
+    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
+
+    This line gets a real commit hash when coding stops. Until then, no lane
+    starts. When it is filled in: report the HEAD you ACTUALLY pulled, never
+    check out the frozen hash, and if you pull a commit that touches `nodes/`,
+    `scripts/` or `workflows/` AFTER the hash on that line, STOP and phone home
+    -- that would mean the freeze was broken.
+
+**PASS `--timeout 0` ON EVERY LEG. This is the single most likely way to
+manufacture a false failure tonight.** `--timeout` defaults to 5400 seconds --
+ninety minutes -- and it bounds how long this PROCESS watches, not how long the
+render may take. The 4060's own measured canonical is 121 minutes
+(`4060_DRILL_LOG.md:1087`); the Mac has legs past two hours. At minute 90 the
+default prints `RESULT TIMEOUT` on a render that is alive and still going to
+publish, and a window that then "resets before every headless run" KILLS A
+PASSING EPISODE and starts it over. `--timeout 0` waits for a terminal result.
+
+**4060 ONLY -- phone home your `kernel_source` counts.** Grep your leg logs and
+the stored Ghost prompts for `kernel_source` and report how many shots resolved
+`key_object_in_beat` versus plain `key_object`. Your profile
+(`otr_4060_12b_gguf_offload`) renders on `animatediff15_v3_haunted_video`, whose
+engine inherits `GHOST_PROMPT_PROFILE`, so **your legs are the first live
+exercise of the beat-ranking crux resolver** -- no episode has ever rendered
+through that path. That ratio is the first real hit-rate measurement of it, and
+it is the number that decides how the next tier gets built. If a leg fails, that
+resolver belongs on the suspect list beside the platform itself.
+
 ## Rules both machines follow
 
 **YOUR REPORT FILE IS GITIGNORED BY DEFAULT, AND `git add` WILL NOT SAY SO.**
@@ -74,7 +103,11 @@ this wave folder is only tracked because its two documents were force-added.
 1. **PULL FIRST, and report the HEAD you actually ran.** A lane that cannot state its
    commit has not qualified anything.
    ```
-   git fetch origin v2.0-alpha && git pull --rebase origin v2.0-alpha && git rev-parse --short HEAD
+   On the 4060 (Windows PowerShell -- `&&` is a PARSE ERROR there, and this is
+   the first command you run):
+       git fetch origin v2.0-alpha; git pull --rebase origin v2.0-alpha; git rev-parse --short HEAD
+   On the Mac (bash/zsh):
+       git fetch origin v2.0-alpha && git pull --rebase origin v2.0-alpha && git rev-parse --short HEAD
    ```
 2. **WRITE FINDINGS TO `docs/` ONLY. DO NOT PUSH.** Commit locally if you like. The
    push belongs to the 5080 so four machines cannot collide on one branch. If you
@@ -88,7 +121,15 @@ this wave folder is only tracked because its two documents were force-added.
    so your harness label becomes the on-screen TITLE CARD and the writer stops naming
    the episode. `--run-label` echoes to the console only.
 6. **A leg is not complete until it publishes to `otr/obs/`.** If a leg has run more
-   than five minutes with nothing there, treat it as failing and go read the leg log
+   than five minutes with nothing there -- NO. **The five-minute rule is a STALLED
+   HEARTBEAT, not elapsed time, and reading it the other way aborts every leg in
+   this wave at minute six.** A canonical episode takes 22 to 121 minutes (the
+   4060's own measured canonical is 121 min, `4060_DRILL_LOG.md:1087`) and NOTHING
+   reaches `otr/obs/` until the very end, because obs is the last step after the
+   mux. What must advance is the leg log's `[soak] t=<N>s` heartbeat, which is what
+   `scripts/otr_render_watchdog.ps1` watches (`-StallSeconds`, default 300).
+   Heartbeat advancing = alive, leave it alone however long it takes. Frozen for
+   five minutes, or `:8000/queue` down = go read the leg log
    rather than waiting it out. Never move, hide, sort or clean anything out of
    `otr/obs/` -- seeing the episodes there is the point.
 7. **Reset before every headless run.** Kill SELECTIVELY by command line

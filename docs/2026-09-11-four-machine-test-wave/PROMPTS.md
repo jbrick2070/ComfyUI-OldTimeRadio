@@ -79,13 +79,17 @@ no document listed until now.
    * **Do NOT invent a quality gate.** No "it passed but the images were poor, so I
      am calling it a partial". No scoring, no rubric, no threshold. If you find
      yourself reaching for a qualifier, the answer is PASS plus an observation.
-   * **A validator's refusal is a FAILURE OF THE VALIDATOR, and it is reported as a
-     defect in the code, not as a failing leg.** If a `verify_*` / `assert_*` /
-     preflight check is what ended a 30-minute render, that is the single most
-     valuable thing you can phone home tonight -- name the file and line. The rule
-     it violated is this repo's own: a guard is legitimate ONLY against a silently
-     WRONG render (a wrong voice, a wrong cast, altered source text, an unowned
-     ledger field). Anything else should have degraded and shipped.
+   * **IF A VALIDATOR ENDED THE RENDER, THE LEG FAILED *AND* THE VALIDATOR IS THE
+     FINDING.** Record both; they are not alternatives. The run died, so the verdict
+     is honest -- but the thing worth phoning home is WHICH check killed it, by file
+     and line. The rule it has to answer to is this repo's own: a guard is
+     legitimate ONLY against a silently WRONG render (a wrong voice, a wrong cast,
+     altered source text, an unowned ledger field). Anything else should have
+     degraded and shipped, and that is a code defect.
+   * **DO NOT GO LOOKING FOR VALIDATORS.** Report the one that actually fired. The
+     tree has ~160 deliberate `NO FALLBACK` raise sites under a standing 2026-06-18
+     directive; auditing them against rule 0 would produce a pile of "defects" that
+     are settled rulings, and bury the one that mattered.
    * **The one inversion:** if an OOM or a genuine resource death was CAUGHT and
      hidden -- the leg "passed" with a quietly degraded render and no loud log --
      that IS worth flagging, for the opposite reason. He wants OOM to be visible.
@@ -106,6 +110,14 @@ no document listed until now.
    you like; the push is the 5080's call so four machines cannot collide on one
    branch. If you believe something must be pushed, say so in your phone-home and
    wait.
+   **THIS OVERRIDES `CLAUDE.md` SECTION 7 FOR THE DURATION OF THIS WAVE, and you will
+   notice the conflict because you are told to read CLAUDE.md first.** Section 7 says
+   every green commit is pushed immediately, "no exceptions", and that pushing to
+   `v2.0-alpha` is "always safe, expected, and required". That is the standing rule and
+   it resumes the moment this wave ends. Tonight four machines run the same branch
+   against one frozen hash, and a push from any of them moves the hash the other three
+   are qualifying. Both are operator directives; this one is dated later and is scoped
+   to the wave.
 
 **YOUR REPORT FILE IS GITIGNORED BY DEFAULT, AND `git add` WILL NOT SAY SO.**
 `.gitignore:255` is `docs/2026-*/` -- dated folders are local scratch on purpose, and
@@ -126,12 +138,29 @@ this wave folder is only tracked because its two documents were force-added.
    `scripts/otr_canonical_api_run.py`.** No `--workflow` override, no
    `--replay-from`, no `partial_execution_targets`, no hand-built graph. There is
    one graph.
+   **PASS `--timeout 0` ON EVERY LEG. This is not optional and it is the single
+   most likely way to manufacture a false failure tonight.** `--timeout` defaults
+   to 5400 seconds -- ninety minutes -- and it is the window this PROCESS watches
+   for, not a limit on the render. The 4060's own measured canonical is 121
+   minutes (`4060_DRILL_LOG.md:1087`) and the Mac has legs past two hours. At
+   minute 90 the default prints `RESULT TIMEOUT` on a render that is still alive
+   and still going to publish. A window that then obeys rule 6 and "resets before
+   every headless run" KILLS A PASSING EPISODE and starts it over. `--timeout 0`
+   waits for a terminal result and the problem disappears.
 4. **Use `--run-label`, NEVER `--title`.** `--title` fills the `episode_title`
    widget, so your harness label becomes the on-screen TITLE CARD and the writer
    stops naming the episode. `--run-label` echoes to the console only.
-5. **A leg is not complete until it publishes to `otr/obs/`.** If a leg has run more
-   than five minutes with nothing in `otr/obs/`, treat it as failing and go read the
-   leg log. Never move, hide, sort or clean anything out of `otr/obs/`.
+5. **A leg is not complete until it publishes to `otr/obs/`.** Never move, hide,
+   sort or clean anything out of `otr/obs/`.
+   **THE FIVE-MINUTE RULE IS A STALLED HEARTBEAT, NOT ELAPSED TIME, and reading it
+   the other way would abort every leg in this wave at minute six.** A canonical
+   episode takes 22 to 121 minutes depending on the box (the 4060's own measured
+   canonical is 121 min, `4060_DRILL_LOG.md:1087`), and NOTHING reaches `otr/obs/`
+   until the very end -- obs is the LAST step, after the mux. What must advance
+   every five minutes is the leg log's `[soak] t=<N>s` heartbeat, which is exactly
+   what `scripts/otr_render_watchdog.ps1` watches (`-StallSeconds`, default 300).
+   So: heartbeat advancing = alive, leave it alone however long it takes. Heartbeat
+   frozen for five minutes, or `:8000/queue` down = go read the leg log.
 6. **Reset before every headless run.** Kill SELECTIVELY by CommandLine via
    `Get-CimInstance Win32_Process` (or `ps`/`pgrep` on Mac/Linux) -- never a blanket
    `Stop-Process -Name python`, which also kills the agent's own tooling. Confirm
@@ -149,7 +178,10 @@ this wave folder is only tracked because its two documents were force-added.
    (`nodes/_otr_rolls.py::resolve_style_selection` -- *"Independent of the bank roll
    in every respect"*), so a present-day story can legitimately draw an era-bearing
    pack. With six-plus legs rolling freely tonight, some will land one and some will
-   not, which is a free A/B for the open visual-continuity work. Report the rolled
+   not. Visual continuity is CLOSED, not open (`f6739500`; see
+   `docs/2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md`) -- the pack and the
+   story are a combination and exactness is not the goal, so report the rolled style
+   as evidence and do NOT open it as a bug. Report the rolled
    id; do NOT pin it, and do not re-roll to get a style you prefer.
 
 ---
@@ -201,7 +233,13 @@ Leg A -- one-act monologue and three-act ensemble, full canonical through
 scripts/otr_canonical_api_run.py.
 
 USE `otr_4060_12b_gguf_offload`. That profile is status "shipping". Do NOT use
-`8gb_lite` or `otr_4060_floor` -- both are status "draft", and 8gb_lite is recorded
+`8gb_lite` or `otr_4060_floor` for the legs that must land -- both are status
+"draft". **But do try them afterwards: the operator struck the blanket forbid on
+2026-09-11** ("you kept telling me this won't work"), and the record does not
+support it -- PBUG-20260904-05 has `8gb_lite` publishing successfully on
+`media_archive` and refusing only on the two banks whose prompts exceed its
+2,048-token context. A twenty-second `GenerationContextOverflowError` is a code
+defect to report with its token numbers, not a failed leg. 8gb_lite is recorded
 in PBUG-20260904-05 as refusing in twenty seconds on two of the three banks, because
 the 12B writer's 2,048-token context cannot hold their prompts. Picking a draft
 profile would burn your evening on a known, already-diagnosed refusal.

@@ -1,4 +1,4 @@
-## 2026-09-11 -- seven crash/durability fixes; wave frozen at f5f40bd4
+## 2026-09-11 -- seven crash/durability fixes (the f5f40bd4 freeze was withdrawn)
 
 The receipt for the day's code, so the plan can stop carrying it. Every fix below was
 proven in BOTH directions: the guard was neutered and the tests confirmed to FAIL
