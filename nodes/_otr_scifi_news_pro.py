@@ -3006,9 +3006,15 @@ def _run_markup_ladder(
         last_temp = temp
 
         def _messages_for(content: str) -> "ProviderCapacityMessages":
-            """The rung's messages for a given user turn. Factored out ONLY so
-            the overflow guard below can rebuild them without the draft block;
-            the wording is byte-identical to what it always was."""
+            """The rung's messages for a given user turn.
+
+            Factored out of the loop body so the two-branch format_example
+            shape is stated once. The wording is byte-identical to what it
+            always was -- this is a readability split, not a prompt change.
+            (It was originally added for an in-place overflow retry that was
+            then removed for breaking the attempt/call count invariant; the
+            helper stayed because one expression beats two branches inline.)
+            """
             if format_example is None:
                 return ProviderCapacityMessages([
                     {"role": "system", "content": system},
@@ -3071,23 +3077,42 @@ def _run_markup_ladder(
             if (getattr(exc, "phase", None) != CAPACITY_PHASE_PROMPT_NO_ROOM
                     or not draft_block):
                 raise
+            # ONE CALL PER RUNG. The first version of this guard retried in
+            # place -- a second creative_fn call inside the same iteration --
+            # and that was wrong for a reason the ladder enforces two layers
+            # up: `_counting` (:539) increments per INVOCATION, and the runner
+            # asserts `box["calls"] == len(attempt_trace)`, raising
+            # NewsProScriptError("P3 attempt/call count drift") on any
+            # mismatch. Two calls against one trace row is exactly that drift,
+            # so the in-place retry turned one crash into a different, later
+            # crash. The trace cannot absorb the extra row either:
+            # PassAttemptTrace.outcome is Literal["parse_rejected","accepted"]
+            # and __post_init__ refuses anything else, while
+            # _validate_attempt_sequence requires attempts contiguous from 1.
+            #
+            # So the overflow CONSUMES its rung, which is also the honest
+            # accounting -- the call was invoked and counted, even though the
+            # transport refused before spending a token. Drop the draft, record
+            # the attempt, and let the next rung run cold.
+            #
+            # `defects_by_attempt` and `last_defect_text` are deliberately NOT
+            # touched: the draft's actual defects are unchanged and still owed
+            # to the next prompt, and inventing a new defect string here would
+            # put authored text into the prompt, which is forbidden.
             log.warning(
                 "[SciFiNewsPro] attempt %d: the carried draft overflowed the "
-                "prompt (%s). Dropping it and retrying this rung once -- the "
-                "repair-turn fit estimate was too generous.", attempt, exc,
+                "prompt (%s). Dropping the draft; the next rung regenerates "
+                "cold -- the repair-turn fit estimate was too generous.",
+                attempt, exc,
             )
             rejected_draft = ""
-            draft_block = ""
             cold_regenerations += 1
-            user_content = (
-                f"{base_user}\n\n{extra_user}" if extra_user else base_user
-            )
-            # LLM slot: creative -- same rung, retried without the draft.
-            raw = creative_fn(
-                _messages_for(user_content),
-                temperature=temp,
-                max_new_tokens=None,
-            )
+            traces.append(PassAttemptTrace(
+                attempt=attempt,
+                temperature=float(temp),
+                outcome="parse_rejected",
+            ))
+            continue
         raw = _strip_conversational_wrapper(raw)
         last_raw = raw
         parsed, defects = parse_scifi_news_pro_markup(

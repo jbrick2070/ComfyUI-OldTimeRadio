@@ -12,8 +12,13 @@ node, and surfaced as a failed prompt with nothing in `otr/obs/` -- i.e. the epi
 crashed when it was not supposed to, which is the operator's stated bar.
 
 The remedy is the one the ladder ALREADY performs when the prediction says no: drop
-the draft and continue without it. These tests pin the three behaviours that matter,
-including the two where the guard must NOT fire.
+the draft and continue without it. The overflow CONSUMES its rung -- one counted
+call, one trace row -- because two layers up the runner asserts
+``box["calls"] == len(attempt_trace)`` and raises on drift; see the last test here,
+which is the one that would have caught the first, broken version of this guard.
+
+These tests pin the behaviours that matter, including the two where the guard must
+NOT fire.
 """
 from __future__ import annotations
 
@@ -93,8 +98,9 @@ def _overflow():
 def test_a_draft_that_overflows_the_repair_turn_is_dropped_not_fatal():
     """Attempt 1 is malformed, so attempt 2 carries the draft and overflows.
 
-    The ladder must drop the draft, retry that rung once WITHOUT it, and deliver
-    the clean play. Before the guard this raised out of the node.
+    The overflow CONSUMES its rung -- one counted call, one trace row -- and the
+    NEXT rung regenerates cold without the draft, delivering the clean play.
+    Before the guard this raised straight out of the node.
     """
     writer = ScriptedWriter([play("*SFX: a door slams"), _overflow(), play()])
 
@@ -104,20 +110,22 @@ def test_a_draft_that_overflows_the_repair_turn_is_dropped_not_fatal():
     assert len(writer.prompts) == 3, writer.prompts
     # the prompt that overflowed carried the draft...
     assert DRAFT_MARKER in writer.prompts[1]
-    # ...and the retry of that same rung did not.
+    # ...and the rung after it did not.
     assert DRAFT_MARKER not in writer.prompts[2], (
-        "the retry resent the draft that just overflowed -- that is the banned "
-        "re-roll of a deterministic prompt_no_room refusal")
+        "the next rung resent the draft that just overflowed -- that is the "
+        "banned re-roll of a deterministic prompt_no_room refusal")
     # the trace must SHOW the cold regeneration, not hide it
     assert diag["cold_regenerations"] >= 1, diag
 
 
-def test_the_dropped_draft_retry_holds_its_rung_temperature():
+def test_the_rung_after_an_overflow_does_not_raise_temperature():
     """Dropping the draft must not silently escalate the ladder's temperature.
 
     `_MARKUP_LADDER_TEMPS` documents that the markup ladder NEVER raises
-    temperature. The guard retries the SAME rung, so the temperature it retries
-    at is the temperature it just failed at.
+    temperature. The rung after an overflow carries no draft, so it takes the
+    ladder's existing cold-regeneration branch -- `temp = max(temp, last_temp)`
+    -- which HOLDS the previous rung rather than resetting to the opening
+    temperature. This asserts the observed effect, not the mechanism.
     """
     seen = []
 
@@ -134,7 +142,8 @@ def test_the_dropped_draft_retry_holds_its_rung_temperature():
 
     assert len(seen) == 3, seen
     assert seen[2] == seen[1], (
-        "the retry after dropping the draft changed rung temperature: %r" % (seen,))
+        "the rung after the overflow raised temperature: %r -- the markup "
+        "ladder never raises" % (seen,))
 
 
 # --------------------------------------------------------------------------- #
@@ -181,3 +190,57 @@ def test_the_happy_path_is_untouched():
     assert parsed is not None and raw
     assert len(writer.prompts) == 1
     assert DRAFT_MARKER not in writer.prompts[0]
+
+
+# --------------------------------------------------------------------------- #
+# THE INVARIANT MY FIRST FIX BROKE, and which these tests did not catch.
+#
+# The first version of the overflow guard retried in place -- a SECOND
+# creative_fn call inside the same rung. Every test above still passed, because
+# they drive _run_markup_ladder directly. But two layers up the runner wraps the
+# creative slot in `_counting` (which increments per INVOCATION, before the
+# underlying call) and then asserts:
+#
+#     if box["calls"] != len(p3_attempts):
+#         raise NewsProScriptError("script", "P3 attempt/call count drift")
+#
+# Two calls against one trace row is exactly that drift, so the "fix" turned one
+# crash into a different, later crash. The trace cannot absorb an extra row
+# either: PassAttemptTrace.outcome is Literal["parse_rejected","accepted"] and
+# _validate_attempt_sequence demands attempts contiguous from 1.
+#
+# So the rule is ONE COUNTED CALL PER TRACE ROW, and this is the test that
+# would have caught it.
+# --------------------------------------------------------------------------- #
+def test_every_counted_call_has_exactly_one_trace_row(tmp_path):
+    """Drive the ladder through the same counting wrapper the runner uses."""
+    counted = {"calls": 0}
+    inner = ScriptedWriter([play("*SFX: a door slams"), _overflow(), play()])
+
+    def counting_fn(messages, *, temperature, max_new_tokens):
+        counted["calls"] += 1          # increments on INVOCATION, like _counting
+        return inner(messages, temperature=temperature,
+                     max_new_tokens=max_new_tokens)
+
+    _raw, parsed, diag = scifi_news_pro._run_markup_ladder(
+        counting_fn,
+        pass_id="script",
+        system="system prompt",
+        base_user="base user prompt",
+        envelope=None,
+        cast_names=CAST,
+        initial_temperature=0.7,
+    )
+
+    assert parsed is not None
+    traces = diag["attempt_trace"]
+    assert counted["calls"] == len(traces), (
+        "P3 attempt/call count drift: %d counted calls against %d trace rows. "
+        "The runner raises NewsProScriptError on exactly this mismatch, so a "
+        "second in-rung call is a crash, not a fix."
+        % (counted["calls"], len(traces)))
+    # and the trace stays well-formed for _validate_attempt_sequence
+    assert [t.attempt for t in traces] == list(range(1, len(traces) + 1))
+    assert sum(1 for t in traces if t.selected) == 1
+    assert traces[-1].selected
+
