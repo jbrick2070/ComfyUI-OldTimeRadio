@@ -16,17 +16,19 @@ list is one fix plus the platform, which is a single bisect instead of six. So t
 frozen hash is written here before the wave starts, and nothing touching the render
 path lands after it:
 
-    WAVE HEAD: 3e692dc5   (frozen 2026-09-11, and this one is real)
+    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
 
-    Coding is complete. What remains in GO_FORWARD is blocked on an arc, on an
-    operator ruling, or on evidence this wave itself produces, and each row
-    states which. Four crash/durability fixes and the repair-turn budget are in
-    this head; so is the deterministic Ghost crux resolver, which no episode has
-    ever rendered through -- see the suspect list.
+    Withdrawn 2026-09-11 after being cut, and this is the SECOND withdrawal --
+    read the reason so it is not cut early a third time. The head was frozen at
+    3e692dc5 with two arcs deliberately deferred past it and 3.6 Shakespeare cut
+    from the week. The operator's ordering is:
 
-    THE EARLIER f5f40bd4 FREEZE IS WITHDRAWN, not superseded quietly: it was cut
-    before coding finished and was broken within the hour by a074f56e. If you
-    have that hash written down anywhere, discard it.
+        ARCS  ->  CODING  ->  SHAKESPEARE  ->  TESTING, ABSOLUTELY LAST
+
+    An ARC IS CODING. So a deferred arc is deferred coding, and "no testing until
+    all coding is complete" means the arcs run FIRST, their outcomes get built,
+    Shakespeare gets built, and only then is a head frozen. Neither 3e692dc5 nor
+    the withdrawn f5f40bd4 is a hash any lane may start against.
 
     WHEN IT IS FROZEN, IT WILL BE A CODE FREEZE, NOT A COMMIT FREEZE. Commits
     after the hash will be documentation only -- this file's own freeze line

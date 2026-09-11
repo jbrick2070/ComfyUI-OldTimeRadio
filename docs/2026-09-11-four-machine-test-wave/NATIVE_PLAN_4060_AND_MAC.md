@@ -20,14 +20,19 @@ written to be self-contained: do not assume the reader has seen this conversatio
 
 ## Before anything: the frozen head, and one flag
 
-    WAVE HEAD: 3e692dc5   (frozen 2026-09-11)
+    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
 
-    Report the HEAD you ACTUALLY pulled -- it will legitimately be LATER than
-    this hash, because documentation commits keep landing after a CODE freeze
-    and that is expected. Never check out the frozen hash. But if you pull a
-    commit that touches `nodes/`, `scripts/` or `workflows/` after 3e692dc5,
-    STOP and phone home: that would mean the freeze was broken and the four
-    machines are no longer qualifying the same code.
+    Withdrawn 2026-09-11 after being cut, and this is the SECOND withdrawal --
+    read the reason so it is not cut early a third time. The head was frozen at
+    3e692dc5 with two arcs deliberately deferred past it and 3.6 Shakespeare cut
+    from the week. The operator's ordering is:
+
+        ARCS  ->  CODING  ->  SHAKESPEARE  ->  TESTING, ABSOLUTELY LAST
+
+    An ARC IS CODING. So a deferred arc is deferred coding, and "no testing until
+    all coding is complete" means the arcs run FIRST, their outcomes get built,
+    Shakespeare gets built, and only then is a head frozen. Neither 3e692dc5 nor
+    the withdrawn f5f40bd4 is a hash any lane may start against.
 
 **PASS `--timeout 0` ON EVERY LEG. This is the single most likely way to
 manufacture a false failure tonight.** `--timeout` defaults to 5400 seconds --

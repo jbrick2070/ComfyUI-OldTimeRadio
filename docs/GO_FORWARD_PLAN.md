@@ -46,32 +46,42 @@ story source combined is quite complex. I'm not expecting anything exact."* So:
 
 ## 1. The sequence
 
-**NO TESTING UNTIL ALL CODING IS COMPLETE (operator directive 2026-09-11 -- hard, and
-it is the caveat that governs everything else).** The wave does not run on a partial
-tree. Coding finishes, THEN the hash is frozen, THEN four machines qualify it.
+**ARCS -> CODING -> SHAKESPEARE -> TESTING, ABSOLUTELY LAST (operator directive
+2026-09-11 -- hard, and it governs everything else in this file).**
 
-**This inverts what "render-affecting" means for scheduling, so read it before
-deferring anything.** An item was held back earlier today on the reasoning "it changes
-which script comes back, so it must land AFTER the wave". That reasoning depended on
-the wave running tonight. It does not: the wave waits for coding. So a render-affecting
-item now belongs **IN** the frozen hash, not after it -- deferring it would mean
-qualifying a commit that is already known to be behind the code. **The freeze simply
-moves to whenever coding finishes.** The earlier freeze at `f5f40bd4` is WITHDRAWN,
-not provisional -- it was cut before coding finished and was broken within the hour
-by `a074f56e`. It is not a hash any lane may start against.
+| phase | what it means | done when |
+|---|---|---|
+| 1. ARCS | Every row whose design has more than one defensible answer gets its r1 BEFORE any code. An arc IS coding; it is $0 and costs a wait, not a budget. | No row in 5A/5B is waiting on a design decision. |
+| 2. CODING | Build what the arcs settled, plus every row that never needed one. | Section 5 is empty of buildable work. |
+| 3. SHAKESPEARE | Row 3.6, named by the operator as its own phase rather than folded into general coding. | A verbatim Shakespeare episode is buildable. |
+| 4. TESTING | Freeze ONE hash, then four machines qualify it. | Section 4's coverage is owed against a real head. |
 
-**What still defers, and it is a short list:** an item blocked on an operator ruling,
-an item whose design genuinely has not converged, and an item that needs live evidence
-the wave itself will produce. "Render-affecting" is no longer on that list.
+**A DEFERRED ARC IS DEFERRED CODING, and that is the mistake this table exists to
+stop.** The head was frozen once at `3e692dc5` with two arcs pushed past it and 3.6
+cut from the week -- which is testing before coding is complete, by the plan's own
+definition. Withdrawn. Before that, `f5f40bd4` was frozen before coding finished and
+was broken inside the hour by `a074f56e`. **Two premature freezes in one day: do not
+cut a third until phases 1-3 are actually empty.**
 
-**Then: four machines qualify ONE frozen commit.** The 5080 and RunPod are driven from
-the coder window; the 4060 and the Mac are driven by Cowork natively on those boxes,
-from
+**A GATE ON EVIDENCE THE WAVE PRODUCES IS NOT A VALID DEFERRAL EITHER, now that
+testing is last.** Ghost Half B was held for the 4060's `kernel_source` hit-rate; the
+Sci-Fi repair cap was held as "render-affecting, lands after the wave". Both reasonings
+assumed the wave ran first. It does not. An item that can only be decided by live
+evidence must either be decided WITHOUT it or be explicitly cut from this round -- it
+may not sit in a queue waiting for a phase that comes after it.
+
+**What genuinely still defers, and it is now a two-item list:** a row blocked on an
+operator ruling, and a row deliberately cut from this round with the reason written in
+it. Nothing else.
+
+**Then, and only then: four machines qualify ONE frozen commit.** The 5080 and RunPod
+are driven from the coder window; the 4060 and the Mac are driven by Cowork natively on
+those boxes, from
 [NATIVE_PLAN_4060_AND_MAC.md](2026-09-11-four-machine-test-wave/NATIVE_PLAN_4060_AND_MAC.md).
 
 **After the wave, the next day begins in `otr/obs/`, not in the editor.** Count what
-landed against the legs promised, read the four phone-homes, and triage any
-crash-class failure FIRST. Only when that triage is empty does new work start.
+landed against the legs promised, read the four phone-homes, and triage any crash-class
+failure FIRST. Only when that triage is empty does new work start.
 
 ## 2. Tonight -- the four-machine wave (the TEST phase)
 
@@ -152,7 +162,7 @@ before landing here. Arc receipts, if a row's history is wanted:
 | Row | What to write |
 |---|---|
 | 3.1 Ghost Half-B, LLM tier | The DETERMINISTIC tier is in: the beat's own text now ranks `meta.key_objects`, with a negation guard. Its measured ceiling is 26.3% of beats, so what remains is the tier the operator actually chose -- extend the batched Ghost author so a beat naming no listed object still gets a physical-artifact subject. Rules: photographable thing only, never an abstraction; beat reference RANKS, never SOURCES; a noun named only inside a negation is not an artifact. Not a new retry loop and not a gate. **Gated on two things, deliberately.** It is a design choice with more than one defensible answer, so it takes a full arc before code -- and it changes the batched Ghost author's PROMPT, which the operator has ruled on twice (*"be very careful about swashbuckling updating prompts"*, *"we are constrained by characters"*). And the 4060's legs are the first live exercise of the deterministic tier, so their `kernel_source` counts are the first real hit-rate measurement -- the number that should shape the prompt. Build it after the wave reports, not before. |
-| 3.6 Shakespeare | **The "wiring, not design" label is wrong and it came from a plan rewrite, not from the code.** The 2026-08-03 arc settled the KEYSTONE -- compile source speech deterministically, never generate it -- and `_otr_source_document.py` does provide the artifact. But `select_grounding` has zero production callers (tests only), and the archive row (GO_FORWARD_ARCHIVE:8777) lists five steps whose first is marked BLOCKS EVERYTHING: loosening a hard-raise cast-count invariant and retiring `cast_hints` through a schema migration. That is a build, not a wire-up. Do not start it as a quick item. |
+| 3.6 Shakespeare -- **PHASE 3, its own phase** | The operator named this directly on 2026-09-11 (*"arcs - coding - Shakespeare and testing absolutely last"*), so it is in scope, not cut. **The old "wiring, not design" label was wrong** -- it came from a plan rewrite rather than from the code. The 2026-08-03 arc settled the KEYSTONE (compile source speech deterministically, never generate it) and `_otr_source_document.py` provides the artifact, but `select_grounding` has zero production callers and GO_FORWARD_ARCHIVE:8777 lists five steps whose first is marked BLOCKS EVERYTHING: loosening a hard-raise cast-count invariant and retiring `cast_hints` through a schema migration. | **r1 IN FLIGHT 2026-09-11**, asking the two questions that decide the size: is step 1 still blocking against the CURRENT files, and is there a smallest useful slice that delivers a real verbatim episode without the full five steps and without a schema migration? The cast-count hard-raise is itself suspect under "only an out of memory should fail", and relaxing it may unblock step 1 cheaply. Size it from the arc, then build. Not a quick item, and no longer a reason to skip it. |
 | 3.7 meta ownership | Fork NONE. Fix the stale comments; the ownership split is already correct in code. |
 | 3.2 composer | Fork NONE, no crash risk. Fix the stale docs. |
 | 2.4 audit tail, model-root | The four-owner model-root merge, or nothing. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `flux2_klein.py:209-215`. Refusal reasoning recorded in `afe3bfed`. |
