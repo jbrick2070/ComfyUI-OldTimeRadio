@@ -154,12 +154,21 @@ stress test. Collect the other machines' actual receipts first, then fill the
 gaps on a recorded common implementation. The counts below are planned test
 coverage, never story admission limits. Do not report these as completed.
 
+**One canonical, full qualification (operator clarification, 2026-09-11):**
+Every qualifying stress run starts from workflows/otr_canonical.json and runs
+through audio, video and publication to otr/obs. Use the shipped canonical API
+runner without --workflow, replay substitution or partial_execution_targets.
+The approved runtime applier may configure the actual machine, and the normal
+creative inputs supply My Story. Record those changes; do not build another
+graph. Writer/freeze-only checks are component diagnostics and do not count as
+full canonical qualification, even when they load the real full graph.
+
 | Coverage | Planned additional evidence |
 |---|---|
 | Repeatability | Three fresh six-act Jeffrey/Codex runs on the final correction, spanning a clean boot and resident reuse where the actual runtime permits it. Record load/reuse events rather than assuming a cache hit. |
 | Source and cast variety | Three contrasting manual stories: a one-act monologue, a three-act ensemble, and a detailed six-act source. Include requested/actual cast differences, supplied and neutral bylines, and act breaks on/off. Preserve the source people and ending. |
 | Model diversity | Three runs at one/three/six acts on a second installed, compatible model family. Count another machine's run only when its receipt proves that family, code revision, controls and ledger outcome. |
-| Full pipeline | At least two canonical media runs, including a six-act case, with durable ledger, audio/video assets and the final file in otr/obs. Inspect credits and play representative opening, middle and ending sections. A writer/freeze result cannot satisfy this row. |
+| Full pipeline | Require durable ledger, audio/video assets and the final file in otr/obs for the qualifying runs above. Inspect credits and play representative opening, middle and ending sections on at least two completed episodes, including a six-act case. A writer/freeze result cannot satisfy this row. |
 
 Record every attempt, including failures: exact source fields, code/canonical
 hashes, runtime/model settings, prompt ID, elapsed time, observed memory/load
@@ -170,8 +179,9 @@ the failed attempts. Do not turn elapsed time, prose length or character-count
 differences into rejection gates. Real provider, memory, storage and cancellation
 outcomes remain truthful; applicable ledger defects use the existing repairs.
 
-Stage the cheaper writer/freeze repetitions before the full media cases. Use
-the real canonical graph and sanctioned runtime profiles for every leg. Keep
+Use component checks only to diagnose a specific failure; keep them outside
+the qualifying stress-run count. Use the real canonical graph and sanctioned
+runtime profiles for every leg. Keep
 4060/Mac under their existing task owners; do not resume rented compute merely
 to fill a duplicate cell. New findings go through the existing live-evidence
 and root-fix process. A2 or another subsequent implementation change requires

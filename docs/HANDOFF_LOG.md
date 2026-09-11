@@ -1,3 +1,25 @@
+## 2026-09-11 -- one canonical and full-run qualification clarified
+
+The operator explicitly reaffirmed that the real test is the canonical. Prior
+My Story requests loaded the real full 23-node/63-link canonical, but requested
+native partial target 62, so only validator/writer/freeze ran. They are component
+results, not full canonical qualification. The submission helper used the
+existing otr_api converter and runtime applier; it did not supply an old graph.
+
+Independent read-only audit of both archived requests against current canonical
+and live object_info confirms identical graph structure and all non-widget
+fields. Each full API prompt exactly equals the shared converter's output.
+Only eight writer widgets differ: bank, runtime device, act count, character
+hint and the four supplied story fields. Every other node's widgets match.
+
+GO_FORWARD now requires the qualifying stress cases to run the shipped canonical
+API entrypoint through audio/video and an actual published otr/obs file, with no
+alternate workflow, replay substitution or partial execution target. Runtime
+and normal story-input overrides must be recorded. No new full-run PASS is
+claimed by this docs-only correction. Independent device receipts are still
+being collected before filling the remaining coverage.
+
+---
 ## 2026-09-11 -- operator requests stress coverage beyond the first proof
 
 The operator correctly distinguishes the first clean result from stress
