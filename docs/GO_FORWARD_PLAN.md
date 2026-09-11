@@ -92,8 +92,10 @@ below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
 
 **Next action:** implement A2 native HF capacity below as a separate qualified
-chunk. Collect independent 4060/Mac results and incoming lessons against their
-exact tested commits. The completed R1-R4 judgments are in
+chunk after collecting the independent 4060/Mac results and identifying the
+remaining stress-test coverage below. Keep each tested code revision distinct;
+an earlier passing run is not proof of the final correction. The completed
+R1-R4 judgments are in
 2026-09-10-my-story-next/; the later flexible-character amendment is recorded in
 2026-09-10-my-story-a1/operator_amendment.md. The older queue below is outside this campaign. The earlier D1 arc is complete and is not being repeated;
 this arc reviews the new failure-policy ruling, live evidence and credits work.
@@ -144,6 +146,37 @@ this arc reviews the new failure-policy ruling, live evidence and credits work.
    once, and the final seals account for the authorized cleanup rewrite. Keep
    that live evidence available for the credit work; do not claim this music
    correction fixes the shared cleaner or rewrite story prose in Python.
+
+### Stress coverage after the independent reports
+
+Operator, 2026-09-11: one successful final-fix run is useful, but it is not a
+stress test. Collect the other machines' actual receipts first, then fill the
+gaps on a recorded common implementation. The counts below are planned test
+coverage, never story admission limits. Do not report these as completed.
+
+| Coverage | Planned additional evidence |
+|---|---|
+| Repeatability | Three fresh six-act Jeffrey/Codex runs on the final correction, spanning a clean boot and resident reuse where the actual runtime permits it. Record load/reuse events rather than assuming a cache hit. |
+| Source and cast variety | Three contrasting manual stories: a one-act monologue, a three-act ensemble, and a detailed six-act source. Include requested/actual cast differences, supplied and neutral bylines, and act breaks on/off. Preserve the source people and ending. |
+| Model diversity | Three runs at one/three/six acts on a second installed, compatible model family. Count another machine's run only when its receipt proves that family, code revision, controls and ledger outcome. |
+| Full pipeline | At least two canonical media runs, including a six-act case, with durable ledger, audio/video assets and the final file in otr/obs. Inspect credits and play representative opening, middle and ending sections. A writer/freeze result cannot satisfy this row. |
+
+Record every attempt, including failures: exact source fields, code/canonical
+hashes, runtime/model settings, prompt ID, elapsed time, observed memory/load
+behavior, repair attempts, requested/actual counts, ledger verdict and seals,
+and output paths. Keep interrupted or pre-fix runs visible but separate. Report
+the denominator and failure classes; never rerun until a lucky pass and hide
+the failed attempts. Do not turn elapsed time, prose length or character-count
+differences into rejection gates. Real provider, memory, storage and cancellation
+outcomes remain truthful; applicable ledger defects use the existing repairs.
+
+Stage the cheaper writer/freeze repetitions before the full media cases. Use
+the real canonical graph and sanctioned runtime profiles for every leg. Keep
+4060/Mac under their existing task owners; do not resume rented compute merely
+to fill a duplicate cell. New findings go through the existing live-evidence
+and root-fix process. A2 or another subsequent implementation change requires
+clearly labelled requalification of its affected cases, not relabelling old
+results as if they ran new code.
 
 A2 implementation boundary (shared owners, separate qualified chunk):
 

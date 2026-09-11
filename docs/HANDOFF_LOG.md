@@ -1,3 +1,18 @@
+## 2026-09-11 -- operator requests stress coverage beyond the first proof
+
+The operator correctly distinguishes the first clean result from stress
+qualification. The 5080 completed one-, three- and six-act components, but
+only the six-act run used the final music-parent correction. RunPod tested
+the earlier code. No repeatability, model-diversity or full-media stress PASS
+is claimed from those results.
+
+GO_FORWARD now includes the pending repeat/source/cast/model/media coverage
+matrix, with all attempts retained and each tested implementation identified.
+Collect independent 4060/Mac receipts first, then fill the actual gaps. The
+repo watcher remains active. This is a docs-only scope update: no new render,
+code change, remote action or test result is implied.
+
+---
 ## 2026-09-11 01:35 UTC -- qualification pushed; RunPod stopped, latest sync blocked
 
 OTR code and measured receipts pushed at f829c920; HEAD equalled origin.
