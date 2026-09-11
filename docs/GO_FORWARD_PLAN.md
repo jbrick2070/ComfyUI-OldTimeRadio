@@ -123,41 +123,43 @@ model/quantization/profile, prompt ID, elapsed time, memory and loads, all repai
 attempts, requested vs actual acts and cast, ledger seals and final paths. Preserve
 terminal failure evidence before asserting anything. Keep the full denominator.
 
-## 5. Design rows -- the ARC phase, and this IS the remaining work
+## 5. The remaining work, triaged against current code (2026-09-11)
 
-Ordered by the section 0 bar: what can crash or lose an episode comes first. None of
-these is coded without its arc, and the arc IS the coding.
+**Operator rule: a no-brainer does not get an arc; only genuinely complex items do.**
+Every row below was re-grounded against the CURRENT tree before being classified,
+because the row descriptions are months old and the code moved underneath them. That
+grounding changed almost every verdict -- several "design rows" turned out to be
+already decided, already arced, or already closed.
 
-**Tier 1 -- crash / OOM class. Arc these first.**
+### 5A. CODE IT -- the fork is already settled, so there is nothing to pressure-test
 
-| Row | Scope |
+| Row | What to write |
 |---|---|
-| 3.3 | Orphan generation occupancy vs cleared model-cache state. `has_local_resident_llm()`'s own docstring says it does NOT make orphan GPU occupancy visible, so the process can believe nothing is resident while a previous generation still holds VRAM. Several narrow fixes each surfaced a NEW race -- that is the two-strikes signal, and why it takes an arc rather than a sixth patch. |
-| 3.5 per-beat model reload | A ~14 GiB LTX reload per beat. Framed as an OOM SURFACE, not a speed complaint: reloading that much per beat is where a long episode falls over. |
-| Sci-Fi repair-turn cap VALUE | See section 2. Local, GGUF-native and OpenRouter each resolve capacity differently, so the "read the real window" fix is a three-transport design, not a constant swap. Render-affecting; arc now, code after a wave. |
-| 3.5 runtime pack writes | See section 2. Needs a migration step or it cold-starts a populated cache and moves the writer's token budget; and the billing ledger must not land in a tier whose contract says "never the only copy". |
+| 3.1 Ghost Half-B | `ghost_signal_author.py::resolve_crux_kernel` picks the beat's physical-artifact subject by ORDINAL. **The fork was already ruled by the operator** -- `docs/OTR_STANDING_RULINGS.md:759`, 2026-09-03, hard: extend with the beat's own dialogue. Implement the existing ruling. No arc. |
+| 3.6 Shakespeare | **The keystone design was already settled by a full kibitz arc on 2026-08-03** (`kibitz-runs/2026-08-03-adaptation-fid...`): compile source speech deterministically, never generate it. `nodes/_otr_source_document.py` already provides SourceDocument/SourceSpan with `canonical_body_sha256`. What remains is wiring, not design. No arc. |
+| 3.7 meta ownership | Fork NONE. All three sub-questions are decided: style vs `story_scaffold` ownership is already correctly separated in code; content-derived style is STRUCK by [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md); the rest are single-answer documentation corrections. Fix the stale comments. No arc. |
+| Sci-Fi repair-turn cap VALUE | The crash path closed today. A correct uniform value ALREADY EXISTS -- `cache_entry["context_cap"]`, stamped per-provider by each backend's own resolver and trusted by every other transport in the tree. Thread it into `_draft_fits_repair_turn` (`_otr_scifi_news_pro.py:2861`) instead of the flat `HARD_VRAM_CONTEXT_LIMIT`. Narrow. No arc. **Still render-affecting** -- it changes repair-vs-cold-regeneration, so it lands after a wave, not before a freeze. |
+| 3.2 composer face/crux | Fork NONE. `compose_parts` works as intended, and the audio-in / text-to-video requirements are preserved by lane-local code layered around it, not overridden by it. No crash or durability risk. The two findings are stale documentation. Fix the comments. No arc. |
 
-**Tier 2 -- correctness, no crash.**
+### 5B. ARC IT -- a real fork with more than one defensible answer
 
-| Row | Scope |
+| Row | The fork |
 |---|---|
-| 3.8 | Shared torch-free font-family/file resolution across captions, titles, credits, scopes. Its evidence arrives tonight from the Mac's text-rendering leg -- eight macOS episodes shipped with the hero title off the right edge. Arc it AFTER that leg reports, or the arc re-derives what the leg will hand you. |
-| 3.2 | Shared silent-video composer face/crux. Touches eleven lanes on both machines, so CLAUDE.md 0B applies -- prove the unchanged machine is unchanged, measured. **Guard: preserve the audio-in / text-to-video requirements, and measure truncation at the ACTUAL engine, not from a declared limit.** |
-| 3.7 | Pitch/cast name reconciliation and dead-field ownership. `meta.style` still has readers and writers; `meta.story_scaffold` already means a separate control -- resolve ownership, do not blind-rename. **"Content-derived style" is STRUCK**: deriving style from content is picking a winner between pack and story, which [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md) settled. |
-| 2.4 routing/canvas | ShotLock write-side canvas validation; ltx_av long-beat underruns; matrix declared-vs-effective limits; `wants_talking_prompt` capture. |
-| 2.4 voice/credits | Opt-in Bark non-speech repair with a bounded keep-best policy; small-canvas credits layout (known -- report it, do not chase it). |
-| 2.4 audit tail | Remaining output-root/env-exporter and protected model-root items. The cold-cache test dependency is FIXED; the google/veo unpinned-fixture and worktree-credit claims were re-grounded and REFUTED -- do not re-derive them. |
-| 2.4 source | HTML block joins pending an operator digest ruling; scifi_news P0 literal-span convergence; scifi_news_pro provider/output capacity and P9/GGUF follow-ups. No deterministic source-prune rung. |
-| A2 follow-up | Unknown native capacity and remote token-estimate accounting. **Guard: do NOT reopen the shared native-capacity/EOS fix -- it landed and is receipted.** |
+| 3.5 per-beat model reload | `eng_ltx_video.render_clip` builds a FRESH graph every call -- GGUF unet, Gemma-3 text encoder and VAE reloaded per beat. Fork: what to cache (text encoder only, ~8.8 GB, matching the proven `eng_ltx25` pattern, vs also the ~10 GB unet), where to hold it (VRAM-resident for the episode vs CPU-resident with a faster per-beat transfer), and how either interacts with the existing cross-engine inter-beat reclaim invariant. OOM-class. |
+| Runtime pack writes | Not a one-line path swap: the two files need DIFFERENT target tiers, and there is a migration decision for data already on disk -- a populated catalog cache that cold-starts changes the writer's token budget, and `billing_ledger.jsonl` is the only copy of real spend and must not land in a tier whose contract says "never the only copy". |
+| 3.8 fonts | Build the shared torch-free resolver the bug log already calls for (one candidate table per platform, one override-env convention, one fallback policy) vs formally accept per-platform divergence. **Its evidence arrives tonight from the Mac's text leg** -- arc after that reports. |
+| 2.4 voice/credits | Bark: wire the existing, tested `_otr_bark_lib.py:684-727` high-band artifact scorer into an opt-in bounded retry-and-keep-best -- i.e. un-defer the 2026-06-21 B3 reroll loop that was consciously left as future work once source-side prevention landed. Whether to un-defer it at all is the fork. |
+| 2.4 source | Genuine fork; needs the operator's digest ruling first (section 6). |
+| 2.4 audit tail | Remaining output-root/env-exporter and protected model-root items. NOTE: the cold-cache test dependency is FIXED, and the google/veo unpinned-fixture and worktree-credit claims were re-grounded and REFUTED -- do not re-derive them. |
+| 3.4 clean install | **The headline concern is CLOSED**: `_assert_profile_models_present` is a refuse-only gate for the dev harness, exactly as suspected, and its "blocked on Section 1.1" clause is stale. Two narrower forks survive -- the scope of auto-download coverage (`_COVERED` is deliberately 3 engines today) and where fetch code lives so it ships in the registry bundle. Neither is crash-class. Low priority. |
 
-**Tier 3 -- wait for evidence, or explicitly not next.**
+### 5C. NOT CODE AT ALL
 
-| Row | Scope |
+| Row | Disposition |
 |---|---|
-| 3.4 | Clean-install manifest / queue-time download / ffprobe gaps. Its "blocked on 1.1" clause is STALE -- there is no 1.1 row. **The 4060 and RunPod pull steps tonight produce the real gap list**, so arcing it first re-derives it. |
-| 3.1 | Ghost v3 Half-B: the author picks objects by ordinal and excludes beat dialogue. Restart the arc; r2 never converged. Weigh against the bar -- this is authoring quality, and story quality is DONE. Arc it only if the ordinal selection is a correctness fault rather than a taste one. |
-| 3.6 | Shakespeare segmented/verbatim source artifact and field-owner table. Explicitly not next. |
-| 2.2 | Five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. No new Ghost schema field. Needs a CUDA proving host. |
+| 2.2 Ghost CUDA | Its own spec says "Section 0 explicitly rules NO ARC for this closed specification." A live five-act forced-Ghost CUDA publication, nothing more. Needs a CUDA host. |
+| A2 follow-up | **CLOSED and removed.** Both sub-items -- unknown native capacity and remote token-estimate accounting -- are already deliberate and tested in current code. The row description was stale. |
+| 2.4 routing/canvas | Grounding still in flight at the time of writing; classify before acting. |
 
 ## 6. Blocked on the operator -- each unblocks with one word
 

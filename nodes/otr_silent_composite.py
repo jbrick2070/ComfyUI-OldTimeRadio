@@ -1842,6 +1842,38 @@ class OTRSilentComposite:
             except ValueError as exc:
                 log.error("[OTR_SilentComposite] %s", exc)
                 return ("", f"error: {exc}")
+            except OSError as exc:
+                # A FAILED SPAWN MUST NOT DISCARD A FINISHED EPISODE.
+                #
+                # The probe helpers underneath reach ffprobe/ffmpeg through
+                # `_run` -> `otr_proc.run` -> `subprocess.run`, which raises
+                # OSError (FileNotFoundError when the binary has moved,
+                # PermissionError when a scanner locks it, and the transient
+                # spawn failures Windows produces under load) -- not
+                # ValueError. So the clause above did not cover them, and the
+                # exception left the node.
+                #
+                # That is the most expensive place in the pipeline to die: the
+                # script, the cast, every voice, the audio master and every
+                # rendered clip are already done, and the whole episode is
+                # thrown away with nothing published.
+                #
+                # This is not a new policy, it is the SAME degrade one line
+                # up -- return the error tuple the caller already knows how to
+                # read. Exception-only: a run that spawns successfully is
+                # byte-identical.
+                #
+                # OSError DELIBERATELY, not Exception. `otr_proc._check` raises
+                # ExecutableNotAllowed for a binary this pack refuses to run,
+                # and that is a security contract that must stay fatal -- it is
+                # a RuntimeError, so this clause cannot swallow it. A genuine
+                # OOM is likewise not an OSError and still kills the render,
+                # which the project requires.
+                log.error(
+                    "[OTR_SilentComposite] could not run the video toolchain: "
+                    "%s -- the episode is rendered but cannot be composited",
+                    exc)
+                return ("", f"error: {exc}")
         finally:
             if _engine_active:
                 engine.unload()
