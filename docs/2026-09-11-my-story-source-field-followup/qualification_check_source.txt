@@ -1,0 +1,140 @@
+from pathlib import Path
+from collections import Counter
+import ast
+import hashlib
+import json
+import shutil
+import sys
+import xml.etree.ElementTree as ET
+import yaml
+
+from finish_source_field import failures, norm
+
+root = Path(__file__).resolve().parents[1]
+out = root / 'docs/2026-09-11-my-story-source-field-followup'
+tests = out / 'tests'
+tests.mkdir(exist_ok=True)
+
+def tally(path):
+    cases = ET.parse(path).iter('testcase')
+    return dict(Counter('failure' if c.find('failure') is not None else 'error'
+        if c.find('error') is not None else 'xfail' if c.find('skipped') is not None
+        and c.find('skipped').get('type') == 'pytest.xfail' else 'skip'
+        if c.find('skipped') is not None else 'pass' for c in cases))
+
+before = root / 'tmp/my_story_treatment_gap_full.xml'
+after = root / 'tmp/source_field_final_full.xml'
+b, c = failures(before), failures(after)
+counts = tally(after)
+assert counts == {'pass': 14411, 'skip': 183, 'failure': 51, 'xfail': 1}, counts
+assert b.keys() == c.keys()
+assert all(norm(b[k]) == norm(c[k]) for k in b), 'Changed inherited failure payload'
+comparison = {'baseline': tally(before), 'final': counts,
+              'new_failures': [], 'changed_normalized_failure_payloads': []}
+(out / 'full_comparison.json').write_text(json.dumps(comparison, indent=2)+'\n', encoding='utf-8')
+for path in sorted((root / 'tmp').glob('source_field*')):
+    if path.suffix in {'.log', '.xml'}:
+        shutil.copyfile(path, tests / path.name)
+shutil.copyfile(before, tests / 'baseline_my_story_treatment_gap_full.xml')
+
+receipt = '''# Source-field conformance: qualified for the next live measurement
+
+The existing spoken source editor now gets the same four-field namespace in
+native grammar that its application validator already enforces. Source/draft
+quotes and candidate-line offsets are clarified in its actual instruction.
+No extra correction calls, source gate, node/widget/wire or semantic certificate.
+The exact final production/test diff and hashes are in final_state.md. This
+does not claim the remaining source omissions or added child are fixed live.
+
+## Verification
+
+- Focused real owner/input/runner/native-decoder tests:186 passed.
+- First full run:14410 passed,52 failed,183 skipped,1 xfailed.51 failure IDs and
+  normalized payloads match the prior baseline. The extra failure found the
+  manual README qualification note inside its generated dropdown table.
+  Moved it outside and regenerated via the owner; --check passes.
+- Final full run:14411 passed, the same51 inherited failures with identical
+  normalized payloads,183 skipped,1 xfailed. No introduced failure and no
+  quarantine edits. The known-fail guard exits2; this is not an all-green suite.
+- Final controlled Bible:38 passed,10 inherited failures,11 skipped,3 xfailed.
+  Same final Bible against untouched18569a3b:36 passed,12 failures,11 skipped,
+  3 xfailed. New schema guard and coverage catalog fail baseline/pass candidate;
+  the ten common failure payloads match after path/repr/address normalization.
+- Canonical unchanged, SHA256
+  d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c.
+  Shipped validator, JSON round-trip, live widget counts and link audit pass:
+  23 nodes,63 links. Touched Python parses with Python3.10 grammar; UTF8/noBOM
+  and nonempty-file checks pass. Bible retains344 entries; existing11.39 extended.
+
+Actual LMFE excludes the live invalid alias and admits all four valid fields.
+The separate public two-call test proves applied replacement and conservation,
+but already passed before fix; it is not semantic or fix-discriminating proof.
+All raw logs/XML, including the first README failure and before-fix result,
+are preserved under tests/. Controlled worktrees separate current probes from
+the portable scan. No whole-suite failures were hidden or marked newly known.
+
+## Review and next action
+
+Opus5 and Sonnet5 each reviewed twice, including Sonnet after the last test-code
+revision. Both found no production change needed. Root grounded their remaining
+test/artifact concerns against the final files; see review_judgment.md and the
+authoritative final_state.md. Historical duplicate Bible hunks in a review
+packet are not duplicate real code. Cursor follow-up yielded no review after
+two prior timeouts; no Cursor/unanimous consensus is claimed. API cost USD0.485079.
+
+Independent read-only wiring review found no must-fix. Independent05 evidence
+review checked hashes and corrected one receipt claim: age bands come from
+accepted treatment, not numerical ages supplied in the raw story.
+
+Commit/push this qualified chunk before one fresh full canonical5080 attempt06
+with the same source, Mistral pair, profile and controls as05. Verify submitted
+graphs match. Inspect actual applied edits, spoken source, voice/credits and
+pixels, retaining every failure. No retry reset and no claim an alias exclusion
+guarantees semantic recovery. Mac/4060 stay held until operator release; RunPod
+remains unauthenticated and no rental has started. GO_FORWARD is the sole queue.
+'''
+(out / 'qualification_receipt.md').write_text(receipt, encoding='utf-8')
+
+go = root / 'docs/GO_FORWARD_PLAN.md'
+text = go.read_text(encoding='utf-8')
+a = text.index('**Current work: finish source-field conformance QA')
+b = text.index('After those checks and push, use the real canonical', a)
+finished = text[a:b]
+archive = root / 'docs/GO_FORWARD_ARCHIVE.md'
+old = archive.read_text(encoding='utf-8')
+entry = ('## 2026-09-11 -- source-field offline qualification completed\n\n'
+         'Completed instruction, verbatim:\n\n' + finished + '---\n\n')
+archive.write_text(old.replace('# GO_FORWARD -- ARCHIVE\n\n',
+    '# GO_FORWARD -- ARCHIVE\n\n' + entry, 1), encoding='utf-8')
+text = text[:a] + '''**Next action: ONE fresh full canonical 5080 attempt06 on the pushed
+source-field correction.** Verify the checkout matches origin and the final
+qualification receipt before boot. Offline code/review evidence is complete in
+`docs/2026-09-11-my-story-source-field-followup/qualification_receipt.md`;
+it does not establish live source recovery.
+
+Use the real canonical''' + text[b+len('After those checks and push, use the real canonical'):]
+go.write_text(text, encoding='utf-8')
+handoff = root / 'docs/HANDOFF_LOG.md'
+text = handoff.read_text(encoding='utf-8')
+text = text.replace('attempt05 publishes; source-field correction in final QA',
+                    'attempt05 publishes; source-field correction qualified offline', 1)
+text = text.replace('Finished Opus/Sonnet QA and full regression,\ncontrolled Bible and canonical checks precede push/attempt06. Final outcomes',
+                    'Opus/Sonnet QA completed; final regression has14411 passes and51 unchanged\ninherited failures. Controlled Bible38pass/10inherited and canonical checks\ncomplete. Push before attempt06. Final outcomes', 1)
+handoff.write_text(text, encoding='utf-8')
+
+for folder, pattern, name in [(root/'docs/2026-09-11-my-story-5080-qualification',
+                              'pairlock_05_*','pairlock_05_manifest.json'),
+                             (out, '*', 'evidence_manifest.json')]:
+    records = []
+    for path in sorted(folder.rglob(pattern) if folder == out else folder.glob(pattern)):
+        if not path.is_file() or path.name == name:
+            continue
+        data = path.read_bytes()
+        assert data, path
+        if path.suffix != '.png':
+            assert not data.startswith(b'\xef\xbb\xbf'), path
+            data.decode('utf-8')
+        records.append({'path': path.relative_to(folder).as_posix(), 'bytes': len(data),
+                        'sha256': hashlib.sha256(data).hexdigest()})
+    (folder / name).write_text(json.dumps(records, indent=2)+'\n', encoding='utf-8')
+print(json.dumps(comparison))

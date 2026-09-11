@@ -1,5 +1,52 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- source-field offline qualification completed
+
+Completed instruction, verbatim:
+
+**Current work: finish source-field conformance QA and push, then ONE fresh
+full canonical 5080 attempt06 on that qualified commit.** Attempt05 published
+with correct delivered voice credits, but omitted the girlfriend mention and
+requested ending, and one image added a child. The concrete invalid source-field
+alias is now excluded by the existing editor's schema; quote-coordinate guidance
+reaches its actual prompt. No extra calls, source gate or semantic certificate.
+Finished Opus/Sonnet review, full regression, controlled Bible and canonical
+audits must complete before live testing. Evidence and final qualification
+receipt: `docs/2026-09-11-my-story-source-field-followup/`.
+
+---
+
+## 2026-09-11 -- attempt05 completed; source-field conformance follow-up
+
+Completed and superseded instructions below are preserved verbatim.
+
+**Next action: ONE fresh full canonical 5080 pair-lock attempt05 with the
+installed Mistral Nemo pair.** Production code remains the Sonnet-reviewed
+d2837e45 correction; no prompt or sampling change accompanies this measurement.
+Load real `workflows/otr_canonical.json` through the shipped full API runner,
+same pairlock_01 source and `otr_w45_still_pan`, NF4/SDPA and sampling controls.
+Set both model shortcuts to the exact installed label
+`mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)`. Verify the resulting
+API prompt differs from attempt04 only in the two model selections. Record
+loaded identity/capacity, actual attempts, natural failure or durable publication.
+Do not restart an exhausted ladder or treat a changed-family success as proof
+of Qwen's cause. Preserve any failure before another run.
+
+Keep attempts01/02/03/04 in the denominator across their recorded revisions:
+three writing failures and one publication with source defects. Source
+qualification still requires both adults sharing the present-day meal, distinct
+absent girlfriend, preserved metadata, actual voice/credits agreement, accepted
+prompts and inspected pixels, and zero between-act music. Publication alone is
+insufficient. Qwen reliability, later stress coverage and fresh Original credits
+remain open. The grounded diagnosis and CPU boundary evidence are in
+`docs/2026-09-11-my-story-treatment-clarification/`; they do not count as a live run.
+
+| **1st** | **My Story: Sprints A, B, C, then separate qualification** | Execute WHERE TO PICK UP. That section is the authoritative next coding plan; D0/D1 and the initial graph implementation are archived completion receipts, not tasks to restart. |
+
+**The next concrete step is the R1-R4 review of Sprints A-C under WHERE TO PICK UP, followed by Sprint A coding and a real canonical writer/ledger dry run.**
+
+---
+
 ## 2026-09-11 -- canonical attempt04 measured; next family qualification
 
 Completed instruction block, verbatim:

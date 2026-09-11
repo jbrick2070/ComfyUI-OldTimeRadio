@@ -1,0 +1,197 @@
+[
+  {
+    "path": "bible_comparison.json",
+    "bytes": 385,
+    "sha256": "745d8cd8b2cacbba809af2fd16754262e0b80056ece4876a1cf6c4dc27122a1a"
+  },
+  {
+    "path": "bible_final_comparison.json",
+    "bytes": 385,
+    "sha256": "745d8cd8b2cacbba809af2fd16754262e0b80056ece4876a1cf6c4dc27122a1a"
+  },
+  {
+    "path": "comparison_helpers_source.txt",
+    "bytes": 5568,
+    "sha256": "1e08e06c8470d7490309c3b345cddb4f054ea2d1a82e6667d868863102f06c29"
+  },
+  {
+    "path": "driver_anchor.md",
+    "bytes": 3227,
+    "sha256": "2aa7496228c871caef7b6a2fad8e405ec0fe202c0141155fd37169650889c991"
+  },
+  {
+    "path": "file_checks.json",
+    "bytes": 791,
+    "sha256": "90be9966485b3f2d4f64d3a5eed8dcd8078e136b90ef25798660e33336c0e5d0"
+  },
+  {
+    "path": "final_grounding.md",
+    "bytes": 45245,
+    "sha256": "f6c3ec45ef1dcfb5257fe039faa443eec986d32a8e6b94fc6b2f640a4e0ddba4"
+  },
+  {
+    "path": "final_qa/anthropic__claude-opus-latest.md",
+    "bytes": 3682,
+    "sha256": "90aeab5c6e6c0c92ffa11e853b603853ffec7c8e1c72b13dcf1299354845d886"
+  },
+  {
+    "path": "final_qa/anthropic__claude-sonnet-latest.md",
+    "bytes": 2559,
+    "sha256": "ebb7aa1b0b15199bf4626fca9ceff06063eaf3382ad9b427a23b040d05aeb889"
+  },
+  {
+    "path": "final_qa/manifest.json",
+    "bytes": 841,
+    "sha256": "39c8786273009777c874c3a3caf4ce70c0e653f871df62fe48d841a0615273aa"
+  },
+  {
+    "path": "final_state.md",
+    "bytes": 14655,
+    "sha256": "94292e6842afc5dee08ac5fbc76772bb4636df02455e4003e302d4d242f16674"
+  },
+  {
+    "path": "finished_qa/anthropic__claude-opus-latest.md",
+    "bytes": 7024,
+    "sha256": "57f44cba616fea635ba39ac4f4c2d6a34dccd994e701c0099c4ba32ed81c2afa"
+  },
+  {
+    "path": "finished_qa/anthropic__claude-sonnet-latest.md",
+    "bytes": 3531,
+    "sha256": "4d116954a5cfc3794058595bd43be6cccaeee929c984a53461bf7654d353c75b"
+  },
+  {
+    "path": "finished_qa/manifest.json",
+    "bytes": 837,
+    "sha256": "26798afb9f4561eea25de3aa54b4a9aa04d1ddf1bf01dfe58ce40841d7fd4542"
+  },
+  {
+    "path": "finished_qa.md",
+    "bytes": 34681,
+    "sha256": "03e98d22753afa7ff813ba741983a65ef1112bf0784607a419f38162cc5037fc"
+  },
+  {
+    "path": "full_comparison.json",
+    "bytes": 265,
+    "sha256": "33d3f5b7963714f7e9b57c9b6b9ca1f25408905648c5d5174e52171323325829"
+  },
+  {
+    "path": "qualification_check_source.txt",
+    "bytes": 7757,
+    "sha256": "f6ab0e3159db2619350cdf5ddf03068743eb5c4bc790c60563af8b256622cfc2"
+  },
+  {
+    "path": "qualification_receipt.md",
+    "bytes": 3733,
+    "sha256": "6240cb9861f554637a71cedd457998d5b050243c8647edd9c3ce4638008cf370"
+  },
+  {
+    "path": "review_judgment.md",
+    "bytes": 4020,
+    "sha256": "1e72b33adb5b65e8ff1daf0e61b0de8fbff3070bae767e8b6d30f284b8494fa7"
+  },
+  {
+    "path": "tests/baseline_my_story_treatment_gap_full.xml",
+    "bytes": 2307173,
+    "sha256": "96583571a53dd2aa50b3dce10637199255342df5017c95a3dc9c575215e815ef"
+  },
+  {
+    "path": "tests/source_field_before.log",
+    "bytes": 1204,
+    "sha256": "2266873a5e62b024d2529bf99ef466e54090262a1b50501c29362ea768074e8d"
+  },
+  {
+    "path": "tests/source_field_before.xml",
+    "bytes": 1165,
+    "sha256": "17f7489f9401f5f3b291bafe6f0a113b7b43d0fe4becbd50f0531f5a9d4ad749"
+  },
+  {
+    "path": "tests/source_field_bible_baseline.log",
+    "bytes": 35415,
+    "sha256": "26f5d9b1ec2ca34dc5319a5cc5fc86276ac66e937294d502215104a35cc1d661"
+  },
+  {
+    "path": "tests/source_field_bible_baseline.xml",
+    "bytes": 49051,
+    "sha256": "a5a5c71844a67d594d3c8ab976e3076e7071cf7620014d96ca4d1d1ee1093229"
+  },
+  {
+    "path": "tests/source_field_bible_candidate.log",
+    "bytes": 27506,
+    "sha256": "23f3c46531ae76d036f7a05f0fbbc6554fee6ad96aabde6381d2996bbff0ba52"
+  },
+  {
+    "path": "tests/source_field_bible_candidate.xml",
+    "bytes": 40601,
+    "sha256": "dd002cee13fdf10ceb71fa892bc64ddd0e622ce1d4b75735060af0b98c4237c9"
+  },
+  {
+    "path": "tests/source_field_bible_final.log",
+    "bytes": 27502,
+    "sha256": "c86e73252b83119fe5acb53899bac034a0b039525ea6932d954363205e5a3f9f"
+  },
+  {
+    "path": "tests/source_field_bible_final.xml",
+    "bytes": 40601,
+    "sha256": "afc975e4878afcf5cb93340a849ad3649ecb362665861ea82b8bc131895cf3e1"
+  },
+  {
+    "path": "tests/source_field_bible_final_baseline.log",
+    "bytes": 35288,
+    "sha256": "8ae33e47a70fd6b1f26dda5366eb706334cedd73193a4ba4bf676a1b720380f5"
+  },
+  {
+    "path": "tests/source_field_bible_final_baseline.xml",
+    "bytes": 48753,
+    "sha256": "997e2ac5264f3d1f0668300de5e257f6b277bc0c1cb66ada14cfd56d225839c7"
+  },
+  {
+    "path": "tests/source_field_canonical.log",
+    "bytes": 619,
+    "sha256": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2"
+  },
+  {
+    "path": "tests/source_field_final_canonical.log",
+    "bytes": 619,
+    "sha256": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2"
+  },
+  {
+    "path": "tests/source_field_final_full.log",
+    "bytes": 74834,
+    "sha256": "045e69cb9670a7fffed90c1bcc8eb7f1bc2884bfbef2d326082dd757de2d4946"
+  },
+  {
+    "path": "tests/source_field_final_full.xml",
+    "bytes": 2307483,
+    "sha256": "b27276844418d5c341ade4c7b7f917c368dfbb6f7ab86f2e5ae57c7d593f3e1e"
+  },
+  {
+    "path": "tests/source_field_final_qa.log",
+    "bytes": 845,
+    "sha256": "4b3aaa37b45d18eefc736ff8758eb7e5b4ff4f9b2dcc524106dd56b0d725ada3"
+  },
+  {
+    "path": "tests/source_field_finished_qa.log",
+    "bytes": 845,
+    "sha256": "981f17c4dd36eafed09d6ef49154e73d9aa3cc3276b28287a844f37f3f5bc415"
+  },
+  {
+    "path": "tests/source_field_focused.log",
+    "bytes": 1984,
+    "sha256": "e1a6b4e83d8ab91b80b1aa6dc83081759689c97a3f820d53ec4a12cf0e1cdb50"
+  },
+  {
+    "path": "tests/source_field_focused.xml",
+    "bytes": 25804,
+    "sha256": "a6b459549da933a10923a361bb0ea283433d0999f33de9ba53db65a3d73f3149"
+  },
+  {
+    "path": "tests/source_field_full.log",
+    "bytes": 74920,
+    "sha256": "30c247a7e6f07a5d01b83a6bfa0531db99e754fd6305a4f230c95f052adf4518"
+  },
+  {
+    "path": "tests/source_field_full.xml",
+    "bytes": 2309451,
+    "sha256": "d4f2d55da0954bb2cfab080694b97d9a81634715beca8c6cf1698fae7609ea61"
+  }
+]

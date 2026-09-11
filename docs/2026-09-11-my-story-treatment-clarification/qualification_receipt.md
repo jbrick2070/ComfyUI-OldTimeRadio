@@ -94,3 +94,8 @@ Actual native context131072 and tokenization differ from Qwen; record their
 runtime observations. A publication needs ledger/source/voice/credits/pixels
 inspection before any source-qualified claim. GO_FORWARD owns that next leg
 and later stress work. Mac/4060 remain held; RunPod remains authentication-blocked.
+
+
+2026-09-11 follow-up: the proposed Nemo measurement completed as attempt05.
+See [its full receipt](../2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md).
+It published but remains source-unqualified; the earlier diagnosis above is preserved.

@@ -288,6 +288,22 @@ def test_scope_authorization_real_grammar_accepts_empty_or_omitted_spans_never_n
     assert ord('[') in allowed and ord('n') not in allowed
 
 
+def test_spoken_source_grammar_excludes_candidate_field_and_accepts_all_source_keys():
+    from nodes._otr_story_source import SpokenSourceEdits
+    from nodes._otr_story_input import CREATIVE_FIELDS
+    schema = SpokenSourceEdits.model_json_schema()
+    assert tuple(schema['$defs']['SpokenSourceEdit']['properties']['source_field']['enum']) == CREATIVE_FIELDS
+    _, prefix = _real_constraint(SpokenSourceEdits)
+    allowed = _feed_json(prefix, '{"edits":[{"line_id":"l1","source_field":"')
+    assert ord('t') not in allowed  # live failure: source_field="text"
+    for field in CREATIVE_FIELDS:
+        _, prefix = _real_constraint(SpokenSourceEdits)
+        text = ('{"edits":[{"line_id":"l1","source_field":"' + field +
+                '","source_quote":"Mother is alive","original_quote":"Mother died.",'
+                '"replacement":"Mother lives."}]}')
+        assert 200 in _feed_json(prefix, text)
+
+
 def test_real_lmfe_uses_shared_model_chat_eos_and_refreshes_without_mutating_history():
     from types import SimpleNamespace
     import torch

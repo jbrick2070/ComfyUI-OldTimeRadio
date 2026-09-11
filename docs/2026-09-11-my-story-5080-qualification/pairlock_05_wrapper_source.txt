@@ -1,0 +1,70 @@
+"""Same recorded full canonical request, changing only both writer model labels."""
+from pathlib import Path
+from datetime import datetime, timezone
+import ast, copy, hashlib, json, re, shutil, subprocess, sys, urllib.request
+
+root = Path(__file__).resolve().parents[1]
+folder = root / 'docs/2026-09-11-my-story-5080-qualification'
+head = subprocess.check_output(['git','rev-parse','HEAD'], cwd=root, text=True).strip()
+assert head == subprocess.check_output(['git','rev-parse','origin/v2.0-alpha'], cwd=root, text=True).strip()
+assert head == '18569a3bd0b2ad1acbf6120e10dcb830dafa56a0'
+assert not subprocess.check_output(['git','diff','d2837e45','--','nodes','tests','scripts','config','workflows'], cwd=root)
+for name in subprocess.check_output(['git','diff-tree','--no-commit-id','--name-only','-r','HEAD'], cwd=root, text=True).splitlines():
+    raw = (root/name).read_bytes()
+    assert raw and not raw.startswith(b'\xef\xbb\xbf'), name
+    raw.decode('utf-8')
+    if name.endswith('.py'): ast.parse(raw.decode('utf-8'), filename=name)
+old = json.loads((folder/'pairlock_04_request.json').read_text(encoding='utf-8'))
+request = {k: old[k] for k in ('canonical_path','canonical_sha256','runner','profile','fields','quant_policy','scope','source_note','runpod','mac_4060','actual_sampling')}
+label = 'mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)'
+request.update(creative_model=label, technical_model=label, code_commit=head,
+    executable_code_revision='d2837e45e66d656e1f2dca4c9e33479ef2812cec',
+    previous_attempts=['pairlock_01','pairlock_02','pairlock_03','pairlock_04'],
+    status='Full canonical submission; terminal outcome pending',
+    created_utc=datetime.now(timezone.utc).isoformat(), run_label='5080_pairlock_05_mistral',
+    changed_control='Both writer slots select the installed Mistral Nemo family; source, saved graph, profile, configured sampling and production code retained.',
+    model_dependent_differences='Native context, tokenization, grammar vocabulary/EOS and inherited model defaults differ; this is compatibility evidence, not a binary causal comparison.',
+    desktop_memory_before_boot_mib=2095)
+assert hashlib.sha256((root/'workflows/otr_canonical.json').read_bytes()).hexdigest() == request['canonical_sha256']
+def save(): (folder/'pairlock_05_request.json').write_text(json.dumps(request, indent=2)+'\n', encoding='utf-8')
+save()
+with urllib.request.urlopen('http://127.0.0.1:8000/object_info', timeout=10) as response:
+    info = json.load(response)
+assert 'OTR_LedgerScriptWriter' in info
+args = ['--comfyui-url','http://127.0.0.1:8000','--profile',request['profile'],
+        '--creative-model',label,'--technical-model',label,'--run-label',request['run_label'],
+        '--dump-prompt',str(folder/'pairlock_05_prompt.json'),'--timeout','0','--poll-s','5']
+for key,value in request['fields'].items(): args.extend(['--set','OTR_LedgerScriptWriter.'+key+'='+json.dumps(value)])
+logpath = root/'tmp/my_story_5080_pairlock_05.log'
+with logpath.open('w', encoding='utf-8') as log:
+    command = [sys.executable,'-u',str(root/request['runner']),*args]
+    result = subprocess.run([*command,'--dry-run'], cwd=root, stdout=log, stderr=subprocess.STDOUT)
+    assert result.returncode == 0, 'Full canonical dry run failed'
+    prior = json.loads((folder/'pairlock_04_prompt.json').read_text(encoding='utf-8'))
+    expected = copy.deepcopy(prior)
+    writer_nodes = [node for node in expected.values() if node.get('class_type') == 'OTR_LedgerScriptWriter']
+    assert len(writer_nodes) == 1
+    for key in ['creative_writing_model','technical_model']: writer_nodes[0]['inputs'][key] = label
+    assert expected == json.loads((folder/'pairlock_05_prompt.json').read_text(encoding='utf-8')), 'Unexpected API prompt change'
+    request['prompt_diff_only_two_model_labels'] = True
+    save()
+    result = subprocess.run(command, cwd=root, stdout=log, stderr=subprocess.STDOUT)
+print('Shipped canonical runner exited', result.returncode, flush=True)
+match = re.search(r'QUEUED prompt_id=([a-f0-9-]+)', logpath.read_text(encoding='utf-8'))
+assert match, 'No queued prompt; preserve runner failure separately'
+pid = match.group(1)
+with urllib.request.urlopen('http://127.0.0.1:8000/history/'+pid, timeout=10) as response: history=json.load(response)
+(folder/'pairlock_05_history.json').write_text(json.dumps(history,indent=2)+'\n', encoding='utf-8')
+request.update(prompt_id=pid, status=history[pid]['status']['status_str'], terminal_utc=datetime.now(timezone.utc).isoformat())
+with urllib.request.urlopen('http://127.0.0.1:8000/otr/latest_ledger',timeout=10) as response: latest=json.load(response)
+if latest.get('ok'):
+    matches=list(Path('C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes').glob('*/audio/'+latest['filename']))
+    assert len(matches)==1, matches
+    ledger=matches[0]
+    request.update(ledger_path=str(ledger), ledger_sha256=hashlib.sha256(ledger.read_bytes()).hexdigest())
+    shutil.copyfile(ledger, folder/'pairlock_05_ledger.json')
+save()
+for source,target in [('my_story_5080_pairlock_05.log','pairlock_05_runner.log'),('my_story_5080_pairlock_05_server.log','pairlock_05_server.log')]:
+    shutil.copyfile(root/'tmp'/source, folder/target)
+print('Terminal history, ledger and logs preserved.', flush=True)
+sys.exit(result.returncode)

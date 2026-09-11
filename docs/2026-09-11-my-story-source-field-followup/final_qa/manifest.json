@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-09-11T11:45:42.949039+00:00",
+  "doc": "docs/2026-09-11-my-story-source-field-followup/final_grounding.md",
+  "prompt_tokens_est": 11155,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 16541,
+      "completion_tokens": 3052,
+      "cost_usd": 0.159005,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-sonnet-5",
+      "ok": true,
+      "prompt_tokens": 16541,
+      "completion_tokens": 1853,
+      "cost_usd": 0.051612,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.2106
+}

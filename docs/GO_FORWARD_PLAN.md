@@ -92,26 +92,28 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 pair-lock attempt05 with the
-installed Mistral Nemo pair.** Production code remains the Sonnet-reviewed
-d2837e45 correction; no prompt or sampling change accompanies this measurement.
-Load real `workflows/otr_canonical.json` through the shipped full API runner,
-same pairlock_01 source and `otr_w45_still_pan`, NF4/SDPA and sampling controls.
-Set both model shortcuts to the exact installed label
-`mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)`. Verify the resulting
-API prompt differs from attempt04 only in the two model selections. Record
-loaded identity/capacity, actual attempts, natural failure or durable publication.
-Do not restart an exhausted ladder or treat a changed-family success as proof
-of Qwen's cause. Preserve any failure before another run.
+**Next action: ONE fresh full canonical 5080 attempt06 on the pushed
+source-field correction.** Verify the checkout matches origin and the final
+qualification receipt before boot. Offline code/review evidence is complete in
+`docs/2026-09-11-my-story-source-field-followup/qualification_receipt.md`;
+it does not establish live source recovery.
 
-Keep attempts01/02/03/04 in the denominator across their recorded revisions:
-three writing failures and one publication with source defects. Source
-qualification still requires both adults sharing the present-day meal, distinct
-absent girlfriend, preserved metadata, actual voice/credits agreement, accepted
-prompts and inspected pixels, and zero between-act music. Publication alone is
-insufficient. Qwen reliability, later stress coverage and fresh Original credits
-remain open. The grounded diagnosis and CPU boundary evidence are in
-`docs/2026-09-11-my-story-treatment-clarification/`; they do not count as a live run.
+Use the real canonical/shipped full API runner,
+same pairlock_05 source, installed Mistral Nemo pair, NF4/SDPA, sampling and
+otr_w45_still_pan. Compare submitted graphs05/06 for unexpected differences.
+Inspect actual source-edit fields, applied corrections, final spoken source,
+voice/credits and pixels. Preserve any failure before another run; never reset
+an exhausted budget. Preventing an invalid alias alone does not guarantee
+semantic recovery or correct image generation.
+
+Keep all FIVE recovery attempts across recorded revisions: three writing
+failures and two source-defective publications, ZERO source-qualified episodes.
+Four use Qwen, one Nemo. Attempt05 receipt and complete artifacts are at
+`docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md`.
+Both adults sharing the meal, distinct absent girlfriend, requested ending,
+preserved metadata, delivered voice/credits, inspected prompts/pixels and zero
+between-act music remain required qualification evidence. Publication alone
+is insufficient. Later stress coverage and fresh Original credits remain open.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow
@@ -132,7 +134,7 @@ further production revision after coding; no speculative new architecture pass.
 
 | Remaining work | Required evidence |
 |---|---|
-| A1R source and A2 native qualification | Full canonical one-act pair-lock publication, actual loaded capacity, exact prompt fit, durable source/correction evidence, spoken text and pixels. |
+| A1R source and A2 native qualification | Attempt05 supplies publication, loaded capacity and actual voice-credit agreement. Source delivery and scene pixels remain unqualified; measure the next correction with full canonical evidence. |
 | Repeatability and source/model variety | Full canonical stress attempts below, including failures and actual runtime/model identity. |
 | Original live credit confirmation | A fresh Original publication whose wire, saved ledger and rendered credit agree on observed generation models. |
 | Mac/4060 follow-up after operator release | Current loaded extension and 37-slot schema; their own proven installed routes, Mac allocation observations without an assumed cause. |
@@ -548,7 +550,7 @@ remain in force for the remaining queue.
 
 | # | row | why it sits here |
 |---|---|---|
-| **1st** | **My Story: Sprints A, B, C, then separate qualification** | Execute WHERE TO PICK UP. That section is the authoritative next coding plan; D0/D1 and the initial graph implementation are archived completion receipts, not tasks to restart. |
+| **1st** | **My Story: source repair and fresh canonical qualification** | Execute WHERE TO PICK UP. Initial sprints and prior attempts are archived; do not restart their coding. |
 | **2nd** | **2.2 GHOST POOL** | Five-act canonical forced-Ghost publication proof on CUDA. Read the admission-signature and per-beat reuse receipts; a plain `still_flat` leg cannot prove it. |
 
 **ARC VERDICTS (this is the "match the review to the task" call, made once):**
@@ -590,7 +592,7 @@ accepted ledger malformed and fails closed. The stored object already carries `m
 makes "applied identically to writer output, replay and the deterministic path"
 achievable in one commit.
 
-**The next concrete step is the R1-R4 review of Sprints A-C under WHERE TO PICK UP, followed by Sprint A coding and a real canonical writer/ledger dry run.**
+**The next concrete step is the current repair and qualification sequence under WHERE TO PICK UP. Completed Sprints A-C are not a new review/coding queue.**
 Row 2.2 resumes after the combined priority #1 programme. Its build
 specification and superseded plumbing directions are archived;
 do not add a new field or redirect the v3 renderer to the v2 admission key.

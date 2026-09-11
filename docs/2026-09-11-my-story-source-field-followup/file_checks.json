@@ -1,0 +1,26 @@
+[
+  {
+    "path": "nodes/_otr_story_input.py",
+    "sha256": "6ca61a41c65e4278c624f6d64ee5d60aa09cfcbbc4a86a3ba91c6c9abc9d9ed9",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "nodes/_otr_story_source.py",
+    "sha256": "0bae5a77a7ae2def680d2f39a4972266ff9c81f0b5b7090763ce0506a3f22eb5",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "tests/test_constrained_generate.py",
+    "sha256": "ee7873c576e785a37aee1bff9ea168b741d258e551c45693b68bdda4d6b020c4",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "tests/test_story_source_review.py",
+    "sha256": "b1294e2a17120b189246696a3c7425baeec745162f6ac977fbe2a5e6f8ae5a33",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  }
+]

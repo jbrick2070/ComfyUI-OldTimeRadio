@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictInt, StrictStr, Validat
 
 from ._otr_generation_budget import CAPACITY_ERRORS, PromptContextOverflowError, ProviderCapacityMessages
 from ._otr_source_document import build_source_document
-from ._otr_story_input import CREATIVE_FIELDS
+from ._otr_story_input import CREATIVE_FIELDS, CreativeFieldName
 from ._otr_structured_call import (
     PostValidationError, StructuredCallFailedError, inspect_structured_fit, structured_call,
 )
@@ -267,7 +267,7 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
 class SpokenSourceEdit(BaseModel):
     model_config = ConfigDict(extra="forbid")
     line_id: StrictStr
-    source_field: StrictStr
+    source_field: CreativeFieldName
     source_quote: StrictStr = Field(min_length=1)
     original_quote: StrictStr = Field(min_length=1)
     replacement: StrictStr
@@ -363,9 +363,16 @@ def rewrite_spoken_from_source(ledger_data, *, slot_fn, slot_scheduler=None,
         slot_scheduler=slot_scheduler, configured_model_id=configured_model_id,
         instruction=("For this spoken ledger return edits containing actual replacement "
                      "text, grounded in an exact source quote and exact original interval. "
+                     "source_field names an original source key: %s. "
+                     "Copy source_quote exactly from source[source_field], never from "
+                     "the draft. Copy original_quote exactly from the draft line's text "
+                     "identified by line_id. Optional start_char/end_char are zero-based "
+                     "Python character offsets in that draft line, with end_char exclusive; "
+                     "they are not positions in the original source. "
                      "Use the edits schema instead of returning the full draft. Keep every "
                      "unrelated byte unchanged. Never change speakers, order or ids. "
-                     "Return an empty edits list when no source correction is needed."))
+                     "Return an empty edits list when no source correction is needed."
+                     % ", ".join(CREATIVE_FIELDS)))
     receipt["candidate_line_ids"] = [row["line_id"] for row in candidate["lines"]]
     if result is not None:
         updated = {row["line_id"]: row["text"] for row in accepted["lines"]}

@@ -284,6 +284,31 @@ def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_
     assert data["lines"][0]["char_count"] == len(data["lines"][0]["text"])
 
 
+def test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls():
+    data = _ledger()
+    data['meta']['source_meta']['story_input']['fields'] = {
+        'plot': 'Jeffrey briefly mentions his girlfriend as a separate person.'}
+    data['lines'][0]['text'] = '  Mom, I loved the carousel.  '
+    before = copy.deepcopy(data['lines'])
+    correction = _edit(
+        source_field='plot', source_quote='Jeffrey briefly mentions his girlfriend',
+        original_quote='Mom, I loved the carousel.',
+        replacement='Mom, I loved the carousel. My girlfriend would enjoy it too.')
+    responses = iter([{'edits': [dict(correction, source_field='text')]},
+                      {'edits': [correction]}])
+    slot = Slot(lambda _messages: next(responses))
+    receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+    assert len(slot.calls) == 2 and receipt['applied']
+    assert data['lines'][0]['text'] == '  Mom, I loved the carousel. My girlfriend would enjoy it too.  '
+    assert data['lines'][1] == before[1]
+    assert data['lines'][0]['speaker'] == before[0]['speaker']
+    assert data['lines'][0]['line_id'] == before[0]['line_id']
+    assert receipt['input_sha256'] != receipt['output_sha256']
+    assert receipt['attempts'][0]['status'] == 'failed'
+    assert receipt['attempts'][1]['status'] == 'usable'
+    assert receipt['qualified'] is False  # application is not a semantic certificate
+
+
 @pytest.mark.parametrize("override", [
     {"source_field": "author"}, {"source_quote": "Invented source"},
     {"line_id": "unknown"}, {"original_quote": "invented original"},

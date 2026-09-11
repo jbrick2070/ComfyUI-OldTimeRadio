@@ -1,0 +1,104 @@
+import ast
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import xml.etree.ElementTree as ET
+
+ROOT = Path(__file__).resolve().parents[1]
+BIBLE = ROOT.parents[1] / 'comfyui-custom-node-survival-guide'
+OUT = ROOT / 'docs/2026-09-11-my-story-source-field-followup'
+FILES = ['nodes/_otr_story_input.py', 'nodes/_otr_story_source.py',
+         'tests/test_constrained_generate.py', 'tests/test_story_source_review.py']
+
+def write(name, text):
+    (OUT / name).write_text(text, encoding='utf-8')
+
+def failures(path):
+    tree = ET.parse(path)
+    result = {}
+    for case in tree.iter('testcase'):
+        fail = case.find('failure')
+        if fail is None:
+            fail = case.find('error')
+        if fail is not None:
+            result[case.attrib['classname'] + '::' + case.attrib['name']] = fail.text or ''
+    return result
+
+def norm(text):
+    text = re.sub(r'otr-source-field-(?:baseline|candidate)', 'PACK', text)
+    text = re.sub(r'0x[0-9a-fA-F]+', 'ADDRESS', text)
+    text = re.sub(r'pytest-[0-9]+', 'pytest-N', text)
+    text = re.sub(r'pytest_[a-zA-Z0-9_]+[\\/]', 'pytest_TEMP/', text)
+    # Pytest truncates this diagnostic repr at different characters because
+    # the two worktree basenames have different lengths; assertions below
+    # retain the actual finding lists and are still compared in full.
+    text = re.sub(r'^py_files = .*$', 'py_files = <truncated fixture repr>', text, flags=re.M)
+    # Pytest prints unequal mapping entries in process-dependent key order.
+    # Sort only that explicit diagnostic block; retain each key/value pair.
+    text = re.sub(r'(E\s+Differing items:\n)((?:E\s+\{[^\n]+\n)+)',
+                  lambda match: match[1] + ''.join(sorted(match[2].splitlines(keepends=True))), text)
+    return text
+
+if __name__ == '__main__':
+    OUT.mkdir(exist_ok=True)
+    diff = subprocess.check_output(['git', 'diff', '--', *FILES], cwd=ROOT, encoding='utf-8')
+    bible_diff = subprocess.check_output(['git', 'diff', '--', 'BUG_BIBLE.yaml',
+        'tests/bug_bible_regression.py'], cwd=BIBLE, encoding='utf-8')
+    packet = '''# Finished-code QA: existing spoken source namespace
+
+Review the final diff for reachable defects. Return concise must-fix findings
+with exact evidence, or no demonstrated must-fix plus practical limits. Root
+is sole judge. Do not propose a new checker, rejection gate, extra model call,
+output cap, chunker, or speculative prompt architecture. This is finished-code
+QA, not a claim that the four-round architecture campaign ran for this small
+conformance correction. Opus is explicitly requested; Sonnet QA is mandatory.
+Cursor's two prior follow-up attempts timed out and are not consensus.
+
+The actual live05 full canonical Mistral publication returned source_field=text
+and quoted draft dialogue as source in final spoken correction. Existing
+post-validation rejected it; attempt2 returned edits:[], and the episode omitted
+the source girlfriend mention and requested ending. One rendered image added a
+child although its accepted prompt described the two adults. Those semantic
+failures remain unqualified; this edit does not claim to solve all of them.
+
+Application already accepts only idea/characters/plot/setting: _raw_values
+retains only those, and a nonempty source_quote must occur in raw[source_field].
+The schema now encodes exactly that existing namespace, preventing native LMFE
+from generating an invalid alias. The actual owner prompt distinguishes source
+quotes from draft intervals. No widget/wire, retry, accepted-edit policy,
+provider/OOM/cancel behavior or semantic gate changes. Python>=3.10 supported.
+
+Focused tests: 186 pass. Actual LMFE fails the new enum regression before fix,
+passes all4 keys after fix. Public correction test proves applied rewrite and
+two-call budget, but already passed before fix; it is integration conservation
+coverage, not independent proof the new schema caused a live success.
+Bible candidate38pass/10inheritedfail/11skip/3xfail versus baseline36pass/12fail;
+the new schema guard and updated coverage catalog fail only baseline. Full
+regression is running. Local read-only final wiring review found no must-fix.
+
+## Exact OTR diff
+```diff
+''' + diff + '\n```\n## Exact Bible diff\n```diff\n' + bible_diff + '\n```\n'
+    packet += '\n## Existing owner context\n```python\n' + (ROOT / 'nodes/_otr_story_source.py').read_text(encoding='utf-8') + '\n```\n'
+    write('finished_qa.md', packet)
+    checks = []
+    for filename in FILES:
+        data = (ROOT / filename).read_bytes()
+        assert data and not data.startswith(b'\xef\xbb\xbf')
+        ast.parse(data.decode('utf-8'), feature_version=(3, 10))
+        checks.append({'path': filename, 'sha256': hashlib.sha256(data).hexdigest(),
+                       'utf8_no_bom': True, 'python_310_parse': True})
+    write('file_checks.json', json.dumps(checks, indent=2) + '\n')
+    base = failures(ROOT / 'tmp/source_field_bible_baseline.xml')
+    candidate = failures(ROOT / 'tmp/source_field_bible_candidate.xml')
+    def keys(rows):
+        return {norm(k): norm(v) for k,v in rows.items()}
+    b, c = keys(base), keys(candidate)
+    comparison = {'baseline_failures': len(b), 'candidate_failures': len(c),
+                  'new_failures': sorted(c.keys() - b.keys()),
+                  'fixed_guards': sorted(b.keys() - c.keys()),
+                  'changed_common_failure_payloads': sorted(k for k in b.keys() & c.keys() if b[k] != c[k])}
+    write('bible_comparison.json', json.dumps(comparison, indent=2) + '\n')
+    print(json.dumps(comparison))

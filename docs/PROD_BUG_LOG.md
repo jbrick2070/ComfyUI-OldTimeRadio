@@ -14347,6 +14347,26 @@ scene caches. Neutral portraits and image conditioning policy stay separate.
 Bible11.39 remains the source-grounding authority. Actual final prompt/pixel
 qualification remains OPEN; canned fixtures prove transport and preservation.
 
+
+### PBUG-20260910-03 follow-up -- pairlock_05 source-field coordinates
+
+Full canonical05 on18569a3b published Dinner Memories, prompt
+2ef6cb63-b211-4e0a-9d85-b56823370963. Missing girlfriend mention and requested
+ending predate cleanup. One inspected scene adds a child despite an accepted
+two-adult prompt. Delivered voices and rendered credits now agree. Source
+qualification remains OPEN; see pairlock_05_receipt.md and raw evidence.
+
+The final spoken correction returned source_field=text and quoted candidate
+dialogue as source. Validation rejected it; the remaining attempt returned
+edits:[], preserving omissions. Existing _raw_values contains only idea,
+characters,plot,setting, while the native schema admitted any string. The
+source-field Literal now derives the identical ordered CREATIVE_FIELDS tuple
+and constrains decoding to that existing namespace. The actual instruction
+clarifies source_quote versus original_quote and zero-based/end-exclusive draft
+offsets. Application rules, two-call budget and qualified=false stay intact.
+Bible11.39 covers real LMFE alias exclusion/all4 keys and applied-rewrite
+conservation. This is a contract repair, not proof missing facts/pixels recover.
+
 ### PBUG-20260910-05 follow-up -- cleanup scope authorizer omitted native binding
 
 In the same published pairlock_02, the authorizer returned already_spoken with

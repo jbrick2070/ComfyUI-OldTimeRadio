@@ -19,6 +19,11 @@
 patches/ComfyUI-GGUF-ltx25-gemma4.patch -whitespace
 tests/fixtures/comfyui_gguf_6ea2651/loader.py -whitespace
 
+# Hashed qualification evidence retains the captured bytes on every checkout.
+# In particular, do not rewrite Windows log/XML line endings after hashing.
+docs/2026-09-11-my-story-source-field-followup/** -text
+docs/2026-09-11-my-story-5080-qualification/pairlock_05_* -text
+
 # Binary files - never touch line endings
 *.wav binary
 *.mp3 binary

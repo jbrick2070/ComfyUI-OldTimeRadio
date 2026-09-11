@@ -26,7 +26,7 @@ import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping, get_args
 
 #: Bundle schema version. Bump only when the DIGESTED shape changes -- the
 #: digest is an identity, and a reader that cannot recompute it cannot verify
@@ -42,7 +42,8 @@ KNOWN_INPUT_MODES = frozenset({INPUT_MODE_LEGACY, INPUT_MODE_USER_FIELDS})
 #: The four creative fields, in the order they are shown and projected. The
 #: author is deliberately NOT one of them: naming who a story is by is not an
 #: idea for a story, and a run carrying only an author has nothing to write.
-CREATIVE_FIELDS = ("idea", "characters", "plot", "setting")
+CreativeFieldName = Literal["idea", "characters", "plot", "setting"]
+CREATIVE_FIELDS = get_args(CreativeFieldName)
 
 #: The three fields that belong to My Story alone. `custom_premise` is shared
 #: with every other bank and keeps its existing meaning there, so it is not in

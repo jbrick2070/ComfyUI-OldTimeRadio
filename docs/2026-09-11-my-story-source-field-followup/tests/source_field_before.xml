@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="2" time="2.946" timestamp="2026-09-11T04:29:53.962091-07:00" hostname="iDream"><testcase classname="tests.test_constrained_generate" name="test_spoken_source_grammar_excludes_candidate_field_and_accepts_all_source_keys" time="2.485"><failure message="KeyError: 'enum'">def test_spoken_source_grammar_excludes_candidate_field_and_accepts_all_source_keys():
+        from nodes._otr_story_source import SpokenSourceEdits
+        from nodes._otr_story_input import CREATIVE_FIELDS
+        schema = SpokenSourceEdits.model_json_schema()
+&gt;       assert tuple(schema['$defs']['SpokenSourceEdit']['properties']['source_field']['enum']) == CREATIVE_FIELDS
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'enum'
+
+tests\test_constrained_generate.py:295: KeyError</failure></testcase><testcase classname="tests.test_story_source_review" name="test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls" time="0.009" /></testsuite></testsuites>

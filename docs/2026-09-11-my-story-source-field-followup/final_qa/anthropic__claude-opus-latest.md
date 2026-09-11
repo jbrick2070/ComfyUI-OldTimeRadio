@@ -1,0 +1,18 @@
+<!-- requested_model: ~anthropic/claude-opus-latest | resolved_model: anthropic/claude-opus-5 -->
+
+## Must-fix (demonstrated)
+
+**M1. The F2/F3 claim does not match the code.** You state the scan "accepts Assign/AnnAssign + TypeAlias." In the final `tests/bug_bible_regression.py` hunk, `targets` is computed only for `ast.Assign` (`node.targets`) and `ast.AnnAssign` (`[node.target]`); every other statement yields `[]`. A PEP 695 `type CreativeFieldName = Literal[...]` statement parses to `ast.TypeAlias`, is skipped, `found != names`, and the guard fails with the refactor message. Adding `typing.TypeAlias` to `namespace` supports only the annotation form `CreativeFieldName: TypeAlias = Literal[...]`. Either fix the claim ("Assign/AnnAssign, including `X: TypeAlias = ...`") or add `isinstance(node, ast.TypeAlias)` handling (Py3.12+, guarded by `getattr(ast, "TypeAlias", ())`). As written, the packet overstates coverage.
+
+**M2. Sign-off is requested on unfinished evidence.** "Final full regression is rerunning… Test-only final Bible rerun underway," yet you also present 14410/52/183/1 and 38pass/10/11/3 as the verdict basis. The only reported delta cause (README note moved out of a generated matrix block and regenerated) touches `--check` and therefore the very run not yet complete. No push or QA closure until the rerun lands and is compared as 51-normalized + Bible 38/10/11/3; otherwise the numbers in the Bible/QA record are provisional claims.
+
+## Grounded limits (not must-fix, do not silently drop)
+
+- **Exec-order coupling (new guard).** `fields` is collected in file order and exec'd as a module; `CREATIVE_FIELDS = get_args(CreativeFieldName)` NameErrors if the two declarations are ever reordered. The pre-exec `found == names` assertion does not catch this, so the failure surfaces as a raw NameError, not the refactor message. Acceptable, but the message promise is partial.
+- **Hand-maintained namespace is a mirror.** The dict (`BaseModel`, `ConfigDict`, `StrictStr`, `StrictInt`, `Field`, `Literal`, `get_args`) duplicates `_otr_story_source` imports. Any future field using a name outside that set (e.g. `StrictBool`, a validator) fails as NameError, i.e. a false alarm rather than a real regression. This is the price you accepted for pack-detached portability; keep it documented.
+- **Grammar assertion is weaker than its comment.** `assert ord('t') not in allowed  # live failure: source_field="text"` proves only that no allowed value starts with `t`. It does not isolate `"text"`, and it breaks if a future creative field begins with `t`. The four positive `200 in _feed_json(...)` cases carry the real weight.
+- **Alias path is now decode-unreachable.** `test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls` injects `source_field='text'` through a stub, so under real LMFE the first attempt it models cannot occur; it is retry/budget conservation coverage for a non-grammar provider, not evidence about the enum. Your Bible wording separates the two-attempt test correctly — apply the same qualification to this one.
+- **F6 residual.** The instruction grew; `inspect_structured_fit` can flip `fits` from True to False at the margin, yielding `unresolved_capacity` and no repair where a repair previously ran. You accept this and add no cap; no test pins the boundary. State it as a known limit rather than "no behavior effect."
+- **Bible hunks are alternatives.** The two shown diffs share base `ccf3535` with different result blobs; confirm only the 14-line final paragraph is applied (no duplicated prose).
+
+No production change warranted; `_exact_interval` end-exclusive guidance is consistent with the owner.

@@ -1,0 +1,10 @@
+{
+  "baseline_failures": 12,
+  "candidate_failures": 10,
+  "new_failures": [],
+  "fixed_guards": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage",
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_spoken_source_schema_uses_the_original_field_namespace"
+  ],
+  "changed_common_failure_payloads": []
+}

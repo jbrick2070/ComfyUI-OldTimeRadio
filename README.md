@@ -19,19 +19,16 @@ The development branch now contains a
 [pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
 it has offline tests, but has not been released or cold-install/GPU qualified.
 
-**My Story qualification:** code repairs have completed offline tests and review;
-fresh canonical source recovery remains unproven. The first 5080 recovery attempt
-failed during story writing. The second published, but exposed source metadata,
-casting credits and scene-fidelity defects. Those follow-up fixes are reviewed
-and offline tested. The third attempt preserved corrected source metadata but
-failed treatment writing after its three allowed attempts. The fourth also
-exhausted treatment writing after the repair-context correction. Source
-qualification remains open; see the
-[recorded diagnosis](docs/2026-09-11-my-story-treatment-clarification/qualification_receipt.md).
-The next qualified revision and machine sequencing come from [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
-Existing model-matrix proof retains its recorded scope and does not establish
-source fidelity for the repaired My Story flow. See the
-[cross-machine evidence](docs/2026-09-11-my-story-cross-machine/triage.md).
+**My Story qualification:** five full canonical 5080 recovery attempts across
+recorded revisions produced three writing failures and two publications with
+source defects. The fifth, using Mistral Nemo, delivered correct voice credits
+but omitted requested story details and added a child in one image. That is
+zero source-qualified recovery episodes. See the
+[fifth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md)
+and [GO_FORWARD](docs/GO_FORWARD_PLAN.md) for repair QA and the next qualification.
+Existing model-matrix proof retains its recorded platform/scope; it does not
+establish source fidelity for the repaired My Story flow. The
+[cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md) remain recorded.
 
 100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
 any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
@@ -601,13 +598,6 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | fits | **tight** |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **proven** | measured | **no** |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** |
-**My Story on the 5080:** the four recorded Qwen3.5-4B/NF4 recovery attempts,
-across their recorded code revisions, include three treatment-writing failures
-and one publication with source-fidelity defects. That is zero source-qualified recovery episodes; it does not erase the
-older matrix's platform-specific proof. Follow
-[the current diagnostic receipts](docs/2026-09-11-my-story-treatment-clarification/)
-and [GO_FORWARD](docs/GO_FORWARD_PLAN.md) for the next qualified revision.
-
 **How you get the weights.** **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
@@ -659,6 +649,16 @@ memory has no separate pool to exhaust. That is why the Mac column is worth
 reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
+
+**My Story on the 5080:** four Qwen3.5-4B/NF4 recovery attempts produced three
+treatment-writing failures and one source-defective publication. A fifth run
+with Mistral Nemo/NF4 published with correct voice credits but still missed
+source facts and generated an extra child in one image. Total: five attempts,
+two publications, zero source-qualified episodes. Preserve the older matrix's
+platform-specific proof; this campaign does not promote source fidelity. See
+[the actual receipts](docs/2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md)
+and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
+
 
 ### The cheapest complete setups
 

@@ -1,0 +1,1027 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[1m[33m[WARNING][0m On windows we are currently forcing single GPU mode in ComfyUI due to a Nvidia related issue, if you want to disable this use: --cuda-device all
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path clip C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusers C:\ComfyUI-Models\diffusers
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path gligen C:\ComfyUI-Models\gligen
+[32m[INFO][0m Adding extra search path hypernetworks C:\ComfyUI-Models\hypernetworks
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path photomaker C:\ComfyUI-Models\photomaker
+[32m[INFO][0m Adding extra search path style_models C:\ComfyUI-Models\style_models
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path unet C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path vae_approx C:\ComfyUI-Models\vae_approx
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Adding extra search path download_model_base C:\ComfyUI-Models
+[32m[INFO][0m Adding extra search path custom_nodes C:\Users\jeffr\Documents\ComfyUI\custom_nodes
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path upscale_models C:\Users\jeffr\Documents\ComfyUI\models\upscale_models
+[32m[INFO][0m Adding extra search path latent_upscale_models C:\ComfyUI-Models\latent_upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Setting output directory to: C:\Users\jeffr\Documents\ComfyUI\output
+[32m[INFO][0m Setting user directory to: C:\Users\jeffr\Documents\ComfyUI
+[START] Security scan
+[DONE] Security scan
+## ComfyUI-Manager: installing dependencies done.
+** ComfyUI startup time: 2026-09-11 04:10:59.299
+** Platform: Windows
+** Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+** Python executable: C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe
+** ComfyUI Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** ComfyUI Base Folder Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** User directory: C:\Users\jeffr\Documents\ComfyUI
+** ComfyUI-Manager config path: C:\Users\jeffr\Documents\ComfyUI\__manager\config.ini
+** Log path: C:\Users\jeffr\Documents\ComfyUI\comfyui.log
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    1.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    2.8 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: Potential Error in code: Torch already imported, torch should never be imported before this point.
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'int8_linear', 'na3d', 'quantize_and_rotate_rowwise', 'quantize_int8_rowwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 16275 MB, total RAM 64957 MB
+[32m[INFO][0m pytorch version: 2.10.0+cu130
+[32m[INFO][0m Set vram state to: NORMAL_VRAM
+[32m[INFO][0m Device: cuda:0 NVIDIA GeForce RTX 5080 Laptop GPU : cudaMallocAsync
+[32m[INFO][0m Using async weight offloading with 2 streams
+[32m[INFO][0m Enabled pinned memory 25982.0
+[32m[INFO][0m working around nvidia conv3d memory bug.
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+[32m[INFO][0m aimdo: src/control.c:269:INFO:comfy-aimdo NVML pressure enabled
+[32m[INFO][0m aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 5080 Laptop GPU runtime_luid=00000000:00014e21 dxgi_luid=00000000:00014e21
+[32m[INFO][0m aimdo: src/control.c:284:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 5080 Laptop GPU (VRAM: 16275 MB)
+[32m[INFO][0m DynamicVRAM support detected and enabled
+[32m[INFO][0m Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+[32m[INFO][0m ComfyUI version: 0.35.1
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfyui-frontend-package version: 1.51.10
+[32m[INFO][0m comfyui-workflow-templates version: 0.11.59
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.11
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m [Prompt Server] web root: C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\comfyui_frontend_package\static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m No OpenGL_accelerate module loaded: Acceleration disabled
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+[DMM] Data Media Machine v3.7: loaded 31/31 nodes
+[DMM] Graceful disconnect handler installed
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m ### Loading: ComfyUI-Impact-Pack (V8.28.3)
+[32m[INFO][0m [Impact Pack] Wildcard total size (0.00 MB) is within cache limit (50.00 MB). Using full cache mode.
+[32m[INFO][0m [Impact Pack] Wildcards loading done.
+W0911 04:11:08.222000 51620 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+[32m[INFO][0m ### Loading: ComfyUI-Manager (V3.40)
+[32m[INFO][0m [ComfyUI-Manager] network_mode: offline
+[32m[INFO][0m [ComfyUI-Manager] ComfyUI per-queue preview override detected (PR #11261). Manager's preview method feature is disabled. Use ComfyUI's --preview-method CLI option or 'Settings > Execution > Live preview method'.
+[32m[INFO][0m ### ComfyUI Revision: 5920 [856a922b] *DETACHED | Released on '2026-09-10'
+[32m[INFO][0m [ComfyUI-Manager] All startup tasks have been completed.
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+⚡ SeedVR2 optimizations check: SageAttention ✅ | Flash Attention ❌ | Triton ✅
+💡 Optional: pip install flash-attn
+🔧 Conv3d workaround active: PyTorch 2.10.0, cuDNN 91200 (fixing VAE 3x memory bug)
+📊 Initial CUDA memory: 14.60GB free / 15.89GB total
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:35: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:268: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\manual_sigmas.py
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\websocket_image_save.py
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\dmm_ascii_art.py
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OTR-UpstreamStoryLab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-MiniMax-H3-Turbo
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-data-media-machine
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-GGUF
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-KJNodes
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Nvidia_RTX_Nodes_ComfyUI
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-LTXVideo
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-videohelpersuite
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-AnimateDiff-Evolved
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-impact-pack
+[32m[INFO][0m    0.6 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m    1.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-kokorotts
+[32m[INFO][0m    2.4 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-SeedVR2_VideoUpscaler
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8000
+[32m[INFO][0m got prompt
+[32m[INFO][0m [OTR_WorkflowValidator] story input for node 1: b4243b7d90d0 (verified)
+[32m[INFO][0m OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[32m[INFO][0m OTR_WorkflowValidator: OK -- 23 nodes, 63 links, strict_unknown_types=True, path='C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json', widget_vector_drift=0
+[1m[33m[WARNING][0m [OTR.assets] still_pan: automatic visual-weight coverage unavailable; existing adapter checks remain
+[32m[INFO][0m [OTR.assets] EXISTING diffusion_models/z_image_turbo_nvfp4.safetensors bytes=4509509600 native=C:\ComfyUI-Models\diffusion_models\z_image_turbo_nvfp4.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/qwen_3_4b_fp8_mixed.safetensors bytes=5631994051 native=C:\ComfyUI-Models\text_encoders\qwen_3_4b_fp8_mixed.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING vae/ae.safetensors bytes=335304388 native=C:\ComfyUI-Models\vae\ae.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING checkpoints/stable_audio_3_small_music.safetensors bytes=2270384940 native=C:\ComfyUI-Models\checkpoints\stable_audio_3_small_music.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/t5gemma_b_b_ul2.safetensors bytes=1187264003 native=C:\ComfyUI-Models\text_encoders\t5gemma_b_b_ul2.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] READY engines=stable_audio_3,z_image_turbo files=5 (availability only; render/GPU/publish success not qualified)
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story input b4243b7d90d0 (verified) -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_shared\state\story_drafts\b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9\input.json
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story: 4 creative field(s), draft b4243b7d90d0 (unattributed)
+[32m[INFO][0m [OTR_LedgerScriptWriter] start: creative_model='mistralai/Mistral-Nemo-Instruct-2407', technical_model='mistralai/Mistral-Nemo-Instruct-2407', act_count=1, num_characters=2, creativity='balanced' (temp=0.85 top_p=0.95), seed_source=my_story_fields, episode_title='', perfect_run_spacesaver=False
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] skeleton ledger saved up front: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\audio\pending_20260911_041157_ledger.json
+[32m[INFO][0m [PendingSweep] BUG-LOCAL-290: deleted 2 empty pending dir(s) (scanned=402 skipped_too_young=6 skipped_has_lines=393 skipped_no_ledger=1 skipped_unreadable=0 errors=0).
+[32m[INFO][0m [OTR_LedgerScriptWriter] BUG-LOCAL-290 pending sweep: deleted 2 stale dir(s) before run start.
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_interpret' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [OTR_HF_ENV] HF_HOME='C:\\ComfyUI-Models\\huggingface' HF_HUB_CACHE='C:\\ComfyUI-Models\\huggingface\\hub' (source=os.environ); exported to os.environ
+[32m[INFO][0m Loading LLM model: mistralai/Mistral-Nemo-Instruct-2407 (quantized=True)
+[32m[INFO][0m [StoryOrchestrator] Enabling 4-bit quantization (NF4, policy)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved mistralai/Mistral-Nemo-Instruct-2407 -> C:\ComfyUI-Models\huggingface\hub\models--mistralai--Mistral-Nemo-Instruct-2407\snapshots\04d8a90549d23fc6bd7f642064003592df51e9b3
+Loading weights:   0%|          | 0/363 [00:00<?, ?it/s]Loading weights:   0%|          | 1/363 [00:00<05:51,  1.03it/s]Loading weights:   1%|          | 2/363 [00:01<04:57,  1.21it/s]Loading weights:   1%|          | 4/363 [00:04<07:48,  1.31s/it]Loading weights:   2%|▏         | 6/363 [00:05<04:25,  1.35it/s]Loading weights:   4%|▎         | 13/363 [00:05<01:24,  4.14it/s]Loading weights:   4%|▍         | 15/363 [00:05<01:13,  4.70it/s]Loading weights:   6%|▌         | 22/363 [00:05<00:39,  8.67it/s]Loading weights:   7%|▋         | 25/363 [00:05<00:35,  9.51it/s]Loading weights:   9%|▊         | 31/363 [00:06<00:24, 13.39it/s]Loading weights:   9%|▉         | 34/363 [00:06<00:24, 13.58it/s]Loading weights:  11%|█         | 40/363 [00:06<00:18, 17.60it/s]Loading weights:  12%|█▏        | 43/363 [00:06<00:19, 16.62it/s]Loading weights:  13%|█▎        | 49/363 [00:06<00:15, 20.38it/s]Loading weights:  14%|█▍        | 52/363 [00:07<00:16, 18.49it/s]Loading weights:  16%|█▌        | 58/363 [00:07<00:13, 22.02it/s]Loading weights:  17%|█▋        | 61/363 [00:07<00:15, 19.63it/s]Loading weights:  18%|█▊        | 67/363 [00:07<00:12, 22.93it/s]Loading weights:  19%|█▉        | 70/363 [00:07<00:14, 19.93it/s]Loading weights:  21%|██        | 76/363 [00:08<00:12, 23.03it/s]Loading weights:  22%|██▏       | 79/363 [00:08<00:14, 20.13it/s]Loading weights:  23%|██▎       | 85/363 [00:08<00:12, 23.07it/s]Loading weights:  24%|██▍       | 88/363 [00:08<00:13, 20.11it/s]Loading weights:  26%|██▌       | 94/363 [00:09<00:11, 22.86it/s]Loading weights:  27%|██▋       | 97/363 [00:09<00:13, 19.80it/s]Loading weights:  28%|██▊       | 103/363 [00:09<00:11, 22.72it/s]Loading weights:  29%|██▉       | 106/363 [00:09<00:12, 20.23it/s]Loading weights:  31%|███       | 112/363 [00:09<00:10, 24.56it/s]Loading weights:  32%|███▏      | 115/363 [00:09<00:11, 22.21it/s]Loading weights:  33%|███▎      | 121/363 [00:10<00:09, 26.21it/s]Loading weights:  34%|███▍      | 124/363 [00:10<00:10, 23.14it/s]Loading weights:  36%|███▌      | 130/363 [00:10<00:08, 27.21it/s]Loading weights:  37%|███▋      | 133/363 [00:10<00:09, 23.72it/s]Loading weights:  38%|███▊      | 139/363 [00:10<00:08, 27.52it/s]Loading weights:  39%|███▉      | 142/363 [00:11<00:09, 23.99it/s]Loading weights:  41%|████      | 148/363 [00:11<00:07, 27.74it/s]Loading weights:  42%|████▏     | 151/363 [00:11<00:08, 24.31it/s]Loading weights:  43%|████▎     | 157/363 [00:11<00:07, 27.97it/s]Loading weights:  44%|████▍     | 160/363 [00:11<00:08, 24.37it/s]Loading weights:  46%|████▌     | 166/363 [00:11<00:06, 28.21it/s]Loading weights:  47%|████▋     | 169/363 [00:12<00:07, 24.68it/s]Loading weights:  48%|████▊     | 175/363 [00:12<00:06, 28.19it/s]Loading weights:  49%|████▉     | 178/363 [00:12<00:07, 24.51it/s]Loading weights:  51%|█████     | 184/363 [00:12<00:06, 28.12it/s]Loading weights:  52%|█████▏    | 187/363 [00:12<00:07, 24.37it/s]Loading weights:  53%|█████▎    | 193/363 [00:12<00:06, 28.10it/s]Loading weights:  54%|█████▍    | 196/363 [00:13<00:06, 24.43it/s]Loading weights:  56%|█████▌    | 202/363 [00:13<00:05, 28.23it/s]Loading weights:  56%|█████▋    | 205/363 [00:13<00:06, 24.64it/s]Loading weights:  58%|█████▊    | 211/363 [00:13<00:05, 28.02it/s]Loading weights:  59%|█████▉    | 214/363 [00:13<00:06, 24.11it/s]Loading weights:  61%|██████    | 220/363 [00:13<00:05, 27.42it/s]Loading weights:  61%|██████▏   | 223/363 [00:14<00:05, 24.05it/s]Loading weights:  63%|██████▎   | 229/363 [00:14<00:04, 27.77it/s]Loading weights:  64%|██████▍   | 232/363 [00:14<00:05, 24.18it/s]Loading weights:  66%|██████▌   | 238/363 [00:14<00:04, 28.23it/s]Loading weights:  66%|██████▋   | 241/363 [00:14<00:04, 24.55it/s]Loading weights:  68%|██████▊   | 247/363 [00:14<00:04, 28.06it/s]Loading weights:  69%|██████▉   | 250/363 [00:15<00:04, 24.40it/s]Loading weights:  71%|███████   | 256/363 [00:15<00:03, 27.93it/s]Loading weights:  71%|███████▏  | 259/363 [00:15<00:04, 24.16it/s]Loading weights:  73%|███████▎  | 265/363 [00:15<00:03, 27.47it/s]Loading weights:  74%|███████▍  | 268/363 [00:15<00:04, 23.72it/s]Loading weights:  75%|███████▌  | 274/363 [00:16<00:03, 27.55it/s]Loading weights:  76%|███████▋  | 277/363 [00:16<00:03, 24.03it/s]Loading weights:  78%|███████▊  | 283/363 [00:16<00:02, 27.88it/s]Loading weights:  79%|███████▉  | 286/363 [00:16<00:03, 24.47it/s]Loading weights:  80%|████████  | 292/363 [00:16<00:02, 28.16it/s]Loading weights:  81%|████████▏ | 295/363 [00:16<00:02, 24.53it/s]Loading weights:  83%|████████▎ | 301/363 [00:17<00:02, 27.91it/s]Loading weights:  84%|████████▎ | 304/363 [00:17<00:02, 24.30it/s]Loading weights:  85%|████████▌ | 310/363 [00:17<00:01, 27.80it/s]Loading weights:  86%|████████▌ | 313/363 [00:17<00:02, 24.06it/s]Loading weights:  88%|████████▊ | 319/363 [00:17<00:01, 27.27it/s]Loading weights:  89%|████████▊ | 322/363 [00:17<00:01, 23.96it/s]Loading weights:  90%|█████████ | 328/363 [00:18<00:01, 27.42it/s]Loading weights:  91%|█████████ | 331/363 [00:18<00:01, 23.99it/s]Loading weights:  93%|█████████▎| 337/363 [00:18<00:00, 27.35it/s]Loading weights:  94%|█████████▎| 340/363 [00:18<00:00, 23.82it/s]Loading weights:  95%|█████████▌| 346/363 [00:18<00:00, 27.47it/s]Loading weights:  96%|█████████▌| 349/363 [00:18<00:00, 24.02it/s]Loading weights:  98%|█████████▊| 355/363 [00:19<00:00, 27.78it/s]Loading weights:  99%|█████████▊| 358/363 [00:19<00:00, 24.15it/s]Loading weights: 100%|██████████| 363/363 [00:19<00:00, 18.73it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (12.9s) - first generate will not stall
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.3 tok/s | 4.2s | ...in Los Angeles.",       "kind": "event",       "source_field": "plot",       "strength": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 17.6 tok/s | 7.3s | ...Area.",       "kind": "event",       "source_field": "plot",       "strength": "required" 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 18.5 tok/s | 10.4s | ...eld": "plot",       "strength": "preferred"     },     {       "id": "girlfriend_mentioned
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 19.0 tok/s | 13.5s | ...ength": "preferred"     },     {       "id": "no_death",       "text": "There is no death,
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 19.4 tok/s | 16.5s | ..."source_field": "plot",       "strength": "required"     },     {       "id": "los_angeles
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 19.6 tok/s | 19.6s | ...e_field": "setting",       "strength": "required"     }   ],   "named_cast": [     {      
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 19.7 tok/s | 22.7s | ...aking": true,       "required": true     },     {       "name": "Mother",       "notes": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 19.9 tok/s | 25.8s | ...ue,       "required": true     }   ],   "cast_plan": {     "requested": 2,     "planned": 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 20.0 tok/s | 28.8s | ...ining room in the present day, at one shared dinner table in the evening.",   "assumptions
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 20.0 tok/s | 31.9s | ... "why": "The mother's response is implied but not explicitly stated.",       "resolution":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 663 tok | 20.1 tok/s | 33.0s | ... shown through Jeffrey's reaction and the continuation of their conversation."     }   ] }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2702909440, "timestamp_utc": "2026-09-11T11:13:07.104731+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=663 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_interpret' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] slot=technical reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=technical reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 13.3 tok/s | 4.8s | ... in Los Angeles",       "kind": "event",       "source_field": "plot",       "strength": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 15.3 tok/s | 8.4s | ... Area",       "kind": "event",       "source_field": "plot",       "strength": "required" 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 16.2 tok/s | 11.9s | ...eld": "plot",       "strength": "preferred"     },     {       "id": "girlfriend_mentioned
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 16.6 tok/s | 15.4s | ...ength": "preferred"     },     {       "id": "no_death",       "text": "There is no death,
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 16.8 tok/s | 19.0s | ..."source_field": "plot",       "strength": "required"     },     {       "id": "los_angeles
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 16.8 tok/s | 22.8s | ...e_field": "setting",       "strength": "required"     }   ],   "named_cast": [     {      
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 17.1 tok/s | 26.2s | ...aking": true,       "required": true     },     {       "name": "Mother",       "notes": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 17.3 tok/s | 29.6s | ...ue,       "required": true     }   ],   "cast_plan": {     "requested": 2,     "planned": 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 17.4 tok/s | 33.1s | ...dining room in the present day, at one shared dinner table in the evening",   "assumptions
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 17.4 tok/s | 36.7s | ...  "why": "The mother's response is implied but not explicitly stated",       "resolution":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 663 tok | 17.4 tok/s | 38.0s | ...e shown through Jeffrey's reaction and the continuation of their conversation"     }   ] }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 3250106368, "timestamp_utc": "2026-09-11T11:13:46.690771+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=663 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [my_story] filled 2 unstated detail(s): The girlfriend is not present at the dinner; The dinner is in the evening
+[1m[33m[WARNING][0m [my_story] could not honour 'mother_response' as written: The mother's response is implied but not explicitly stated -- the story will Her response will be shown through Jeffrey's reaction and the continuation of their conversation
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 1/3: base call at temperature=0.850
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 13.1 tok/s | 4.9s | ...es Jeffrey's memory of the Bay Area influence his appreciation for his life in Los Angeles
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 15.1 tok/s | 8.5s | ...",       "role": "Son",       "character_description": "An adult man who loves Los Angeles
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 16.0 tok/s | 12.0s | ...nate",       "timbre": "Warm, slightly raspy"     },     {       "name": "Mother",       "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 16.5 tok/s | 15.5s | ...r": "female",       "age_band": "50s",       "register": "Soothing, nostalgic",       "tim
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 16.8 tok/s | 19.1s | ..., and set up his mother's response",       "scene_setting": "The dinner table in Jeffrey's
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 16.9 tok/s | 22.7s | ...y"],       "ending_state": "Mother ready to share her own memory"     }   ],   "ending": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 402 tok | 16.9 tok/s | 23.7s | ...ng": "Jeffrey and his mother continue enjoying their meal, appreciating their lives now" }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 3141095424, "timestamp_utc": "2026-09-11T11:14:10.575467+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=402 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_treatment' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 12.5 tok/s | 5.1s | ...of the Bay Area influence his appreciation for his life in Los Angeles with his mother now
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 14.8 tok/s | 8.7s | ...: "An adult man who loves Los Angeles and remembers growing up in the Bay Area", "gender":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 15.6 tok/s | 12.3s | ... "character_description": "Jeffrey's living mother, physically present, eating dinner with
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 16.2 tok/s | 15.8s | ...g, nostalgic", "timbre": "Soft, slightly accented"}], "acts": [{"n": 1, "purpose": "Establ
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 16.4 tok/s | 19.6s | ...rea memory", "Mother listens attentively", "Jeffrey shares details of the memory", "Mother
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 359 tok | 16.5 tok/s | 21.8s | ...ing": "Jeffrey and his mother continue enjoying their meal, appreciating their lives now"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 3145097216, "timestamp_utc": "2026-09-11T11:14:32.479900+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=359 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_act_1' attempt 1/3: base call at temperature=0.850
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 17.5 tok/s | 3.7s | ...text": "Remember when we used to spend summers in the Bay Area, Mom?"     },     {       "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 19.0 tok/s | 6.8s | ...frey",       "text": "And the carousel! I loved that carousel. You'd always let me ride it
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 172 tok | 19.3 tok/s | 8.9s | ...r",       "text": "You were such a sweet boy, Jeffrey. Always so full of joy."     }   ] }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2902425600, "timestamp_utc": "2026-09-11T11:14:41.470822+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=172 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_act_1' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.0 tok/s | 4.3s | ...e used to spend summers in the Bay Area, Mom?"}, {"speaker": "Mother", "text": "Of course,
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 16.2 tok/s | 7.9s | ...'d always let me ride it twice if I promised to behave."}, {"speaker": "Mother", "text": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 146 tok | 16.3 tok/s | 9.0s | ...peaker": "Mother", "text": "You were such a sweet boy, Jeffrey. Always so full of joy."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2993672192, "timestamp_utc": "2026-09-11T11:14:50.466042+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=146 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_frame' attempt 1/3: base call at temperature=0.600
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 18.5 tok/s | 3.5s | ...ining us on this heartwarming journey. That was 'Dinner Memories'."],   "coda": "Remember,
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 19.6 tok/s | 6.5s | ...me melody, but softer and slower, signifying the end of the meal and the story.",   "music
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 133 tok | 19.6 tok/s | 6.8s | ...t softer and slower, signifying the end of the meal and the story.",   "music_inter": [] }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903056384, "timestamp_utc": "2026-09-11T11:14:57.306147+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=133 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_frame' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.0 tok/s | 4.3s | ...twarming journey. That was 'Dinner Memories'."],"coda":"Remember, every family has its own
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 123 tok | 15.5 tok/s | 7.9s | ...n":"A warm, inviting melody on piano and strings, evoking the comfort of a home kitchen."}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2997055488, "timestamp_utc": "2026-09-11T11:15:05.274730+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=123 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (2 lines, 11 words)
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (6 lines, 71 words)
+[32m[INFO][0m [delivery-stamp] stamped=7 (delivery-differs=0)
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 94 words)
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 94 words)
+[32m[INFO][0m [my_story] complete: seed=181052409 cast=2 acts=1 by='(a listener)'
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 94 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] episode_canon written with title='Dinner Memories' (source=my_story_script_title) at C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\episode_canon.json
+[32m[INFO][0m [OTR_StructuredCall] 'run_story_brief_reflection' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] slot=technical reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 17.7 tok/s | 3.6s | ...s": ["Dining table", "Shared living space"],   "lighting_terms": ["Warm", "Intimate"],   "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 19.2 tok/s | 6.7s | ...": ["Earthy tones", "Warm colors"],   "key_objects": ["Dinner table", "Food", "Photographs
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 164 tok | 19.6 tok/s | 8.4s | ...  "atmosphere_line": "The atmosphere is filled with fond memories and a sense of warmth" }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903330816, "timestamp_utc": "2026-09-11T11:15:13.711806+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=164 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'run_produced_story_summary' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [Selector] slot=technical reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 49 tok | 19.2 tok/s | 2.5s | ...orite memories of crab cakes and carousel rides.",   "subject": "Jeffrey and his mother" }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903388160, "timestamp_utc": "2026-09-11T11:15:16.272983+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=49 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_act_summary' attempt 1/2: base call at temperature=0.300
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 24 tok | 18.3 tok/s | 1.3s | ...ing_on": "Jeffrey reminiscences about childhood summers in the Bay Area with his mother."}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903367680, "timestamp_utc": "2026-09-11T11:15:17.605146+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=24 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [ledger_clean] the the episode: Jeffrey reminiscences about childhood summers in the Bay Area with his mother.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 38 tok | 14.6 tok/s | 2.6s | ...": [{"quote": "Tonight's story comes from one of our listeners.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903449600, "timestamp_utc": "2026-09-11T11:15:20.204977+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=38 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 36 tok | 16.2 tok/s | 2.2s | ...": [{"span_id": "span_001", "replacement": "And now, a tale from one of our listeners."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903490560, "timestamp_utc": "2026-09-11T11:15:22.438588+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=36 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 38 tok | 14.7 tok/s | 2.6s | ...speech": [{"quote": "And now, a tale from one of our listeners.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903502848, "timestamp_utc": "2026-09-11T11:15:25.040904+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=38 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 36 tok | 15.6 tok/s | 2.3s | ...span_id": "span_001", "replacement": "Tonight's story comes from one of our listeners."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903547904, "timestamp_utc": "2026-09-11T11:15:27.371026+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=36 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 38 tok | 14.5 tok/s | 2.6s | ...": [{"quote": "Tonight's story comes from one of our listeners.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903547904, "timestamp_utc": "2026-09-11T11:15:30.007929+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=38 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[31m[ERROR][0m [ledger_clean] shot_000_b1 is STILL unclean after 2 bounded repair pass(es): Tonight's story comes from one of our listeners.. The row SHIPS with compose_flag 'unclean_spoken_text' and the render continues -- a render is never killed for this.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 45 tok | 15.0 tok/s | 3.0s | ...used to spend summers in the Bay Area, Mom?", "why": "names the person being spoken to"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903547904, "timestamp_utc": "2026-09-11T11:15:33.016875+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=45 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_scope_authorization' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.0 tok/s | 4.0s | ... already spoken in the story. It does not name the person being spoken to, as the original
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 93 tok | 15.3 tok/s | 6.1s | ...tly in the context of their conversation. Therefore, no edit is necessary for this line."}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2983444480, "timestamp_utc": "2026-09-11T11:15:39.137538+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=93 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 43 tok | 14.3 tok/s | 3.0s | ...most taste those crab cakes from that little place by the pier.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903650304, "timestamp_utc": "2026-09-11T11:15:42.192727+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=43 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 45 tok | 16.5 tok/s | 2.7s | ...ab cakes from the little place by the pier, remember? I could almost taste them again."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903658496, "timestamp_utc": "2026-09-11T11:15:44.937158+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=45 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.5 tok/s | 3.9s | ...: "action"}]}  Explanation: The line is split into three pieces: "Of course, dear.", "Mmm,
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 18.4 tok/s | 7.0s | ...r, the second piece, "Mmm, those crab cakes from the little place by the pier, remember?",
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 160 tok | 18.8 tok/s | 8.5s | ...s not constitute talking to someone. Therefore, it is considered stage business and should
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903658496, "timestamp_utc": "2026-09-11T11:15:53.454680+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=160 last_token=2715 eos_token_ids=[2] ended_with_eos=False
+[1m[33m[WARNING][0m [OTR_LedgerScriptWriter] OUTPUT_CAP: generation stopped at the caller's own ceiling (prompt_tokens=1788 generated_tokens=160 max_new_tokens=160); output may be truncated.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 49 tok | 16.6 tok/s | 3.0s | ...crab cakes from the little place by the pier, remember? I can almost taste them again."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903678976, "timestamp_utc": "2026-09-11T11:15:56.434014+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=49 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.6 tok/s | 3.8s | ...delivery note"}]}  Explanation: The line is split into three pieces: "Of course, dear.", "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 18.6 tok/s | 6.9s | ...e second piece is stage business, as it describes an action (the mother's enjoyment of the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 153 tok | 19.0 tok/s | 8.1s | ...the crab cakes) and uses a delivery note ("Mmm"). Therefore, it is reported as not_speech.
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903875584, "timestamp_utc": "2026-09-11T11:16:04.500614+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=153 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[31m[ERROR][0m [ledger_clean] shot_001_b2 is STILL unclean after 2 bounded repair pass(es): Mmm, those crab cakes from the little place by the pier, remember?. The row SHIPS with compose_flag 'unclean_spoken_text' and the render continues -- a render is never killed for this.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.3 tok/s | 3.9s | ...e if I promised to behave.", "why": "delivery note"}]}  Explanation: - "And the carousel!"
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 18.4 tok/s | 7.0s | ... deliver the line, making it stage business as well. - The rest of the line, "I loved that
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 140 tok | 18.6 tok/s | 7.5s | ... rest of the line, "I loved that carousel," is spoken by Jeffrey and thus considered talk.
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903875584, "timestamp_utc": "2026-09-11T11:16:12.056521+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=140 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 17.4 tok/s | 3.7s | ..., {"span_id": "span_002", "replacement": "You'd indulge me, Mom. Let me ride it twice if I
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 69 tok | 17.6 tok/s | 3.9s | ... "span_002", "replacement": "You'd indulge me, Mom. Let me ride it twice if I behaved."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903875584, "timestamp_utc": "2026-09-11T11:16:15.995125+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=69 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.3 tok/s | 3.9s | ...e pieces: "Remember how we'd spend hours on that carousel?", "I loved that carousel.", and
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 110 tok | 18.0 tok/s | 6.1s | ... it describes an action ("Let me ride it twice if I behaved.") without speaking to anyone.
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903879680, "timestamp_utc": "2026-09-11T11:16:22.131764+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=110 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 57 tok | 17.0 tok/s | 3.4s | ...l?"}, {"span_id": "span_002", "replacement": "You'd let me ride it twice if I behaved."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:25.499942+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=57 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 16.5 tok/s | 3.9s | ...cene report"}]}  Explanation: - "Remember that carousel?" and "I loved that carousel." are
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 112 tok | 18.1 tok/s | 6.2s | ...ice if I behaved," is spoken words as it involves Jeffrey talking about his past behavior.
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:31.731358+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=112 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[33m[WARNING][0m [ledger_clean] shot_001_b3 could not be made spotless in 2 pass(es), but the best rewrite cut its problems from 2 to 1 -- SHIPPING that one, flagged: "And the carousel! I loved that carousel. You'd always let me" -> "Remember how we'd spend hours on that carousel? I loved that"
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 33 tok | 13.8 tok/s | 2.4s | ...ents_read": 1, "not_speech": [{"quote": "Always so full of joy.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:34.154876+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=33 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 36 tok | 15.8 tok/s | 2.3s | ...d": "span_001", "replacement": "You brought so much happiness into our lives, Jeffrey."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:36.449151+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=36 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 47 tok | 15.2 tok/s | 3.1s | ...Jeffrey. You brought so much happiness into our lives, Jeffrey.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:39.544879+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=47 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 33 tok | 15.0 tok/s | 2.2s | ...eplacements": [{"span_id": "span_001", "replacement": "Always so full of joy, Jeffrey."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:41.755216+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=33 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 35 tok | 14.0 tok/s | 2.5s | ...": 1, "not_speech": [{"quote": "Always so full of joy, Jeffrey.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:44.276471+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=35 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[31m[ERROR][0m [ledger_clean] shot_001_b4 is STILL unclean after 2 bounded repair pass(es): Always so full of joy, Jeffrey.. The row SHIPS with compose_flag 'unclean_spoken_text' and the render continues -- a render is never killed for this.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 35 tok | 14.1 tok/s | 2.5s | ...read": 1, "not_speech": [{"quote": "That was 'Dinner Memories'.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:46.779400+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=35 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 41 tok | 16.0 tok/s | 2.6s | ...span_001", "replacement": "And that, dear listeners, was our story, 'Dinner Memories'."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903883776, "timestamp_utc": "2026-09-11T11:16:49.347812+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=41 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 43 tok | 14.8 tok/s | 2.9s | ...": "And that, dear listeners, was our story, 'Dinner Memories'.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903937024, "timestamp_utc": "2026-09-11T11:16:52.276665+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=43 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_repair' attempt 1/2: base call at temperature=0.550
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 41 tok | 15.5 tok/s | 2.6s | ...span_001", "replacement": "And that, dear listeners, was our story, 'Dinner Memories'."}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903937024, "timestamp_utc": "2026-09-11T11:16:54.920315+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=41 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 43 tok | 14.8 tok/s | 2.9s | ...": "And that, dear listeners, was our story, 'Dinner Memories'.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903949312, "timestamp_utc": "2026-09-11T11:16:57.851496+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=43 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[31m[ERROR][0m [ledger_clean] shot_002_b1 is STILL unclean after 2 bounded repair pass(es): And that, dear listeners, was our story, 'Dinner Memories'.. The row SHIPS with compose_flag 'unclean_spoken_text' and the render continues -- a render is never killed for this.
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_line_judge' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 39 tok | 14.4 tok/s | 2.7s | ...e": "Remember, every family has its own unique stories to tell.", "why": "scene report"}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903949312, "timestamp_utc": "2026-09-11T11:17:00.572410+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=39 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'ledger_clean_scope_authorization' attempt 1/2: base call at temperature=0.200
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.8 tok/s | 4.0s | ...ncluding a short closing line, which is already_spoken according to the rules provided. No
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 101 tok | 15.7 tok/s | 6.4s | ...ken correctly and fits within the context of the scene report and original story source."}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2992603136, "timestamp_utc": "2026-09-11T11:17:07.003143+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=101 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [ledger_clean] context 11111 sha b70bb8e2 across 29 prompt(s) (line speaker act around complaint)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_ledger_clean_spoken' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 15.1 tok/s | 4.2s | ... You'd indulge me, Mom. Let me ride it twice if I behaved.","original_quote":"Remember how
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 15.6 tok/s | 8.2s | ...t carousel? I loved that carousel. You'd let me ride it twice if I behaved.","start_char":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 139 tok | 15.9 tok/s | 8.7s | ... that carousel. You'd let me ride it twice if I behaved.","start_char":0,"end_char":125}]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 3011641344, "timestamp_utc": "2026-09-11T11:17:15.792975+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=139 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_source_rewrite_ledger_clean_spoken' attempt 1 failed: A spoken correction must quote an actual original source field | raw head: {"edits":[{"line_id":"shot_001_b3","source_field":"text","source_quote":"Remember how we'd spend hours on that carousel? I loved that carousel. You'd indulge me, Mom. Let me ride it twice if I behaved.","original_quote":"Remember how we'd spend hours on that carousel? I loved that carousel. You'd indulge me, Mom. Let me ride it twice if I behaved.","replacement":"Remember how we'd spend hours on t...
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_ledger_clean_spoken' attempt 2/2: typed repair at temperature=0.100
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [Selector] slot=creative reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 7 tok | 6.6 tok/s | 1.1s | ...{"edits":[]}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 51620, "process_rss_bytes": 2903797760, "timestamp_utc": "2026-09-11T11:17:16.917866+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=7 last_token=2 eos_token_ids=[2] ended_with_eos=True
+[32m[INFO][0m [ledger_clean] 7 voiced row(s): 7 carried something that is not speech (8 segment(s) named), F2 on 0. 0 repaired, 1 improved, 4 still unclean, 0 with no model, in 32 model call(s) (1 of them briefing). Found by: judge only 7, patterns only 0, both 0.
+[32m[INFO][0m [ledger_clean] 7 row(s) were caught ONLY by the judge -- no pattern would have found them. That is the reason the judge is a model.
+[32m[INFO][0m [ledger_cleanup] complete: 9 deterministic fill(s), 0 prose fill(s), safety=retired
+[32m[INFO][0m [clean-transaction] authorized window resealed: 1 row(s) rewritten ['shot_001_b3'], 0 dropped from the voiced set []
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_before", "pid": 51620, "process_rss_bytes": 2903797760, "timestamp_utc": "2026-09-11T11:17:16.925096+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_cpu_move", "pid": 51620, "process_rss_bytes": 11229061120, "timestamp_utc": "2026-09-11T11:17:19.822349+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_allocator_flush", "pid": 51620, "process_rss_bytes": 11229061120, "timestamp_utc": "2026-09-11T11:17:20.373694+00:00"}
+[32m[INFO][0m [delivery-stamp] stamped=7 (delivery-differs=0)
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 99 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] DONE: episode_id=pending_20260911_041157, lines=9, words=99, est_minutes=1, ledger=C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\audio\pending_20260911_041157_ledger.json
+[32m[INFO][0m [OTR_LedgerFreezeCascade] running cascade on ledger pending_20260911_041157 (9 lines)
+[32m[INFO][0m [LFC:phase_0] ledger is gap-clean.
+[32m[INFO][0m [LFC] policy content_owned_readonly: content-owned ledger is structurally clean
+[32m[INFO][0m [LFC:phase_8] cast=0/3 with portrait, voiced=0/7 with visual
+[32m[INFO][0m [LFC:phase_10] frozen_clean.
+[32m[INFO][0m [LFC] freeze landed: verdict=frozen_clean cleanup=not_applicable pre_warns=0 post_warns=0
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 99 words)
+[32m[INFO][0m [OTR_LedgerFreezeCascade] freeze_verdict=frozen_clean (pre_warns=0 post_warns=0 cleanup=n/a)
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 99 words)
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=shot_001_b1 char=c02 -> voice_ref_id=vz_donor_gyroo ref=vz_donor_gyroo.wav engine=indextts2 alpha=1.0 delivery=v2:nonzero(derived) emo_mass=0.559(capped) seed=474768714022326749 policy=char_v1 seed_ref=vz_donor_gyroo
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=shot_001_b2 char=c03 -> voice_ref_id=vz_ljspeech ref=vz_ljspeech.wav engine=indextts2 alpha=1.0 delivery=v2:nonzero(derived) emo_mass=0.56(capped) seed=1950699292668716627 policy=char_v1 seed_ref=vz_ljspeech
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=shot_001_b3 char=c02 -> voice_ref_id=vz_donor_gyroo ref=vz_donor_gyroo.wav engine=indextts2 alpha=1.0 delivery=v2:nonzero(derived) emo_mass=0.559(capped) seed=474768714022326749 policy=char_v1 seed_ref=vz_donor_gyroo
+[32m[INFO][0m [OTR voice P-OBS] char_voice: line=shot_001_b4 char=c03 -> voice_ref_id=vz_ljspeech ref=vz_ljspeech.wav engine=indextts2 alpha=1.0 delivery=v2:nonzero(derived) emo_mass=0.559(capped) seed=1950699292668716627 policy=char_v1 seed_ref=vz_ljspeech
+[32m[INFO][0m [OTR voice P-OBS] announcer_voice: line=shot_000_b1 char=announcer -> voice_ref_id=bm_fable ref=bm_fable engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=8473157247889510413 policy=line_v1 seed_ref=bm_fable
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\modules\rnn.py:990: UserWarning: dropout option adds dropout after all but last recurrent layer, so non-zero dropout expects num_layers greater than 1, but got dropout=0.2 and num_layers=1
+  super().__init__("LSTM", *args, **kwargs)
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\torch\nn\utils\weight_norm.py:144: FutureWarning: `torch.nn.utils.weight_norm` is deprecated in favor of `torch.nn.utils.parametrizations.weight_norm`.
+  WeightNorm.apply(module, name, dim)
+[32m[INFO][0m [OTR.kokoro] backend=torch device=cuda
+[32m[INFO][0m [OTR voice P-OBS] announcer_voice: line=shot_002_b1 char=announcer -> voice_ref_id=bm_fable ref=bm_fable engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=8897595566967371457 policy=line_v1 seed_ref=bm_fable
+[32m[INFO][0m [OTR voice P-OBS] announcer_voice: line=shot_002_b2 char=announcer -> voice_ref_id=bm_fable ref=bm_fable engine=kokoro alpha=n/a delivery=v2:nonzero(derived) emo_mass=n/a seed=2122476244760599920 policy=line_v1 seed_ref=bm_fable
+[32m[INFO][0m model weight dtype torch.float16, manual cast: None
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[1m[33m[WARNING][0m no CLIP/text encoder weights in checkpoint, the text encoder model will not be loaded.
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Requested to load SAT5GemmaModel
+[32m[INFO][0m Model SAT5GemmaModel prepared for dynamic VRAM loading. 537MB Staged. 0 patches attached. Force pre-loaded 49 weights: 73 KB.
+[32m[INFO][0m Model SAT5GemmaModel prepared for dynamic VRAM loading. 537MB Staged. 0 patches attached. Force pre-loaded 49 weights: 73 KB.
+[32m[INFO][0m Requested to load StableAudio3
+[32m[INFO][0m Model StableAudio3 prepared for dynamic VRAM loading. 875MB Staged. 0 patches attached. Force pre-loaded 140 weights: 133 KB.
+  0%|          | 0/100 [00:00<?, ?it/s]  0%|          | 0/100 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/100 [00:00<?, ?it/s,  Model Initialization complete!  ]  1%|          | 1/100 [00:00<01:33,  1.06it/s,  Model Initialization complete!  ]  1%|          | 1/100 [00:00<01:33,  1.06it/s]                                     4%|▍         | 4/100 [00:00<00:04, 19.97it/s]  6%|▌         | 6/100 [00:00<00:04, 19.10it/s]  8%|▊         | 8/100 [00:00<00:04, 19.44it/s] 11%|█         | 11/100 [00:00<00:04, 20.80it/s] 14%|█▍        | 14/100 [00:00<00:04, 18.39it/s] 16%|█▌        | 16/100 [00:00<00:04, 19.05it/s] 19%|█▉        | 19/100 [00:01<00:03, 20.95it/s] 22%|██▏       | 22/100 [00:01<00:04, 18.27it/s] 24%|██▍       | 24/100 [00:01<00:03, 19.43it/s] 27%|██▋       | 27/100 [00:01<00:03, 20.06it/s] 30%|███       | 30/100 [00:01<00:03, 20.37it/s] 33%|███▎      | 33/100 [00:01<00:03, 20.32it/s] 36%|███▌      | 36/100 [00:01<00:03, 20.22it/s] 39%|███▉      | 39/100 [00:02<00:03, 19.99it/s] 42%|████▏     | 42/100 [00:02<00:02, 20.42it/s] 45%|████▌     | 45/100 [00:02<00:02, 20.02it/s] 48%|████▊     | 48/100 [00:02<00:02, 20.42it/s] 51%|█████     | 51/100 [00:02<00:02, 20.50it/s] 54%|█████▍    | 54/100 [00:02<00:02, 20.61it/s] 57%|█████▋    | 57/100 [00:02<00:01, 21.64it/s] 60%|██████    | 60/100 [00:03<00:01, 20.59it/s] 63%|██████▎   | 63/100 [00:03<00:01, 21.69it/s] 66%|██████▌   | 66/100 [00:03<00:01, 21.81it/s] 69%|██████▉   | 69/100 [00:03<00:01, 22.11it/s] 72%|███████▏  | 72/100 [00:03<00:01, 21.68it/s] 75%|███████▌  | 75/100 [00:03<00:01, 21.91it/s] 78%|███████▊  | 78/100 [00:03<00:01, 21.86it/s] 81%|████████  | 81/100 [00:04<00:00, 21.81it/s] 84%|████████▍ | 84/100 [00:04<00:00, 21.91it/s] 87%|████████▋ | 87/100 [00:04<00:00, 21.88it/s] 90%|█████████ | 90/100 [00:04<00:00, 21.69it/s] 93%|█████████▎| 93/100 [00:04<00:00, 21.45it/s] 96%|█████████▌| 96/100 [00:04<00:00, 21.37it/s] 99%|█████████▉| 99/100 [00:04<00:00, 22.53it/s]100%|██████████| 100/100 [00:04<00:00, 20.31it/s]
+[32m[INFO][0m Requested to load SA3AudioVAE
+[32m[INFO][0m Model SA3AudioVAE prepared for dynamic VRAM loading. 406MB Staged. 0 patches attached. Force pre-loaded 152 weights: 3153 KB.
+[32m[INFO][0m [OTR.sa3] cue_window start=0.0s total=12.0s dur=12.0s seed=5946460877261721936 steps=100 cfg=7.0 sampler=dpmpp_3m_sde_gpu/exponential prompt_hash=a26fad98
+[32m[INFO][0m Model SAT5GemmaModel prepared for dynamic VRAM loading. 537MB Staged. 0 patches attached. Force pre-loaded 49 weights: 73 KB.
+[32m[INFO][0m Model SAT5GemmaModel prepared for dynamic VRAM loading. 537MB Staged. 0 patches attached. Force pre-loaded 49 weights: 73 KB.
+[32m[INFO][0m Model StableAudio3 prepared for dynamic VRAM loading. 875MB Staged. 0 patches attached. Force pre-loaded 140 weights: 133 KB.
+  0%|          | 0/100 [00:00<?, ?it/s]  0%|          | 0/100 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/100 [00:00<?, ?it/s,  Model Initialization complete!  ]  1%|          | 1/100 [00:00<00:10,  9.55it/s,  Model Initialization complete!  ]  1%|          | 1/100 [00:00<00:10,  9.55it/s]                                     3%|▎         | 3/100 [00:00<00:05, 19.01it/s]  6%|▌         | 6/100 [00:00<00:04, 20.43it/s]  9%|▉         | 9/100 [00:00<00:04, 20.80it/s] 12%|█▏        | 12/100 [00:00<00:04, 21.09it/s] 15%|█▌        | 15/100 [00:00<00:04, 21.01it/s] 18%|█▊        | 18/100 [00:00<00:04, 20.08it/s] 21%|██        | 21/100 [00:01<00:03, 20.58it/s] 24%|██▍       | 24/100 [00:01<00:03, 21.05it/s] 27%|██▋       | 27/100 [00:01<00:03, 20.52it/s] 30%|███       | 30/100 [00:01<00:03, 21.28it/s] 33%|███▎      | 33/100 [00:01<00:03, 20.67it/s] 36%|███▌      | 36/100 [00:01<00:03, 21.06it/s] 39%|███▉      | 39/100 [00:01<00:02, 20.97it/s] 42%|████▏     | 42/100 [00:02<00:02, 20.79it/s] 45%|████▌     | 45/100 [00:02<00:02, 20.82it/s] 48%|████▊     | 48/100 [00:02<00:02, 21.00it/s] 51%|█████     | 51/100 [00:02<00:02, 20.81it/s] 54%|█████▍    | 54/100 [00:02<00:02, 21.24it/s] 57%|█████▋    | 57/100 [00:02<00:01, 21.63it/s] 60%|██████    | 60/100 [00:02<00:01, 21.30it/s] 63%|██████▎   | 63/100 [00:03<00:01, 21.58it/s] 66%|██████▌   | 66/100 [00:03<00:01, 21.18it/s] 69%|██████▉   | 69/100 [00:03<00:01, 21.42it/s] 72%|███████▏  | 72/100 [00:03<00:01, 21.45it/s] 75%|███████▌  | 75/100 [00:03<00:01, 21.55it/s] 78%|███████▊  | 78/100 [00:03<00:01, 21.58it/s] 81%|████████  | 81/100 [00:03<00:00, 21.77it/s] 84%|████████▍ | 84/100 [00:04<00:00, 21.07it/s] 87%|████████▋ | 87/100 [00:04<00:00, 21.40it/s] 90%|█████████ | 90/100 [00:04<00:00, 21.62it/s] 93%|█████████▎| 93/100 [00:04<00:00, 21.96it/s] 96%|█████████▌| 96/100 [00:04<00:00, 21.10it/s] 99%|█████████▉| 99/100 [00:04<00:00, 21.65it/s]100%|██████████| 100/100 [00:04<00:00, 20.78it/s]
+[32m[INFO][0m Model SA3AudioVAE prepared for dynamic VRAM loading. 406MB Staged. 0 patches attached. Force pre-loaded 152 weights: 3153 KB.
+[32m[INFO][0m [OTR.sa3] cue_window start=2.0s total=12.0s dur=8.0s seed=119551057752460777 steps=100 cfg=7.0 sampler=dpmpp_3m_sde_gpu/exponential prompt_hash=323bb801
+[32m[INFO][0m [Ledger] saved pending_20260911_041157_ledger.json (9 lines, 99 words)
+[32m[INFO][0m [SceneSequencer] No local LLM VRAM to free
+[32m[INFO][0m [SceneSequencer] Pre-rendered clips: 4 TTS, 3 ANNOUNCER
+[32m[INFO][0m [SceneSequencer] Rendering ledger lines 0-9
+[32m[INFO][0m [SceneSequencer] passthrough music line shot_000_music (role=music_open)
+[32m[INFO][0m [loudnorm] per-segment RMS leveling ON (default) -- target=-16.0 dBFS boost<=9.0 cut>=-12.0 gate=-50.0 ceiling=0.95
+[32m[INFO][0m [SceneSequencer] passthrough music line shot_002_music (role=music_close)
+[32m[INFO][0m [SceneSequencer] wrote ledger audio metadata. phase_ms=36 total_sec=35.07 lines_positioned=7/7
+[32m[INFO][0m [OTR_AudioEnhance] Input: 48000Hz 1ch 1683241 samples (35.1s)
+[32m[INFO][0m [OTR_AudioEnhance] Resampled 48000Hz -> 48000Hz (1683241 samples)
+[32m[INFO][0m [OTR_AudioEnhance] Channels: 1 -> 2
+[32m[INFO][0m [OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)
+[32m[INFO][0m [OTR_AudioEnhance] Output: 48000Hz 2ch 1683241 samples (35.1s) spatial=0.00 Haas=0.0ms warmth=0.00
+[32m[INFO][0m [OTR_AudioEnhance] schema-l3 ledger update: phase_ms=1 gate=post_audio_enhance dur=35.1s
+[32m[INFO][0m [EpisodeAssembler] cue-manifest ledger reconciliation: matched=2 created=0 paths=2 total=2
+[32m[INFO][0m [EpisodeAssembler] Resampled theme 44100 Hz -> 48000 Hz
+[32m[INFO][0m [EpisodeAssembler] Resampled theme 44100 Hz -> 48000 Hz
+[32m[INFO][0m [EpisodeAssembler] Assembled 3 segments with 500ms crossfades
+[32m[INFO][0m [EpisodeAssembler] Final loudness master: measured -14.46 LUFS -> target -14.0 LUFS (gain +0.46 dB), true-peak ceiling -1.0 dBFS [peak-limited] (post-crossfade)
+[32m[INFO][0m [EpisodeAssembler] master WAV saved -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\audio\pending_20260911_041157_master.wav (sha256=48960c12e92a)
+[32m[INFO][0m [EpisodeAssembler] '' - 0.9 min
+[32m[INFO][0m [EpisodeAssembler] music_rows=2 segments=3 (BUG-LOCAL-130 diagnostic)
+[32m[INFO][0m [EpisodeAssembler] music mirror outcome: music_rows=2 appended=2 chunked_cues=0 stale_removed=0 existing_music_ids=9
+[32m[INFO][0m [EpisodeAssembler] music mirror: appended=2, chunked_cues=0, stale_removed=0, total_lines=11 (post-BUG-117e: music chunks <= 22.0s to fit the LTX 22B 25s safe envelope)
+[32m[INFO][0m [EpisodeAssembler] BUG-106 master-mix shift: +9.500s applied to 7 line(s) + 0 clip(s)
+[32m[INFO][0m [EpisodeAssembler] schema-l3 ledger update: phase_ms=208 gate=post_episode_assembler dur=52.1s
+[32m[INFO][0m [EpisodeAssembler] emit audio_done signal: audio_done:length_sec=52.06;sample_rate=48000;length_samples=2498649;segments=3
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from pending_20260911_041157_ledger.json (freeze_timestamp=2026-09-11T11:17:20.634991+00:00, rows=7, music=2, mirrors=2, master_sha=48960c12e92a)
+[32m[INFO][0m [Video] Starting render: 52.1s audio -> 1302 frames @ 25fps (1920x1080)
+[32m[INFO][0m [Video] Encoder: NVIDIA h264_nvenc
+[32m[INFO][0m [Video] Launching ffmpeg: C:\Users\jeffr\AppData\Local\Microsoft\WinGet\Links\ffmpeg.EXE -y -f rawvideo -vcodec rawvideo ...
+[32m[INFO][0m [Video] Encoding: frame 0/1302 (0%) -- 0.5s elapsed
+[32m[INFO][0m [Video] Encoding: frame 250/1302 (19%) -- 5.8s elapsed
+[32m[INFO][0m [Video] Encoding: frame 500/1302 (38%) -- 9.9s elapsed
+[32m[INFO][0m [Video] Encoding: frame 750/1302 (57%) -- 15.0s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1000/1302 (76%) -- 19.0s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1250/1302 (96%) -- 24.2s elapsed
+[32m[INFO][0m [Video] Encode complete: 1302 frames in 24.8s (52.6 fps)
+[32m[INFO][0m [Video] Saved: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\audio\signal_lost_dinner_memories_20260911_041839.mp4 (45.5 MB, 52.1s, 1302 frames total)
+[32m[INFO][0m [Video] Treatment saved: signal_lost_dinner_memories_20260911_041839_treatment.txt
+[32m[INFO][0m [Ledger] per-episode dir moved pending_20260911_041157 -> signal_lost_dinner_memories_20260911_041839 (attempt 1)
+[32m[INFO][0m [Ledger] ledger file moved pending_20260911_041157_ledger.json -> signal_lost_dinner_memories_20260911_041839_ledger.json
+[32m[INFO][0m [Ledger] renamed pending_20260911_041157 -> signal_lost_dinner_memories_20260911_041839 (dir_moved=True, durable_paths_rebased=9, memory_paths_rebased=7)
+[32m[INFO][0m [Video] post-rename mp4 path: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_041157\audio\signal_lost_dinner_memories_20260911_041839.mp4 -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_dinner_memories_20260911_041839\audio\signal_lost_dinner_memories_20260911_041839.mp4
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=2 rejected=0 existing=0
+[32m[INFO][0m [Ledger] saved signal_lost_dinner_memories_20260911_041839_ledger.json (9 lines, 99 words)
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from signal_lost_dinner_memories_20260911_041839_ledger.json (freeze_timestamp=2026-09-11T11:17:20.634991+00:00, rows=7, music=2, mirrors=2, master_sha=48960c12e92a)
+[32m[INFO][0m [story_brief:shotlock_m4] status=ok brief_chars=108 terms=setting=2/lighting=2/atmosphere=2
+[32m[INFO][0m [OTR_ShotLock] music row shot_000_music is a pre-audio sentinel; the timed music_open mirror owns the timeline
+[32m[INFO][0m [OTR_ShotLock] music row shot_002_music is a pre-audio sentinel; the timed music_close mirror owns the timeline
+[32m[INFO][0m Loading LLM model: mistralai/Mistral-Nemo-Instruct-2407 (quantized=True)
+[32m[INFO][0m [StoryOrchestrator] Enabling 4-bit quantization (NF4, policy)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved mistralai/Mistral-Nemo-Instruct-2407 -> C:\ComfyUI-Models\huggingface\hub\models--mistralai--Mistral-Nemo-Instruct-2407\snapshots\04d8a90549d23fc6bd7f642064003592df51e9b3
+Loading weights:   0%|          | 0/363 [00:00<?, ?it/s]Loading weights:   0%|          | 1/363 [00:00<03:45,  1.61it/s]Loading weights:   1%|          | 2/363 [00:01<03:33,  1.69it/s]Loading weights:   1%|▏         | 5/363 [00:01<01:10,  5.07it/s]Loading weights:   3%|▎         | 10/363 [00:01<00:30, 11.55it/s]Loading weights:   4%|▍         | 14/363 [00:01<00:22, 15.49it/s]Loading weights:   5%|▌         | 19/363 [00:01<00:15, 21.51it/s]Loading weights:   6%|▋         | 23/363 [00:01<00:14, 23.83it/s]Loading weights:   8%|▊         | 28/363 [00:01<00:11, 28.77it/s]Loading weights:   9%|▉         | 32/363 [00:02<00:11, 28.76it/s]Loading weights:  10%|█         | 37/363 [00:02<00:09, 32.94it/s]Loading weights:  11%|█▏        | 41/363 [00:02<00:10, 31.60it/s]Loading weights:  13%|█▎        | 46/363 [00:02<00:08, 35.40it/s]Loading weights:  14%|█▍        | 50/363 [00:02<00:09, 34.09it/s]Loading weights:  15%|█▌        | 55/363 [00:02<00:08, 37.01it/s]Loading weights:  16%|█▋        | 59/363 [00:02<00:08, 35.09it/s]Loading weights:  18%|█▊        | 64/363 [00:02<00:07, 38.08it/s]Loading weights:  19%|█▊        | 68/363 [00:03<00:08, 35.66it/s]Loading weights:  20%|██        | 73/363 [00:03<00:07, 38.47it/s]Loading weights:  21%|██        | 77/363 [00:03<00:07, 36.31it/s]Loading weights:  23%|██▎       | 82/363 [00:03<00:07, 39.60it/s]Loading weights:  24%|██▍       | 87/363 [00:03<00:08, 33.78it/s]Loading weights:  26%|██▌       | 94/363 [00:03<00:06, 41.11it/s]Loading weights:  27%|██▋       | 99/363 [00:03<00:06, 38.61it/s]Loading weights:  29%|██▊       | 104/363 [00:03<00:06, 37.03it/s]Loading weights:  30%|███       | 109/363 [00:04<00:06, 39.32it/s]Loading weights:  31%|███▏      | 114/363 [00:04<00:07, 34.22it/s]Loading weights:  33%|███▎      | 121/363 [00:04<00:05, 40.76it/s]Loading weights:  35%|███▍      | 126/363 [00:04<00:06, 38.25it/s]Loading weights:  36%|███▌      | 131/363 [00:04<00:06, 36.67it/s]Loading weights:  37%|███▋      | 136/363 [00:04<00:05, 38.93it/s]Loading weights:  39%|███▉      | 141/363 [00:04<00:06, 34.50it/s]Loading weights:  41%|████      | 148/363 [00:05<00:05, 41.47it/s]Loading weights:  42%|████▏     | 153/363 [00:05<00:05, 39.12it/s]Loading weights:  44%|████▎     | 158/363 [00:05<00:05, 37.62it/s]Loading weights:  45%|████▍     | 163/363 [00:05<00:04, 40.24it/s]Loading weights:  46%|████▋     | 168/363 [00:05<00:05, 34.38it/s]Loading weights:  48%|████▊     | 175/363 [00:05<00:04, 40.62it/s]Loading weights:  50%|████▉     | 180/363 [00:05<00:04, 38.00it/s]Loading weights:  51%|█████     | 185/363 [00:06<00:04, 36.76it/s]Loading weights:  52%|█████▏    | 190/363 [00:06<00:04, 38.66it/s]Loading weights:  54%|█████▎    | 195/363 [00:06<00:05, 33.39it/s]Loading weights:  56%|█████▌    | 202/363 [00:06<00:03, 40.41it/s]Loading weights:  57%|█████▋    | 207/363 [00:06<00:04, 38.44it/s]Loading weights:  58%|█████▊    | 212/363 [00:06<00:04, 36.52it/s]Loading weights:  60%|█████▉    | 216/363 [00:06<00:04, 36.74it/s]Loading weights:  61%|██████    | 221/363 [00:07<00:03, 35.98it/s]Loading weights:  62%|██████▏   | 226/363 [00:07<00:03, 39.11it/s]Loading weights:  64%|██████▎   | 231/363 [00:07<00:03, 34.33it/s]Loading weights:  66%|██████▌   | 238/363 [00:07<00:03, 40.86it/s]Loading weights:  67%|██████▋   | 243/363 [00:07<00:03, 38.36it/s]Loading weights:  68%|██████▊   | 248/363 [00:07<00:03, 36.97it/s]Loading weights:  70%|██████▉   | 253/363 [00:07<00:02, 39.19it/s]Loading weights:  71%|███████   | 258/363 [00:08<00:03, 33.85it/s]Loading weights:  73%|███████▎  | 265/363 [00:08<00:02, 40.24it/s]Loading weights:  74%|███████▍  | 270/363 [00:08<00:02, 38.18it/s]Loading weights:  76%|███████▌  | 275/363 [00:08<00:02, 36.23it/s]Loading weights:  77%|███████▋  | 280/363 [00:08<00:02, 38.67it/s]Loading weights:  79%|███████▊  | 285/363 [00:08<00:02, 33.01it/s]Loading weights:  80%|████████  | 292/363 [00:08<00:01, 38.93it/s]Loading weights:  82%|████████▏ | 297/363 [00:09<00:01, 36.81it/s]Loading weights:  83%|████████▎ | 302/363 [00:09<00:01, 35.59it/s]Loading weights:  85%|████████▍ | 307/363 [00:09<00:01, 38.40it/s]Loading weights:  86%|████████▌ | 312/363 [00:09<00:01, 33.61it/s]Loading weights:  88%|████████▊ | 319/363 [00:09<00:01, 40.35it/s]Loading weights:  89%|████████▉ | 324/363 [00:09<00:01, 38.45it/s]Loading weights:  91%|█████████ | 329/363 [00:09<00:00, 36.94it/s]Loading weights:  92%|█████████▏| 334/363 [00:10<00:00, 39.57it/s]Loading weights:  93%|█████████▎| 339/363 [00:10<00:00, 34.19it/s]Loading weights:  95%|█████████▌| 346/363 [00:10<00:00, 40.88it/s]Loading weights:  97%|█████████▋| 351/363 [00:10<00:00, 38.22it/s]Loading weights:  98%|█████████▊| 356/363 [00:10<00:00, 36.59it/s]Loading weights:  99%|█████████▉| 361/363 [00:10<00:00, 38.62it/s]Loading weights: 100%|██████████| 363/363 [00:10<00:00, 33.62it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (0.2s) - first generate will not stall
+[32m[INFO][0m [shot_lock] derivation writer mistralai/Mistral-Nemo-Instruct-2407: 4 char beats, batch 15, reply budget 1770 tokens
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 18.9 tok/s | 3.4s | ...hes a photograph on the table, traces the image with his fingertips",     "camera": "Track
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 128 tok | 19.7 tok/s | 6.5s | ...frey",     "motion": "Pauses eating, leans in towards Jeffrey, nods gently",     "camera":
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 192 tok | 20.1 tok/s | 9.6s | ...ous grin",     "motion": "Mimes turning a carousel horse, laughs softly, then looks at his
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 256 tok | 20.2 tok/s | 12.7s | ...on": "Warm, loving gaze at Jeffrey",     "motion": "Reaches out, pats Jeffrey's hand, then
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 282 tok | 20.3 tok/s | 13.9s | ... meal",     "camera": "Pull back slightly to reveal the table and their shared meal"   } ]
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3597045760, "timestamp_utc": "2026-09-11T11:19:33.557678+00:00"}
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat music_opening_001 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_000_b1 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_001_b1 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_001_b2 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_001_b3 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_001_b4 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_002_b1 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat shot_002_b2 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR.render_driver] still_pan STILL DEFERRED: beat music_closing_001 is at cast preflight; image generation has not run yet. The post-image still check remains required.
+[32m[INFO][0m [OTR_ShotLock] the set speaks throughout: no overheard human face in this episode
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_dinner_memories_20260911_041839_ledger.json (11 lines, 130 words)
+[32m[INFO][0m [story_brief:flux_portrait] status=ok brief_chars=108 terms=setting=2/lighting=2/atmosphere=2
+[32m[INFO][0m [Selector] slot=technical reuse cache for mistralai/Mistral-Nemo-Instruct-2407
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 52 tok | 20.1 tok/s | 2.6s | ...at an unseen storyteller, with the iconic LA skyline visible through a window behind him."
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3599372288, "timestamp_utc": "2026-09-11T11:19:36.197926+00:00"}
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 19.9 tok/s | 3.2s | ...her, her eyes crinkling as she smiles at Jeffrey, her hair a wild, colorful explosion, the
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 78 tok | 20.1 tok/s | 3.9s | ...rful explosion, the Los Angeles sunset casting a warm glow through the window behind her."
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3599425536, "timestamp_utc": "2026-09-11T11:19:40.075324+00:00"}
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_scene_shot_001_b1' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 15.2 tok/s | 4.2s | ... listening attentively, a plate of food between them, warm lighting casting a soft glow on
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 86 tok | 16.4 tok/s | 5.2s | ..., the room filled with fond memories and a sense of warmth, no other characters present."}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3600687104, "timestamp_utc": "2026-09-11T11:19:45.334855+00:00"}
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_scene_shot_001_b2' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 15.1 tok/s | 4.2s | ...30s, who looks fondly at his mother, both framed in a cinematic medium shot, full head and
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 103 tok | 16.9 tok/s | 6.1s | ...intimate, bright cartoon illustration, clean shapes, expressive faces, no on-screen text"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3601399808, "timestamp_utc": "2026-09-11T11:19:51.429023+00:00"}
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_scene_shot_001_b3' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 14.4 tok/s | 4.4s | ...rm meal, a plate of food between them, Jeffrey's hands gesturing as he recalls a childhood
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 75 tok | 15.0 tok/s | 5.0s | ... hands gesturing as he recalls a childhood memory, his mother's eyes soft with nostalgia"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3601727488, "timestamp_utc": "2026-09-11T11:19:56.412664+00:00"}
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_scene_shot_001_b4' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 64 tok | 15.1 tok/s | 4.2s | ...n also at the table, holding his own fork, both in a medium shot, framed within a wide 16:
+[32m[INFO][0m [llm:mistralai/Mistral-Nemo-Instruct-2407] heartbeat: 124 tok | 17.3 tok/s | 7.2s | ...m colors, Bright cartoon illustration, clean shapes, expressive faces, no on-screen text"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "base_generation_returned", "pid": 51620, "process_rss_bytes": 3601936384, "timestamp_utc": "2026-09-11T11:20:03.587340+00:00"}
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_music_opening_001 kind=scene_beat role=music_visual -> slot=music_image_model engine=z_image_turbo
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_before", "pid": 51620, "process_rss_bytes": 3601936384, "timestamp_utc": "2026-09-11T11:20:03.603615+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_cpu_move", "pid": 51620, "process_rss_bytes": 11929255936, "timestamp_utc": "2026-09-11T11:20:06.291218+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "mistralai/Mistral-Nemo-Instruct-2407", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_allocator_flush", "pid": 51620, "process_rss_bytes": 11929255936, "timestamp_utc": "2026-09-11T11:20:06.620104+00:00"}
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (image engine load preflight (z_image_turbo)) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache, cuda.synchronize, cuda.empty_cache, cuda.ipc_collect | allocated 7991 -> 65 MB, reserved 8128 -> 192 MB, free=14735 MB
+[32m[INFO][0m [OTR_ImageGenDispatcher] pipeline residue freed before the first local still: free 14.4 GB after; ran=unload_llm,_unload_bark,gc.collect,soft_empty_cache,cuda.synchronize,cuda.empty_cache,cuda.ipc_collect failed=-
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=7d9eaa0b
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:01<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:01<00:12,  1.78s/it,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:12,  1.78s/it]                                    25%|██▌       | 2/8 [00:00<00:01,  5.97it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.27it/s] 50%|█████     | 4/8 [00:01<00:02,  1.98it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.27it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.26it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.21it/s]100%|██████████| 8/8 [00:03<00:00,  2.34it/s]100%|██████████| 8/8 [00:03<00:00,  2.63it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=156851398 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_music_opening_001 -> 5fda56c33376c8bef531e915fb966f4f93002d77cb74b127d58592dac0c543ef.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_000_b1 kind=scene_beat role=announcer_visual -> slot=announcer_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=31b21696
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.19it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.19it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.88it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.26it/s] 50%|█████     | 4/8 [00:01<00:01,  2.04it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.21it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.19it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.27it/s]100%|██████████| 8/8 [00:03<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.61it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3408646014 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_000_b1 -> 0a281b88b9ccebd44ebbd88aa8e295f2e2b74b8da9452d9467fdb3e5f6216470.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_001_b1 kind=scene_character role=character_video -> slot=character_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=41ac1958
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.10it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.10it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.81it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.18it/s] 50%|█████     | 4/8 [00:01<00:01,  2.07it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.26it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.20it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.27it/s]100%|██████████| 8/8 [00:03<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.61it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3030580935 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_001_b1 -> 24f94f63533f51545f67c20ceb8a9f9784689f25129ddfd24febff00c7e2e2c4.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_001_b2 kind=scene_character role=character_video -> slot=character_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=c647a07c
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.20it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.20it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.75it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.19it/s] 50%|█████     | 4/8 [00:01<00:01,  2.03it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.25it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.08it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.25it/s]100%|██████████| 8/8 [00:03<00:00,  2.24it/s]100%|██████████| 8/8 [00:03<00:00,  2.57it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=4290436480 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_001_b2 -> bdac6a0047361fbde44b9ee6ef321f891467e5d756b850f1dee32f7a73f11463.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_001_b3 kind=scene_character role=character_video -> slot=character_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=f76c992a
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.16it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.16it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.92it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.16it/s] 50%|█████     | 4/8 [00:01<00:01,  2.05it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.26it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.11it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.25it/s]100%|██████████| 8/8 [00:03<00:00,  2.59it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3030580935 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_001_b3 -> 9165acba949be6adf64cbe7800b8d45d8209ea0c3bd503935d9c0c0752664ab5.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_001_b4 kind=scene_character role=character_video -> slot=character_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=0116fa6c
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.12it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.12it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.79it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.15it/s] 50%|█████     | 4/8 [00:01<00:01,  2.02it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.21it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.10it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.23it/s]100%|██████████| 8/8 [00:03<00:00,  2.15it/s]100%|██████████| 8/8 [00:03<00:00,  2.54it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=4290436480 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_001_b4 -> a032c5fd819bc0f5ef860341fb385d64891236cdfd06d5e63a6f18da299cd4ed.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_002_b1 kind=scene_beat role=announcer_visual -> slot=announcer_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=0e1283a7
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.22it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.22it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.53it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.27it/s] 50%|█████     | 4/8 [00:01<00:02,  1.98it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.28it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.19it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.28it/s]100%|██████████| 8/8 [00:03<00:00,  2.59it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3045746569 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_002_b1 -> 872323113d2cf9c7a322650c46059129d9e19b383e7d826ec2726217746c27e0.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_002_b2 kind=scene_beat role=announcer_visual -> slot=announcer_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=9b19fd09
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.12it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.12it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.78it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.17it/s] 50%|█████     | 4/8 [00:01<00:02,  1.98it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.24it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.11it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.16it/s]100%|██████████| 8/8 [00:03<00:00,  2.20it/s]100%|██████████| 8/8 [00:03<00:00,  2.54it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3484150238 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_002_b2 -> 022460f331a5f8491184003366d4baf56f910950969a0828886af25a1b344f57.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_music_closing_001 kind=scene_beat role=music_visual -> slot=music_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=eb6a49ef
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.07it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.07it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.71it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.19it/s] 50%|█████     | 4/8 [00:01<00:02,  1.99it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.28it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.11it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.25it/s]100%|██████████| 8/8 [00:03<00:00,  2.57it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=1806840373 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_music_closing_001 -> 66a8169847789b7767215467b95d1d1f39fbf2e06278e3c3ef4b228b288ad3a4.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_000_music kind=scene_beat role=music_visual -> slot=music_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=180bffcb
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.08it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:06,  1.08it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  5.78it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.19it/s] 50%|█████     | 4/8 [00:01<00:01,  2.04it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.25it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.19it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.25it/s]100%|██████████| 8/8 [00:03<00:00,  2.59it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=3533939228 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_000_music -> f0237c1a21d4e76b9908ea4b5e84231b4baac3bff796090269569edef7e94ec0.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR_ImageGenDispatcher] resolve: object=still_shot_002_music kind=scene_beat role=music_visual -> slot=music_image_model engine=z_image_turbo
+[32m[INFO][0m [gpu_residency] lease acquired pid=51620 token=8a3ec9d9
+[32m[INFO][0m [OTR.image.z_image_turbo] unet resolved -> z_image_turbo_nvfp4.safetensors (verified=True; installed=['z_image_turbo_nvfp4.safetensors', 'z_image_turbo_bf16.safetensors'])
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Detected mixed precision quantization
+[32m[INFO][0m Using mixed precision operations
+[32m[INFO][0m Native ops: nvfp4, float8_e4m3fn, mxfp8, convrot_w4a4, int8_tensorwise, float8_e5m2, asym_w4a8_int8 
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: torch.bfloat16
+[32m[INFO][0m model_type FLOW
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load ZImageTEModel_
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m Model ZImageTEModel_ prepared for dynamic VRAM loading. 5370MB Staged. 0 patches attached. Force pre-loaded 145 weights: 383 KB.
+[32m[INFO][0m [OTR graph-exec] evict_after_use 'clip': unloaded 1 dynamic model patcher(s) through comfy.model_management before the drop
+[32m[INFO][0m Requested to load Lumina2
+[32m[INFO][0m Model Lumina2 prepared for dynamic VRAM loading. 4299MB Staged. 0 patches attached. Force pre-loaded 385 weights: 1046 KB.
+  0%|          | 0/8 [00:00<?, ?it/s]  0%|          | 0/8 [00:00<?, ?it/s,   Model Initializing ...  ]  0%|          | 0/8 [00:00<?, ?it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.22it/s,  Model Initialization complete!  ] 12%|█▎        | 1/8 [00:00<00:05,  1.22it/s]                                    25%|██▌       | 2/8 [00:00<00:01,  6.00it/s] 38%|███▊      | 3/8 [00:00<00:02,  2.12it/s] 50%|█████     | 4/8 [00:01<00:01,  2.06it/s] 62%|██████▎   | 5/8 [00:01<00:01,  2.28it/s] 75%|███████▌  | 6/8 [00:02<00:00,  2.17it/s] 88%|████████▊ | 7/8 [00:02<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.26it/s]100%|██████████| 8/8 [00:03<00:00,  2.60it/s]
+[32m[INFO][0m Requested to load AutoencodingEngine
+[32m[INFO][0m Model AutoencodingEngine prepared for dynamic VRAM loading. 159MB Staged. 0 patches attached. Force pre-loaded 108 weights: 182 KB.
+[1m[33m[WARNING][0m [OTR video] LOUD VRAM reclaim (z_image_turbo post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+[32m[INFO][0m [OTR.image.z_image_turbo] minted still 1472x832 seed=1368999352 steps=8 cfg=1.00 shift=3.00 sampler=euler/normal
+[32m[INFO][0m [portrait_ledger] non-cast portrait char_id=still_shot_002_music -> 62370c2d6fd952e582a533ea25c5acccf79ad0e41d4adcbd39cef2aea31500e1.png (cast stamp skipped; recorded via ledger['images'])
+[32m[INFO][0m [OTR.image.style_authority] style='cartoon' token='bright cartoon' styled=11/11 pack_negative=True spread=238.4
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_dinner_memories_20260911_041839_ledger.json (11 lines, 130 words)
+[32m[INFO][0m [OTR_ImageGenDispatcher] banana_route=on candidate_substitutions=0 varieties=SIDEARM=banana,LONG=long banana
+[32m[INFO][0m [story_brief:ltx_scene_open] status=ok brief_chars=108 terms=setting=2/lighting=2/atmosphere=2
+[32m[INFO][0m [OTR_MasterAudioMux] PATH RECONCILED: master audio path stale (episode dir renamed after capture); 'C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_041157\\audio\\pending_20260911_041157_master.wav' -> 'C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_memories_20260911_041839\\audio\\pending_20260911_041157_master.wav' (active episode, matching basename)
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": null, "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_before", "pid": 51620, "process_rss_bytes": 3782918144, "timestamp_utc": "2026-09-11T11:21:40.406982+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": null, "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_cpu_move", "pid": 51620, "process_rss_bytes": 3782918144, "timestamp_utc": "2026-09-11T11:21:40.406982+00:00"}
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": null, "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "llm_retirement_after_allocator_flush", "pid": 51620, "process_rss_bytes": 3782918144, "timestamp_utc": "2026-09-11T11:21:40.690040+00:00"}
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (pre-render: all stills minted) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache, cuda.synchronize, cuda.empty_cache, cuda.ipc_collect | allocated 97 -> 97 MB, reserved 256 -> 256 MB, free=14665 MB
+[1m[33m[WARNING][0m [OTR video] pre-render residue free: ran=['unload_llm', '_unload_bark', 'gc.collect', 'soft_empty_cache', 'cuda.synchronize', 'cuda.empty_cache', 'cuda.ipc_collect'] failed=[] free_gb_after=14.3212890625
+[32m[INFO][0m [OTR.render_driver] still_pan: beat music_opening_001 conditioning on scene still still_music_opening_001_5fda56c33376.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @0.000+10.000s -> slice_77b8829ddc611e3e.wav (beat music_opening_001)
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_000_b1 conditioning on scene still still_shot_000_b1_0a281b88b9cc.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @9.500+4.603s -> slice_0c00123c353d6dd4.wav (beat shot_000_b1)
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_001_b1 conditioning on scene still still_shot_001_b1_24f94f63533f.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @14.103+4.033s -> slice_e5cb45c94fe780d1.wav (beat shot_001_b1)
+[32m[INFO][0m [OTR.render_driver] prompt source=shared_video_prompting_engine sha8=72280a1e chars=505 beat=shot_001_b1 | bright cartoon. An adult man who loves Los Angeles and remembers growing up in the Bay Area, Dining 
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_001_b2 conditioning on scene still still_shot_001_b2_bdac6a004736.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @18.136+5.252s -> slice_ca6efa8a87bada8a.wav (beat shot_001_b2)
+[32m[INFO][0m [OTR.render_driver] prompt source=shared_video_prompting_engine sha8=4eb3fbda chars=486 beat=shot_001_b2 | bright cartoon. Jeffrey's living mother, physically present, eating dinner with Jeffrey at their sha
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_001_b3 conditioning on scene still still_shot_001_b3_9165acba949b.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @23.388+8.023s -> slice_1a3281540052c3ed.wav (beat shot_001_b3)
+[32m[INFO][0m [OTR.render_driver] prompt source=shared_video_prompting_engine sha8=d0bcd3da chars=457 beat=shot_001_b3 | bright cartoon. An adult man who loves Los Angeles and remembers growing up in the Bay Area, Dining 
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_001_b4 conditioning on scene still still_shot_001_b4_a032c5fd819b.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @31.410+3.696s -> slice_1bcfad96c5b89499.wav (beat shot_001_b4)
+[32m[INFO][0m [OTR.render_driver] prompt source=shared_video_prompting_engine sha8=1d4a05b6 chars=496 beat=shot_001_b4 | bright cartoon. Jeffrey's living mother, physically present, eating dinner with Jeffrey at their sha
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_002_b1 conditioning on scene still still_shot_002_b1_872323113d2c.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @35.107+5.028s -> slice_e438ed26e2c40350.wav (beat shot_002_b1)
+[32m[INFO][0m [OTR.render_driver] still_pan: beat shot_002_b2 conditioning on scene still still_shot_002_b2_022460f331a5.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @40.134+4.433s -> slice_35c7f592945d99d0.wav (beat shot_002_b2)
+[32m[INFO][0m [OTR.render_driver] still_pan: beat music_closing_001 conditioning on scene still still_music_closing_001_66a816984778.png (landscape; portrait never used)
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced pending_20260911_041157_master.wav @44.068+7.988s -> slice_8631b841213f771d.wav (beat music_closing_001)
+[32m[INFO][0m [OTR video] persisted 9 clip(s) to episodes/signal_lost_dinner_memories_20260911_041839/clips/
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_dinner_memories_20260911_041839_ledger.json (11 lines, 130 words)
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_dinner_memories_20260911_041839_ledger.json (11 lines, 130 words)
+[1m[33m[WARNING][0m [OTR_VideoRenderBatch] audio_motion: stamped 9 profile(s) (9 ok) -> signal_lost_dinner_memories_20260911_041839_ledger.json saved=True
+[1m[33m[WARNING][0m [OTR_VideoRenderBatch] mode=episode ok=True -> node_episode_report.json
+[1m[33m[WARNING][0m [OTR.composite] TAIL NOT LOOPED: 25 frame(s) from cursor 1302 to 1327 are not provably inside the closing-theme window {'start': 1102, 'end': 1302} -- filling with floor instead. Only the closing theme may reuse a clip (operator ruling 2026-08-06).
+[32m[INFO][0m [SceneAwareScopes] 1327 frames @ 1920x1080 25fps -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_shared\tmp\otr_scopes_signal_lost_dinner_memories_20260911_041839_20260911_042148.mp4
+[32m[INFO][0m [OTR_SilentComposite] A/V-sync master reconcile: 1327 -> 1302 frames (positioned ledger cross-check)
+[32m[INFO][0m [OTR_SilentComposite] assembled 11 beats -> 1302 frames @25fps 1920x1080 silent; budget 1302 OK
+[32m[INFO][0m [PostUpscaleProcgenBlend] PostUpscaleProcgenBlend: bypass=True, copied signal_lost_dinner_memories_20260911_041839_silent.mp4 -> signal_lost_dinner_memories_20260911_041839_silent_procgen_blended.mp4
+[32m[INFO][0m [OTR_CaptionBurn] captions burned (style=sdh_standard) :: captions: 11 events from 7 speech lines -> signal_lost_dinner_memories_20260911_041839_silent_procgen_blended_captioned.ass (style=sdh_standard, margin_v=90) -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_dinner_memories_20260911_041839\signal_lost_dinner_memories_20260911_041839_silent_procgen_blended_captioned.mp4
+[32m[INFO][0m [OTR_CreditsRoll] appended 19.8s console (hero='DINNER MEMORIES' backdrop=body final frame) -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_dinner_memories_20260911_041839\signal_lost_dinner_memories_20260911_041839_silent_procgen_blended_captioned_with_credits.mp4
+[32m[INFO][0m [OTR_MasterAudioMux] PATH RECONCILED: master audio path stale (episode dir renamed after capture); 'C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_041157\\audio\\pending_20260911_041157_master.wav' -> 'C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\signal_lost_dinner_memories_20260911_041839\\audio\\pending_20260911_041157_master.wav' (active episode, matching basename)
+[1m[33m[WARNING][0m [OTR_MasterAudioMux] LOUD publish: final episode -> C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\dinner_memories_20260911_041839__cart__stpa__zimg__idx2__unk__nemo__sa3_final.mp4 (30895300 bytes; video copy + AAC-320k viewing audio; archival PCM byte-identical final: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\signal_lost_dinner_memories_20260911_041839\signal_lost_dinner_memories_20260911_041839_silent_procgen_blended_captioned_with_credits_final.mp4)
+[32m[INFO][0m [OTR_MasterAudioMux] duration_check v=71.880s a=52.055s tail_budget=19.8s (declared) OK
+[32m[INFO][0m [OTR_MasterAudioMux] audio_mode=master_copy
+[32m[INFO][0m [OTR_MasterAudioMux] audio_byte_identical OK (7e00c76bfcfc)
+[32m[INFO][0m [OTR_MasterAudioMux] obs_publish OK -> C:\Users\jeffr\Documents\ComfyUI\output\otr\obs\dinner_memories_20260911_041839__cart__stpa__zimg__idx2__unk__nemo__sa3_final.mp4
+[32m[INFO][0m [OTR_MasterAudioMux] stamped ledger signal_lost_dinner_memories_20260911_041839_ledger.json: final_audio_path -> pending_20260911_041157_master.wav; final_video_path -> signal_lost_dinner_memories_20260911_041839_silent_procgen_blended_captioned_with_credits_final.mp4; obs_final_path -> dinner_memories_20260911_041839__cart__stpa__zimg__idx2__unk__nemo__sa3_final.mp4
+[32m[INFO][0m [OTR_MasterAudioMux] delivery OK -- required publication verified on disk and on the ledger
+[32m[INFO][0m [32mPrompt executed in 00:10:29[0m

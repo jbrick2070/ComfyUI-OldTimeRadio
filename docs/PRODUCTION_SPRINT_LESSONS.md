@@ -17,6 +17,20 @@ Use this guide when planning any OTR coding sprint, including story banks,
 dynamic visual direction, audio/SFX layers, model integrations, and workflow
 changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
+## 2026-09-11 -- align source-edit grammar with source authority
+
+Canonical05's final editor used source_field=text (a candidate field), which
+the source quote validator can never accept. Do not waste a repair attempt on
+an alias excluded by the existing application contract: derive the source
+namespace from one Literal authority and bind that same enum into native
+decoding. Put source-versus-draft quote and offset guidance in the actual owner
+instruction; metadata descriptions omitted by a compact schema renderer are
+not model guidance. Retain bounded applied rewrites and exact conservation.
+Actual LMFE + public apply tests prove the contract, not semantic recovery.
+The same publication omitted facts before cleanup and added a child in pixels
+despite a correct two-adult prompt; neither a clean ledger nor prompt agreement
+qualifies source fidelity. PBUG-20260910-03 and Bible11.39 retain this distinction.
+
 ## 1. Define ownership before implementation
 
 Pairlock_03 (2026-09-11): a generation that raises never assigns the shared

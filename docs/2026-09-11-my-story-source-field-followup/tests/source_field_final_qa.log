@@ -1,0 +1,12 @@
+Roundtable pass
+  doc:            docs/2026-09-11-my-story-source-field-followup/final_grounding.md (44432 chars, ~11155 prompt tokens)
+  grounding:      0 file(s), ~0 chars
+  panel:          2 model(s)
+    - ~anthropic/claude-opus-latest                worst-case unknown (no price hint in config)  max_tokens=8000 temp=0.2 reasoning=low
+    - ~anthropic/claude-sonnet-latest              worst-case unknown (no price hint in config)  max_tokens=8000 temp=0.2 reasoning=low
+  budget ceiling: $5.00   worst-case panel: >= ~$0.0000 (2 model(s) unknown)
+  OK   ~anthropic/claude-opus-latest -> anthropic/claude-opus-5    3052 out tokens
+  OK   ~anthropic/claude-sonnet-latest -> anthropic/claude-sonnet-5  1853 out tokens
+
+Saved 2/2 review(s) to docs/2026-09-11-my-story-source-field-followup/final_qa
+Actual spend this pass: ~$0.2106

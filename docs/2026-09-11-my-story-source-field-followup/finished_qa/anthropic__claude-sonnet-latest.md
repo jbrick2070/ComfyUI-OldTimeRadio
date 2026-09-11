@@ -1,0 +1,17 @@
+<!-- requested_model: ~anthropic/claude-sonnet-latest | resolved_model: anthropic/claude-sonnet-5 -->
+
+**Verdict: no demonstrated must-fix.** The diff is narrowly scoped to closing the `source_field` alias hole and does not introduce a new checker, gate, model call, or output cap, consistent with the stated constraints. Findings below are practical limitations/risks, not blocking defects.
+
+**Confirmed correct:**
+- `CREATIVE_FIELDS = get_args(CreativeFieldName)` preserves the original tuple `("idea","characters","plot","setting")` and its order, so downstream ordering-dependent code (`build_raw_documents`, `source_intervals` list construction) is unaffected.
+- `SpokenSourceEdit.source_field: CreativeFieldName` correctly narrows the LMFE-generated grammar and pydantic validation to the four keys `_raw_values` actually populates, matching the application's existing acceptance (`nodes/_otr_story_source.py::_raw_values`).
+- The instruction text addition in `rewrite_spoken_from_source` (`"source_field names an original source key: %s."` plus the source_quote/original_quote/offset clarifications) is a plausible, low-risk grounding aid, not a new gate.
+- `test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls` exercises the exact failure mode described (attempt 1 emits `source_field="text"`, attempt 2 corrects) within the existing two-call budget, and asserts `receipt['qualified'] is False`, correctly avoiding overclaiming semantic proof.
+- Parametrized rejection test at the bottom of `test_story_source_review.py` (`{"source_field": "author"}` etc.) still exercises `ValidationError`, since `Literal` continues to reject non-enum values the same way `StrictStr` + implicit narrowing did before — no regression there.
+
+**Risks / non-blocking gaps:**
+1. `tests/bug_bible_regression.py::test_otr_spoken_source_schema_uses_the_original_field_namespace` reconstructs `SpokenSourceEdit` via `ast.parse` + selective `exec` of only the matching `ClassDef`/`Assign` nodes, rebuilding a synthetic namespace. This is fragile: if `_otr_story_input.py`'s `CREATIVE_FIELDS`/`CreativeFieldName` assignment nodes ever depend on any prior statement in the module (e.g., a constant defined earlier), the isolated `ast.Module` exec will `NameError` rather than fail meaningfully. It currently works only because both assignments are self-contained one-liners — a coincidence of current file layout, not a structural guarantee.
+2. The new instruction text is a heuristic prompt hint. It cannot by itself prevent the model from once again emitting `source_field="text"` or a hallucinated field — the actual enforcement is the grammar/pydantic validation, and the *bug bible* narrative frames the instruction as teaching, which is correct, but there is no test proving the model *reliably* stops attempting `"text"` in one call rather than needing the retry-budget fallback exercised by the integration test. That's an acceptable and disclosed limit given the two-call architecture is unchanged, not a defect.
+3. `_apply_spoken_edits` still does `raw.get(edit.source_field, "")` with a default — now dead code since `edit.source_field` is guaranteed to be a valid `CREATIVE_FIELDS` key by the Literal type, and `raw` (from `_raw_values`) always contains all four keys. Harmless, but is a small leftover from the pre-fix defensive coding that no longer reflects the tightened invariant.
+
+No further correctness, wiring, or regression-coverage defects are demonstrated against the material actually shown.

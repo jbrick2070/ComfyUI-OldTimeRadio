@@ -1,3 +1,26 @@
+## 2026-09-11 -- attempt05 publishes; source-field correction qualified offline
+
+Nemo pair on18569a3b (executable d2837e45) completed the full canonical in10:29,
+published Dinner Memories,71.88seconds. Actual voice references and rendered
+credits agree. Source FAIL: missing girlfriend mention/present-day appreciation
+ending; one of four inspected images adds a child despite its two-adult prompt.
+Cleanup uses32 bounded calls,10 repair proposals across five rows, one retained
+rewrite and six unchanged rows. Omissions predate cleanup. Source correction
+returned invalid source_field=text, then edits:[]; no applied correction.
+
+The existing four accepted source keys now share one Literal authority with
+native decoding; actual owner instructions distinguish source quotes and draft
+intervals. No new gate/retry/wire. Opus/Sonnet QA completed; final regression has14411 passes and51 unchanged
+inherited failures. Controlled Bible38pass/10inherited and canonical checks
+complete. Push before attempt06. Final outcomes
+and reviewer limits are in2026-09-11-my-story-source-field-followup. The full05
+receipt is2026-09-11-my-story-5080-qualification/pairlock_05_receipt.md.
+Five attempts,three writing failures,two source-defective publications,zero
+source-qualified. Mac/4060 held; RunPod unauthenticated,no rental. GO_FORWARD
+is the sole queue; completed attempt05 and stale sprint directions archived.
+
+---
+
 ## 2026-09-11 -- attempt04 failed; grounded model-family qualification next
 
 Full canonical attempt04 on d2837e45 failed P1 naturally after three calls,
