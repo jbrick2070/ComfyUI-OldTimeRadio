@@ -608,8 +608,27 @@ _FONT_CACHE: dict = {}
 
 def _load_font(pt: int):
     """Resolve a monospace truetype at ``pt`` via absolute font paths (bare
-    names do not resolve reliably). Cached. RAISES if nothing resolves --
-    no-fallback: a point-size-less bitmap hero is unacceptable (Fable risk #3)."""
+    names do not resolve reliably). Cached.
+
+    DEGRADES rather than raising when nothing resolves (operator ruling
+    2026-09-11): *"don't assume people have fonts installed. I'm open to some
+    bad formatting as long as it doesn't crash."*
+
+    This REVERSES the earlier no-fallback policy ("a point-size-less bitmap
+    hero is unacceptable", Fable risk #3). That ruling optimised for the look
+    of the card; the operator's standing rule is that a leg which does not
+    reach ``otr/obs/`` did not pass, and today's bar is "as long as it doesn't
+    crash when it's not supposed to". On a machine with no matching font the
+    old behaviour killed a FULLY RENDERED episode at the credits -- the script,
+    cast, voices, audio master and every clip already paid for -- rather than
+    publishing it with an ugly title card. An ugly card ships; a
+    CreditsDataError ships nothing.
+
+    The fallback is PIL's built-in bitmap font. It ignores ``pt``, so the hero
+    line will be small and the layout will look wrong. That is the accepted
+    cost, and it is logged at WARNING with the remedy so the operator can fix
+    the box rather than discover it silently.
+    """
     from PIL import ImageFont
     key = int(pt)
     if key in _FONT_CACHE:
@@ -643,11 +662,17 @@ def _load_font(pt: int):
             return f
         except Exception:  # noqa: BLE001
             continue
-    raise CreditsDataError(
-        "no monospace truetype font resolved -- refusing to render a "
-        "point-size-less bitmap hero (no-fallback). Set OTR_CREDITS_FONT to "
-        "the absolute path of any monospace .ttf/.ttc on this machine"
-        + (f" (OTR_CREDITS_FONT={explicit!r} did not load)" if explicit else ""))
+    # NOTHING RESOLVED -- publish an ugly card rather than no episode.
+    log.warning(
+        "[OTR_CreditsRoll] no monospace truetype font resolved on this machine; "
+        "falling back to PIL's bitmap font. The credits will be SMALL and the "
+        "layout will look wrong -- the episode still publishes. Set "
+        "OTR_CREDITS_FONT to the absolute path of any monospace .ttf/.ttc to "
+        "fix the look%s",
+        (f" (OTR_CREDITS_FONT={explicit!r} did not load)" if explicit else ""))
+    fallback = ImageFont.load_default()
+    _FONT_CACHE[key] = fallback
+    return fallback
 
 
 def _fw(draw, s, font) -> int:

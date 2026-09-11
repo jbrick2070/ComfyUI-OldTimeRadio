@@ -31,6 +31,15 @@ story source combined is quite complex. I'm not expecting anything exact."* So:
   behind the real work; **section 4 IS the remaining work**, and "do all the coding
   before testing" means do the arcs. Arcs cost no GPU and no money, so the only
   budget they spend is wall clock.
+- **NEVER ASSUME A FONT IS INSTALLED (operator ruling 2026-09-11).** Operator:
+  *"don't assume people have fonts installed. I'm open to some bad formatting as
+  long as it doesn't crash."* This REVERSES the earlier no-fallback policy for
+  credits (*"a point-size-less bitmap hero is unacceptable"*, Fable risk #3): that
+  ruling optimised for how the card looks, and it was killing FULLY RENDERED
+  episodes at the credits stage on any box without DejaVu/consola/Menlo. An ugly
+  card ships; a `CreditsDataError` ships nothing. **Coded 2026-09-11** --
+  `_load_font` degrades to PIL's embedded font and logs the remedy. Generalise the
+  principle: a missing PRESENTATION resource degrades, it never refuses.
 - **Prompts are hand-crafted per model and CHARACTER-BUDGETED.** Do not swashbuckle
   them. Adding conditional nuance spends budget that does not exist and reintroduces
   the per-prompt subtleties the operator has already rejected; removing words edits a
@@ -167,14 +176,6 @@ ceremony. Receipts: `kibitz-runs/2026-09-11-arc-*/r1/`, anchors in
 | 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication. Needs a CUDA host. No code, no arc. |
 
 ## 6. Blocked on the operator -- each unblocks with one word
-
-**Credits font exhaustion -- two of your own rulings now conflict.**
-`otr_credits_roll.py:607` hard-RAISES when no font resolves, deliberately and
-documented (*"no-fallback: a point-size-less bitmap hero is unacceptable, Fable
-risk #3"*). The standing rule *"do not reduce how many episodes reach `otr/obs/`"*
-and today's bar point the other way. On a box with no matching font the episode
-currently DIES AT THE CREDITS rather than publishing with an ugly title. Publish
-anyway, or keep failing loudly? Surfaced by the fonts arc. ·
 
 2.4 source digest ruling (HTML block joins) · 4 / 4B registry review note for posting (**guard: revalidate the old
 discriminator/bisection hypothesis before ANY destructive strip-down**) · 5.1-5.2 release after physical 8 GB proof ·
