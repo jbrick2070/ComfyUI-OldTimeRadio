@@ -1,0 +1,85 @@
+MODEL: cursor-grok-4.6-high
+MODE: ask
+TRANSPORT: stdin
+ARGV (prompt omitted): ['C:\\Users\\jeffr\\AppData\\Local\\cursor-agent\\cursor-agent.cmd', '-p', '--trust', '--mode', 'ask', '--output-format', 'text', '--model', 'cursor-grok-4.6-high']
+
+STDOUT:
+VERDICT: no -- this is a question list, not a coding plan: writer inventory is incomplete, exact string rewrites and fallback replacements are missing, and stripping pack costume leaves adaptation garments with no owner.
+
+MUST-FIX BEFORE BUILD:
+1. [§5 Q1 / §2 / §4(b)] The four-writer / seven-field inventory is incomplete. A seven-field shakespeare JSON edit plus one fallback will not stop era assertion. Concrete extra writers already in tree:
+
+   STILL/PORTRAIT/PLATE PATHS (in scope of Q1):
+   - `nodes/visual_styles/shakespeare_stage_realism.json` fields beyond the seven: `image_grade_tail` ("crisp costume detail"), `announcer_subject_object` ("period tabletop radio"), `announcer_subject_ltx_mouth` ("period radio"), `open_subjects.announcer` ("period dials"), `open_subjects.default` ("period stage radio").
+   - Shared `positive_tail` is appended on scene_beat, scene_open, scene_character (`nodes/_otr_story_brief_helpers.py::compose_still_prompt`), portraits via `finish_visual_prompt` (`nodes/otr_meta_brief_image_prompt.py` ~2244), plates via `_compose_background_plate_prompt` (~2043-2046), and ShotLock video via `nodes/otr_shot_lock.py` ~1652. One costume clause therefore hits house frame, drama, and plate.
+   - LLM request builders re-inject pack look: `_build_char_prompt_request` (`portrait_instruction_look` + `_style_anchor_for_aspect` -> `portrait_look`), `_build_char_scene_request` (`scene_instruction_look` + wide `portrait_look`). `_rewrite_char_scene_from_source` starts from `compose_still_prompt` and tells the model "The visual_request supplies framing and style instructions" with no garment precedence (`otr_meta_brief_image_prompt.py` ~1768-1780). That matches the 09 receipt: `status="rewritten"` while "period costume" remains.
+   - `compose_image_prompt_fallback` (~1533-1534) does not use the "period-dressed" literal; empty appearance degrades to `_style_anchor_for_aspect`, which is pack `portrait_look` (or `PORTRAIT_LOOK_DEFAULT`). Second empty-appearance writer.
+   - `nodes/otr_shot_lock.py::_appearance_for_char` is a READER (portrait_prompt|appearance|description|character_description|name). It does not invent era. Do not treat it as writer 5. It also disagrees with `otr_meta_brief_image_prompt._appearance_for_char` (no `description`, no name fallback). Empty image-path appearance hits the period-dressed / portrait_look fallbacks; video path can emit the display name.
+
+   OTHER PACKS THAT STILL ASSERT COSTUME IF §4(b) IS "checked-in pack strings" PLURAL:
+   - Default pack `nodes/visual_styles/sci_fi_radio.json`: `portrait_look` / `portrait_look_talking` = "period-accurate costume...", `portrait_instruction_look` = "period-consistent", `plate_look` = "period-accurate set", `still_word_title_mood_style` = "atmospheric period illustration". Byte-locked to Python fixtures by `tests/test_visual_styles_a1.py` TestExtractionFixtures (`PORTRAIT_LOOK_DEFAULT` etc. in `otr_meta_brief_image_prompt.py` ~171-177, `PLATE_LOOK_DEFAULT` ~699, `_STILL_WORD_TITLE_MOOD_STYLE` ~1011-1013).
+   - `nodes/visual_styles/archival_documentary.json`: same costume/set pattern plus `non_character_emblem_fallback` "period-authentic emblematic object".
+
+   ADJACENT (not the four still kinds, but still clothes the figure if that engine is live):
+   - `nodes/_otr_video_engines/ghost_signal_author.py` `MOTIF_FALLBACK_POOLS["garment"]` invents coat/uniform/shawl when appearance has no allowlisted garment.
+
+   Fix: publish a closed table (path, function, field/literal, keep/drop/rewrite). Name pack scope: shakespeare-only vs also `sci_fi_radio` + `archival_documentary`. If `sci_fi_radio` moves, change the Python fixtures in the same change or `test_visual_styles_a1.py` / `test_visual_styles_a2.py` fail. `validate_pack` (`nodes/_otr_visual_styles.py` ~365) allows value edits; `portrait_look` cannot become "".
+
+2. [§5 Q2 / §6 adaptation fidelity] After pack costume is removed, no remaining owner writes garments on non-My-Story lanes. Per-lane context that visual authors actually receive:
+
+   - All lanes, stills: `_read_setting` / `compose_still_prompt` read `meta.story_brief_terms.setting[:2]` only. `StoryBriefModel` (`nodes/_otr_story_brief.py` ~125-156) has no era field. Reflection prompt ~212-218 forbids invented dates/eras and says setting_terms are PLACES. Unspecified-time therefore yields place nouns or empty, never "present day" / "Elizabethan".
+   - My Story only: `raw_fields_from_ledger` (`nodes/_otr_story_source.py` ~62-67) returns CREATIVE_FIELDS (idea/characters/plot/setting) iff `meta.my_story` is a dict; `_scene_source_context` returns None otherwise, so `_rewrite_char_scene_from_source` never runs. Source `fields.setting` does not automatically become the still setting.
+   - Original / Shakespeare / public_domain / media_archive / scifi_news: no source rewrite. Folger / PD text does not reach `_build_char_prompt_request` / `_build_char_scene_request`. Appearance is casting `character_description` (`nodes/_otr_casting.py` ~417-421 format: age, role, Face, Presence, Voice -- clothing is not requested).
+   - ShotLock video: `otr_shot_lock._read_setting` (~99-127) uses the same brief setting, else `_FALLBACK_SETTING = "a vintage radio studio"` (~76). Image `_read_setting` (~47-64) returns "" instead. Empty-brief video prompts gain a vintage-studio era the stills do not.
+   - Unspecified wardrobe: image model + pack look. Today pack look IS the adaptation period-dress owner.
+
+   Bank-name branching is forbidden (§5 Q2). Extending source rewrite by detecting Shakespeare/PD is that shape. Casting prompt-craft to "write better clothes" is story-quality work (§6).
+
+   Fix (smallest, matches §4 operator assumption): state in the spec that unspecified wardrobe is modern/model-default on EVERY lane, including Macbeth, and that period dress on adaptations happens only if `character_description` already names clothes. If that outcome is rejected, stop: you need a new garment owner that is not bank-keyed and not a forbidden-word gate -- and that is a different design, not a pack-string edit.
+
+3. [§4(b) / §5 Q4] Editorial boundary is not coded. Mixed strings have no specified rewrite; `validate_pack` only checks non-empty str. Without exact replacements the implementor will either leave era tokens ("Elizabethan", "Shakespearean", "period costume") or strip theatrical identity the operator may still want. Required rewrites for `shakespeare_stage_realism.json` (keep treatment; drop garment/date/story-set):
+
+   - `positive_tail`: "photorealistic theatrical stage still, candlelit theater realism, practical set texture" (drop "Shakespearean", "period costume detail"). This one field is shared by house frame, drama, and plate -- see M1.
+   - `era_tail`: "photorealistic theatrical stage realism" (drop "Elizabethan and Jacobean"). Note: `get_era_tail` (`_otr_story_brief_helpers.py` ~254) uses pack `era_tail` only when atmosphere/palette/lighting are empty; a filled present-day brief already suppresses it. Still rewrite the fallback.
+   - `portrait_look`: "photoreal Shakespearean actor portrait, candlelit stage light, natural skin detail" -- [ASSUMPTION] drop only "period costume"; if "Shakespearean actor" is read as ruff-and-doublet, use "photoreal stage-actor portrait, candlelit stage light, natural skin detail".
+   - `portrait_look_talking`: same, drop "period costume".
+   - `portrait_instruction_look`: "photorealistic and theater-real, like a stage actor photographed during rehearsal" (drop "period").
+   - `scene_instruction_look`: "photoreal Shakespearean stage scene, candlelit practical set, theatrical blocking" -- same Shakespearean-token assumption as portrait_look.
+   - `plate_look`: "photoreal practical stage set, candlelit interior" (drop "period interior"; surroundings are story per §4(b)).
+   - `image_grade_tail`: drop "crisp costume detail" (garment). Keep lighting/lensing.
+   - Deterministic fallback `nodes/_otr_story_brief_helpers.py:567`: replace `"a period-dressed character, face clearly visible"` with `"a character, face clearly visible"`. Do not infer dress from setting (that is a classifier).
+   - House-frame radio strings (`open_subjects.*`, `announcer_subject_*`): not character garments. Leave unless Q3 says the word "period" on the PROP is in scope; if yes, "period stage radio" -> "stage radio", "period dials" -> "dials".
+
+4. [§5 Q3] House frame (`announcer_visual` / `kind=scene_beat`) must not share dramatic-world dress, and today it does. `derive_scene_still_targets` (`otr_meta_brief_image_prompt.py` ~1376-1384) maps non-`CHARACTER_BEARING_ROLES` to `kind=scene_beat`; composer leads with `get_open_subject` (faceless radio, `_otr_story_brief_helpers.py` ~440-471, `open_subjects.announcer` for role `announcer_visual`) then always appends `positive_tail`. That is a sufficient mechanism for still_000: radio subject + dining-room setting + "period costume detail" -> diffusion paints a costumed man in a kitchen. Do not add a second dress policy or a second `positive_tail`. The M3 positive_tail rewrite is the house-frame fix. Radio-host portraits (`build_radio_host_prompt`) already avoid person style-anchors (`otr_meta_brief_image_prompt.py` ~262-268); keep it that way -- do not route announcer stills through `_style_anchor_for_aspect`.
+
+5. [§5 Q5 / §6] Acceptance is unspecified and the dangerous claim is still nearby. Provable gates (pytest on composed strings / loaded JSON, not pixels, not a runtime checker):
+
+   - Loaded in-scope pack objects contain no substring `period costume` / `period-dressed` / `period-accurate costume`.
+   - `compose_still_prompt(..., kind="scene_character"|"portrait")` with empty appearance does not contain `period-dressed`.
+   - Fixture: `meta={"visual_style":"shakespeare_stage_realism","story_brief_terms":{"setting":["Los Angeles dining room"]}}` -> scene_character, scene_beat, plate, and `_style_anchor_for_aspect` outputs contain the setting (where that path carries setting) and do not contain `period costume`.
+   - `_build_char_scene_request` / `_build_char_prompt_request` for that meta: `style_look` / instruction look do not contain `period costume`.
+   - Explicitly out of acceptance: identical clothing across beats; any claim the sampler will render modern dress; any new publication veto.
+
+   Do not add a generation-time forbidden-word list (§6). A unit assert on authored pack strings is config, not that gate.
+
+SHOULD-FIX:
+1. [§2 fact 6] `_rewrite_char_scene_from_source` instruction never mentions garment/era. After M3, the candidate should already lack pack costume. If rewrite still elaborates ruffs from "Shakespearean" leftovers, that is the arbitration hole. Smallest add (My Story only): one sentence that garments and interiors follow source setting/action, and style instructions are medium/light/framing only. Not a content gate. Does nothing for Shakespeare/PD (no `raw_fields_from_ledger`).
+2. [shot_lock vs image] Unify empty-setting behavior or document it: video `_FALLBACK_SETTING` "a vintage radio studio" vs image empty. Leaving it will reintroduce period-studio on character_video when the brief fails (`story_brief_status=failed` clears setting lists, `_otr_story_brief.py` ~453-456).
+3. [sci_fi_radio as default] If pack scope is shakespeare-only, say so in the spec: default-style present-day episodes keep "period-accurate costume" on every portrait (`get_visual_style` empty id -> sci_fi_radio). That is a known residual, not an accident.
+4. [`finish_visual_prompt` in `otr_shot_lock.py` ~1645-1654] Bare `except` swallows style resolution; call is `finish_visual_prompt(meta, text_prompt)` with no `style=` and default `era_profile="full"`. Pre-existing. After a pack edit this path still appends `positive_tail`. Do not "fix" the swallow in this arc unless you are already touching the call; do pass the resolved style if the composer entry is open.
+
+OPTIONAL / NICE-TO-HAVE:
+- Align the two `_appearance_for_char` key chains (image vs shot_lock). Not required to remove pack costume.
+- `image_grade_tail` "crisp fabric/set texture" instead of deleting the clause.
+- Ghost `MOTIF_FALLBACK_POOLS` is a costume inventor on one video family; out of scope for the 09 stills unless Ghost is in the four-machine wave.
+
+CUT THESE:
+1. Era-aware style eligibility -- already cut in §4(a); `resolve_style_selection` stays independent. Reopening it contradicts the operator full-pool rule and cannot fix an explicitly selected pack.
+2. Pack schema / new keys / `meta.period` / StoryBriefModel era field -- `validate_pack` already allows rewriting existing strings; reflection is era-neutral on purpose. A new era field is a classifier.
+3. Extending `raw_fields_from_ledger` / source rewrite to adaptation banks -- that is bank-shaped routing (§5 Q2 / §6 Macbeth fidelity defect).
+4. Per-role `positive_tail` or a house-frame-only costume strip -- shared field rewrite (M3) is enough; a second tail is a schema change `validate_pack` would reject without a new key.
+5. Runtime costume checker, retry, or publication veto -- §6.
+6. Wardrobe continuity / outfit lock -- ripped 2026-08-27 (`otr_shot_lock.py` ~192-197); 09 receipt leaves clothing continuity unqualified (§5 Q5).
+7. Teaching the casting Face/Presence/Voice contract to author clothes -- new writer, story-adjacent, not needed if unspecified wardrobe is accepted (M2).
+
+[ASSUMPTION] §4 operator decision stands: `shakespeare_stage_realism` is theatrical treatment without mandatory Elizabethan clothing. If the operator wants that pack to always period-dress, M2-M4 are wrong and eligibility (§4a) returns; this document cannot be implemented until that bit is explicit.
