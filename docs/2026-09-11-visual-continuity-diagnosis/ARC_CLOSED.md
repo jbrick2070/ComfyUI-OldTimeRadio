@@ -9,7 +9,23 @@ should be.** This is a real result, not an abandoned task. The arc's job was to
 pressure-test a design, and the design did not survive -- on engineering grounds from
 three independent reviewers, and on product grounds from the operator.
 
-## What was actually wrong (this part is solid and worth keeping)
+## READ THIS BEFORE REOPENING -- operator framing, 2026-09-11
+
+Operator, closing the arc: *"I realize my visual pack and story source combined is
+quite complex. I'm not expecting anything exact -- this is a fun experimental app."*
+
+**So this was never a correctness requirement, and a future session should not treat
+it as one.** The pack-plus-story combination is a deliberately open-ended, generative
+system; a Shakespearean staging of an LA dinner is emergent behaviour from combining
+two independent surfaces, not a broken contract. Exactness is not the goal and was
+never promised.
+
+The word "defect" appears below because that is how the observation entered the
+record. Read it as *an observation worth understanding*, not a bug awaiting a fix.
+Everything below is kept so the mechanism is known if it is ever wanted -- not as an
+open work item. **Do not reopen this as a bug hunt.**
+
+## What was observed (this part is solid and worth keeping)
 
 Canonical09 is a present-day **Los Angeles** dinner (the Bay Area is a spoken memory
 and the title) that rolled the `shakespeare_stage_realism` visual style. In the
