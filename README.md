@@ -24,9 +24,10 @@ fresh canonical source recovery remains unproven. The first 5080 recovery attemp
 failed during story writing. The second published, but exposed source metadata,
 casting credits and scene-fidelity defects. Those follow-up fixes are reviewed
 and offline tested. The third attempt preserved corrected source metadata but
-failed treatment writing after its three allowed attempts. A further repair
-context omission was found; source qualification remains open. See the
-[repair receipt](docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md).
+failed treatment writing after its three allowed attempts. The fourth also
+exhausted treatment writing after the repair-context correction. Source
+qualification remains open; see the
+[recorded diagnosis](docs/2026-09-11-my-story-treatment-clarification/qualification_receipt.md).
 The next qualified revision and machine sequencing come from [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 Existing model-matrix proof retains its recorded scope and does not establish
 source fidelity for the repaired My Story flow. See the
@@ -600,11 +601,11 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | fits | **tight** |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **proven** | measured | **no** |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** |
-**My Story on the 5080:** the three recorded Qwen3.5-4B/NF4 recovery attempts
-include two treatment-writing failures and one publication with source-fidelity
-defects. That is zero source-qualified recovery episodes; it does not erase the
+**My Story on the 5080:** the four recorded Qwen3.5-4B/NF4 recovery attempts,
+across their recorded code revisions, include three treatment-writing failures
+and one publication with source-fidelity defects. That is zero source-qualified recovery episodes; it does not erase the
 older matrix's platform-specific proof. Follow
-[the current repair receipts](docs/2026-09-11-my-story-treatment-followup/)
+[the current diagnostic receipts](docs/2026-09-11-my-story-treatment-clarification/)
 and [GO_FORWARD](docs/GO_FORWARD_PLAN.md) for the next qualified revision.
 
 **How you get the weights.** **auto** -- fetched on first use, no account and no

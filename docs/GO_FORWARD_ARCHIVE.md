@@ -1,5 +1,28 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- canonical attempt04 measured; next family qualification
+
+Completed instruction block, verbatim:
+
+**Next action: ONE fresh full canonical 5080 pair-lock attempt04 on the pushed
+treatment repair-context correction.** Use the real
+`workflows/otr_canonical.json` and shipped full API runner. Keep exactly the
+pairlock_01 source, Qwen3.5-4B model pair, NF4/SDPA, `otr_w45_still_pan` and
+sampling controls; record the qualified checkout/canonical hashes and actual
+attempts. Do not change sampling or the treatment prompt in the same measurement.
+If a raised completion reaches final repair, verify the actual full captured
+draft is supplied and the correction is applied within the existing three
+attempts. Preserve any failure before another run; never restart the budget.
+
+Keep attempts01/02/03 in the denominator. Source qualification still requires
+both adults sharing the present-day meal, distinct absent girlfriend, preserved
+metadata, actual voice/credits agreement, accepted prompts and inspected pixels,
+and zero between-act music. Publication alone is insufficient. Later stress
+coverage and a fresh Original credit publication remain below. Diagnosis,
+grounded reviewer disagreements, CPU quote-admission limits and code evidence
+are in `docs/2026-09-11-my-story-treatment-followup/`.
+
+
 ## 2026-09-11 -- F1 source-correction code checkpoint
 
 Receipt: 2026-09-11-my-story-cross-machine/f1_rewrite_receipt.md. Final 236 focused;

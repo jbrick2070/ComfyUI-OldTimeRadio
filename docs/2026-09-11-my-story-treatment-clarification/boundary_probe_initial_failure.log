@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\probe_pairlock_04_native_boundary.py", line 31, in <module>
+    class BoundaryRecorder:
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\probe_pairlock_04_native_boundary.py", line 33, in BoundaryRecorder
+    generation_config = GenerationConfig.from_pretrained(snapshot, local_files_only=True)
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\transformers\generation\configuration_utils.py", line 1001, in from_pretrained
+    resolved_config_file = cached_file(
+                           ^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\transformers\utils\hub.py", line 293, in cached_file
+    file = cached_files(path_or_repo_id=path_or_repo_id, filenames=[filename], **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\transformers\utils\hub.py", line 395, in cached_files
+    raise OSError(
+OSError: C:\ComfyUI-Models\huggingface\hub\models--Qwen--Qwen3.5-4B\snapshots\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a does not appear to have a file named generation_config.json. Checkout 'https://huggingface.co/C:\ComfyUI-Models\huggingface\hub\models--Qwen--Qwen3.5-4B\snapshots\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a/tree/main' for available files.

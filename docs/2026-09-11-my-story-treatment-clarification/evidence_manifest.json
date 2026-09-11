@@ -1,0 +1,170 @@
+[
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_attempt_1_prompt.txt",
+    "bytes": 9530,
+    "sha256": "35d768c9f829d502d24261d92bebf1157c7fe03d3ea967d5cc5e64a09c9beb8c",
+    "git_blob_oid": "7807be8f0bee99a803a6a168fbdad2609fa88b8c"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_attempt_2_prompt.txt",
+    "bytes": 9530,
+    "sha256": "35d768c9f829d502d24261d92bebf1157c7fe03d3ea967d5cc5e64a09c9beb8c",
+    "git_blob_oid": "7807be8f0bee99a803a6a168fbdad2609fa88b8c"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_attempt_3_prompt.txt",
+    "bytes": 17671,
+    "sha256": "c27a0d0bc7d8ee529788f4588f6359e4b55b8e724ff1476b6c986d54ff300386",
+    "git_blob_oid": "63b657d224fd96db55d6d310e82788d3dca8e749"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_constructor_failure.log",
+    "bytes": 338,
+    "sha256": "fdef07256bd845d6ec0f7e3b984225806ed06280bba01b4592ec059e03bf6495",
+    "git_blob_oid": "34c47c8866ec34a41e0e6362d2a7b5cbb4cb1539"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_initial_failure.log",
+    "bytes": 1557,
+    "sha256": "04e242dbb2d53d67582ade2c840abf33667802eb8f5ff9d82802d9db78ca876d",
+    "git_blob_oid": "2dcaa768fbcc91e14fddb4a63b4449e7da302a29"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_pack_fixture_failure.log",
+    "bytes": 867,
+    "sha256": "04199759485914acb3eff88e13c707725b53d86316240ae95916b1548138449d",
+    "git_blob_oid": "a874da4faf62ba0b6f6c385e6bfe71c563866351"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_shortened_error.json",
+    "bytes": 2679,
+    "sha256": "a8417c592e0b32477a5de49902d788d2da917741f73b97c5d94c76a31ceec87e",
+    "git_blob_oid": "df21cedced061d6aacf1374de5d71a867cd2666c"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_shortened_error.log",
+    "bytes": 4378,
+    "sha256": "a501169f1c5110fd3bad431461415fc800034fb30a42dab68698cea9f72f7d5b",
+    "git_blob_oid": "a5470f39a3a47e4070c68cfd5a1268c40af76fb5"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe_source.txt",
+    "bytes": 5577,
+    "sha256": "4054b279958a3668865ad7edfb0670f373287ed07a6b04e9c29a87b4f9f4827f",
+    "git_blob_oid": "d9b25e8d1ced975ea87b05cccce5aa682d898fb0"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe.json",
+    "bytes": 2679,
+    "sha256": "1f276717216772c9a262f638f9fba4a82d96769a860eded74dd376e4cf4cb475",
+    "git_blob_oid": "5ab1b6aadc05b79eb05bc1b82aa66c04aed441ec"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/boundary_probe.log",
+    "bytes": 4543,
+    "sha256": "8580f374fb58d69c1e1e6c4765c43b3ddaf448fef1bdb1e8ed5875c04fc95e2e",
+    "git_blob_oid": "adaf16f75022e98da86a5b6aa5647aaeb2330517"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/canonical_audit.log",
+    "bytes": 619,
+    "sha256": "4896aa49c47039b4dd628a983c5f8895de2603ecdfb0f5fba76974eae03763d2",
+    "git_blob_oid": "631706f94b972832598ddc36d091abade507a41b"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/completion_comparison.json",
+    "bytes": 574,
+    "sha256": "c54aa59d0cb435b40fccef33de3fb1aa7f49410b159641fe3739a3baaadaac00",
+    "git_blob_oid": "6cda9670f121acd01c950df1c954e855e6e335fa"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/driver_anchor.md",
+    "bytes": 23659,
+    "sha256": "004d35796f196071aa27441b8126d5600a9bd048b487f8515f1e56a2dae38937",
+    "git_blob_oid": "8e5fc86cc7a2705d6587a16c91eb99d78f027ad4"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/opus_grounding.md",
+    "bytes": 12159,
+    "sha256": "fb0e5e2f006c8461b5815daa0332bdc35e58fb46729ab9141ac409e612f3bec8",
+    "git_blob_oid": "e034a4b1e85657fb71e35e8d9dfb69c07005ce1c"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/qualification_receipt.md",
+    "bytes": 7855,
+    "sha256": "dc8e6df632402ec805082003bdab3eb71bd62fa71103dd34df60a3c636266ded",
+    "git_blob_oid": "725b1769ad9d4004623b5edb953b4165660637c9"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/opus_final/anthropic__claude-opus-latest.md",
+    "bytes": 3330,
+    "sha256": "e3d8321224c0797da3ea590b5ff845149433749c2f7631926c00d498d0aa0d57",
+    "git_blob_oid": "cdf25ac32f3ecce68fb280604fdb778649bc1df2"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/opus_final/manifest.json",
+    "bytes": 520,
+    "sha256": "56b4f0f4732d9aff8d4c728d1b667e38d0ff6c0aaf1001083978d81f4d0279cc",
+    "git_blob_oid": "74c897f444a6a0389888b4bae684b37d89cdcd53"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/roundtable/pass01/anthropic__claude-opus-latest.md",
+    "bytes": 4473,
+    "sha256": "0b5dbf7fa169a4f24fc1ccb7785ce7810c7b7569411a999149cad5bc20158753",
+    "git_blob_oid": "e341a2c024cfdc3fbd6ef4784ad5597091257b63"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/roundtable/pass01/google__gemini-pro-latest.md",
+    "bytes": 3103,
+    "sha256": "a7dbebf9d78f21ddd3a16c6676b798752df3854409812f690e10b753ad3b28a2",
+    "git_blob_oid": "af68b38e6dfd04b9bd2225f1e62278f20334055a"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-treatment-clarification/roundtable/pass01/manifest.json",
+    "bytes": 838,
+    "sha256": "d8b43a31d5d251b4e48a25d59c42af42e524bf0d747b5c6c9f17314b4a1784dd",
+    "git_blob_oid": "f4ae4a57eab47f3d78ded92cff197e76fc305b8d"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_history.json",
+    "bytes": 25056,
+    "sha256": "b9b2f53bc130f63760807006ace2f96ef458f54fde693254dd2416c0d34bbb5b",
+    "git_blob_oid": "791e1cfa4ae9fd1aa9521fffcb9a52e95e48b9cc"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_ledger.json",
+    "bytes": 41113,
+    "sha256": "3c65d17bca067f508367f76ea98812e390b8b2cf378b8cf953f2cfe17129dfe6",
+    "git_blob_oid": "49317ccc9c2969aeb202fa657cfbd3796ff8d26f"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_prequeue_boot_not_ready.log",
+    "bytes": 6037,
+    "sha256": "273e3ac912c6d527f560f0e6818d17d7c7c8a1e0a9403d3a56591b4229ad3185",
+    "git_blob_oid": "1bb5a0815684a47508ca59154a1f5a25c4639139"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_prompt.json",
+    "bytes": 11845,
+    "sha256": "5c80abd1e23f399faedff8c4b31288a0d27762e64e36f25750c022c4e7680dac",
+    "git_blob_oid": "df78163aa10e83d4a0b792046e16b5be1f4a5167"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_request.json",
+    "bytes": 3989,
+    "sha256": "79e6ff116ef3b9dcf2cbb5a05402aea50a1aa7f72c30f67bedafb9e5fc775518",
+    "git_blob_oid": "7d3c02aee3345795467d9115976f602c895cefa4"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_runner.log",
+    "bytes": 17201,
+    "sha256": "c7896095fbf1898957c76ebf7a5d47e5cf6309caa43b37d99a531d6cae7ae9e1",
+    "git_blob_oid": "693fba674388002625d76672c81ec53e30d87595"
+  },
+  {
+    "path": "docs/2026-09-11-my-story-5080-qualification/pairlock_04_server.log",
+    "bytes": 53084,
+    "sha256": "5ecdfa1f9494f0572dccf31ca488913a97c3be3d03d81e997180cff06214d621",
+    "git_blob_oid": "feda97d6fff87bae8184db7da1442fbd0273e0e3"
+  }
+]

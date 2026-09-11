@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\probe_pairlock_04_native_boundary.py", line 73, in <module>
+    story._pass_treatment(scheduler.for_slot('creative'), pack,
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 518, in _pass_treatment
+    {"role": "system", "content": _seam(pack, "my_story_treatment_system")},
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 309, in _seam
+    raise MyStoryError(name, "the story pack declares no %r seam" % name)
+nodes._otr_my_story.MyStoryError: [my_story] pass 'my_story_treatment_system' failed: the story pack declares no 'my_story_treatment_system' seam

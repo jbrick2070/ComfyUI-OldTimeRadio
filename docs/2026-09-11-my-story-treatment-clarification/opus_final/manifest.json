@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T11:06:10.950395+00:00",
+  "doc": "docs/2026-09-11-my-story-treatment-clarification/opus_grounding.md",
+  "prompt_tokens_est": 3022,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 4463,
+      "completion_tokens": 2701,
+      "cost_usd": 0.08984,
+      "max_tokens": 9000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.0898
+}

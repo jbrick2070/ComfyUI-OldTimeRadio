@@ -1,3 +1,32 @@
+## 2026-09-11 -- attempt04 failed; grounded model-family qualification next
+
+Full canonical attempt04 on d2837e45 failed P1 naturally after three calls,
+386.22 seconds; no lines, freeze or media. P0 and its sparse correction preserved
+all accepted metadata, including male Jeffrey, female Mother and nonspeaking,
+absent Girlfriend. P1 repeated inside logline at 224/1568/1568 tokens. Native
+EOS worked for P0/correction. The full failed ledger, history and logs are saved;
+server stopped selectively after archival, port8000 empty, desktop2055MiB.
+
+Actual Opus5/Gemini3.1 diagnosis challenged a title-only prompt edit. Root's
+CPU-only reconstruction exercised the real treatment ladder, scheduler, native
+prompt preparation and actual cached tokenizer/LMFE at a recording generate
+boundary: .85/.5/.1, do_sample=True, full raw source, distinct full repair input,
+fresh grammar, no supplied KV cache. Token counts2327/2327/4032 match live04.
+Attempts2/3 were similar, not byte-identical. No retry-routing code defect found.
+This is diagnostic evidence, not model sampling or a successful episode.
+
+No production change; prior Sonnet QA/full regression/Bible remain applicable.
+GO_FORWARD selects one unchanged-code full canonical Mistral Nemo pair attempt
+using the already-installed supported profile. Family compatibility evidence
+cannot by itself prove a Qwen cause. Four prior attempts remain recorded: three
+writing failures and one source-defective publication, zero source-qualified.
+Review claims, limitations, probe setup failures and actual costs are retained in
+docs/2026-09-11-my-story-treatment-clarification/qualification_receipt.md.
+Cursor follow-up review remains unavailable after two timeouts. Mac/4060 held;
+RunPod lacks authenticated access, no rental started.
+
+---
+
 ## 2026-09-11 -- raised completion reaches My Story's final repair
 
 Canonical03 on97f2d40f failed P1 after three verbatim cycles,408.62seconds,

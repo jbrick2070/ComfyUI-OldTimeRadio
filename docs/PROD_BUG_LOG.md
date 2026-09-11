@@ -14055,6 +14055,25 @@ EOS alignment and fresh parser ownership were verified separately. No new length
 time, story-quality or cast gate is justified. Raw03artifacts and diagnosis:
 2026-09-11-my-story-5080-qualification/ and2026-09-11-my-story-treatment-followup/.
 
+### Pairlock_04 measurement after the repair-context fix
+
+On d2837e45, full canonical prompt ff0f3b5a-595d-4732-9ddc-e85be8debde6
+still exhausted P1 naturally after three verbatim-cycle halts (224/1568/1568
+tokens, 386.22 seconds), without media. P0/correction completed on EOS248046
+and preserved accepted metadata. This result does not undo the demonstrated
+repair-context fix, but it does not establish successful recovery either.
+
+The first attempt echoed the prompt's ambiguous title instruction, "no quotation
+marks," inside logline. Later attempts copied broader schema instructions.
+The wording is a static ambiguity with live leakage, not a proven cause or cure
+for the whole failure. No title-only prompt patch or new production bug ID follows.
+Independent Opus/Gemini review and a CPU-only reconstruction of the real ladder,
+scheduler, tokenizer and native boundary found full source/latest failed draft,
+distinct final repair input, intended temperatures and fresh grammar. Exact
+reconstructed prompt sizes match live telemetry; original live prompt/logits are
+not captured. Source artifacts and qualification limits remain in
+2026-09-11-my-story-treatment-clarification/ and pairlock_04_*.
+
 ## PBUG-20260910-02 -- supplemental My Story music rows invented parent beat references
 
 - promotion: BUG-12.58 (existing line-versus-parent identity rule)

@@ -1,0 +1,95 @@
+"""CPU reconstruction of saved P1 through the real ladder and native boundary.
+
+No model weights, sampled tokens, server, media, or production edits. The model
+boundary records its inputs and raises the archived failure for each attempt.
+"""
+from pathlib import Path
+import os, sys, json, hashlib
+from types import SimpleNamespace
+from unittest.mock import patch
+
+os.environ['OTR_TEST_MODE'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+from transformers import AutoTokenizer, GenerationConfig
+from nodes import OTR_LedgerScriptWriter as writer
+from nodes import _otr_my_story as story
+from nodes._otr_generation_budget import GenerationDegeneracyError
+from nodes._otr_structured_call import StructuredCallFailedError
+
+out = root / 'docs/2026-09-11-my-story-treatment-clarification'
+evidence = root / 'docs/2026-09-11-my-story-5080-qualification'
+ledger = json.loads((evidence / 'pairlock_04_ledger.json').read_text(encoding='utf-8'))
+saved = ledger['meta']['my_story']
+failures = [a for a in saved['attempts'] if a['pass_id'] == 'treatment']
+fields = ledger['meta']['source_meta']['story_input']['fields']
+snapshot = Path('C:/ComfyUI-Models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a')
+tokenizer = AutoTokenizer.from_pretrained(snapshot, local_files_only=True)
+observations, callbacks = [], []
+
+class BoundaryRecorder:
+    device = 'cpu'
+    # This snapshot has no generation_config.json: use its actual text decoder
+    # EOS plus the native owner's tokenizer union, without loading weights.
+    generation_config = GenerationConfig(eos_token_id=json.loads(
+        (snapshot / 'config.json').read_text())['text_config']['eos_token_id'])
+
+    def generate(self, **kwargs):
+        i = len(observations)
+        ids = kwargs['input_ids'].tolist()[0]
+        prompt = tokenizer.decode(ids, skip_special_tokens=False)
+        callback = kwargs['prefix_allowed_tokens_fn']
+        assert not callback.token_enforcer.prefix_states
+        assert all(callback is not prior for prior in callbacks)
+        callbacks.append(callback)
+        assert 'past_key_values' not in kwargs
+        record = {name: kwargs.get(name) for name in (
+            'do_sample', 'temperature', 'top_p', 'min_p', 'repetition_penalty',
+            'num_beams', 'eos_token_id', 'max_new_tokens')}
+        record.update(attempt=i + 1, input_tokens=len(ids),
+                      prompt_ids_sha256=hashlib.sha256(json.dumps(ids).encode()).hexdigest(),
+                      prompt_text_sha256=hashlib.sha256(prompt.encode()).hexdigest(),
+                      fresh_grammar=True, supplied_kv_cache=False,
+                      full_source_present=all(value in prompt for value in fields.values() if value),
+                      latest_completion_present=failures[1]['raw_completion'] in prompt)
+        observations.append(record)
+        (out / f'boundary_attempt_{i + 1}_prompt.txt').write_text(prompt, encoding='utf-8')
+        raise GenerationDegeneracyError(
+            failures[i]['error'],
+            halt_reason='verbatim_cycle', raw_completion=failures[i]['raw_completion'])
+
+entry = dict(model=BoundaryRecorder(), tokenizer=tokenizer,
+             model_id='Qwen/Qwen3.5-4B', context_cap=262144,
+             native_context_capacity=262144, context_capacity_source='recorded loaded decoder config')
+scheduler = writer._SlotScheduler(
+    creative_id='Qwen/Qwen3.5-4B', technical_id='Qwen/Qwen3.5-4B',
+    top_p=.95, min_p=.05, repetition_penalty=1.03)
+pack = SimpleNamespace(**json.loads((root / 'nodes/story_packs/my_story/my_story.json').read_text(encoding='utf-8')))
+attempts = []
+with patch.object(scheduler, '_account_and_get_entry', return_value=entry), \
+     patch.object(writer._OTRHB, 'make_streamer', return_value=None):
+    try:
+        story._pass_treatment(scheduler.for_slot('creative'), pack,
+            SimpleNamespace(fields=fields), story.StoryInterpretation.model_validate(saved['interpretation']),
+            act_count=1, requested_characters=2, include_act_breaks=False, attempt_receipts=attempts)
+    except StructuredCallFailedError:
+        pass
+    else:
+        raise AssertionError('The archived three failures must exhaust the same ladder')
+assert len(observations) == 3
+assert [r['temperature'] for r in observations] == [.85, .5, .1]
+assert all(r['do_sample'] is True and r['full_source_present'] for r in observations)
+assert observations[0]['prompt_ids_sha256'] == observations[1]['prompt_ids_sha256']
+assert observations[1]['prompt_ids_sha256'] != observations[2]['prompt_ids_sha256']
+assert observations[2]['latest_completion_present']
+assert [r['input_tokens'] for r in observations] == [2327, 2327, 4032]
+receipt = {
+    'scope': 'CPU-only reconstruction using actual saved source, accepted interpretation, current pack, shared ladder, scheduler, native prompt preparation and installed Qwen tokenizer/LMFE. No model weights or real generation.',
+    'limits': 'Not captured live04 prompt/logits. Native generate boundary is replaced by the recorder. No claim about actual model-internal cache or probability distribution. Error framing is reconstructed using current exception constructor.',
+    'model_snapshot': str(snapshot), 'observations': observations,
+    'captured_attempts': len(attempts),
+    'raw_attempt_2_equals_3': failures[1]['raw_completion'] == failures[2]['raw_completion'],
+}
+(out / 'boundary_probe.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
+print(json.dumps(receipt, indent=2))

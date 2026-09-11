@@ -244,6 +244,15 @@ still alive. Check the queue, runner exit code, history result, log, and file.
 
 ## 8. Keep GPU experiments clean and comparable
 
+Pairlock_04 (2026-09-11): equal generated-token and cycle counts do not imply
+identical outputs, prompts or ignored sampling. Compare actual captured text;
+exercise the owning ladder through tokenizer preparation and native kwargs
+before inventing a transport fix. A recording CPU boundary proves requested
+inputs and controls, not model-internal behavior or sampled probabilities.
+Preserve diagnostic fixture failures and distinguish reconstructed prompts from
+captured live prompts. A different-family success is compatibility evidence,
+not a binary proof of another model's failure cause.
+
 Before every headless run, selectively stop only ComfyUI and its harnesses,
 clear port 8000, and confirm baseline VRAM. Never blanket-kill Python. Boot with
 UTF-8 through the canonical launcher. Save one server log and one leg log per

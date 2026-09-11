@@ -1,0 +1,72 @@
+{
+  "scope": "CPU-only reconstruction using actual saved source, accepted interpretation, current pack, shared ladder, scheduler, native prompt preparation and installed Qwen tokenizer/LMFE. No model weights or real generation.",
+  "limits": "Not captured live04 prompt/logits. Native generate boundary is replaced by the recorder. No claim about actual model-internal cache or probability distribution. Error framing is reconstructed using current exception constructor.",
+  "model_snapshot": "C:\\ComfyUI-Models\\huggingface\\hub\\models--Qwen--Qwen3.5-4B\\snapshots\\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "observations": [
+    {
+      "do_sample": true,
+      "temperature": 0.85,
+      "top_p": 0.95,
+      "min_p": 0.05,
+      "repetition_penalty": 1.03,
+      "num_beams": 1,
+      "eos_token_id": [
+        248044,
+        248046
+      ],
+      "max_new_tokens": 259817,
+      "attempt": 1,
+      "input_tokens": 2327,
+      "prompt_ids_sha256": "f04216961755e32654622c619fac719253d286821ca1aa4fcb79335b6320f05d",
+      "prompt_text_sha256": "5d2fb73eb63a779ee1686401df8ecdf72e6556bbb38a68e85f062470d061b6e1",
+      "fresh_grammar": true,
+      "supplied_kv_cache": false,
+      "full_source_present": true,
+      "latest_completion_present": false
+    },
+    {
+      "do_sample": true,
+      "temperature": 0.5,
+      "top_p": 0.95,
+      "min_p": 0.05,
+      "repetition_penalty": 1.03,
+      "num_beams": 1,
+      "eos_token_id": [
+        248044,
+        248046
+      ],
+      "max_new_tokens": 259817,
+      "attempt": 2,
+      "input_tokens": 2327,
+      "prompt_ids_sha256": "f04216961755e32654622c619fac719253d286821ca1aa4fcb79335b6320f05d",
+      "prompt_text_sha256": "5d2fb73eb63a779ee1686401df8ecdf72e6556bbb38a68e85f062470d061b6e1",
+      "fresh_grammar": true,
+      "supplied_kv_cache": false,
+      "full_source_present": true,
+      "latest_completion_present": false
+    },
+    {
+      "do_sample": true,
+      "temperature": 0.1,
+      "top_p": 0.95,
+      "min_p": 0.05,
+      "repetition_penalty": 1.03,
+      "num_beams": 1,
+      "eos_token_id": [
+        248044,
+        248046
+      ],
+      "max_new_tokens": 258124,
+      "attempt": 3,
+      "input_tokens": 4020,
+      "prompt_ids_sha256": "b6ac9f5c4d4b328addccb3aff46f7f65ce807c94b8c81adfb7b391dd0f61b99f",
+      "prompt_text_sha256": "582ec9f453b06f6c344502ba9ce501c33414a2571fec01136a11529dc2cce4d6",
+      "fresh_grammar": true,
+      "supplied_kv_cache": false,
+      "full_source_present": true,
+      "latest_completion_present": true
+    }
+  ],
+  "captured_attempts": 3,
+  "raw_attempt_2_equals_3": false
+}

@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\tmp\probe_pairlock_04_native_boundary.py", line 65, in <module>
+    scheduler = writer._SlotScheduler(
+                ^^^^^^^^^^^^^^^^^^^^^^
+TypeError: _SlotScheduler.__init__() got an unexpected keyword argument 'device'
