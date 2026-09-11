@@ -277,6 +277,11 @@ def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_
     slot = Slot({"edits": [_edit()]})
     receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
     assert len(slot.calls) == 1 and receipt["applied"]
+    system = slot.calls[0][0]["content"]
+    assert "A partial artifact need not repeat source facts outside its scope." in system
+    assert "An act need not repeat every fact" not in system
+    assert "Preserve compatible elaboration and unaffected wording." in system
+    assert "unrelated byte unchanged. Never change speakers, order or ids." in system
     assert data["lines"][0]["text"] == "  Keep this. Mother lives.  Keep that!"
     assert data["lines"][1] == before["lines"][1]
     assert data["lines"][0]["speaker"] == "Ada"

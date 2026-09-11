@@ -1,0 +1,127 @@
+from pathlib import Path
+from collections import Counter
+import ast
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import xml.etree.ElementTree as ET
+
+ROOT=Path(__file__).resolve().parents[1]
+BIBLE=ROOT.parents[1]/'comfyui-custom-node-survival-guide'
+OUT=ROOT/'docs/2026-09-11-my-story-source-authority'
+FILES=['nodes/_otr_my_story.py','nodes/_otr_story_source.py',
+       'nodes/story_packs/my_story/my_story.json',
+       'tests/test_my_story_runner.py','tests/test_story_source_review.py']
+
+def tally(path):
+    return dict(Counter('failure' if c.find('failure') is not None else 'error'
+        if c.find('error') is not None else 'xfail' if c.find('skipped') is not None
+        and c.find('skipped').get('type')=='pytest.xfail' else 'skip'
+        if c.find('skipped') is not None else 'pass' for c in ET.parse(path).iter('testcase')))
+
+def failures(path):
+    result={}
+    for c in ET.parse(path).iter('testcase'):
+        f=c.find('failure')
+        if f is None: f=c.find('error')
+        if f is not None: result[c.attrib['classname']+'::'+c.attrib['name']]=f.text or ''
+    return result
+
+def norm(text):
+    text=re.sub(r'otr-source-authority-(?:baseline|candidate)','PACK',text)
+    text=re.sub(r'0x[0-9a-fA-F]+','ADDRESS',text)
+    text=re.sub(r'pytest-[0-9]+','pytest-N',text)
+    text=re.sub(r'pytest_[a-zA-Z0-9_]+[\\/]','pytest_TEMP/',text)
+    text=re.sub(r'^py_files = .*$', 'py_files = <truncated fixture repr>',text,flags=re.M)
+    text=re.sub(r'(E\s+Differing items:\n)((?:E\s+\{[^\n]+\n)+)',
+                lambda m:m[1]+''.join(sorted(m[2].splitlines(keepends=True))),text)
+    return text
+
+def compare(before,after,name):
+    b={norm(k):norm(v) for k,v in failures(before).items()}
+    c={norm(k):norm(v) for k,v in failures(after).items()}
+    record={'baseline':tally(before),'candidate':tally(after),
+        'new_failures':sorted(c.keys()-b.keys()),'fixed_guards':sorted(b.keys()-c.keys()),
+        'changed_normalized_failure_payloads':sorted(k for k in b.keys()&c.keys() if b[k]!=c[k])}
+    (OUT/name).write_text(json.dumps(record,indent=2)+'\n',encoding='utf-8')
+    return record
+
+def evidence():
+    checks=[]
+    for relative in FILES:
+        path=ROOT/relative;data=path.read_bytes()
+        assert data and not data.startswith(b'\xef\xbb\xbf')
+        text=data.decode('utf-8')
+        if path.suffix=='.py': ast.parse(text,filename=relative,feature_version=(3,10))
+        else: assert json.loads(json.dumps(json.loads(text)))==json.loads(text)
+        checks.append({'path':relative,'sha256':hashlib.sha256(data).hexdigest(),
+                       'utf8_no_bom':True,'python_310_parse':path.suffix=='.py'})
+    canonical=ROOT/'workflows/otr_canonical.json'
+    assert hashlib.sha256(canonical.read_bytes()).hexdigest()=='d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c'
+    (OUT/'file_checks.json').write_text(json.dumps(checks,indent=2)+'\n',encoding='utf-8')
+    comparisons={}
+    comparisons['bible']=compare(ROOT/'tmp/source_authority_bible_baseline.xml',ROOT/'tmp/source_authority_bible_candidate.xml','bible_comparison.json')
+    if (ROOT/'tmp/source_authority_full.xml').exists():
+        try:
+            comparisons['full']=compare(ROOT/'docs/2026-09-11-my-story-source-field-followup/tests/source_field_final_full.xml',ROOT/'tmp/source_authority_full.xml','full_comparison.json')
+        except ET.ParseError:
+            comparisons['full']='still running'
+    else: comparisons['full']='still running'
+    comparisons['focused']=tally(ROOT/'tmp/source_authority_focused_final.xml')
+    comparisons['before_fix']=tally(ROOT/'tmp/source_authority_before_fix.xml')
+    return comparisons
+
+if __name__=='__main__':
+    result=evidence()
+    diff=subprocess.check_output(['git','diff','--',*FILES],cwd=ROOT,encoding='utf-8')
+    bible_diff=subprocess.check_output(['git','diff','--','BUG_BIBLE.yaml','tests/bug_bible_regression.py'],cwd=BIBLE,encoding='utf-8')
+    packet='''# Sonnet finished-code QA: final act/source scope
+
+Review final actual code/test changes for concrete introduced defects, plus
+practical limits. This is finished-code QA after coding/test revisions, not
+another design campaign. R1-R4 Opus/Gemini reviews and root judgments completed;
+root remains sole judge. Terra independently reviewed source owners; Luna
+reviewed minimum test coverage. Cursor timed out twice, no consensus claimed.
+
+The real canonical06 published with a source-fidelity failure: P0 downgraded
+requested actions; sole-act plan ended in past reminiscence while accepted
+global ending called for present dinner appreciation. P2 foregrounded local
+ending; no source correction changed it. Full source arrived/no accepted edit
+was lost. This change clarifies P0 optionality, P1 coherence, surfaces the
+existing global ending as final-act target and sends static scope through the
+existing correction instruction. Common partial-artifact rule replaces blanket
+act omission, preserving scenes/frames. No source/story literal is forced in
+Python, no dynamic ending in system, no extra calls/limits/receipt/widget/graph.
+Existing no-journal author-only path, flexible cast, selected acts, fixed3author/
+2source attempts, provider/OOM/cancel, actual retained edits remain unchanged.
+
+Tests use the real structured owner (including appended schema contract),
+not fake copied dispatch.1/3/6 acts, cast already heard/unheard, blank/global/
+multiline endpoints, exact suffix not global-text substring, static correction
+scope and no leakage, actual applied/unchanged responses. First focused run
+had41 fixture assertions incorrectly expecting scope at the END of system:
+shared structured owner appends its schema contract. Fixed only these tests
+to assert one exact copy in system; production unchanged. Final246 pass.
+All45 targeted assertions fail against untouched production1e079681 with final
+test files temporarily overlaid; overlay restored and baseline clean afterward.
+Bible finalcandidate38pass/10inherited, baseline37pass/11fail: new coverage
+catalog fails only baseline. Full comparison status below. No quarantine edits.
+Canonical validator/roundtrip/widget/link pass23nodes63links and bytes unchanged.
+CPU saved06 fixture routes capture10acts/20canned calls, no generation/quality
+claim. One new real canonical run ONLY after final QA/regressions/push, then
+inspect source and actual media; cannot attribute a single result to one rule
+or claim reliability. Mac/4060 held; RunPod unauthenticated/no rental.
+
+## Mechanical results
+'''+json.dumps(result,indent=2)+'\n\n## Exact final OTR diff\n```diff\n'+diff+'\n```\n## Exact final Bible diff\n```diff\n'+bible_diff+'\n```\n'
+    packet+='\n## Existing actual owner context\n'
+    for relative,names in [('nodes/_otr_my_story.py',{'_call','_pass_act','_pass_frame','_full_artifact_repair'}),('nodes/_otr_story_source.py',{'rewrite_story_source','rewrite_spoken_from_source'})]:
+        code=(ROOT/relative).read_text(encoding='utf-8');lines=code.splitlines()
+        for n in ast.parse(code).body:
+            if getattr(n,'name',None) in names:
+                packet+='\n### %s:%d\n```python\n%s\n```\n'%(relative,n.lineno,'\n'.join(lines[n.lineno-1:n.end_lineno]))
+    packet+='\n## Root final R4 judgment (claims already grounded)\n'+(OUT/'roundtable/pass03_judgment.md').read_text(encoding='utf-8')
+    (OUT/'finished_sonnet_qa.md').write_text(packet,encoding='utf-8')
+    print(json.dumps(result,indent=2))

@@ -1,0 +1,185 @@
+from pathlib import Path
+import ast
+import hashlib
+import json
+import shutil
+import yaml
+from finish_source_authority import ROOT, BIBLE, OUT, FILES, evidence
+
+result=evidence()
+assert result['focused']=={'pass':246},result
+assert result['before_fix']=={'failure':45},result
+full=result['full'];bible=result['bible']
+assert isinstance(full,dict) and not full['new_failures'] and not full['changed_normalized_failure_payloads'],full
+assert full['candidate']=={'pass':14455,'skip':183,'failure':51,'xfail':1},full
+assert not bible['new_failures'] and not bible['changed_normalized_failure_payloads'],bible
+assert bible['candidate']=={'failure':10,'pass':38,'xfail':3,'skip':11},bible
+testout=OUT/'tests';testout.mkdir(exist_ok=True)
+for path in sorted((ROOT/'tmp').glob('source_authority*')):
+    if path.suffix in {'.log','.xml'}:
+        shutil.copyfile(path,testout/path.name)
+shutil.copyfile(ROOT/'docs/2026-09-11-my-story-source-field-followup/tests/source_field_final_full.xml',testout/'baseline_source_field_final_full.xml')
+for filename in ('probe_authority_routes','finish_source_authority','finalize_authority_receipt'):
+    shutil.copyfile(ROOT/'tmp'/f'{filename}.py',OUT/f'{filename}_source.txt')
+checks=[]
+for relative in ('BUG_BIBLE.yaml','tests/bug_bible_regression.py'):
+    raw=(BIBLE/relative).read_bytes();text=raw.decode('utf-8')
+    assert raw and not raw.startswith(b'\xef\xbb\xbf')
+    if relative.endswith('.py'): ast.parse(text,feature_version=(3,10))
+    else:
+        entries=yaml.safe_load(text)['bugs']
+        assert isinstance(entries,list) and len(entries)==344,len(entries)
+    checks.append({'path':relative,'sha256':hashlib.sha256(raw).hexdigest()})
+(OUT/'bible_file_checks.json').write_text(json.dumps(checks,indent=2)+'\n',encoding='utf-8')
+costs=[]
+for path in sorted((OUT/'roundtable').glob('r*/manifest.json'))+[OUT/'sonnet_qa/manifest.json']:
+    record=json.loads(path.read_text(encoding='utf-8'))
+    for item in record['models']:
+        costs.append({'manifest':path.relative_to(OUT).as_posix(),**item})
+(OUT/'actual_review_usage.json').write_text(json.dumps({'calls':costs,
+    'total_cost_usd':sum(item['cost_usd'] for item in costs)},indent=2)+'\n',encoding='utf-8')
+
+receipt='''# Source/ending ownership: offline qualification complete
+
+The existing My Story final act now receives the episode ending as its explicit
+target when nonblank; earlier acts keep their local endpoint. The same static
+scope reaches its existing correction call. Raw ending data stays in quoted
+context, and returned corrections follow the existing application path. P0
+defines listener-requested versus optional directions; P1 aligns its final plan
+with its global ending. Common correction preserves partial scene/frame scope.
+No extra checker, model pass, retry, source gate, schema, widget or workflow.
+
+## Verification
+
+- Final focused owner/input/registry/visual suite:246 passes.
+- New targeted checks on untouched production1e079681:45 failures. The temporary
+  final-test overlay was restored; controlled baseline is clean. These failures
+  discriminate the changed prompt/routing contracts, not live semantic fidelity.
+- First focused run had41 fixture assertion errors because the shared structured
+  owner appends its schema contract after scope. Corrected those assertions;
+  production unchanged. Raw first/final logs and XML are preserved.
+- Full final regression:14,455 passes,51 inherited failures,183 skips,1 xfail.
+  Every failure ID and normalized payload matches baseline14,411/51/183/1.
+  No new failure, changed inherited failure or quarantine. The process returned
+  nonzero (shell exit1) and printed the known-fail guard, not an all-green suite.
+  Normalization changes addresses, temporary
+  paths, truncated fixture repr and ordering of unequal dict diagnostic entries;
+  actual findings remain compared. Raw XML is preserved.
+- Controlled final Bible candidate:38 passes,10 inherited failures,11 skips,
+  3 xfails. Same final Bible on untouched baseline:37 passes,11 failures. Only
+  the updated behavior-coverage catalog additionally fails baseline; the ten
+  common normalized failures match.344 entries, existing11.39 extended.
+- Full shipped canonical validator/JSON round-trip/widget/link audit passes:
+  23 nodes,63 links. Canonical SHA256 remains
+  d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c.
+- Python3.10 parse/UTF8/noBOM/nonempty checks pass on changed files. CPU-only
+  saved06 source routed through10 cloned1/3/6-act fixtures and20 canned calls;
+  exact current messages and raw source are in offline_prompt_routes.json.
+  It is not a live prompt capture, model completion or qualified episode.
+
+## Review and next measurement
+
+R1 arc, R2 coding, R3 wiring and R4 convergence ran sequentially before code,
+with actual Opus5 and Gemini3.1 Pro reviews and grounded root judgments. Terra
+read actual owners and finished diff; Luna audited minimum test design. Sonnet5
+reviewed finished code after the final test revision. Root disposition and limits
+are in review_judgment.md; no code changed afterward. No unanimous consensus is
+claimed; R4 Opus response is truncated at its budget. Cursor timed out twice in
+prior follow-up and supplied no review. Actual nine API calls cost aboutUSD1.235;
+exact usage is retained in actual_review_usage.json.
+
+Commit AND push this chunk, verify HEAD==origin, then ONE fresh full canonical
+5080 attempt07 with the same dinner source, Mistral pair, profile and controls
+as06. Actual API graph must match06; internal author prompts intentionally
+change. Preserve all terminal results and inspect source, actual applied text,
+voices/credits and pixels. A single run cannot prove which instruction mattered
+or reliability. Missing source facts require preservation/diagnosis before
+another run. Six prior attempts remain3writing failures/3source-defective
+publications/0source-qualified; image extras remain separately unqualified.
+Mac/4060 held until explicit operator release. RunPod lacks authenticated access;
+no rental started. GO_FORWARD is the sole remaining-work queue.
+'''
+(OUT/'qualification_receipt.md').write_text(receipt,encoding='utf-8')
+
+go=ROOT/'docs/GO_FORWARD_PLAN.md';text=go.read_text(encoding='utf-8')
+a=text.index('**Next action: grounded review of source priority')
+b=text.index('**Operator sequencing remains binding.**',a)
+finished=text[a:b]
+archive=ROOT/'docs/GO_FORWARD_ARCHIVE.md';old=archive.read_text(encoding='utf-8')
+entry='## 2026-09-11 -- source/ending review, code and offline QA completed\n\nCompleted instructions, verbatim:\n\n'+finished+'---\n\n'
+archive.write_text(old.replace('# GO_FORWARD -- ARCHIVE\n\n','# GO_FORWARD -- ARCHIVE\n\n'+entry,1),encoding='utf-8')
+text=text[:a]+'''**Next action: ONE fresh full canonical 5080 attempt07 on the pushed
+source/ending correction.** Verify HEAD==origin and final file checks before
+boot. Review/code/offline QA is complete in
+`docs/2026-09-11-my-story-source-authority/qualification_receipt.md`.
+Use the real `workflows/otr_canonical.json` through the shipped canonical API
+runner, with the same dinner source, Mistral pair, profile and controls as06.
+Submitted API graph must match06; internal author/correction prompts have
+intentionally changed. Never substitute a replay, generated graph or partial
+target. Preserve actual attempts, edits, ledger and media, and inspect source
+actions/ending, voices/credits and visible scene people/actions before verdict.
+
+Six prior full canonical attempts remain three writing failures and three
+source-defective publications, ZERO source-qualified episodes. Offline routing
+checks do not change that denominator. No accepted correction was lost in06;
+the model returned unchanged drafts. A new result cannot prove causality or
+reliability. Any missing source fact: preserve and diagnose before another run;
+do not reset budgets or run until lucky. Broader stress and Original credits
+remain open below. Completed06 must not be restarted.
+
+Keep the image failure separate: accepted two-adult prompts reached the
+renderer, but05 added a child and06 added an adult. Do not claim the source
+writer fix guarantees pixels or invent a dropped-prompt defect. Any visual
+implementation needs its own grounded scope.
+
+'''+text[b:]
+go.write_text(text,encoding='utf-8')
+handoff=ROOT/'docs/HANDOFF_LOG.md'
+entry='''## 2026-09-11 -- source/ending ownership qualified offline; canonical07 next
+
+Final act now explicitly targets the existing global ending and shares static
+scope with its existing correction; other phases/budgets/raw source unchanged.
+P0 optionality and P1 endpoint coherence clarified.246 focused pass; full14,455
+pass/51 identical inherited failures/183skip/1xfail. Controlled Bible38pass/
+10 inherited versus baseline37/11; canonical23nodes63links unchanged.45 new
+checks fail before fix. No live source success claimed; six attempts remain
+three writing failures/three source-defective publications/zero qualified.
+
+R1-R4 Opus/Gemini arc completed before code. Terra/Luna bounded audits and final
+Sonnet5 QA completed; root grounded findings, no post-QA code revision. No Cursor
+consensus. Receipts:2026-09-11-my-story-source-authority/. Commit AND push before
+one fullcanonical07 measurement. Mac/4060 held; RunPod no auth/no rental.
+
+---
+
+'''
+handoff.write_text(entry+handoff.read_text(encoding='utf-8'),encoding='utf-8')
+bug=ROOT/'docs/PROD_BUG_LOG.md'
+with bug.open('a',encoding='utf-8') as handle:
+    handle.write('''
+### PBUG-20260910-03 follow-up -- source/ending ownership qualified offline
+
+The live06 mismatch is now addressed inside the existing owners: nonblank
+global ending is the final act's explicit target; static scope reaches its
+author and source corrector without depending on unheard cast. P0 optionality
+and P1 endpoint agreement are explicit; raw source/accepted treatment remain.
+Partial scene/frame scope and existing exact spoken conservation stay intact.
+No new source gate, checker, retry or model pass. This is not proof that the
+model will rewrite an omission:06's no-op was a decision, not a lost result.
+
+246 focused passes; full14,455 passes with51 unchanged inherited failures;
+controlled Bible38pass/10 inherited; canonical23nodes63links unchanged. Existing
+Bible11.39 verification and real-owner coverage extended;45 targeted checks
+fail before fix. R1-R4 and finished Sonnet QA receipts live under
+2026-09-11-my-story-source-authority/. Live closure remains OPEN pending the
+next full canonical measurement and broader source/audio/pixel qualification.
+''')
+records=[]
+for path in sorted(OUT.rglob('*')):
+    if not path.is_file() or path.name=='evidence_manifest.json':continue
+    raw=path.read_bytes();assert raw and not raw.startswith(b'\xef\xbb\xbf')
+    raw.decode('utf-8')
+    records.append({'path':path.relative_to(OUT).as_posix(),'bytes':len(raw),
+                    'sha256':hashlib.sha256(raw).hexdigest()})
+(OUT/'evidence_manifest.json').write_text(json.dumps(records,indent=2)+'\n',encoding='utf-8')
+print(json.dumps(result,indent=2))

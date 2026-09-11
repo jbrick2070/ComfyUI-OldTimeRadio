@@ -1,3 +1,20 @@
+## 2026-09-11 -- source/ending ownership qualified offline; canonical07 next
+
+Final act now explicitly targets the existing global ending and shares static
+scope with its existing correction; other phases/budgets/raw source unchanged.
+P0 optionality and P1 endpoint coherence clarified.246 focused pass; full14,455
+pass/51 identical inherited failures/183skip/1xfail. Controlled Bible38pass/
+10 inherited versus baseline37/11; canonical23nodes63links unchanged.45 new
+checks fail before fix. No live source success claimed; six attempts remain
+three writing failures/three source-defective publications/zero qualified.
+
+R1-R4 Opus/Gemini arc completed before code. Terra/Luna bounded audits and final
+Sonnet5 QA completed; root grounded findings, no post-QA code revision. No Cursor
+consensus. Receipts:2026-09-11-my-story-source-authority/. Commit AND push before
+one fullcanonical07 measurement. Mac/4060 held; RunPod no auth/no rental.
+
+---
+
 ## 2026-09-11 -- attempt06 published; Terra/Luna trace remaining source misses
 
 Full canonical on5f7329fa, prompt201bb7a8-de1b-46e6-967f-371546f3b7dc,

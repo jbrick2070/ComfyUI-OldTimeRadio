@@ -1,0 +1,113 @@
+{
+  "calls": [
+    {
+      "manifest": "roundtable/r1/manifest.json",
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 12663,
+      "completion_tokens": 6783,
+      "cost_usd": 0.23289,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r1/manifest.json",
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 8740,
+      "completion_tokens": 1897,
+      "cost_usd": 0.040244,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r2/manifest.json",
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 14516,
+      "completion_tokens": 7690,
+      "cost_usd": 0.26483,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r2/manifest.json",
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 9963,
+      "completion_tokens": 1982,
+      "cost_usd": 0.04371,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r3/manifest.json",
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 17090,
+      "completion_tokens": 7694,
+      "cost_usd": 0.2778,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r3/manifest.json",
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 11730,
+      "completion_tokens": 1957,
+      "cost_usd": 0.046944,
+      "max_tokens": 8000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r4/manifest.json",
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 15789,
+      "completion_tokens": 5500,
+      "cost_usd": 0.216445,
+      "max_tokens": 5500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "roundtable/r4/manifest.json",
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 10976,
+      "completion_tokens": 2185,
+      "cost_usd": 0.048172,
+      "max_tokens": 5500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "manifest": "sonnet_qa/manifest.json",
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-sonnet-5",
+      "ok": true,
+      "prompt_tokens": 21189,
+      "completion_tokens": 2167,
+      "cost_usd": 0.064048,
+      "max_tokens": 6500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 1.235083
+}

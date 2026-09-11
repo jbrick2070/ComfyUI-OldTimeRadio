@@ -14416,3 +14416,20 @@ LMFE admission prove the path; Bible11.63 is extended. Fresh live closure pendin
 - Qualification: final code/tests/reviews and exact snapshots are recorded in
   2026-09-11-my-story-pairlock-followup/. Fresh canonical source/voice/pixel closure
   is still required; publication alone did not qualify the supplied story.
+
+### PBUG-20260910-03 follow-up -- source/ending ownership qualified offline
+
+The live06 mismatch is now addressed inside the existing owners: nonblank
+global ending is the final act's explicit target; static scope reaches its
+author and source corrector without depending on unheard cast. P0 optionality
+and P1 endpoint agreement are explicit; raw source/accepted treatment remain.
+Partial scene/frame scope and existing exact spoken conservation stay intact.
+No new source gate, checker, retry or model pass. This is not proof that the
+model will rewrite an omission:06's no-op was a decision, not a lost result.
+
+246 focused passes; full14,455 passes with51 unchanged inherited failures;
+controlled Bible38pass/10 inherited; canonical23nodes63links unchanged. Existing
+Bible11.39 verification and real-owner coverage extended;45 targeted checks
+fail before fix. R1-R4 and finished Sonnet QA receipts live under
+2026-09-11-my-story-source-authority/. Live closure remains OPEN pending the
+next full canonical measurement and broader source/audio/pixel qualification.

@@ -374,7 +374,7 @@ def _resolve_seed() -> int:
 
 def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
           source_rewrite_receipts=None, slot_scheduler=None, configured_model_id=None,
-          **kwargs) -> Any:
+          source_rewrite_instruction="", **kwargs) -> Any:
     """Use the shared capacity contract and retain actual attempt evidence."""
     author_context = [dict(message) for message in kwargs["prompt"]]
     prompt = [dict(message) for message in author_context]
@@ -401,6 +401,7 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
         receipts=source_rewrite_receipts, pass_id=pass_id,
         post_validator=kwargs.get("post_validator"), slot_scheduler=slot_scheduler,
         configured_model_id=configured_model_id, author_context=author_context,
+        instruction=source_rewrite_instruction,
         preserve_omitted={
             ("requirements",): "id", ("named_cast",): "name",
             ("conflicts",): "requirement_id", ("cast",): "name", ("acts",): "n",
@@ -594,6 +595,28 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
                                c.character_description)
         for c in treatment.cast
     )
+    global_ending = treatment.ending if is_last and treatment.ending.strip() else ""
+    endpoint = global_ending or plan.ending_state
+    if global_ending:
+        act_scope = (
+            "This is the final act. Its explicit target is the episode conclusion, "
+            "which supersedes this act's planned ending_state where they conflict. "
+            "Realize it here through character dialogue; original source outranks "
+            "both. Earlier events need not be repeated, and the conclusion must "
+            "not be deferred beyond this act.")
+    elif is_last:
+        act_scope = (
+            "This is the final act. Conclude the story here through character "
+            "dialogue, consistent with the original source and the local target "
+            "when supplied. Earlier events need not be repeated. Do not defer "
+            "the ending beyond this act.")
+    else:
+        act_scope = (
+            "This is an intermediate act. Follow its local target; source events "
+            "planned for later acts may remain there. Do not end the episode early.")
+    # This private kwargs dict belongs to this act. Both existing owners receive
+    # the same scope; the story's ending remains data in the authoring context.
+    source_kwargs["source_rewrite_instruction"] = act_scope
     unheard = ""
     if must_speak:
         unheard = ("\nNOT YET HEARD IN THIS STORY: %s.%s\n"
@@ -608,13 +631,13 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
                 "THE ACCEPTED TREATMENT:\n%s\n\nTHE CAST:\n%s\n%s\n"
                 "%s\n\nTHIS ACT (act %d of %d):\n"
                 "- where: %s\n- what it accomplishes: %s\n- its beats: %s\n"
-                "- where it should leave the story: %s\n\n"
+                "- where it should leave the story: %s\nACT SCOPE: %s\n\n"
                 "Write act %d now."
                 % (json.dumps(treatment.model_dump(by_alias=True), ensure_ascii=False), cast_block, unheard,
                    _prior_digest(prev, prev_plan), plan.n, len(treatment.acts),
                    plan.scene_setting or treatment.setting, plan.purpose,
                    "; ".join(plan.turns) or "as the story needs",
-                   plan.ending_state, plan.n)
+                   endpoint, act_scope, plan.n)
             )},
         ],
         schema=ActScript,

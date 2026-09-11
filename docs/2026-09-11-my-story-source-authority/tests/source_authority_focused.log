@@ -1,0 +1,61 @@
+[OTR conftest] CUDA_VISIBLE_DEVICES='' OTR_TEST_MODE=1 OTR_EXTRA_OUTPUT_ROOTS='C:\Users\jeffr\AppData\Local\Temp\pytest-of-jeffr\pytest-9472'
+============================= test session starts =============================
+platform win32 -- Python 3.12.11, pytest-9.0.2, pluggy-1.6.0
+rootdir: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+configfile: pyproject.toml
+plugins: anyio-4.12.1, hydra-core-1.3.5, jaxtyping-0.3.9, langsmith-0.7.12, asyncio-1.3.0, typeguard-4.5.1
+asyncio: mode=Mode.STRICT, debug=False, asyncio_default_fixture_loop_scope=function, asyncio_default_test_loop_scope=function
+collected 246 items
+
+tests\test_my_story_runner.py .......................................... [ 17%]
+...........................................FFFFFFFFFFFFFFFFFFFFFFFFFFFFF [ 46%]
+FFFFFFFFFFF...F                                                          [ 52%]
+tests\test_story_source_review.py ...................................... [ 67%]
+...                                                                      [ 69%]
+tests\test_my_story_input.py .....................................       [ 84%]
+tests\test_my_story_registry.py .....                                    [ 86%]
+
+[KNOWN-FAIL-GUARD] NEW failures (REGRESSION) -- the following nodeids failed but are not in EXPECTED_FAILED_NODEIDS:
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---6-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-1-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-True]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-False]
+  - tests/test_my_story_runner.py::test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-True]
+  - tests/test_my_story_runner.py::test_act_scope_does_not_leak_to_other_phases_of_the_real_runner
+If these are intentional new known-fails, add them to EXPECTED_FAILED_NODEIDS + docs/known-failures.md in the same commit. Otherwise fix the regression.
+tests\test_my_story_visual_source.py ..................................  [100%]

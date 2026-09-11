@@ -194,7 +194,8 @@ def rewrite_story_source(raw_fields, candidate, slot_fn, *, schema, receipts,
             "interpretations and summaries. Correct direct contradictions and restore "
             "explicitly supplied people, relationships, actions or endings lost from this "
             "artifact's scope. Preserve compatible elaboration and unaffected wording. "
-            "An act need not repeat every fact; speculation is not a fact, and absence "
+            "A partial artifact need not repeat source facts outside its scope. "
+            "Speculation is not a fact, and absence "
             "from an act is not death. If no correction is needed, return the draft "
             "unchanged. Do not change plot or prose merely to improve style. " + instruction)},
         {"role": "user", "content": _json({"source": raw, "draft": candidate,

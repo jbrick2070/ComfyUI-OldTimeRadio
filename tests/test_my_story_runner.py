@@ -1142,3 +1142,134 @@ def test_all_author_and_correction_prompts_receive_the_exact_raw_story():
         else:
             assert idea in prompt[1]["content"]
     assert led.data["meta"]["source_meta"]["story_input"]["fields"]["idea"] == idea
+
+
+@pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                (6, False), (6, True)])
+@pytest.mark.parametrize("ending,local", [
+    ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+    (" \n\t", "LOCAL FALLBACK"),
+    ("", ""),
+    ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+     "LOCAL 50%\ncontinues"),
+])
+@pytest.mark.parametrize("rewrite", [False, True])
+def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+        monkeypatch, act_count, is_last, ending, local, rewrite):
+    """Actual prompts/returned objects, including a conflicting final plan.
+
+    Fixtures prove delivery and application, not a model's semantic fidelity.
+    Exact suffixes avoid false passes from endpoints inside treatment JSON.
+    """
+    real_call = MS.structured_call
+
+    def strict_call(**kwargs):
+        assert "source_rewrite_instruction" not in kwargs
+        return real_call(**kwargs)
+
+    monkeypatch.setattr(MS, "structured_call", strict_call)
+    treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+    treatment.ending = ending
+    number = act_count if is_last else 1
+    plan = treatment.acts[number - 1]
+    plan.ending_state = local
+    before = treatment.model_dump()
+    bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                             SI.StoryRequest())
+    scopes = []
+    for must_speak in ((), ("Ada", "Tom")):
+        captured, journal = [], []
+        authored = _act(number)
+        replacement = "The bell answers us."
+
+        def slot(messages, **kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            captured.append([dict(m) for m in messages])
+            if messages[0]["content"].startswith("Check and rewrite"):
+                payload = json.loads(messages[1]["content"])
+                assert payload["source"]["idea"] == bundle.fields.idea
+                draft = payload["draft"]
+                if rewrite:
+                    draft["lines"][-1]["text"] = replacement
+                return json.dumps(draft)
+            return json.dumps(authored)
+
+        result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+            treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+            source_rewrite_receipts=journal)
+        assert len(captured) == 2 and len(journal) == 1
+        author, correction = captured
+        target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+        scope, tail = scope_tail.split("\n\n", 1)
+        assert tail == "Write act %d now." % number
+        expected = ending if is_last and ending.strip() else local
+        assert target_area.endswith("\n- where it should leave the story: " + expected)
+        assert ("NOT YET HEARD IN THIS STORY" in target_area) == bool(must_speak)
+        assert ("This is the LAST act, so they must speak here." in target_area) == bool(
+            is_last and must_speak)
+        assert ("This is the final act." in scope) == is_last
+        assert ("supersedes" in scope) == bool(is_last and ending.strip())
+        if is_last:
+            assert "Earlier events need not be repeated" in scope
+            assert "beyond this act" in scope
+        else:
+            assert "planned for later acts may remain there" in scope
+            assert "Do not end the episode early" in scope
+        assert "GLOBAL" not in scope  # model-derived ending is data, not system text
+        scopes.append(scope)
+        # The shared structured owner appends its schema contract afterward.
+        assert correction[0]["content"].count(scope) == 1
+        context = json.loads(correction[1]["content"])["authoring_context"]
+        assert context[1]["content"].endswith("\nACT SCOPE: " + scope + "\n\n" + tail)
+        raw_block = MS._SOURCE.raw_source_block(bundle.fields)
+        assert author[1]["content"] == raw_block + "\n\n" + context[1]["content"]
+        assert result.lines[-1].text == (replacement if rewrite else authored["lines"][-1]["text"])
+        assert result.model_dump()["lines"][:-1] == authored["lines"][:-1]
+        assert journal[0]["applied"] is rewrite
+        assert len(journal[0]["attempts"]) == 1
+        assert journal[0]["attempt_limit"] == 2 and not journal[0]["qualified"]
+    assert scopes[0] == scopes[1]
+    assert treatment.model_dump() == before
+
+
+@pytest.mark.parametrize("act_count", [1, 3, 6])
+def test_act_scope_without_a_source_journal_still_reaches_the_author(act_count):
+    treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+    bundle = SI.build_bundle(SI.capture_raw(idea="A bell answers."), SI.StoryRequest())
+    captured = []
+
+    def slot(messages, **kwargs):
+        assert "source_rewrite_instruction" not in kwargs
+        captured.append(messages)
+        return json.dumps(_act(act_count))
+
+    result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+        treatment, treatment.acts[-1], None, None, must_speak=(), is_last=True)
+    assert len(captured) == 1 and result.n == act_count
+    user = captured[0][1]["content"]
+    assert "\n- where it should leave the story: the bell answers\nACT SCOPE: " in user
+    assert "This is the final act." in user and "supersedes" in user
+
+
+def test_act_scope_does_not_leak_to_other_phases_of_the_real_runner():
+    slots = Slots(acts=6, inter=5)
+    led, _ = _run(slots, act_count=6)
+    corrections = [p for p in slots.prompts if p[0]["content"].startswith("Check and rewrite")]
+    assert len(corrections) == 9 and len(slots.calls) == 18
+    act_scopes = []
+    for messages in corrections:
+        payload = json.loads(messages[1]["content"])
+        context = payload["authoring_context"]
+        if "one act of a radio drama" in context[0]["content"]:
+            scope = context[1]["content"].rsplit("\nACT SCOPE: ", 1)[1].split("\n\n", 1)[0]
+            act_scopes.append(scope)
+            assert messages[0]["content"].count(scope) == 1
+        else:
+            assert "ACT SCOPE:" not in context[1]["content"]
+            assert "This is the final act." not in messages[0]["content"]
+            assert "This is an intermediate act." not in messages[0]["content"]
+    assert len(act_scopes) == 6
+    assert all("intermediate act" in scope for scope in act_scopes[:-1])
+    assert "episode conclusion" in act_scopes[-1]
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    assert saved["meta"]["my_story"]["acts_accepted"] == 6

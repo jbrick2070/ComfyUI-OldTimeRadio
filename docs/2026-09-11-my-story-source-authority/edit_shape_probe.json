@@ -1,0 +1,15 @@
+{
+  "kind": "CPU-only synthetic edit-shape probe against saved live06 projection",
+  "not_a_model_completion": true,
+  "not_live_qualification": true,
+  "original_ledger_unchanged": true,
+  "candidate_unchanged": true,
+  "rows_before": 9,
+  "rows_after": 9,
+  "edited_line_id": "shot_001_b5",
+  "source_field": "plot",
+  "original": "I still can't believe you let me do that.",
+  "synthetic_replacement": "I still can't believe you let me do that. Mom, I'm glad we're here enjoying dinner together now.",
+  "unrelated_rows_and_identity_preserved": true,
+  "conclusion": "Existing replacement schema can express a source-ending addition without inserting a row. It does not prove the model will propose it or that the episode is source-qualified."
+}

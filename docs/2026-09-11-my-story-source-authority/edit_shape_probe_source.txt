@@ -1,0 +1,43 @@
+from pathlib import Path
+import json
+import os
+import sys
+
+root = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root))
+os.environ['OTR_TEST_MODE'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+from nodes import _otr_story_source as source
+
+q = root / 'docs/2026-09-11-my-story-5080-qualification'
+data = json.loads((q / 'pairlock_06_ledger.json').read_text(encoding='utf-8'))
+raw = source.raw_fields_from_ledger(data)
+candidate = source.spoken_projection(data)
+before = json.loads(json.dumps(candidate))
+row = next(r for r in candidate['lines'] if r['line_id'] == 'shot_001_b5')
+# Hand-authored synthetic edit shape, not a model output or a new episode.
+# Keep every original byte, append a source-grounded ending in the same row.
+suffix = " Mom, I'm glad we're here enjoying dinner together now."
+proposal = source.SpokenSourceEdits(edits=[source.SpokenSourceEdit(
+    line_id=row['line_id'], source_field='plot', source_quote=raw['plot'],
+    original_quote=row['text'], replacement=row['text'] + suffix)])
+result = source._apply_spoken_edits(proposal, candidate, raw)
+assert candidate == before
+assert len(result['lines']) == len(before['lines'])
+for old, new in zip(before['lines'], result['lines']):
+    if old['line_id'] == row['line_id']:
+        assert new['text'] == old['text'] + suffix
+        assert {k:v for k,v in new.items() if k!='text'} == {k:v for k,v in old.items() if k!='text'}
+    else:
+        assert old == new
+receipt = {'kind': 'CPU-only synthetic edit-shape probe against saved live06 projection',
+           'not_a_model_completion': True, 'not_live_qualification': True,
+           'original_ledger_unchanged': True, 'candidate_unchanged': True,
+           'rows_before': len(before['lines']), 'rows_after': len(result['lines']),
+           'edited_line_id': row['line_id'], 'source_field': 'plot',
+           'original': row['text'], 'synthetic_replacement': row['text']+suffix,
+           'unrelated_rows_and_identity_preserved': True,
+           'conclusion': 'Existing replacement schema can express a source-ending addition without inserting a row. It does not prove the model will propose it or that the episode is source-qualified.'}
+out = root / 'docs/2026-09-11-my-story-source-authority'
+(out / 'edit_shape_probe.json').write_text(json.dumps(receipt,indent=2)+'\n',encoding='utf-8')
+print(json.dumps(receipt))

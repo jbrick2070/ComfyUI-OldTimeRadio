@@ -1,0 +1,2605 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="45" skipped="0" tests="45" time="3.351" timestamp="2026-09-11T05:44:56.553485-07:00" hostname="iDream"><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-1-True]" time="1.654"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825A9B950&gt;
+act_count = 1, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001887FB2FBC0&gt;
+act_count = 3, is_last = False, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882530E090&gt;
+act_count = 3, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532FAA0&gt;
+act_count = 6, is_last = False, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532F3B0&gt;
+act_count = 6, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538A300&gt;
+act_count = 1, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532D550&gt;
+act_count = 3, is_last = False, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-3-True]" time="0.003"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532E030&gt;
+act_count = 3, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532F200&gt;
+act_count = 6, is_last = False, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False- \n\t-LOCAL FALLBACK-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538B320&gt;
+act_count = 6, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532DD60&gt;
+act_count = 1, is_last = True, ending = '', local = '', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532C950&gt;
+act_count = 3, is_last = False, ending = '', local = '', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538BB00&gt;
+act_count = 3, is_last = True, ending = '', local = '', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538B530&gt;
+act_count = 6, is_last = False, ending = '', local = '', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False---6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825388FB0&gt;
+act_count = 6, is_last = True, ending = '', local = '', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532EC00&gt;
+act_count = 1, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825388F80&gt;
+act_count = 3, is_last = False
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536C650&gt;
+act_count = 3, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532C650&gt;
+act_count = 6, is_last = False
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[False-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538BF20&gt;
+act_count = 6, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = False
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536E7E0&gt;
+act_count = 1, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536FF50&gt;
+act_count = 3, is_last = False, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538B5C0&gt;
+act_count = 3, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536DA90&gt;
+act_count = 6, is_last = False, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-GLOBAL RESOLUTION-LOCAL UNRESOLVED TURN-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536C4D0&gt;
+act_count = 6, is_last = True, ending = 'GLOBAL RESOLUTION'
+local = 'LOCAL UNRESOLVED TURN', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825371010&gt;
+act_count = 1, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-3-False]" time="0.003"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536F7D0&gt;
+act_count = 3, is_last = False, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532E720&gt;
+act_count = 3, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825370FE0&gt;
+act_count = 6, is_last = False, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True- \n\t-LOCAL FALLBACK-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000188253739B0&gt;
+act_count = 6, is_last = True, ending = ' \n\t', local = 'LOCAL FALLBACK'
+rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---1-True]" time="0.003"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882532E630&gt;
+act_count = 1, is_last = True, ending = '', local = '', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---3-False]" time="0.003"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536EAE0&gt;
+act_count = 3, is_last = False, ending = '', local = '', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---3-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825370260&gt;
+act_count = 3, is_last = True, ending = '', local = '', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---6-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000018825AFCD70&gt;
+act_count = 6, is_last = False, ending = '', local = '', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True---6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536E330&gt;
+act_count = 6, is_last = True, ending = '', local = '', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-1-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001887FC62630&gt;
+act_count = 1, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-False]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882536E2D0&gt;
+act_count = 3, is_last = False
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-3-True]" time="0.003"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000188251FB3E0&gt;
+act_count = 3, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-False]" time="0.005"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538A7E0&gt;
+act_count = 6, is_last = False
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast[True-  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  -LOCAL 50%\ncontinues-6-True]" time="0.004"><failure message="ValueError: not enough values to unpack (expected 2, got 1)">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001882538BD40&gt;
+act_count = 6, is_last = True
+ending = '  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  '
+local = 'LOCAL 50%\ncontinues', rewrite = True
+
+    @pytest.mark.parametrize("act_count,is_last", [(1, True), (3, False), (3, True),
+                                                    (6, False), (6, True)])
+    @pytest.mark.parametrize("ending,local", [
+        ("GLOBAL RESOLUTION", "LOCAL UNRESOLVED TURN"),
+        (" \n\t", "LOCAL FALLBACK"),
+        ("", ""),
+        ("  GLOBAL 100%\nACT SCOPE: quoted story text\n- where it should leave the story: END  ",
+         "LOCAL 50%\ncontinues"),
+    ])
+    @pytest.mark.parametrize("rewrite", [False, True])
+    def test_act_endpoint_and_scope_reach_both_owners_independent_of_unheard_cast(
+            monkeypatch, act_count, is_last, ending, local, rewrite):
+        """Actual prompts/returned objects, including a conflicting final plan.
+    
+        Fixtures prove delivery and application, not a model's semantic fidelity.
+        Exact suffixes avoid false passes from endpoints inside treatment JSON.
+        """
+        real_call = MS.structured_call
+    
+        def strict_call(**kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            return real_call(**kwargs)
+    
+        monkeypatch.setattr(MS, "structured_call", strict_call)
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        treatment.ending = ending
+        number = act_count if is_last else 1
+        plan = treatment.acts[number - 1]
+        plan.ending_state = local
+        before = treatment.model_dump()
+        bundle = SI.build_bundle(SI.capture_raw(idea="  RAW SOURCE\nEnd at the bell.  "),
+                                 SI.StoryRequest())
+        scopes = []
+        for must_speak in ((), ("Ada", "Tom")):
+            captured, journal = [], []
+            authored = _act(number)
+            replacement = "The bell answers us."
+    
+            def slot(messages, **kwargs):
+                assert "source_rewrite_instruction" not in kwargs
+                captured.append([dict(m) for m in messages])
+                if messages[0]["content"].startswith("Check and rewrite"):
+                    payload = json.loads(messages[1]["content"])
+                    assert payload["source"]["idea"] == bundle.fields.idea
+                    draft = payload["draft"]
+                    if rewrite:
+                        draft["lines"][-1]["text"] = replacement
+                    return json.dumps(draft)
+                return json.dumps(authored)
+    
+            result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+                treatment, plan, None, None, must_speak=must_speak, is_last=is_last,
+                source_rewrite_receipts=journal)
+            assert len(captured) == 2 and len(journal) == 1
+            author, correction = captured
+&gt;           target_area, scope_tail = author[1]["content"].rsplit("\nACT SCOPE: ", 1)
+            ^^^^^^^^^^^^^^^^^^^^^^^
+E           ValueError: not enough values to unpack (expected 2, got 1)
+
+tests\test_my_story_runner.py:1202: ValueError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_scope_without_a_source_journal_still_reaches_the_author[1]" time="0.003"><failure message="AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 1\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 1 now.'">act_count = 1
+
+    @pytest.mark.parametrize("act_count", [1, 3, 6])
+    def test_act_scope_without_a_source_journal_still_reaches_the_author(act_count):
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        bundle = SI.build_bundle(SI.capture_raw(idea="A bell answers."), SI.StoryRequest())
+        captured = []
+    
+        def slot(messages, **kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            captured.append(messages)
+            return json.dumps(_act(act_count))
+    
+        result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+            treatment, treatment.acts[-1], None, None, must_speak=(), is_last=True)
+        assert len(captured) == 1 and result.n == act_count
+        user = captured[0][1]["content"]
+&gt;       assert "\n- where it should leave the story: the bell answers\nACT SCOPE: " in user
+E       AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 1\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 1 now.'
+
+tests\test_my_story_runner.py:1250: AssertionError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_scope_without_a_source_journal_still_reaches_the_author[3]" time="0.003"><failure message="AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 3\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 3 now.'">act_count = 3
+
+    @pytest.mark.parametrize("act_count", [1, 3, 6])
+    def test_act_scope_without_a_source_journal_still_reaches_the_author(act_count):
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        bundle = SI.build_bundle(SI.capture_raw(idea="A bell answers."), SI.StoryRequest())
+        captured = []
+    
+        def slot(messages, **kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            captured.append(messages)
+            return json.dumps(_act(act_count))
+    
+        result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+            treatment, treatment.acts[-1], None, None, must_speak=(), is_last=True)
+        assert len(captured) == 1 and result.n == act_count
+        user = captured[0][1]["content"]
+&gt;       assert "\n- where it should leave the story: the bell answers\nACT SCOPE: " in user
+E       AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 3\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 3 now.'
+
+tests\test_my_story_runner.py:1250: AssertionError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_scope_without_a_source_journal_still_reaches_the_author[6]" time="0.003"><failure message="AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 6\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 6 now.'">act_count = 6
+
+    @pytest.mark.parametrize("act_count", [1, 3, 6])
+    def test_act_scope_without_a_source_journal_still_reaches_the_author(act_count):
+        treatment = MS.StoryTreatment.model_validate(_treatment(act_count))
+        bundle = SI.build_bundle(SI.capture_raw(idea="A bell answers."), SI.StoryRequest())
+        captured = []
+    
+        def slot(messages, **kwargs):
+            assert "source_rewrite_instruction" not in kwargs
+            captured.append(messages)
+            return json.dumps(_act(act_count))
+    
+        result = MS._pass_act(slot, RT.resolve_story_pack("my_story"), bundle,
+            treatment, treatment.acts[-1], None, None, must_speak=(), is_last=True)
+        assert len(captured) == 1 and result.n == act_count
+        user = captured[0][1]["content"]
+&gt;       assert "\n- where it should leave the story: the bell answers\nACT SCOPE: " in user
+E       AssertionError: assert '\n- where it should leave the story: the bell answers\nACT SCOPE: ' in 'ORIGINAL STORY SOURCE (quoted data, authoritative over working notes):\nIDEA:\nA bell answers.\n\nTHE ACCEPTED TREATM...\n- what it accomplishes: turn 6\n- its beats: a; b\n- where it should leave the story: unresolved\n\nWrite act 6 now.'
+
+tests\test_my_story_runner.py:1250: AssertionError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_act_scope_does_not_leak_to_other_phases_of_the_real_runner" time="0.169"><failure message="IndexError: list index out of range">def test_act_scope_does_not_leak_to_other_phases_of_the_real_runner():
+        slots = Slots(acts=6, inter=5)
+        led, _ = _run(slots, act_count=6)
+        corrections = [p for p in slots.prompts if p[0]["content"].startswith("Check and rewrite")]
+        assert len(corrections) == 9 and len(slots.calls) == 18
+        act_scopes = []
+        for messages in corrections:
+            payload = json.loads(messages[1]["content"])
+            context = payload["authoring_context"]
+            if "one act of a radio drama" in context[0]["content"]:
+&gt;               scope = context[1]["content"].rsplit("\nACT SCOPE: ", 1)[1].split("\n\n", 1)[0]
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E               IndexError: list index out of range
+
+tests\test_my_story_runner.py:1264: IndexError</failure></testcase><testcase classname="tests.test_story_source_review" name="test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order" time="0.018"><failure message="AssertionError: assert 'A partial artifact need not repeat source facts outside its scope.' in 'Check and rewrite the supplied draft against the original story source. Return the corrected artifact itself, never a...Of=2\n- edits[*].end_char: optional; type=integer\n- edits[*].end_char: optional; type=null\n[/OTR_SCHEMA_CONTRACT_V1]'">def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order():
+        data = _ledger()
+        before = copy.deepcopy(data)
+        slot = Slot({"edits": [_edit()]})
+        receipt = source.rewrite_spoken_from_source(data, slot_fn=slot)
+        assert len(slot.calls) == 1 and receipt["applied"]
+        system = slot.calls[0][0]["content"]
+&gt;       assert "A partial artifact need not repeat source facts outside its scope." in system
+E       AssertionError: assert 'A partial artifact need not repeat source facts outside its scope.' in 'Check and rewrite the supplied draft against the original story source. Return the corrected artifact itself, never a...Of=2\n- edits[*].end_char: optional; type=integer\n- edits[*].end_char: optional; type=null\n[/OTR_SCHEMA_CONTRACT_V1]'
+
+tests\test_story_source_review.py:281: AssertionError</failure></testcase></testsuite></testsuites>

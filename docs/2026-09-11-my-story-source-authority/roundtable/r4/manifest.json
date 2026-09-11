@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-09-11T12:39:35.667628+00:00",
+  "doc": "docs/2026-09-11-my-story-source-authority/roundtable/pass03_plan.md",
+  "prompt_tokens_est": 11250,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 15789,
+      "completion_tokens": 5500,
+      "cost_usd": 0.216445,
+      "max_tokens": 5500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 10976,
+      "completion_tokens": 2185,
+      "cost_usd": 0.048172,
+      "max_tokens": 5500,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.2646
+}

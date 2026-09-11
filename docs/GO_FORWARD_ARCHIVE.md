@@ -1,5 +1,36 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- source/ending review, code and offline QA completed
+
+Completed instructions, verbatim:
+
+**Next action: grounded review of source priority and final-act instructions
+inside the existing My Story author/correction owners.** Attempt06 completed;
+do not restart it. Full source reaches the calls and returned corrections are
+not lost, but the model repeatedly returns unchanged drafts with missing source
+actions/ending. Review P0 required/preferred/conflict semantics, P2's explicit
+plan.ending_state versus the global ending on the last act, and the generic
+act-scope caveat. Root writes a code-grounded anchor; independent reviewers
+converge before any design-bearing revision. Use the appropriate R1-R4 arc
+for a new design choice, then finished Sonnet QA and regressions before live.
+Keep changes inside existing calls and fixed budgets; no separate checker,
+chunker, forced story substring, extra retries, gate or model-quality promise.
+
+No further GPU run until that decision/coding/QA completes. Keep the image
+failure separate: accepted two-adult prompts reached the renderer, but05 added
+a child and06 added an adult. Do not claim a prompt edit guarantees pixels or
+invent a dropped-prompt defect. Any visual implementation needs its own grounded
+scope; do not expand the source-writer fix into a new image architecture.
+
+Six recorded full canonical attempts: three writing failures and three
+source-defective publications, ZERO source-qualified episodes. Four Qwen and
+two Nemo runs. Evidence: `docs/2026-09-11-my-story-5080-qualification/pairlock_06_receipt.md`.
+The pushed source-field conformance correction remains5f7329fa with full
+offline/regression receipts; live06 returned no edits and did not establish
+semantic recovery. Later stress coverage and Original credits remain open.
+
+---
+
 ## 2026-09-11 -- attempt06 completed; source authority review next
 
 Completed instructions, verbatim:

@@ -1,0 +1,10 @@
+Roundtable pass
+  doc:            docs/2026-09-11-my-story-source-authority/finished_sonnet_qa.md (57768 chars, ~14489 prompt tokens)
+  grounding:      0 file(s), ~0 chars
+  panel:          1 model(s)
+    - ~anthropic/claude-sonnet-latest              worst-case unknown (no price hint in config)  max_tokens=6500 temp=0.2 reasoning=low
+  budget ceiling: $5.00   worst-case panel: >= ~$0.0000 (1 model(s) unknown)
+  OK   ~anthropic/claude-sonnet-latest -> anthropic/claude-sonnet-5  2167 out tokens
+
+Saved 1/1 review(s) to docs/2026-09-11-my-story-source-authority/sonnet_qa
+Actual spend this pass: ~$0.0640

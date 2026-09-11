@@ -1,0 +1,32 @@
+[
+  {
+    "path": "nodes/_otr_my_story.py",
+    "sha256": "ba6f6978fa41502b003235437e2b90b45778fad73f04267ec739d3bf267f1eae",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "nodes/_otr_story_source.py",
+    "sha256": "1cf71ccfd3ce74cd138078b5e6f133d1a21b03095c0df815aafd323e25abfb05",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "nodes/story_packs/my_story/my_story.json",
+    "sha256": "10da063ee78604d1a218f6c0932d5c3587db958d64ab458532cd3ccc670e28ed",
+    "utf8_no_bom": true,
+    "python_310_parse": false
+  },
+  {
+    "path": "tests/test_my_story_runner.py",
+    "sha256": "ed614f61d96fe48d8e37c1daa6bbf1b796fd4792f27a643891887c151dc28438",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  },
+  {
+    "path": "tests/test_story_source_review.py",
+    "sha256": "98d3bc7cfd02f25c06f86019d8600a92f7a7cf468ad0beebe49f29a9109f5f2c",
+    "utf8_no_bom": true,
+    "python_310_parse": true
+  }
+]
