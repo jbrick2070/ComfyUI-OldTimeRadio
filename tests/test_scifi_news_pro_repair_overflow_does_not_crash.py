@@ -115,7 +115,10 @@ def test_a_draft_that_overflows_the_repair_turn_is_dropped_not_fatal():
         "the next rung resent the draft that just overflowed -- that is the "
         "banned re-roll of a deterministic prompt_no_room refusal")
     # the trace must SHOW the cold regeneration, not hide it
-    assert diag["cold_regenerations"] >= 1, diag
+    # EXACTLY one, not ">= 1". The loose form passed while the overflow
+    # handler and the next rung were BOTH counting the same cold regeneration
+    # -- a weak assertion is how a miscount survives its own test.
+    assert diag["cold_regenerations"] == 1, diag
 
 
 def test_the_rung_after_an_overflow_does_not_raise_temperature():

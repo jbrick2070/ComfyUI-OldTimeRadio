@@ -76,9 +76,20 @@ operator's "an orphan is ripped 100% or wired back in" rule forbids.
 and the ruling's text was never updated. A reader trusting it would redo finished work
 or restore an order that was deliberately fixed.
 
-**Wave frozen at `f5f40bd4`** -- a CODE freeze; later commits are documentation only.
-Nothing render-affecting lands after it without a re-freeze. The Sci-Fi cap VALUE is
-code-ready and deliberately held back for exactly that reason.
+**The `f5f40bd4` freeze was WITHDRAWN the same day and no lane ever started
+against it.** Two things made it wrong. It was cut before the coding was
+finished, and the operator's rule is the reverse -- *"we don't test until all
+coding is complete"* -- so a wave run against it would have qualified a commit
+already known to be behind the code. And it was broken within the hour anyway:
+`a074f56e` landed the deterministic Ghost tier in `nodes/`, which is exactly the
+condition this file's own prompts told all four machines to stop and phone home
+about. The hash is re-cut when coding stops, not before.
+
+**That also reverses this day's own scheduling call.** The Sci-Fi cap VALUE was
+held back as "render-affecting, lands after the wave" -- reasoning that only
+worked while the wave was running that night. Once the wave waits for the code,
+a render-affecting item belongs IN the frozen hash rather than after it, and it
+shipped the same day.
 
 ## 2026-09-11 -- canonical09 publishes; pending-only handoff to Opus
 

@@ -674,6 +674,33 @@ class _SlotScheduler:
         bucket[slot] = bucket.get(slot, 0) + 1
         return cache_entry
 
+    def context_cap_for(self, slot: str) -> int:
+        """Return the slot's REAL context window, or 0 when it cannot be read.
+
+        The three transports each resolve capacity differently and each stamps
+        its answer into the cache entry as `context_cap`: local transformers
+        from the tokenizer/config, GGUF-native from llama.cpp's `n_ctx`,
+        OpenRouter from the provider's advertised `context_window`. This reads
+        that already-resolved number rather than re-deriving it, which is why
+        it is one accessor and not three.
+
+        CALL THIS ONLY WHERE THE SLOT IS ALREADY WARM. It shares
+        `_account_and_get_entry` with `inspect_fit`, so it does not count a
+        generation -- but it does ACQUIRE, and on a cold or swapped slot that
+        means a real model load plus a recorded transition, for a number the
+        caller may not even use. Its one caller today asks immediately after a
+        generation on the same slot returned, where acquisition is a cache hit
+        and `_last_resolved_id` already matches, so neither happens.
+
+        0 means "no answer", never "no room": every caller must fall back to
+        its own estimate rather than treat a missing cap as a refusal.
+        """
+        try:
+            entry = self._account_and_get_entry(slot, count_generation=False)
+            return max(0, int(entry.get("context_cap") or 0))
+        except Exception:   # noqa: BLE001 -- an unreadable cap is not fatal
+            return 0
+
     def helper_context(self, helper_name: str):
         """Context manager: attribute slot calls made within `with` to
         `helper_name`. Used by the writer to wrap each helper call so

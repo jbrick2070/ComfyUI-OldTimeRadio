@@ -750,6 +750,12 @@ def test_runner_restamps_coverage_after_assembly_rebind(
         _envelope,
         cast_names,
         _extra_aliases=None,
+        # `**_kw` absorbs `context_cap_fn`, the resolver the runner now hands
+        # `_pass_script` so the repair-turn budget can read the transport's real
+        # context window instead of a flat constant. This double stands in for the
+        # whole P3 pass; which window that pass would have budgeted against is not
+        # what it is testing.
+        **_kw,
     ):
         counting_fn([], temperature=0.75, max_new_tokens=None)
         raw = _valid_markup()

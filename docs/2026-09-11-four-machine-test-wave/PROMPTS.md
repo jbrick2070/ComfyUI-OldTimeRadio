@@ -23,25 +23,83 @@ path lands after it:
     cut before the coding was finished and is WITHDRAWN -- it is behind the
     code and qualifying it would prove nothing about what ships.
     This line gets a real hash when coding stops. Until then, no lane starts.
-    Frozen 2026-09-11. Six crash/durability fixes and the plan rebaseline are
-    in it.
 
-    THIS IS A CODE FREEZE, NOT A COMMIT FREEZE. Commits AFTER this hash are
-    documentation only -- this file's own freeze line is one of them, so the
-    hash you pull will legitimately be LATER than the hash written here. That
-    is expected and it is not a problem: nothing touching the render path lands
+    WHEN IT IS FROZEN, IT WILL BE A CODE FREEZE, NOT A COMMIT FREEZE. Commits
+    after the hash will be documentation only -- this file's own freeze line
+    among them -- so the hash you pull will legitimately be LATER than the one
+    written here. That is expected: nothing touching the render path lands
     after the frozen hash without a re-freeze, and a docs commit cannot change
     what a render produces.
 
-    So: report the HEAD you ACTUALLY pulled, whatever it is. Do not try to
-    check out the frozen hash. If you pull a commit that touches nodes/,
-    scripts/ or workflows/ after f5f40bd4, STOP and phone home -- that would
-    mean the freeze was broken.
+    So: report the HEAD you ACTUALLY pulled, whatever it is. Never check out
+    the frozen hash. If you pull a commit that touches nodes/, scripts/ or
+    workflows/ AFTER the hash written on the WAVE HEAD line above, STOP and
+    phone home -- that would mean the freeze was broken.
 
+
+### The suspect list, written before the wave rather than after it
+
+If a leg fails, this is what to look at first -- and the third entry is the one
+no document listed until now.
+
+1. **The scopes re-homing.** `OTR_SceneAwareScopes` stopped writing into the
+   janitor-swept scratch tier and now resolves through the episode path
+   authority. Rendered pixels were proven unchanged across 18 inputs, but it is
+   the newest thing on the composited path.
+2. **The platform itself.** Three of the four machines are not the box the code
+   was written on, which is the entire point of running them.
+3. **THE CRUX RANKER, ON THE 4060 SPECIFICALLY.** `resolve_crux_kernel` now
+   ranks `meta.key_objects` by whether the beat's own text names one. The 4060
+   profile renders on `animatediff15_v3_haunted_video`, whose engine inherits
+   `GHOST_PROMPT_PROFILE` -- so the 4060's legs are the FIRST live exercise of
+   that ranker, on a code path no episode has ever rendered through. It is
+   offline-proven and it is still the least-observed thing in the wave.
+   **4060: phone home your `kernel_source` counts** -- how many shots resolved
+   `key_object_in_beat` versus plain `key_object`. That ratio is the first real
+   hit-rate measurement of the deterministic tier, and it decides how the LLM
+   tier gets built.
 
 ---
 
 ## Rules every lane follows (these are in all four prompts)
+
+0. **WHAT COUNTS AS A FAILURE, and it is much narrower than you will assume.**
+   Operator directive 2026-09-11: *"be careful not to fail anything because of a
+   verification round check. Only an out of memory should fail."* With his standing
+   bar: *"as long as it doesn't crash when it's not supposed to"*, and *"this is a
+   fun experimental app, I'm not expecting anything exact."*
+   * **A leg FAILS only when the run DIED:** an uncaught traceback that ended the
+     prompt, an out-of-memory, a hang with nothing in `otr/obs/` past the five-minute
+     rule, or the server going away. That is the whole list.
+   * **A leg that PUBLISHED to `otr/obs/` PASSED.** Even if the title card is ugly,
+     the font fell back, a caption is mistimed, the cast is smaller than requested,
+     the story is thin, the images do not match the pack, or a checker somewhere
+     printed a complaint. Those are OBSERVATIONS. They go in the receipt as
+     observations, under their own heading, and they do not change the verdict.
+   * **Do NOT invent a quality gate.** No "it passed but the images were poor, so I
+     am calling it a partial". No scoring, no rubric, no threshold. If you find
+     yourself reaching for a qualifier, the answer is PASS plus an observation.
+   * **A validator's refusal is a FAILURE OF THE VALIDATOR, and it is reported as a
+     defect in the code, not as a failing leg.** If a `verify_*` / `assert_*` /
+     preflight check is what ended a 30-minute render, that is the single most
+     valuable thing you can phone home tonight -- name the file and line. The rule
+     it violated is this repo's own: a guard is legitimate ONLY against a silently
+     WRONG render (a wrong voice, a wrong cast, altered source text, an unowned
+     ledger field). Anything else should have degraded and shipped.
+   * **The one inversion:** if an OOM or a genuine resource death was CAUGHT and
+     hidden -- the leg "passed" with a quietly degraded render and no loud log --
+     that IS worth flagging, for the opposite reason. He wants OOM to be visible.
+   * **THE RUNNER RETURNS 1 FOR THREE DIFFERENT THINGS. Do not map `rc != 0` to
+     FAIL.** `scripts/otr_canonical_api_run.py` collapses every non-SUCCESS into
+     `return 1`, so the exit code alone cannot tell these apart -- read the printed
+     lines, which say which one happened:
+     | what the log says | what it is | verdict |
+     |---|---|---|
+     | `PREFLIGHT FAIL: ... the running server cannot see: <files>` | never started; the weights are absent from the roots this server booted with | **NOT A FAILED LEG** -- report it as "could not start, missing weights", name the files, and move to the next leg |
+     | `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE` | this process stopped WATCHING; the server is still rendering and should still publish | **NOT A FAILED LEG** -- say so, re-run with `--timeout 0`, and check `otr/obs/` later |
+     | `RESULT TIMEOUT ... the queue is EMPTY` or an uncaught traceback or an OOM | the render died | **FAILED** |
+     A leg that publishes to `otr/obs/` passed even if this process already gave up
+     watching it. The artifact on disk outranks the exit code.
 
 1. **WRITE FINDINGS TO `docs/` ONLY. DO NOT PUSH.** Operator directive 2026-09-11:
    *"only write their fixes in docs and not to push their fixes."* Commit locally if

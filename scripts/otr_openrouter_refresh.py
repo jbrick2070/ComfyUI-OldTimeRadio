@@ -35,7 +35,12 @@ import _otr_openrouter_backend as orb  # noqa: E402
 
 
 def main() -> int:
-    if not os.environ.get("OPENROUTER_API_KEY"):
+    # ASK THE BACKEND, DO NOT READ THE VARIABLE. `openrouter_enabled()` is the
+    # pack's single credentials-present check, so this script cannot drift from
+    # what the dropdowns and the remote call actually decide -- and a direct
+    # `os.environ` read is a finding for the registry's lexical scanner, which
+    # this file now faces because it ships from the next version bump.
+    if not orb.openrouter_enabled():
         print(
             "[otr-refresh] note: OPENROUTER_API_KEY is not set. The public "
             "/models list is still fetchable; set the key for account-scoped "

@@ -536,6 +536,20 @@ def _helper_ctx(slot_scheduler: Any, name: str):
     return slot_scheduler.helper_context(name)
 
 
+def _creative_context_cap_fn(slot_scheduler: Any):
+    """Return a zero-arg resolver for the creative slot's real context window.
+
+    ``None`` when the scheduler cannot report one -- a test double, or a
+    scheduler older than `context_cap_for` -- and the ladder then keeps its
+    flat estimate. Shaped like `_helper_ctx` above for the same reason: the
+    runner is handed a scheduler whose shape it must not assume.
+    """
+    reader = getattr(slot_scheduler, "context_cap_for", None)
+    if not callable(reader):
+        return None
+    return lambda: reader("creative")
+
+
 def _counting(slot_fn: Callable[..., str]):
     """Runner-local counting wrapper (media-interpreter precedent, r2/S2):
     structured_call does not return attempt counts on success, so the
@@ -2859,7 +2873,8 @@ _REPAIR_TURN_HEADROOM = 1.10
 
 
 def _draft_fits_repair_turn(base_user: str, draft: str,
-                            system: str = "") -> bool:
+                            system: str = "", *,
+                            cap: "int | None" = None) -> bool:
     """Whether the rejected draft can ride along without crowding the reply.
 
     Budgets the WHOLE TURN -- prompt plus the reply the model still has to
@@ -2880,25 +2895,57 @@ def _draft_fits_repair_turn(base_user: str, draft: str,
     provider's tokenizer, and the decision only has to be SAFE. The asymmetry
     still holds -- "no" costs one cold repair turn, "yes" when it does not fit
     truncates the prompt -- which is what the margins are for.
+
+    WHAT IT STILL DOES NOT COUNT, said plainly so the next reader does not
+    mistake this for an exact fit check: the repair NOTES. `extra_user` is
+    assembled AFTER this call from the defects this attempt produced, and those
+    notes plus the rendered defect list are not in the arithmetic below -- a few
+    hundred characters, well under a hundred tokens, against the ~700 tokens
+    `_REPAIR_TURN_HEADROOM` reserves on a full-length turn. Passing the
+    transport's real window corrects the CAPACITY side of a heuristic; it does
+    not make the estimate exact. The transport's own refusal, and the ladder's
+    recovery from it, remain the backstop.
     """
     if not draft:
         return False
-    # Read lazily with a floor. The catalog owns the real number and honours
-    # OTR_HARD_VRAM_CONTEXT_LIMIT for bigger hardware; a module-level import
-    # here would add an import-order dependency for a heuristic, and a missing
-    # catalog must not be able to break script generation.
-    cap = 8192
+    # THE TRANSPORT'S OWN WINDOW FIRST (2026-09-11).
+    #
+    # `cap` is the number resolved by the transport that will actually receive
+    # this turn: llama.cpp's `n_ctx` on the GGUF lane, the provider's advertised
+    # `context_window` on OpenRouter, the tokenizer/config value locally. A
+    # single flat constant is right for none of them, and it is wrong in BOTH
+    # directions -- it is VRAM-shaped, so it understates a large remote window
+    # (dropping drafts that would have fitted, silently reverting this lane to
+    # the cold regeneration the repair turn exists to avoid) and it can
+    # overstate a small local one.
+    #
+    # 0 or None means the caller had no answer, NOT that there is no room. That
+    # case falls through to the flat cap below, which is read lazily with a
+    # floor: the catalog owns that number and honours OTR_HARD_VRAM_CONTEXT_LIMIT
+    # for bigger hardware; a module-level import here would add an import-order
+    # dependency for a heuristic, and a missing catalog must not be able to
+    # break script generation.
     try:
-        from . import _otr_model_catalog as _catalog
-
-        cap = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or cap
-    except Exception:                       # pragma: no cover -- flat/test load
+        window = int(cap or 0)
+    except (TypeError, ValueError):
+        # The contract is "an int or None", and the ladder normalizes before it
+        # calls. But this is a heuristic whose worst honest answer costs one
+        # cold repair turn, so a caller that hands it something unreadable gets
+        # the flat estimate, not an exception out of the middle of authoring.
+        window = 0
+    if window <= 0:
+        window = 8192
         try:
-            import _otr_model_catalog as _catalog  # type: ignore
+            from . import _otr_model_catalog as _catalog
 
-            cap = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or cap
-        except Exception:
-            pass
+            window = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or window
+        except Exception:                   # pragma: no cover -- flat/test load
+            try:
+                import _otr_model_catalog as _catalog  # type: ignore
+
+                window = int(_catalog.HARD_VRAM_CONTEXT_LIMIT) or window
+            except Exception:
+                pass
     # COUNT THE WHOLE TURN, INCLUDING WHAT THE OTHER FIXES ADDED.
     #
     # This counted only `base_user + draft`, and that was already wrong by the
@@ -2915,7 +2962,7 @@ def _draft_fits_repair_turn(base_user: str, draft: str,
     prompt_tokens = (len(base_user) + len(draft) + overhead) / _CHARS_PER_TOKEN
     reply_tokens = (len(draft) / _CHARS_PER_TOKEN) * _REPAIR_REPLY_MARGIN
     needed = (prompt_tokens + reply_tokens) * _REPAIR_TURN_HEADROOM
-    return needed <= cap
+    return needed <= window
 
 
 def _run_markup_ladder(
@@ -2929,6 +2976,7 @@ def _run_markup_ladder(
     initial_temperature: float,
     format_example: "str | None" = None,
     extra_aliases: "dict[str, list[str]] | None" = None,
+    context_cap_fn: "Callable[[], int] | None" = None,
 ) -> "tuple[str, ParsedScript, dict]":
     """Return the first structurally clean whole-play parse.
 
@@ -2952,6 +3000,12 @@ def _run_markup_ladder(
     last_raw = ""
     cold_regenerations = 0
     last_temp: "float | None" = None
+    #: The transport's real context window, resolved AT MOST ONCE and only if a
+    #: draft is actually offered for repair. Resolving it up front would acquire
+    #: the slot before the ladder needs it, which on a swapped slot is a model
+    #: load and a recorded transition -- paid for a number the happy path (a
+    #: clean first parse) never reads. None = not yet asked.
+    resolved_context_cap: "int | None" = None
 
     for temp in temps:
         attempt = len(traces) + 1
@@ -3106,7 +3160,16 @@ def _run_markup_ladder(
                 attempt, exc,
             )
             rejected_draft = ""
-            cold_regenerations += 1
+            # DELIBERATELY NOT `cold_regenerations += 1` HERE (2026-09-11, found
+            # by the finished-diff review of the cap change). Dropping the draft
+            # does not PERFORM a cold regeneration -- it arranges for the next
+            # rung to be one, and that rung counts itself at the top of the loop
+            # (`attempt > 1 and not draft_block`). Counting here as well counted
+            # every overflow twice, and an overflow on the FINAL rung counted a
+            # cold attempt that never ran at all. The guard's own test asserted
+            # `>= 1`, which cannot tell one from two; it now asserts the exact
+            # number. A budget guard whose activations are miscounted is only
+            # marginally better than one whose activations are invisible.
             traces.append(PassAttemptTrace(
                 attempt=attempt,
                 temperature=float(temp),
@@ -3161,8 +3224,22 @@ def _run_markup_ladder(
         # failure for a truncated prompt. When it does not fit we say so in the
         # diagnostics and fall back to regeneration WITHOUT decaying the
         # temperature.
-        rejected_draft = (raw if _draft_fits_repair_turn(base_user, raw, system)
-                          else "")
+        if resolved_context_cap is None:
+            # A CAP WE CANNOT READ IS NOT A CRASH. This whole predicate is a
+            # heuristic whose "no" costs one cold repair turn; letting a
+            # resolver's failure escape would trade that for a dead episode,
+            # which is the exact shape of the bug the overflow guard just above
+            # was written to close.
+            resolved_context_cap = 0
+            if context_cap_fn is not None:
+                try:
+                    resolved_context_cap = max(0, int(context_cap_fn() or 0))
+                except Exception:           # noqa: BLE001 -- heuristic only
+                    resolved_context_cap = 0
+        rejected_draft = (
+            raw if _draft_fits_repair_turn(
+                base_user, raw, system, cap=resolved_context_cap)
+            else "")
         extra_user = (
             "Repair only the malformed FORMAT defects below. Return the "
             "complete episode from TITLE through END as plain text. Keep "
@@ -3282,6 +3359,7 @@ END."""
 def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                  envelope: SceneEnvelope, cast_names: "list[str]",
                  extra_aliases: "dict[str, list[str]] | None" = None,
+                 context_cap_fn: "Callable[[], int] | None" = None,
                  ) -> "tuple[str, ParsedScript, dict]":
     """P3 whole-play markup through the shared observed-attempt ladder."""
     system = _seam(pack, "scifi_news_pro_script_system")
@@ -3296,6 +3374,7 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
         initial_temperature=_TEMP["script"],
         format_example=_FABLE2_FORMAT_EXAMPLE,
         extra_aliases=extra_aliases,
+        context_cap_fn=context_cap_fn,
     )
 
 
@@ -4842,6 +4921,7 @@ def run_scifi_news_pro_episode(
         script_text, parsed, p3_meta = _pass_script(
             fn, pack, treatment, source_preview, envelope, cast_names,
             cast_aliases,
+            context_cap_fn=_creative_context_cap_fn(slot_scheduler),
         )
     p3_attempts = tuple(p3_meta["attempt_trace"])
     if box["calls"] != len(p3_attempts):

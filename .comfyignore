@@ -140,6 +140,19 @@ scripts/*
 # join onto "scripts" and confirm each target is in the zip.
 !scripts/otr_mesh_stage_blender.py
 
+# 2026-09-11, and it is the SAME class again -- a runtime `scripts/` path the
+# pack tells the user to run and then does not ship. `refresh_catalog_cache()`
+# has ZERO callers under `nodes/`: nothing self-warms the OpenRouter catalog,
+# by design (INPUT_TYPES must never touch the network). Its only caller is this
+# script. So on a registry install the catalog stayed empty forever, every
+# OpenRouter model silently ran at `DEFAULT_CONTEXT_WINDOW = 8192` instead of
+# its real window, and the empty-cache sentinel read "(no OpenRouter models
+# cached -- run refresh_catalog_cache)" to a user who had no way to run it.
+# `docs/openrouter-setup.md:108,155` documents the command in both directions.
+# The script is 63 lines of stdlib: no exec, no eval, no subprocess, no network
+# call of its own (the backend module owns the fetch).
+!scripts/otr_openrouter_refresh.py
+
 # 2026-09-05: the ONE node module excluded from the registry bundle, and the
 # reason is the registry scan, not correctness. eng_indextts2.py is byte-hashed
 # by _otr_voice_route.RUNTIME_FINGERPRINT_SOURCES, so the idiomatic spelling fix

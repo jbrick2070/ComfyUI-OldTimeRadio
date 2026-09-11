@@ -20,6 +20,44 @@ written to be self-contained: do not assume the reader has seen this conversatio
 
 ## Rules both machines follow
 
+0. **WHAT COUNTS AS A FAILURE, and it is much narrower than you will assume.**
+   Operator directive 2026-09-11: *"be careful not to fail anything because of a
+   verification round check. Only an out of memory should fail."* With his standing
+   bar: *"as long as it doesn't crash when it's not supposed to"*, and *"this is a
+   fun experimental app, I'm not expecting anything exact."*
+   * **A leg FAILS only when the run DIED:** an uncaught traceback that ended the
+     prompt, an out-of-memory, a hang with nothing in `otr/obs/` past the five-minute
+     rule, or the server going away. That is the whole list.
+   * **A leg that PUBLISHED to `otr/obs/` PASSED.** Even if the title card is ugly,
+     the font fell back, a caption is mistimed, the cast is smaller than requested,
+     the story is thin, the images do not match the pack, or a checker somewhere
+     printed a complaint. Those are OBSERVATIONS. They go in the receipt as
+     observations, under their own heading, and they do not change the verdict.
+   * **Do NOT invent a quality gate.** No "it passed but the images were poor, so I
+     am calling it a partial". No scoring, no rubric, no threshold. If you find
+     yourself reaching for a qualifier, the answer is PASS plus an observation.
+   * **A validator's refusal is a FAILURE OF THE VALIDATOR, and it is reported as a
+     defect in the code, not as a failing leg.** If a `verify_*` / `assert_*` /
+     preflight check is what ended a 30-minute render, that is the single most
+     valuable thing you can phone home tonight -- name the file and line. The rule
+     it violated is this repo's own: a guard is legitimate ONLY against a silently
+     WRONG render (a wrong voice, a wrong cast, altered source text, an unowned
+     ledger field). Anything else should have degraded and shipped.
+   * **The one inversion:** if an OOM or a genuine resource death was CAUGHT and
+     hidden -- the leg "passed" with a quietly degraded render and no loud log --
+     that IS worth flagging, for the opposite reason. He wants OOM to be visible.
+   * **THE RUNNER RETURNS 1 FOR THREE DIFFERENT THINGS. Do not map `rc != 0` to
+     FAIL.** `scripts/otr_canonical_api_run.py` collapses every non-SUCCESS into
+     `return 1`, so the exit code alone cannot tell these apart -- read the printed
+     lines, which say which one happened:
+     | what the log says | what it is | verdict |
+     |---|---|---|
+     | `PREFLIGHT FAIL: ... the running server cannot see: <files>` | never started; the weights are absent from the roots this server booted with | **NOT A FAILED LEG** -- report it as "could not start, missing weights", name the files, and move to the next leg |
+     | `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE` | this process stopped WATCHING; the server is still rendering and should still publish | **NOT A FAILED LEG** -- say so, re-run with `--timeout 0`, and check `otr/obs/` later |
+     | `RESULT TIMEOUT ... the queue is EMPTY` or an uncaught traceback or an OOM | the render died | **FAILED** |
+     A leg that publishes to `otr/obs/` passed even if this process already gave up
+     watching it. The artifact on disk outranks the exit code.
+
 1. **PULL FIRST, and report the HEAD you actually ran.** A lane that cannot state its
    commit has not qualified anything.
    ```
@@ -70,11 +108,28 @@ Pull v2.0-alpha and report the HEAD you ran.
 You are the only box that can answer "does this work somewhere other than where it
 was written." That is your whole value in this wave, so test the 8 GB path.
 
-PROFILE: use `otr_4060_12b_gguf_offload`. It is status "shipping".
-DO NOT use `8gb_lite` or `otr_4060_floor` -- both are status "draft", and 8gb_lite is
-recorded in PBUG-20260904-05 as REFUSING IN TWENTY SECONDS on two of the three banks,
-because the 12B writer's 2,048-token context cannot hold their prompts. Picking a
-draft profile burns your evening on an already-diagnosed refusal.
+PROFILE for the legs that must land: `otr_4060_12b_gguf_offload`, status
+"shipping" -- the same 12B Q4_K_M at `gguf_n_ctx: 4096` with a full 48-layer offload,
+measured 7.8 of 8.2 GB on your card. 4,096 holds any bank's prompt with room to answer,
+so run the required legs there and get them banked first.
+
+**THEN TRY A DRAFT PROFILE ANYWAY, and this correction is the operator's
+(2026-09-11).** An earlier draft of this plan said "DO NOT use `8gb_lite` or
+`otr_4060_floor`" and called them an evening burnt on a diagnosed refusal. **The record
+does not say that.** PBUG-20260904-05 has `8gb_lite` WRITING, RENDERING AND PUBLISHING
+on `media_archive` -- RESULT SUCCESS, obs_publish OK, the mp4 in the watched folder --
+and refusing only on `science_news` and `original`, whose prompts exceed its
+2,048-token context. That is two banks, not a profile. Forbidding it was a forecast
+dressed as a finding, and the operator's standing complaint is exactly that:
+*"you kept telling me this won't work."*
+  So: after the required legs, run `8gb_lite` on `media_archive`. If you have more
+  evening, try it on a bank it is "supposed to" refuse.
+  * **A twenty-second `GenerationContextOverflowError` is NOT a failed leg** -- it is a
+    refusal, and per rule 0 a refusal that kills an episode is a DEFECT IN THE CODE.
+    Report the input-token count and the `context_cap` from the log and move on; that
+    pair is the measurement the fix needs.
+  * A draft profile that publishes is a real result worth having, even if nothing is
+    promoted on the strength of it. Status promotions are the 5080's to make.
 
 Leg A -- one-act monologue, full canonical. Then a three-act ensemble.
   Record the profile that actually RESOLVED: grep the leg log for the resolved-profile
@@ -100,6 +155,19 @@ Leg C -- KNOWN, report-and-move-on, do not chase:
 
 Leg D -- fresh-install friction. Anything that needed a manual step the docs do not
 mention goes in docs/4060_DRILL_LOG.md, which is yours.
+
+Leg E -- KEEP GOING. The diagnostic legs above are the floor, not the ceiling.
+With evening left, spend it on MORE PUBLISHED EPISODES rather than on more analysis:
+rotate the source bank and let `visual_style` roll freely, and bank whatever lands in
+`otr/obs/`. Published episodes are how the operator reads success -- *"if I see it in
+obs then it's somewhat a success"* -- so five published episodes with rough edges beat
+two immaculate ones plus an idle box.
+  * Do not re-roll away a homely result. Publish it, note what was homely, move on.
+  * Do not stop because something upstream "probably will not work here". That
+    forecast is what rule 0 exists to retire. Run it; only a death fails it.
+  * One line per extra episode in your phone-home: bank, rolled style, elapsed,
+    obs filename. No essay.
+
 
 Findings to docs/. Do not push. Phone home per leg.
 ```
@@ -140,6 +208,19 @@ fonts installed -- I'm open to some bad formatting as long as it doesn't crash")
 Leg D -- note every place this platform needed something the Windows path did not:
 fonts installed, ffmpeg build features, PyAV limitations, missing codecs. This feeds
 the open shared font-resolution question.
+
+Leg E -- KEEP GOING. The diagnostic legs above are the floor, not the ceiling.
+With evening left, spend it on MORE PUBLISHED EPISODES rather than on more analysis:
+rotate the source bank and let `visual_style` roll freely, and bank whatever lands in
+`otr/obs/`. Published episodes are how the operator reads success -- *"if I see it in
+obs then it's somewhat a success"* -- so five published episodes with rough edges beat
+two immaculate ones plus an idle box.
+  * Do not re-roll away a homely result. Publish it, note what was homely, move on.
+  * Do not stop because something upstream "probably will not work here". That
+    forecast is what rule 0 exists to retire. Run it; only a death fails it.
+  * One line per extra episode in your phone-home: bank, rolled style, elapsed,
+    obs filename. No essay.
+
 
 Findings to docs/. Do not push. Phone home per leg.
 ```
