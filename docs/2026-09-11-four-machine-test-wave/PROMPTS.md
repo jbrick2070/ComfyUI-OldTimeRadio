@@ -16,7 +16,9 @@ list is one fix plus the platform, which is a single bisect instead of six. So t
 frozen hash is written here before the wave starts, and nothing touching the render
 path lands after it:
 
-    WAVE HEAD: <filled in at freeze time -- do not start without it>
+    WAVE HEAD: f5f40bd4a98d2a85c464224ad2db69cc559aab4f
+    Frozen 2026-09-11. Six crash/durability fixes and the plan rebaseline are
+    in it. Nothing touching the render path lands after this without a re-freeze.
 
 
 ---
