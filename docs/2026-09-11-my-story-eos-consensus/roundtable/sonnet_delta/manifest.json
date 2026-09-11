@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T09:05:47.967464+00:00",
+  "doc": "docs/2026-09-11-my-story-eos-consensus/roundtable/sonnet_delta_plan.md",
+  "prompt_tokens_est": 5035,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-sonnet-5",
+      "ok": true,
+      "prompt_tokens": 7400,
+      "completion_tokens": 772,
+      "cost_usd": 0.02252,
+      "max_tokens": 3000,
+      "temperature": 0.5,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.0225
+}

@@ -14224,3 +14224,42 @@ Step 120 supports authored dinner preserved but visual staging inverted; Step 12
 also lost the authored pair lock and must not be described as source-qualified.
 The combined Sonnet/full/Bible receipt is in finishing_receipt.md. Publication,
 spoken facts and image pixels still need fresh canonical recovery on this code.
+
+
+### PBUG-20260910-05 follow-up -- native chat and grammar termination disagree
+
+Live attempt: full canonical 5080 pairlock_01 on 2c9d47f2, prompt
+19cba4cc-ceaa-43d6-833a-393854eb45f1. Evidence is preserved under
+2026-09-11-my-story-5080-qualification/: exact request/prompt, failed ledger,
+terminal history, server/runner logs and a file-hash manifest. Qwen3.5-4B loaded
+its text decoder from snapshot 851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a with
+NF4/SDPA. Native capacity was 262144; source-correction fit measured 2186 prompt
+tokens. No new hardware tuple or source fidelity is qualified.
+
+One optional P0 source-correction operation spent two attempts. Each emitted
+parseable complete JSON followed by 82/87 newline characters, then hit a
+verbatim-cycle guard at 672 tokens. Its fixed two-call budget exhausted and the
+usable accepted intake was retained. The model snapshot has no cached
+generation_config.json. Tokenizer/chat EOS is 248046; the selected text model
+configuration EOS is 248044. Native generation formerly supplied no explicit EOS
+override while LMFE admitted tokenizer EOS. Installed code/configuration verify
+the termination contract mismatch. Generated token IDs were not saved, so the
+exact hidden EOS sequence and its contribution to padding remain inference.
+
+Separately, P1 repeated inside open JSON strings across three main attempts,
+then failed at 400.67 seconds with primary_ladder_exhausted. All five recorded
+halts were verbatim_cycle with open_string_tokens=None; this was not the
+open-string-size guard firing. A diagnostic /interrupt request near 386 seconds
+did not change the terminal classification to cancellation. No media or
+publication was produced. EOS alignment does not prove P1 repetition fixed or
+establish NF4 causality from this one attempt.
+
+The candidate shares effective-model-plus-chat EOS IDs across all four native
+generators, real LMFE completion admission/cache identity, and capacity-boundary
+completion accounting. Configured multiple EOS IDs and owner objects are
+preserved; padding remains scalar. Writer decode evidence now records the last
+token and EOS set before the existing halt classification. Sampling, liveness
+and retry policy are unchanged. Final qualification and Opus/Cursor judgment:
+`2026-09-11-my-story-eos-consensus/consensus_judgment.md`. Existing Bible 12.100
+owns this termination contract. Fresh canonical qualification remains open;
+no new bug ID is minted from an unverified hidden-token hypothesis.

@@ -86,31 +86,39 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Active campaign owner: Codex, v2.0-alpha.** All included A1R/A2, F1/F2,
-Original-credit B, credits-title C and Mac/O2 coding is complete and qualified.
-Code receipts and preserved implementation contracts are in HANDOFF_LOG,
-GO_FORWARD_ARCHIVE and docs/2026-09-11-my-story-cross-machine/finishing_receipt.md.
-GO_FORWARD remains the sole work queue. Root owns any new production fix;
-other reviewers are read-only.
+**Active campaign owner: Codex, v2.0-alpha.** Root owns production fixes;
+reviewers are read-only. GO_FORWARD is the sole work queue. Prior finishing
+code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
+`docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
+and fresh hardware qualification remain open.
 
-**Next action: fresh canonical 5080 source recovery, then stress coverage below.**
-Use the real workflows/otr_canonical.json through the shipped full API runner and
-an approved runtime profile. Record the actual checkout/canonical hashes and
-controls. Inspect accepted P0-P3, final spoken text, scene prompts, correction
-receipts and image pixels; publication alone is not source-fidelity proof.
+**Next action: ONE fresh full canonical 5080 pair-lock retry of the qualified code.** Opus and Cursor converge on this
+sequence after grounding; the receipt is
+`docs/2026-09-11-my-story-eos-consensus/consensus_judgment.md`.
+Use the corrected commit, the real `workflows/otr_canonical.json`, the shipped
+full API runner, `otr_w45_still_pan`, and exactly the pairlock_01 source fields,
+Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Do not retune sampling or
+swap models/quantization before this measurement. Record checkout/canonical
+hashes, actual EOS IDs, loaded capacity, schema-enriched fit, and terminal state.
+Keep failed attempt 01 in the denominator. Its one optional source-correction
+operation spent two attempts; P1 separately exhausted three verbatim-cycle
+attempts. No media was produced. EOS alignment does not establish a P1 cure.
 
-The first recovery is the one-act living-mother/shared-Los-Angeles-dinner
-pair-lock case from the 4060 report. It must retain the actual supplied people,
-shared presence and ending, with zero between-act music. Record loaded native
-capacity and exact schema-enriched prompt fit. Qualify Original model credits
-on a fresh Original publication as part of subsequent coverage.
+The recovery case is one act: Jeffrey and his living mother share dinner at the
+same Los Angeles table. Inspect accepted P0-P3, final spoken text, scene prompts,
+correction receipts and image pixels. Both people remain present and the ending
+remains a shared meal; between-act music is zero. Publication alone is not
+source-fidelity proof. If it fails, preserve evidence and diagnose the specific
+failure before another run. Subsequent stress coverage remains below; Original
+model credits require a fresh Original publication.
 
-**Operator sequencing remains binding.** Coding precedes live testing. The 5080
-and scoped RunPod trial are authorized now that included coding is complete;
-stop rented compute afterward. Mac/4060 stay idle until tomorrow AND Jeffrey's
-explicit go-ahead. Coordination automation remains paused; do not contact or
-activate those machines. RunPod needs authenticated current access and a pull
-of this qualified commit before any run; historical receipts are not current status.
+**Operator sequencing remains binding.** No GPU run before coding and QA finish.
+5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow
+AND Jeffrey's explicit go-ahead. Coordination remains paused; do not contact or
+activate those machines. RunPod is authorized in scope but currently BLOCKED by
+missing authenticated access here; no rented compute is running. It requires
+current authenticated status and a pull of the qualified commit before any run;
+stop rented compute afterward. Historical pod receipts are not current status.
 
 **Checker+rewriter ruling:** the operator rejected a separate chunker/recursive
 organizer and report-only checker. Existing author/correction calls receive full

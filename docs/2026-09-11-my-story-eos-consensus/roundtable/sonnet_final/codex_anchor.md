@@ -1,0 +1,1 @@
+VERDICT: ready for final QA/regression completion, then one canonical retry. No known production blocker; fit allowance positive, explicit None semantics grounded in installed Transformers. Model/sampling/retry policies remain unchanged. Exact EOS samples and P1 recovery still require live proof.

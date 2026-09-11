@@ -953,7 +953,8 @@ def _build_truncating_generate_fn(
             "temperature": float(temperature),
             "top_p": active_top_p,
             "max_new_tokens": effective_max_new_tokens,
-            "pad_token_id": tokenizer.eos_token_id,
+            "pad_token_id": prepared["pad_token_id"],
+            "eos_token_id": prepared["eos_token_ids"] or None,
         }
         # Only forward non-default values so older transformers
         # versions that don't accept `min_p` as a kwarg keep working
@@ -1067,7 +1068,8 @@ def _build_truncating_generate_fn(
             try:
                 if schema_model is not None:
                     _, gen_kwargs["prefix_allowed_tokens_fn"] = (
-                        get_cached_transformers_schema_constraint(cache_entry, schema_model)
+                        get_cached_transformers_schema_constraint(
+                            cache_entry, schema_model, eos_token_ids=prepared["eos_token_ids"])
                     )
                 out = model.generate(**inputs, **gen_kwargs)
             except TypeError as exc:
@@ -1090,7 +1092,8 @@ def _build_truncating_generate_fn(
                     _seed_writer_sampling(inputs)
                     if schema_model is not None:
                         _, gen_kwargs["prefix_allowed_tokens_fn"] = (
-                            get_cached_transformers_schema_constraint(cache_entry, schema_model)
+                            get_cached_transformers_schema_constraint(
+                                cache_entry, schema_model, eos_token_ids=prepared["eos_token_ids"])
                         )
                     out = model.generate(**inputs, **gen_kwargs)
                 else:
@@ -1103,15 +1106,18 @@ def _build_truncating_generate_fn(
         except Exception:  # pragma: no cover - exotic backend sequence shape
             generated_tokens = None
         ended_with_eos = False
+        last_token = None
         try:
             last_token = int(generated_ids[-1])
-            eos = tokenizer.eos_token_id
-            eos_values = {int(value) for value in (
-                eos if isinstance(eos, (list, tuple, set)) else (eos,)
-            ) if value is not None}
+            eos_values = prepared["eos_token_ids"]
             ended_with_eos = last_token in eos_values
         except Exception:  # pragma: no cover - exotic token container
             pass
+        log.info(
+            "[OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=%s "
+            "last_token=%s eos_token_ids=%s ended_with_eos=%s",
+            generated_tokens, last_token, prepared["eos_token_ids"], ended_with_eos,
+        )
         # A-1 (2026-07-30, writer repair): DECODE BEFORE THE RAISE.
         # The output-limit raise used to fire HERE, above the decode, so a
         # fail-closed leg threw away the only copy of what the model actually
@@ -1175,7 +1181,7 @@ def _build_truncating_generate_fn(
                 ended_with_eos=ended_with_eos,
             )
 
-        if generated_tokens == effective_max_new_tokens:
+        if generated_tokens == effective_max_new_tokens and not ended_with_eos:
             # The model stopped because it ran OUT OF ROOM, not because it was
             # finished. When the room it was given is also LESS than the room
             # its caller asked for, that is the silent catastrophe: the artifact

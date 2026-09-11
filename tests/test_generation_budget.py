@@ -58,7 +58,7 @@ def _exact_prompt_entry(monkeypatch, capacity=32768):
 
     monkeypatch.setattr(writer._OTRHB, "make_streamer", lambda *args: None)
     monkeypatch.setattr(constrained, "get_cached_transformers_schema_constraint",
-                        lambda *args: (None, lambda *args: []))
+                        lambda *args, **kwargs: (None, lambda *args: []))
     entry = {"model": Model(), "tokenizer": Tokenizer(), "model_id": "Qwen/Qwen3.5-4B",
              "context_cap": capacity, "native_context_capacity": capacity,
              "context_capacity_source": "loaded decoder config"}
@@ -118,6 +118,71 @@ def test_constrained_eos_at_exact_capacity_is_a_completed_reply(eos, monkeypatch
     result = constrained.make_constrained_generate_fn(entry, _FitSchema)(
         messages, temperature=.2, max_new_tokens=None)
     assert result == '{"value":"ok"}' and generated[-1][1] == 1
+
+
+@pytest.mark.parametrize("route", ["writer", "constrained", "base", "polish"])
+@pytest.mark.parametrize("terminal", [19998, 19999, 20000])
+def test_all_native_routes_stop_on_configured_or_chat_eos_at_capacity(route, terminal, monkeypatch, caplog):
+    from types import SimpleNamespace
+    import torch
+    from transformers import EosTokenCriteria
+    from nodes import _otr_constrained_generate as constrained
+    from nodes._otr_generation_budget import ProviderCapacityMessages
+
+    entry, *_ = _exact_prompt_entry(monkeypatch)
+    caplog.set_level("INFO", logger=writer.log.name)
+    configured = [19998, 19999]
+    entry["model"].generation_config = SimpleNamespace(eos_token_id=configured)
+    entry["model"].config = SimpleNamespace(eos_token_id=12345)
+    messages = ProviderCapacityMessages([{"role": "user", "content": "Reply."}])
+    prepared = model_loader.prepare_native_prompt(entry, messages)
+    entry["context_cap"] = prepared["prompt_tokens"] + 1
+    calls = []
+
+    def generate(**kwargs):
+        calls.append(kwargs)
+        assert kwargs["eos_token_id"] == [19998, 19999, 20000]
+        assert kwargs["pad_token_id"] == 20000
+        output = torch.cat([kwargs["input_ids"], torch.tensor([[terminal]])], dim=1)
+        # Exercise Transformers' actual stop criterion with the transport kwargs.
+        assert EosTokenCriteria(kwargs["eos_token_id"])(output, None).item()
+        return output
+
+    entry["model"].generate = generate
+    factories = {"writer": writer._build_truncating_generate_fn,
+                 "constrained": lambda e: constrained.make_constrained_generate_fn(e, _FitSchema),
+                 "base": model_loader.make_generate_fn, "polish": model_loader.make_polish_generate_fn}
+    assert factories[route](entry)(messages, temperature=.2, max_new_tokens=None) == '{"value":"ok"}'
+    assert len(calls) == 1 and calls[0]["max_new_tokens"] == 1
+    assert configured == [19998, 19999] and entry["tokenizer"].eos_token_id == 20000
+    if route == "writer":
+        assert f"last_token={terminal} eos_token_ids=[19998, 19999, 20000] ended_with_eos=True" in caplog.text
+        assert "OUTPUT_CAP:" not in caplog.text
+        assert "OUTPUT_TRUNCATED:" not in caplog.text
+
+
+@pytest.mark.parametrize("configured,expected", [
+    ([7, 8, 7], [7, 8, 9]), (0, [0, 9]), (None, [5, 6, 9]),
+])
+def test_native_eos_respects_generation_precedence_and_nested_fallback(configured, expected):
+    from types import SimpleNamespace
+    import copy
+    model = SimpleNamespace(generation_config=SimpleNamespace(eos_token_id=configured),
+                            config=SimpleNamespace(eos_token_id=4,
+                                                   text_config=SimpleNamespace(eos_token_id=[5, 6])))
+    tokenizer = SimpleNamespace(eos_token_id=9)
+    before = copy.deepcopy((model, tokenizer))
+    assert model_loader.native_eos_token_ids({"model": model, "tokenizer": tokenizer}) == expected
+    assert (model, tokenizer) == before
+
+
+def test_native_eos_collection_normalization_keeps_padding_scalar(monkeypatch):
+    entry, *_ = _exact_prompt_entry(monkeypatch)
+    entry["tokenizer"].eos_token_id = {20000, 19999}
+    prepared = model_loader.prepare_native_prompt(entry, [{"role": "user", "content": "Reply."}])
+    assert prepared["eos_token_ids"] == [19999, 20000]
+    assert prepared["pad_token_id"] == 19999
+    assert model_loader._native_token_ids({True, -1, "bad", None, 8}) == [8]
 
 
 def test_unmarked_none_budget_is_a_programmer_error_before_prompt_preparation(monkeypatch):
@@ -453,7 +518,7 @@ def test_local_structured_transport_adds_prefix_without_losing_sampling(
     parser = object()
     monkeypatch.setattr(
         "nodes._otr_constrained_generate.get_cached_transformers_schema_constraint",
-        lambda cache_entry, schema_model: (parser, prefix),
+        lambda cache_entry, schema_model, **kwargs: (parser, prefix),
     )
     model = Model()
     generate = writer._build_truncating_generate_fn(

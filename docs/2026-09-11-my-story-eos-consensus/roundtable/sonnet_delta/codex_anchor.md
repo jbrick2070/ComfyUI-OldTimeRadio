@@ -1,0 +1,1 @@
+VERDICT: no known blocker. Gate only misleading ceiling diagnostics on not ended_with_eos; existing guard and capacity failures unchanged. Full writer body read. Focused/full/Bible qualification precedes live.

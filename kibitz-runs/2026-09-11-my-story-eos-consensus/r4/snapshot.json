@@ -1,0 +1,22 @@
+[
+  {
+    "path": "nodes/_otr_model_loader.py",
+    "sha256": "468597c196625de8ef5700ff53ac1d68394aa893d6694a6ef914266c9713ec61"
+  },
+  {
+    "path": "nodes/OTR_LedgerScriptWriter.py",
+    "sha256": "c25ff162e086182b1b4d290c58bc3469f312917d1540468e5cde71b90c412920"
+  },
+  {
+    "path": "nodes/_otr_constrained_generate.py",
+    "sha256": "d8298bf94f283ca21286415ac16b70af49a619f060103506a5b4d36ad0fa94f8"
+  },
+  {
+    "path": "tests/test_generation_budget.py",
+    "sha256": "44afff3e1b7ea110ed047586851f35b72c3b72b9809b0c3b1db387775a68b7e1"
+  },
+  {
+    "path": "tests/test_constrained_generate.py",
+    "sha256": "1d23a5df75df5cae9400f497987e78731138700495af164305f5f95889c510f0"
+  }
+]

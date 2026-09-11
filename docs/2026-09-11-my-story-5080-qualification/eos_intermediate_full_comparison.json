@@ -1,0 +1,21 @@
+{
+  "baseline": {
+    "passed": 14361,
+    "failed": 51,
+    "skipped": 183,
+    "xfailed": 1,
+    "xml_sha256": "986a29cc8801330184ffd4c6a6171820b40c95a4b2c62c9ed6ac7d3bf68cec71"
+  },
+  "candidate": {
+    "passed": 14379,
+    "failed": 51,
+    "skipped": 183,
+    "xfailed": 1,
+    "xml_sha256": "366b5893a0460259801f851d4ced3583e83a8279944b1ebfbb34dd14bb34279f"
+  },
+  "new_failures": [],
+  "resolved_failures": [],
+  "changed_failure_payloads": [],
+  "normalization": "memory addresses, pytest directory numbers, timestamps, source line numbers; Bible checkout names and truncated py_files repr only",
+  "presentation_only_dictionary_diff_order": []
+}

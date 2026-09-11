@@ -43,6 +43,7 @@ import logging
 import os
 import threading
 import time
+from numbers import Integral
 from pathlib import Path
 from typing import Any
 
@@ -2266,6 +2267,30 @@ def _normalize_messages_for_cache_entry(
     )
 
 
+def _native_token_ids(value) -> list[int]:
+    values = value if isinstance(value, (list, tuple, set)) else (value,)
+    normalized = [int(item) for item in values
+                  if isinstance(item, Integral) and not isinstance(item, bool) and item >= 0]
+    return sorted(normalized) if isinstance(value, set) else normalized
+
+
+def native_eos_token_ids(cache_entry: dict[str, Any]) -> list[int]:
+    """Share effective model and chat terminators without changing either owner.
+
+    A native text decoder may inherit end-of-text from its config while its
+    chat tokenizer names end-of-turn. Grammar, generation and completion
+    classification must accept the same set. Preserve configured multi-EOS.
+    """
+    model = cache_entry["model"]
+    configured = _native_token_ids(getattr(getattr(model, "generation_config", None), "eos_token_id", None))
+    if not configured:
+        config = getattr(model, "config", None)
+        text_config = getattr(config, "text_config", None) or config
+        configured = _native_token_ids(getattr(text_config, "eos_token_id", None))
+    chat = _native_token_ids(getattr(cache_entry["tokenizer"], "eos_token_id", None))
+    return list(dict.fromkeys([*configured, *chat]))
+
+
 def prepare_native_prompt(cache_entry: dict[str, Any], messages) -> dict[str, Any]:
     """Prepare the exact generation prompt on CPU; retain no model handles.
 
@@ -2300,6 +2325,8 @@ def prepare_native_prompt(cache_entry: dict[str, Any], messages) -> dict[str, An
         source = "legacy entry missing native capacity; default context estimate"
     return {
         "inputs": inputs,
+        "eos_token_ids": native_eos_token_ids(cache_entry),
+        "pad_token_id": next(iter(_native_token_ids(tokenizer.eos_token_id)), None),
         "prompt_tokens": int(inputs["input_ids"].shape[-1]),
         "context_cap": cap,
         "capacity_source": str(source or "entry context setting; native capacity unreported"),
@@ -2316,6 +2343,7 @@ def inspect_native_prompt_fit(cache_entry: dict[str, Any], messages, *, max_new_
     prepared = prepare_native_prompt(cache_entry, messages)
     measured = {key: prepared[key] for key in (
         "prompt_tokens", "context_cap", "capacity_source", "capacity_known", "model_id",
+        "eos_token_ids",
     )}
     requested = (prepared["context_cap"] if prepared["reserve_remaining"]
                  else max(1, int(max_new_tokens)))
@@ -2454,7 +2482,8 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 temperature=temperature,
                 top_p=0.92,
                 max_new_tokens=effective_max_new_tokens,
-                pad_token_id=tokenizer.eos_token_id,
+                pad_token_id=prepared["pad_token_id"],
+                eos_token_id=prepared["eos_token_ids"] or None,
                 stopping_criteria=StoppingCriteriaList(
                     [_guard, _deadline_guard]),
                 # Read-only live heartbeat (2026-08-13). A reserve-remaining
@@ -2513,7 +2542,9 @@ def make_generate_fn(cache_entry: dict[str, Any]):
                 generated_tokens=len(generated_ids),
                 effective_output_tokens=effective_max_new_tokens,
             )
-        if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
+        if (fail_on_output_limit
+                and len(generated_ids) >= effective_max_new_tokens
+                and int(generated_ids[-1]) not in prepared["eos_token_ids"]):
             raise ModelLoaderError(
                 "prose generation exhausted the full remaining provider/context "
                 "capacity; the partial artifact is not eligible for reroll"
@@ -2651,7 +2682,8 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 temperature=temperature,
                 top_p=_POLISH_TOP_P,
                 max_new_tokens=effective_max_new_tokens,
-                pad_token_id=tokenizer.eos_token_id,
+                pad_token_id=prepared["pad_token_id"],
+                eos_token_id=prepared["eos_token_ids"] or None,
                 stopping_criteria=StoppingCriteriaList(
                     [_guard, _deadline_guard]),
                 streamer=_OTRHB.make_streamer(
@@ -2695,7 +2727,9 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
                 generated_tokens=len(generated_ids),
                 effective_output_tokens=effective_max_new_tokens,
             )
-        if fail_on_output_limit and len(generated_ids) >= effective_max_new_tokens:
+        if (fail_on_output_limit
+                and len(generated_ids) >= effective_max_new_tokens
+                and int(generated_ids[-1]) not in prepared["eos_token_ids"]):
             raise ModelLoaderError(
                 "prose generation exhausted the full remaining provider/context "
                 "capacity; the partial artifact is not eligible for reroll"

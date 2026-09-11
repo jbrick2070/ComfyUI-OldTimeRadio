@@ -161,7 +161,7 @@ class TestFactoryContract:
         assert prefix_2 is not prefix_1
         internal = cache_entry["_otr_lmfe_constraint_cache"]
         assert internal["tokenizer"] is cache_entry["tokenizer"]
-        assert set(internal) == {"tokenizer", "tokenizer_data"}
+        assert set(internal) == {"tokenizer", "tokenizer_data", "eos_token_ids"}
         assert scan.call_count == 1
         # Warm entries may still carry the old history-owning shape.
         internal["by_schema"] = {_TinySchema: (parser_1, prefix_1)}
@@ -275,6 +275,34 @@ def _feed_json(prefix, text):
         assert ord(char) in prefix(0, torch.tensor(ids)), (position, text[:position], char)
         ids.append(ord(char))
     return prefix(0, torch.tensor(ids))
+
+
+def test_real_lmfe_uses_shared_model_chat_eos_and_refreshes_without_mutating_history():
+    from types import SimpleNamespace
+    import torch
+    from transformers import EosTokenCriteria
+    from nodes._otr_constrained_generate import get_cached_transformers_schema_constraint
+    from nodes._otr_model_loader import native_eos_token_ids
+    entry = TestFactoryContract()._make_minimal_cache_entry()
+    entry["model"].generation_config = SimpleNamespace(eos_token_id=[202])
+    _, old_prefix = get_cached_transformers_schema_constraint(entry, _TinySchema)
+    ids = native_eos_token_ids(entry)
+    assert ids == [202, 200]
+    assert not set(ids).intersection(old_prefix(0, torch.tensor([201])))
+    allowed = _feed_json(old_prefix, '{"color":"red","count":1}')
+    for eos in ids:
+        assert eos in allowed
+        assert EosTokenCriteria(ids)(torch.tensor([[eos]]), None).item()
+    old_data = entry["_otr_lmfe_constraint_cache"]["tokenizer_data"]
+    entry["model"].generation_config.eos_token_id = [201]
+    _, new_prefix = get_cached_transformers_schema_constraint(entry, _TinySchema)
+    assert new_prefix is not old_prefix
+    assert entry["_otr_lmfe_constraint_cache"]["tokenizer_data"] is not old_data
+    assert old_data.eos_token_id == [202, 200]
+    assert old_prefix.token_enforcer.eos_token_id == [202, 200]
+    assert set(_feed_json(new_prefix, '{"color":"red","count":1}')) >= {201, 200}
+    assert entry["tokenizer"].eos_token_id == 200
+    assert entry["model"].generation_config.eos_token_id == [201]
 
 
 @pytest.mark.parametrize("nested", [False, True])
@@ -391,7 +419,7 @@ def test_each_actual_generation_has_fresh_collectible_history(kind, outcome, mon
     assert observations == [
         ("writer" if kind == "writer" else "constrained") + "_generation_returned"
     ] * (1 if outcome == "error" else 2)
-    assert set(entry["_otr_lmfe_constraint_cache"]) == {"tokenizer", "tokenizer_data"}
+    assert set(entry["_otr_lmfe_constraint_cache"]) == {"tokenizer", "tokenizer_data", "eos_token_ids"}
     assert not hasattr(fn, "prefix_allowed_tokens_fn")
     gc.collect()
     assert all(ref() is None for group in refs for ref in group)

@@ -150,31 +150,62 @@ def test_two_different_seeds_really_do_diverge(monkeypatch):
 # WIRING: both generate call sites are covered.
 # --------------------------------------------------------------------------- #
 
-def test_both_generate_paths_are_seeded():
+@pytest.mark.parametrize("seeded", [True, False])
+def test_both_generate_paths_are_seeded(monkeypatch, seeded):
     """The min_p retry re-generates after a failed attempt has already consumed
     RNG state. Without a re-seed there, a run that hit the TypeError would
     diverge from one that did not -- reproducible only by luck."""
-    import ast
-    import inspect
-    import textwrap
+    torch = pytest.importorskip("torch")
+    draws, min_p_values = [], []
+    if seeded:
+        monkeypatch.setenv(writer.WRITER_SEED_ENV, "42")
+    else:
+        monkeypatch.delenv(writer.WRITER_SEED_ENV, raising=False)
 
-    source = inspect.getsource(writer)
-    tree = ast.parse(source)
-    generate_lines, seed_lines = [], []
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
-            continue
-        func = node.func
-        if isinstance(func, ast.Attribute) and func.attr == "generate":
-            generate_lines.append(node.lineno)
-        if isinstance(func, ast.Name) and func.id == "_seed_writer_sampling":
-            seed_lines.append(node.lineno)
-    assert len(generate_lines) >= 2, generate_lines
-    for line in generate_lines:
-        assert any(0 < line - seed < 12 for seed in seed_lines), (
-            "model.generate at line %d has no _seed_writer_sampling call "
-            "shortly before it; that path is not reproducible" % line)
-    del textwrap
+    class Inputs(dict):
+        def to(self, device):
+            return self
+
+    class Tokenizer:
+        eos_token_id = 99
+
+        def apply_chat_template(self, messages, **kwargs):
+            return "Write this story."
+
+        def __call__(self, prompt, **kwargs):
+            return Inputs(input_ids=torch.tensor([[1, 2, 3]]))
+
+        def decode(self, tokens, **kwargs):
+            return "The story."
+
+    class Model:
+        device = "cpu"
+
+        def generate(self, **kwargs):
+            draws.append(torch.rand(4).tolist())
+            min_p_values.append(kwargs.get("min_p"))
+            if "min_p" in kwargs:
+                # An unsupported-argument failure can consume RNG state.
+                raise TypeError("unexpected keyword argument 'min_p'")
+            return torch.cat([kwargs["input_ids"], torch.tensor([[99]])], dim=1)
+
+    monkeypatch.setattr(writer._OTRHB, "make_streamer", lambda *args: None)
+    generate = writer._build_truncating_generate_fn(
+        {"model": Model(), "tokenizer": Tokenizer(), "context_cap": 1024},
+        min_p=.05,
+    )
+    messages = [{"role": "user", "content": "Write this story."}]
+    # First call exercises normal generation then the TypeError retry; the
+    # second uses the remembered unsupported-min_p path without another retry.
+    assert generate(messages, temperature=.5, max_new_tokens=20) == "The story."
+    assert generate(messages, temperature=.5, max_new_tokens=20) == "The story."
+    assert min_p_values == [.05, None, None]
+    if seeded:
+        assert draws[0] == draws[1] == draws[2]
+    else:
+        # Four float32 draws make an accidental collision negligible; compare
+        # every pair, including the first and the remembered-min_p call.
+        assert len({tuple(draw) for draw in draws}) == 3
 
 
 def test_production_sampling_is_still_unseeded_by_default():

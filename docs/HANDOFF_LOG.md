@@ -1,3 +1,28 @@
+## 2026-09-11 -- EOS repair qualified after Opus/Cursor consensus and Sonnet QA
+
+Shared native/grammar EOS ownership is fixed across all four generate factories.
+The writer logs actual terminal IDs and avoids false truncation diagnostics on
+clean EOS at capacity. No sampling, model, source or retry-policy change.
+Final focused 292 passed; full 14,379 passed / 51 unchanged inherited failures /
+183 skipped / one xfailed. Controlled Bible 34/10/11/3 versus baseline 33/11/11/3;
+new resolver guard fails baseline and passes candidate, 343 entries/146 inherited
+metadata issues unchanged. Bible 283fb360 is pushed. Canonical validator/link/widget
+round-trip passes; graph unchanged at 23 nodes / 63 links / 37 writer widgets.
+
+Actual Cursor/Grok and API Opus5 reviews converge on QA then ONE unchanged-control
+canonical retry. Actual Sonnet5 QA and a final diagnostic-delta review completed;
+no remaining grounded must-fix. Raw claims, rejected misreads, model identities,
+snapshots, reported costs and test evidence:
+docs/2026-09-11-my-story-eos-consensus/qualification_receipt.md.
+
+Prior full canonical pairlock_01 on 2c9d47f2 failed after 400.67s in P1 with no media.
+Preserve it in the denominator. Native/chat EOS mismatch is verified; sampled-token
+causality and P1 source recovery remain unproven. GO_FORWARD owns the single next
+5080 attempt and later stress coverage. Mac/4060 remain held; RunPod is blocked
+by missing authenticated access. No hardware/model-matrix proof is promoted.
+
+---
+
 ## 2026-09-11 -- My Story finishing coding complete; canonical recovery next
 
 F2 visual source corrections, actual Original generation-model credits, hero-title

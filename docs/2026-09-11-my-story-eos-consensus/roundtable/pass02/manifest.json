@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T08:57:51.497855+00:00",
+  "doc": "docs/2026-09-11-my-story-eos-consensus/roundtable/pass01_plan.md",
+  "prompt_tokens_est": 12452,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 19842,
+      "completion_tokens": 3719,
+      "cost_usd": 0.192185,
+      "max_tokens": 12000,
+      "temperature": 0.5,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.1922
+}

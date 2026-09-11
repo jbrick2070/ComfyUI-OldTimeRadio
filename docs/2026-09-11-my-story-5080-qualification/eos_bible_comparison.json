@@ -1,0 +1,22 @@
+{
+  "baseline": {
+    "passed": 33,
+    "failed": 11,
+    "skipped": 11,
+    "xfailed": 3,
+    "xml_sha256": "4c86da71a76d49783ca300b6a6247f2c0731fa7a7e569e58aeb2531e7a0530da"
+  },
+  "candidate": {
+    "passed": 34,
+    "failed": 10,
+    "skipped": 11,
+    "xfailed": 3,
+    "xml_sha256": "0dbe47907edcf994835d036e07014a861de1f6f0694a11ee5391307d25530d1a"
+  },
+  "new_failures": [],
+  "resolved_failures": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_native_termination_resolver_is_shared_and_nonmutating"
+  ],
+  "changed_failure_payloads": [],
+  "normalization": "memory addresses, pytest directory numbers, source line numbers, baseline/candidate checkout names, pytest truncated py_files fixture representation"
+}

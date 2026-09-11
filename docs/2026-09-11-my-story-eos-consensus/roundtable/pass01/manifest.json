@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-09-11T08:53:16.693247+00:00",
+  "doc": "docs/2026-09-11-my-story-eos-consensus/roundtable/pass00_plan.md",
+  "prompt_tokens_est": 51296,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "ok": false,
+      "error": "empty content (finish_reason=length); the model likely spent max_tokens on hidden reasoning -- raise --max-tokens or lower --reasoning-effort",
+      "max_tokens": 7000,
+      "temperature": 0.5,
+      "reasoning_effort": "high"
+    }
+  ],
+  "total_cost_usd": 0.0
+}

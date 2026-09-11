@@ -1,0 +1,25 @@
+{
+  "baseline": {
+    "passed": 14361,
+    "failed": 51,
+    "skipped": 183,
+    "xfailed": 1,
+    "xml_sha256": "986a29cc8801330184ffd4c6a6171820b40c95a4b2c62c9ed6ac7d3bf68cec71"
+  },
+  "candidate": {
+    "passed": 14376,
+    "failed": 53,
+    "skipped": 183,
+    "xfailed": 1,
+    "xml_sha256": "ac7e7f79227f8b469632e02bc9bcc5905232192686a17019add4a641e277d02f"
+  },
+  "new_failures": [
+    "tests.test_orphan_cache_epoch_and_deadline::test_make_generate_fn_is_unaffected_with_no_deadline_set",
+    "tests.test_writer_sampling_seed::test_both_generate_paths_are_seeded"
+  ],
+  "resolved_failures": [],
+  "changed_failure_payloads": [
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies"
+  ],
+  "normalization": "memory addresses, pytest directory numbers, source line numbers and timestamps"
+}

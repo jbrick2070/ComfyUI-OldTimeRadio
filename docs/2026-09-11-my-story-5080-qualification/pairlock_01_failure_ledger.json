@@ -1,0 +1,370 @@
+{
+  "schema_version": "l4-2026-08-07",
+  "episode_id": "pending_20260911_012621",
+  "commit": "2c9d47f2",
+  "total_episode_dur_s": null,
+  "total_char_count": 0,
+  "total_word_count": 0,
+  "total_dialogue_lines": 0,
+  "total_beats": 0,
+  "cast": [],
+  "scenes": [],
+  "shots": [],
+  "beats": [],
+  "lines": [],
+  "music": [],
+  "clips": [],
+  "audio": {},
+  "final_audio_path": null,
+  "final_video_path": null,
+  "meta": {
+    "cast_status": "building",
+    "source_bank": "my_story",
+    "delivery_intent": {
+      "schema_version": "otr_delivery_intent_v1",
+      "source_bank": "my_story",
+      "publication_required": true,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "delivery_token": "6c5f142ac0e44ee7b04b823f9bcc635a"
+    },
+    "story_draft": {
+      "schema_version": "my_story_input_v1",
+      "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\state\\story_drafts\\b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9\\input.json",
+      "status": "verified"
+    },
+    "style_pool_class": "generic",
+    "source_ref": "",
+    "source_meta": {
+      "kind": "user_story",
+      "story_input": {
+        "schema_version": "my_story_input_v1",
+        "fields": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "normalized": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "request": {
+          "num_characters": 2,
+          "act_count": "1",
+          "include_act_breaks": true,
+          "source_bank_requested": "my_story",
+          "visual_style_requested": "roll (any style)"
+        },
+        "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9"
+      },
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "requested_num_characters": 2,
+      "story_author": ""
+    },
+    "source_rights": {
+      "license_label": "listener original idea"
+    },
+    "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+    "story_attribution": {
+      "author": "",
+      "sentence": "Tonight's story comes from one of our listeners.",
+      "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+      "source": "none supplied"
+    },
+    "story_scaffold": "auto",
+    "visual_style": "cartoon",
+    "style_roll": {
+      "receipt_version": 1,
+      "surface": "visual_style",
+      "requested": "roll (any style)",
+      "selected": "cartoon",
+      "seed": 3354901523,
+      "seed_source": "OS entropy",
+      "eligible_order": [
+        "anime",
+        "archival_documentary",
+        "cartoon",
+        "paper_origami",
+        "recur_frac",
+        "sci_fi_radio",
+        "shakespeare_stage_realism",
+        "storybook_engraving",
+        "video_art",
+        "visual_storybased"
+      ]
+    },
+    "character_word_count": 0,
+    "announcer_word_count": 0,
+    "total_word_count": 0,
+    "paths": {
+      "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\audio\\pending_20260911_012621_ledger.json",
+      "episode_root": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621",
+      "audio_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\audio",
+      "stills_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\stills",
+      "portraits_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\portraits",
+      "videos_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\videos",
+      "composited_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_012621\\composited",
+      "obs_final": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\pending_20260911_012621.mp4",
+      "obs_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs",
+      "layout": "per-episode-workspace"
+    },
+    "schema_version": "l4-2026-08-07",
+    "episode_seed": 2417418923,
+    "word_budget": {
+      "schema_version": 5,
+      "owner": "my_story",
+      "policy": "actual_count_only"
+    },
+    "my_story": {
+      "schema_version": "my_story_v1",
+      "seed": 2417418923,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "attempts": [
+        {
+          "pass_id": "interpret",
+          "attempt": 1,
+          "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"dinner_scene\",\n      \"text\": \"Jeffrey and his living mother share a warm present-day dinner at a Los Angeles home.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"idea\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey recalls his childhood growing up in the Bay Area during the dinner.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"mother_response\",\n      \"text\": \"Jeffrey's mother responds with her own warm recollection of the memory.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"continuous_setting\",\n      \"text\": \"The entire scene takes place at one shared dinner table without moving characters to separate locations.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_grief_elements\",\n      \"text\": \"The story must exclude death, grief, abandonment, empty chairs, waiting, fire, emergencies, or a girlfriend replacing the mother.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"warm_tone\",\n      \"text\": \"The tone should be affectionate, humorous, and appreciative of current life and family.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"single_act\",\n      \"text\": \"The story consists of a single continuous scene.\",\n      \"kind\": \"structure\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"Adult man who loves Los Angeles and remembers Bay Area childhood.\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Jeffrey's living mother, physically present and eating dinner.\",\n      \"stated_gender\": \"\",\n      \"speaking\": true,\n      \"required\": true\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The story explicitly requires only Jeffrey and his mother to speak in the dramatic scene, excluding the girlfriend from the physical space.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day evening, featuring Jeffrey and his living mother seated across from each other at a shared table.\",\n  \"assumptions\": [\n    \"Jeffrey's mother is alive and physically present at the dinner table.\",\n    \"The girlfriend is mentioned but does not attend the dinner.\",\n    \"The scene focuses on the contrast between Jeffrey's past in the Bay Area and his present in Los Angeles.\"\n  ],\n  \"conflicts\": []\n}\n",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 1,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"Two Tables, One Memory\",\n  \"logline\": \"Jeffrey and his living mother share a warm dinner in Los Angeles while reflecting on his Bay Area childhood and their enduring bond.\",\n  \"dramatic_question\": \"Can Jeffrey find joy and gratitude in his current life with his mother still by his side? yes, he does. the answer is revealed through their shared meal and laughter. the answer is confirmed by the unbroken continuity of their table. the answer is found in the simple act of eating together. the answer lies in the choice to appreciate the life they have built. the answer is yes, they choose to love this moment. the answer is yes, they choose to appreciate their lives now. the answer is yes, they choose to cherish this dinner. the answer is yes, they choose to love their family. the answer is yes, they choose to live in the present. the answer is yes, they choose to be grateful. the answer is yes, they choose to be happy. the answer is yes, they choose to be together. the answer is yes, they choose to eat. the answer is yes, they choose to talk. the answer is yes, they choose to love. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is yes, they choose to be. the answer is",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 2,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"Two Tables, One Table\",\n  \"logline\": \"In a warm Los Angeles dinner, Jeffrey and his living mother share a meal while reflecting on their contrasting childhoods and appreciating the family they still have. The dramatic question: How do two generations find comfort in the same present moment? The setting is a comfortable Los Angeles home dining room in the present day evening. The time of day is evening. The cast includes Jeffrey, an adult man who loves Los Angeles and remembers his Bay Area childhood, speaking with a warm, reflective register and a deep, resonant timbre, aged in his 40s. It also includes Mother, Jeffrey's living mother who is physically present and eating dinner with him, speaking with a gentle, affectionate register and a soft, warm timbre, aged in her 50s. The single act serves to establish the shared meal, weave in the memories of the Bay Area and the mention of the girlfriend, and conclude with their appreciation of their current life together. The scene setting remains the shared Los Angeles dining table throughout. The turns begin with Jeffrey and Mother eating and acknowledging the warmth of the room, move to Jeffrey recalling his specific memories of the foggy hills and his mother sharing her own fond recollection of the past, shift to Jeffrey briefly mentioning his girlfriend as a separate person who isn't there, and end with both continuing their meal in peaceful contentment. The ending state is Jeffrey and his mother still together at the same table, enjoying their meal and choosing to appreciate their lives now. The story ends with them finishing their meal, satisfied and grateful for the connection they share right now. No music cues are used between acts. The output is a valid JSON object with no Markdown, headings, or prose. Its exact top-level keys are title, logline, dramatic_question, setting, time_of_day, cast, acts, ending. No undeclared fields are added. Every required nested path is present, including repeated graph references. Required paths are cast, cast[*].name, and acts. The cast array contains the story's speaking characters, excluding ANNOUNCER. The cast array contains Jeffrey and Mother. The acts array contains one act. The act number is 1. The purpose is to establish the shared meal, weave in the memories of the Bay Area and the mention of the girlfriend, and conclude with their appreciation of their current life together. The scene setting is the shared Los Angeles dining table. The turns are a list of short strings describing the beats. The ending_state describes where the story stands when the act ends. The ending describes how it ends. The gender for Mother is empty as it was not stated in the source. The age bands are inferred from the description of 'adult man' and 'living mother' in a context implying mid-life. The register and timbre are descriptive words. The title is authored. The logline is one sentence. The dramatic_question is one sentence. The setting is concrete. The time_of_day is specific. The cast array has minItems 1. The acts array has minItems 1. The turns array has minItems 1. All required paths are present. The output is exactly one JSON object. No prose is included. No fences are used. The JSON is valid. The schema is followed. The story is written as requested. The requirements outrank invention. The names are preserved. The gender is left empty for Mother. The age band is 40s for Jeffrey and 50s for Mother. The register is warm/reflective for Jeffrey and gentle/affectionate for Mother. The timbre is deep/resonant for Jeffrey and soft/warm for Mother. The act number is 1. The purpose is clear. The scene setting is consistent. The turns cover the plot points. The ending state is correct. The ending is correct. The output is ready. The JSON is the only output. The response is complete. The task is done. The plan is final. The story is told. The episode is planned. The metadata is provided. The title is set. The logline is written. The question is asked. The setting is defined. The time is noted. The cast is listed. The acts are structured. The ending is described. The JSON is valid. The schema is met. The rules are followed. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story is told. The episode is ready. The plan is final. The story",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 3,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"Two Tables, One Memory\",\n  \"logline\": \"Jeffrey and his mother share a warm dinner in Los Angeles while reflecting on his Bay Area childhood and the life they still have together. The dramatic question is: How does Jeffrey honor his past while cherishing his present family? The setting is a comfortable Los Angeles home dining room in the present day evening. The time of day is evening. The cast includes Jeffrey, an adult man who loves Los Angeles and remembers growing up in the Bay Area, described as warm and reflective with a steady, affectionate register and a rich, resonant timbre; he is male and in his 30s or 40s. The cast also includes Mother, Jeffrey's living mother who is physically present and eating dinner, described as kind and grounding with a gentle, reassuring register and a soft, warm timbre; her gender is unspecified and her age band is n/a. The single act begins with Jeffrey and his mother already seated together at the same dinner table in Los Angeles. The purpose of this act is to establish the warm domestic atmosphere and move through their shared meal while discussing Jeffrey's childhood memories. The scene setting is the shared Los Angeles dining table where Jeffrey and his mother sit across from each other with plates of food. The turns are: Jeffrey takes a bite of food and looks at his mother with affection; Jeffrey speaks about his childhood growing up in the Bay Area and how different it feels from Los Angeles now; Jeffrey mentions his girlfriend as a separate person who is not at the dinner; Mother responds with her own warm recollection of Jeffrey's childhood and expresses pride in him; Jeffrey and Mother continue eating and laughing lightly about the food; Jeffrey concludes by expressing gratitude for having his mother alive and present in his life now. The ending state is Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. The ending is Jeffrey and his mother finish their meal, satisfied with the connection they share and the life they have built together. The output is a valid JSON object with no Markdown, headings, or prose. Its exact top-level keys are: title, logline, dramatic_question, setting, time_of_day, cast, acts, ending. Do not add undeclared fields. Every required nested path must be present, including repeated graph references. Required paths: cast, cast[*].name, acts. Complete output schema contract: - object <root>: exact keys=title, logline, dramatic_question, setting, time_of_day, cast, acts, ending - title: optional; type=string - logline: optional; type=string - dramatic_question: optional; type=string - setting: optional; type=string - time_of_day: optional; type=string - cast: required; type=array; minItems=1 - cast[*]: required; type=object - object cast[*]: exact keys=name, role, character_description, gender, age_band, register, timbre - cast[*].name: required; type=string; minLength=1 - cast[*].role: optional; type=string - cast[*].character_description: optional; type=string - cast[*].gender: optional; type=string - cast[*].age_band: optional; type=string - cast[*].register: optional; type=string - cast[*].timbre: optional; type=string - acts: required; type=array; minItems=1 - acts[*]: required; type=object - object acts[*]: exact keys=n, purpose, scene_setting, turns, ending_state - acts[*].n: optional; type=integer - acts[*].purpose: optional; type=string - acts[*].scene_setting: optional; type=string - acts[*].turns: optional; type=array - acts[*].turns[*]: required; type=string - acts[*].ending_state: optional; type=string - ending: optional; type=string [/OTR_SCHEMA_CONTRACT_V1] The output is a valid JSON object with no Markdown, headings, or prose. Its exact top-level keys are: title, logline, dramatic_question, setting, time_of_day, cast, acts, ending. Do not add undeclared fields. Every required nested path must be present, including repeated graph references. Required paths: cast, cast[*].name, acts. Complete output schema contract: - object <root>: exact keys=title, logline, dramatic_question, setting, time_of_day, cast, acts, ending - title: optional; type=string - logline: optional; type=string - dramatic_question: optional; type=string - setting: optional; type=string - time_of_day: optional; type=string - cast: required; type=array; minItems=1 - cast[*]: required; type=object - object cast[*]: exact keys=name, role, character_description, gender, age_band, register, timbre - cast[*].name: required; type=string; minLength=1 - cast[*].role: optional; type=string - cast[*].character_description: optional; type=string - cast[*].gender: optional; type=string - cast[*].age_band: optional; type=string - cast[*].register: optional; type=string - cast[*].timbre: optional; type=string - acts: required; type=array; minItems=1 - acts[*]: required; type=object - object acts[*]: exact keys=n, purpose, scene_setting, turns, ending_state - acts[*].n: optional; type=integer - acts[*].purpose: optional; type=string - acts[*].scene_setting: optional; type=string - acts[*].turns: optional; type=array - acts[*].turns[*]: required; type=string - acts[*].ending_state: optional; type=string - ending: optional; type=string [/OTR_SCHEMA_CONTRACT_V1] The output is a valid JSON object with no Markdown, headings, or prose. Its exact top-level keys are: title, logline, dramatic_question, setting, time_of_day, cast, acts, ending. Do not add undeclared fields. Every required nested path must be present, including repeated graph references. Required paths: cast, cast[*].name, acts. Complete output schema contract: - object <root>: exact keys=title, logline, dramatic_question, setting, time_of_day, cast, acts, ending - title: optional; type=string - logline: optional; type=string - dramatic_question: optional; type=string - setting: optional; type=string - time_of_day: optional; type=string - cast: required; type=array; minItems=1 - cast[*]: required; type=object - object cast[*]: exact keys=name, role, character_description, gender, age_band, register, timbre - cast[*].name: required; type=string; minLength=1 - cast[*].role: optional; type=string - cast[*].character_description: optional; type=string - cast[*].gender: optional; type=string - cast[*].age_band: optional; type=string - cast[*].register: optional; type=string - cast[*].timbre: optional; type=string - acts: required; type=array; minItems=1 - acts[*]: required; type=object - object acts[*]: exact keys=n, purpose, scene_setting, turns, ending_state - acts[*].n: optional; type=integer - acts[*].purpose: optional; type=string - acts[*].scene_setting: optional; type=string - acts[*].turns: optional; type=array - acts[*].turns[*]: required; type=string - acts[*].ending_state: optional; type=string - ending: optional; type=string [/OTR_SCHEMA_CONTRACT_V1] The output",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        }
+      ],
+      "source_rewrites": [
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "interpret",
+          "operation_id": "source_rewrite_1",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "25a3a671b83bcce857ba26c7ab5530789bc0bbcc67b8b7d9a8f7aae371cb013d",
+          "output_sha256": "25a3a671b83bcce857ba26c7ab5530789bc0bbcc67b8b7d9a8f7aae371cb013d",
+          "applied": false,
+          "configured_model_id": "Qwen/Qwen3.5-4B",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "c1f25f87c1ace487c65326f37351cc398ebef7b61f5c613b1b9a8f4d376666db",
+              "raw_output": "",
+              "raw_completion": "{\n  \"requirements\": [\n    {\n      \"id\": \"dinner_scene\",\n      \"text\": \"Jeffrey and his living mother share a warm present-day dinner at a Los Angeles home.\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey recalls his childhood growing up in the Bay Area during the dinner.\"\n    },\n    {\n      \"id\": \"mother_response\",\n      \"text\": \"Jeffrey's mother responds with her own warm recollection of the memory.\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.\"\n    },\n    {\n      \"id\": \"continuous_setting\",\n      \"text\": \"The entire scene takes place at one shared dinner table without moving characters to separate locations.\"\n    },\n    {\n      \"id\": \"no_grief_elements\",\n      \"text\": \"The story must exclude death, grief, abandonment, empty chairs, waiting, fire, emergencies, or a girlfriend replacing the mother.\"\n    },\n    {\n      \"id\": \"warm_tone\",\n      \"text\": \"The tone should be affectionate, humorous, and appreciative of current life and family.\"\n    },\n    {\n      \"id\": \"single_act\",\n      \"text\": \"The story consists of a single continuous scene.\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"Adult man who loves Los Angeles and remembers Bay Area childhood. Has a girlfriend who is not at the dinner.\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Jeffrey's living mother, physically present and eating dinner.\"\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The story explicitly requires only Jeffrey and his mother to speak in the dramatic scene, excluding the girlfriend from the physical space.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day evening, featuring Jeffrey and his living mother seated across from each other at a shared table.\"\n}\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 259958,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 262144)",
+                "context_cap": 262144,
+                "effective_output_tokens": 259958,
+                "fits": true,
+                "model_id": "Qwen/Qwen3.5-4B",
+                "prompt_tokens": 2186,
+                "requested_output_tokens": 262144,
+                "supported": true
+              },
+              "status": "failed",
+              "error_type": "GenerationDegeneracyError",
+              "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim",
+              "validation_error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+            },
+            {
+              "number": 2,
+              "prompt_sha256": "c1f25f87c1ace487c65326f37351cc398ebef7b61f5c613b1b9a8f4d376666db",
+              "raw_output": "",
+              "raw_completion": "{\n  \"requirements\": [\n    {\n      \"id\": \"dinner_scene\",\n      \"text\": \"Jeffrey and his living mother share a warm present-day dinner at a Los Angeles home.\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey recalls his childhood growing up in the Bay Area during the dinner.\"\n    },\n    {\n      \"id\": \"mother_response\",\n      \"text\": \"Jeffrey's mother responds with her own warm recollection of the memory.\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.\"\n    },\n    {\n      \"id\": \"continuous_setting\",\n      \"text\": \"The entire scene takes place at one shared dinner table without moving characters to separate locations.\"\n    },\n    {\n      \"id\": \"no_grief_elements\",\n      \"text\": \"The story must exclude death, grief, abandonment, empty chairs, waiting, fire, emergencies, or a girlfriend replacing the mother.\"\n    },\n    {\n      \"id\": \"warm_tone\",\n      \"text\": \"The tone should be affectionate, humorous, and appreciative of current life and family.\"\n    },\n    {\n      \"id\": \"single_act\",\n      \"text\": \"The story consists of a single continuous scene.\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"Adult man who loves Los Angeles and remembers Bay Area childhood.\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Jeffrey's living mother, physically present and eating dinner.\"\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 2,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The story explicitly requires only Jeffrey and his mother to speak in the dramatic scene, excluding the girlfriend from the physical space.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day evening, featuring Jeffrey and his living mother seated across from each other at a shared table.\"\n}\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 259958,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 262144)",
+                "context_cap": 262144,
+                "effective_output_tokens": 259958,
+                "fits": true,
+                "model_id": "Qwen/Qwen3.5-4B",
+                "prompt_tokens": 2186,
+                "requested_output_tokens": 262144,
+                "supported": true
+              },
+              "status": "failed",
+              "error_type": "GenerationDegeneracyError",
+              "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim",
+              "validation_error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+            }
+          ],
+          "status": "unresolved",
+          "qualified": false,
+          "error": "[OTR_StructuredCall] 'my_story_source_rewrite_interpret' failed after 2 attempt(s); disposition=primary_ladder_exhausted; last error -> GenerationDegeneracyError: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim",
+          "terminal_disposition": "primary_ladder_exhausted"
+        }
+      ],
+      "counts": {
+        "requested_acts": 1,
+        "proposed_acts": null,
+        "accepted_acts": null,
+        "actual_acts": null,
+        "requested_characters": 2,
+        "planned_characters": 2,
+        "proposed_characters": null,
+        "accepted_characters": null,
+        "actual_characters": null
+      },
+      "notes": [
+        "The person's own typed fields are the sole source.",
+        "Selected acts bind treatment acceptance; character count is flexible guidance."
+      ],
+      "interpretation": {
+        "requirements": [
+          {
+            "id": "dinner_scene",
+            "text": "Jeffrey and his living mother share a warm present-day dinner at a Los Angeles home.",
+            "kind": "setting",
+            "source_field": "idea",
+            "strength": "required"
+          },
+          {
+            "id": "bay_area_memory",
+            "text": "Jeffrey recalls his childhood growing up in the Bay Area during the dinner.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "mother_response",
+            "text": "Jeffrey's mother responds with her own warm recollection of the memory.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "girlfriend_mention",
+            "text": "Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "continuous_setting",
+            "text": "The entire scene takes place at one shared dinner table without moving characters to separate locations.",
+            "kind": "setting",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "no_grief_elements",
+            "text": "The story must exclude death, grief, abandonment, empty chairs, waiting, fire, emergencies, or a girlfriend replacing the mother.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "warm_tone",
+            "text": "The tone should be affectionate, humorous, and appreciative of current life and family.",
+            "kind": "setting",
+            "source_field": "setting",
+            "strength": "required"
+          },
+          {
+            "id": "single_act",
+            "text": "The story consists of a single continuous scene.",
+            "kind": "structure",
+            "source_field": "setting",
+            "strength": "required"
+          }
+        ],
+        "named_cast": [
+          {
+            "name": "Jeffrey",
+            "notes": "Adult man who loves Los Angeles and remembers Bay Area childhood.",
+            "stated_gender": "male",
+            "speaking": true,
+            "required": true
+          },
+          {
+            "name": "Mother",
+            "notes": "Jeffrey's living mother, physically present and eating dinner.",
+            "stated_gender": "",
+            "speaking": true,
+            "required": true
+          }
+        ],
+        "cast_plan": {
+          "requested": 2,
+          "planned": 2,
+          "exclusive": true,
+          "reason": "The story explicitly requires only Jeffrey and his mother to speak in the dramatic scene, excluding the girlfriend from the physical space."
+        },
+        "setting_brief": "A comfortable Los Angeles home dining room in the present day evening, featuring Jeffrey and his living mother seated across from each other at a shared table.",
+        "assumptions": [
+          "Jeffrey's mother is alive and physically present at the dinner table.",
+          "The girlfriend is mentioned but does not attend the dinner.",
+          "The scene focuses on the contrast between Jeffrey's past in the Bay Area and his present in Los Angeles."
+        ],
+        "conflicts": []
+      },
+      "cast_plan": {
+        "requested": 2,
+        "planned": 2,
+        "exclusive": true,
+        "reason": "The story explicitly requires only Jeffrey and his mother to speak in the dramatic scene, excluding the girlfriend from the physical space."
+      }
+    },
+    "news": null
+  }
+}

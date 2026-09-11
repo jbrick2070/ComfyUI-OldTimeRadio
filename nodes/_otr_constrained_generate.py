@@ -46,6 +46,7 @@ from ._otr_generation_budget import (
 )
 from ._otr_model_loader import (
     ModelLoaderError,
+    native_eos_token_ids,
     prepare_native_prompt,
 )
 
@@ -99,6 +100,7 @@ closes.
 def get_cached_transformers_schema_constraint(
     cache_entry: dict[str, Any],
     schema_model: Type[BaseModel],
+    *, eos_token_ids: list[int] | None = None,
 ) -> tuple[Any, Any]:
     """Return fresh request state while reusing resident tokenizer preprocessing.
 
@@ -125,11 +127,18 @@ def get_cached_transformers_schema_constraint(
         build_transformers_prefix_allowed_tokens_fn,
     )
 
+    eos_ids = tuple(native_eos_token_ids(cache_entry) if eos_token_ids is None else eos_token_ids)
     cache = cache_entry.get("_otr_lmfe_constraint_cache")
-    if not isinstance(cache, dict) or cache.get("tokenizer") is not tokenizer:
+    if (not isinstance(cache, dict) or cache.get("tokenizer") is not tokenizer
+            or cache.get("eos_token_ids") != eos_ids):
+        tokenizer_data = build_token_enforcer_tokenizer_data(tokenizer)
+        # This data is newly owned by this cache entry, not the tokenizer.
+        # LMFE supports multiple EOS IDs and only permits them at completion.
+        tokenizer_data.eos_token_id = list(eos_ids)
         cache = {
             "tokenizer": tokenizer,
-            "tokenizer_data": build_token_enforcer_tokenizer_data(tokenizer),
+            "tokenizer_data": tokenizer_data,
+            "eos_token_ids": eos_ids,
         }
         cache_entry["_otr_lmfe_constraint_cache"] = cache
 
@@ -320,13 +329,14 @@ def make_constrained_generate_fn(
             sampling = {"do_sample": False}
         with torch.no_grad():
             parser, prefix_fn = get_cached_transformers_schema_constraint(
-                cache_entry, schema_model,
+                cache_entry, schema_model, eos_token_ids=prepared["eos_token_ids"],
             )
             out = model.generate(
                 **inputs,
                 **sampling,
                 max_new_tokens=effective_max_new_tokens,
-                pad_token_id=tokenizer.eos_token_id,
+                pad_token_id=prepared["pad_token_id"],
+                eos_token_id=prepared["eos_token_ids"] or None,
                 stopping_criteria=StoppingCriteriaList([_guard]),
                 # The schema-binding argument. transformers passes
                 # this hook into the logits-processing path; lm-
@@ -373,10 +383,7 @@ def make_constrained_generate_fn(
                 prompt_tokens=prompt_len,
             )
         generated_ids = out[0][prompt_len:]
-        eos = tokenizer.eos_token_id
-        eos_values = {int(value) for value in (
-            eos if isinstance(eos, (list, tuple, set)) else (eos,)
-        ) if value is not None}
+        eos_values = prepared["eos_token_ids"]
         ended_with_eos = bool(len(generated_ids)) and int(generated_ids[-1]) in eos_values
         if (prepared["fail_on_output_limit"]
                 and len(generated_ids) >= effective_max_new_tokens and not ended_with_eos):

@@ -19,6 +19,23 @@ changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
 ## 1. Define ownership before implementation
 
+Native termination follow-up (2026-09-11): grammar admission, model generation
+and completion classification must share the same effective model-plus-chat EOS
+set. A multimodal model's text decoder may inherit an end-of-text token while
+its chat tokenizer uses an end-of-turn token. Preserve effective generation-config
+precedence and configured multiple stops; keep padding scalar and parser histories
+request-local. A clean EOS at the output allowance is complete, including its
+log classification. Record actual terminal IDs before classifying guard failures.
+
+Keep diagnosis narrower than the artifact: complete JSON followed by whitespace
+and a measured terminator mismatch establish an ownership defect, not proof of
+which hidden EOS was sampled. They do not explain repetition inside an unfinished
+JSON string. Preserve the failed canonical attempt and qualify the repair on the
+same source/model/profile controls. See PBUG-20260910-05 follow-up and Bible12.100;
+Opus/Cursor/Sonnet claims were grounded against installed Transformers/LMFE rather
+than converted directly into new gates or speculative model changes.
+
+
 Finishing campaign (2026-09-11): source corrections must replace the artifact
 at its existing author, with helper repairs counted inside a fixed budget.
 Hash the current source plus resolved scene context for cached descendants;
