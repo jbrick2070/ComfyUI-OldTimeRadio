@@ -49,20 +49,20 @@ judge's own words about what is wrong -- and returns the best edit. Sometimes
 the action becomes implied in what the character says. That judgement is the
 model's, which is exactly why it may never be Python.
 
-PYTHON'S ENTIRE JOB IN THIS MODULE
+PYTHON'S JOB IN THIS MODULE
 -----------------------------------
-Choose which rows to ask about, carry the model's answer into the row, count
-what happened, and stop after a bounded number of tries. It never writes,
-edits, strips, or overrules a word of prose. The single line of code that
-touches a row's text writes the MODEL'S returned string.
+Choose rows, ground the original complaint, and interleave model-written
+replacements with unchanged original slices. Partial repairs cannot change
+uncomplained text, including its whitespace. A separate model authorization
+must permit whole-row conversion. Python never invents replacement prose.
 
-BOUNDED, INFORMED, AND IT NEVER STOPS THE RENDER
+BOUNDED, INFORMED, AND HONEST ABOUT FAILURE
 -------------------------------------------------
 Each repair is TOLD what the judge found, and the judge re-reads the result
 -- a retry that knows what was wrong is not the same cold roll again. After
 the budget, the row SHIPS, the ledger records it as unclean, and the log says
-so loudly. Never a silent pass; never a hard stop. An imperfect line beats a
-dead episode.
+so loudly. Malformed or unresolved model answers retain the original; actual
+provider, memory, cancellation and terminal-capacity failures keep their type.
 
 WHERE IT RUNS
 -------------
@@ -76,8 +76,121 @@ rewrite rather than before it.
 """
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
-from typing import Any, Callable, Mapping, MutableMapping, Sequence
+from typing import Any, Callable, Literal, Mapping, MutableMapping, NamedTuple, Sequence
+
+try:
+    from pydantic import BaseModel, Field
+except ImportError:  # pragma: no cover -- the optional pass remains unavailable
+    _ScopeAuthorization = _SpanReplacements = _RepairedLine = None
+else:
+    class _ComplaintSpan(BaseModel):
+        quote: str = Field(min_length=1)
+        start_char: int | None = Field(default=None, ge=0, strict=True)
+        end_char: int | None = Field(default=None, ge=1, strict=True)
+
+    class _ScopeAuthorization(BaseModel):
+        verdict: Literal["already_spoken", "localized_defect", "whole_row_direction", "unresolved"]
+        spans: list[_ComplaintSpan] = Field(default_factory=list)
+        reason: str = ""
+
+    class _SpanReplacement(BaseModel):
+        span_id: str
+        replacement: str
+
+    class _SpanReplacements(BaseModel):
+        replacements: list[_SpanReplacement]
+
+    class _RepairedLine(BaseModel):
+        text: str = Field(min_length=1)
+
+
+class _RepairSpan(NamedTuple):
+    span_id: str
+    start_char: int
+    end_char: int
+    quote: str
+
+
+def _exact_interval(text: str, finding: Mapping[str, Any]) -> tuple[int, int] | None:
+    """Ground one occurrence without case folding or whitespace changes."""
+    quote = finding.get("quote")
+    if not isinstance(quote, str) or not quote:
+        return None
+    start, end = finding.get("start_char"), finding.get("end_char")
+    if start is not None or end is not None:
+        if (type(start) is not int or type(end) is not int
+                or not 0 <= start < end <= len(text) or text[start:end] != quote):
+            return None
+        return start, end
+    start = text.find(quote)
+    if start < 0 or text.find(quote, start + 1) >= 0:
+        return None
+    return start, start + len(quote)
+
+
+def _whole_spoken_row(text: str, interval: tuple[int, int]) -> bool:
+    start, end = interval
+    return not (text[:start] + text[end:]).strip()
+
+
+def _merge_repair_spans(text: str, intervals: Sequence[tuple[int, int]]) -> tuple[_RepairSpan, ...]:
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(set(intervals)):
+        if merged and start < merged[-1][1]:
+            merged[-1] = merged[-1][0], max(end, merged[-1][1])
+        else:
+            merged.append((start, end))
+    return tuple(_RepairSpan(f"span_{i:03d}", start, end, text[start:end])
+                 for i, (start, end) in enumerate(merged, 1))
+
+
+def _covers_spoken_row(text: str, intervals: Sequence[tuple[int, int]]) -> bool:
+    """Several complaints cannot bypass whole-row authorization by splitting it."""
+    spans = _merge_repair_spans(text, intervals)
+    cursor = 0
+    outside = []
+    for span in spans:
+        outside.append(text[cursor:span.start_char])
+        cursor = span.end_char
+    outside.append(text[cursor:])
+    return bool(spans) and not "".join(outside).strip()
+
+
+def _splice_replacements(text: str, spans: Sequence[_RepairSpan], replacements: Sequence[Mapping[str, Any]]) -> str:
+    ids = [item.get("span_id") for item in replacements]
+    expected = {span.span_id for span in spans}
+    if (any(not isinstance(value, str) for value in ids)
+            or len(ids) != len(set(ids)) or set(ids) != expected):
+        raise ValueError("Return exactly one replacement for each approved span_id; no duplicate, missing or unknown IDs")
+    by_id = {item["span_id"]: item.get("replacement") for item in replacements}
+    if any(not isinstance(value, str) for value in by_id.values()):
+        raise ValueError("Each replacement must be a string")
+    cursor = 0
+    pieces = []
+    for span in spans:
+        if span.start_char < cursor or text[span.start_char:span.end_char] != span.quote:
+            raise ValueError("Approved spans must match the immutable original row")
+        pieces.extend((text[cursor:span.start_char], by_id[span.span_id]))
+        cursor = span.end_char
+    pieces.append(text[cursor:])
+    candidate = "".join(pieces)
+    if not candidate.strip():
+        raise ValueError("The final spoken row must contain speech")
+    return candidate
+
+
+def _is_exhausted_clean_response(exc: BaseException) -> bool:
+    """Only malformed/exhausted structured answers may retain a flagged row."""
+    try:
+        from ._otr_structured_call import StructuredCallFailedError, PostValidationError
+    except ImportError:  # pragma: no cover -- flat load
+        from _otr_structured_call import StructuredCallFailedError, PostValidationError
+    from pydantic import ValidationError
+    return (isinstance(exc, StructuredCallFailedError)
+            and isinstance(exc.last_error, (json.JSONDecodeError, ValidationError, PostValidationError)))
 
 try:
     from . import _otr_spoken_text_policy as _POLICY
@@ -96,7 +209,7 @@ __all__ = [
     "run_ledger_clean",
 ]
 
-LEDGER_CLEAN_VERSION = "ledger_clean_v2"
+LEDGER_CLEAN_VERSION = "ledger_clean_v3"
 
 #: A ROW THIS PASS MAY NOT REWRITE, BECAUSE PYTHON OWNS PART OF ITS TEXT.
 #:
@@ -391,13 +504,16 @@ def _episode_context(ledger_data: Mapping[str, Any]) -> str:
     return ", ".join(bits)
 
 
-def _numbered(findings: "Sequence[Mapping[str, str]]") -> str:
+def _numbered(findings: Sequence[Mapping[str, Any]]) -> str:
     """The judge's findings as the repair's must-all-be-gone checklist."""
     lines = []
     for n, finding in enumerate(findings, start=1):
-        quote = str(finding.get("quote") or "").strip()
+        quote = str(finding.get("quote") or "")
         why = str(finding.get("why") or "").strip()
-        lines.append(f"  {n}. {quote!r}" + (f" -- {why}" if why else ""))
+        bounds = {key: finding[key] for key in
+                  ("start_char", "end_char", "sentence_start", "sentence_end") if key in finding}
+        lines.append(f"  {n}. {quote!r}" + (f" -- {why}" if why else "")
+                     + (f"; original coordinates: {json.dumps(bounds)}" if bounds else ""))
     return "\n".join(lines)
 
 
@@ -622,6 +738,8 @@ def summarize_acts(
                 helper_name="ledger_clean_act_summary",
             )
         except Exception as exc:  # noqa: BLE001 -- context is a bonus
+            if not _is_exhausted_clean_response(exc):
+                raise
             log.warning(
                 "[ledger_clean] could not summarize the %s (%s: %s); the "
                 "pass runs on the arc labels alone for those rows",
@@ -680,7 +798,10 @@ def _judge_by_sentence(
 
     found: "list[dict[str, str]]" = []
     reachable = False
+    cursor = 0
     for piece in pieces:
+        piece_start = text.index(piece, cursor)
+        cursor = piece_start + len(piece)
         verdict, ok = _judge_row(
             slot_fn=slot_fn,
             speaker=speaker,
@@ -695,10 +816,12 @@ def _judge_by_sentence(
         )
         reachable = reachable or ok
         for entry in verdict:
-            # The quote is the SENTENCE, exact by construction -- no verbatim
-            # transcription for the model to get wrong.
-            found.append({"quote": piece, "why": entry.get("why", "")})
-            break
+            interval = _exact_interval(piece, entry)
+            scoped = {"quote": entry["quote"], "why": entry.get("why", ""),
+                      "sentence_start": piece_start, "sentence_end": cursor}
+            if interval is not None:
+                scoped.update(start_char=piece_start + interval[0], end_char=piece_start + interval[1])
+            found.append(scoped)
     return found, reachable
 
 
@@ -955,12 +1078,13 @@ def _judge_votes(**kwargs) -> "tuple[list[dict[str, str]], bool]":
     if not rounds:
         return [], reachable
 
-    # A finding survives only if EVERY read named the same words.
+    # Votes about different occurrences cannot authorize one another.
     agreed: "list[dict[str, str]]" = []
     for entry in rounds[0]:
-        quote = entry["quote"].casefold()
+        identity = _exact_interval(kwargs["text"], entry)
         if all(
-            any(other["quote"].casefold() == quote for other in later)
+            any((_exact_interval(kwargs["text"], other) == identity
+                 and (identity is not None or other["quote"] == entry["quote"])) for other in later)
             for later in rounds[1:]
         ):
             agreed.append(entry)
@@ -1168,8 +1292,10 @@ def _judge_row(
     BaseModel, Field, structured_call = parts
 
     class _NotSpeech(BaseModel):
-        quote: str = Field(min_length=1, max_length=300)
+        quote: str = Field(min_length=1)
         why: str = Field(default="", max_length=120)
+        start_char: int | None = Field(default=None, ge=0, strict=True)
+        end_char: int | None = Field(default=None, ge=1, strict=True)
 
     class _SpokenLineJudgement(BaseModel):
         # A model cannot report how many pieces it read without actually
@@ -1237,6 +1363,8 @@ def _judge_row(
             helper_name="ledger_clean_line_judge",
         )
     except Exception as exc:  # noqa: BLE001 -- fall back to the hints
+        if not _is_exhausted_clean_response(exc):
+            raise
         log.warning(
             "[ledger_clean] the judge could not read a line (%s: %s); the "
             "pattern findings stand alone for it",
@@ -1246,10 +1374,10 @@ def _judge_row(
     found: "list[dict[str, str]]" = []
     dropped: "list[str]" = []
     for entry in result.not_speech:
-        quote = " ".join(str(entry.quote or "").split())
+        quote = str(entry.quote or "")
         if not quote:
             continue
-        if quote.casefold() not in haystack:
+        if " ".join(quote.split()).casefold() not in haystack:
             # NOT ABOUT THIS LINE. Measured in the lab: shown the lines
             # around the target, a 2B routinely quotes a NEIGHBOUR back --
             # it is reading the block as the subject. Acting on it would
@@ -1257,20 +1385,11 @@ def _judge_row(
             # entry goes; the rest of the answer stands.
             dropped.append(f"{quote!r} (not in this line)")
             continue
-        if (
-            result.segments_read >= 2
-            and len(result.not_speech) == 1
-            and len(quote.casefold()) >= len(haystack) - 2
-        ):
-            # SELF-CONTRADICTED: it says it split the line into pieces and
-            # then condemns the whole line as one piece. That shape was the
-            # exact signature of the measured false positives on clean
-            # dialogue, so the entry goes and the line reads clean.
-            dropped.append(f"{quote!r} (whole line, but claims a split)")
-            continue
         found.append({
             "quote": quote,
             "why": " ".join(str(entry.why or "").split())[:120],
+            **({"start_char": entry.start_char, "end_char": entry.end_char}
+               if entry.start_char is not None or entry.end_char is not None else {}),
         })
     if dropped:
         log.info(
@@ -1286,6 +1405,129 @@ def _judge_row(
 # ---------------------------------------------------------------------------
 
 
+def _authorize_repair_scope(
+    *, slot_fn, speaker: str, text: str, complaint: Sequence[Mapping[str, Any]],
+    admissible: frozenset[str], lines_around: Sequence[str], where: str,
+    receipt: MutableMapping[str, Any], sightings=None,
+) -> tuple[str, tuple[_RepairSpan, ...], dict[str, Any]]:
+    """Freeze original scope; complaint contains judge evidence, not display hints."""
+    patterns = [finding for finding in _POLICY.f1_finding_spans(text)
+                if finding["kind"] in admissible]
+    intervals = [(finding["start_char"], finding["end_char"]) for finding in patterns]
+    needs_authorization = False
+    whole = any(_whole_spoken_row(text, interval) for interval in intervals)
+    for finding in complaint:
+        interval = _exact_interval(text, finding)
+        if interval is None:
+            needs_authorization = True
+            # Normalized equality only routes a suspected whole-row complaint
+            # to the model; it never grants an exact editing interval itself.
+            whole = whole or (bool(text.strip()) and
+                " ".join(str(finding.get("quote") or "").split()).casefold()
+                == " ".join(text.split()).casefold())
+        else:
+            intervals.append(interval)
+            whole = whole or _whole_spoken_row(text, interval)
+    # Several overlapping/adjacent complaints can collectively accuse all speech.
+    # That grants no shortcut around the whole-row authorization.
+    whole = whole or _covers_spoken_row(text, intervals)
+    record = {"coordinate_version": "original_python_chars_v1", "pattern_spans": patterns,
+              "calls": [], "verdict": "localized_defect"}
+    if not whole and not needs_authorization:
+        spans = _merge_repair_spans(text, intervals)
+        return ("partial" if spans else "unresolved"), spans, record
+
+    parts = _structured()
+    if parts is None:
+        record.update(verdict="unresolved", reason="structured authorization unavailable")
+        return "unresolved", (), record
+    _base, _field, structured_call = parts
+    # For a whole-row accusation the authorization must establish localized
+    # scope afresh; retaining the old collective scope would undo that narrowing.
+    original_partial = [] if whole else list(intervals)
+    def matches_original_complaint(quote, interval):
+        normalized = " ".join(quote.split()).casefold()
+        return any(
+            normalized == " ".join(str(item.get("quote") or "").split()).casefold()
+            and item.get("sentence_start", 0) <= interval[0]
+            and interval[1] <= item.get("sentence_end", len(text))
+            for item in complaint
+        )
+
+    def validate(result):
+        if result.verdict == "whole_row_direction" and not whole:
+            return "Only an original whole-row complaint can authorize whole-row conversion"
+        if result.verdict != "localized_defect":
+            if result.spans:
+                return "Only localized_defect may contain spans"
+            return None
+        if not result.spans:
+            return "localized_defect needs at least one exact original span"
+        resolved = []
+        for item in result.spans:
+            finding = item.model_dump()
+            interval = _exact_interval(text, finding)
+            if interval is None:
+                return "Each span must uniquely identify exact original text with valid offsets"
+            resolved.append(interval)
+            if _whole_spoken_row(text, interval):
+                return "Use whole_row_direction only when the entire row is actually a direction"
+            if not whole and not (
+                any(start <= interval[0] and interval[1] <= end for start, end in original_partial)
+                or matches_original_complaint(item.quote, interval)
+            ):
+                return "Localization must resolve an original complaint, not authorize another passage"
+        if _covers_spoken_row(text, original_partial + resolved):
+            return "Collective whole-row scope requires whole_row_direction authorization"
+        return None
+
+    numbered = _numbered(complaint or [dict(item, why=item["kind"]) for item in patterns])
+    built = [{"role": "system", "content": "Decide the permitted scope of a radio-dialogue edit. Return JSON only."},
+             {"role": "user", "content": (
+                 "AUTHORIZE THE ORIGINAL COMPLAINT, not a new critique. A complaint may be wrong. "
+                 "Ordinary spoken dialogue, including a short closing line, is already_spoken. "
+                 "Choose localized_defect for actual non-speech inside otherwise valid speech; "
+                 "give exact quote and zero-based start_char/end_char (end exclusive). "
+                 "Repeated quotes need the intended occurrence's offsets. Choose whole_row_direction "
+                 "only if the entire spoken row is actually a direction needing conversion. "
+                 "Choose unresolved when uncertain. Preserve the speaker's meaning.\n"
+                 f"THE SPEAKER: {speaker}\nTHE LINE: {text}\n"
+                 f"ORIGINAL COMPLAINTS:\n{numbered}\nWHERE THE STORY IS: {where}\n"
+                 f"THE LINES AROUND IT:\n" + "\n".join(lines_around))}]
+    landed = verify_context_landed(built, {"line": text, "speaker": speaker, "act": where,
+                                         "around": "\n".join(lines_around), "complaint": numbered})
+    if sightings is not None:
+        sightings.append(dict(landed, job="scope_authorization"))
+
+    def completed(attempt, raw, error):
+        receipt["model_calls"] += 1
+        record["calls"].append({"attempt": attempt, "raw_output": raw,
+                                "error": None if error is None else f"{type(error).__name__}: {error}"})
+
+    try:
+        # LLM slot: creative -- the existing dialogue slot authorizes this edit.
+        result = structured_call(
+            prompt=built, schema=_ScopeAuthorization, slot_fn=slot_fn,
+            base_temperature=JUDGE_TEMPERATURE, structural_retry_temperature=0.1,
+            max_new_tokens=_MAX_NEW_TOKENS, max_attempts=2, post_validator=validate,
+            on_attempt_complete=completed, helper_name="ledger_clean_scope_authorization",
+        )
+    except Exception as exc:
+        if not _is_exhausted_clean_response(exc):
+            raise
+        record.update(verdict="unresolved", reason=str(exc))
+        return "unresolved", (), record
+    record.update(result.model_dump())
+    if result.verdict == "already_spoken":
+        return "already_spoken", (), record
+    if result.verdict == "whole_row_direction":
+        return "whole", (), record
+    if result.verdict == "unresolved":
+        return "unresolved", (), record
+    resolved = [_exact_interval(text, item.model_dump()) for item in result.spans]
+    return "partial", _merge_repair_spans(text, original_partial + resolved), record
+
+
 def _repair_prompt(
     *,
     speaker: str,
@@ -1294,6 +1536,7 @@ def _repair_prompt(
     lines_around: "Sequence[str]",
     previous_attempt: str = "",
     where: str = "",
+    authorized_spans: Sequence[_RepairSpan] | None = None,
 ) -> "list[dict[str, str]]":
     speaker_label = speaker or "the announcer"
     parts = [
@@ -1386,13 +1629,23 @@ def _repair_prompt(
         "wrapped around the whole line, no description of anyone doing "
         "anything.",
     ]
+    if authorized_spans is not None:
+        parts[0] = ("Write replacement speech ONLY for the approved original spans. "
+                    "Everything outside them will be retained exactly, including whitespace. "
+                    "The complaints are feedback, never permission to widen those spans.")
+        parts[-1] = ("Return replacements as specified below; the full original row is context, "
+                     "not your output or an additional editing surface.")
+        parts += ["APPROVED ORIGINAL SPANS:", json.dumps(
+            [span._asdict() for span in authorized_spans], ensure_ascii=False),
+            "Return JSON with a replacements LIST, exactly one {span_id, replacement} per "
+            "approved ID. No duplicate, missing or unknown IDs. An empty replacement may "
+            "remove a direction, but the complete spoken row must remain nonempty. "
+            "Keep any join changes inside the replacement; never return the whole line."]
     return [
         {
             "role": "system",
             "content": (
-                "You rewrite one line of radio dialogue so that every word "
-                "of it is something the speaker says out loud. You return "
-                "JSON only."
+                "You write radio dialogue inside the authorized editing scope. Return JSON only."
             ),
         },
         {"role": "user", "content": "\n".join(parts)},
@@ -1407,22 +1660,33 @@ def _call_repair(
     complaint: str,
     lines_around: "Sequence[str]",
     previous_attempt: str,
+    scope_mode: str,
+    authorized_spans: Sequence[_RepairSpan],
+    proposal_receipt: MutableMapping[str, Any],
     where: str = "",
     sightings: "list[dict[str, Any]] | None" = None,
 ) -> str:
-    """One bounded model call. Returns the rewritten line, or "" on failure --
-    a repair that cannot run is never fatal to the render."""
+    """Return a scoped candidate, or empty on malformed/exhausted answers.
+
+    Runtime failures propagate rather than masquerading as an unclean row.
+    """
     parts = _structured()
     if parts is None:
         return ""
     BaseModel, Field, structured_call = parts
 
-    class _RepairedLine(BaseModel):
-        text: str = Field(min_length=1, max_length=2000)
+    if scope_mode not in ("partial", "whole") or (scope_mode == "partial" and not authorized_spans):
+        raise ValueError("Repair requires an explicitly authorized nonempty editing scope")
 
-    def _validate(result: "_RepairedLine") -> "str | None":
-        if not " ".join(str(result.text or "").split()):
-            return "text is empty after whitespace normalization"
+    def _validate(result) -> str | None:
+        try:
+            if scope_mode == "partial":
+                _splice_replacements(text, authorized_spans,
+                                     [item.model_dump() for item in result.replacements])
+            elif not result.text.strip():
+                return "The spoken row is empty"
+        except ValueError as exc:
+            return str(exc)
         return None
 
     built = _repair_prompt(
@@ -1432,6 +1696,7 @@ def _call_repair(
         lines_around=lines_around,
         previous_attempt=previous_attempt,
         where=where,
+        authorized_spans=authorized_spans if scope_mode == "partial" else None,
     )
     # SHA VERIFY, and this is the exact path where it earned itself: `where`
     # was threaded into this builder's signature and never rendered into the
@@ -1458,7 +1723,7 @@ def _call_repair(
         # its neighbours (operator ruling 2026-08-14).
         result = structured_call(
             prompt=built,
-            schema=_RepairedLine,
+            schema=_SpanReplacements if scope_mode == "partial" else _RepairedLine,
             slot_fn=slot_fn,
             base_temperature=0.55,
             structural_retry_temperature=0.25,
@@ -1468,13 +1733,23 @@ def _call_repair(
             helper_name="ledger_clean_line_repair",
         )
     except Exception as exc:  # noqa: BLE001 -- the row ships flagged instead
+        if not _is_exhausted_clean_response(exc):
+            raise
+        proposal_receipt["rejection_reason"] = str(exc)
         log.warning(
             "[ledger_clean] repair call failed (%s: %s); the row keeps its "
             "current text and is flagged rather than dropped",
             type(exc).__name__, str(exc)[:200],
         )
         return ""
-    return " ".join(str(result.text or "").split())
+    if scope_mode == "partial":
+        replacements = [item.model_dump() for item in result.replacements]
+        candidate = _splice_replacements(text, authorized_spans, replacements)
+        proposal_receipt["replacements"] = replacements
+    else:
+        candidate = result.text
+    proposal_receipt["candidate_sha256"] = hashlib.sha256(candidate.encode("utf-8")).hexdigest()
+    return candidate
 
 
 # ---------------------------------------------------------------------------
@@ -1711,6 +1986,7 @@ def run_ledger_clean(
             index=index,
             beats=beats,
             complaint=complaint,
+            judge_complaint=judged,
             source=source,
             episode=episode,
             act_briefs=act_briefs,
@@ -1766,6 +2042,7 @@ def _repair_row(
     index: int,
     beats: "Mapping[str, Mapping]",
     complaint: "Sequence[Mapping[str, str]]",
+    judge_complaint: Sequence[Mapping[str, Any]],
     source: str,
     episode: str,
     act_briefs: "Mapping[str, str]",
@@ -1788,6 +2065,25 @@ def _repair_row(
     lines_around = _lines_around(rows, index, beats)
     where = _where_the_story_is(row, beats, episode, act_briefs)
 
+    scope_mode, authorized_spans, authorization = _authorize_repair_scope(
+        slot_fn=slot_fn, speaker=speaker, text=original, complaint=judge_complaint,
+        admissible=admissible, lines_around=lines_around, where=where,
+        receipt=receipt, sightings=sightings,
+    )
+    scope_record = {
+        "original_sha256": hashlib.sha256(original.encode("utf-8")).hexdigest(),
+        "initial_judge_valid": judge_reachable,
+        "mode": scope_mode, "approved_spans": [span._asdict() for span in authorized_spans],
+        "authorization": authorization,
+    }
+    if scope_mode not in ("partial", "whole"):
+        if scope_mode != "already_spoken":
+            _flag_unclean(row)
+            receipt["unclean"] += 1
+        return {"line_id": line_id, "outcome": scope_mode,
+                "found_by": source, "complaint": list(complaint),
+                "before": original, "after": original, "scope": scope_record, "attempts": []}
+
     current = list(complaint)
     previous = ""
     attempts: "list[dict[str, Any]]" = []
@@ -1805,6 +2101,7 @@ def _repair_row(
 
     for attempt in range(1, _MAX_ATTEMPTS + 1):
         receipt["model_calls"] += 1
+        proposal: dict[str, Any] = {}
         candidate = _call_repair(
             slot_fn=slot_fn,
             speaker=speaker,
@@ -1812,12 +2109,30 @@ def _repair_row(
             complaint=_numbered(current),
             lines_around=lines_around,
             previous_attempt=previous,
+            scope_mode=scope_mode,
+            authorized_spans=authorized_spans,
+            proposal_receipt=proposal,
             where=where,
             sightings=sightings,
         )
         if not candidate:
-            attempts.append({"attempt": attempt, "outcome": "call_failed"})
+            attempts.append({"attempt": attempt, "outcome": "call_failed", **proposal})
             break
+
+        # Recheck construction at the mutation owner, before either acceptance
+        # path or the best-progress fallback can retain a proposal.
+        try:
+            if scope_mode == "partial" and _splice_replacements(
+                original, authorized_spans, proposal.get("replacements", ()),
+            ) != candidate:
+                raise ValueError("Candidate differs from the authorized original-slice construction")
+            if not candidate.strip():
+                raise ValueError("Candidate has no spoken text")
+        except ValueError as exc:
+            attempts.append({"attempt": attempt, "outcome": "scope_rejected",
+                             **proposal, "rejection_reason": str(exc)})
+            previous = candidate
+            continue
 
         # READ IT BACK THE SAME WAY IT WAS READ THE FIRST TIME. A repair
         # graded by a weaker check than the one that condemned it is a repair
@@ -1825,18 +2140,27 @@ def _repair_row(
         still_patterns = [
             f for f in _POLICY.f1_findings(candidate) if f.kind in admissible
         ]
-        still_judged: "list[dict[str, str]]" = []
-        if judge_reachable:
-            receipt["model_calls"] += 1
-            still_judged, _ok = _judge_row(
-                slot_fn=slot_fn,
-                speaker=speaker,
-                text=candidate,
-                hints=still_patterns,
-                lines_around=lines_around,
-                where=where,
-                sightings=sightings,
-            )
+        receipt["model_calls"] += 1
+        candidate_rows = list(rows)
+        candidate_rows[index] = dict(row, text=candidate)
+        still_judged, reread_ok = _judge_row(
+            slot_fn=slot_fn,
+            speaker=speaker,
+            text=candidate,
+            hints=still_patterns,
+            lines_around=_lines_around(candidate_rows, index, beats),
+            where=where,
+            sightings=sightings,
+        )
+        if not reread_ok:
+            # No valid judgment is not a clean judgment or measured progress.
+            # Retry within the same original scope; retain a previously verified
+            # best candidate only if an earlier reread actually assessed it.
+            attempts.append({"attempt": attempt, "outcome": "reread_unresolved",
+                             "scope_verified": True, **proposal,
+                             "rejection_reason": "Candidate reread returned no validated judgment"})
+            previous = candidate
+            continue
         remaining = still_judged or _as_findings(still_patterns)
         attempts.append({
             "attempt": attempt,
@@ -1845,6 +2169,8 @@ def _repair_row(
                 else "still_dirty"
             ),
             "remaining": remaining,
+            "scope_verified": True,
+            **proposal,
         })
         if not still_judged and not still_patterns:
             # THE CANONICAL OWNER sets the text, so `word_count` and
@@ -1867,6 +2193,7 @@ def _repair_row(
                 "complaint": list(complaint),
                 "before": original,
                 "after": candidate,
+                "scope": scope_record,
                 "attempts": attempts,
             }
         if len(remaining) < best_count:
@@ -1897,6 +2224,7 @@ def _repair_row(
             "complaint": list(complaint),
             "before": original,
             "after": best_text,
+            "scope": scope_record,
             "remaining_count": best_count,
             "attempts": attempts,
         }
@@ -1918,6 +2246,7 @@ def _repair_row(
         "found_by": source,
         "complaint": list(complaint),
         "text": original,
+        "scope": scope_record,
         "attempts": attempts,
     }
 

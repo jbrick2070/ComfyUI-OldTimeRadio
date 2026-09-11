@@ -1,5 +1,24 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- C1 scope-conservation code checkpoint
+
+Receipt: 2026-09-11-my-story-cross-machine/c1_receipt.md. Final183focused;
+full14247/51unchangedfail/183skip/1xfail; Bible31/10unchangedfail/11skip/3xfail.
+Sonnet's reread must-fix is corrected and follow-up converged. Canonical unchanged.
+No live qualification is implied; all included campaign coding must finish first.
+The completed queue item is preserved verbatim:
+
+3. Constrain shared cleanup to verified complaints, conserving speech outside
+   authorized spans. Resolve whole-line false accusations without suppressing
+   legitimate direction-to-speech repairs. Do not infer an extra-edit bug from
+   five model-dirty rows versus six edits without the pattern-only row receipt.
+
+Superseded immediate next step:
+
+structured-output defects, in focused shared-core chunks. Next implement C1
+shared cleanup conservation below, then F1 adaptive source organization and
+semantic review, and F2 visual source integration. The six-leg receipt is
+
 ## 2026-09-11 -- coordination and prompt preparation withdrawn
 
 The operator's final instruction is to stop everything else until coding is

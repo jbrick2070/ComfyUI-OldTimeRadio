@@ -88,6 +88,11 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 **Active production-code owner: Codex, `v2.0-alpha`.** Independent reviewers
 are read-only. Continue coding; no handoff is being activated.
+Euler currently owns only the F1 source-review library
+and its tests in the isolated `otr-my-story-f1-library` worktree. Root handles
+integration reads and makes no concurrent implementation edits. That library
+is unfinished work until root wires it into the existing writer and qualifies
+the integrated change; it is not a second main checkout or a hardware handoff.
 **GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
 below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
@@ -101,9 +106,9 @@ A1R/A2 implementation, Original credit B, credits-title C and retained Mac/O2
 diagnostics. A3, optional App and the older backlog remain separately scoped.
 
 **Next action:** close A1R, the received 4060 My Story source-fidelity and
-structured-output defects, in focused shared-core chunks. Next implement C1
-shared cleanup conservation below, then F1 adaptive source organization and
-semantic review, and F2 visual source integration. The six-leg receipt is
+structured-output defects, in focused shared-core chunks. Continue F1 adaptive
+source organization and semantic review through the existing author/cleanup
+owners, then F2 visual source integration. The six-leg receipt is
 `docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
 end-to-end source-qualified My Story output exists. Keep each tested code
 revision distinct; an earlier passing run is not proof of the final correction.
@@ -193,10 +198,6 @@ each design step and a CLI review of each finished code chunk before push.
 2. Verify zero between-act music in the full canonical one-act recovery after
    the remaining source repairs. The boundary code receipt is in HANDOFF_LOG;
    do not reopen it as uncoded work or add a keyword rejection of planning prose.
-3. Constrain shared cleanup to verified complaints, conserving speech outside
-   authorized spans. Resolve whole-line false accusations without suppressing
-   legitimate direction-to-speech repairs. Do not infer an extra-edit bug from
-   five model-dirty rows versus six edits without the pattern-only row receipt.
 4. Preserve raw listener source through P0/P1/P2/P3, cleanup and the actual
    MetaBrief visual prompt owners. Review the source-versus-candidate check and
    existing bounded repair integration before code. Source quotations establish

@@ -66,6 +66,7 @@ __all__ = [
     "F1_PATTERNS",
     "Finding",
     "f1_findings",
+    "f1_finding_spans",
     "f2_findings",
     "repairable_kinds",
     "summarize",
@@ -187,6 +188,16 @@ def f1_findings(text: str) -> "list[Finding]":
         if hit:
             findings.append(Finding(kind, hit))
     return findings
+
+
+def f1_finding_spans(text: str) -> "list[dict[str, Any]]":
+    """Every exact original match; display summaries never grant edit authority."""
+    return [
+        {"kind": kind, "quote": match.group(0),
+         "start_char": match.start(), "end_char": match.end()}
+        for kind, pattern in F1_PATTERNS
+        for match in pattern.finditer(text)
+    ]
 
 
 def f2_findings(

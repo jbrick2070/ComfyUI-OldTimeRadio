@@ -1,0 +1,10 @@
+{
+  "base": "440573962d53521e8be9af875cb7c0ca8a772f32",
+  "files": {
+    "nodes/_otr_ledger_clean.py": "dae2eefca9bc2b61ede09c91447831b1e984d8d784106a819ea6826c82193388",
+    "nodes/_otr_spoken_text_policy.py": "93052b5684485e014d09579cc59522539b179f57c2aa17592974473b9a030058",
+    "tests/test_ledger_clean_stage.py": "cdab887376a47197063c9c2ebc16a5127f779f9b79c69dd243145da96a2b6d29",
+    "tests/test_d1_protected_fact_component.py": "d4e285b09dddaefd6edf95f3f1cd5cb24083a222e48a252e40e2b3d2ebc98e76"
+  },
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c"
+}

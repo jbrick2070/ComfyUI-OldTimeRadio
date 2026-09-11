@@ -14148,5 +14148,17 @@ for promotion from the Windows box. Each is portable beyond OTR:
 - consequence: this is a committed semantic rewrite, not an `unclean` row
   that fails safe. Add a short-coda regression requiring byte-identical
   preservation unless a localized, strictly shorter offending segment exists.
-- status: remains OPEN. This is not the protected Python-owned-fact class in
-  BUG-12.103.
+- implementation: shared cleanup now freezes exact original complaint spans,
+  requires separate authorization for collective whole-row scope, and interleaves
+  model replacements with unchanged original slices. Invalid replacement IDs,
+  out-of-scope proposals and malformed rereads cannot win clean or progressive
+  acceptance. Unresolved cases retain the original with a flag. Valid whole-row
+  directions remain convertible after explicit model authorization.
+- verification: focused coverage includes the live coda false accusation,
+  repeated/overlapping quotes, exact whitespace conservation, whole-row narrowing,
+  malformed reread and real provider/OOM/cancellation/capacity propagation. See
+  `2026-09-11-my-story-cross-machine/c1_receipt.md` for final code-check results.
+- status: code corrected; fresh canonical live qualification remains OPEN and
+  on hold until all campaign coding is complete. Promoted as Bible 11.64 with
+  executable coverage. This is distinct from protected Python-owned facts in
+  BUG-12.103; that earlier protection remains.

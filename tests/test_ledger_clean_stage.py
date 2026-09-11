@@ -16,9 +16,12 @@ The contract under test, in the operator's own terms (2026-08-14):
 from __future__ import annotations
 
 import json
+from concurrent.futures import CancelledError
+import pytest
 
 from nodes import _otr_ledger_clean as lcl
 from nodes import _otr_spoken_text_policy as policy
+from nodes._otr_generation_budget import GenerationContextOverflowError
 
 
 # ---------------------------------------------------------------------------
@@ -89,9 +92,12 @@ class _Slot:
     entry is judged pure speech, which is what an unremarkable row is.
     """
 
-    def __init__(self, judgements=None, repairs=None, brief="a fight over a lamp"):
+    def __init__(self, judgements=None, repairs=None, brief="a fight over a lamp", authorizations=None):
         self.judgements = dict(judgements or {})
         self.repairs = dict(repairs or {})
+        self.authorizations = dict(authorizations or {})
+        self.authorization_calls = 0
+        self.authorization_prompts = []
         self.brief = brief
         self.judge_calls = 0
         self.repair_calls = 0
@@ -139,6 +145,11 @@ class _Slot:
             self.judge_calls += 1
             return json.dumps(
                 self._reply("judge", self.judgements, text, CLEAN_JUDGEMENT))
+        if "AUTHORIZE THE ORIGINAL COMPLAINT" in text:
+            self.authorization_calls += 1
+            self.authorization_prompts.append(text)
+            return json.dumps(self._reply("authorization", self.authorizations, text,
+                                          {"verdict": "unresolved", "spans": [], "reason": "No fixture authorization"}))
         self.repair_prompts.append(text)
         self.repair_calls += 1
         return json.dumps(
@@ -148,12 +159,348 @@ class _Slot:
 #: Stage business the pattern list happens to know about.
 DIRTY = "(She turns from the window.) The lamp has not turned since Tuesday."
 #: What a thinking repair gives back -- the action implied in the speech.
-FIXED = "I can't even look at the window. That lamp has been dead since Tuesday."
+FIXED_REPLACEMENT = "I can't even look at the window."
+FIXED = FIXED_REPLACEMENT + " The lamp has not turned since Tuesday."
 
 #: THE CASE THE PATTERN LIST CANNOT SEE. "closes" is not in any verb list,
 #: and never will be, because the next story invents a new one.
 INVISIBLE = "The door closes behind him. I told you he would not stay."
-INVISIBLE_FIXED = "He's gone -- I told you he would not stay."
+INVISIBLE_REPLACEMENT = "He's gone."
+INVISIBLE_FIXED = INVISIBLE_REPLACEMENT + " I told you he would not stay."
+
+
+def _replacement_reply(*values):
+    return {"replacements": [{"span_id": f"span_{i:03d}", "replacement": value}
+                              for i, value in enumerate(values, 1)]}
+
+
+def test_whole_row_false_accusation_preserves_valid_coda_and_outer_whitespace():
+    original = "  Until next time.\t"
+    ledger = _ledger(original, bank="my_story")
+    slot = _Slot(judgements={original: [_dirty_judgement("Until next time.")]},
+                 authorizations={original: [{"verdict": "already_spoken", "reason": "This is spoken dialogue"}]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="my_story")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.authorization_calls == 1 and slot.repair_calls == 0
+    assert receipt["rows"][0]["outcome"] == "already_spoken"
+    assert receipt["rows"][0]["scope"]["authorization"]["calls"][0]["error"] is None
+
+
+def test_genuine_whole_row_direction_remains_convertible_after_authorization():
+    original = "The door closes behind him."
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{"verdict": "whole_row_direction"}]},
+                 repairs={original: [{"text": "He's gone."}]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "He's gone."
+    assert receipt["rows"][0]["scope"]["mode"] == "whole"
+    assert slot.authorization_calls == 1 and slot.repair_calls == 1
+
+
+def test_whole_row_authorization_can_narrow_to_a_real_local_direction():
+    original = "Stay here. (He sighs)"
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{"verdict": "localized_defect", "spans": [
+                     {"quote": "(He sighs)", "start_char": 11, "end_char": len(original)}]}]},
+                 repairs={original: [_replacement_reply("")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "Stay here. "
+    assert receipt["rows"][0]["scope"]["mode"] == "partial"
+
+
+def test_disjoint_repairs_preserve_all_unedited_spaces_tabs_newlines_and_punctuation():
+    original = "  (He sighs)\tI won't leave;  promise.\n(He nods)  "
+    expected = "  All right.\tI won't leave;  promise.\nAgreed.  "
+    ledger = _ledger(original)
+    slot = _Slot(repairs={"(He sighs)": [_replacement_reply("All right.", "Agreed.")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == expected
+    assert len(receipt["rows"][0]["scope"]["approved_spans"]) == 2
+
+
+def test_exact_pattern_spans_include_all_occurrences_without_summary_normalization():
+    note = "(He\twhispers " + "very " * 15 + "quietly)"
+    original = note + "\tStay.\n" + note
+    findings = [item for item in policy.f1_finding_spans(original)
+                if item["kind"] == "stage direction in brackets"]
+    assert len(findings) == 2
+    assert all(item["quote"] == note for item in findings)
+    assert all(original[item["start_char"]:item["end_char"]] == note for item in findings)
+    assert len(policy.f1_findings(original)[0].detail) <= 60 < len(note)
+    spans = lcl._merge_repair_spans(original, [
+        (item["start_char"], item["end_char"]) for item in policy.f1_finding_spans(original)])
+    assert [span.quote for span in spans] == [note, note]
+
+
+@pytest.mark.parametrize("with_offsets", [False, True])
+def test_repeated_judge_quote_needs_the_intended_occurrence(with_offsets):
+    quote = "The door closes."
+    original = quote + " I wait. " + quote
+    finding = {"quote": quote, "why": "direction"}
+    if with_offsets:
+        finding.update(start_char=original.rindex(quote), end_char=len(original))
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [{"not_speech": [finding]}]},
+                 repairs={original: [_replacement_reply("It's shut.")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    if with_offsets:
+        assert ledger["lines"][1]["text"] == quote + " I wait. It's shut."
+        assert slot.authorization_calls == 0
+    else:
+        assert ledger["lines"][1]["text"] == original
+        assert slot.repair_calls == 0
+        assert receipt["rows"][0]["outcome"] == "unresolved"
+
+
+def test_bounded_localizer_resolves_a_repeated_quote_without_authorizing_both():
+    quote = "The door closes."
+    original = quote + " I wait. " + quote
+    ledger = _ledger(original)
+    slot = _Slot(judgements={original: [_dirty_judgement(quote)]},
+                 authorizations={original: [{"verdict": "localized_defect", "spans": [
+                     {"quote": quote, "start_char": original.rindex(quote), "end_char": len(original)}]}]},
+                 repairs={original: [_replacement_reply("It's shut.")]})
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == quote + " I wait. It's shut."
+    assert slot.authorization_calls == 1 and slot.repair_calls == 1
+
+
+@pytest.mark.parametrize("replacements", [
+    [],
+    [{"span_id": "another_span", "replacement": "Hello."}],
+    [{"span_id": "span_001", "replacement": "Hello."}, {"span_id": "span_001", "replacement": "Again."}],
+])
+def test_invalid_replacement_id_sets_never_mutate_the_row(replacements):
+    ledger = _ledger(DIRTY)
+    slot = _Slot(repairs={DIRTY: [{"replacements": replacements}]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == DIRTY
+    assert receipt["repaired"] == receipt["improved"] == 0
+    assert receipt["unclean"] == 1
+    assert receipt["rows"][0]["attempts"][0]["rejection_reason"]
+
+
+def test_invalid_candidate_cannot_reach_clean_or_best_progress_acceptance(monkeypatch):
+    def invalid_candidate(**kwargs):
+        kwargs["proposal_receipt"]["replacements"] = _replacement_reply("")["replacements"]
+        return "A replacement for every word in the line."
+    monkeypatch.setattr(lcl, "_call_repair", invalid_candidate)
+    ledger = _ledger(DIRTY)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=_Slot(), bank_id="original")
+    assert ledger["lines"][1]["text"] == DIRTY
+    assert receipt["repaired"] == receipt["improved"] == 0
+    assert [item["outcome"] for item in receipt["rows"][0]["attempts"]] == ["scope_rejected"] * 2
+
+
+def test_retry_feedback_cannot_widen_original_scope_and_reread_sees_candidate():
+    protected = "The lamp has not turned since Tuesday."
+    ledger = _ledger(DIRTY)
+    slot = _Slot(judgements={FIXED: [_dirty_judgement(protected)]},
+                 repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == FIXED
+    scope = receipt["rows"][0]["scope"]["approved_spans"]
+    assert len(scope) == 1 and scope[0]["quote"] == "(She turns from the window.)"
+    assert slot.repair_calls == 2 and slot.authorization_calls == 0
+    rereads = [prompt for prompt in slot.judge_prompts if "THE LINE: " + FIXED in prompt]
+    assert rereads and all(">>> Nan Reyes: " + FIXED in prompt for prompt in rereads)
+    assert all(">>> Nan Reyes: " + DIRTY in prompt for prompt in slot.repair_prompts)
+
+
+def test_conserved_row_over_two_thousand_characters_is_not_a_schema_rejection():
+    suffix = "\t" + "The lantern remains lit. " * 160 + "  "
+    original = "(He sighs)" + suffix
+    ledger = _ledger(original)
+    slot = _Slot(repairs={"(He sighs)": [_replacement_reply("All right.")]})
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert len(original) > 2000
+    assert ledger["lines"][1]["text"] == "All right." + suffix
+    assert receipt["repaired"] == 1
+
+
+def test_empty_local_deletion_cannot_make_the_final_spoken_row_empty():
+    spans = lcl._merge_repair_spans("(He sighs) ", [(0, 10)])
+    with pytest.raises(ValueError, match="final spoken row"):
+        lcl._splice_replacements("(He sighs) ", spans, _replacement_reply("")["replacements"])
+
+
+@pytest.mark.parametrize("job", ["judge", "authorization", "repair", "reread"])
+@pytest.mark.parametrize("error_type", [RuntimeError, MemoryError, CancelledError, GenerationContextOverflowError])
+def test_cleaner_jobs_do_not_swallow_real_runtime_failures(job, error_type):
+    original = "The door closes behind him."
+    class _FailingJob(_Slot):
+        def __call__(self, messages, **kwargs):
+            prompt = "\n".join(message["content"] for message in messages)
+            marker = {"judge": "DO THIS, IN ORDER:",
+                      "authorization": "AUTHORIZE THE ORIGINAL COMPLAINT",
+                      "repair": "HOW TO EDIT", "reread": "DO THIS, IN ORDER:"}[job]
+            if marker in prompt and (job != "reread" or "THE LINE: He's gone." in prompt):
+                raise error_type("runtime failed")
+            return super().__call__(messages, **kwargs)
+    slot = _FailingJob(judgements={original: [_dirty_judgement(original)]},
+                       authorizations={original: [{"verdict": "whole_row_direction"}]},
+                       repairs={original: [{"text": "He's gone."}]})
+    with pytest.raises(error_type, match="runtime failed"):
+        lcl.run_ledger_clean(_ledger(original), slot_fn=slot, bank_id="original")
+
+
+def test_malformed_reread_cannot_be_clean_or_best_progress():
+    class _MalformedReread(_Slot):
+        def __call__(self, messages, **kwargs):
+            prompt = "\n".join(message["content"] for message in messages)
+            if "DO THIS, IN ORDER:" in prompt and "THE LINE: " + INVISIBLE_FIXED in prompt:
+                return '{"not_speech": false}'
+            return super().__call__(messages, **kwargs)
+    slot = _MalformedReread(judgements={INVISIBLE: [_dirty_judgement("The door closes behind him.")]},
+                            repairs={INVISIBLE: [_replacement_reply(INVISIBLE_REPLACEMENT)]})
+    ledger = _ledger(INVISIBLE)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == INVISIBLE
+    assert receipt["repaired"] == receipt["improved"] == 0
+    assert receipt["unclean"] == 1 and slot.repair_calls == 2
+    assert lcl.UNCLEAN_COMPOSE_FLAG in ledger["lines"][1]["compose_flags"]
+    assert [item["outcome"] for item in receipt["rows"][0]["attempts"]] == ["reread_unresolved"] * 2
+
+
+def test_pattern_repair_gets_a_real_reread_after_initial_judge_exhaustion():
+    class _MalformedInitial(_Slot):
+        def __call__(self, messages, **kwargs):
+            prompt = "\n".join(message["content"] for message in messages)
+            if "DO THIS, IN ORDER:" in prompt and "THE LINE: " + DIRTY in prompt:
+                return '{"not_speech": false}'
+            return super().__call__(messages, **kwargs)
+    slot = _MalformedInitial(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
+    ledger = _ledger(DIRTY)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == FIXED
+    assert receipt["rows"][0]["scope"]["initial_judge_valid"] is False
+    assert any("THE LINE: " + FIXED in prompt for prompt in slot.judge_prompts)
+    assert receipt["repaired"] == 1
+
+
+@pytest.mark.parametrize("note", ["(He\tsighs)", "(He whispers " + "very " * 20 + "quietly)"])
+def test_pattern_display_summary_cannot_override_exact_pattern_scope(note):
+    original = note + " Stay. " + note
+    slot = _Slot(repairs={note: [_replacement_reply("", "")]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == " Stay. "
+    assert receipt["repaired"] == 1 and slot.authorization_calls == 0
+    assert [span["quote"] for span in receipt["rows"][0]["scope"]["approved_spans"]] == [note, note]
+
+
+def test_pattern_and_model_findings_both_keep_their_exact_edit_scope():
+    original = "(He sighs) Stay here. The door closes."
+    slot = _Slot(judgements={original: [_dirty_judgement("The door closes.")]},
+                 repairs={original: [_replacement_reply("", "It's shut.")]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == " Stay here. It's shut."
+    assert receipt["found_by_both"] == 1 and slot.authorization_calls == 0
+
+
+@pytest.mark.parametrize("quotes", [("Until next", "next time."), ("Until", "next", "time.")])
+def test_collective_whole_row_complaints_cannot_bypass_authorization(quotes):
+    original = "Until next time."
+    slot = _Slot(judgements={original: [_dirty_judgement(*quotes)]},
+                 authorizations={original: [{"verdict": "already_spoken"}]},
+                 repairs={original: [_replacement_reply("That's a wrap.")]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.authorization_calls == 1 and slot.repair_calls == 0
+    assert receipt["rows"][0]["outcome"] == "already_spoken"
+
+
+def test_normalized_whole_row_complaint_can_authorize_a_real_direction():
+    original = "He\t walks away."
+    slot = _Slot(judgements={original: [_dirty_judgement("He walks away.")]},
+                 authorizations={original: [{"verdict": "whole_row_direction"}]},
+                 repairs={original: [{"text": "He's gone."}]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "He's gone."
+    assert slot.authorization_calls == slot.repair_calls == 1
+
+
+@pytest.mark.parametrize("authorization", [
+    {"verdict": "rewrite_it"},
+    {"verdict": "localized_defect", "spans": []},
+    {"verdict": "localized_defect", "spans": [{"quote": "Until", "start_char": 1, "end_char": 6}]},
+    {"verdict": "localized_defect", "spans": [{"quote": "Until", "start_char": False, "end_char": 5}]},
+    {"verdict": "localized_defect", "spans": [{"quote": "Until next"}, {"quote": "next time."}]},
+    {"verdict": "already_spoken", "spans": [{"quote": "Until"}]},
+])
+def test_malformed_or_collectively_full_localization_keeps_the_original(authorization):
+    original = "Until next time."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [authorization]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.authorization_calls == 2 and slot.repair_calls == 0
+    record = receipt["rows"][0]
+    assert record["outcome"] == "unresolved" and receipt["unclean"] == 1
+    assert all(call["error"] for call in record["scope"]["authorization"]["calls"])
+
+
+def test_partial_ambiguous_complaint_cannot_authorize_whole_row_conversion():
+    original = "The door closes. Stay. The door closes."
+    slot = _Slot(judgements={original: [_dirty_judgement("The door closes.")]},
+                 authorizations={original: [{"verdict": "whole_row_direction"}]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.authorization_calls == 2 and slot.repair_calls == 0
+
+
+def test_whole_row_localization_discards_earlier_collective_scope():
+    original = "The door closes. Stay."
+    slot = _Slot(judgements={original: [_dirty_judgement("The door closes.", "Stay.")]},
+                 authorizations={original: [{"verdict": "localized_defect", "spans": [{"quote": "The door closes."}]}]},
+                 repairs={original: [_replacement_reply("It's shut.")]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "It's shut. Stay."
+    assert [span["quote"] for span in receipt["rows"][0]["scope"]["approved_spans"]] == ["The door closes."]
+
+
+def test_adjacent_scopes_are_distinct_replacements():
+    original = "(He sighs)(He nods) Stay."
+    slot = _Slot(repairs={original: [_replacement_reply("All right.", " Agreed.")]})
+    ledger = _ledger(original)
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == "All right. Agreed. Stay."
+    assert len(receipt["rows"][0]["scope"]["approved_spans"]) == 2
+
+
+def test_sentence_judging_preserves_second_occurrence_offsets(monkeypatch):
+    quote = "The door closes."
+    original = quote + " I wait. " + quote
+    monkeypatch.setattr(lcl, "JUDGE_PER_SENTENCE", True)
+    slot = _Slot(judgements={quote + " I wait. It's shut.": [CLEAN_JUDGEMENT],
+                            quote: [CLEAN_JUDGEMENT, _dirty_judgement(quote)]},
+                 repairs={original: [_replacement_reply("It's shut.")]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == quote + " I wait. It's shut."
+    assert slot.authorization_calls == 0
+
+
+def test_votes_on_different_occurrences_do_not_authorize_either(monkeypatch):
+    quote = "The door closes."
+    original = quote + " I wait. " + quote
+    monkeypatch.setattr(lcl, "JUDGE_VOTES", 2)
+    slot = _Slot(judgements={original: [
+        {"not_speech": [{"quote": quote, "start_char": 0, "end_char": len(quote)}]},
+        {"not_speech": [{"quote": quote, "start_char": original.rindex(quote), "end_char": len(original)}]},
+    ]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] == original
+    assert slot.repair_calls == slot.authorization_calls == 0
 
 
 # ---------------------------------------------------------------------------
@@ -173,7 +520,7 @@ def test_the_judge_catches_what_no_pattern_list_can():
     ledger = _ledger(INVISIBLE)
     slot = _Slot(
         judgements={INVISIBLE: [_dirty_judgement("The door closes behind him.")]},
-        repairs={INVISIBLE: [{"text": INVISIBLE_FIXED}]},
+        repairs={INVISIBLE: [_replacement_reply(INVISIBLE_REPLACEMENT)]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -196,7 +543,7 @@ def test_every_voiced_row_is_read_by_the_judge():
 
 def test_the_patterns_are_offered_as_evidence_and_labelled_unreliable():
     ledger = _ledger(DIRTY)
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
     # Select by THE LINE:, not by substring -- now that the window carries
@@ -211,7 +558,7 @@ def test_the_patterns_are_offered_as_evidence_and_labelled_unreliable():
 def test_the_patterns_still_fire_when_the_judge_misses_it():
     """A union, never a veto. The 2B model that shrugged does not get to."""
     ledger = _ledger(DIRTY)
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
     assert receipt["pattern_only"] == 1
@@ -240,7 +587,7 @@ def test_a_quote_that_is_not_in_this_line_is_dropped_not_refused():
                 {"quote": "The door closes behind him.", "why": "sound"},
             ],
         }]},
-        repairs={INVISIBLE: [{"text": INVISIBLE_FIXED}]},
+        repairs={INVISIBLE: [_replacement_reply(INVISIBLE_REPLACEMENT)]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -259,7 +606,7 @@ def test_the_best_rewrite_ships_when_it_cannot_be_made_spotless():
     the stage direction.
     """
     two_faults = "(He sighs) The door closes behind him. I told you."
-    half_fixed = "The door closes behind him. I told you."
+    half_fixed = " The door closes behind him. I told you."
     ledger = _ledger(two_faults)
     slot = _Slot(
         judgements={
@@ -267,7 +614,7 @@ def test_the_best_rewrite_ships_when_it_cannot_be_made_spotless():
                                           "The door closes behind him.")],
             half_fixed: [_dirty_judgement("The door closes behind him.")],
         },
-        repairs={two_faults: [{"text": half_fixed}]},
+        repairs={two_faults: [_replacement_reply("", "The door closes behind him.")]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -300,7 +647,7 @@ def test_every_non_speech_segment_in_one_line_is_named_and_repaired():
     slot = _Slot(
         judgements={both_ends: [_dirty_judgement(
             "(Montgomery sighs)", "(Montgomery sighs again)")]},
-        repairs={both_ends: [{"text": fixed}]},
+        repairs={both_ends: [_replacement_reply("I'm tired of this.", "Let it go.")]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -324,7 +671,7 @@ def test_the_repair_is_told_the_judge_s_own_words():
     ledger = _ledger(INVISIBLE)
     slot = _Slot(
         judgements={INVISIBLE: [_dirty_judgement("The door closes behind him.")]},
-        repairs={INVISIBLE: [{"text": INVISIBLE_FIXED}]},
+        repairs={INVISIBLE: [_replacement_reply(INVISIBLE_REPLACEMENT)]},
     )
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert "The door closes behind him." in slot.repair_prompts[0]
@@ -337,7 +684,7 @@ def test_the_repair_is_told_the_judge_s_own_words():
 def test_the_repair_is_shown_the_speaker_the_beat_intent_and_the_story_so_far():
     """The window IS the fix: an edit that cannot see the moment guesses."""
     ledger = _ledger("I have not slept.", DIRTY)
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
     prompt = slot.repair_prompts[0]
@@ -352,7 +699,7 @@ def test_a_repaired_row_carries_metrics_for_the_line_that_actually_ships():
     ledger = _ledger(DIRTY)
     ledger["lines"][1]["word_count"] = 999
     ledger["lines"][1]["char_count"] = 999
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
     from nodes._otr_text_metrics import (
@@ -375,7 +722,7 @@ def test_the_judge_reads_the_repair_back_before_it_is_accepted():
             INVISIBLE: [_dirty_judgement("The door closes behind him.")],
             walked: [_dirty_judgement("He walks out.")],
         },
-        repairs={INVISIBLE: [{"text": walked}, {"text": INVISIBLE_FIXED}]},
+        repairs={INVISIBLE: [_replacement_reply("He walks out."), _replacement_reply(INVISIBLE_REPLACEMENT)]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -393,13 +740,13 @@ def test_the_judge_reads_the_repair_back_before_it_is_accepted():
 
 def test_an_unfixable_row_ships_flagged_and_the_render_continues():
     ledger = _ledger(INVISIBLE)
-    stubborn = "The door closes behind him. He is gone."
+    stubborn = INVISIBLE
     slot = _Slot(
         judgements={
             INVISIBLE: [_dirty_judgement("The door closes behind him.")],
             stubborn: [_dirty_judgement("The door closes behind him.")],
         },
-        repairs={INVISIBLE: [{"text": stubborn}]},
+        repairs={INVISIBLE: [_replacement_reply("The door closes behind him.")]},
     )
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
@@ -411,19 +758,15 @@ def test_an_unfixable_row_ships_flagged_and_the_render_continues():
     assert receipt["rows"][0]["outcome"] == "unclean"
 
 
-def test_a_model_that_raises_never_kills_the_episode():
+def test_a_real_provider_failure_retains_its_failure_type():
     class _Exploding:
         def __call__(self, messages, **kwargs):
             raise RuntimeError("the provider fell over")
 
     ledger = _ledger(DIRTY)
-    receipt = lcl.run_ledger_clean(
-        ledger, slot_fn=_Exploding(), bank_id="original")
-    # The judge could not be reached, so the patterns stand alone -- and the
-    # row is never silently declared clean.
-    assert receipt["unclean"] == 1
+    with pytest.raises(RuntimeError, match="the provider fell over"):
+        lcl.run_ledger_clean(ledger, slot_fn=_Exploding(), bank_id="original")
     assert ledger["lines"][1]["text"] == DIRTY
-    assert lcl.UNCLEAN_COMPOSE_FLAG in ledger["lines"][1]["compose_flags"]
 
 
 def test_python_never_edits_the_prose_itself():
@@ -472,8 +815,8 @@ def test_production_markup_is_still_a_defect_on_a_fidelity_lane():
     """No author ever wrote "MACBETH:" into a character's speech."""
     ledger = _ledger("MACBETH: Is this a dagger which I see before me?",
                      bank="shakespeare")
-    fixed = "Is this a dagger which I see before me?"
-    slot = _Slot(repairs={"MACBETH:": [{"text": fixed}]})
+    fixed = " Is this a dagger which I see before me?"
+    slot = _Slot(repairs={"MACBETH:": [_replacement_reply("")]})
     receipt = lcl.run_ledger_clean(
         ledger, slot_fn=slot, bank_id="shakespeare")
     assert slot.repair_calls == 1
@@ -652,7 +995,7 @@ def _production_shaped_ledger() -> dict:
 
 def test_the_act_is_read_from_the_line_row_where_production_puts_it():
     ledger = _production_shaped_ledger()
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="media_archive")
 
     judged = [p for p in slot.judge_prompts
@@ -675,7 +1018,7 @@ def test_the_receipt_proves_what_the_model_actually_saw():
     working blind and the ledger now says so.
     """
     ledger = _production_shaped_ledger()
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     receipt = lcl.run_ledger_clean(
         ledger, slot_fn=slot, bank_id="media_archive")
 
@@ -698,7 +1041,7 @@ def test_the_beat_row_still_works_for_the_lane_that_populates_it():
         beat["arc_phase"] = "rising"
         beat["beat_intent"] = "admit the lamp is dead"
 
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     receipt = lcl.run_ledger_clean(
         ledger, slot_fn=slot, bank_id="media_archive")
     assert receipt["context_seen"]["rows_with_arc_phase"] == 3
@@ -725,7 +1068,7 @@ def test_a_junk_row_in_the_lines_array_cannot_kill_the_render():
     ledger["lines"].insert(3, None)
     ledger["beats"].append("junk beat")
 
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
     assert receipt["voiced_rows"] == 3
     assert ledger["lines"][2]["text"] == FIXED
@@ -762,7 +1105,7 @@ def test_the_sha_check_proves_the_context_reached_the_prompt():
     meant and looking for it in what we sent does see it.
     """
     ledger = _production_shaped_ledger()
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     receipt = lcl.run_ledger_clean(
         ledger, slot_fn=slot, bank_id="media_archive")
 
@@ -829,7 +1172,7 @@ def test_the_prompt_markers_the_test_double_routes_on_are_pinned():
     somewhere else -- this test names the real cause in one line.
     """
     ledger = _ledger(DIRTY)
-    slot = _Slot(repairs={DIRTY: [{"text": FIXED}]})
+    slot = _Slot(repairs={DIRTY: [_replacement_reply(FIXED_REPLACEMENT)]})
     lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
 
     assert slot.summary_calls and slot.judge_calls and slot.repair_calls, (

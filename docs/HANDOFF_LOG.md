@@ -1,3 +1,29 @@
+## 2026-09-11 -- C1 shared cleanup conservation
+
+Closed the reported My Story coda rewrite class in the shared cleaner. Exact
+original spans remain separate from display hints; collective whole-row scope
+requires dedicated model authorization. Scoped model replacements conserve all
+outside text, punctuation and whitespace. Invalid proposals and malformed model
+rereads cannot win clean or progressive acceptance. Genuine whole-row directions
+remain convertible; real runtime errors retain their type.
+
+Final focused183passed. Final full14247passed/51unchanged baseline failures/
+183skipped/1xfailed; no new failed IDs or changed assertions. Bible31passed/
+10unchanged failures/11skipped/3xfailed; new11.64 guard fails on the pre-C1
+baseline. Canonical audit passes, hash unchanged,23nodes/63links/37writerwidgets.
+Four tested Python hashes match both primary and controlled candidate copies.
+Receipt: docs/2026-09-11-my-story-cross-machine/c1_receipt.md and c1_*.json.
+
+Einstein found and verified three scope/localization gaps. Requested CLI Sonnet
+QA found the malformed-reread acceptance gap; root corrected it and a second,
+targeted Sonnet read confirmed no remaining must-fix. Two actual Sonnet/high CLI
+calls, no claimed exact resolved model version or dollar cost. No fresh media,
+Mac memory diagnosis or source qualification is claimed. F1 source organization/
+review, F2 visual integration, Mac/O2, Original credit and title containment
+remain coding work. All hardware testing/coordination and prompts stay paused.
+
+---
+
 ## 2026-09-11 -- A2 native capacity checkpoint and next-owner handoff
 
 Known native HF capacity now follows actual decoder config, preserving explicit

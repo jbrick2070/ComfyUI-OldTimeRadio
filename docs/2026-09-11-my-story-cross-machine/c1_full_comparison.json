@@ -1,0 +1,25 @@
+{
+  "baseline": "my_story_a2_final_full.xml",
+  "candidate": "my_story_c1_final_full.xml",
+  "baseline_sha256": "ab288493c2f8dbc89be9740d2877e4ee5849ae57c036f3484ebaad368e4082ef",
+  "candidate_sha256": "a43146dc509fd48bb7222db431793ddd10746afabda57ef3cc50b36e3284fcb5",
+  "baseline_counts": {
+    "passed": 14197,
+    "skipped": 183,
+    "failure": 51,
+    "xfailed": 1
+  },
+  "candidate_counts": {
+    "passed": 14247,
+    "skipped": 183,
+    "failure": 51,
+    "xfailed": 1
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [],
+  "shared_failure_fixture_preview_only": [],
+  "shared_failure_display_order_only": [
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies"
+  ],
+  "shared_failure_payload_changes": {}
+}

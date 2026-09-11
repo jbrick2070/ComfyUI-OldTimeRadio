@@ -148,7 +148,8 @@ def _slot_that_destroys_the_coda() -> "_Slot":
     """
     return _Slot(
         judgements={"Library of Congress": [_dirty_judgement(FACT)]},
-        repairs={"Library of Congress": [{"text": SHIPPED_REWRITE}]},
+        repairs={"Library of Congress": [{"replacements": [
+            {"span_id": "span_001", "replacement": SHIPPED_REWRITE}]}]},
     )
 
 
@@ -209,7 +210,7 @@ class TestTheCleanStageKeepsItsHandsOff:
             ledger, slot_fn=_slot_that_destroys_the_coda(),
             bank_id="media_archive")
         assert FACT not in ledger["lines"][2]["text"]
-        assert ledger["lines"][2]["text"] == SHIPPED_REWRITE
+        assert ledger["lines"][2]["text"] == "And in other news: " + SHIPPED_REWRITE
 
     def test_ordinary_voiced_rows_are_STILL_judged(self):
         """The guard must not grow into a general exemption. The opening

@@ -1,0 +1,27 @@
+{
+  "baseline": "my_story_a2_final_full.xml",
+  "candidate": "my_story_c1_full.xml",
+  "baseline_sha256": "ab288493c2f8dbc89be9740d2877e4ee5849ae57c036f3484ebaad368e4082ef",
+  "candidate_sha256": "bd1966a57ee5c380caeeee7c6e5764e38fce7babbbf491b9509332070a40d5b2",
+  "baseline_counts": {
+    "passed": 14197,
+    "skipped": 183,
+    "failure": 51,
+    "xfailed": 1
+  },
+  "candidate_counts": {
+    "passed": 14241,
+    "skipped": 183,
+    "failure": 51,
+    "xfailed": 1
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [],
+  "shared_failure_fixture_preview_only": [],
+  "shared_failure_display_order_only": [
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies"
+  ],
+  "shared_failure_payload_changes": {
+    "tests.test_llm_slot_sweep::test_every_llm_call_site_has_slot_tag": "--- \n\n+++ \n\n@@ -12,8 +12,9 @@\n\n                 f\"{len(untagged)} LLM call site(s) missing \"\n                 f\"'# LLM slot:' tag:/n{details}\"\n             )\n-E           Failed: 2 LLM call site(s) missing '# LLM slot:' tag:\n+E           Failed: 3 LLM call site(s) missing '# LLM slot:' tag:\n E             nodes/story_orchestrator.py:771 request_slot()\n E             nodes/story_orchestrator.py:910 request_slot()\n+E             nodes/_otr_ledger_clean.py:1508 structured_call()\n \n tests/test_llm_slot_sweep.py:52: Failed"
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "baseline": "my_story_c1_bible_baseline.xml",
+  "candidate": "my_story_c1_bible_candidate.xml",
+  "baseline_sha256": "75ec59e243d5e5f5ed6e7774024652460a6d995e0ff5e6c5de91e695da4267f9",
+  "candidate_sha256": "ffa1d9217757ad64920f4d379de74e496c71d9778671fc327ec7bab8a05120c5",
+  "baseline_counts": {
+    "failure": 11,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "candidate_counts": {
+    "failure": 10,
+    "passed": 31,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_cleanup_conserves_original_scope"
+  ],
+  "shared_failure_fixture_preview_only": [
+    ".TestModelSpecificReferenceAdmission::test_reference_image_capability_requires_checkpoint_and_pixel_proof",
+    ".TestPhase01Paths::test_no_deep_dirname_chains",
+    ".TestPhase01Paths::test_output_nodes_use_folder_paths",
+    ".TestPhase07VRAM::test_vram_flush_after_unload",
+    ".TestPhase09Subprocess::test_popen_has_cleanup"
+  ],
+  "shared_failure_display_order_only": [],
+  "shared_failure_payload_changes": {}
+}

@@ -44,6 +44,16 @@ schema.
 
 ## 2. Keep five representations in lockstep
 
+Cleanup conservation follow-up (2026-09-11): a model complaint grants a localized
+edit, not permission to rewrite the row. Preserve exact original offsets separately
+from display summaries; repeated quotes need occurrence identity. Several partial
+complaints can collectively accuse every spoken word and therefore need the same
+dedicated model authorization as one whole-row complaint. Interleave validated
+model replacements with untouched original slices. A malformed reread is no evidence
+of cleanliness or progress. Both immediate and progressive acceptance must enforce
+these contracts. See PBUG-20260829-14's My Story addendum and Bible 11.64. This code
+proof does not establish source semantics or replace fresh canonical qualification.
+
 My Story P1 follow-up (2026-09-11): supplying a schema to validation does
 not bind it to token generation. Use the slot's existing binder once for
 the affected pass and preserve that callable across its typed repairs.
