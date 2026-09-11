@@ -40,10 +40,19 @@ import enum
 import json
 import re
 import threading
+import logging
+import shutil
 import time
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
+
+#: This module predates a logger and used only the print-based
+#: ``_LEAK_LOG`` below, which is named for leak reporting specifically.
+#: The billing-ledger migration needs ordinary INFO/WARNING, so it gets
+#: the pack's normal logger rather than borrowing one named for
+#: something else.
+log = logging.getLogger("OTR.cloud_media")
 from typing import Callable, Optional
 
 try:
@@ -376,9 +385,63 @@ class CloudMediaSession:
     # -- billing ledger (append-only JSONL, single writer) --------------
 
     def ledger_path(self) -> Path:
-        if self._ledger_path is None:
+        """The cloud-media billing ledger -- an append-only record of real money.
+
+        MOVED OUT OF THE PACK DIRECTORY 2026-09-11. It used to live under
+        ``cache_root``, which resolves to ``<repo>/otr/cache/cloud_media`` --
+        INSIDE the installed pack. A registry update or a reinstall wipes that
+        tree, and this file is the ONLY copy of that spend history anywhere on
+        disk (verified: nothing reads it back, so nothing could rebuild it).
+
+        It now lives under ``otr_state_dir()``, which is the tier that already
+        exists for exactly this -- durable per-machine runtime state under the
+        user's output tree, never swept by the janitor (which is scoped to
+        ``_shared/tmp`` alone) and never treated as disposable. The cache tier
+        would have been the wrong home for the opposite reason: its own
+        contract says "a cache entry is NEVER the only copy", and this is.
+
+        ``cache_root`` is unchanged and still owns ``partner_tmp/`` -- genuinely
+        transient bytes, written and consumed inside one node execution.
+
+        Existing ledgers are COPIED FORWARD once, not abandoned and not moved:
+        a copy leaves the old file intact, so a half-finished migration cannot
+        lose spend history. ``OTR_CLOUD_MEDIA_CACHE_DIR`` still overrides
+        ``cache_root``; a box that sets it keeps its ledger beside that override
+        rather than being silently relocated.
+        """
+        if self._ledger_path is not None:
+            return self._ledger_path
+
+        override = otr_env.get("OTR_CLOUD_MEDIA_CACHE_DIR", "").strip()
+        if override:
+            # An explicit override names the whole tier; respect it verbatim.
             self.cache_root.mkdir(parents=True, exist_ok=True)
             self._ledger_path = self.cache_root / "billing_ledger.jsonl"
+            return self._ledger_path
+
+        try:
+            from .._otr_paths import otr_state_dir
+        except ImportError:  # pragma: no cover -- flat (sys.path) load
+            from _otr_paths import otr_state_dir  # type: ignore
+        dest_dir = Path(otr_state_dir()) / "cloud_media"
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        dest = dest_dir / "billing_ledger.jsonl"
+
+        legacy = self.cache_root / "billing_ledger.jsonl"
+        if legacy.is_file() and not dest.exists():
+            try:
+                shutil.copy2(str(legacy), str(dest))
+                log.info(
+                    "[cloud_media] copied the billing ledger forward out of the "
+                    "pack directory: %s -> %s (the original is left in place)",
+                    legacy, dest)
+            except OSError as exc:  # noqa: BLE001
+                # Never let an audit-trail relocation break a render.
+                log.warning(
+                    "[cloud_media] could not copy the billing ledger forward "
+                    "(%s); appending to %s from here", exc, dest)
+
+        self._ledger_path = dest
         return self._ledger_path
 
     def ledger_append(self, record: dict) -> None:
