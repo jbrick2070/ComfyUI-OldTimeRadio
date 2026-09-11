@@ -79,6 +79,16 @@ depth.
 
 ## 3. Separate authored decisions from mechanical repair
 
+My Story source correction (2026-09-11): a source model call must return an
+applicable corrected artifact or exact text replacements. Keep the operation
+outside the original author's post-validator, with one fixed two-call budget
+including syntax/schema repair; never reset it for a changed draft or recursively
+check the correction. Validate and apply the same returned object. Preserve raw
+source independently of working notes. An unusable optional correction retains
+accepted input and unresolved evidence, not a new publication veto or semantic
+PASS. Cleanup rollback needs both attempted history and an actual retained-text
+identity. See PBUG-20260910-03 / Bible 11.39 and f1_rewrite_receipt.md.
+
 Python may safely repair only facts already determined by accepted artifacts:
 IDs, ordering, references, exact enums, hashes, routing metadata, duplicate
 references with an unambiguous first owner, and relocation of values whose

@@ -1,0 +1,27 @@
+{
+  "baseline": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_f1_bible_baseline.xml",
+    "sha256": "34bbc15cc1b08723b5464d1a77f1f5f561a284dbc1099e1ba7700d75263157bc",
+    "counts": {
+      "passed": 30,
+      "failed": 11,
+      "skipped": 11,
+      "xfailed": 3
+    }
+  },
+  "candidate": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_f1_bible_candidate.xml",
+    "sha256": "52944b78bb8023c9dc5354d0168bb0347f4f2b7b5369f4cd2e5a0a693d68c6a7",
+    "counts": {
+      "passed": 31,
+      "failed": 10,
+      "skipped": 11,
+      "xfailed": 3
+    }
+  },
+  "new_failures": [],
+  "resolved_failures": [
+    ".TestPhase07To12ProductionRegressionCatalog::test_otr_my_story_current_repair_and_parent_identity_coverage"
+  ],
+  "changed_assertions": {}
+}

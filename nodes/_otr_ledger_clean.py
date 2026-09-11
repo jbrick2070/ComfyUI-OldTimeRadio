@@ -501,6 +501,11 @@ def _episode_context(ledger_data: Mapping[str, Any]) -> str:
     shape = str(meta.get("arc_shape") or "").strip()
     if shape:
         bits.append(f"its arc is {shape}")
+    if isinstance(meta.get("my_story"), Mapping):
+        from ._otr_story_source import raw_fields_from_ledger, raw_source_block
+        raw = raw_fields_from_ledger(ledger_data)
+        if raw and any(value.strip() for value in raw.values()):
+            bits.append(raw_source_block(raw))
     return ", ".join(bits)
 
 
@@ -1762,6 +1767,8 @@ def run_ledger_clean(
     *,
     slot_fn: "Callable[..., str] | None" = None,
     bank_id: str = "",
+    slot_scheduler: Any = None,
+    configured_model_id: str | None = None,
 ) -> "dict[str, Any]":
     """A model reads every spoken row; a model repairs what it names.
 
@@ -2028,6 +2035,18 @@ def run_ledger_clean(
             rolled, receipt["context_verified"]["sha"], len(sightings),
             " ".join(CONTEXT_FIELDS),
         )
+    # A source check must return usable replacement text, not a report-only
+    # verdict. One combined operation, at most two calls including its retries;
+    # it never enters the row repair loop or checks its own correction again.
+    if isinstance((ledger_data.get("meta") or {}).get("my_story"), Mapping):
+        from ._otr_story_source import rewrite_spoken_from_source
+        source_rewrite = rewrite_spoken_from_source(
+            ledger_data, slot_fn=slot_fn, slot_scheduler=slot_scheduler,
+            configured_model_id=configured_model_id)
+        receipt["source_rewrite"] = source_rewrite
+        receipt["model_calls"] += sum(
+            bool(attempt.get("generation_started"))
+            for attempt in (source_rewrite or {}).get("attempts", []))
     _log_verdict(receipt)
     meta = ledger_data.setdefault("meta", {})
     if isinstance(meta, MutableMapping):

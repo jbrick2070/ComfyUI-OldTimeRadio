@@ -1383,25 +1383,62 @@ class WriterTailMixin:
         from . import _otr_clean_transaction as _OTRTXN
         _clean_window = _OTRTXN.open_transaction(
             led, finalizer=tail_finalizer)
+        _story_meta = (led.data.get("meta") or {}).get("my_story")
+        _story_rewrites = (_story_meta.setdefault("source_rewrites", [])
+                           if isinstance(_story_meta, dict) else None)
 
         from . import _otr_ledger_clean as _OTRLCLN
-        with slot_scheduler.helper_context("ledger_clean"):
-            _OTRLCLN.run_ledger_clean(
-                led.data,
-                slot_fn=creative_generate_fn,
-                bank_id=str(meta.get("source_bank") or ""),
-            )
+        try:
+            _source_clean_options = ({"slot_scheduler": slot_scheduler,
+                                      "configured_model_id": str(resolved.get("creative_writing_model") or "")}
+                                     if _story_rewrites is not None else {})
+            with slot_scheduler.helper_context("ledger_clean"):
+                _OTRLCLN.run_ledger_clean(
+                    led.data,
+                    slot_fn=creative_generate_fn,
+                    bank_id=str(meta.get("source_bank") or ""),
+                    **_source_clean_options,
+                )
 
-        from . import _otr_ledger_cleanup as _OTRLCLEAN
-        with slot_scheduler.helper_context("ledger_cleanup"):
-            _OTRLCLEAN.run_ledger_cleanup(
-                led.data,
-                slot_fn=technical_generate_fn,
-                bank_id=str(meta.get("source_bank") or ""),
-            )
+            from . import _otr_ledger_cleanup as _OTRLCLEAN
+            with slot_scheduler.helper_context("ledger_cleanup"):
+                _OTRLCLEAN.run_ledger_cleanup(
+                    led.data,
+                    slot_fn=technical_generate_fn,
+                    bank_id=str(meta.get("source_bank") or ""),
+                )
 
-        if _clean_window is not None:
-            _clean_window.reconcile()
+            _clean_outcome = _clean_window.reconcile() if _clean_window is not None else None
+            if _story_rewrites is not None:
+                # Rollback replaces nested metadata. Reattach attempted corrections
+                # and name the actual retained bytes without another model call.
+                from . import _otr_story_source as _STORY_SOURCE
+                _retained_story = led.data.setdefault("meta", {}).setdefault("my_story", {})
+                _retained_story["source_rewrites"] = _story_rewrites
+                _retained_projection = _STORY_SOURCE.spoken_projection(led.data)
+                for _rewrite in _story_rewrites:
+                    if _rewrite.get("pass_id") == "ledger_clean_spoken":
+                        _reviewed_ids = set(_rewrite.get("candidate_line_ids") or ())
+                        _retained_subset = {"lines": [row for row in _retained_projection["lines"]
+                                                      if row["line_id"] in _reviewed_ids]}
+                        _rewrite["retained"] = (
+                            _STORY_SOURCE.candidate_sha256(_retained_subset) == _rewrite["output_sha256"])
+                        _rewrite["clean_outcome"] = (_clean_outcome or {}).get("outcome", "no_transaction")
+                _retained_story["retained_spoken"] = {
+                    "sha256": _STORY_SOURCE.candidate_sha256(_retained_projection),
+                    "clean_outcome": (_clean_outcome or {}).get("outcome", "no_transaction"),
+                }
+        except BaseException as error:
+            if _story_rewrites is not None:
+                led.data.setdefault("meta", {}).setdefault("my_story", {})[
+                    "source_rewrites"] = _story_rewrites
+                try:
+                    if led.save() is None:
+                        raise RuntimeError("My Story cleanup attempt history did not persist")
+                except Exception as save_error:
+                    if hasattr(error, "add_note"):
+                        error.add_note("Cleanup history save also failed: %s" % save_error)
+            raise
 
         # Cleanup may supply the title after J.5 fell through an empty outline.
         # Read after reconciliation so rollback, canon and delivery agree.
@@ -1508,6 +1545,10 @@ class WriterTailMixin:
             # pronunciation-safe delivery string is stamped here -- after the
             # cleanup pass above, the last thing that may touch that text.
             stamp_text_for_tts_delivery(led)
+            if isinstance(meta.get("my_story"), dict):
+                from . import _otr_story_source as _STORY_SOURCE
+                meta["my_story"]["final_spoken_sha256"] = _STORY_SOURCE.candidate_sha256(
+                    _STORY_SOURCE.spoken_projection(led.data, delivery=True))
 
         # story-ledger DRIFT chunk 2 (2026-06-25): PRE-FREEZE cross-stage
         # consistency guard. contract / outline / canon are the REAL objects

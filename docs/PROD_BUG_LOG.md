@@ -14076,20 +14076,24 @@ for promotion from the Windows box. Each is portable beyond OTR:
 - root cause: explicit listener facts become ordinary prompt prose rather than
   an immutable, durable contract carried through P0/P1/P2/P3, visual planning,
   cleanup, final spoken text, and eligibility validation.
-- fix: derive only direct listener facts at intake and preserve them in a
-  durable receipt. At each owning boundary, reject and use the existing bounded
-  typed repair for direct contradiction, removal, replacement, major invented
-  event, or inverse staging. Make final eligibility consume that receipt. Do
-  not silently rewrite authored prose or add a subjective quality/content gate.
-- verification: a canned living-mother/pair-at-table fixture must reject P0
-  death/absence, P2 fire/solitude, inverse visual staging, and cleanup removal,
-  while accepting the source-compatible dinner through final spoken text and
-  publication eligibility.
-- status: CODE FIXED / PROMOTED -- P1 binding and all three retry routes are
-  covered; repeated real-model qualification is pending. The focused set
-  passes 197 tests; full regression has no new or changed failures.
-  See docs/2026-09-11-my-story-cross-machine/grammar_receipt.md.
-  Do not treat this wiring proof as complete source-fidelity qualification.
+- correction contract, amended by the operator during F1 coding: keep exact raw
+  source and have a combined checker/rewriter return actual corrected artifacts
+  through the existing author/cleanup owners. Each source operation gets two
+  calls total including helper retries, with no self-recheck or budget reset.
+  Unusable optional source corrections retain accepted text and unresolved
+  evidence; they do not add a final publication veto or claim semantic PASS.
+- verification: canned living-mother/pair-at-table material must reach all
+  author and repair prompts unchanged; usable model corrections must reach
+  accepted artifacts and spoken text. Pin fixed attempt exhaustion, untouched
+  byte preservation, and durable attempts after later cleanup failure/rollback.
+  Visual integration and full canonical recovery remain required before
+  claiming this live source-fidelity defect fully closed.
+- status: OPEN FOR LIVE CLOSURE / PROMOTED -- P1 binding is qualified in
+  docs/2026-09-11-my-story-cross-machine/grammar_receipt.md. The later combined
+  source correction, exact raw author context, and durable cleanup history are
+  recorded separately in f1_rewrite_receipt.md in that folder. Remaining source
+  handling, visual integration and fresh canonical recovery are still required.
+  Do not treat binding or canned correction proof as complete source fidelity.
 
 ## PBUG-20260910-04 -- one selected act is prompted as music "between acts"
 

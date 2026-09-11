@@ -1,0 +1,30 @@
+{
+  "baseline": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_c1_final_full.xml",
+    "sha256": "a43146dc509fd48bb7222db431793ddd10746afabda57ef3cc50b36e3284fcb5",
+    "counts": {
+      "passed": 14247,
+      "failed": 51,
+      "skipped": 183,
+      "xfailed": 1
+    }
+  },
+  "candidate": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_f1_full.xml",
+    "sha256": "2f9bc449698547c82295e76404c3b6ef60444860781856b5c35fe5c0ab2498fc",
+    "counts": {
+      "passed": 14283,
+      "failed": 51,
+      "skipped": 183,
+      "xfailed": 1
+    }
+  },
+  "new_failures": [],
+  "resolved_failures": [],
+  "changed_assertions": {
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies": {
+      "before": "E       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         Use -v to get more diff",
+      "after": "E       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         Use -v to get more diff"
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "baseline": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_c1_final_full.xml",
+    "sha256": "a43146dc509fd48bb7222db431793ddd10746afabda57ef3cc50b36e3284fcb5",
+    "counts": {
+      "passed": 14247,
+      "failed": 51,
+      "skipped": 183,
+      "xfailed": 1
+    }
+  },
+  "candidate": {
+    "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\tmp\\my_story_f1_full.xml",
+    "sha256": "28a97612af6c4b344e69877336d152c95df4c62702ad8606ab3253a6938d6440",
+    "counts": {
+      "passed": 14282,
+      "failed": 52,
+      "skipped": 183,
+      "xfailed": 1
+    }
+  },
+  "new_failures": [
+    "tests.test_text_metric_ownership::test_production_nodes_do_not_bypass_canonical_text_metric_owner"
+  ],
+  "resolved_failures": [],
+  "changed_assertions": {
+    "tests.test_llm_slot_sweep::test_every_llm_call_site_has_slot_tag": {
+      "before": "E           Failed: 2 LLM call site(s) missing '# LLM slot:' tag:\nE             nodes\\story_orchestrator.py:771 request_slot()\nE             nodes\\story_orchestrator.py:910 request_slot()",
+      "after": "E           Failed: 3 LLM call site(s) missing '# LLM slot:' tag:\nE             nodes\\story_orchestrator.py:771 request_slot()\nE             nodes\\story_orchestrator.py:910 request_slot()\nE             nodes\\_otr_story_source.py:175 structured_call()"
+    },
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies": {
+      "before": "E       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         Use -v to get more diff",
+      "after": "E       AssertionError: assert {'automatic':... 'manual': []} == {'automatic':...flux2_klein']}\nE         \nE         Differing items:\nE         {'automatic': ['z_image', 'stable_audio_3']} != {'automatic': ['stable_audio_3']}\nE         {'manual': []} != {'manual': ['flux2_klein']}\nE         Use -v to get more diff"
+    }
+  }
+}

@@ -50,6 +50,7 @@ try:
     from . import _otr_canon as _OTRC
     from . import _otr_casting as _OTRCAST
     from . import _otr_story_input as _SI
+    from . import _otr_story_source as _SOURCE
     from . import _otr_word_delivery as _OTRWD
     from ._otr_structured_call import structured_call, PostValidationError
     from ._otr_generation_budget import ProviderCapacityMessages
@@ -60,6 +61,7 @@ except ImportError:  # pragma: no cover -- flat / standalone test import
     import _otr_canon as _OTRC  # type: ignore
     import _otr_casting as _OTRCAST  # type: ignore
     import _otr_story_input as _SI  # type: ignore
+    import _otr_story_source as _SOURCE  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
     from _otr_structured_call import structured_call, PostValidationError  # type: ignore
     from _otr_generation_budget import ProviderCapacityMessages  # type: ignore
@@ -364,10 +366,14 @@ def _resolve_seed() -> int:
     return random.SystemRandom().getrandbits(32)
 
 
-def _call(pass_id: str, bundle: Any, *, attempt_receipts=None, **kwargs) -> Any:
+def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
+          source_rewrite_receipts=None, slot_scheduler=None, configured_model_id=None,
+          **kwargs) -> Any:
     """Use the shared capacity contract and retain actual attempt evidence."""
-    del bundle
-    kwargs["prompt"] = ProviderCapacityMessages(kwargs["prompt"])
+    author_context = [dict(message) for message in kwargs["prompt"]]
+    prompt = [dict(message) for message in author_context]
+    prompt[-1]["content"] = _SOURCE.raw_source_block(bundle.fields) + "\n\n" + prompt[-1]["content"]
+    kwargs["prompt"] = ProviderCapacityMessages(prompt)
     kwargs["max_new_tokens"] = None
 
     def completed(number, raw, error):
@@ -380,30 +386,43 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None, **kwargs) -> Any:
             })
 
     # LLM slot: per-sub-pass -- caller supplies the creative or technical slot.
-    return structured_call(on_attempt_complete=completed, **kwargs)
+    authored = structured_call(on_attempt_complete=completed, **kwargs)
+    if source_rewrite_receipts is None:
+        return authored
+    original = authored.model_dump(mode="json")
+    corrected, receipt = _SOURCE.rewrite_story_source(
+        bundle.fields, original, kwargs["slot_fn"], schema=kwargs["schema"],
+        receipts=source_rewrite_receipts, pass_id=pass_id,
+        post_validator=kwargs.get("post_validator"), slot_scheduler=slot_scheduler,
+        configured_model_id=configured_model_id, author_context=author_context)
+    # This runs once AFTER author acceptance, never inside its validator. A
+    # source rewrite cannot restart the author ladder or check its own output.
+    if corrected is None:
+        return authored
+    accepted = corrected.model_dump(mode="json")
+    receipt.update(output_sha256=_SOURCE.candidate_sha256(accepted),
+                   applied=accepted != original,
+                   status="rewritten" if accepted != original else "unchanged")
+    return corrected
 
 
 def _full_artifact_repair(instruction: str):
     """Give existing post-validation repair the entire parsed draft to revise.
 
     The generic repair's 400-character echo cannot show the end of a treatment
-    or an act. Keep this at the authoring seam; all other typed repairs remain
-    shared, and the same post-validator still decides acceptance.
+    or an act. Syntax and schema repair need that ending too. The same author
+    attempt budget and structural validator still decide acceptance.
     """
-    typed = make_dispatching_repair_factory()
-
     def repair(*, original_prompt, failed_output, error):
-        if not isinstance(error, PostValidationError):
-            return typed(original_prompt=original_prompt,
-                         failed_output=failed_output, error=error)
         return [
             *[dict(message) for message in original_prompt],
             {"role": "assistant", "content": failed_output},
             {"role": "user", "content": (
                 "Repair the complete draft above. %s\n"
                 "The validation problem is: %s\n"
-                "Preserve its story events, relationships and ending while "
-                "correcting the structure. Return the complete corrected JSON "
+                "Preserve unaffected story events, relationships and ending; "
+                "correct any named defect to respect the original source. "
+                "Return the complete corrected JSON "
                 "object, with no commentary."
                 % (instruction, error)
             )},
@@ -417,25 +436,19 @@ def _full_artifact_repair(instruction: str):
 
 def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
                     act_count: int, include_act_breaks: bool,
-                    attempt_receipts=None) -> StoryInterpretation:
-    norm = bundle.normalized
-    fields = "\n\n".join(
-        "%s:\n%s" % (_SI.FIELD_LABELS[name].upper(), getattr(norm, name))
-        for name in _SI.CREATIVE_FIELDS if getattr(norm, name)
-    )
+                    attempt_receipts=None, **source_kwargs) -> StoryInterpretation:
     base, retry = _TEMP["interpret"]
     return _call(
-        "interpret", bundle, attempt_receipts=attempt_receipts,
+        "interpret", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_interpret_system")},
             {"role": "user", "content": (
-                "WHAT THEY WROTE:\n\n%s\n\n"
                 "THEIR SETTINGS:\n"
                 "- characters requested: %d\n"
                 "- acts: %d\n"
                 "- music cues between acts: %d\n\n"
                 "Interpret it now."
-                % (fields, requested, act_count,
+                % (requested, act_count,
                    _interstitial_count(act_count, include_act_breaks))
             )},
         ],
@@ -443,7 +456,7 @@ def _pass_interpret(technical_fn, pack, bundle, *, requested: int,
         slot_fn=technical_fn,
         base_temperature=base,
         structural_retry_temperature=retry,
-        repair_prompt_factory=make_dispatching_repair_factory(),
+        repair_prompt_factory=_full_artifact_repair("Repair the interpretation of the original fields."),
         max_attempts=3,
         helper_name="my_story_interpret",
     )
@@ -471,23 +484,21 @@ def _make_treatment_validator(act_count: int):
 
 def _pass_treatment(creative_fn, pack, bundle, interp: StoryInterpretation,
                     *, act_count: int, requested_characters: int,
-                    include_act_breaks: bool, attempt_receipts=None) -> StoryTreatment:
+                    include_act_breaks: bool, attempt_receipts=None, **source_kwargs) -> StoryTreatment:
     base, retry = _TEMP["treatment"]
     bind_schema = getattr(creative_fn, "_otr_bind_schema", None)
     treatment_fn = bind_schema(StoryTreatment) if callable(bind_schema) else creative_fn
     return _call(
-        "treatment", bundle, attempt_receipts=attempt_receipts,
+        "treatment", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_treatment_system")},
             {"role": "user", "content": (
-                "THEIR IDEA, AS WRITTEN:\n\n%s\n\n"
                 "THE INTERPRETATION:\n%s\n\n"
                 "SELECTED ACTS: %d (binding). REQUESTED SPEAKING CHARACTERS: %d "
                 "(flexible, announcer excluded).\n"
                 "Let the supplied story guide the cast; preserve its people. Music cues between acts: %d.\n"
                 "Plan the episode now."
-                % (_SI.project_payload(bundle, "")["full_text"],
-                   json.dumps(interp.model_dump(), ensure_ascii=False, indent=2),
+                % (json.dumps(interp.model_dump(), ensure_ascii=False, indent=2),
                    act_count, requested_characters,
                    _interstitial_count(act_count, include_act_breaks))
             )},
@@ -552,7 +563,7 @@ def _prior_digest(prev: "ActScript | None", plan: "ActPlan | None") -> str:
 def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
               plan: ActPlan, prev: "ActScript | None",
               prev_plan: "ActPlan | None", *, must_speak: "tuple[str, ...]",
-              is_last: bool, attempt_receipts=None) -> ActScript:
+              is_last: bool, attempt_receipts=None, **source_kwargs) -> ActScript:
     base, retry = _TEMP["act"]
     cast_block = "\n".join(
         "- %s (%s, %s): %s" % (c.name, c.gender, c.role or "in the story",
@@ -566,7 +577,7 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
                       " This is the LAST act, so they must speak here."
                       if is_last else ""))
     return _call(
-        "act_%d" % plan.n, bundle, attempt_receipts=attempt_receipts,
+        "act_%d" % plan.n, bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_act_system")},
             {"role": "user", "content": (
@@ -601,10 +612,11 @@ def _pass_act(creative_fn, pack, bundle, treatment: StoryTreatment,
 # ---------------------------------------------------------------------------
 
 def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
-                *, attribution: str, inter_wanted: int, attempt_receipts=None) -> StoryFrame:
+                *, attribution: str, inter_wanted: int, attempt_receipts=None,
+                **source_kwargs) -> StoryFrame:
     base, retry = _TEMP["frame"]
     return _call(
-        "frame", bundle, attempt_receipts=attempt_receipts,
+        "frame", bundle, attempt_receipts=attempt_receipts, **source_kwargs,
         prompt=[
             {"role": "system", "content": _seam(pack, "my_story_frame_system")},
             {"role": "user", "content": (
@@ -619,7 +631,7 @@ def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
         slot_fn=creative_fn,
         base_temperature=base,
         structural_retry_temperature=retry,
-        repair_prompt_factory=make_dispatching_repair_factory(),
+        repair_prompt_factory=_full_artifact_repair("Repair the announcer frame; preserve its attribution."),
         max_attempts=3,
         helper_name="my_story_frame",
     )
@@ -933,6 +945,7 @@ def run_my_story_episode(
         "seed": seed,
         "draft_digest": bundle.digest,
         "attempts": [],
+        "source_rewrites": [],
         "counts": {
             "requested_acts": act_count, "proposed_acts": None,
             "accepted_acts": None, "actual_acts": None,
@@ -946,7 +959,18 @@ def run_my_story_episode(
         ],
     }
     meta["my_story"] = story
+    meta["source_meta"] = source_meta
     meta["news"] = None
+
+    def checkpoint(what):
+        # Ledger.save normalizes and rebinds its data. This runner owns the
+        # evolving story journal; reattach it at every durable checkpoint.
+        _ledger_meta(led)["my_story"] = story
+        _require_ledger_save(led, what)
+
+    def source_kwargs(model_id):
+        return {"source_rewrite_receipts": story["source_rewrites"],
+                "slot_scheduler": slot_scheduler, "configured_model_id": model_id}
 
     # The cameo knob belongs to the house, and this cast belongs to the
     # person who described it. Recorded rather than silently ignored.
@@ -963,7 +987,7 @@ def run_my_story_episode(
             interp = _pass_interpret(
                 technical_fn, pack, bundle, requested=requested,
                 act_count=act_count, include_act_breaks=include_act_breaks,
-                attempt_receipts=story["attempts"])
+                attempt_receipts=story["attempts"], **source_kwargs(technical_model))
         receipt("interpret", technical_model, _TEMP["interpret"][0],
                 None)
         story["interpretation"] = interp.model_dump(mode="json")
@@ -977,14 +1001,15 @@ def run_my_story_episode(
                 log.warning("[my_story] could not honour %r as written: %s -- "
                             "the story will %s", conflict.requirement_id,
                             conflict.why, conflict.resolution)
-        _require_ledger_save(led, "the story interpretation")
+        checkpoint("the story interpretation")
 
         # --- P1 treatment ----------------------------------------------------
         with _helper_ctx(slot_scheduler, "my_story_treatment"):
             treatment = _pass_treatment(
                 creative_fn, pack, bundle, interp,
                 act_count=act_count, requested_characters=requested,
-                include_act_breaks=include_act_breaks, attempt_receipts=story["attempts"])
+                include_act_breaks=include_act_breaks, attempt_receipts=story["attempts"],
+                **source_kwargs(creative_model))
         receipt("treatment", creative_model, _TEMP["treatment"][0],
                 None)
         story["treatment_proposal"] = treatment.model_dump(mode="json")
@@ -1008,7 +1033,7 @@ def run_my_story_episode(
                                       "stated": person.stated_gender, "accepted": member.gender})
         story["fidelity_discrepancies"] = discrepancies
         story["treatment"] = treatment.model_dump(mode="json")
-        _require_ledger_save(led, "the treatment")
+        checkpoint("the treatment")
 
         # --- P2 acts, one call each ------------------------------------------
         acts: "list[ActScript]" = []
@@ -1026,7 +1051,7 @@ def run_my_story_episode(
             with _helper_ctx(slot_scheduler, "my_story_act_%d" % plan.n):
                 act = _pass_act(creative_fn, pack, bundle, treatment, plan, prev,
                                 prev_plan, must_speak=must_speak, is_last=is_last,
-                                attempt_receipts=story["attempts"])
+                                attempt_receipts=story["attempts"], **source_kwargs(creative_model))
             story["act_number_normalization"]["replies"].append(
                 {"original": act.n, "slot": plan.n})
             act.n = plan.n
@@ -1041,7 +1066,7 @@ def run_my_story_episode(
             receipt("act_%d" % plan.n, creative_model, _TEMP["act"][0],
                     None)
             story["acts_accepted"] = len(acts)
-            _require_ledger_save(led, "act %d" % plan.n)
+            checkpoint("act %d" % plan.n)
 
         # Every character the treatment cast must be heard. The freeze fails an
         # episode with a silent cast member, and failing there would waste the
@@ -1060,7 +1085,7 @@ def run_my_story_episode(
         with _helper_ctx(slot_scheduler, "my_story_frame"):
             frame = _pass_frame(creative_fn, pack, bundle, treatment,
                                 attribution=attribution, inter_wanted=inter_wanted,
-                                attempt_receipts=story["attempts"])
+                                attempt_receipts=story["attempts"], **source_kwargs(creative_model))
         receipt("frame", creative_model, _TEMP["frame"][0], None)
         story["frame_proposal"] = frame.model_dump(mode="json")
         spoken_frame = " ".join(frame.announcer_intro + frame.announcer_outro + [frame.coda])
@@ -1074,6 +1099,7 @@ def run_my_story_episode(
         receipt("voices", "python", 0.0, None)
 
         # --- P5 assemble (no model call) -------------------------------------
+        _ledger_meta(led)["my_story"] = story
         _assemble(led, treatment, acts, frame, cast_rows, interpretation=interp,
                   include_act_breaks=include_act_breaks,
                   owner_bank=str(getattr(source_bank_row, "source_bank_id", "")
@@ -1082,7 +1108,8 @@ def run_my_story_episode(
 
         # `_assemble` saves, and Ledger.save() rebinds led.data -- reacquire.
         meta = _ledger_meta(led)
-        story = meta.setdefault("my_story", story)
+        story.update(meta.get("my_story") or {})
+        meta["my_story"] = story
         story["counts"].update(actual_acts=len(led.data.get("scenes") or []),
                                actual_characters=_OTRCAST.count_locked_characters(
                                    led.data.get("cast") or []))
@@ -1100,7 +1127,7 @@ def run_my_story_episode(
                 led.data.get("cast") or []),
             decision=None,
         )
-        _require_ledger_save(led, "the My Story receipts")
+        checkpoint("the My Story receipts")
 
         canon = _OTRC.episode_canon_from_outline_dict({
             "title": treatment.title,
@@ -1139,7 +1166,7 @@ def run_my_story_episode(
                     if story["counts"][key] is None and isinstance(proposed.get(field), list):
                         story["counts"][key] = len(proposed[field])
         try:
-            _require_ledger_save(led, "the My Story attempt history")
+            checkpoint("the My Story attempt history")
         except Exception as save_error:
             if primary_error is None:
                 raise

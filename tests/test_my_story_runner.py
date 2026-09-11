@@ -112,6 +112,8 @@ class Slots:
 
     def _answer(self, messages):
         system = messages[0]["content"] if messages else ""
+        if "Check and rewrite the supplied draft" in system:
+            return json.dumps(json.loads(messages[1]["content"])["draft"])
         if "work out what they actually want" in system:
             return json.dumps(self._interp)
         if "radio dramatist" in system:
@@ -183,8 +185,8 @@ def test_the_passes_run_in_order_on_the_declared_slots():
     slots = Slots()
     _run(slots)
     kinds = [slot for slot, _ in slots.calls]
-    assert kinds[0] == "technical", "interpretation is an extraction pass"
-    assert kinds[1:] == ["creative"] * (len(kinds) - 1)
+    assert kinds[:2] == ["technical", "technical"]  # interpretation and its correction
+    assert kinds[2:] == ["creative"] * (len(kinds) - 2)
 
 
 def test_one_call_per_act():
@@ -193,7 +195,7 @@ def test_one_call_per_act():
     act_calls = [c for c in slots.calls if "one act of a radio drama" in c[1]
                  or "act" in c[1].lower()]
     # interpretation + treatment + 3 acts + frame
-    assert len(slots.calls) == 6, slots.calls
+    assert len(slots.calls) == 12, slots.calls  # six author calls, six combined corrections
 
 
 def test_no_source_is_fetched_and_no_spark_is_drawn():
@@ -274,7 +276,7 @@ def test_missing_frame_credit_is_appended_once_without_retry():
     led, _ = _run(slots)
     text = " ".join(row.get("text", "") for row in led.data["lines"])
     assert text.count(slots._attr) == 1
-    assert len(slots.calls) == 4
+    assert len(slots.calls) == 8  # four author calls and four source operations
     assert slots._attr not in str(led.data["meta"]["my_story"]["frame_proposal"])
     validate_receipt(led.data)
 
@@ -297,7 +299,8 @@ def test_the_music_cues_anchor_to_real_sentinel_rows(acts, breaks):
     slots = Slots(acts=acts, inter=acts - 1)
     led, parts = _run(slots, act_count=acts, include_act_breaks=breaks)
     wanted = acts - 1 if breaks else 0
-    for messages in slots.prompts[:2]:
+    authored_prompts = [p for p in slots.prompts if not p[0]["content"].startswith("Check and rewrite")]
+    for messages in authored_prompts[:2]:
         assert "music cues between acts: %d" % wanted in messages[1]["content"].lower()
     assert "Interstitial cues wanted: %d." % wanted in slots.prompts[-1][1]["content"]
     interstitials = [c for c in led.data["music"] if c["placement"] == "interstitial"]
@@ -510,7 +513,7 @@ def test_exclusive_named_cast_can_exceed_the_requested_character_count():
     led, _ = _run(slots, num_characters=1)
     assert len(led.data["cast"]) == 3  # two story characters plus announcer
     assert led.data["meta"]["my_story"]["fidelity_discrepancies"] == []
-    assert len(slots.calls) == 4  # no cast-count repair
+    assert len(slots.calls) == 8  # no cast-count retry; one source operation per artifact
 
 
 @pytest.mark.parametrize("requested,cast", [
@@ -528,7 +531,7 @@ def test_flexible_cast_records_requested_and_actual_counts_without_retry(request
     assert counts["requested_characters"] == requested
     assert counts["accepted_characters"] == counts["actual_characters"] == len(cast)
     assert counts["requested_acts"] == counts["actual_acts"] == acts
-    assert len(slots.calls) == acts + 3
+    assert len(slots.calls) == 2 * (acts + 3)
     assert FC._readonly_structural_validation(saved) == []
     validate_receipt(saved)
 
@@ -761,7 +764,7 @@ def test_count_repair_exhaustion_remains_an_honest_failed_ledger(tmp_path):
     slots = FencedSlots(acts=2)
     with pytest.raises(StructuredCallFailedError, match="selected count is 1"):
         _run(slots, act_count=1)
-    assert len(slots.calls) == 3  # interpretation, treatment, one typed repair
+    assert len(slots.calls) == 4  # interpretation + source correction, treatment + typed repair
     path, = tmp_path.rglob("*_ledger.json")
     saved = json.loads(path.read_text(encoding="utf-8"))
     story = saved["meta"]["my_story"]
@@ -901,7 +904,7 @@ def test_provider_capacity_contract_reaches_every_slot_and_typed_repair():
 
 
 @pytest.mark.parametrize("succeeds", [True, False])
-def test_only_p1_binds_once_and_all_its_retries_use_that_callable(succeeds, tmp_path):
+def test_author_p1_reuses_its_binding_and_source_corrections_bind_their_own_schemas(succeeds, tmp_path):
     from nodes._otr_structured_call import StructuredCallFailedError
     slots = Slots()
     original = slots.creative
@@ -914,15 +917,17 @@ def test_only_p1_binds_once_and_all_its_retries_use_that_callable(succeeds, tmp_
 
     def bind(schema):
         bindings.append(schema)
-        assert schema is MS.StoryTreatment
+        if schema is not MS.StoryTreatment:
+            return original
 
         def bound(messages, **kwargs):
             assert messages._otr_unbounded_json_field is True
             assert kwargs["max_new_tokens"] is None
             bound_calls.append(messages)
-            if succeeds and len(bound_calls) == 3:
+            if succeeds and len(bound_calls) >= 3:
                 return original(messages, **kwargs)
             return '{"incomplete":'
+        bound._otr_bind_schema = bind
         return bound
 
     unbound._otr_bind_schema = bind
@@ -939,8 +944,9 @@ def test_only_p1_binds_once_and_all_its_retries_use_that_callable(succeeds, tmp_
         path, = tmp_path.rglob("*_ledger.json")
         story = json.loads(path.read_text(encoding="utf-8"))["meta"]["my_story"]
         assert story["counts"]["actual_acts"] is None
-    assert bindings == [MS.StoryTreatment]
-    assert len(bound_calls) == 3
+    assert bindings == ([MS.StoryTreatment, MS.StoryTreatment, MS.ActScript, MS.StoryFrame]
+                        if succeeds else [MS.StoryTreatment])
+    assert len(bound_calls) == (4 if succeeds else 3)
 
 
 def test_raised_completion_is_durable_evidence_not_a_completed_proposal(tmp_path):
@@ -967,3 +973,83 @@ def test_raised_completion_is_durable_evidence_not_a_completed_proposal(tmp_path
     assert story["counts"]["proposed_acts"] is None
     assert story["counts"]["proposed_characters"] is None
     assert story["counts"]["actual_acts"] is None
+
+
+def test_combined_corrections_reach_the_saved_artifacts_and_spoken_ledger():
+    from nodes._otr_content_authorship import validate_receipt
+
+    class Correcting(Slots):
+        def _answer(self, messages):
+            if messages[0]["content"].startswith("Check and rewrite"):
+                draft = json.loads(messages[1]["content"])["draft"]
+                if "setting_brief" in draft:
+                    draft["setting_brief"] = "Mother joins the living family."
+                elif "ending" in draft:
+                    draft["ending"] = "Mother takes her chair."
+                elif "lines" in draft:
+                    draft["lines"][0]["text"] = "Mother, your chair is beside mine."
+                elif "coda" in draft:
+                    draft["coda"] = "Mother and daughter stayed together."
+                return json.dumps(draft)
+            return super()._answer(messages)
+
+    led, _ = _run(Correcting(), idea="Mother is alive and joins her daughter at dinner.")
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    assert story["interpretation"]["setting_brief"] == "Mother joins the living family."
+    assert story["treatment"]["ending"] == "Mother takes her chair."
+    assert story["frame"]["coda"] == "Mother and daughter stayed together."
+    assert any(row.get("text") == "Mother, your chair is beside mine." for row in saved["lines"])
+    assert all(row["status"] == "rewritten" and row["applied"] for row in story["source_rewrites"])
+    assert len(story["source_rewrites"]) == 4
+    validate_receipt(saved)
+
+
+def test_unusable_source_rewrites_stop_at_two_and_keep_a_usable_saved_ledger():
+    from nodes._otr_content_authorship import validate_receipt
+
+    class Unusable(Slots):
+        def _answer(self, messages):
+            if messages[0]["content"].startswith("Check and rewrite"):
+                return "incomplete"
+            return super()._answer(messages)
+
+    slots = Unusable()
+    led, _ = _run(slots)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    history = saved["meta"]["my_story"]["source_rewrites"]
+    assert len(history) == 4
+    assert all(row["status"] == "unresolved" and len(row["attempts"]) == 2 for row in history)
+    assert all(not row["applied"] for row in history)
+    assert len(slots.calls) == 12  # four author calls plus eight source attempts, no fourth/fifth retry
+    validate_receipt(saved)
+
+
+def test_source_failure_history_survives_a_provider_exception_after_a_checkpoint(tmp_path):
+    class Failed(Slots):
+        def _answer(self, messages):
+            if messages[0]["content"].startswith("Check and rewrite"):
+                draft = json.loads(messages[1]["content"])["draft"]
+                if "ending" in draft:
+                    raise RuntimeError("source rewrite provider stopped")
+            return super()._answer(messages)
+
+    with pytest.raises(RuntimeError, match="source rewrite provider stopped"):
+        _run(Failed())
+    path, = tmp_path.rglob("*_ledger.json")
+    story = json.loads(path.read_text(encoding="utf-8"))["meta"]["my_story"]
+    assert [row["pass_id"] for row in story["source_rewrites"]] == ["interpret", "treatment"]
+    assert story["source_rewrites"][-1]["status"] == "provider_error"
+    assert len(story["source_rewrites"][-1]["attempts"]) == 1
+
+
+def test_all_author_and_correction_prompts_receive_the_exact_raw_story():
+    idea = "  RAW PREFIX\nMother is alive.\t RAW END  "
+    slots = Slots()
+    led, _ = _run(slots, idea=idea)
+    for prompt in slots.prompts:
+        if prompt[0]["content"].startswith("Check and rewrite"):
+            assert json.loads(prompt[1]["content"])["source"]["idea"] == idea
+        else:
+            assert idea in prompt[1]["content"]
+    assert led.data["meta"]["source_meta"]["story_input"]["fields"]["idea"] == idea

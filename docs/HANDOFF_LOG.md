@@ -1,3 +1,37 @@
+## 2026-09-11 -- F1 bounded source correction wired and qualified
+
+My Story P0-P3 now receive exact raw source and apply actual corrected artifacts
+through their existing owner/schema. The shared cleaner performs actual localized
+source corrections and preserves unrelated text through the metrics owner. Each
+source operation has at most two calls total, including repairs, with no budget
+reset or self-recheck. Unusable optional corrections retain accepted input with
+unresolved evidence; true provider/OOM/cancel preserves its type. Attempt history
+survives later cleanup failure and rollback; retained speech is separately identified.
+
+Final focused: 236 passed. Full: 14,283 passed / 51 existing failures / 183 skipped /
+one xfailed; no new failure or changed meaning. One AMD assertion prints identical
+dictionary differences in a different order. Initial guard defects were fixed and
+the final full run repeated. Bible: 31 passed / ten unchanged failures / 11 skipped /
+three xfailed versus clean baseline 30/11/11/3. Existing rule 11.39 is extended;
+341 entries and 146 legacy metadata issues remain. Canonical audit and round trip
+pass, unchanged 23 nodes / 63 links / 37 writer widget slots. Six final Python
+hashes match the reviewed snapshot and pass AST/nonempty/no-BOM checks.
+
+Two requested local Sonnet/high finished-diff reviews completed. Both found no
+blocker; first-review improvements were implemented and independently checked.
+Final judgments are in kibitz-runs/2026-09-11-my-story-f1-final-qa/r4/. Exact
+version/dollar spend was not returned. Component receipt and baseline comparisons:
+docs/2026-09-11-my-story-cross-machine/f1_rewrite_receipt.md and f1_*.json.
+
+The operator's checker+rewriter amendment supersedes a separate recursive source
+organizer; the earlier proposal is archived, not claimed implemented. F2 remains
+next, with Euler as sole isolated coder while root handles this checkpoint and
+read-only preparation. All campaign coding still precedes hardware testing.
+5080/RunPod then authorized; Mac/4060 wait for the operator tomorrow. No new
+media, semantic success, memory cure or README model proof is claimed.
+
+---
+
 ## 2026-09-11 -- C1 shared cleanup conservation
 
 Closed the reported My Story coda rewrite class in the shared cleaner. Exact

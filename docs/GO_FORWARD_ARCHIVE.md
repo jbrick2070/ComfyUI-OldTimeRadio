@@ -1,5 +1,42 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- F1 source-correction code checkpoint
+
+Receipt: 2026-09-11-my-story-cross-machine/f1_rewrite_receipt.md. Final 236 focused;
+full 14,283 / 51 existing failures / 183 skipped / one xfailed; Bible 31 / ten
+existing failures / 11 skipped / three xfailed. No new regression or changed
+failure meaning. Two Sonnet/high finished-diff reviews, no remaining blocker.
+Canonical unchanged. F2 and remaining campaign coding precede live proof.
+
+Superseded ownership text, verbatim:
+
+Codex owns F1 source-review integration in the primary checkout. The isolated
+library worker has released code ownership; independent reviewers are read-only.
+The library remains unfinished work until its author/cleanup wiring and the
+integrated regressions are qualified. No hardware handoff is active.
+
+## 2026-09-11 -- source organization proposal superseded by operator amendment
+
+The operator requested actual checking plus rewriting with a sensible fixed
+budget, explicitly said "I DONT NEED CHNKER", and rejected an infinite loop.
+The current implementation carries full raw source through existing owners and
+uses at most two calls per source correction. The separate recursive organizer
+proposal below is preserved as history, not active work or claimed completion.
+Independent Einstein review confirmed that finite context plus a fixed call
+budget cannot guarantee arbitrary raw-source coverage; extra reader calls must
+never be hidden as free preparation. Actual capacity limitations stay honest.
+
+Superseded queue text, verbatim:
+
+   Operator follow-up: let the first model organize large input into a working
+   brief and smaller passes as needed. Preserve original fields and complete
+   source coverage; summaries are derived material. The model organizes while
+   the actual tokenizer/provider measures fit. Review measured progressive
+   reading and non-progress handling; never silently discard an unread tail.
+   Use the native structured-fit inspection with the exact intended output
+   budget. Unknown capacity is not a measured fit; preserve its uncertainty
+   and do not substitute the historical 8192-token estimate for proof.
+
 ## 2026-09-11 -- C1 scope-conservation code checkpoint
 
 Receipt: 2026-09-11-my-story-cross-machine/c1_receipt.md. Final183focused;

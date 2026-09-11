@@ -86,13 +86,12 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 
 ## WHERE TO PICK UP
 
-**Active production-code owner: Codex, `v2.0-alpha`.** Independent reviewers
-are read-only. Continue coding; no handoff is being activated.
-Euler currently owns only the F1 source-review library
-and its tests in the isolated `otr-my-story-f1-library` worktree. Root handles
-integration reads and makes no concurrent implementation edits. That library
-is unfinished work until root wires it into the existing writer and qualifies
-the integrated change; it is not a second main checkout or a hardware handoff.
+**Active campaign owner: Codex, `v2.0-alpha`.** Continue coding; no hardware
+handoff is being activated. F2 production-code ownership is temporarily assigned
+to the internal Euler worker in the isolated Windows worktree
+`C:/Users/jeffr/Documents/ComfyUI/_worktrees/otr-my-story-f2-implementation`.
+Root handles F1 verification/git and read-only preparation while Euler codes;
+root does not edit production code concurrently. Other reviewers are read-only.
 **GO_FORWARD is the main plan (operator, 2026-09-10).** The next coding sprints
 below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
@@ -100,15 +99,31 @@ and judgments are receipts; they never become a competing work queue.
 **Latest operator ruling: finish coding first.** Coordination automation is
 paused. Do not prepare or send handoff/hardware prompts, contact the Mac/4060,
 or start any four-machine live test until ALL current repair-campaign coding
-is complete. Mac/4060 additionally require Jeffrey's explicit go-ahead.
+is complete. Once coding is complete, Jeffrey has authorized this window to
+test the 5080 and RunPod, then stop rented compute. Mac/4060 wait until tomorrow
+and additionally require Jeffrey's explicit go-ahead.
 Development regression checks remain part of each code chunk. Close included
 A1R/A2 implementation, Original credit B, credits-title C and retained Mac/O2
 diagnostics. A3, optional App and the older backlog remain separately scoped.
 
+**Source repair amendment (operator, current coding session):** "I JUST NEED A
+CHECKER+REWRITER" and "WE [CAN'T] HAVE AN INFINITE LOOP." Source fidelity work
+must produce and apply corrected text, not spend a model call solely producing
+a verdict. Use a fixed attempt budget at the owning artifact/ledger repair seam;
+do not recursively recheck a rewrite or restart its budget. When repair cannot
+produce a usable result, retain usable accepted text with an unresolved receipt.
+Only the existing structural ledger contract can refuse it. This supersedes the
+report-only source reviewer and final report/rollback portions of the earlier
+R3/R4 design; those snapshots are historical. The operator also said "I DONT
+NEED CHNKER" followed by "I JUST NEED A CHECKER+REWRITER." Do not introduce
+a separate recursive source organizer/compactor with another model budget.
+Keep the full raw source in the existing author/correction calls and report
+actual capacity failures honestly. Sonnet still reviews finished code.
+
 **Next action:** close A1R, the received 4060 My Story source-fidelity and
-structured-output defects, in focused shared-core chunks. Continue F1 adaptive
-source organization and semantic review through the existing author/cleanup
-owners, then F2 visual source integration. The six-leg receipt is
+structured-output defects, in focused shared-core chunks. Implement F2 visual
+source integration, then Mac/O2 diagnostics and the reviewed B/C credit fixes.
+The six-leg receipt is
 `docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
 end-to-end source-qualified My Story output exists. Keep each tested code
 revision distinct; an earlier passing run is not proof of the final correction.
@@ -141,10 +156,11 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
   replacing, or contradicting directly supplied people, relationship, presence,
   setting, action, or ending facts.
 - Technical publication eligibility is separate from source qualification.
-  Persist source-check receipts for accepted authored text, visual planning,
-  cleanup and final spoken text. Record exactly what was checked; uncertain or
-  partial checks are not PASS. Repair direct contradictions at their authoring
-  owner, without an added late publication veto or subjective prose-quality gate.
+  Persist source-repair receipts for accepted authored text, visual planning,
+  cleanup and final spoken text. Record delivered source and actual applied
+  changes; partial or unresolved work is not PASS. Combine checking and rewriting
+  at the existing owner, with a fixed retry budget and no extra model-only
+  verification loop, late publication veto or subjective prose-quality gate.
 - No duration, word-count or story-length rejection. Only defects required
   for a usable ledger justify a story failure, after the existing applicable
   LLM repair path has tried. Real provider, storage and cancellation outcomes
@@ -176,8 +192,8 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 2. Close the remaining A1R cleanup/source/visual repairs. Do not spend further baseline media legs on the
    known-unprotected My Story implementation; use focused checks until the
    repair is ready for a fresh canonical recovery leg.
-3. Integrate exact native fit inspection into adaptive source reading and
-   qualify loaded capacity during canonical recovery after A1R. Implement the reviewed Original model credit and
+3. Qualify exact native prompt fit and loaded capacity during canonical
+   recovery after A1R. Implement the reviewed Original model credit and
    credits title containment sprints. The new App and full media qualification
    follow them.
 4. The shared cleaner copied listener attribution into an adjacent intro on
@@ -198,20 +214,14 @@ each design step and a CLI review of each finished code chunk before push.
 2. Verify zero between-act music in the full canonical one-act recovery after
    the remaining source repairs. The boundary code receipt is in HANDOFF_LOG;
    do not reopen it as uncoded work or add a keyword rejection of planning prose.
-4. Preserve raw listener source through P0/P1/P2/P3, cleanup and the actual
-   MetaBrief visual prompt owners. Review the source-versus-candidate check and
-   existing bounded repair integration before code. Source quotations establish
-   identity; they do not prove semantic fidelity. Distinguish shared story scenes
-   from neutral portraits. Carry truthful, artifact-bound check receipts through
-   final speech and visual prompts without an invented late publication gate.
-   Operator follow-up: let the first model organize large input into a working
-   brief and smaller passes as needed. Preserve original fields and complete
-   source coverage; summaries are derived material. The model organizes while
-   the actual tokenizer/provider measures fit. Review measured progressive
-   reading and non-progress handling; never silently discard an unread tail.
-   Use the native structured-fit inspection with the exact intended output
-   budget. Unknown capacity is not a measured fit; preserve its uncertainty
-   and do not substitute the historical 8192-token estimate for proof.
+4. Carry raw listener source and actual scene context through the MetaBrief
+   visual prompt owners, with bounded corrections inside the existing attempt
+   budget. Distinguish shared story scenes from neutral portraits. Carry truthful,
+   artifact-bound receipts through final visual prompts without an invented late
+   publication gate. Source quotations establish identity, not semantic fidelity.
+   Unknown capacity is not measured fit; never substitute the historical
+   8192-token estimate for proof. The earlier separate adaptive organizer proposal
+   is superseded by the operator's bounded checker+rewriter amendment above.
 5. Instrument the Mac generation/retirement boundary before attributing its OS
    kill to a particular allocation. Existing MPS cache flushing is already
    present. Preserve epoch/orphan-worker protections and correct disk admission;

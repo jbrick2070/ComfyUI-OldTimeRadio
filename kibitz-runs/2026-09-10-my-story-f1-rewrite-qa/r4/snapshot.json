@@ -1,0 +1,27 @@
+[
+  {
+    "path": "nodes/_otr_story_source.py",
+    "sha256": "9d22ffd90af24ec12dd5a0d2f079c17a6525c06ebe85b7c8a9aebd265186d4a8"
+  },
+  {
+    "path": "nodes/_otr_my_story.py",
+    "sha256": "d18d200d83d940f4b308879eb79469c79f0f90a6391ef691b7544174b3683366"
+  },
+  {
+    "path": "nodes/_otr_ledger_clean.py",
+    "sha256": "9df52b7f1d89c309dcfcd2cf397a83981c61fa39c9fe6974381db954b579a6b9"
+  },
+  {
+    "path": "nodes/_otr_writer_tail.py",
+    "sha256": "bead5cd1806c999199781328bc01c2f81194ac990d48002df80ae8b73a0d503e"
+  },
+  {
+    "path": "tests/test_story_source_review.py",
+    "sha256": "d4bead8db55b7d82148f447a748babbd172747acd879cb5ad9bd437f666dc754"
+  },
+  {
+    "path": "tests/test_my_story_runner.py",
+    "sha256": "b3362cecc4214ea8f1ec2cc0949d1784de6d8102663db1f2b4ec9c8c9781ab48"
+  }
+]
+
