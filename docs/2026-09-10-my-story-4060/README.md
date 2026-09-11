@@ -151,6 +151,14 @@ historical records already cover actual LTX misclassification, output identity,
 and credits-tail loss; this report preserves the narrower phase/route-intent
 follow-up without falsely calling a healthy all-stills output an LTX failure.
 
+Diagnostic maintenance follow-up: O1 and O3 are repaired at their shared owners;
+pre-image still deferral and successful active-episode path reconciliation now
+log INFO. Actual missing-still and identity/freeze refusals remain unchanged.
+The code/tests and independent review are recorded in
+`../2026-09-11-my-story-cross-machine/diagnostics_receipt.md`. This does not
+retroactively requalify the six source-defective runs. O2 planned-versus-actual
+LTX health classification remains in GO_FORWARD.
+
 ## Current-code boundary
 
 The report’s six-leg evidence belongs to `0327850a`. The later `f829c920`

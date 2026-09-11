@@ -1,3 +1,29 @@
+## 2026-09-11 -- reported diagnostic fixes and architecture convergence
+
+Closed diagnostic O1/O3: cast-preflight missing stills now defer at INFO;
+successful active-episode path reconciliation is INFO in three consumers.
+Real render-time absence, typed/untyped exceptions, freeze/episode identity
+and downstream audio PCM checks remain. Updated the stale mux canonical canary
+for the existing script_json link291, without changing the workflow.
+
+Focused203passed/1skipped. Full14135passed/53pre-existing failures/183skipped/
+1xfailed; one stale test fixed versus boundary baseline, no new failures or
+changed assertion contents. Existing AMD dictionary failure differs only in
+display order. Clean-candidate Bible30passed/10unchanged failures/11skipped/
+3xfailed, with explicit candidate/file hashes. Canonical audit passes; hash
+unchanged. Single CLI reviewer CursorGrok4.6High plus Euler's follow-up checked
+the final diagnostic diff. See diagnostics_receipt.md in the cross-machine folder.
+
+The full cross-machine R1-R4 arc has converged with Gemini3.8FlashHigh and
+CursorGrok4.6High. Installed LMFE0.11.3 probe confirms the hidden array limit
+needs correction before AND after prefix construction; no LLM was loaded for
+the probe. GO_FORWARD orders grammar/P1, actual native capacity, cleanup,
+adaptive source organization/review and visuals, Mac measurements and LTX intent,
+then canonical recovery. Source-check scope stays separate from publication
+eligibility. One editor; no new baseline media and no claim the story is fixed.
+
+---
+
 ## 2026-09-11 -- cross-machine triage and one-act boundary correction
 
 Read the 4060 and Mac evidence from 2499b411 and the Mac host-scope correction

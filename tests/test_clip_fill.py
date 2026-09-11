@@ -323,10 +323,11 @@ def test_persist_skips_directory_clips(monkeypatch, tmp_path):
     assert result["clips"]["s"]["path"] == str(tmp_path)   # dir clip untouched
 
 
-def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path):
+def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path, caplog):
     from nodes._otr_video_engines import render_driver as rd
     import nodes._otr_paths as paths
 
+    caplog.set_level("INFO")
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
     root = tmp_path / "otr" / "episodes"
     final = root / "signal_lost_final"
@@ -346,6 +347,9 @@ def test_resolve_stale_pending_clip_episode_to_renamed_dir(monkeypatch, tmp_path
         "pending_20260708_010101",
         freeze_timestamp="freeze-clips",
     ) == "signal_lost_final"
+    assert any("PATH RECONCILED" in r.message and r.levelname == "INFO"
+               for r in caplog.records)
+    assert not any(r.levelno >= 30 for r in caplog.records)
 
 
 def test_persist_rekeys_clip_to_renamed_episode_clips(monkeypatch, tmp_path):
@@ -401,7 +405,7 @@ def test_persist_rekeys_clip_to_renamed_episode_clips(monkeypatch, tmp_path):
     assert not clip_src.exists()
 
 
-def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path):
+def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path, caplog):
     from nodes._otr_video_engines import render_driver as rd
     import nodes._otr_paths as paths
 
@@ -424,6 +428,8 @@ def test_resolve_stale_pending_clip_rejects_foreign_freeze(monkeypatch, tmp_path
         "pending_20260708_020202",
         freeze_timestamp="freeze-current",
     ) == "pending_20260708_020202"
+    assert any("REJECTED" in r.message and r.levelname == "WARNING"
+               for r in caplog.records)
 
 
 # --------------------------------------------------------------------------- #

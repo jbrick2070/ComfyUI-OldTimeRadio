@@ -698,7 +698,7 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     Returns the original path unchanged when it already exists, when disk state
     is disabled (``OTR_TEST_MODE``), or when no exact-basename match is found --
     in which case the caller fails closed. It NEVER points at a different audio
-    source: only the byte-for-byte same basename under the renamed episode
+    source: only the same basename under the renamed episode
     ``audio`` dir is accepted, and ``mux_master_audio`` still asserts the output
     is PCM-byte-identical to it.
     """
@@ -728,10 +728,10 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
             return master_audio_path
         cand = Path(p).parent / want          # <episode>/audio/<same-basename>
         if cand.is_file():
-            log.warning(
-                "[OTR_MasterAudioMux] LOUD re-resolve: master audio path stale "
+            log.info(
+                "[OTR_MasterAudioMux] PATH RECONCILED: master audio path stale "
                 "(episode dir renamed after capture); %r -> %r "
-                "(same file, post-rename dir)",
+                "(active episode, matching basename)",
                 master_audio_path, str(cand),
             )
             return str(cand)

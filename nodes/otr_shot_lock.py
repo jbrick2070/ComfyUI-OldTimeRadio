@@ -1899,10 +1899,11 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
     # in the 2026-07-28 engine-coverage campaign. Any raise site that means
     # "the image phase has not run yet" says so by TYPE.
     try:
-        req = build_request_from_shot(shot, ledger, master_audio_path="")
+        req = build_request_from_shot(
+            shot, ledger, master_audio_path="", phase="cast_preflight")
     except DeferredImageGapError as exc:
         req = _cast_time_image_gap_request(shot)
-        log.warning(
+        log.info(
             "[OTR_ShotLock] cast-time image input deferred to "
             "ImageGenDispatcher/render gate for engine %r beat %s: %s",
             effective_engine, beat.get("beat_id", ""), exc)

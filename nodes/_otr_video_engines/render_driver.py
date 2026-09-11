@@ -2401,7 +2401,8 @@ def _cumulative_beat_start(ledger, shot, fps):
 
 
 def build_request_from_shot(shot, ledger, *, canvas=None,
-                            master_audio_path="", segment_index=0):
+                            master_audio_path="", segment_index=0,
+                            phase="render"):
     """A per-shot VideoRequest from the ShotLock-planned ledger (the REAL
     episode path). Resolves the character portrait (``init_image``) + the
     per-beat voice audio + the M4 ``text_prompt`` + the audio-derived
@@ -2413,7 +2414,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     ``master_audio_path`` (optional): path to the FROZEN master mix (MP4 or
     WAV) from which per-beat audio is sliced when the ledger carries no
     per-line ``*_wav_path``.  Passed in via :func:`run_real_episode` so the
-    file is never mutated (read-only ``ffmpeg -i``)."""
+    file is never mutated (read-only ``ffmpeg -i``).
+
+    ``phase`` affects diagnostics only: cast preflight precedes image generation,
+    so an absent still there is deferred. Render-time checks remain unchanged.
+    This value never enters the request payload or its identity hash."""
     # RADIO IS THE HOST (2026-06-30): must run FIRST, before any engine-keyed
     # branch below reads shot["engine_id"] -- a caught announcer/music + HuMo
     # pick is redirected here so every downstream resolution (init_image,
@@ -2682,16 +2687,19 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         else:
             init_image = ""
             init_source = "missing_scene_still"
-            # The engine list in this message was FACTUALLY WRONG from lane 15
-            # onward and is emitted at RUNTIME, so it misled exactly the person
-            # debugging a missing still. All four still families now refuse.
-            _LOG.warning(
-                "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s has NO "
-                "scene still in the ledger. Every still family (still_motion / "
-                "still_pan / still_flat / still_word) and ltx_audio_in now "
-                "FAIL LOUD in render_clip rather than painting a dark floor "
-                "(no fallbacks). Investigate the image phase for beat %s.",
-                _eng, _bid, _bid)
+            if phase == "cast_preflight":
+                _LOG.info(
+                    "[OTR.render_driver] %s STILL DEFERRED: beat %s is at "
+                    "cast preflight; image generation has not run yet. "
+                    "The post-image still check remains required.", _eng, _bid)
+            else:
+                _LOG.warning(
+                    "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s has NO "
+                    "scene still in the ledger. Every still family (still_motion / "
+                    "still_pan / still_flat / still_word) and ltx_audio_in now "
+                    "FAIL LOUD in render_clip rather than painting a dark floor "
+                    "(no fallbacks). Investigate the image phase for beat %s.",
+                    _eng, _bid, _bid)
     # LTX audio-in bookends use a WIDE radio-FACE init under the ia2v talking
     # register. Music remains a radio in every visual mode; when its effective
     # engine is explicitly audio-driven, it gets the same radio-with-lips asset
@@ -6145,8 +6153,8 @@ def resolve_episode_id_for_clip_persistence(episode_id, freeze_timestamp=""):
             and str(disk_ledger.get("episode_id") or "").strip()
                 == new_episode_dir.name
         ):
-            _LOG.warning(
-                "[OTR video] LOUD re-resolve: episode_id %r is a stale pending "
+            _LOG.info(
+                "[OTR video] PATH RECONCILED: episode_id %r is a stale pending "
                 "id (dir renamed before clip persistence); clips re-keyed "
                 "to active ledger episode dir %r.",
                 eid, new_episode_dir.name)

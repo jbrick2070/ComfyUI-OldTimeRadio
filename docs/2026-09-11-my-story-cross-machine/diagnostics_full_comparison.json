@@ -1,0 +1,30 @@
+{
+  "baseline": "my_story_boundary_full.xml",
+  "candidate": "my_story_diagnostics_verified_full.xml",
+  "baseline_counts": {
+    "passed": 14134,
+    "skipped": 183,
+    "failure": 54,
+    "xfailed": 1
+  },
+  "candidate_counts": {
+    "passed": 14135,
+    "skipped": 183,
+    "failure": 53,
+    "xfailed": 1
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [
+    "tests.test_otr_provision_profile_routes::test_amd_profiles_plan_their_exact_image_and_music_dependencies"
+  ],
+  "status_changes": [
+    {
+      "test": "tests.test_google_video_sfx_workflow::test_canonical_workflow_wires_clip_manifest_to_master_audio_mux",
+      "before": "failure",
+      "after": "passed"
+    }
+  ],
+  "new_tests": [],
+  "removed_tests": []
+}

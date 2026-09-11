@@ -37,9 +37,9 @@ proven routes for each machine. No further baseline renders while fixing.
 | F2 | Visual scenes invert required shared presence | Confirmed live defect. MetaBrief `_build_char_scene_request` and `_compose_char_scene_prompt` own the prompts; ImageDirector routing alone is insufficient. Source facts and companion requirements are absent; first nonempty reply is accepted. |
 | C1 | Cleanup substitutes valid authored speech | Confirmed live defect in `_otr_ledger_clean._repair_row`; cleanliness alone admits an unrelated replacement. The existing transaction reseals legal changes but cannot prove semantics. |
 | C2 | Five dirty rows and six edits | Unverified as a separate bug: model-only dirty count excludes pattern-only targets. Need actual row-level receipt before attributing a sixth edit to an unowned target. |
-| O1 | Pre-image missing-still warning sounds like a render failure | Confirmed phase-label defect. `render_driver.build_request_from_shot` is called at cast preflight; retain the real post-image/render guard. |
+| O1 | Pre-image missing-still warning sounds like a render failure | Diagnostic fix complete: cast-preflight INFO, unchanged request content and real post-image/render guard. See diagnostics_receipt.md. |
 | O2 | LTX-open health complains on intentional still_pan | Confirmed intent-classification defect. Health must compare expected versus actual engine, and only demand LTX where selected. |
-| O3 | Successful same-file rename reconciliation is logged loudly | Confirmed diagnostic defect in mux, image dispatcher and render manifest join. Keep failed identity/path checks loud. |
+| O3 | Successful same-file rename reconciliation is logged loudly | Diagnostic fix complete in mux, image dispatcher and render manifest join. Failed identity/freeze/path handling is unchanged. See diagnostics_receipt.md. |
 | D1 | Mac checkout and loaded extension differ | Deployment state, correctly detected. Retest instructions must verify the loaded extension path, commit/schema and restart, not alter canonical widgets. |
 | D2 | Mac cannot download another model with current free space | Correct storage refusal. No cache deletion, invented fallback, or raised budget. Measure the actual generation/retirement boundary; M1 is not a Mac recovery claim. Incoming 0404aa86 explicitly scopes the failure to the measured M4/16 GB host. |
 

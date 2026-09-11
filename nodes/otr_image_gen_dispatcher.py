@@ -594,14 +594,11 @@ def _reresolve_episode_stills_dir(ep, ep_dir, warnings, ledger=None):
             new_ep = new_episode_dir.name
             if str(disk.get("episode_id") or "").strip() != new_ep:
                 return ep_dir, ep
-            log.warning(
-                "[OTR_ImageGenDispatcher] LOUD re-resolve: episode_id %r is a "
+            log.info(
+                "[OTR_ImageGenDispatcher] PATH RECONCILED: episode_id %r is a "
                 "stale pending id (its dir was renamed after capture); stills "
                 "re-keyed to the active ledger's episode dir %r (same episode, "
                 "post-rename name).", ep, new_ep)
-            warnings.append(
-                f"episode stills dir re-resolved: stale {ep!r} -> {new_ep!r} "
-                f"(title rename happened before image dispatch; LOUD)")
             return str(new_episode_dir / "stills"), new_ep
     except Exception as exc:  # noqa: BLE001 -- never block dispatch on the probe
         log.warning(

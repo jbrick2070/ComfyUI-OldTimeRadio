@@ -92,8 +92,8 @@ below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
 
 **Next action:** close A1R, the received 4060 My Story source-fidelity and
-structured-output defects, in focused shared-core chunks before A2 native-HF
-capacity work. The six-leg receipt is
+structured-output defects, in focused shared-core chunks. Start with grammar/P1;
+then A2 native-HF capacity must precede adaptive source reading. The six-leg receipt is
 `docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
 end-to-end source-qualified My Story output exists. Keep each tested code
 revision distinct; an earlier passing run is not proof of the final correction.
@@ -105,7 +105,7 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 
 | Sprint | Remaining work | Required evidence |
 |---|---|---|
-| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, final spoken text, and eligibility; make P1 schema enforcement reliable. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and eligibility receipt preserve the supplied facts. |
+| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, and final spoken text; make P1 schema enforcement reliable. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and source-check receipts preserve the supplied facts. |
 | **A2. Native HF capacity** | Use actual loaded model capacity while preserving explicit context settings and truthful runtime failures. | Capacity/cache/adapter regression coverage and real canonical component proof. |
 | **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
 | **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
@@ -125,10 +125,11 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
   P2, P3, visual planning, and cleanup may elaborate only without removing,
   replacing, or contradicting directly supplied people, relationship, presence,
   setting, action, or ending facts.
-- Technical publication eligibility is not source qualification. Eligibility
-  must consume a durable source-fidelity receipt covering accepted authored
-  text, visual planning, cleanup, and final spoken text. This remains a direct
-  fact contract, never a subjective content or prose-quality gate.
+- Technical publication eligibility is separate from source qualification.
+  Persist source-check receipts for accepted authored text, visual planning,
+  cleanup and final spoken text. Record exactly what was checked; uncertain or
+  partial checks are not PASS. Repair direct contradictions at their authoring
+  owner, without an added late publication veto or subjective prose-quality gate.
 - No duration, word-count or story-length rejection. Only defects required
   for a usable ledger justify a story failure, after the existing applicable
   LLM repair path has tried. Real provider, storage and cancellation outcomes
@@ -140,8 +141,8 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
   creative model. Preserve genuine source authors in adaptation banks.
 - Scope and fix the credits hero title crossing into column 2. The prior Mac
   hardware handoff acceptance does not prohibit this newly requested fix.
-- Review these next sprints through R1-R4, then regress and test My Story in a
-  real writer/ledger dry run before spending on full media qualification.
+- Review these next sprints through R1-R4, then regress before full canonical
+  recovery through otr/obs. Writer/ledger component checks remain diagnostics.
 
 ### Sprint A -- finish qualification of the My Story ledger
 
@@ -157,11 +158,11 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
    sync-only resume for lack of a free GPU. Before any further authorized pod
    trial, pull current v2.0-alpha; its last tested checkout is 0327850a, while
    the music-parent correction is f829c920. Preserve its receipts and volume.
-2. Close A1R below before A2. Do not spend further baseline media legs on the
+2. Close A1R with its A2 capacity dependency. Do not spend further baseline media legs on the
    known-unprotected My Story implementation; use focused checks until the
    repair is ready for a fresh canonical recovery leg.
-3. Continue the shared native HF capacity correction below as its own qualified
-   chunk only after A1R. Then implement the reviewed Original model credit and
+3. After grammar/P1, qualify the shared native HF capacity correction before
+   adaptive reading; then finish A1R. Implement the reviewed Original model credit and
    credits title containment sprints. The new App and full media qualification
    follow them.
 4. The shared cleaner copied listener attribution into an adjacent intro on
@@ -173,7 +174,9 @@ arc reviews the new failure-policy ruling, live evidence and credits work.
 ### A1R -- My Story live source-fidelity and structured-output closure
 
 The cross-machine triage is at `docs/2026-09-11-my-story-cross-machine/triage.md`;
-its R1-R4 review is in progress. This file remains the only work queue. Root
+its R1-R4 review has converged at kibitz-runs/2026-09-10-my-story-cross-machine/r4/.
+The judgments and complete r3/final.md are implementation specifications, not a
+second queue. This file remains the only work queue. Root
 owns production edits. Reviewers are read-only, with an independent reader at
 each design step and a CLI review of each finished code chunk before push.
 
@@ -215,10 +218,10 @@ each design step and a CLI review of each finished code chunk before push.
    the common repaired commit using each machine's proven installed routes.
    Verify the Mac's actual loaded extension and live 37-slot schema after restart.
 
-Observability follow-up after A1R: phase-label pre-image `MISSING-STILL`,
-downgrade successful same-file rename re-resolution, and suppress LTX-open
-health warnings when the route did not require LTX. Keep true render-time
-missing-still failures loud.
+Observability follow-up after A1R: classify LTX-open health by planned and actual
+engine. Intentional still_pan is valid; a requested LTX route falling back is
+not, and absent intent is unknown. Diagnostic O1/O3 completion receipts live in
+HANDOFF_LOG and the cross-machine receipt folder.
 
 ### Stress coverage after the independent reports
 

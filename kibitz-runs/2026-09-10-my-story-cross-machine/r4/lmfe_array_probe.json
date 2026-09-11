@@ -1,0 +1,50 @@
+[
+  {
+    "mode": "default",
+    "schema": "root",
+    "accepts_25_items": false,
+    "first_refused_char": 50
+  },
+  {
+    "mode": "default",
+    "schema": "nested",
+    "accepts_25_items": false,
+    "first_refused_char": 59
+  },
+  {
+    "mode": "before_only",
+    "schema": "root",
+    "accepts_25_items": false,
+    "first_refused_char": 50
+  },
+  {
+    "mode": "before_only",
+    "schema": "nested",
+    "accepts_25_items": false,
+    "first_refused_char": 59
+  },
+  {
+    "mode": "after_only",
+    "schema": "root",
+    "accepts_25_items": false,
+    "first_refused_char": 50
+  },
+  {
+    "mode": "after_only",
+    "schema": "nested",
+    "accepts_25_items": true,
+    "first_refused_char": null
+  },
+  {
+    "mode": "before_and_after",
+    "schema": "root",
+    "accepts_25_items": true,
+    "first_refused_char": null
+  },
+  {
+    "mode": "before_and_after",
+    "schema": "nested",
+    "accepts_25_items": true,
+    "first_refused_char": null
+  }
+]

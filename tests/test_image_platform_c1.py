@@ -1390,14 +1390,15 @@ def _episodes_fixture(tmp_path, final_slug="signal_lost_rapid_roots_x"):
     return root, ledger_path
 
 
-def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch):
+def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch, caplog):
     from nodes.otr_image_gen_dispatcher import _reresolve_episode_stills_dir
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    caplog.set_level("INFO")
     root, ledger_path = _episodes_fixture(tmp_path)
     monkeypatch.setattr(
         "nodes._otr_ledger.in_flight_ledger_path", lambda: ledger_path,
     )
-    warns = []
+    warns = ["earlier diagnostic"]
     stale = str(root / "pending_20260611_010101" / "stills")
     new_dir, new_ep = _reresolve_episode_stills_dir(
         "pending_20260611_010101", stale, warns,
@@ -1405,7 +1406,9 @@ def test_reresolve_stale_pending_rekeys_to_renamed_episode(tmp_path, monkeypatch
     )
     assert new_ep == "signal_lost_rapid_roots_x"
     assert new_dir == str(root / "signal_lost_rapid_roots_x" / "stills")
-    assert warns and "re-resolved" in warns[0]
+    assert warns == ["earlier diagnostic"]
+    records = [r for r in caplog.records if "PATH RECONCILED" in r.message]
+    assert records and all(r.levelname == "INFO" for r in records)
 
 
 def test_reresolve_pending_dir_still_live_is_untouched(tmp_path, monkeypatch):

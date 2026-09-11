@@ -1,0 +1,22 @@
+{
+  "baseline": "my_story_boundary_bible_candidate.xml",
+  "candidate": "my_story_diagnostics_verified_bible.xml",
+  "baseline_counts": {
+    "failure": 10,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "candidate_counts": {
+    "failure": 10,
+    "passed": 30,
+    "xfailed": 3,
+    "skipped": 11
+  },
+  "new_failure_ids": [],
+  "shared_failure_payload_changes": [],
+  "shared_failure_display_order_only": [],
+  "status_changes": [],
+  "new_tests": [],
+  "removed_tests": []
+}

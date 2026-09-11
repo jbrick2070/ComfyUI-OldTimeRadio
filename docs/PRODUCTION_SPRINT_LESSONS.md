@@ -19,6 +19,15 @@ changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
 ## 1. Define ownership before implementation
 
+Cross-machine diagnostic follow-up (2026-09-11): an image missing before the
+image phase is a typed deferral, while a missing render input remains a failure.
+Pass diagnostic phase explicitly without changing the request or its hash.
+Successful active-episode path reconciliation is INFO; identity/freeze rejection
+stays loud. Basename matching is not PCM byte proof; the downstream mux owns
+that comparison. See 2026-09-11-my-story-cross-machine/diagnostics_receipt.md and
+the existing WIRE-W2 / PBUG-20260721-14 contracts. No duplicate production bug
+was created for warning-only outcomes on otherwise completed media legs.
+
 For every artifact and field, name:
 
 - the one authoritative writer;

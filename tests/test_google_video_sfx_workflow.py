@@ -14,9 +14,10 @@ def _workflow():
 
 
 def test_master_audio_reresolve_uses_active_ledger_not_newest_sibling(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, caplog,
 ):
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
+    caplog.set_level("INFO")
     episodes = tmp_path / "otr" / "episodes"
     active_audio = episodes / "signal_lost_active" / "audio"
     sibling_audio = episodes / "signal_lost_newer_sibling" / "audio"
@@ -35,6 +36,9 @@ def test_master_audio_reresolve_uses_active_ledger_not_newest_sibling(
     )
 
     assert _reresolve_master_audio(stale) == str(active_master)
+    assert any("PATH RECONCILED" in r.message and r.levelname == "INFO"
+               for r in caplog.records)
+    assert not any(r.levelno >= 30 for r in caplog.records)
 
 
 def test_master_audio_reresolve_fails_closed_without_active_ledger(
@@ -50,7 +54,7 @@ def test_master_audio_reresolve_fails_closed_without_active_ledger(
 
 
 def test_master_audio_reresolve_rejects_ledger_directory_identity_mismatch(
-    tmp_path, monkeypatch,
+    tmp_path, monkeypatch, caplog,
 ):
     monkeypatch.delenv("OTR_TEST_MODE", raising=False)
     audio = tmp_path / "otr" / "episodes" / "signal_lost_active" / "audio"
@@ -67,6 +71,8 @@ def test_master_audio_reresolve_rejects_ledger_directory_identity_mismatch(
     )
 
     assert _reresolve_master_audio(stale) == stale
+    assert any("REJECTED" in r.message and r.levelname == "WARNING"
+               for r in caplog.records)
 
 
 def test_master_audio_mux_declares_connector_only_clip_manifest_input():
@@ -121,10 +127,10 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # NOTE for whoever bumps this next -- retiring the global-counter line in
     # favour of the scoped assertions would be a deliberate contract change and
     # belongs in its own commit, not in passing.
-    # 289 since 2026-09-02: CANONICAL REPLAY (campaign item 0) appended link
-    # 289, node 62 v2_ledger_json -> node 7 replay_descriptor. Additive: every
-    # scoped assertion below still holds byte for byte.
-    assert wf["last_link_id"] == 289
+    # 291 since My Story: the appended delivery-intent wire reaches the mux.
+    # Existing link 278 and its audio fanout below remain unchanged. This is
+    # the current canonical counter, not a change to the scoped audio contract.
+    assert wf["last_link_id"] == 291
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",
@@ -136,12 +142,14 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
         "output_path",
         "video_policy_json",
         "foley_receipts_json",
+        "script_json",
     ]
     assert [i.get("link") for i in n85["inputs"][:5]] == [274, 263, 249, 276, 278]
     assert n85["widgets_values"] == [25, "ffmpeg", ""]
     assert n92["outputs"][1]["name"] == "clip_manifest_json"
     assert n92["outputs"][1]["links"] == [261, 271, 275, 278, 288]
     links = {l[0]: l for l in wf["links"]}
+    assert links[291] == [291, 1, 1, 85, 10, "STRING"]
     assert links[278] == [278, 92, 1, 85, 4, "STRING"]
     assert links[261] == [261, 92, 1, 84, 2, "STRING"]
     assert links[271] == [271, 92, 1, 94, 1, "STRING"]

@@ -199,6 +199,7 @@ def _preflight(monkeypatch, raiser):
     from nodes import otr_shot_lock as sl
 
     def _boom(*_a, **_kw):
+        assert _kw["phase"] == "cast_preflight"
         raise raiser
 
     monkeypatch.setattr(rd, "build_request_from_shot", _boom)
@@ -206,13 +207,17 @@ def _preflight(monkeypatch, raiser):
         "wan_i2v", _beat(), _ledger(), _policy())
 
 
-def test_a_declared_cast_time_gap_is_DEFERRED_not_raised(monkeypatch):
+def test_a_declared_cast_time_gap_is_DEFERRED_not_raised(monkeypatch, caplog):
     """The whole point: cast time runs BEFORE the image phase, so a missing
     still here is expected and the beat proceeds on a placeholder init that
     the still spine later proves was replaced by a real image."""
+    caplog.set_level("INFO")
     _preflight(monkeypatch, rd.DeferredImageGapError(
         "LTX-I2V requires a minted scene still for beat b001; the image "
         "phase produced no usable path."))
+    deferred = [record for record in caplog.records
+                if "cast-time image input deferred" in record.message]
+    assert deferred and all(record.levelname == "INFO" for record in deferred)
 
 
 def test_a_plain_render_error_still_PROPAGATES(monkeypatch):

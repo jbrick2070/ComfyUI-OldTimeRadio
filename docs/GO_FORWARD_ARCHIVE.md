@@ -1,5 +1,37 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-11 -- diagnostic follow-up queue superseded
+
+Previous combined item, preserved verbatim; O1/O3 are complete, O2 remains in
+GO_FORWARD. Receipt: docs/2026-09-11-my-story-cross-machine/diagnostics_receipt.md.
+
+Observability follow-up after A1R: phase-label pre-image `MISSING-STILL`,
+downgrade successful same-file rename re-resolution, and suppress LTX-open
+health warnings when the route did not require LTX. Keep true render-time
+missing-still failures loud.
+
+Prior sequencing and qualification wording, superseded by adaptive briefing
+and grounded cross-machine review; preserved verbatim:
+
+2. Close A1R below before A2. Do not spend further baseline media legs on the
+   known-unprotected My Story implementation; use focused checks until the
+   repair is ready for a fresh canonical recovery leg.
+3. Continue the shared native HF capacity correction below as its own qualified
+   chunk only after A1R. Then implement the reviewed Original model credit and
+   credits title containment sprints. The new App and full media qualification
+   follow them.
+
+- Technical publication eligibility is not source qualification. Eligibility
+  must consume a durable source-fidelity receipt covering accepted authored
+  text, visual planning, cleanup, and final spoken text. This remains a direct
+  fact contract, never a subjective content or prose-quality gate.
+- Review these next sprints through R1-R4, then regress and test My Story in a
+  real writer/ledger dry run before spending on full media qualification.
+
+Current interpretation: A2 capacity is a prerequisite for adaptive reading;
+source qualification has scoped durable evidence but adds no late mux veto.
+Only full canonical publication counts as end-to-end qualification.
+
 ## 2026-09-11 -- A1R boundary implementation moved to receipt
 
 Completed pending item, preserved verbatim:

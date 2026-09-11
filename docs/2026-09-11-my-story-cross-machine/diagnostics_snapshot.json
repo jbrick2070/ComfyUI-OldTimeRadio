@@ -1,0 +1,43 @@
+{
+  "base": "59a4013103cd062302aa77d0e3acef5eb29e5786",
+  "snapshot": "C:/Users/jeffr/Documents/ComfyUI/_worktrees/otr-my-story-diagnostics-candidate",
+  "source": "C:/Users/jeffr/Documents/ComfyUI/custom_nodes/ComfyUI-OldTimeRadio",
+  "files": [
+    {
+      "file": "nodes/_otr_video_engines/render_driver.py",
+      "sha256": "b517c4f67ce05ebb783f937f217e45ec6ffeca0cc1656279b77ca7e28ca683d4"
+    },
+    {
+      "file": "nodes/otr_shot_lock.py",
+      "sha256": "e6f971060d1cda9cc0b50144f64574c571cb90ee0b443fe74b614dbd9b9b0b4b"
+    },
+    {
+      "file": "nodes/otr_master_audio_mux.py",
+      "sha256": "946675b2641fbd3871fba8709014f938b5c28170828a8fddfb2f2d9dbd369183"
+    },
+    {
+      "file": "nodes/otr_image_gen_dispatcher.py",
+      "sha256": "3cb7fd3d9d1ee4ba2d95646fa764cbed592c4519fc9d3cb499d970719d363aa1"
+    },
+    {
+      "file": "tests/test_image_platform_c1.py",
+      "sha256": "bb84d966fc08dc814ebed4bfafd8925c4414d4461ea3df16b7bc3722b1d541c5"
+    },
+    {
+      "file": "tests/test_wire_w2_deferred_image_gap.py",
+      "sha256": "f752dbc538d88498aad87755d926d8b691ec45193e9aefda4e3917a8345ec18e"
+    },
+    {
+      "file": "tests/test_video_render_driver_additive.py",
+      "sha256": "efe7b54a670a96983326c0469e8341447a2c28fed718accb8a87aa429550c554"
+    },
+    {
+      "file": "tests/test_google_video_sfx_workflow.py",
+      "sha256": "b06bbfff74274df0eeedc2e0150ca7a3467be9da1e1430771a63c40f31296f1c"
+    },
+    {
+      "file": "tests/test_clip_fill.py",
+      "sha256": "d4b646335f397d5d459103362ca500ab87dd4b0f1f0477c0530ede17b09c8618"
+    }
+  ]
+}

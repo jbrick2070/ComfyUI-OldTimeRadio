@@ -331,7 +331,7 @@ def test_seedance_preflight_requires_engine_init_image():
     assert "init_image" in str(excinfo.value)
 
 
-def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black():
+def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black(caplog):
     # No scene still for the opener -> init stays empty, but the degrade is LOUD
     # (the branch warns), never a silent scene_still claim. init_source falls
     # back to "none".
@@ -346,7 +346,16 @@ def test_build_request_from_shot_still_pan_missing_still_is_loud_not_black():
     led["images"]["images"] = [r for r in led["images"]["images"]
                                if r["object_id"] != "still_b000_music_open"]
     shot = led["video"]["shots"][0]
+    caplog.set_level("INFO")
+    planned = rd.build_request_from_shot(shot, led, phase="cast_preflight")
+    assert any("STILL DEFERRED" in r.message and r.levelname == "INFO"
+               for r in caplog.records)
+    assert not any("MISSING-STILL" in r.message for r in caplog.records)
+    caplog.clear()
     req = rd.build_request_from_shot(shot, led)
+    assert req == planned, "diagnostic phase must not change the render request"
+    assert any("MISSING-STILL" in r.message and r.levelname == "WARNING"
+               for r in caplog.records)
     assert req["asset_refs"] == {}                       # no still -> empty
     assert req["observability"]["init_source"] == "none"
 
