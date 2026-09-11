@@ -139,6 +139,31 @@
     panel at "is this function correct", and section 9's rule still stands: do
     not burn a scalpel on a screw.
 
+- **NO FIXED ROUND COUNT -- BUT EVERY ROUND GETS A CONTRARIAN (operator directive
+  2026-09-11).** Operator: *"I don't need a full r1/r4, you decide. [I want a]
+  contrarian QA / peer at each round."*
+  * **DEPTH IS THE DRIVER'S CALL.** One round is a complete arc when one round
+    settles it. Do not run r2-r4 to hear "looks good" in more accents; measured
+    2026-09-11, r2 was unnecessary on 8 of 8 rows because each had already
+    collapsed into a decision, a measurement or a concrete diff. Say why you
+    stopped, and say why when you go deeper.
+  * **WHAT IS NOT OPTIONAL IS THE CONTRARIAN.** Every round ends with a reader
+    whose ONLY job is to break the conclusion -- not to review it, not to
+    summarize it, not to confirm it. Brief it to REFUTE, tell it to default to
+    "refuted" when it cannot ground a claim, and give it the real files.
+  * **A SELF-CRITIQUE IS NOT A CONTRARIAN.** Asking the author for "the strongest
+    case against my own pick" is worth having and is not this. The whole mechanism
+    is a reader with no memory of having written the thing -- the 2026-09-07 rule
+    above exists because two defects shipped that the author structurally could not
+    see, and on 2026-09-11 a contrarian pass returned a flat "no" on a finished diff
+    and was RIGHT: it found that a failed resample returned the original waveform to
+    a caller that then labelled it with the destination rate, which the author had
+    reasoned past while writing a docstring claiming the opposite.
+  * **THE CONTRARIAN MAY BE ANY MODEL** -- the codex/cursor CLI lanes, a Sonnet or
+    Opus subagent, Fable on a judgment row. What matters is that it is SEPARATE and
+    that it is briefed to disagree. Record which one actually ran; a round without
+    a contrarian is reported as a round without one.
+
 - **`otr/obs/` IS THE SUCCESS SIGNAL. ALWAYS PUBLISH TO IT (operator directive 2026-08-17 --
   hard, and it OVERRIDES the tidiness instinct).** Operator, in his words: *"always publish to
   obs -- a test is not complete unless published to obs (or it's just testing one part). If I
