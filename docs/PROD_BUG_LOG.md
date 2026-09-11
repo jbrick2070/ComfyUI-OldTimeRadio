@@ -14058,3 +14058,83 @@ for promotion from the Windows box. Each is portable beyond OTR:
   comparison improves one current-owner check with ten shared failures
   unchanged. Finished-diff CLI review is grounded and resolved. Exact receipts
   are in docs/2026-09-10-my-story-a1/music_parent_receipt.json.
+
+## PBUG-20260910-03 -- My Story loses explicit listener facts after intake
+
+- promotion: BUG-11.39, the existing immutable source-grounding rule. This is
+  a new My Story occurrence, not a duplicate of its earlier opaque
+  source-draw incident.
+- surfaced: physical 4060 canonical one-act My Story Steps 116--121 in
+  docs/4060_DRILL_LOG.md, summarized with durable artifact identifiers in
+  docs/2026-09-10-my-story-4060/.
+- symptom: schema-valid P0 inferred that an explicitly living, present mother
+  was deceased, unavailable, absent, or replaceable. Schema-valid P2 then
+  replaced a required shared Los Angeles dinner with an invented fire and
+  solitude. A visual plan inverted required pair staging, and technical
+  publication eligibility remained true with an empty fidelity-discrepancy
+  list.
+- root cause: explicit listener facts become ordinary prompt prose rather than
+  an immutable, durable contract carried through P0/P1/P2/P3, visual planning,
+  cleanup, final spoken text, and eligibility validation.
+- fix: derive only direct listener facts at intake and preserve them in a
+  durable receipt. At each owning boundary, reject and use the existing bounded
+  typed repair for direct contradiction, removal, replacement, major invented
+  event, or inverse staging. Make final eligibility consume that receipt. Do
+  not silently rewrite authored prose or add a subjective quality/content gate.
+- verification: a canned living-mother/pair-at-table fixture must reject P0
+  death/absence, P2 fire/solitude, inverse visual staging, and cleanup removal,
+  while accepting the source-compatible dinner through final spoken text and
+  publication eligibility.
+- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+
+## PBUG-20260910-04 -- one selected act is prompted as music "between acts"
+
+- promotion: pending focused verification and Bug Bible/index comparison. This
+  is not PBUG-20260825-01, which concerns invalid 7/8-act topology rather than
+  a valid one-act control being projected as an impossible narrative boundary.
+- surfaced: 4060 Steps 118, 119, and 121. The selected count was one and
+  assembly correctly created zero interstitials, while P0 retained an
+  assumption or requirement for music "between acts."
+- root cause: P0 and P1 render `include_act_breaks` as affirmative
+  between-acts music whenever it is true, even when `act_count=1`.
+  Assembly/P3 already derive the actual boundary count as
+  `max(0, act_count - 1)`.
+- fix: compute and pass the actual boundary count in P0/P1 and reject a
+  between-act/interstitial assertion when it is zero. Preserve legitimate
+  `N - 1` interstitials for multi-act stories.
+- verification: one-act prompt/response fixtures contain zero between-act
+  claims and no interstitial rows; 3/6-act fixtures retain exactly `N - 1`
+  when breaks are enabled; breaks-off remains zero.
+- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+
+## PBUG-20260910-05 -- My Story P1 bypasses its available local schema binder
+
+- promotion: no exact existing binder rule found. This is separate from
+  PBUG-20260910-01 / BUG-11.48, whose full-failed-treatment repair-context fix
+  is already landed.
+- surfaced: 4060 Steps 117--121 after that repair-context fix. Base and
+  lower-temperature P1 treatment calls repeatedly returned JSON-looking but
+  undecodable output; typed repair exhausted entirely in two legs and succeeded
+  only variably in later legs.
+- confirmed wiring gap: My Story P1 passes `creative_fn` directly to the
+  structured call although the local writer closure exposes
+  `_otr_bind_schema`. The live evidence proves the failure; focused bind/repeat
+  coverage must prove causal closure.
+- fix: bind only the local P1 callable once to `StoryTreatment` when the seam
+  is callable. Preserve P2/P3 callables, attempt accounting, the three
+  fail-closed attempts, and the existing typed repair. Do not add generic JSON
+  regex or natural-language salvage.
+- verification: a P1-only binder-once seam test; a malformed-output
+  fail-closed control; and a repeated canonical one-act treatment on the
+  corrected implementation.
+- status: OPEN -- live evidence only; no 4060 shared-core source changed.
+
+### PBUG-20260829-14 addendum -- My Story coda was falsely rewritten
+
+- surfaced: 4060 My Story Step 120. The valid spoken coda "Until next time"
+  was classified as non-speech and committed as "That's a wrap."
+- consequence: this is a committed semantic rewrite, not an `unclean` row
+  that fails safe. Add a short-coda regression requiring byte-identical
+  preservation unless a localized, strictly shorter offending segment exists.
+- status: remains OPEN. This is not the protected Python-owned-fact class in
+  BUG-12.103.

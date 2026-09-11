@@ -91,17 +91,21 @@ handoff log and the bug log cite the ORIGINAL ids, so here is the map.
 below are the source of truth. Kibitz round inputs/finals are review snapshots
 and judgments are receipts; they never become a competing work queue.
 
-**Next action:** implement A2 native HF capacity below as a separate qualified
-chunk after collecting the independent 4060/Mac results and identifying the
-remaining stress-test coverage below. Keep each tested code revision distinct;
-an earlier passing run is not proof of the final correction. The completed
-R1-R4 judgments are in
-2026-09-10-my-story-next/; the later flexible-character amendment is recorded in
-2026-09-10-my-story-a1/operator_amendment.md. The older queue below is outside this campaign. The earlier D1 arc is complete and is not being repeated;
-this arc reviews the new failure-policy ruling, live evidence and credits work.
+**Next action:** close A1R, the received 4060 My Story source-fidelity and
+structured-output defects, in focused shared-core chunks before A2 native-HF
+capacity work. The six-leg receipt is
+`docs/2026-09-10-my-story-4060/`: technical all-stills delivery works, but no
+end-to-end source-qualified My Story output exists. Keep each tested code
+revision distinct; an earlier passing run is not proof of the final correction.
+The completed R1-R4 judgments are in 2026-09-10-my-story-next/; the later
+flexible-character amendment is recorded in
+2026-09-10-my-story-a1/operator_amendment.md. The older queue below is outside
+this campaign. The earlier D1 arc is complete and is not being repeated; this
+arc reviews the new failure-policy ruling, live evidence and credits work.
 
 | Sprint | Remaining work | Required evidence |
 |---|---|---|
+| **A1R. My Story source-fidelity closure** | Preserve direct listener facts and one-act semantics through P0--P3, visual planning, cleanup, final spoken text, and eligibility; make P1 schema enforcement reliable. | Focused/full/Bible coverage plus a canonical one-act pair-lock publication whose accepted text, visual plan, final TTS, and eligibility receipt preserve the supplied facts. |
 | **A2. Native HF capacity** | Use actual loaded model capacity while preserving explicit context settings and truthful runtime failures. | Capacity/cache/adapter regression coverage and real canonical component proof. |
 | **B. Original model credit** | Credit the creative model actually used; preserve listener and genuine source-author credits. | Local/remote identity and persisted/wire/renderer parity checks. |
 | **C. Credits title containment** | Wrap long hero titles within column 1, with correct vertical layout. | Real-font visual proof and measured glyph/column/footer regression coverage. |
@@ -115,6 +119,16 @@ this arc reviews the new failure-policy ruling, live evidence and credits work.
   clarification makes character count flexible, as on Public Domain/Shakespeare:
   My Story preserves the supplied people and records requested/actual counts.
   The announcer is excluded. No RSS or random source is used for My Story.
+- For `act_count=1`, the interstitial count is zero. P0/P1 must not request,
+  infer, or retain between-acts music or events in a one-act story.
+- Explicit listener facts are protected data, not creative suggestions. P0, P1,
+  P2, P3, visual planning, and cleanup may elaborate only without removing,
+  replacing, or contradicting directly supplied people, relationship, presence,
+  setting, action, or ending facts.
+- Technical publication eligibility is not source qualification. Eligibility
+  must consume a durable source-fidelity receipt covering accepted authored
+  text, visual planning, cleanup, and final spoken text. This remains a direct
+  fact contract, never a subjective content or prose-quality gate.
 - No duration, word-count or story-length rejection. Only defects required
   for a usable ledger justify a story failure, after the existing applicable
   LLM repair path has tried. Real provider, storage and cancellation outcomes
@@ -131,21 +145,53 @@ this arc reviews the new failure-policy ruling, live evidence and credits work.
 
 ### Sprint A -- finish qualification of the My Story ledger
 
-1. Collect the independent4060/Mac results and any incoming lessons against
-   their exact tested commits. The operator owns those machines; preserve their
-   repo updates and keep one production-code editor.
+1. The independent 4060 report is received at
+   `docs/2026-09-10-my-story-4060/`, against tested implementation `0327850a`.
+   It records four full technical all-stills publications, two correct P1
+   fail-closed stops, and zero source-qualified outputs. The Mac result remains
+   pending. The operator owns those machines; preserve their repo updates and
+   keep one production-code editor.
    RunPod latest sync is also pending: the stopped existing host refused a
    sync-only resume for lack of a free GPU. Before any further authorized pod
    trial, pull current v2.0-alpha; its last tested checkout is 0327850a, while
    the music-parent correction is f829c920. Preserve its receipts and volume.
-2. Continue the shared native HF capacity correction below as its own qualified
-   chunk. Then implement the reviewed Original model credit and credits title
-   containment sprints. The new App and full media qualification follow them.
-3. The shared cleaner copied listener attribution into an adjacent intro on
+2. Close A1R below before A2. Do not spend further baseline media legs on the
+   known-unprotected My Story implementation; use focused checks until the
+   repair is ready for a fresh canonical recovery leg.
+3. Continue the shared native HF capacity correction below as its own qualified
+   chunk only after A1R. Then implement the reviewed Original model credit and
+   credits title containment sprints. The new App and full media qualification
+   follow them.
+4. The shared cleaner copied listener attribution into an adjacent intro on
    both local and RunPod baseline runs. The accepted frame has the sentence
    once, and the final seals account for the authorized cleanup rewrite. Keep
    that live evidence available for the credit work; do not claim this music
    correction fixes the shared cleaner or rewrite story prose in Python.
+
+### A1R -- My Story live source-fidelity and structured-output closure
+
+1. Bind only P1's local creative callable through its existing
+   `_otr_bind_schema(StoryTreatment)` seam. Preserve P2/P3's original callable,
+   all three fail-closed attempts, and no generic JSON repair.
+2. Replace the one-act boolean between-acts prompt claim with the actual
+   `max(0, act_count - 1)` boundary count in P0/P1. Reject an interstitial claim
+   when the selected count is one.
+3. Carry direct listener facts through P0/P1/P2/P3, ShotLock/ImageDirector,
+   cleanup, and final TTS. Reject and bounded-repair direct contradictions,
+   invented major events, solitude/separation, or source setting/action
+   replacement. Do not make this a language, safety, length, or quality gate.
+4. Add durable source-fidelity receipts and make publication eligibility consume
+   them. Regression fixtures cover the living-mother contradiction, one-act
+   music, P2 pair-lock replacement, inverse visual staging, and cleanup changing
+   a valid short coda.
+5. Requalify with one canonical one-act pair-lock all-stills publication after
+   focused/full/Bible checks. Accepted text, visual prompts, final TTS, and the
+   eligibility receipt must preserve the shared-table facts.
+
+Observability follow-up after A1R: phase-label pre-image `MISSING-STILL`,
+downgrade successful same-file rename re-resolution, and suppress LTX-open
+health warnings when the route did not require LTX. Keep true render-time
+missing-still failures loud.
 
 ### Stress coverage after the independent reports
 
@@ -187,6 +233,10 @@ to fill a duplicate cell. New findings go through the existing live-evidence
 and root-fix process. A2 or another subsequent implementation change requires
 clearly labelled requalification of its affected cases, not relabelling old
 results as if they ran new code.
+
+MRKT's 4060 campaign remains exactly one act per GUI Run. Its one-act pair-lock
+recovery proof is a repair gate, not a substitute for the authorized 3/6-act
+stress coverage on another host.
 
 A2 implementation boundary (shared owners, separate qualified chunk):
 

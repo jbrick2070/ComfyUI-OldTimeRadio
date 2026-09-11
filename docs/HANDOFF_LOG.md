@@ -1,3 +1,43 @@
+## 2026-09-11 03:03 UTC -- HEAD 691325f (v2.0-alpha) -- 4060 evidence / 5080 core handoff
+
+Did:
+
+- Ran six canonical, one-act, non-Registry My Story all-stills legs on MRKT;
+  the durable receipts are Steps 116--121 and
+  `docs/2026-09-10-my-story-4060/`.
+- Four legs technically published with materialized Z-Image stills, `still_pan`
+  clips, duration checks, audio identity, OBS publication, and delivery. Two
+  stopped correctly after P1 exhausted its malformed-JSON ladder.
+- Confirmed distinct P0/P2/visual/cleanup source-fidelity defects and a P1
+  schema-binding wiring gap. No end-to-end source-qualified My Story media pass
+  exists. PBUG-20260910-03 through -05 record the new core work; the coda
+  rewrite extends existing PBUG-20260829-14.
+
+Current step:
+
+- 5080 core closes A1R source-fact propagation, one-act semantics, and P1
+  schema reliability before A2 capacity work or further qualification.
+
+Next:
+
+- Land focused A1R chunks, test them, then run one canonical one-act pair-lock
+  recovery leg. MRKT remains exactly one act per GUI Run; that proof does not
+  replace authorized 3/6-act stress coverage elsewhere.
+
+Models:
+
+- Local Qwen/Qwen3.5-4B supplied the 4060 authoring calls. No shared-core
+  `nodes/` source changed on MRKT; no new reviewer/model call was used for this
+  handoff.
+
+Commits:
+
+- `691325f` records the 4060 drill evidence. This documentation handoff adds
+  the full report, production-bug records, and forward plan; the final commit
+  and origin parity are verified after the docs-only push.
+
+---
+
 ## 2026-09-11 -- one canonical and full-run qualification clarified
 
 The operator explicitly reaffirmed that the real test is the canonical. Prior
