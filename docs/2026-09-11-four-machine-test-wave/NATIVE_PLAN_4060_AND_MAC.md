@@ -211,6 +211,26 @@ Leg C -- KNOWN, report-and-move-on, do not chase:
 Leg D -- fresh-install friction. Anything that needed a manual step the docs do not
 mention goes in docs/4060_DRILL_LOG.md, which is yours.
 
+Leg D2 -- THE SHIPPING OUTPUT TREE, and this is the one nobody has ever tested.
+Operator, 2026-09-11: *"otr/obs is always the local output folder -- don't confuse my
+testing setup with what ships. Everyone this ships to will see the otr subdirectory in
+their output folder; our workflow should create the folders within their output."*
+  The code is built for that: `comfy_output_dir()` prefers `OTR_OUTPUT_DIR`, then
+  ComfyUI's own `folder_paths.get_output_directory()`; `_otr_paths` resolves and never
+  creates; each writer calls `makedirs(..., exist_ok=True)`. **But every box in this
+  wave pins those env vars** -- the harness launcher sets `OTR_OUTPUT_DIR` and the
+  5080 sets `OTR_OBS_DIR` for its two-tree split -- so the tier a REAL USER hits is
+  the one tier no leg exercises.
+  So run one canonical episode with **NO `OTR_OUTPUT_DIR` and NO `OTR_OBS_DIR` set at
+  all** (check the environment before you boot; `Get-ChildItem Env:OTR_*`), and report:
+    1. the absolute path `otr/` was created under -- it should be YOUR ComfyUI
+       `output/` folder, the same one stock ComfyUI nodes save into;
+    2. that `otr/episodes/<episode_id>/` and `otr/obs/` were both created by the
+       render rather than needing to exist first;
+    3. anything the pack expected to find and did not create.
+  A fresh clone on a stranger's machine has no env pins and no pre-made folders. This
+  leg is that stranger.
+
 Leg E -- KEEP GOING. The diagnostic legs above are the floor, not the ceiling.
 With evening left, spend it on MORE PUBLISHED EPISODES rather than on more analysis:
 rotate the source bank and let `visual_style` roll freely, and bank whatever lands in
