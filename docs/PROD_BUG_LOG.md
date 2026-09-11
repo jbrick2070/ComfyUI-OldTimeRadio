@@ -14028,6 +14028,33 @@ for promotion from the Windows box. Each is portable beyond OTR:
 - status: ROOT-FIXED; first live component completed; final qualification
   receipts in docs/2026-09-10-my-story-a1/.
 
+### PBUG-20260910-01 follow-up -- raised completion omitted from final repair
+
+Full canonical 5080 pairlock_03 on97f2d40f, prompt24612071-a226-4871-9612-23f9eae1f3af,
+failed P1 naturally after three verbatim-cycle halts at408.62seconds. The saved
+attempts carry empty raw_output and complete raw_completion strings of2673,
+11581 and1770characters. The shared ladder passes last_raw (empty after a raise)
+and last_error to the existing My Story full-artifact repair factory. That local
+factory ignored error.raw_completion, so the third call received an empty draft
+despite the available full second completion. This is an observed repair-context
+omission, not proof of what caused the first two model spirals.
+
+Fix at that factory only: exact nonempty returned text wins, else exact string
+captured completion, else empty. Interrupted text is explicitly failure evidence;
+the original source remains authority. Keep three attempts, all source context,
+schema binding, provider fit, validators and failure/proposal distinction. Generic
+shared-caller policy is unchanged. Bible11.48 extended, no duplicate bug ID.
+Public-ladder coverage distinguishes successive failures, requires latest full
+text beyond400characters at the actual final call, and saves its valid correction.
+Portable Bible guard executes the actual helper and fails on the pre-fix code.
+
+All three P1 fragments stay inside logline (last quoteoffset48). CPU reconstruction
+using the actual cached tokenizer and installed LMFE admits closing quote token1
+after each retokenized prefix. This is not original token/logit replay. Native
+EOS alignment and fresh parser ownership were verified separately. No new length,
+time, story-quality or cast gate is justified. Raw03artifacts and diagnosis:
+2026-09-11-my-story-5080-qualification/ and2026-09-11-my-story-treatment-followup/.
+
 ## PBUG-20260910-02 -- supplemental My Story music rows invented parent beat references
 
 - promotion: BUG-12.58 (existing line-versus-parent identity rule)

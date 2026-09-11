@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="5" time="2.184" timestamp="2026-09-11T03:31:51.153216-07:00" hostname="iDream"><testcase classname="tests.test_my_story_runner" name="test_halted_treatment_repair_receives_the_latest_full_completion_and_rewrites" time="1.695"><failure message="assert '' == '{&quot;title&quot;:&quot;Ha...RY TURNS AWAY'&#10;  &#10;  - {&quot;title&quot;:&quot;Harbor&quot;,&quot;logline&quot;:&quot;second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interr...&#10;  &#10;  ...Full output truncated (1 line hidden), use '-vv' to show">def test_halted_treatment_repair_receives_the_latest_full_completion_and_rewrites():
+        from nodes._otr_generation_budget import GenerationDegeneracyError
+        from nodes._otr_content_authorship import validate_receipt
+        first = '{"title":"Harbor","logline":"' + "first interrupted fragment " * 30
+        last = '{"title":"Harbor","logline":"' + "second interrupted fragment " * 30
+        last += "THE FERRY TURNS AWAY"
+    
+        class HaltThenRepair(Slots):
+            treatment_calls = 0
+    
+            def _answer(self, messages):
+                if "radio dramatist" in messages[0]["content"]:
+                    self.treatment_calls += 1
+                    if self.treatment_calls &lt; 3:
+                        raise GenerationDegeneracyError(
+                            "the output repeated a run of tokens verbatim",
+                            halt_reason="verbatim_cycle",
+                            raw_completion=first if self.treatment_calls == 1 else last,
+                        )
+                    assert self.treatment_calls == 3
+                    prior = [m for m in messages if m["role"] == "assistant"]
+                    assert prior[-1]["content"] == last
+                    assert prior[-1]["content"].index("THE FERRY TURNS AWAY") &gt; 400
+                    assert "a keeper hears a voice" in messages[1]["content"]
+                    result = _treatment()
+                    result["ending"] = "THE FERRY TURNS AWAY"
+                    return json.dumps(result)
+                return super()._answer(messages)
+    
+        slots = HaltThenRepair()
+&gt;       led, _ = _run(slots)
+                 ^^^^^^^^^^^
+
+tests\test_my_story_runner.py:1008: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_my_story_runner.py:168: in _run
+    parts = MS.run_my_story_episode(
+nodes\_otr_my_story.py:1018: in run_my_story_episode
+    treatment = _pass_treatment(
+nodes\_otr_my_story.py:501: in _pass_treatment
+    return _call(
+nodes\_otr_my_story.py:395: in _call
+    authored = structured_call(on_attempt_complete=completed, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+nodes\_otr_structured_call.py:1116: in structured_call
+    last_raw = _invoke_slot(
+nodes\_otr_structured_call.py:659: in invoke_structured_slot
+    return slot_fn(
+tests\test_my_story_runner.py:131: in creative
+    return self._answer(messages)
+           ^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;tests.test_my_story_runner.test_halted_treatment_repair_receives_the_latest_full_completion_and_rewrites.&lt;locals&gt;.HaltThenRepair object at 0x000001ED6E3D40E0&gt;
+messages = [{'role': 'system', 'content': 'You are a radio dramatist. You are handed a person\'s story idea, already interpreted,...rect any named defect to respect the original source. Return the complete corrected JSON object, with no commentary."}]
+
+    def _answer(self, messages):
+        if "radio dramatist" in messages[0]["content"]:
+            self.treatment_calls += 1
+            if self.treatment_calls &lt; 3:
+                raise GenerationDegeneracyError(
+                    "the output repeated a run of tokens verbatim",
+                    halt_reason="verbatim_cycle",
+                    raw_completion=first if self.treatment_calls == 1 else last,
+                )
+            assert self.treatment_calls == 3
+            prior = [m for m in messages if m["role"] == "assistant"]
+&gt;           assert prior[-1]["content"] == last
+E           assert '' == '{"title":"Ha...RY TURNS AWAY'
+E             
+E             - {"title":"Harbor","logline":"second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interrupted fragment second interr...
+E             
+E             ...Full output truncated (1 line hidden), use '-vv' to show
+
+tests\test_my_story_runner.py:999: AssertionError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft[{&quot;returned&quot;:true}-{&quot;older&quot;:true}-{&quot;returned&quot;:true}]" time="0.002" /><testcase classname="tests.test_my_story_runner" name="test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft[-  complete interrupted bytes\n-  complete interrupted bytes\n]" time="0.002"><failure message="AssertionError: assert {'content': '...: 'assistant'} == {'content': '...: 'assistant'}&#10;  &#10;  Omitting 1 identical items, use -vv to show&#10;  Differing items:&#10;  {'content': ''} != {'content': '  complete interrupted bytes\n'}&#10;  Use -v to get more diff">returned = '', completion = '  complete interrupted bytes\n'
+expected = '  complete interrupted bytes\n'
+
+    @pytest.mark.parametrize("returned,completion,expected", [
+        ('{"returned":true}', '{"older":true}', '{"returned":true}'),
+        ("", "  complete interrupted bytes\n", "  complete interrupted bytes\n"),
+        ("", None, ""),
+        ("", {"not": "text"}, ""),
+    ])
+    def test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft(returned, completion, expected):
+        error = ValueError("failed")
+        error.raw_completion = completion
+        messages = MS._full_artifact_repair("Repair the treatment.")(
+            original_prompt=[{"role": "user", "content": "original source"}],
+            failed_output=returned, error=error,
+        )
+&gt;       assert messages[-2] == {"role": "assistant", "content": expected}
+E       AssertionError: assert {'content': '...: 'assistant'} == {'content': '...: 'assistant'}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'content': ''} != {'content': '  complete interrupted bytes\n'}
+E         Use -v to get more diff
+
+tests\test_my_story_runner.py:1035: AssertionError</failure></testcase><testcase classname="tests.test_my_story_runner" name="test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft[-None-]" time="0.001" /><testcase classname="tests.test_my_story_runner" name="test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft[-completion3-]" time="0.001" /></testsuite></testsuites>

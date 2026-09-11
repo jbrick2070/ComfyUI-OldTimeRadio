@@ -92,22 +92,23 @@ code/test/review receipts are in HANDOFF_LOG, GO_FORWARD_ARCHIVE and
 `docs/2026-09-11-my-story-cross-machine/finishing_receipt.md`. Source fidelity
 and fresh hardware qualification remain open.
 
-**Next action: ONE fresh full canonical 5080 pair-lock attempt 03 after the
-qualified follow-up is pushed.** Use the real `workflows/otr_canonical.json`,
-the shipped full API runner, `otr_w45_still_pan`, and exactly the pairlock_01
-source fields, Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Record
-checkout/canonical hashes, actual EOS IDs, loaded capacity, schema-enriched fit,
-correction attempts and terminal state. Keep attempts 01 and 02 in the denominator:
-their receipts are in `docs/2026-09-11-my-story-5080-qualification/`.
+**Next action: ONE fresh full canonical 5080 pair-lock attempt04 on the pushed
+treatment repair-context correction.** Use the real
+`workflows/otr_canonical.json` and shipped full API runner. Keep exactly the
+pairlock_01 source, Qwen3.5-4B model pair, NF4/SDPA, `otr_w45_still_pan` and
+sampling controls; record the qualified checkout/canonical hashes and actual
+attempts. Do not change sampling or the treatment prompt in the same measurement.
+If a raised completion reaches final repair, verify the actual full captured
+draft is supplied and the correction is applied within the existing three
+attempts. Preserve any failure before another run; never restart the budget.
 
-The case is one act: Jeffrey and his living mother share dinner at the same
-Los Angeles table. Inspect accepted P0-P3 metadata, final speech, actual voice
-references and durable credits, scene prompts and image pixels. Both adults
-remain present, the ending is a shared meal, and between-act music is zero.
-Publication alone is not source-fidelity proof. Preserve and diagnose any new
-failure before another run. Subsequent stress coverage remains below; Original
-model credits require a fresh Original publication. Qualified code/test/review
-evidence: `docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md`.
+Keep attempts01/02/03 in the denominator. Source qualification still requires
+both adults sharing the present-day meal, distinct absent girlfriend, preserved
+metadata, actual voice/credits agreement, accepted prompts and inspected pixels,
+and zero between-act music. Publication alone is insufficient. Later stress
+coverage and a fresh Original credit publication remain below. Diagnosis,
+grounded reviewer disagreements, CPU quote-admission limits and code evidence
+are in `docs/2026-09-11-my-story-treatment-followup/`.
 
 **Operator sequencing remains binding.** No GPU run before coding and QA finish.
 5080 recovery is authorized after those checks. Mac/4060 stay idle until tomorrow

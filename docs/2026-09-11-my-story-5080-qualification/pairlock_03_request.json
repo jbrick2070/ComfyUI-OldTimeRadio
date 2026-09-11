@@ -1,0 +1,49 @@
+{
+  "canonical_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json",
+  "canonical_sha256": "d586a286aaee4c039e410ae9a10014c5c7f4ab82d00eac0e9e1cc0564415057c",
+  "runner": "scripts/otr_canonical_api_run.py",
+  "profile": "otr_w45_still_pan",
+  "creative_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "technical_model": "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+  "quant_policy": "bnb_nf4",
+  "scope": "Full canonical through audio, video and obs publication; no workflow substitute, replay or partial target.",
+  "source_note": "Fresh explicit recovery inputs based on the committed 4060 dinner/pair-lock failure; not a claim to reproduce an unarchived exact earlier request.",
+  "fields": {
+    "source_bank": "my_story",
+    "custom_premise": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+    "story_characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+    "story_plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+    "story_setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+    "story_author": "",
+    "num_characters": 2,
+    "act_count": "1",
+    "visual_style": "roll (any style)"
+  },
+  "runpod": "not started; current session has no authenticated RunPod API or console access",
+  "mac_4060": "held; no contact",
+  "status": "FAILED: treatment exhausted three verbatim-cycle attempts; no media/publication",
+  "created_utc": "2026-09-11T10:17:03.020322+00:00",
+  "code_commit": "97f2d40f7168e32324283aee044e652e666a84b0",
+  "previous_attempts": [
+    "pairlock_01",
+    "pairlock_02"
+  ],
+  "run_label": "5080_pairlock_03_followup_qualified",
+  "full_prompt_matches_attempt_01": true,
+  "actual_sampling": {
+    "creativity": "balanced",
+    "temperature": 0.85,
+    "top_p": 0.95,
+    "min_p": 0.05,
+    "repetition_penalty": 1.03
+  },
+  "prompt_id": "24612071-a226-4871-9612-23f9eae1f3af",
+  "elapsed_seconds": 408.62,
+  "desktop_memory_before_boot_mib": 2121,
+  "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\audio\\pending_20260911_031716_ledger.json",
+  "ledger_sha256": "1cf9254aca00c0c188fe38da39a4c385c30cc047e7b7f5096edae218f34899c0",
+  "extension_junction_target": "C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio",
+  "terminal_history_file": "pairlock_03_history.json",
+  "failed_ledger_copy": "pairlock_03_failure_ledger.json",
+  "interrupt_requested": false
+}

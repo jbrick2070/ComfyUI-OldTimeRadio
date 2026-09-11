@@ -1,0 +1,46 @@
+{
+  "scope": "CPU-only grammar/tokenizer reconstruction from archived decoded text; NOT original sampled token replay, logits or semantic model proof",
+  "model_snapshot": "C:/ComfyUI-Models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a",
+  "schema": "StoryTreatment",
+  "probes": [
+    {
+      "attempt": 1,
+      "raw_chars": 2673,
+      "last_quote_offset": 48,
+      "reconstructed_tokens": 512,
+      "quote_character_allowed": true,
+      "retokenized_prefix_admitted": true,
+      "first_rejected": null,
+      "closing_quote_tokens": [
+        1
+      ],
+      "closing_quote_token_allowed": true
+    },
+    {
+      "attempt": 2,
+      "raw_chars": 11581,
+      "last_quote_offset": 48,
+      "reconstructed_tokens": 2752,
+      "quote_character_allowed": true,
+      "retokenized_prefix_admitted": true,
+      "first_rejected": null,
+      "closing_quote_tokens": [
+        1
+      ],
+      "closing_quote_token_allowed": true
+    },
+    {
+      "attempt": 3,
+      "raw_chars": 1770,
+      "last_quote_offset": 48,
+      "reconstructed_tokens": 448,
+      "quote_character_allowed": true,
+      "retokenized_prefix_admitted": true,
+      "first_rejected": null,
+      "closing_quote_tokens": [
+        1
+      ],
+      "closing_quote_token_allowed": true
+    }
+  ]
+}

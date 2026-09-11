@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T10:37:24.771753+00:00",
+  "doc": "docs/2026-09-11-my-story-treatment-followup/sonnet_grounding.md",
+  "prompt_tokens_est": 4207,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-sonnet-5",
+      "ok": true,
+      "prompt_tokens": 6194,
+      "completion_tokens": 959,
+      "cost_usd": 0.021978,
+      "max_tokens": 12000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.022
+}

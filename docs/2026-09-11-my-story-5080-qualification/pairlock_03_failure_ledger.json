@@ -1,0 +1,436 @@
+{
+  "schema_version": "l4-2026-08-07",
+  "episode_id": "pending_20260911_031716",
+  "commit": "97f2d40f",
+  "total_episode_dur_s": null,
+  "total_char_count": 0,
+  "total_word_count": 0,
+  "total_dialogue_lines": 0,
+  "total_beats": 0,
+  "cast": [],
+  "scenes": [],
+  "shots": [],
+  "beats": [],
+  "lines": [],
+  "music": [],
+  "clips": [],
+  "audio": {},
+  "final_audio_path": null,
+  "final_video_path": null,
+  "meta": {
+    "cast_status": "building",
+    "source_bank": "my_story",
+    "delivery_intent": {
+      "schema_version": "otr_delivery_intent_v1",
+      "source_bank": "my_story",
+      "publication_required": true,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "delivery_token": "5ae758f5b12044779a6a0294deb6df1d"
+    },
+    "story_draft": {
+      "schema_version": "my_story_input_v1",
+      "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\_shared\\state\\story_drafts\\b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9\\input.json",
+      "status": "verified"
+    },
+    "style_pool_class": "generic",
+    "source_ref": "",
+    "source_meta": {
+      "kind": "user_story",
+      "story_input": {
+        "schema_version": "my_story_input_v1",
+        "fields": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "normalized": {
+          "idea": "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has.",
+          "characters": "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer.",
+          "plot": "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend.",
+          "setting": "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table.",
+          "author": ""
+        },
+        "request": {
+          "num_characters": 2,
+          "act_count": "1",
+          "include_act_breaks": true,
+          "source_bank_requested": "my_story",
+          "visual_style_requested": "roll (any style)"
+        },
+        "digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9"
+      },
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "requested_num_characters": 2,
+      "story_author": ""
+    },
+    "source_rights": {
+      "license_label": "listener original idea"
+    },
+    "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+    "story_attribution": {
+      "author": "",
+      "sentence": "Tonight's story comes from one of our listeners.",
+      "credits_source_line": "a story from a listener's own idea, produced by machine for this broadcast",
+      "source": "none supplied"
+    },
+    "story_scaffold": "auto",
+    "visual_style": "storybook_engraving",
+    "style_roll": {
+      "receipt_version": 1,
+      "surface": "visual_style",
+      "requested": "roll (any style)",
+      "selected": "storybook_engraving",
+      "seed": 2641338392,
+      "seed_source": "OS entropy",
+      "eligible_order": [
+        "anime",
+        "archival_documentary",
+        "cartoon",
+        "paper_origami",
+        "recur_frac",
+        "sci_fi_radio",
+        "shakespeare_stage_realism",
+        "storybook_engraving",
+        "video_art",
+        "visual_storybased"
+      ]
+    },
+    "character_word_count": 0,
+    "announcer_word_count": 0,
+    "total_word_count": 0,
+    "paths": {
+      "ledger_path": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\audio\\pending_20260911_031716_ledger.json",
+      "episode_root": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716",
+      "audio_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\audio",
+      "stills_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\stills",
+      "portraits_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\portraits",
+      "videos_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\videos",
+      "composited_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\episodes\\pending_20260911_031716\\composited",
+      "obs_final": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs\\pending_20260911_031716.mp4",
+      "obs_dir": "C:\\Users\\jeffr\\Documents\\ComfyUI\\output\\otr\\obs",
+      "layout": "per-episode-workspace"
+    },
+    "schema_version": "l4-2026-08-07",
+    "episode_seed": 46722675,
+    "word_budget": {
+      "schema_version": 5,
+      "owner": "my_story",
+      "policy": "actual_count_only"
+    },
+    "my_story": {
+      "schema_version": "my_story_v1",
+      "seed": 46722675,
+      "draft_digest": "b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9",
+      "attempts": [
+        {
+          "pass_id": "interpret",
+          "attempt": 1,
+          "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"dinner_scene\",\n      \"text\": \"Jeffrey and his living mother share a warm present-day dinner at a table in Los Angeles.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"idea\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey recalls his childhood growing up in the Bay Area while eating.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"idea\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"mother_recollection\",\n      \"text\": \"Jeffrey's mother responds with her own warm recollection of the past.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.\",\n      \"kind\": \"character\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"continuous_scene\",\n      \"text\": \"The entire story takes place in one continuous scene without scene changes or interruptions.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"no_death_grief\",\n      \"text\": \"There is no death, grief, abandonment, or emergency in the story.\",\n      \"kind\": \"plot\",\n      \"source_field\": \"plot\",\n      \"strength\": \"required\"\n    },\n    {\n      \"id\": \"domestic_atmosphere\",\n      \"text\": \"The tone is warm, affectionate, humorous, and focused on appreciating current life.\",\n      \"kind\": \"setting\",\n      \"source_field\": \"setting\",\n      \"strength\": \"required\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"Adult man who loves Los Angeles; remembers Bay Area childhood; has a girlfriend.\",\n      \"stated_gender\": \"male\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Jeffrey's living mother; physically present at the dinner; shares warm recollections.\",\n      \"stated_gender\": \"female\",\n      \"speaking\": true,\n      \"required\": true\n    },\n    {\n      \"name\": \"Girlfriend\",\n      \"notes\": \"Different person from mother; not attending dinner; mentioned by Jeffrey.\",\n      \"stated_gender\": \"\",\n      \"speaking\": false,\n      \"required\": false\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 3,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The girlfriend is mentioned but not present, so only Jeffrey and his mother speak in the dramatic scene.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day evening, with Jeffrey and his mother sitting across from each other at a shared table.\",\n  \"assumptions\": [\n    \"The mother is living and physically present in the present day.\",\n    \"The dinner occurs in the evening.\",\n    \"The story ends with Jeffrey and his mother still together at the table.\"\n  ],\n  \"conflicts\": []\n}",
+          "raw_completion": null,
+          "status": "accepted",
+          "error": null
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 1,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"The Table We Share\",\n  \"logline\": \"Jeffrey and his mother enjoy a warm evening dinner in Los Angeles, bonding over memories of his Bay Area childhood and the present life they still have together. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend. Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend. Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend. Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 2,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"The Bay Area Table\",\n  \"logline\": \"An adult man and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating the life they still have together. The single act is set in one continuous scene. The girlfriend is mentioned but does not speak. The ending is a warm meal and appreciation of current life. The tone is affectionate and humorous. The setting is a comfortable Los Angeles home dining room. The time of day is evening. The cast consists of Jeffrey and his mother. Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey. Jeffrey has a girlfriend who is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene. The plot begins with them already seated. Jeffrey recalls his childhood. His mother responds with her own recollection. Jeffrey briefly mentions his girlfriend. The story ends with them still together at the table. There is no death, grief, abandonment, or emergency. The atmosphere is domestic. The story is written as requested. The title is The Bay Area Table. The logline is An adult man and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating the life they still have together. The dramatic question is Can Jeffrey and his mother find joy in their present life after recalling their past? The setting is A comfortable Los Angeles home dining room in the present day. The time_of_day is evening. The cast is Jeffrey and his mother. Jeffrey is an adult male with a warm, reflective register and deep timbre. His mother is a female with a kind, gentle register and soft timbre. The acts consist of one act. The act number is 1. The purpose is to share a warm dinner and reflect on childhood memories. The scene_setting is the Los Angeles dining room. The turns are Jeffrey eats and looks at his mother, Jeffrey recalls the Bay Area, Jeffrey mentions his girlfriend, and Mother shares a warm memory. The ending_state is they continue eating and appreciate their lives. The ending is they finish their meal together, still sitting at the same table, grateful for the life they have. The music cues are zero. The requirements are preserved. The characters are Jeffrey and his mother. The girlfriend is excluded from speaking. The story is continuous. The tone is warm. The conflicts are none. The assumptions are honored. The plan is complete. The output is valid JSON. The schema is followed. The keys are correct. The types are correct. The values are correct. The length is appropriate. The content is accurate. The story is told. The episode is planned. The end is here. The plan is done. The work is finished. The task is complete. The goal is achieved. The result is clear. The output is ready. The response is final. The text is sent. The data is sent. The message is sent. The signal is sent. The wave is sent. The light is sent. The sound is sent. The voice is sent. The word is sent. The letter is sent. The mark is sent. The sign is sent. The symbol is sent. The token is sent. The bit is sent. The byte is sent. The file is sent. The disk is sent. The drive is sent. The server is sent. The cloud is sent. The net is sent. The web is sent. The link is sent. The path is sent. The route is sent. The way is sent. The road is sent. The street is sent. The lane is sent. The avenue is sent. The boulevard is sent. The drive is sent. The parkway is sent. The highway is sent. The interstate is sent. The expressway is sent. The turnpike is sent. The freeway is sent. The toll road is sent. The bridge is sent. The tunnel is sent. The viaduct is sent. The overpass is sent. The underpass is sent. The cul-de-sac is sent. The dead end is sent. The alley is sent. The lane is sent. The driveway is sent. The yard is sent. The garden is sent. The lawn is sent. The field is sent. The meadow is sent. The pasture is sent. The prairie is sent. The plain is sent. The desert is sent. The valley is sent. The hill is sent. The mountain is sent. The peak is sent. The summit is sent. The ridge is sent. The slope is sent. The grade is sent. The incline is sent. The decline is sent. The rise is sent. The fall is sent. The drop is sent. The dip is sent. The hollow is sent. The basin is sent. The crater is sent. The pit is sent. The well is sent. The spring is sent. The stream is sent. The river is sent. The creek is sent. The brook is sent. The brooklet is sent. The trickle is sent. The gush is sent. The rush is sent. The flood is sent. The deluge is sent. The torrent is sent. The waterfall is sent. The cascade is sent. The rapids are sent. The eddy is sent. The current is sent. The tide is sent. The wave is sent. The surf is sent. The beach is sent. The shore is sent. The coast is sent. The harbor is sent. The port is sent. The dock is sent. The pier is sent. The jetty is sent. The breakwater is sent. The mooring is sent. The anchor is sent. The chain is sent. The rope is sent. The line is sent. The cable is sent. The wire is sent. The cord is sent. The string is sent. The thread is sent. The yarn is sent. The wool is sent. The silk is sent. The cotton is sent. The linen is sent. The hemp is sent. The flax is sent. The jute is sent. The sisal is sent. The abaca is sent. The ramie is sent. The viscose is sent. The modal is sent. The lyocell is sent. The acetate is sent. The cellulose is sent. The plastic is sent. The polymer is sent. The resin is sent. The glue is sent. The paste is sent. The cement is sent. The concrete is sent. The mortar is sent. The plaster is sent. The paint is sent. The stain is sent. The varnish is sent. The lacquer is sent. The enamel is sent. The latex is sent. The acrylic is sent. The oil is sent. The watercolor is sent. The ink is sent. The pencil is sent. The pen is sent. The brush is sent. The palette is sent. The easel is sent. The canvas is sent. The paper is sent. The cardstock is sent. The vellum is sent. The parchment is sent. The papyrus is sent. The parchment is sent. The paper is sent. The card is sent. The envelope is sent. The stamp is sent. The seal is sent. The mark is sent. The signature is sent. The name is sent. The title is sent. The author is sent. The editor is sent. The publisher is sent. The printer is sent. The distributor is sent. The retailer is sent. The buyer is sent. The seller is sent. The customer is sent. The consumer is sent. The user is sent. The client is sent. The partner is sent. The vendor is sent. The supplier is sent. The manufacturer is sent. The producer is sent. The creator is sent. The inventor is sent. The designer is sent. The artist is sent. The craftsman is sent. The artisan is sent. The maker is sent. The builder is sent. The constructor is sent. The engineer is sent. The architect is sent. The planner is sent. The strategist is sent. The tactician is sent. The commander is sent. The leader is sent. The manager is sent. The director is sent. The supervisor is sent. The monitor is sent. The auditor is sent. The inspector is sent. The examiner is sent. The tester is sent. The evaluator is sent. The appraiser is sent. The assessor is sent. The analyst is sent. The researcher is sent. The scientist is sent. The scholar is sent. The professor is sent. The teacher is sent. The instructor is sent. The trainer is sent. The coach is sent. The mentor is sent. The guide is sent. The counselor is sent. The advisor is sent. The consultant is sent. The specialist is sent. The expert is sent. The guru is sent. The sage is sent. The wise is sent. The fool is sent. The knave is sent. The jester is sent. The clown is sent. The mime is sent. The actor is sent. The player is sent. The performer is sent. The entertainer is sent. The comedian is sent. The humorist is sent. The satirist is sent. The critic is sent. The reviewer is sent. The journalist is sent. The reporter is sent. The correspondent is sent. The editor is sent. The writer is sent. The poet is sent. The lyricist is sent. The singer is sent. The musician is sent. The band is sent. The orchestra is sent. The choir is sent. The ensemble is sent. The group is sent. The team is sent. The crew is sent. The cast is sent. The crew is sent. The staff is sent. The corps is sent. The gang is sent. The squad is sent. The unit is sent. The force is sent. The army is sent. The navy is sent. The air force is sent. The marine is sent. The coast guard is sent. The police is sent. The sheriff is sent. The detective is sent. The investigator is sent. The spy is sent. The agent is sent. The clerk is sent. The clerk is sent. The worker is sent. The laborer is sent. The farmer is sent. The rancher is sent. The hunter is sent. The fisherman is sent. The sailor is sent. The pilot is sent. The driver is sent. The mechanic is sent. The technician is sent. The engineer is sent. The builder is sent. The contractor is sent. The developer is sent. The landlord is sent. The tenant is sent. The owner is sent. The proprietor is sent. The businessman is sent. The entrepreneur is sent. The investor is sent. The banker is sent. The broker is sent. The trader is sent. The stockbroker is sent. The fund manager is sent. The hedge fund manager is sent. The private equity manager is sent. The venture capitalist is sent. The angel investor is sent. The donor is sent. The patron is sent. The benefactor is sent. The grantor is sent. The grantee is sent. The recipient is sent. The beneficiary is sent. The trustee is sent. The executor is sent. The administrator is sent. The liquidator is sent. The receiver is sent. The receiver is sent. The trustee is sent. The agent is sent. The attorney is sent. The lawyer is sent. The judge is sent. The magistrate is sent. The jury is sent. The witness is sent. The victim is sent. The suspect is sent. The defendant is sent. The plaintiff is sent. The claimant is sent. The obligor is sent. The obligee is sent. The debtor is sent. The creditor is sent. The lender is sent. The borrower is sent. The mortgagor is sent. The mortgagee is sent. The lienholder is sent. The pledgee is sent. The collateral is sent. The security is sent. The guarantee is sent. The bond is sent. The note is sent. The check is sent. The bill is sent. The invoice is sent. The receipt is sent. The voucher is sent. The ledger is sent. The journal is sent. The account is sent. The balance is sent. The total is sent. The sum is sent. The difference is sent. The variance is sent. The deviation is sent. The error is sent. The mistake is sent. The fault is sent. The defect is sent. The flaw is sent. The bug is sent. The glitch is sent. The crash is sent. The failure is sent. The breakdown is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        },
+        {
+          "pass_id": "treatment",
+          "attempt": 3,
+          "raw_output": "",
+          "raw_completion": "{\n  \"title\": \"The Bay Area Table\",\n  \"logline\": \"Jeffrey and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating their current life together. The dramatic question is: How does Jeffrey honor his past while cherishing his present family? The setting is a comfortable Los Angeles home dining room in the present day. The time of day is evening. The cast includes Jeffrey, an adult man who loves Los Angeles and remembers his Bay Area childhood, speaking with a warm, reflective register and a deep, resonant timbre; and Mother, Jeffrey's living mother who shares warm recollections, speaking with a gentle, affectionate register and a soft, clear timbre. The single act begins with Jeffrey and his mother seated across from each other at a shared dinner table in Los Angeles. The first turn features Jeffrey taking a bite of food and recalling his childhood growing up in the Bay Area. The second turn shows his mother responding with her own warm recollection of the past. The third turn has Jeffrey briefly mentioning his girlfriend as a separate person who is not at the dinner. The fourth turn concludes with Jeffrey and his mother still together at the table, enjoying their meal and choosing to appreciate their lives now. The ending is Jeffrey and his mother continuing their meal, content in the warmth of their shared presence and the appreciation of their current life together. } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }",
+          "status": "failed",
+          "error": "generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim"
+        }
+      ],
+      "source_rewrites": [
+        {
+          "version": "my_story.source_rewrite.v1",
+          "pass_id": "interpret",
+          "operation_id": "source_rewrite_1",
+          "coordinate_version": "my_story.raw_python_char.v1",
+          "source_digest": "1c88360b742fa193dba710619d5e90a083af3e7e99412505d7a78107ff36cb05",
+          "raw_field_hashes": {
+            "idea": "ff972b77d7291caf2d4d763a6fc8c29f3bafc5cfb906368e54789c0f69bd8a12",
+            "characters": "a44c1d1d4f5930157575ff472fac22404e9d3c95c69576059300c228c52ede46",
+            "plot": "1ea3b09278381525287cad9786c3863556aefbea35b4c824929db78105c60d13",
+            "setting": "7209a44c13f611a4ad64e5e7ffaea814df6726cca9d3ff321cfe9899d6ce6657"
+          },
+          "source_intervals": [
+            {
+              "field": "idea",
+              "start_char": 0,
+              "end_char": 187
+            },
+            {
+              "field": "characters",
+              "start_char": 0,
+              "end_char": 379
+            },
+            {
+              "field": "plot",
+              "start_char": 0,
+              "end_char": 785
+            },
+            {
+              "field": "setting",
+              "start_char": 0,
+              "end_char": 360
+            }
+          ],
+          "source_scope": "whole",
+          "input_sha256": "47049f4fdf8b0f71273f37fdafdd610aca7f2939221c22892461457c7a1882b3",
+          "output_sha256": "47049f4fdf8b0f71273f37fdafdd610aca7f2939221c22892461457c7a1882b3",
+          "applied": false,
+          "configured_model_id": "Qwen/Qwen3.5-4B",
+          "executed_model_id": null,
+          "attempt_limit": 2,
+          "attempts": [
+            {
+              "number": 1,
+              "prompt_sha256": "bd84c5738730f8d67e1a48ee779eb549f7b08e5e10a5bae7af8fe02be60dc552",
+              "raw_output": "{\n  \"requirements\": [\n    {\n      \"id\": \"dinner_scene\",\n      \"text\": \"Jeffrey and his living mother share a warm present-day dinner at a table in Los Angeles.\"\n    },\n    {\n      \"id\": \"bay_area_memory\",\n      \"text\": \"Jeffrey recalls his childhood growing up in the Bay Area while eating.\"\n    },\n    {\n      \"id\": \"mother_recollection\",\n      \"text\": \"Jeffrey's mother responds with her own warm recollection of the past.\"\n    },\n    {\n      \"id\": \"girlfriend_mention\",\n      \"text\": \"Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.\"\n    },\n    {\n      \"id\": \"continuous_scene\",\n      \"text\": \"The entire story takes place in one continuous scene without scene changes or interruptions.\"\n    },\n    {\n      \"id\": \"no_death_grief\",\n      \"text\": \"There is no death, grief, abandonment, or emergency in the story.\"\n    },\n    {\n      \"id\": \"domestic_atmosphere\",\n      \"text\": \"The tone is warm, affectionate, humorous, and focused on appreciating current life.\"\n    }\n  ],\n  \"named_cast\": [\n    {\n      \"name\": \"Jeffrey\",\n      \"notes\": \"Adult man who loves Los Angeles; remembers Bay Area childhood; has a girlfriend.\"\n    },\n    {\n      \"name\": \"Mother\",\n      \"notes\": \"Jeffrey's living mother; physically present at the dinner; shares warm recollections.\"\n    },\n    {\n      \"name\": \"Girlfriend\",\n      \"notes\": \"Different person from mother; not attending dinner; mentioned by Jeffrey.\"\n    }\n  ],\n  \"cast_plan\": {\n    \"requested\": 3,\n    \"planned\": 2,\n    \"exclusive\": true,\n    \"reason\": \"The girlfriend is mentioned but not present, so only Jeffrey and his mother speak in the dramatic scene.\"\n  },\n  \"setting_brief\": \"A comfortable Los Angeles home dining room in the present day evening, with Jeffrey and his mother sitting across from each other at a shared table.\"\n}",
+              "raw_completion": null,
+              "generation_started": true,
+              "fit": {
+                "available_output_tokens": 259928,
+                "capacity_known": true,
+                "capacity_source": "loaded decoder config (native 262144)",
+                "context_cap": 262144,
+                "effective_output_tokens": 259928,
+                "eos_token_ids": [
+                  248044,
+                  248046
+                ],
+                "fits": true,
+                "model_id": "Qwen/Qwen3.5-4B",
+                "prompt_tokens": 2216,
+                "requested_output_tokens": 262144,
+                "supported": true
+              },
+              "status": "usable",
+              "validation_error": null
+            }
+          ],
+          "status": "unchanged",
+          "qualified": false,
+          "returned_artifact": {
+            "requirements": [
+              {
+                "id": "dinner_scene",
+                "text": "Jeffrey and his living mother share a warm present-day dinner at a table in Los Angeles.",
+                "kind": "setting",
+                "source_field": "idea",
+                "strength": "required"
+              },
+              {
+                "id": "bay_area_memory",
+                "text": "Jeffrey recalls his childhood growing up in the Bay Area while eating.",
+                "kind": "plot",
+                "source_field": "idea",
+                "strength": "required"
+              },
+              {
+                "id": "mother_recollection",
+                "text": "Jeffrey's mother responds with her own warm recollection of the past.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "girlfriend_mention",
+                "text": "Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.",
+                "kind": "character",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "continuous_scene",
+                "text": "The entire story takes place in one continuous scene without scene changes or interruptions.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "no_death_grief",
+                "text": "There is no death, grief, abandonment, or emergency in the story.",
+                "kind": "plot",
+                "source_field": "plot",
+                "strength": "required"
+              },
+              {
+                "id": "domestic_atmosphere",
+                "text": "The tone is warm, affectionate, humorous, and focused on appreciating current life.",
+                "kind": "setting",
+                "source_field": "setting",
+                "strength": "required"
+              }
+            ],
+            "named_cast": [
+              {
+                "name": "Jeffrey",
+                "notes": "Adult man who loves Los Angeles; remembers Bay Area childhood; has a girlfriend.",
+                "stated_gender": "male",
+                "speaking": true,
+                "required": true
+              },
+              {
+                "name": "Mother",
+                "notes": "Jeffrey's living mother; physically present at the dinner; shares warm recollections.",
+                "stated_gender": "female",
+                "speaking": true,
+                "required": true
+              },
+              {
+                "name": "Girlfriend",
+                "notes": "Different person from mother; not attending dinner; mentioned by Jeffrey.",
+                "stated_gender": "",
+                "speaking": false,
+                "required": false
+              }
+            ],
+            "cast_plan": {
+              "requested": 3,
+              "planned": 2,
+              "exclusive": true,
+              "reason": "The girlfriend is mentioned but not present, so only Jeffrey and his mother speak in the dramatic scene."
+            },
+            "setting_brief": "A comfortable Los Angeles home dining room in the present day evening, with Jeffrey and his mother sitting across from each other at a shared table.",
+            "assumptions": [
+              "The mother is living and physically present in the present day.",
+              "The dinner occurs in the evening.",
+              "The story ends with Jeffrey and his mother still together at the table."
+            ],
+            "conflicts": []
+          }
+        }
+      ],
+      "counts": {
+        "requested_acts": 1,
+        "proposed_acts": null,
+        "accepted_acts": null,
+        "actual_acts": null,
+        "requested_characters": 2,
+        "planned_characters": 2,
+        "proposed_characters": null,
+        "accepted_characters": null,
+        "actual_characters": null
+      },
+      "notes": [
+        "The person's own typed fields are the sole source.",
+        "Selected acts bind treatment acceptance; character count is flexible guidance."
+      ],
+      "interpretation": {
+        "requirements": [
+          {
+            "id": "dinner_scene",
+            "text": "Jeffrey and his living mother share a warm present-day dinner at a table in Los Angeles.",
+            "kind": "setting",
+            "source_field": "idea",
+            "strength": "required"
+          },
+          {
+            "id": "bay_area_memory",
+            "text": "Jeffrey recalls his childhood growing up in the Bay Area while eating.",
+            "kind": "plot",
+            "source_field": "idea",
+            "strength": "required"
+          },
+          {
+            "id": "mother_recollection",
+            "text": "Jeffrey's mother responds with her own warm recollection of the past.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "girlfriend_mention",
+            "text": "Jeffrey briefly mentions his girlfriend as a separate person who is not at the dinner.",
+            "kind": "character",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "continuous_scene",
+            "text": "The entire story takes place in one continuous scene without scene changes or interruptions.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "no_death_grief",
+            "text": "There is no death, grief, abandonment, or emergency in the story.",
+            "kind": "plot",
+            "source_field": "plot",
+            "strength": "required"
+          },
+          {
+            "id": "domestic_atmosphere",
+            "text": "The tone is warm, affectionate, humorous, and focused on appreciating current life.",
+            "kind": "setting",
+            "source_field": "setting",
+            "strength": "required"
+          }
+        ],
+        "named_cast": [
+          {
+            "name": "Jeffrey",
+            "notes": "Adult man who loves Los Angeles; remembers Bay Area childhood; has a girlfriend.",
+            "stated_gender": "male",
+            "speaking": true,
+            "required": true
+          },
+          {
+            "name": "Mother",
+            "notes": "Jeffrey's living mother; physically present at the dinner; shares warm recollections.",
+            "stated_gender": "female",
+            "speaking": true,
+            "required": true
+          },
+          {
+            "name": "Girlfriend",
+            "notes": "Different person from mother; not attending dinner; mentioned by Jeffrey.",
+            "stated_gender": "",
+            "speaking": false,
+            "required": false
+          }
+        ],
+        "cast_plan": {
+          "requested": 3,
+          "planned": 2,
+          "exclusive": true,
+          "reason": "The girlfriend is mentioned but not present, so only Jeffrey and his mother speak in the dramatic scene."
+        },
+        "setting_brief": "A comfortable Los Angeles home dining room in the present day evening, with Jeffrey and his mother sitting across from each other at a shared table.",
+        "assumptions": [
+          "The mother is living and physically present in the present day.",
+          "The dinner occurs in the evening.",
+          "The story ends with Jeffrey and his mother still together at the table."
+        ],
+        "conflicts": []
+      },
+      "cast_plan": {
+        "requested": 3,
+        "planned": 2,
+        "exclusive": true,
+        "reason": "The girlfriend is mentioned but not present, so only Jeffrey and his mother speak in the dramatic scene."
+      }
+    },
+    "news": null
+  }
+}

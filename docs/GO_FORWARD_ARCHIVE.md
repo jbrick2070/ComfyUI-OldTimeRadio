@@ -7661,3 +7661,34 @@ source-fidelity proof. If it fails, preserve evidence and diagnose the specific
 failure before another run. Subsequent stress coverage remains below; Original
 model credits require a fresh Original publication.
 
+
+## 2026-09-11 -- canonical attempt03 failed in P1; preserve its instructions verbatim
+
+Measured request/history/failedledger and logs: 2026-09-11-my-story-5080-qualification/pairlock_03_*.
+Treatment diagnosis and repair-context correction: 2026-09-11-my-story-treatment-followup/.
+
+**Next action: ONE fresh full canonical 5080 pair-lock attempt 03 after the
+qualified follow-up is pushed.** Use the real `workflows/otr_canonical.json`,
+the shipped full API runner, `otr_w45_still_pan`, and exactly the pairlock_01
+source fields, Qwen3.5-4B model pair, NF4/SDPA and sampling settings. Record
+checkout/canonical hashes, actual EOS IDs, loaded capacity, schema-enriched fit,
+correction attempts and terminal state. Keep attempts 01 and 02 in the denominator:
+their receipts are in `docs/2026-09-11-my-story-5080-qualification/`.
+
+The case is one act: Jeffrey and his living mother share dinner at the same
+Los Angeles table. Inspect accepted P0-P3 metadata, final speech, actual voice
+references and durable credits, scene prompts and image pixels. Both adults
+remain present, the ending is a shared meal, and between-act music is zero.
+Publication alone is not source-fidelity proof. Preserve and diagnose any new
+failure before another run. Subsequent stress coverage remains below; Original
+model credits require a fresh Original publication. Qualified code/test/review
+evidence: `docs/2026-09-11-my-story-pairlock-followup/qualification_receipt.md`.
+
+
+## 2026-09-11 -- treatment repair-context code qualification
+
+Receipt:2026-09-11-my-story-treatment-followup/qualification_receipt.md.
+Superseded qualification precondition, verbatim:
+
+**Next action: finish qualification and push the treatment repair-context fix,
+then ONE fresh full canonical 5080 pair-lock attempt04.**

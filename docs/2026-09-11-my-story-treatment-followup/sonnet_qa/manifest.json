@@ -1,0 +1,19 @@
+{
+  "timestamp": "2026-09-11T10:35:32.917096+00:00",
+  "doc": "docs/2026-09-11-my-story-treatment-followup/repair_qa.md",
+  "prompt_tokens_est": 3904,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-sonnet-latest",
+      "resolved_model": "anthropic/claude-sonnet-5",
+      "ok": true,
+      "prompt_tokens": 5775,
+      "completion_tokens": 1191,
+      "cost_usd": 0.02346,
+      "max_tokens": 16000,
+      "temperature": 0.2,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.0235
+}

@@ -1,3 +1,26 @@
+## 2026-09-11 -- raised completion reaches My Story's final repair
+
+Canonical03 on97f2d40f failed P1 after three verbatim cycles,408.62seconds,
+no media. P0 metadata preservation succeeded. Freshparser/EOSownership verified;
+CPU reconstruction admits closingquote, with original-token limitations retained.
+One concrete handoffgap remained: the finalrepair got emptyreturnedtext despite
+the latesterror carrying11,581characters. The localfull-artifactfactory now
+passes that exactcapturedtext withoriginalsourceauthority; same threecalls and
+validators, no newmodel/lengthgate/samplingchange or genericpolicychange.
+
+Final193focused; full14,409/51inheritedfailures/183skips/one xfail, unchangedfailure
+meaning. ControlledBible37/10/11/3 versus35/12/11/3; newguardsfailbase/passcandidate.
+Bibleb61503c pushed,344entries. FinalSonnet5 APIQA andindependentlocalreviewclean;
+actualSonnetCLIweeklylimit was preserved asfailure. Canonicalunchanged/audited.
+Allclaimgrounding, priorfailedtests andsourcequalificationlimits:
+docs/2026-09-11-my-story-treatment-followup/qualification_receipt.md.
+
+GO_FORWARD owns freshfullcanonical04 afterthispush. Preserve01/02/03 denominator;
+READMEexplicitlyrecords zero sourcequalifiedrecoveryepisodes. Mac/4060held,
+RunPodauthblocked. No newGPUproof ormodel-matrixpromotionclaimed byofflinetests.
+
+---
+
 ## 2026-09-11 -- pair-lock follow-up qualified after Opus and Sonnet review
 
 Canonical attempt 02 on bd814148 completed in 834 seconds and published The LA

@@ -1,0 +1,20 @@
+{
+  "baseline": {
+    "total": 14639,
+    "passed": 14404,
+    "failed": 51,
+    "skipped_including_xfail": 184
+  },
+  "candidate": {
+    "total": 14644,
+    "passed": 14409,
+    "failed": 51,
+    "skipped_including_xfail": 184
+  },
+  "new_failure_ids": [],
+  "resolved_failure_ids": [],
+  "changed_raw_failure_payloads": {},
+  "changed_assertion_lines_after_order_normalization": {},
+  "baseline_xml_sha256": "5226f575420e583099b6abc315d98728cf3351c2edaee9abb7297b70f2610ee0",
+  "candidate_xml_sha256": "96583571a53dd2aa50b3dce10637199255342df5017c95a3dc9c575215e815ef"
+}

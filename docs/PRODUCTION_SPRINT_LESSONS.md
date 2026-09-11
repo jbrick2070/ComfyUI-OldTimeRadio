@@ -19,6 +19,15 @@ changes. The project rules in `AGENTS.md` and `CLAUDE.md` remain authoritative.
 
 ## 1. Define ownership before implementation
 
+Pairlock_03 (2026-09-11): a generation that raises never assigns the shared
+caller's return variable. A lane that promises full-artifact repair must use the
+latest error's captured text when returned text is absent; an empty assistant
+draft cannot expose the failed structure. Keep exact evidence and original source
+authority, with existing attempt limits and validators. Captured fragments are
+not accepted proposals. A valid closing quote admitted by a reconstructed grammar
+does not prove the model will sample it; don't confuse repair-context completeness
+with a cure for generation degeneration. See PBUG20260910-01/Bible11.48 follow-up.
+
 Pairlock_02 follow-up (2026-09-11): schema defaults suitable for first authorship
 must not erase accepted fields omitted from a correction. Retain field presence,
 match only unique explicit identities, honor explicit clears and returned list

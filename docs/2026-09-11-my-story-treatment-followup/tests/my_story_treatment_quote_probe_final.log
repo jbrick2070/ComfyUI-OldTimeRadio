@@ -1,0 +1,3 @@
+{"attempt": 1, "raw_chars": 2673, "last_quote_offset": 48, "reconstructed_tokens": 512, "quote_character_allowed": true, "retokenized_prefix_admitted": true, "first_rejected": null, "closing_quote_tokens": [1], "closing_quote_token_allowed": true}
+{"attempt": 2, "raw_chars": 11581, "last_quote_offset": 48, "reconstructed_tokens": 2752, "quote_character_allowed": true, "retokenized_prefix_admitted": true, "first_rejected": null, "closing_quote_tokens": [1], "closing_quote_token_allowed": true}
+{"attempt": 3, "raw_chars": 1770, "last_quote_offset": 48, "reconstructed_tokens": 448, "quote_character_allowed": true, "retokenized_prefix_admitted": true, "first_rejected": null, "closing_quote_tokens": [1], "closing_quote_token_allowed": true}

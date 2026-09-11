@@ -1,0 +1,271 @@
+{
+  "recorded_utc": "2026-09-11T10:25:29.212538+00:00",
+  "prompt_id": "24612071-a226-4871-9612-23f9eae1f3af",
+  "code_commit": "97f2d40f7168e32324283aee044e652e666a84b0",
+  "terminal_status": {
+    "status_str": "error",
+    "completed": false,
+    "messages": [
+      [
+        "execution_start",
+        {
+          "prompt_id": "24612071-a226-4871-9612-23f9eae1f3af",
+          "timestamp": 1789121835198
+        }
+      ],
+      [
+        "execution_cached",
+        {
+          "nodes": [],
+          "prompt_id": "24612071-a226-4871-9612-23f9eae1f3af",
+          "timestamp": 1789121836229
+        }
+      ],
+      [
+        "execution_error",
+        {
+          "prompt_id": "24612071-a226-4871-9612-23f9eae1f3af",
+          "node_id": "1",
+          "node_type": "OTR_LedgerScriptWriter",
+          "executed": [
+            "63"
+          ],
+          "exception_message": "[OTR_StructuredCall] 'my_story_treatment' failed after 3 attempt(s); disposition=primary_ladder_exhausted; last error -> GenerationDegeneracyError: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim\n",
+          "exception_type": "C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio.nodes._otr_structured_call.StructuredCallFailedError",
+          "traceback": [
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 545, in execute\n    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 344, in get_output_data\n    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 318, in _async_map_node_over_list\n    await process_inputs(input_dict, i)\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\execution.py\", line 306, in process_inputs\n    result = f(**inputs)\n             ^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\OTR_LedgerScriptWriter.py\", line 3679, in run\n    _parts = _lane_runner(\n             ^^^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 1018, in run_my_story_episode\n    treatment = _pass_treatment(\n                ^^^^^^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 501, in _pass_treatment\n    return _call(\n           ^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_my_story.py\", line 395, in _call\n    authored = structured_call(on_attempt_complete=completed, **kwargs)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n",
+            "  File \"C:\\Users\\jeffr\\ComfyUI-Installs\\ComfyUI\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\nodes\\_otr_structured_call.py\", line 1286, in structured_call\n    raise StructuredCallFailedError(\n"
+          ],
+          "current_inputs": {
+            "gate_in": [
+              "OTR_WorkflowValidator: OK -- 23 nodes, 63 links, strict_unknown_types=True, path='C:\\\\Users\\\\jeffr\\\\Documents\\\\ComfyUI\\\\custom_nodes\\\\ComfyUI-OldTimeRadio\\\\workflows\\\\otr_canonical.json', widget_vector_drift=0"
+            ],
+            "episode_title": [
+              ""
+            ],
+            "num_characters": [
+              2
+            ],
+            "creative_writing_model": [
+              "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)"
+            ],
+            "technical_model": [
+              "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)"
+            ],
+            "custom_premise": [
+              "Jeffrey shares a warm present-day dinner with his living mother at the same table in Los Angeles. Remembering his Bay Area childhood makes him appreciate the life and family he still has."
+            ],
+            "include_act_breaks": [
+              true
+            ],
+            "act_count": [
+              "1"
+            ],
+            "creativity": [
+              "balanced"
+            ],
+            "perfect_run_spacesaver": [
+              false
+            ],
+            "min_p": [
+              0.05
+            ],
+            "repetition_penalty": [
+              1.03
+            ],
+            "max_new_tokens_cap": [
+              200
+            ],
+            "lemmy_cameo": [
+              "roll (~11% chance)"
+            ],
+            "use_exchange": [
+              true
+            ],
+            "enable_production_stage3_validators": [
+              true
+            ],
+            "news_briefs_required": [
+              true
+            ],
+            "openrouter_slot_a_model": [
+              "(enable OpenRouter)"
+            ],
+            "openrouter_slot_b_model": [
+              "(enable OpenRouter)"
+            ],
+            "comfy_slot_a_model": [
+              "(enable Comfy Credits)"
+            ],
+            "comfy_slot_b_model": [
+              "(enable Comfy Credits)"
+            ],
+            "story_scaffold": [
+              "auto"
+            ],
+            "source_bank": [
+              "my_story"
+            ],
+            "visual_style": [
+              "roll (any style)"
+            ],
+            "google_api_slot_a_model": [
+              "(select Google API model)"
+            ],
+            "google_api_slot_b_model": [
+              "(select Google API model)"
+            ],
+            "source_ref": [
+              ""
+            ],
+            "llm_device": [
+              "cuda"
+            ],
+            "llm_attn_impl": [
+              "sdpa"
+            ],
+            "llm_quant_policy": [
+              "bnb_nf4"
+            ],
+            "llm_vram_ceiling_gb": [
+              14.5
+            ],
+            "gguf_n_ctx": [
+              4096
+            ],
+            "gguf_quant": [
+              "Q8_0"
+            ],
+            "replay_from": [
+              ""
+            ],
+            "story_characters": [
+              "Jeffrey is an adult man who loves Los Angeles and remembers growing up in the Bay Area. His mother is alive, physically present, and eating dinner with Jeffrey at their shared Los Angeles table. Jeffrey has a girlfriend, who is a different person from his mother and is not attending this dinner. Only Jeffrey and his mother speak in the dramatic scene, apart from the announcer."
+            ],
+            "story_plot": [
+              "Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person. End with Jeffrey and his mother still together at that same table, enjoying their meal and choosing to appreciate their lives now. Keep both people physically present throughout this single continuous scene. There is no death, grief, abandonment, empty-chair vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend."
+            ],
+            "story_setting": [
+              "A comfortable Los Angeles home dining room in the present day, at one shared dinner table in the evening. Jeffrey and his living mother sit across from each other with plates of food. Warm domestic conversation, clinking cutlery, and a little affectionate humor. Bay Area childhood is a spoken memory; the physical setting remains the shared Los Angeles table."
+            ],
+            "story_author": [
+              ""
+            ],
+            "api_key_comfy_org": [
+              null
+            ]
+          },
+          "current_outputs": [
+            "88",
+            "91",
+            "85",
+            "80",
+            "62",
+            "7",
+            "87",
+            "93",
+            "90",
+            "4",
+            "89",
+            "94",
+            "12",
+            "92",
+            "86",
+            "81",
+            "1",
+            "3",
+            "95",
+            "84",
+            "82",
+            "63",
+            "83"
+          ],
+          "timestamp": 1789122243818
+        }
+      ]
+    ]
+  },
+  "source_qualified": false,
+  "publication": false,
+  "elapsed_seconds": 408.62,
+  "request_matches_attempt_01": true,
+  "treatment_attempts": [
+    {
+      "attempt": 1,
+      "generated_tokens": 512,
+      "last_token": 5133,
+      "cycle_tokens": 147
+    },
+    {
+      "attempt": 2,
+      "generated_tokens": 2752,
+      "last_token": 68770,
+      "cycle_tokens": 50
+    },
+    {
+      "attempt": 3,
+      "generated_tokens": 448,
+      "last_token": 333,
+      "cycle_tokens": 48
+    }
+  ],
+  "all_treatment_halts": "verbatim_cycle",
+  "effective_eos_token_ids": [
+    248044,
+    248046
+  ],
+  "p0_and_correction_last_token": 248046,
+  "metadata_conservation_observed": true,
+  "no_gpu_cancellation_or_new_story_gate": true,
+  "evidence": [
+    {
+      "path": "pairlock_03_failure_ledger.json",
+      "bytes": 41537,
+      "sha256_observed": "1cf9254aca00c0c188fe38da39a4c385c30cc047e7b7f5096edae218f34899c0",
+      "sha256_git_archive": "a8816490f8afdf492c5d813a8f81adb346d25a3cfe708bd81a05ce6d32af0372"
+    },
+    {
+      "path": "pairlock_03_history.json",
+      "bytes": 25056,
+      "sha256_observed": "6a8fb6f8738a9a1aceeacd3b26de6f75de05793c8bb81696bcca91ab92a4900c",
+      "sha256_git_archive": "74309ef87ac78b1bfafd02674860deea30cd8943eb48dd16a9f40f16d4eda4e6"
+    },
+    {
+      "path": "pairlock_03_prompt.json",
+      "bytes": 11845,
+      "sha256_observed": "5c80abd1e23f399faedff8c4b31288a0d27762e64e36f25750c022c4e7680dac",
+      "sha256_git_archive": "b3d48dad3afd7ff95b075885760d66d31c42112b3b09d941bc1732c692e2bfd1"
+    },
+    {
+      "path": "pairlock_03_request.json",
+      "bytes": 4058,
+      "sha256_observed": "2f3c85bc39bcb4200bddf20eda2a96128cca9d4733cbbbb5cacf7ccf775ead07",
+      "sha256_git_archive": "f03160d4896fc7dc159584ad80e7db24273f1671abe7a45709ee357707b66023"
+    },
+    {
+      "path": "pairlock_03_runner.log",
+      "bytes": 17551,
+      "sha256_observed": "aa72f1f9b985a6351bff080074f4471491f866b3aa327ef8a2636794f8ec5193",
+      "sha256_git_archive": "dce74294dc9afd752382fbf2947f43914853daaacb7c1438082a0da16385c67d"
+    },
+    {
+      "path": "pairlock_03_server.log",
+      "bytes": 54400,
+      "sha256_observed": "0119ff0834163b38b3454d7bb428b5b4c13b37bc17a84ddc231f076f85d6e939",
+      "sha256_git_archive": "0119ff0834163b38b3454d7bb428b5b4c13b37bc17a84ddc231f076f85d6e939"
+    },
+    {
+      "path": "pairlock_03_watchdog.log",
+      "bytes": 800,
+      "sha256_observed": "d1b42fb9c174f851a30b0942a11bc5086a38ca5810b1ab7dc5fc15c96cebb08f",
+      "sha256_git_archive": "5b50d9c087912cbec5a3f62e314371f463808d8ba74e6e56295a47c1216a0ee0"
+    }
+  ]
+}

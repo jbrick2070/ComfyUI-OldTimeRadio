@@ -1,0 +1,385 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[1m[33m[WARNING][0m On windows we are currently forcing single GPU mode in ComfyUI due to a Nvidia related issue, if you want to disable this use: --cuda-device all
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path clip C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusers C:\ComfyUI-Models\diffusers
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path gligen C:\ComfyUI-Models\gligen
+[32m[INFO][0m Adding extra search path hypernetworks C:\ComfyUI-Models\hypernetworks
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path photomaker C:\ComfyUI-Models\photomaker
+[32m[INFO][0m Adding extra search path style_models C:\ComfyUI-Models\style_models
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path unet C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path vae_approx C:\ComfyUI-Models\vae_approx
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Adding extra search path download_model_base C:\ComfyUI-Models
+[32m[INFO][0m Adding extra search path custom_nodes C:\Users\jeffr\Documents\ComfyUI\custom_nodes
+[32m[INFO][0m Adding extra search path checkpoints C:\ComfyUI-Models\checkpoints
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\text_encoders
+[32m[INFO][0m Adding extra search path text_encoders C:\ComfyUI-Models\clip
+[32m[INFO][0m Adding extra search path clip_vision C:\ComfyUI-Models\clip_vision
+[32m[INFO][0m Adding extra search path configs C:\ComfyUI-Models\configs
+[32m[INFO][0m Adding extra search path controlnet C:\ComfyUI-Models\controlnet
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\diffusion_models
+[32m[INFO][0m Adding extra search path diffusion_models C:\ComfyUI-Models\unet
+[32m[INFO][0m Adding extra search path embeddings C:\ComfyUI-Models\embeddings
+[32m[INFO][0m Adding extra search path loras C:\ComfyUI-Models\loras
+[32m[INFO][0m Adding extra search path upscale_models C:\ComfyUI-Models\upscale_models
+[32m[INFO][0m Adding extra search path upscale_models C:\Users\jeffr\Documents\ComfyUI\models\upscale_models
+[32m[INFO][0m Adding extra search path latent_upscale_models C:\ComfyUI-Models\latent_upscale_models
+[32m[INFO][0m Adding extra search path vae C:\ComfyUI-Models\vae
+[32m[INFO][0m Adding extra search path audio_encoders C:\ComfyUI-Models\audio_encoders
+[32m[INFO][0m Adding extra search path model_patches C:\ComfyUI-Models\model_patches
+[32m[INFO][0m Setting output directory to: C:\Users\jeffr\Documents\ComfyUI\output
+[32m[INFO][0m Setting user directory to: C:\Users\jeffr\Documents\ComfyUI
+[START] Security scan
+[DONE] Security scan
+## ComfyUI-Manager: installing dependencies done.
+** ComfyUI startup time: 2026-09-11 03:16:40.678
+** Platform: Windows
+** Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+** Python executable: C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe
+** ComfyUI Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** ComfyUI Base Folder Path: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI
+** User directory: C:\Users\jeffr\Documents\ComfyUI
+** ComfyUI-Manager config path: C:\Users\jeffr\Documents\ComfyUI\__manager\config.ini
+** Log path: C:\Users\jeffr\Documents\ComfyUI\comfyui.log
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=C:\ComfyUI-Models\huggingface | safetensors_conversion mocked EARLY
+[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any transformers import
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    1.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    2.9 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: Potential Error in code: Torch already imported, torch should never be imported before this point.
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'int8_linear', 'na3d', 'quantize_and_rotate_rowwise', 'quantize_int8_rowwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'sol_attn', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 16275 MB, total RAM 64957 MB
+[32m[INFO][0m pytorch version: 2.10.0+cu130
+[32m[INFO][0m Set vram state to: NORMAL_VRAM
+[32m[INFO][0m Device: cuda:0 NVIDIA GeForce RTX 5080 Laptop GPU : cudaMallocAsync
+[32m[INFO][0m Using async weight offloading with 2 streams
+[32m[INFO][0m Enabled pinned memory 25982.0
+[32m[INFO][0m working around nvidia conv3d memory bug.
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+[32m[INFO][0m aimdo: src/control.c:269:INFO:comfy-aimdo NVML pressure enabled
+[32m[INFO][0m aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 5080 Laptop GPU runtime_luid=00000000:00014e21 dxgi_luid=00000000:00014e21
+[32m[INFO][0m aimdo: src/control.c:284:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 5080 Laptop GPU (VRAM: 16275 MB)
+[32m[INFO][0m DynamicVRAM support detected and enabled
+[32m[INFO][0m Python version: 3.12.11 (main, Aug 18 2025, 19:17:54) [MSC v.1944 64 bit (AMD64)]
+[32m[INFO][0m ComfyUI version: 0.35.1
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfyui-frontend-package version: 1.51.10
+[32m[INFO][0m comfyui-workflow-templates version: 0.11.59
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.11
+[32m[INFO][0m comfy-kitchen version: 0.2.33
+[32m[INFO][0m comfy-aimdo version: 0.5.3
+[32m[INFO][0m [Prompt Server] web root: C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\comfyui_frontend_package\static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m No OpenGL_accelerate module loaded: Acceleration disabled
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\basline-models\\__init__.py'
+[DMM] Data Media Machine v3.7: loaded 31/31 nodes
+[DMM] Graceful disconnect handler installed
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m ### Loading: ComfyUI-Impact-Pack (V8.28.3)
+[32m[INFO][0m [Impact Pack] Wildcard total size (0.00 MB) is within cache limit (50.00 MB). Using full cache mode.
+[32m[INFO][0m [Impact Pack] Wildcards loading done.
+W0911 03:16:49.937000 48600 Lib\site-packages\torch\distributed\elastic\multiprocessing\redirects.py:29] NOTE: Redirects are currently not supported in Windows or MacOs.
+[32m[INFO][0m ### Loading: ComfyUI-Manager (V3.40)
+[32m[INFO][0m [ComfyUI-Manager] network_mode: offline
+[32m[INFO][0m [ComfyUI-Manager] ComfyUI per-queue preview override detected (PR #11261). Manager's preview method feature is disabled. Use ComfyUI's --preview-method CLI option or 'Settings > Execution > Live preview method'.
+[32m[INFO][0m ### ComfyUI Revision: 5920 [856a922b] *DETACHED | Released on '2026-09-10'
+[32m[INFO][0m [ComfyUI-Manager] All startup tasks have been completed.
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+⚡ SeedVR2 optimizations check: SageAttention ✅ | Flash Attention ❌ | Triton ✅
+💡 Optional: pip install flash-attn
+🔧 Conv3d workaround active: PyTorch 2.10.0, cuDNN 91200 (fixing VAE 3x memory bug)
+📊 Initial CUDA memory: 14.60GB free / 15.89GB total
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:35: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+C:\Users\jeffr\Documents\ComfyUI\.venv\Lib\site-packages\rotary_embedding_torch\rotary_embedding_torch.py:268: FutureWarning: `torch.cuda.amp.autocast(args...)` is deprecated. Please use `torch.amp.autocast('cuda', args...)` instead.
+  @autocast(enabled = False)
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\llm-script-lab\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\models\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\otr-model-smoker\\__init__.py'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\nodes.py", line 2266, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 995, in exec_module
+  File "<frozen importlib._bootstrap_external>", line 1132, in get_code
+  File "<frozen importlib._bootstrap_external>", line 1190, in get_data
+FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+
+[1m[33m[WARNING][0m Cannot import C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network module for custom nodes: [Errno 2] No such file or directory: 'C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\Uncanny-Valley-News-Network\\__init__.py'
+[32m[INFO][0m [hf_token] HF_TOKEN resolved from os.environ (len=37)
+[OldTimeRadio] OK - All 25 nodes loaded successfully
+[OldTimeRadio] Load the show:  Workflow > Browse Templates > EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped graph -- pick it, then Queue Prompt) -- or drag workflows/otr_canonical.json onto the canvas. There is one graph now: set its device dropdowns to match your hardware, per the README's "Pick the graph" table.
+[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Uncanny-Valley-News-Network
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\manual_sigmas.py
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\otr-model-smoker
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\models
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\dmm_ascii_art.py
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\llm-script-lab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\golden-flicker
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\websocket_image_save.py
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-MiniMax-H3-Turbo
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): C:\Users\jeffr\Documents\ComfyUI\custom_nodes\basline-models
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OTR-UpstreamStoryLab
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-data-media-machine
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-GGUF
+[32m[INFO][0m    0.0 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-KJNodes
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\Nvidia_RTX_Nodes_ComfyUI
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-LTXVideo
+[32m[INFO][0m    0.1 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-videohelpersuite
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-AnimateDiff-Evolved
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.2 seconds: C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio
+[32m[INFO][0m    0.3 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-impact-pack
+[32m[INFO][0m    0.6 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m    1.4 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\comfyui-kokorotts
+[32m[INFO][0m   11.5 seconds: C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-SeedVR2_VideoUpscaler
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8000
+[32m[INFO][0m got prompt
+[32m[INFO][0m [OTR_WorkflowValidator] story input for node 1: b4243b7d90d0 (verified)
+[32m[INFO][0m OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\workflows\otr_canonical.json
+[32m[INFO][0m OTR_WorkflowValidator: OK -- 23 nodes, 63 links, strict_unknown_types=True, path='C:\\Users\\jeffr\\Documents\\ComfyUI\\custom_nodes\\ComfyUI-OldTimeRadio\\workflows\\otr_canonical.json', widget_vector_drift=0
+[1m[33m[WARNING][0m [OTR.assets] still_pan: automatic visual-weight coverage unavailable; existing adapter checks remain
+[32m[INFO][0m [OTR.assets] EXISTING diffusion_models/z_image_turbo_nvfp4.safetensors bytes=4509509600 native=C:\ComfyUI-Models\diffusion_models\z_image_turbo_nvfp4.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/qwen_3_4b_fp8_mixed.safetensors bytes=5631994051 native=C:\ComfyUI-Models\text_encoders\qwen_3_4b_fp8_mixed.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING vae/ae.safetensors bytes=335304388 native=C:\ComfyUI-Models\vae\ae.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING checkpoints/stable_audio_3_small_music.safetensors bytes=2270384940 native=C:\ComfyUI-Models\checkpoints\stable_audio_3_small_music.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] EXISTING text_encoders/t5gemma_b_b_ul2.safetensors bytes=1187264003 native=C:\ComfyUI-Models\text_encoders\t5gemma_b_b_ul2.safetensors (preserved; content hash/GPU compatibility not qualified)
+[32m[INFO][0m [OTR.assets] READY engines=stable_audio_3,z_image_turbo files=5 (availability only; render/GPU/publish success not qualified)
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story input b4243b7d90d0 (verified) -> C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\_shared\state\story_drafts\b4243b7d90d0860d902b95d0a7b43b01303e75ff2b9737677a7b2c363311d9a9\input.json
+[32m[INFO][0m [OTR_LedgerScriptWriter] my_story: 4 creative field(s), draft b4243b7d90d0 (unattributed)
+[32m[INFO][0m [OTR_LedgerScriptWriter] start: creative_model='Qwen/Qwen3.5-4B', technical_model='Qwen/Qwen3.5-4B', act_count=1, num_characters=2, creativity='balanced' (temp=0.85 top_p=0.95), seed_source=my_story_fields, episode_title='', perfect_run_spacesaver=False
+[32m[INFO][0m [Ledger] saved pending_20260911_031716_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_LedgerScriptWriter] skeleton ledger saved up front: C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes\pending_20260911_031716\audio\pending_20260911_031716_ledger.json
+[32m[INFO][0m [PendingSweep] BUG-LOCAL-290: deleted 2 empty pending dir(s) (scanned=403 skipped_too_young=7 skipped_has_lines=393 skipped_no_ledger=1 skipped_unreadable=0 errors=0).
+[32m[INFO][0m [OTR_LedgerScriptWriter] BUG-LOCAL-290 pending sweep: deleted 2 stale dir(s) before run start.
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_interpret' attempt 1/3: base call at temperature=0.300
+[32m[INFO][0m [OTR_HF_ENV] HF_HOME='C:\\ComfyUI-Models\\huggingface' HF_HUB_CACHE='C:\\ComfyUI-Models\\huggingface\\hub' (source=os.environ); exported to os.environ
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m Loading LLM model: Qwen/Qwen3.5-4B (quantized=True)
+[32m[INFO][0m [StoryOrchestrator] Enabling 4-bit quantization (NF4, policy)
+[32m[INFO][0m [OTR_HF_ENV] snapshot resolved Qwen/Qwen3.5-4B -> C:\ComfyUI-Models\huggingface\hub\models--Qwen--Qwen3.5-4B\snapshots\851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a
+Loading weights:   0%|          | 0/426 [00:00<?, ?it/s]Loading weights:   0%|          | 1/426 [00:00<06:15,  1.13it/s]Loading weights:   1%|▏         | 6/426 [00:02<02:15,  3.09it/s]Loading weights:   5%|▍         | 20/426 [00:02<00:31, 12.94it/s]Loading weights:   7%|▋         | 28/426 [00:02<00:21, 18.63it/s]Loading weights:  10%|▉         | 42/426 [00:02<00:12, 31.57it/s]Loading weights:  13%|█▎        | 54/426 [00:02<00:08, 43.60it/s]Loading weights:  16%|█▌        | 67/426 [00:02<00:06, 57.72it/s]Loading weights:  20%|██        | 87/426 [00:02<00:04, 84.43it/s]Loading weights:  24%|██▎       | 101/426 [00:02<00:03, 85.82it/s]Loading weights:  28%|██▊       | 119/426 [00:03<00:02, 104.44it/s]Loading weights:  31%|███▏      | 134/426 [00:03<00:02, 110.79it/s]Loading weights:  35%|███▍      | 148/426 [00:03<00:02, 110.58it/s]Loading weights:  38%|███▊      | 161/426 [00:03<00:02, 107.70it/s]Loading weights:  41%|████      | 173/426 [00:03<00:02, 102.91it/s]Loading weights:  44%|████▍     | 187/426 [00:03<00:02, 105.74it/s]Loading weights:  47%|████▋     | 200/426 [00:03<00:02, 107.05it/s]Loading weights:  50%|████▉     | 212/426 [00:03<00:02, 93.20it/s] Loading weights:  53%|█████▎    | 225/426 [00:04<00:02, 97.56it/s]Loading weights:  56%|█████▌    | 238/426 [00:04<00:01, 101.17it/s]Loading weights:  58%|█████▊    | 249/426 [00:04<00:01, 103.09it/s]Loading weights:  61%|██████    | 260/426 [00:04<00:01, 84.52it/s] Loading weights:  65%|██████▍   | 276/426 [00:04<00:01, 100.57it/s]Loading weights:  67%|██████▋   | 287/426 [00:04<00:01, 97.99it/s] Loading weights:  70%|██████▉   | 298/426 [00:04<00:01, 97.43it/s]Loading weights:  73%|███████▎  | 309/426 [00:04<00:01, 90.13it/s]Loading weights:  75%|███████▍  | 319/426 [00:05<00:01, 83.61it/s]Loading weights:  78%|███████▊  | 331/426 [00:05<00:01, 89.19it/s]Loading weights:  81%|████████  | 344/426 [00:05<00:00, 94.01it/s]Loading weights:  83%|████████▎ | 355/426 [00:05<00:00, 96.59it/s]Loading weights:  86%|████████▌ | 365/426 [00:05<00:00, 76.55it/s]Loading weights:  90%|████████▉ | 382/426 [00:05<00:00, 95.04it/s]Loading weights:  92%|█████████▏| 393/426 [00:05<00:00, 94.31it/s]Loading weights:  95%|█████████▍| 404/426 [00:06<00:00, 93.24it/s]Loading weights:  97%|█████████▋| 414/426 [00:06<00:00, 84.34it/s]Loading weights:  99%|█████████▉| 423/426 [00:06<00:00, 82.79it/s]Loading weights: 100%|██████████| 426/426 [00:06<00:00, 67.52it/s]
+[32m[INFO][0m [StoryOrchestrator] CUDA warmup complete (6.2s) - first generate will not stall
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 14.2 tok/s | 4.5s | ... at a table in Los Angeles.",       "kind": "setting",       "source_field": "idea",      
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 16.4 tok/s | 7.8s | ...Area while eating.",       "kind": "plot",       "source_field": "idea",       "strength":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 17.2 tok/s | 11.2s | ...he past.",       "kind": "plot",       "source_field": "plot",       "strength": "required
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 17.7 tok/s | 14.5s | ...the dinner.",       "kind": "character",       "source_field": "plot",       "strength": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 17.9 tok/s | 17.9s | ...tions.",       "kind": "plot",       "source_field": "plot",       "strength": "required" 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 18.1 tok/s | 21.2s | ...ry.",       "kind": "plot",       "source_field": "plot",       "strength": "required"    
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 18.2 tok/s | 24.6s | ...e.",       "kind": "setting",       "source_field": "setting",       "strength": "required
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 18.3 tok/s | 27.9s | ...s Bay Area childhood; has a girlfriend.",       "stated_gender": "male",       "speaking":
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 18.4 tok/s | 31.3s | ...er; shares warm recollections.",       "stated_gender": "female",       "speaking": true, 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 18.5 tok/s | 34.6s | ...ffrey.",       "stated_gender": "",       "speaking": false,       "required": false     }
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 704 tok | 18.5 tok/s | 38.0s | ...tioned but not present, so only Jeffrey and his mother speak in the dramatic scene."   }, 
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 768 tok | 18.6 tok/s | 41.4s | ... "The mother is living and physically present in the present day.",     "The dinner occurs
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 802 tok | 18.6 tok/s | 43.1s | ...ry ends with Jeffrey and his mother still together at the table."   ],   "conflicts": [] }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "Qwen/Qwen3.5-4B", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 48600, "process_rss_bytes": 2861096960, "timestamp_utc": "2026-09-11T10:18:14.125338+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=802 last_token=248046 eos_token_ids=[248044, 248046] ended_with_eos=True
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_source_rewrite_interpret' attempt 1/2: base call at temperature=0.350
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=technical reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 10.8 tok/s | 5.9s | ...day dinner at a table in Los Angeles."     },     {       "id": "bay_area_memory",       "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 11.8 tok/s | 10.9s | ...frey's mother responds with her own warm recollection of the past."     },     {       "id
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 12.1 tok/s | 15.8s | ...    "text": "The entire story takes place in one continuous scene without scene changes or
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 12.1 tok/s | 21.2s | ...r emergency in the story."     },     {       "id": "domestic_atmosphere",       "text": "
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 12.6 tok/s | 25.4s | ... "notes": "Adult man who loves Los Angeles; remembers Bay Area childhood; has a girlfriend
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 12.7 tok/s | 30.3s | ...s."     },     {       "name": "Girlfriend",       "notes": "Different person from mother;
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 13.1 tok/s | 34.3s | ... true,     "reason": "The girlfriend is mentioned but not present, so only Jeffrey and his
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 497 tok | 13.1 tok/s | 37.9s | ... evening, with Jeffrey and his mother sitting across from each other at a shared table." }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "Qwen/Qwen3.5-4B", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 48600, "process_rss_bytes": 3657859072, "timestamp_utc": "2026-09-11T10:18:55.159345+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=497 last_token=248046 eos_token_ids=[248044, 248046] ended_with_eos=True
+[32m[INFO][0m [my_story] filled 3 unstated detail(s): The mother is living and physically present in the present day.; The dinner occurs in the evening.; The story ends with Jeffrey and his mother still together at the table.
+[32m[INFO][0m [Ledger] saved pending_20260911_031716_ledger.json (0 lines, 0 words)
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 1/3: base call at temperature=0.850
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 9.8 tok/s | 6.5s | ...till have together. The memory is discussed at their present-day table; do not move either
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 11.3 tok/s | 11.4s | .... Keep both people physically present throughout this single continuous scene. There is no
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 11.4 tok/s | 16.9s | ...les. They share food and talk face to face about an affectionate memory from his childhood
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 11.6 tok/s | 22.1s | ...frey and his mother still together at that same table, enjoying their meal and choosing to
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 11.9 tok/s | 26.8s | ...gin with Jeffrey and his living mother already seated together at the same dinner table in
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 11.9 tok/s | 32.4s | ...h her own warm recollection. Jeffrey briefly mentions his girlfriend as a separate person.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 12.0 tok/s | 37.5s | ...air vigil, waiting for Jeffrey to arrive, fire, emergency, or replacement of his mother by
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 12.1 tok/s | 42.5s | ...discussed at their present-day table; do not move either person into a separate scene. His
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "Qwen/Qwen3.5-4B", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 48600, "process_rss_bytes": 4165455872, "timestamp_utc": "2026-09-11T10:19:37.819514+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=512 last_token=5133 eos_token_ids=[248044, 248046] ended_with_eos=False
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] DECODE HALTED (verbatim_cycle): the output repeated a run of tokens verbatim, after 512 generated tokens of a 259809-token allowance. Rerollable. Telemetry: {'halt_reason': 'verbatim_cycle', 'cycle_tokens': 147, 'open_string_tokens': None, 'max_open_string_tokens': None, 'open_string_bound': None, 'required_repeats': 3, 'min_cycle_tokens': 48, 'generated_tokens_seen': 512}
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] RUNAWAY EVIDENCE (2673 chars, 512 tokens, halted)
+  HEAD: {   "title": "The Table We Share",   "logline": "Jeffrey and his mother enjoy a warm evening dinner in Los Angeles, bonding over memories of his Bay Area childhood and the present life they still have together. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfri
+  TAIL: or Jeffrey to arrive, fire, emergency, or replacement of his mother by his girlfriend. Begin with Jeffrey and his living mother already seated together at the same dinner table in Los Angeles. They share food and talk face to face about an affectionate memory from his childhood in the Bay Area. The memory is discussed at their present-day table; do not move either person into a separate scene. His
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_treatment' attempt 1 failed: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim | raw head: { "title": "The Table We Share", "logline": "Jeffrey and his mother enjoy a warm evening dinner in Los Angeles, bonding over memories of his Bay Area childhood and the present life they still have together. The memory is discussed at their present-day table; do not move either person into a separate scene. His mother responds with her own warm recollection. Jeffrey briefly mentions his girlfriend ...
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 2/3: structural retry at temperature=0.500 (lowered from 0.850)
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 10.7 tok/s | 6.0s | ...e together. The single act is set in one continuous scene. The girlfriend is mentioned but
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 10.1 tok/s | 12.6s | ...rey and his mother. Jeffrey is an adult man who loves Los Angeles and remembers growing up
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 11.1 tok/s | 17.4s | ...ted. Jeffrey recalls his childhood. His mother responds with her own recollection. Jeffrey
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 11.5 tok/s | 22.3s | ...e Bay Area Table. The logline is An adult man and his living mother share a warm dinner in
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 11.6 tok/s | 27.6s | ...geles home dining room in the present day. The time_of_day is evening. The cast is Jeffrey
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 11.9 tok/s | 32.3s | ... act number is 1. The purpose is to share a warm dinner and reflect on childhood memories.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 11.7 tok/s | 38.3s | ...ppreciate their lives. The ending is they finish their meal together, still sitting at the
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 512 tok | 11.8 tok/s | 43.5s | .... The conflicts are none. The assumptions are honored. The plan is complete. The output is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 576 tok | 11.9 tok/s | 48.3s | ...lanned. The end is here. The plan is done. The work is finished. The task is complete. The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 640 tok | 11.9 tok/s | 53.6s | ...e wave is sent. The light is sent. The sound is sent. The voice is sent. The word is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 704 tok | 12.0 tok/s | 58.7s | ...he disk is sent. The drive is sent. The server is sent. The cloud is sent. The net is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 768 tok | 12.1 tok/s | 63.3s | ...avenue is sent. The boulevard is sent. The drive is sent. The parkway is sent. The highway
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 832 tok | 12.0 tok/s | 69.3s | ...el is sent. The viaduct is sent. The overpass is sent. The underpass is sent. The cul-de-s
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 896 tok | 12.1 tok/s | 74.1s | ...The field is sent. The meadow is sent. The pasture is sent. The prairie is sent. The plain
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 960 tok | 12.1 tok/s | 79.2s | ...pe is sent. The grade is sent. The incline is sent. The decline is sent. The rise is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1024 tok | 12.0 tok/s | 85.4s | ...The spring is sent. The stream is sent. The river is sent. The creek is sent. The brook is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1088 tok | 12.1 tok/s | 90.2s | ...nt. The waterfall is sent. The cascade is sent. The rapids are sent. The eddy is sent. The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1152 tok | 12.1 tok/s | 94.9s | ...The port is sent. The dock is sent. The pier is sent. The jetty is sent. The breakwater is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1216 tok | 12.1 tok/s | 100.9s | ...d is sent. The string is sent. The thread is sent. The yarn is sent. The wool is sent. The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1280 tok | 12.1 tok/s | 105.7s | ... The abaca is sent. The ramie is sent. The viscose is sent. The modal is sent. The lyocell
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1344 tok | 12.1 tok/s | 110.8s | ... is sent. The concrete is sent. The mortar is sent. The plaster is sent. The paint is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1408 tok | 12.1 tok/s | 116.1s | ...tercolor is sent. The ink is sent. The pencil is sent. The pen is sent. The brush is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1472 tok | 12.2 tok/s | 120.9s | ...is sent. The parchment is sent. The paper is sent. The card is sent. The envelope is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1536 tok | 12.1 tok/s | 126.5s | ...ent. The printer is sent. The distributor is sent. The retailer is sent. The buyer is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1600 tok | 12.0 tok/s | 132.9s | ... is sent. The producer is sent. The creator is sent. The inventor is sent. The designer is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1664 tok | 12.1 tok/s | 137.9s | ...The planner is sent. The strategist is sent. The tactician is sent. The commander is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1728 tok | 12.1 tok/s | 142.7s | ...he tester is sent. The evaluator is sent. The appraiser is sent. The assessor is sent. The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1792 tok | 12.1 tok/s | 148.1s | ...s sent. The mentor is sent. The guide is sent. The counselor is sent. The advisor is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1856 tok | 12.1 tok/s | 153.0s | ...nt. The jester is sent. The clown is sent. The mime is sent. The actor is sent. The player
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1920 tok | 12.1 tok/s | 158.8s | ...t is sent. The reporter is sent. The correspondent is sent. The editor is sent. The writer
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 1984 tok | 12.0 tok/s | 165.3s | ...ensemble is sent. The group is sent. The team is sent. The crew is sent. The cast is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2048 tok | 12.0 tok/s | 170.5s | ...vy is sent. The air force is sent. The marine is sent. The coast guard is sent. The police
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2112 tok | 12.0 tok/s | 175.5s | ... is sent. The laborer is sent. The farmer is sent. The rancher is sent. The hunter is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2176 tok | 12.0 tok/s | 181.0s | ...ractor is sent. The developer is sent. The landlord is sent. The tenant is sent. The owner
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2240 tok | 12.1 tok/s | 185.8s | ... fund manager is sent. The hedge fund manager is sent. The private equity manager is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2304 tok | 12.1 tok/s | 190.6s | ... beneficiary is sent. The trustee is sent. The executor is sent. The administrator is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2368 tok | 12.0 tok/s | 196.6s | ...magistrate is sent. The jury is sent. The witness is sent. The victim is sent. The suspect
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2432 tok | 12.1 tok/s | 201.5s | ...nt. The lender is sent. The borrower is sent. The mortgagor is sent. The mortgagee is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2496 tok | 12.1 tok/s | 206.3s | ...sent. The bill is sent. The invoice is sent. The receipt is sent. The voucher is sent. The
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2560 tok | 12.1 tok/s | 211.6s | ...on is sent. The error is sent. The mistake is sent. The fault is sent. The defect is sent.
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2624 tok | 12.1 tok/s | 216.5s | ...unction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2688 tok | 12.1 tok/s | 222.1s | ... malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 2752 tok | 12.0 tok/s | 228.4s | ...The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "Qwen/Qwen3.5-4B", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 48600, "process_rss_bytes": 10071019520, "timestamp_utc": "2026-09-11T10:23:26.231542+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=2752 last_token=68770 eos_token_ids=[248044, 248046] ended_with_eos=False
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] DECODE HALTED (verbatim_cycle): the output repeated a run of tokens verbatim, after 2752 generated tokens of a 259809-token allowance. Rerollable. Telemetry: {'halt_reason': 'verbatim_cycle', 'cycle_tokens': 50, 'open_string_tokens': None, 'max_open_string_tokens': None, 'open_string_bound': None, 'required_repeats': 3, 'min_cycle_tokens': 48, 'generated_tokens_seen': 2752}
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] RUNAWAY EVIDENCE (11581 chars, 2752 tokens, halted)
+  HEAD: {   "title": "The Bay Area Table",   "logline": "An adult man and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating the life they still have together. The single act is set in one continuous scene. The girlfriend is mentioned but does not speak. The ending is a warm meal and appreciation of current life. The tone is affectionate and humor
+  TAIL:  is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction is sent. The malfunction
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_treatment' attempt 2 failed: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim | raw head: { "title": "The Bay Area Table", "logline": "An adult man and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating the life they still have together. The single act is set in one continuous scene. The girlfriend is mentioned but does not speak. The ending is a warm meal and appreciation of current life. The tone is affectionate and humorous....
+[32m[INFO][0m [OTR_StructuredCall] 'my_story_treatment' attempt 3/3: typed repair at temperature=0.100
+[32m[INFO][0m [Selector] proceeding with caution: ctx_cap=PASS@262144, vram_fit=WARN@4.3 GB
+[32m[INFO][0m [Selector] slot=creative reuse cache for Qwen/Qwen3.5-4B
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 64 tok | 12.4 tok/s | 5.2s | ...dramatic question is: How does Jeffrey honor his past while cherishing his present family?
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 128 tok | 11.8 tok/s | 10.8s | ...warm, reflective register and a deep, resonant timbre; and Mother, Jeffrey's living mother
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 192 tok | 11.8 tok/s | 16.2s | ...n features Jeffrey taking a bite of food and recalling his childhood growing up in the Bay
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 256 tok | 12.0 tok/s | 21.3s | ...till together at the table, enjoying their meal and choosing to appreciate their lives now
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 320 tok | 12.0 tok/s | 26.8s | ...rrent life together. } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 384 tok | 11.8 tok/s | 32.4s | ... } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+[32m[INFO][0m [OTR_LedgerScriptWriter] heartbeat: 448 tok | 12.0 tok/s | 37.2s | ... } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+[32m[INFO][0m MEMORY_SNAPSHOT {"model_id": "Qwen/Qwen3.5-4B", "mps_current_bytes": null, "mps_driver_bytes": null, "phase": "writer_generation_returned", "pid": 48600, "process_rss_bytes": 9938935808, "timestamp_utc": "2026-09-11T10:24:03.805683+00:00"}
+[32m[INFO][0m [OTR_LedgerScriptWriter] DECODE RETURNED: generated_tokens=448 last_token=333 eos_token_ids=[248044, 248046] ended_with_eos=False
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] DECODE HALTED (verbatim_cycle): the output repeated a run of tokens verbatim, after 448 generated tokens of a 259696-token allowance. Rerollable. Telemetry: {'halt_reason': 'verbatim_cycle', 'cycle_tokens': 48, 'open_string_tokens': None, 'max_open_string_tokens': None, 'open_string_bound': None, 'required_repeats': 3, 'min_cycle_tokens': 48, 'generated_tokens_seen': 448}
+[1m[31m[ERROR][0m [OTR_LedgerScriptWriter] RUNAWAY EVIDENCE (1770 chars, 448 tokens, halted)
+  HEAD: {   "title": "The Bay Area Table",   "logline": "Jeffrey and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating their current life together. The dramatic question is: How does Jeffrey honor his past while cherishing his present family? The setting is a comfortable Los Angeles home dining room in the present day. The time of day is evening.
+  TAIL: their shared presence and the appreciation of their current life together. } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } } }
+[1m[33m[WARNING][0m [OTR_StructuredCall] 'my_story_treatment' attempt 3 (repair) failed: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim | raw head: { "title": "The Bay Area Table", "logline": "Jeffrey and his living mother share a warm dinner in Los Angeles, reflecting on their childhood memories and appreciating their current life together. The dramatic question is: How does Jeffrey honor his past while cherishing his present family? The setting is a comfortable Los Angeles home dining room in the present day. The time of day is evening. The...
+[1m[31m[ERROR][0m [OTR_StructuredCall] 'my_story_treatment' exhausted the retry ladder after 3 attempt(s); raising StructuredCallFailedError
+[32m[INFO][0m [Ledger] saved pending_20260911_031716_ledger.json (0 lines, 0 words)
+[1m[31m[ERROR][0m !!! Exception during processing !!! [OTR_StructuredCall] 'my_story_treatment' failed after 3 attempt(s); disposition=primary_ladder_exhausted; last error -> GenerationDegeneracyError: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim
+[1m[31m[ERROR][0m Traceback (most recent call last):
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 545, in execute
+    output_data, output_ui, has_subgraph, has_pending_tasks = await get_output_data(prompt_id, unique_id, obj, input_data_all, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 344, in get_output_data
+    return_values = await _async_map_node_over_list(prompt_id, unique_id, obj, input_data_all, obj.FUNCTION, allow_interrupt=True, execution_block_cb=execution_block_cb, pre_execute_cb=pre_execute_cb, v3_data=v3_data)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 318, in _async_map_node_over_list
+    await process_inputs(input_dict, i)
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\execution.py", line 306, in process_inputs
+    result = f(**inputs)
+             ^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\OTR_LedgerScriptWriter.py", line 3679, in run
+    _parts = _lane_runner(
+             ^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 1018, in run_my_story_episode
+    treatment = _pass_treatment(
+                ^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 501, in _pass_treatment
+    return _call(
+           ^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_my_story.py", line 395, in _call
+    authored = structured_call(on_attempt_complete=completed, **kwargs)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio\nodes\_otr_structured_call.py", line 1286, in structured_call
+    raise StructuredCallFailedError(
+C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio.nodes._otr_structured_call.StructuredCallFailedError: [OTR_StructuredCall] 'my_story_treatment' failed after 3 attempt(s); disposition=primary_ladder_exhausted; last error -> GenerationDegeneracyError: generation was halted by the in-decode liveness guard: the output repeated a run of tokens verbatim
+
+[32m[INFO][0m [32mPrompt executed in 408.62 seconds[0m

@@ -1,0 +1,15 @@
+[watchdog] start 03:17:13 :: leg=tmp/my_story_5080_pairlock_03.log stall=300s poll=30s
+[watchdog] 03:17:43 t=25s stalled=0s qfail=0
+[watchdog] 03:18:13 t=55s stalled=0s qfail=0
+[watchdog] 03:18:43 t=85s stalled=0s qfail=0
+[watchdog] 03:19:13 t=115s stalled=0s qfail=0
+[watchdog] 03:19:43 t=145s stalled=0s qfail=0
+[watchdog] 03:20:13 t=175s stalled=0s qfail=0
+[watchdog] 03:20:43 t=205s stalled=0s qfail=0
+[watchdog] 03:21:13 t=235s stalled=0s qfail=0
+[watchdog] 03:21:43 t=266s stalled=0s qfail=0
+[watchdog] 03:22:13 t=296s stalled=0s qfail=0
+[watchdog] 03:22:43 t=326s stalled=0s qfail=0
+[watchdog] 03:23:13 t=356s stalled=0s qfail=0
+[watchdog] 03:23:43 t=386s stalled=0s qfail=0
+[watchdog] DONE 03:24:13 :: [canonical-api] RESULT FAIL prompt_id=24612071-a226-4871-9612-23f9eae1f3af

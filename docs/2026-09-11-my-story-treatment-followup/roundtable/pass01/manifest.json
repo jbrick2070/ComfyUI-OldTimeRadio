@@ -1,0 +1,30 @@
+{
+  "timestamp": "2026-09-11T10:28:27.975212+00:00",
+  "doc": "docs/2026-09-11-my-story-treatment-followup/driver_anchor.md",
+  "prompt_tokens_est": 27042,
+  "models": [
+    {
+      "requested_model": "~anthropic/claude-opus-latest",
+      "resolved_model": "anthropic/claude-opus-5",
+      "ok": true,
+      "prompt_tokens": 39681,
+      "completion_tokens": 5466,
+      "cost_usd": 0.335055,
+      "max_tokens": 10000,
+      "temperature": 0.3,
+      "reasoning_effort": "low"
+    },
+    {
+      "requested_model": "~google/gemini-pro-latest",
+      "resolved_model": "google/gemini-3.1-pro-preview",
+      "ok": true,
+      "prompt_tokens": 28560,
+      "completion_tokens": 2390,
+      "cost_usd": 0.0858,
+      "max_tokens": 10000,
+      "temperature": 0.3,
+      "reasoning_effort": "low"
+    }
+  ],
+  "total_cost_usd": 0.4209
+}

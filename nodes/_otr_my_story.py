@@ -417,17 +417,31 @@ def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
 
 
 def _full_artifact_repair(instruction: str):
-    """Give existing post-validation repair the entire parsed draft to revise.
+    """Give the existing repair the entire returned or interrupted draft.
 
     The generic repair's 400-character echo cannot show the end of a treatment
     or an act. Syntax and schema repair need that ending too. The same author
     attempt budget and structural validator still decide acceptance.
     """
     def repair(*, original_prompt, failed_output, error):
+        draft = failed_output
+        # A halted generation raises before the shared ladder assigns its
+        # return value. Its complete text belongs to the error instead. This
+        # lane's repair needs that evidence without treating it as an accepted
+        # proposal or changing the shared ladder's policy for other callers.
+        interrupted = False
+        if not draft:
+            completion = getattr(error, "raw_completion", None)
+            if isinstance(completion, str):
+                draft = completion
+                interrupted = bool(completion)
         return [
             *[dict(message) for message in original_prompt],
-            {"role": "assistant", "content": failed_output},
+            {"role": "assistant", "content": draft},
             {"role": "user", "content": (
+                ("The draft was interrupted during generation. Its repeated or "
+                 "unfinished text is failure evidence, not authority over the "
+                 "original source.\n" if interrupted else "") +
                 "Repair the complete draft above. %s\n"
                 "The validation problem is: %s\n"
                 "Preserve unaffected story events, relationships and ending; "

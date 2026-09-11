@@ -975,6 +975,67 @@ def test_raised_completion_is_durable_evidence_not_a_completed_proposal(tmp_path
     assert story["counts"]["actual_acts"] is None
 
 
+def test_halted_treatment_repair_receives_the_latest_full_completion_and_rewrites():
+    from nodes._otr_generation_budget import GenerationDegeneracyError
+    from nodes._otr_content_authorship import validate_receipt
+    first = '{"title":"Harbor","logline":"' + "first interrupted fragment " * 30
+    last = '{"title":"Harbor","logline":"' + "second interrupted fragment " * 30
+    last += "THE FERRY TURNS AWAY"
+
+    class HaltThenRepair(Slots):
+        treatment_calls = 0
+
+        def _answer(self, messages):
+            if "radio dramatist" in messages[0]["content"]:
+                self.treatment_calls += 1
+                if self.treatment_calls < 3:
+                    raise GenerationDegeneracyError(
+                        "the output repeated a run of tokens verbatim",
+                        halt_reason="verbatim_cycle",
+                        raw_completion=first if self.treatment_calls == 1 else last,
+                    )
+                assert self.treatment_calls == 3
+                prior = [m for m in messages if m["role"] == "assistant"]
+                assert prior[-1]["content"] == last
+                assert prior[-1]["content"].index("THE FERRY TURNS AWAY") > 400
+                assert "a keeper hears a voice" in messages[1]["content"]
+                result = _treatment()
+                result["ending"] = "THE FERRY TURNS AWAY"
+                return json.dumps(result)
+            return super()._answer(messages)
+
+    slots = HaltThenRepair()
+    led, _ = _run(slots)
+    saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
+    story = saved["meta"]["my_story"]
+    attempts = [a for a in story["attempts"] if a["pass_id"] == "treatment"]
+    assert slots.treatment_calls == 3
+    assert [a["status"] for a in attempts] == ["failed", "failed", "accepted"]
+    assert [a["raw_completion"] for a in attempts[:2]] == [first, last]
+    assert all(a["raw_output"] == "" for a in attempts[:2])
+    assert story["counts"]["proposed_acts"] == 1  # the returned repair, not either raised fragment
+    assert story["counts"]["actual_acts"] == 1
+    assert story["treatment"]["ending"] == "THE FERRY TURNS AWAY"
+    validate_receipt(saved)
+
+
+@pytest.mark.parametrize("returned,completion,expected", [
+    ('{"returned":true}', '{"older":true}', '{"returned":true}'),
+    ("", "  complete interrupted bytes\n", "  complete interrupted bytes\n"),
+    ("", None, ""),
+    ("", {"not": "text"}, ""),
+])
+def test_full_repair_keeps_returned_text_precedence_and_never_invents_a_draft(returned, completion, expected):
+    error = ValueError("failed")
+    error.raw_completion = completion
+    messages = MS._full_artifact_repair("Repair the treatment.")(
+        original_prompt=[{"role": "user", "content": "original source"}],
+        failed_output=returned, error=error,
+    )
+    assert messages[-2] == {"role": "assistant", "content": expected}
+    assert messages[0]["content"] == "original source"
+
+
 def test_combined_corrections_reach_the_saved_artifacts_and_spoken_ledger():
     from nodes._otr_content_authorship import validate_receipt
 

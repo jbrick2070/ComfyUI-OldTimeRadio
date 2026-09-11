@@ -1,0 +1,46 @@
+from pathlib import Path
+import json, os, sys
+os.environ['OTR_TEST_MODE']='1'
+os.environ['CUDA_VISIBLE_DEVICES']=''
+root=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(root))
+from transformers import AutoTokenizer
+import torch
+from nodes._otr_my_story import StoryTreatment
+from nodes._otr_constrained_generate import get_cached_transformers_schema_constraint
+snapshot='C:/ComfyUI-Models/huggingface/hub/models--Qwen--Qwen3.5-4B/snapshots/851bf6e806efd8d0a36b00ddf55e13ccb7b8cd0a'
+tokenizer=AutoTokenizer.from_pretrained(snapshot,local_files_only=True)
+cache={'tokenizer':tokenizer,'model':object()}
+ledger=json.loads((root/'docs/2026-09-11-my-story-5080-qualification/pairlock_03_failure_ledger.json').read_text(encoding='utf-8'))
+result={'scope':'CPU-only grammar/tokenizer reconstruction from archived decoded text; NOT original sampled token replay, logits or semantic model proof','model_snapshot':snapshot,'schema':'StoryTreatment','probes':[]}
+for attempt in ledger['meta']['my_story']['attempts']:
+    if attempt['pass_id']!='treatment':continue
+    raw=attempt.get('raw_output') or attempt.get('raw_completion')
+    assert isinstance(raw,str) and raw, 'No saved text to reconstruct'
+    parser,callback=get_cached_transformers_schema_constraint(cache,StoryTreatment,eos_token_ids=[248044,248046])
+    text_parser=parser
+    for ch in raw:
+        assert ch in text_parser.get_allowed_characters(),repr(ch)
+        text_parser=text_parser.add_character(ch)
+    quote_char_allowed='"' in text_parser.get_allowed_characters()
+    tokens=tokenizer.encode(raw,add_special_tokens=False)
+    # The original prompt is unavailable; a fixed prefix initializes the same
+    # parser root, then feed the retokenized completion incrementally.
+    history=[0]
+    allowed=callback(0,torch.tensor(history,dtype=torch.long))
+    tokens_admitted=True
+    first_rejected=None
+    for i,token in enumerate(tokens):
+        if token not in allowed:
+            tokens_admitted=False
+            first_rejected={'position':i,'token':token,'decoded':tokenizer.decode([token])}
+            break
+        history.append(token)
+        allowed=callback(0,torch.tensor(history,dtype=torch.long))
+    quote_tokens=tokenizer.encode('"',add_special_tokens=False)
+    token_quote_allowed=tokens_admitted and len(quote_tokens)==1 and quote_tokens[0] in allowed
+    row={'attempt':attempt['attempt'],'raw_chars':len(raw),'last_quote_offset':raw.rfind('"'),'reconstructed_tokens':len(tokens),'quote_character_allowed':quote_char_allowed,'retokenized_prefix_admitted':tokens_admitted,'first_rejected':first_rejected,'closing_quote_tokens':quote_tokens,'closing_quote_token_allowed':token_quote_allowed}
+    result['probes'].append(row)
+    print(json.dumps(row),flush=True)
+folder=root/'docs/2026-09-11-my-story-treatment-followup'
+(folder/'quote_admissibility.json').write_text(json.dumps(result,indent=2)+'\n',encoding='utf-8')
