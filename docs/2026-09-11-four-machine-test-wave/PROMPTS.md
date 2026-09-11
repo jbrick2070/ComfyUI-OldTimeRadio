@@ -18,7 +18,19 @@ path lands after it:
 
     WAVE HEAD: f5f40bd4a98d2a85c464224ad2db69cc559aab4f
     Frozen 2026-09-11. Six crash/durability fixes and the plan rebaseline are
-    in it. Nothing touching the render path lands after this without a re-freeze.
+    in it.
+
+    THIS IS A CODE FREEZE, NOT A COMMIT FREEZE. Commits AFTER this hash are
+    documentation only -- this file's own freeze line is one of them, so the
+    hash you pull will legitimately be LATER than the hash written here. That
+    is expected and it is not a problem: nothing touching the render path lands
+    after the frozen hash without a re-freeze, and a docs commit cannot change
+    what a render produces.
+
+    So: report the HEAD you ACTUALLY pulled, whatever it is. Do not try to
+    check out the frozen hash. If you pull a commit that touches nodes/,
+    scripts/ or workflows/ after f5f40bd4, STOP and phone home -- that would
+    mean the freeze was broken.
 
 
 ---
