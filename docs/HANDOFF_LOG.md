@@ -1,3 +1,27 @@
+## 2026-09-11 01:35 UTC -- qualification pushed; RunPod stopped, latest sync blocked
+
+OTR code and measured receipts pushed at f829c920; HEAD equalled origin.
+The shared Bug Bible update pushed at ea9fb78 on main, also verified equal.
+All 45 OTR changed files were nonempty UTF-8 without BOM, all 28 JSON files
+parsed, all three Python files passed AST parsing, and canonical bytes matched
+the prior commit. Only inherited diff.txt/diff_utf8.txt remain untracked.
+
+RunPod k0ph3m9491yp6s stopped at the agreed deadline after its completed baseline
+test; GPU release was then confirmed. A brief sync-only resume for f829c920 was
+refused because the existing host had no free GPU. No second compute session
+or generation began, and no other pod was touched. Last verified pod checkout
+is 0327850a, not f829c920. First-session compute estimate is USD 0.40, excluding
+storage. Stop and sync-blocker receipts are in 2026-09-10-my-story-live/.
+
+The six-act story is available as a readable projection of its frozen ledger:
+output/otr/episodes/pending_20260910_181203/Jeffrey and Codex - six acts.md.
+The original ledger hash is unchanged. Repo lesson watcher checks every five
+minutes while independent 4060/Mac qualification remains active, quiet unless
+there is a meaningful result, lesson or conflict. No incoming commit was
+present at the final fetch. GO_FORWARD retains A2, B, C and pending remote
+qualification/sync; no completed instructions need repeating.
+
+---
 ## 2026-09-11 01:32 UTC -- My Story clean six-act ledger and final regression
 
 My Story supplemental music now uses a null optional parent, retaining line,

@@ -132,6 +132,10 @@ this arc reviews the new failure-policy ruling, live evidence and credits work.
 1. Collect the independent4060/Mac results and any incoming lessons against
    their exact tested commits. The operator owns those machines; preserve their
    repo updates and keep one production-code editor.
+   RunPod latest sync is also pending: the stopped existing host refused a
+   sync-only resume for lack of a free GPU. Before any further authorized pod
+   trial, pull current v2.0-alpha; its last tested checkout is 0327850a, while
+   the music-parent correction is f829c920. Preserve its receipts and volume.
 2. Continue the shared native HF capacity correction below as its own qualified
    chunk. Then implement the reviewed Original model credit and credits title
    containment sprints. The new App and full media qualification follow them.

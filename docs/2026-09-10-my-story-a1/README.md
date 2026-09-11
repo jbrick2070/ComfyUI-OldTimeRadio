@@ -42,3 +42,9 @@ The shared cleaner's repeated attribution sentence remains separate evidence
 for credit work. GO_FORWARD is the pending-only queue: A2 native HF capacity,
 Original model credit, credits hero containment, and later App/media tests.
 The operator owns independent 4060/Mac trials; this task owns 5080/RunPod.
+
+Code is pushed at f829c920, Bible at ea9fb78. RunPod is stopped with GPU
+released. Its sync-only resume for the final correction was refused because
+the existing host had no free GPU; last verified pod checkout is 0327850a.
+No additional generation ran. Exact stop/blocker receipts accompany the live
+evidence. GO_FORWARD records the pending sync rather than claiming it landed.

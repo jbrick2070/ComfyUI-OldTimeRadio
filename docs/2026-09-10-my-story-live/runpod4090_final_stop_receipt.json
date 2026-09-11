@@ -1,0 +1,16 @@
+{
+  "pod_id": "k0ph3m9491yp6s",
+  "desiredStatus": "EXITED",
+  "runtime_present": true,
+  "checked_at_utc": "2026-09-11T01:29:33.964Z",
+  "hourly_compute_usd": 0.74,
+  "resume_utc": "2026-09-11T00:56:44Z",
+  "final_deadline_utc": "2026-09-11T01:29:00Z",
+  "tested_revision": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "synced_revision": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "last_verified_origin_utc": "2026-09-11T01:28:29Z",
+  "last_verified_origin": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "further_generation": false,
+  "final_sync_note": "Root had not pushed a newer qualified revision before the sync-only hold deadline.",
+  "estimated_compute_usd": 0.40493724999999997
+}

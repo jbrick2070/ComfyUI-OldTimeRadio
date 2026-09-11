@@ -1,0 +1,18 @@
+{
+  "pod_id": "k0ph3m9491yp6s",
+  "checked_at_utc": "2026-09-11T01:34:06.816Z",
+  "desiredStatus": "EXITED",
+  "runtime_present": false,
+  "costPerHr": 0.74,
+  "purpose": "qualified latest-repo sync only; no generation",
+  "requested_commit": "f829c920b2217b2b15a1b88118239146d7c07a66",
+  "requested_runner_git_blob": "fb866f491ff17870f2098fc1aafc34206c409877",
+  "requested_canonical_git_blob": "fa66dcc8d618dfa11031f5c0d38b1d9b3c259fb1",
+  "resume_result": "refused by RunPod",
+  "blocker": "There are not enough free GPUs on the host machine to start this pod.",
+  "sync_performed": false,
+  "last_verified_pod_commit": "0327850a2d819a7ebed0d3df8e0cda2e90616153",
+  "additional_generations": 0,
+  "other_pods_touched": false,
+  "second_session_compute_started": false
+}
