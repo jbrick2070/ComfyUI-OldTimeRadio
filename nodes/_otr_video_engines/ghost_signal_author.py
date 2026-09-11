@@ -1761,7 +1761,69 @@ def _setting_terms(meta) -> list:
     return []
 
 
-def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
+#: Negation cues that make a noun NOT an artifact of the scene. The worked case
+#: from the operator ruling: "This ISN'T JUST some dusty list of truck routes and
+#: coal tonnages; it's the heartbeat of an entire community." Ellie is holding a
+#: LEDGER in an ARCHIVE -- the truck exists only inside a rhetorical negative, and
+#: a dialogue-noun extractor draws a coal truck into an archive drama. Radio
+#: dialogue is full of the same shape ("this isn't a game", "a caged bird").
+_CRUX_NEGATION_CUES = (
+    "isn't", "isnt", "is not", "aren't", "arent", "are not",
+    "wasn't", "wasnt", "was not", "weren't", "werent", "were not",
+    "no longer", "not just", "never", "hardly", "instead of", "rather than",
+    "nothing but", "far from",
+)
+
+#: How far back a negation cue reaches. Bounded on purpose: a cue ten words
+#: earlier is a different clause, not this noun's.
+_CRUX_NEGATION_LOOKBACK_WORDS = 8
+
+
+def _beat_mentions_object(beat_text: str, obj: str) -> bool:
+    """True when the beat's own text refers to ``obj`` and does NOT negate it.
+
+    RANKING ONLY. This never supplies a subject -- the candidate always comes
+    from ``meta.key_objects``. That is the ruling's second rule: "beat reference
+    RANKS candidates; it is not the source", and it is what stops the beat's
+    stray nouns becoming the picture.
+    """
+    text = " ".join(str(beat_text or "").lower().split())
+    head = " ".join(str(obj or "").lower().split())
+    if not text or not head:
+        return False
+    # Match on the object's most specific word rather than the whole phrase:
+    # `key_objects` entries read like "handwritten municipal ledger" and the
+    # dialogue says "ledger".
+    words = [w.strip(".,;:!?'\"()") for w in head.split()]
+    words = [w for w in words if len(w) > 3]
+    if not words:
+        return False
+    haystack = text.split()
+    for probe in (head, words[-1]):
+        if probe not in text:
+            continue
+        # Found it -- but is EVERY occurrence inside a negation?
+        for i, w in enumerate(haystack):
+            if probe.split()[-1] not in w.strip(".,;:!?'\"()"):
+                continue
+            window = haystack[max(0, i - _CRUX_NEGATION_LOOKBACK_WORDS):i]
+            # A negation does not reach across a sentence boundary. Without
+            # this, "It isn't a ledger. Then she opened the ledger." reads the
+            # SECOND, clean mention as negated by the first sentence's cue and
+            # the real subject is thrown away. Measured while writing this.
+            for back_i in range(len(window) - 1, -1, -1):
+                if window[back_i].endswith((".", "!", "?", ";")):
+                    window = window[back_i + 1:]
+                    break
+            back = " ".join(window)
+            if not any(cue in back for cue in _CRUX_NEGATION_CUES):
+                return True      # at least one clean mention
+        return False             # every mention was negated
+    return False
+
+
+def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
+                        beat_text="") -> tuple:
     """The beat's SUBJECT: the story's own thing, in the story's own place.
 
     TOTAL BY CONSTRUCTION -- four tiers, and the last one cannot fail. It never
@@ -1842,6 +1904,21 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="") -> tuple:
             return _in_place(motif), "bookend_radio"
 
     if objects:
+        # BEAT REFERENCE RANKS THE CANDIDATES (operator ruling 2026-09-03).
+        # The residual defect this closes: the subject was chosen by the beat's
+        # POSITION in the episode, not its content -- `objects[ordinal % len]` --
+        # so the beat about the ledger drew `pen` purely because it was the third
+        # row, and swapping two beats swapped the pictures with them.
+        #
+        # Deliberately a RANKER over `key_objects`, never an extractor over the
+        # dialogue: the candidate pool is unchanged, so a stray or negated noun
+        # can never become the subject. Measured ceiling, from the ruling: the
+        # dialogue names one of the episode's own key_objects on 26.3% of beats
+        # and 29.5% of character beats. On the other ~74% nothing is referenced
+        # and the odometer below still runs, byte-identical to today.
+        for obj in objects:
+            if _beat_mentions_object(beat_text, obj):
+                return _in_place(obj), "key_object_in_beat"
         return _in_place(objects[ordinal % len(objects)]), "key_object"
 
     if places:
@@ -2189,7 +2266,8 @@ def _apply_style_placement(composed: dict) -> dict:
 
 def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
                              ordinal=0, token_measure_fn=None,
-                             banana_enabled=None, pack_motion="") -> dict:
+                             banana_enabled=None, pack_motion="",
+                             beat_text="") -> dict:
     """Resolve, compose, transform, FIT and measure one Ghost v3 prompt.
 
     The v3 sibling of :func:`finalize_ghost_prompt_v2`, and deliberately a
@@ -2229,7 +2307,7 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
     """
     meta = ledger_meta if isinstance(ledger_meta, dict) else {}
     kernel, kernel_source = resolve_crux_kernel(
-        meta, ordinal=ordinal, role=role, mode=mode)
+        meta, ordinal=ordinal, role=role, mode=mode, beat_text=beat_text)
     light = resolve_world_light(meta, ordinal=ordinal, mode=mode)
     # THE PACK'S OWN KINETIC DIRECTION WINS ON A BOOKEND BEAT (2026-09-03).
     # The operator watched a published episode and reported that the announcer

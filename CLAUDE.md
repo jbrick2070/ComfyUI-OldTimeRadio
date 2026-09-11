@@ -104,6 +104,41 @@
     amendment calls for one (a design choice with more than one defensible
     answer). It is the floor, not the ceiling.
 
+- **SPLIT THE REVIEWERS BY WHAT THEY ACTUALLY CATCH (operator directive
+  2026-09-11 -- in force while the credits last).** Asked whether Fable should
+  run r1-r4 on every open sprint, the answer measured out of a full day of
+  arcs is NO -- put the two kinds of reviewer on the two kinds of defect.
+  * **FILE-GROUNDED PANEL (codex, cursor) -> CODE-SHAPED ROWS, r1.** They read
+    files and check the driver's reasoning against them, cheaply and fast. On
+    2026-09-11 eight arcs ran r1 with one reviewer each: **41 of 42 claims held
+    against the real files, and seven of eight driver anchors were wrong** --
+    even though those anchors were built from adversarially-verified grounding.
+    Establishing the facts and reasoning correctly FROM them are different
+    skills, and this is the one that catches the second.
+  * **FABLE -> JUDGMENT ROWS AND THE PERIODIC PLAN-LEVEL PASS.** Fable's value
+    is the defect that lives BETWEEN documents, which a file-grounded reader
+    structurally cannot see: on 2026-09-11 it caught a standing ruling
+    invalidated by a commit made THE SAME DAY (the ruling told the reader to
+    reorder `GHOST_V3_DROP_ORDER`; the code already had it reordered -- both
+    files look fine in isolation), receipts squatting in a plan whose own rule
+    is "only unfinished work belongs here", an obsolete phase table, a
+    dissolved row still cited by a live test prompt, and a shipping gap nobody
+    had listed. It is also the right reviewer for "is this worth building at
+    all under the bar", which is a taste question, not a code question.
+  * **RUN THE FABLE PLAN PASS AFTER EACH BATCH OF PUSHES, not once a day.**
+    Every time it ran on 2026-09-11 it found something stale that the driver
+    had created HOURS earlier. A plan rots from the inside at the speed you
+    push to it.
+  * **DEPTH IS THE DRIVER'S CALL, and "be sparing" is the default** (operator,
+    same day). r2+ only when a row genuinely stays forked -- say so when you
+    escalate, and say so when you decline. Measured: after r1 plus a grounded
+    judgment, **r2 was unnecessary on 8 of 8 rows**, because each had already
+    collapsed into a decision, a measurement, or a concrete diff. Another round
+    there is ceremony, not rigour.
+  * **Do NOT spend Fable on code claims.** It is weaker and dearer than the
+    panel at "is this function correct", and section 9's rule still stands: do
+    not burn a scalpel on a screw.
+
 - **`otr/obs/` IS THE SUCCESS SIGNAL. ALWAYS PUBLISH TO IT (operator directive 2026-08-17 --
   hard, and it OVERRIDES the tidiness instinct).** Operator, in his words: *"always publish to
   obs -- a test is not complete unless published to obs (or it's just testing one part). If I

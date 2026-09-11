@@ -1639,6 +1639,40 @@ def _beat_id_for_shot(shot):
     return sid[len("shot_"):] if sid.startswith("shot_") else sid
 
 
+def _beat_text_for_shot(ledger, shot) -> str:
+    """The spoken text of the beat this shot renders, for CRUX RANKING only.
+
+    Ghost v3's ``resolve_crux_kernel`` used to pick the beat's subject by the
+    beat's POSITION -- ``key_objects[ordinal % len]`` -- so the beat about the
+    ledger drew ``pen`` because it was the third row, and swapping two beats
+    swapped the pictures with them (operator ruling 2026-09-03). Handing it the
+    beat's own words lets it RANK the episode's key_objects by which one the
+    beat actually refers to.
+
+    RANKING ONLY, and that distinction is the ruling's second rule. The
+    candidate pool stays ``meta.key_objects``; this text never supplies a
+    subject, so a stray noun -- or one inside a rhetorical negative, which is
+    the case that motivated the item -- cannot become the picture.
+
+    Returns "" when the beat has no text, which is the common case for bookend
+    and music beats. The kernel ladder then runs exactly as it does today.
+    """
+    lines = (ledger or {}).get("lines")
+    if not isinstance(lines, list):
+        return ""
+    sid = str((shot or {}).get("shot_id") or "")
+    bid = _beat_id_for_shot(shot or {})
+    out = []
+    for ln in lines:
+        if not isinstance(ln, dict):
+            continue
+        if str(ln.get("shot_id") or "") == sid or str(ln.get("beat_id") or "") == bid:
+            txt = str(ln.get("text") or "").strip()
+            if txt:
+                out.append(txt)
+    return " ".join(out)
+
+
 #: Mirrors ``otr_shot_lock.OPENING_MUSIC_BEAT_ID`` -- duplicated as a local
 #: constant (round 5): importing the ShotLock node module from the driver would
 #: drag node-registration side effects into the engine package.
@@ -3286,7 +3320,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _g_final = _gsa.finalize_ghost_prompt_v3(
                 role=_shot_role, style=_vstyle, mode=_g_obj["mode"],
                 ledger_meta=(ledger or {}).get("meta") or {},
-                ordinal=_g_ordinal, pack_motion=_g_pack_motion)
+                ordinal=_g_ordinal, pack_motion=_g_pack_motion,
+                beat_text=_beat_text_for_shot(ledger, shot))
             _g_positive = str(_g_final["positive"]).strip()
             _g_negative = str(_g_final["negative"]).strip()
             req["text_prompt"] = _g_positive

@@ -826,13 +826,23 @@ and cannot be dropped, and `motion` survives because nothing is being trimmed.
 What is missing from his formula is only the **per beat** part, which is exactly
 what Half B adds.
 
-**THE TRAP THAT CREATES, and Half B must close it in the same change:**
-`GHOST_V3_DROP_ORDER = ("light", "motion", "vantage", "kernel_setting")` --
-**`motion` is the SECOND thing dropped.** That is harmless today because the
-ladder never runs, but Half B adds a per-beat object clause, prompts grow, and
-the ladder may fire for the first time. At that moment the current order deletes
-movement before framing, which directly contradicts the ruling above. Reorder it
-WITH Half B, not speculatively before it.
+**THE TRAP THAT CREATED -- AND IT IS ALREADY CLOSED. DO NOT "FIX" IT AGAIN.**
+This paragraph used to read: *"`GHOST_V3_DROP_ORDER = ("light", "motion",
+"vantage", "kernel_setting")` -- `motion` is the SECOND thing dropped ... reorder
+it WITH Half B, not speculatively before it."* **That order no longer exists.**
+
+Measured 2026-09-11 against the real file: `GHOST_V3_DROP_ORDER` is
+`("trailing_style", "light", "vantage", "motion", "kernel_setting")` --
+`ghost_signal_author.py:2196`. Motion is FOURTH, dropped AFTER framing, which is
+what this ruling asked for. It was reordered on 2026-09-03 by commit `6f1de820`
+("Spend the spare prompt budget on style at both ends"), the same day this ruling
+was written, and the ruling's text was never updated to match.
+
+**So Half B is ONE build, not two, and a reader who trusts the old sentence will
+either do redundant work or, worse, "restore" an order that was deliberately
+fixed.** Caught when the driver quoted this paragraph as current and a reviewer
+checked the code against it. The ruling's substance -- movement must not be
+dropped before framing -- STANDS and is now enforced by the code itself.
 
 *Do not re-measure the token headroom on CPU: the fitter's measure is `None`
 without the real CLIP tokenizer, so an off-GPU run reports zero drops and 100%
