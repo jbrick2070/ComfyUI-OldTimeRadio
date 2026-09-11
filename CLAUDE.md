@@ -139,6 +139,29 @@
     panel at "is this function correct", and section 9's rule still stands: do
     not burn a scalpel on a screw.
 
+- **A HELPER IS WIRED IN THE SAME CHANGE THAT BUILDS IT, OR THE ROW SAYS WHY NOT
+  (measured 2026-09-11 -- FOUR instances found in one day).** Correct, tested code
+  that nothing calls is this repo's most repeated defect, and it is invisible to
+  every check that passes: the tests pass because they call it directly, the suite
+  is green, and the feature simply does not exist at runtime.
+  * **The four:** `select_grounding` (tests only, zero production callers);
+    `select_passage` in `_otr_passage_selector.py` (14 KB, three commits, its own
+    test file, zero callers -- and it is most of what row 3.6 needs);
+    `caption_support_gap` / `probe_ffmpeg_capabilities` (own test file, zero callers
+    until they were wired that day); and `SourceOverview`, which was deleted on
+    2026-09-05 precisely for having no consumers.
+  * **THE CHECK IS ONE GREP AND IT TAKES A MINUTE.** After adding a function, grep
+    `nodes/` for a caller that is not a test and not the defining module. No caller
+    means one of two things, and both are fine as long as one is CHOSEN: wire it
+    now, or write the row that says what it is waiting for.
+  * **`scripts/dead_code_closure.py` does NOT find these.** It reads an unreferenced
+    symbol as dead code to delete; these are the opposite -- correct code nothing
+    reaches. Deleting one and wiring one look identical to that tool and are
+    opposite decisions ([[orphans-rip-fully-or-wire-back]] governs which).
+  * **A test that calls the helper directly proves the helper, never the wiring.**
+    Where the wiring matters, assert the CALL exists at its real site -- that is the
+    one job source inspection is the right tool for.
+
 - **NO FIXED ROUND COUNT -- BUT EVERY ROUND GETS A CONTRARIAN (operator directive
   2026-09-11).** Operator: *"I don't need a full r1/r4, you decide. [I want a]
   contrarian QA / peer at each round."*
