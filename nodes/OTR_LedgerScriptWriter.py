@@ -2061,6 +2061,44 @@ def _compose_and_stamp_announcer_close(
 
     return outro_res
 
+def assert_locked_cast_count(non_announcer_count, cast_meta, requested, cast_rows):
+    """Raise unless the locked cast is the size `lock_cast` INTENDED.
+
+    A module-level function rather than an inline comparison so the decision can be
+    tested without standing up the whole writer node. Nothing in the test suite
+    drives this lane end to end, which is exactly how the defect below survived: the
+    only coverage read source strings.
+
+    THE DISTINCTION THIS EXISTS FOR is requested-vs-intended. `lock_cast` CLAMPS an
+    over-six request down to the voice stock's seats and logs it at WARNING, because
+    a target is a request and not a gate. The check here compared the clamped result
+    against `resolved["num_characters"]` -- the raw request, never reassigned -- so on
+    the INLINE lanes any request above six raised and killed the episode, defeating
+    the 2026-08-24 clamp one level up under a different name.
+
+    SCOPE, measured: `_otr_writer_inputs` bounds the widget to `_FABLE2_MAX_CAST`
+    (above six), so 7-10 really do arrive here. But the DISPATCHED lanes
+    (`scifi_news_pro_multipass`, `my_story_multipass`) return through the shared tail
+    before this point, so they never reached the raise. This is the inline lanes'
+    crash.
+
+    THE GUARD IS NOT WEAKENED. `lock_cast` returning duplicates, dropping a row or
+    mis-counting still raises here -- it is simply asked the right question.
+
+    `cast_meta["num_characters_effective"]` is read DIRECTLY, not with a fallback to
+    the raw request: there is exactly one producer and it is called a few lines above,
+    so a missing key is a producer-contract breach that should fail loudly and
+    identically on every run, not silently restore the comparison this fixes.
+    """
+    expected = int(cast_meta["num_characters_effective"])
+    if non_announcer_count != expected:
+        raise RuntimeError(
+            f"Cast lock count mismatch: lock_cast intended {expected} "
+            f"non-announcer characters (requested {requested}), got "
+            f"{non_announcer_count}. cast_rows: {cast_rows!r}"
+        )
+
+
 class OTR_LedgerScriptWriter(WriterTailMixin):
     """v2.0 LPL script writer with legacy-style widget surface.
 
@@ -4306,15 +4344,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 f"Cast lock produced duplicate non-announcer names: "
                 f"{raw_names!r}"
             )
-        # Count match: the locked open characters should equal the
-        # requested num_characters.
-        if non_announcer_count != resolved["num_characters"]:
-            raise RuntimeError(
-                f"Cast lock count mismatch: requested "
-                f"{resolved['num_characters']} non-announcer "
-                f"characters, got {non_announcer_count}. "
-                f"cast_rows: {cast_rows!r}"
-            )
+        # Count match against the size LOCK_CAST INTENDED, not the size that
+        # was requested. See `assert_locked_cast_count` for why those differ and
+        # which lanes the difference reached.
+        assert_locked_cast_count(
+            non_announcer_count, cast_meta, resolved["num_characters"], cast_rows)
 
         # D.5 Generate validated outline against the locked cast.
         # The outline LLM is told to use exactly these character names

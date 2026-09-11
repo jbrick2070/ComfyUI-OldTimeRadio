@@ -208,3 +208,131 @@ def test_the_bound_and_the_clamp_read_ONE_constant():
     bound = inspect.getsource(_otr_casting.assemble_pre_locked_rows)
     assert "1 <= num_characters <= _LEGACY_MAX_SPEAKING_CAST" in bound, (
         "the assembler's bound must read the shared constant, not a literal")
+
+# ---------------------------------------------------------------------------
+# THE HALF THIS FILE WAS MISSING, and its absence is why the clamp above was
+# defeated for two and a half weeks while every test here passed.
+#
+# Everything above tests `lock_cast` IN ISOLATION -- mostly by reading its
+# source. None of it follows the clamped value to its CALLER. The writer took
+# the clamped cast, compared its size against `resolved["num_characters"]` --
+# the raw, never-reassigned, unclamped request -- and raised RuntimeError
+# ("Cast lock count mismatch"). So an operator asking for 8 still lost the
+# episode, after the RSS fetch, the bank roll and the story contract had spent
+# their minutes: exactly the failure the clamp was written to remove, moved up
+# one level and renamed.
+#
+# A fix verified only at the site it was made is not verified. This is the
+# second instance of that shape found on 2026-09-11 -- the other was a
+# resample helper deleted along with the single caller that used it, which
+# returned the crash to a path nothing guarded.
+# ---------------------------------------------------------------------------
+def _canned(responses):
+    """A generate_fn that yields each response in order (mirrors the harness in
+    tests/test_otr_casting.py rather than importing across test modules)."""
+    iterator = iter(responses)
+
+    def gen_fn(messages, *, temperature, max_new_tokens):  # noqa: ARG001
+        try:
+            return next(iterator)
+        except StopIteration as exc:
+            raise RuntimeError("canned exhausted") from exc
+
+    return gen_fn
+
+
+def _desc(n):
+    import json
+    return [json.dumps({"character_description":
+                        "Sharp-eyed scientist, 30s, anxious about the data."})
+            for _ in range(n)]
+
+
+def test_lock_cast_REPORTS_the_count_it_actually_used():
+    """The clamp has to be legible to the caller, or the caller re-derives the
+    ceiling and drifts from it -- which is precisely what happened."""
+    import random
+
+    from nodes import _otr_casting
+
+    over = _otr_casting._LEGACY_MAX_SPEAKING_CAST + 2
+    cast, meta = _otr_casting.lock_cast(
+        creative_fn=_canned(_desc(over)),
+        num_characters=over,
+        news_seed="A science article about deep-sea hydrothermal vents.",
+        style="noir mystery",
+        rng=random.Random("clamp-reports-itself"),
+        force_lemmy=False,
+    )
+
+    assert "num_characters_effective" in meta, (
+        "lock_cast clamps but does not say what it clamped TO; a caller cannot "
+        "check the result without re-deriving the ceiling")
+    assert meta["num_characters_effective"] == _otr_casting._LEGACY_MAX_SPEAKING_CAST
+    non_announcer = [r for r in cast if r["name"] != "ANNOUNCER"]
+    assert len(non_announcer) == meta["num_characters_effective"], (
+        "the reported effective count must match the cast actually returned")
+
+
+#: Six rows the caster returned, for a request of eight. The shape the clamp
+#: produces, and the shape the old guard killed the episode over.
+_SIX_ROWS = [{"name": "C%d" % n} for n in range(6)]
+
+
+def test_a_CLAMPED_cast_is_ACCEPTED():
+    """THE REGRESSION, driven rather than read.
+
+    Requested 8, the caster seated 6 and said so. The old guard compared 6
+    against 8 and raised, killing the episode after the RSS fetch, the bank roll
+    and the story contract had already spent their minutes."""
+    writer_node.assert_locked_cast_count(
+        6, {"num_characters_effective": 6}, 8, _SIX_ROWS)
+
+
+def test_an_EXACT_request_is_accepted():
+    """The ordinary path must be untouched."""
+    writer_node.assert_locked_cast_count(
+        3, {"num_characters_effective": 3}, 3, _SIX_ROWS[:3])
+
+
+def test_a_REAL_MISCOUNT_still_raises():
+    """The guard is corrected, not removed. Its stated job is catching lock_cast
+    dropping a row or mis-counting, and it still does."""
+    with pytest.raises(RuntimeError, match="Cast lock count mismatch"):
+        writer_node.assert_locked_cast_count(
+            5, {"num_characters_effective": 6}, 8, _SIX_ROWS[:5])
+
+
+def test_the_raise_names_BOTH_numbers():
+    """A message saying only "got 5" sends the next reader to the wrong module.
+    Which count was intended, and which was requested, are different facts."""
+    with pytest.raises(RuntimeError) as excinfo:
+        writer_node.assert_locked_cast_count(
+            5, {"num_characters_effective": 6}, 8, _SIX_ROWS[:5])
+    msg = str(excinfo.value)
+    assert "intended 6" in msg and "requested 8" in msg, msg
+
+
+def test_a_MISSING_effective_count_fails_loudly_not_silently():
+    """The fallback that was here first would have silently restored the broken
+    comparison if the producer ever stopped stamping. There is exactly one
+    producer and it is called a few lines above the consumer, so an absent key is
+    a contract breach that must fail identically on every run."""
+    with pytest.raises(KeyError):
+        writer_node.assert_locked_cast_count(6, {}, 8, _SIX_ROWS)
+
+
+def test_the_guard_is_actually_WIRED_into_the_writer():
+    """A correct function nothing calls is the defect class this lane keeps
+    producing -- select_grounding, select_passage and SourceOverview were each
+    built to spec and never wired. Source inspection is the right tool for THIS
+    question only: is the call there?"""
+    source = inspect.getsource(writer_node.OTR_LedgerScriptWriter)
+
+    assert "assert_locked_cast_count(" in source, (
+        "the writer no longer calls the count guard at all")
+    assert 'if non_announcer_count != resolved["num_characters"]:' not in source, (
+        "the raw-request comparison is back -- this is the 2026-09-11 "
+        "regression returning")
+    assert "Cast lock produced no non-announcer characters" in source, (
+        "the empty-cast guard is unrelated to the clamp and must survive")

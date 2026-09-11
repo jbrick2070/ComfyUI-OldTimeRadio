@@ -2315,6 +2315,15 @@ def lock_cast(
         }
 
     meta.update({
+        # THE COUNT THIS CALL ACTUALLY USED, which is not always the count the
+        # caller asked for: an over-request is CLAMPED to the voice stock's seats
+        # above, loudly, because "the request is honoured as far as it can be,
+        # never refused". This module owns that clamp, so this module reports it
+        # -- the alternative is every caller re-deriving the ceiling and drifting
+        # from it. `OTR_LedgerScriptWriter`'s post-lock count check reads THIS,
+        # not the original request; comparing against the request made the
+        # clamp unreachable and crashed the episode instead (2026-09-11).
+        "num_characters_effective": int(num_characters),
         "lemmy_hit":              lemmy_hit,
         # BOTH READ THE CARRIED DECISION -- this key used to re-derive the
         # policy from `_source_bank_excludes_lemmy` all over again, a THIRD
