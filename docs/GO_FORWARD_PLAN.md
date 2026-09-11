@@ -46,18 +46,31 @@ story source combined is quite complex. I'm not expecting anything exact."* So:
 
 ## 1. The sequence
 
-**Tonight: four machines qualify ONE frozen commit.** The 5080 and RunPod are driven
-from the coder window; the 4060 and the Mac are driven by Cowork natively on those
-boxes, from
+**NO TESTING UNTIL ALL CODING IS COMPLETE (operator directive 2026-09-11 -- hard, and
+it is the caveat that governs everything else).** The wave does not run on a partial
+tree. Coding finishes, THEN the hash is frozen, THEN four machines qualify it.
+
+**This inverts what "render-affecting" means for scheduling, so read it before
+deferring anything.** An item was held back earlier today on the reasoning "it changes
+which script comes back, so it must land AFTER the wave". That reasoning depended on
+the wave running tonight. It does not: the wave waits for coding. So a render-affecting
+item now belongs **IN** the frozen hash, not after it -- deferring it would mean
+qualifying a commit that is already known to be behind the code. **The freeze simply
+moves to whenever coding finishes.** The earlier freeze at `f5f40bd4` is therefore
+provisional and will be re-cut; a lane must not start against it.
+
+**What still defers, and it is a short list:** an item blocked on an operator ruling,
+an item whose design genuinely has not converged, and an item that needs live evidence
+the wave itself will produce. "Render-affecting" is no longer on that list.
+
+**Then: four machines qualify ONE frozen commit.** The 5080 and RunPod are driven from
+the coder window; the 4060 and the Mac are driven by Cowork natively on those boxes,
+from
 [NATIVE_PLAN_4060_AND_MAC.md](2026-09-11-four-machine-test-wave/NATIVE_PLAN_4060_AND_MAC.md).
 
-**Tomorrow begins in `otr/obs/`, not in the editor.** Count what landed against the
-legs promised, read the four phone-homes, and triage any crash-class failure FIRST.
-Only when that triage is empty does coding resume -- and the render-affecting items
-held back for the wave land before any new build starts.
-
-**The one ordering rule:** anything render-affecting either landed before the freeze
-or waits. Nothing render-affecting goes in between.
+**After the wave, the next day begins in `otr/obs/`, not in the editor.** Count what
+landed against the legs promised, read the four phone-homes, and triage any
+crash-class failure FIRST. Only when that triage is empty does new work start.
 
 ## 2. Tonight -- the four-machine wave (the TEST phase)
 
@@ -89,7 +102,7 @@ ingest audio, and reading TTS text or checking a waveform is not listening).
 
 | Defect | State | Next action |
 |---|---|---|
-| Sci-Fi repair-turn cap VALUE | `_draft_fits_repair_turn` predicts fit against a flat `HARD_VRAM_CONTEXT_LIMIT` rather than the transport's real window, so a too-generous estimate sends a draft that does not fit. | RENDER-AFFECTING: the cap decides repair-vs-cold-regeneration, so it changes which script comes back. Not before a wave. It is also not one fix -- local, GGUF-native and OpenRouter each resolve capacity differently -- so it needs an arc, not a constant swap. |
+| Sci-Fi repair-turn cap VALUE | `_draft_fits_repair_turn` predicts fit against a flat `HARD_VRAM_CONTEXT_LIMIT` rather than the transport's real window, so a too-generous estimate sends a draft that does not fit. | Render-affecting -- the cap decides repair-vs-cold-regeneration -- which under the no-testing-until-coding-is-done rule means it belongs IN the frozen hash, not after it. Not one fix though: local, GGUF-native and OpenRouter each resolve capacity differently, so it is transport-aware threading of the already-resolved `cache_entry["context_cap"]`, never a constant swap. |
 | OpenRouter catalog cache | The catalog cache at `_otr_openrouter_backend.py:792` is written inside the installed pack. **And it is worse than "gets wiped": a registry-installed pack can NEVER WARM IT.** `refresh_catalog_cache` has zero callers in `nodes/` -- nothing self-warms -- and its only caller, `scripts/otr_openrouter_refresh.py`, is stripped by `.comfyignore:94` (`scripts/*`) and never allow-listed back. So every registry user with OpenRouter enabled silently runs at `DEFAULT_CONTEXT_WINDOW = 8192` instead of the model's real window, and the empty-cache sentinel tells them to "run refresh_catalog_cache", which they have no way to do. Not crash-class -- it truncates output. Cheap: allow-list the refresh script, which is render-inert (`.comfyignore` changes what SHIPS, not what renders, and only `pyproject.toml` fires a publish). |
 
 ## 4. Qualification coverage still owed

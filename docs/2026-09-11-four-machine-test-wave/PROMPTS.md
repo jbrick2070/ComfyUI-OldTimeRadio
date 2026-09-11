@@ -16,7 +16,13 @@ list is one fix plus the platform, which is a single bisect instead of six. So t
 frozen hash is written here before the wave starts, and nothing touching the render
 path lands after it:
 
-    WAVE HEAD: f5f40bd4a98d2a85c464224ad2db69cc559aab4f
+    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
+
+    Operator directive 2026-09-11: NO TESTING UNTIL ALL CODING IS COMPLETE.
+    The wave does not run on a partial tree. An earlier freeze at f5f40bd4 was
+    cut before the coding was finished and is WITHDRAWN -- it is behind the
+    code and qualifying it would prove nothing about what ships.
+    This line gets a real hash when coding stops. Until then, no lane starts.
     Frozen 2026-09-11. Six crash/durability fixes and the plan rebaseline are
     in it.
 
