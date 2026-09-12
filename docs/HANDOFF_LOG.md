@@ -49,6 +49,35 @@ Reviewed by codex r1 (yes-with-fixes, folded) and Sonnet QA. The same commit
 carries the two music QA follow-ups (bounded hope/love stems; the composed row
 keeps its instrumental tail on overflow) and the mux docstring.
 
+**The flags, last (his words: "do chase flags now, that's the last thing we do").**
+The registry served alpha.24 (Active) while alpha.25-29 sat Flagged on four lexical
+scanner findings the oracle reproduced exactly: three `subprocess.run` spawns
+outside the process boundary (the ffmpeg capability probe, the macOS `vm_stat`
+and `sysctl` memory probes) and one `os.environ.get` in prestartup. `0f6caa12`:
+the three spawns go through `_otr_shared.proc.run` and the allowlist now STATES
+`vm_stat` and `sysctl` with their reasons (the honest judgement the plan row asked
+for -- routing them without admitting them would have silently broken both Mac
+probes); prestartup uses the bare `environ` name it already imported for this;
+the oracle reports 0 findings; pyproject bumps to 2.0.0-alpha.30 with the
+`av>=17.0.0` line the requirements already carried. THE BUMP FIRES THE PUBLISH:
+watch `curl https://api.comfy.org/nodes/comfyui-old-time-radio/versions` -- Pending
+first, then the 30-minute-plus scan, then Active if the oracle was right (it has
+been, every time). Read it two or three times before concluding.
+
+**On his worry that there are too many tests:** the full suite is ~4,200 tests and
+~12 minutes, ran five times tonight, always in the background under other work;
+the identity diff (51 == 51) is what let seven pushes go up with zero regressions.
+The real waste is the 51 known-failing STALE tests carried as a baseline (rulings
+outran them, see `suite-is-red-from-outrun-rulings`); deleting them is a cut worth
+making, not a cost worth carrying. The per-change groups run in seconds. Found
+while chasing the flags: four tests are ORDER-DEPENDENT -- they fail in isolation
+on the pushed HEAD tree and pass inside the suite
+(`test_unified_memory_weight_floor.py::test_the_impure_half_actually_raises_on_an_oversized_engine`,
+`test_ghost_signal_lightning_lane.py::{test_hold_is_resolved_per_beat_and_not_stored_on_the_instance,
+test_it_escalates_only_as_far_as_it_must,test_two_different_holds_really_do_produce_different_cache_keys}`);
+a fixture leaks state between them. Test hygiene, not a product defect; a row
+for the next window that touches those lanes.
+
 **Pending for the operator:** listen to `laughter_in_the_shadows_20260911_214126` (music) and say whether the
 music is now music; the NEXT episode rendered carries the limiter -- listen for
 level and for pumping around any loud moment; `pyproject.toml` gets `av>=17.0.0` at the next version bump
