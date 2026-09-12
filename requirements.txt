@@ -225,3 +225,10 @@ imageio-ffmpeg>=0.5
 # resolve_ffmpeg prefers this pair over the imageio wheel precisely because of
 # the sibling; the imageio wheel remains the fallback for plain encoding.
 ffmpeg-downloader>=0.5
+# PyAV is what the pack MEASURES media with on a box that has ffmpeg and no
+# ffprobe (`_otr_shared/ffprobe.py`, the fallback section, 2026-09-11): the
+# imageio wheel above ships one binary and `ffdl install` is a manual step
+# nothing runs, so a cold install used to die at the first clip probe-back.
+# ComfyUI's own requirements.txt already pins av>=17.0.0; declared here so
+# the pack states its own need instead of borrowing the host's.
+av>=17.0.0

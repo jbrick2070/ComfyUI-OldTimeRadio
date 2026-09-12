@@ -1506,25 +1506,20 @@ def _ffmpeg_bin() -> str:
     return p
 
 
-def _ffprobe_bin() -> str:
-    """The credits policy, unchanged: no probe means no credits, said by name.
-
-    This module was the ONLY one in the pack that honoured ``OTR_FFPROBE``;
-    the shared resolver is where that stopped being a local courtesy. What it
-    COSTS to have no probe is still decided right here.
-    """
-    p = _ffp.resolve_ffprobe()
-    if not p:
-        raise CreditsDataError(
-            "ffprobe not found (OTR_FFPROBE / PATH) -- cannot render credits")
-    return p
-
-
 def _probe_video(path: str) -> dict:
+    """The source's dimensions, rate and duration, or CreditsDataError by name.
+
+    The credits policy is unchanged -- no measurement means no credits -- but
+    the measurement no longer insists on the ffprobe BINARY. A `_ffprobe_bin()`
+    used to raise here before the boundary was even asked, which on a cold
+    install (ffmpeg from the imageio wheel, no ffprobe) lost a fully rendered
+    episode at its LAST node. The boundary reads the file through PyAV when no
+    binary resolves, and refuses by name only when nothing can measure it.
+    """
     try:
         data = _ffp.probe_json(
             path, ["stream=width,height,r_frame_rate", "format=duration"],
-            select_streams="v:0", ffprobe=_ffprobe_bin())
+            select_streams="v:0")
     except _ffp.FFprobeError as exc:
         raise CreditsDataError(f"ffprobe failed on {path!r}: {exc}")
     st = (data.get("streams") or [{}])[0]

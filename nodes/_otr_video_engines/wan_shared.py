@@ -194,48 +194,33 @@ def ffprobe_counted_frames(path, *, ffprobe="ffprobe"):
     arrives as GraphExecutionError like every other probe failure, for the
     reason set out at length in :func:`ffprobe_clip_fields`.
     """
-    import json as _json
-
     from .._otr_shared import ffprobe as _ffp
 
     from . import wrapper_bridge as _wb
-    # probe_raw rather than probe_json HERE, deliberately: this function names
-    # THE FRAME-COUNT PROBE in every one of its refusals, and reading a nested
-    # boundary message inside its own would blur exactly the distinction the
-    # messages exist to draw -- a header count that lied versus a decode that
-    # could not run.
+    # probe_json since 2026-09-11 -- it was probe_raw, so that this function
+    # could name THE FRAME-COUNT PROBE in every refusal without a nested
+    # boundary message inside its own. That message is now worth carrying:
+    # on a cold install with no ffprobe, probe_json reads the file through
+    # PyAV and DECODES the count itself, and its refusals say which backend
+    # was missing. The query is unchanged, flag for flag.
     #
     # WHY THE REFUSALS SAY "the frame-count probe" AND NOT THE FLAG (2026-09-04):
     # the Comfy Registry scanner reads the literal string "ffprobe -count_frames"
-    # inside a message as a shell command, and these six refusals were six of the
-    # twelve "url command" findings on their own. The flag itself is RIGHT HERE in
-    # the argv below and is untouched -- three tests assert those args -- so
-    # nothing about what runs has changed, only what the error text calls it.
-    # Renaming the messages is free; renaming the invocation would not be.
+    # inside a message as a shell command, and these refusals were six of the
+    # twelve "url command" findings on their own. The flag itself is RIGHT HERE
+    # in the query and is untouched -- tests assert it -- so nothing about what
+    # runs has changed, only what the error text calls it.
     try:
-        proc = _ffp.probe_raw(
-            ["-v", "error", "-count_frames", "-select_streams", "v:0",
-             "-show_entries", "stream=nb_read_frames", "-of", "json", path],
-            ffprobe=ffprobe)
+        data = _ffp.probe_json(
+            path, "stream=nb_read_frames", select_streams="v:0",
+            extra_args=("-count_frames",), ffprobe=ffprobe)
     except _ffp.FFprobeMissing as exc:
         raise _wb.GraphExecutionError("ffprobe not found: %s" % exc)
     except _ffp.FFprobeError as exc:
+        # A non-zero exit, unreadable output, or -- with no binary -- a file
+        # PyAV could not read: every one a FAILED VERIFICATION, named.
         raise _wb.GraphExecutionError(
             "the frame-count probe failed for %r: %s" % (path, exc))
-    if proc.returncode != 0:
-        raise _wb.GraphExecutionError(
-            "the frame-count probe failed for %r: %s"
-            % (path, (proc.stderr or "")[:300]))
-    try:
-        data = _json.loads(proc.stdout or "{}")
-    except ValueError as exc:
-        # ffprobe exited 0 and wrote something that is not the document. That
-        # is a FAILED VERIFICATION, not a crash to be re-raised as whatever
-        # `json` happens to call it -- this function promises one exit and now
-        # keeps that promise on every path.
-        raise _wb.GraphExecutionError(
-            "the frame-count probe returned unreadable output for %r: %s"
-            % (path, exc))
     streams = data.get("streams") or []
     if not streams:
         raise _wb.GraphExecutionError(

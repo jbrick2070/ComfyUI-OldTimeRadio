@@ -36,6 +36,14 @@ guessed at:
 3. **A bare ``"ffprobe"`` in an argv is not a configuration**, it is a hope.
    It is now the ONE thing this module refuses to treat as a caller's choice.
 
+A COLD INSTALL HAS ffmpeg AND NO ffprobe (2026-09-11). The imageio-ffmpeg wheel
+that requirements.txt installs ships ONE binary, so on a fresh Mac or pod
+``resolve_ffprobe`` answers ``None`` and the first clip probe-back used to end
+the leg. ``probe_json`` now builds the same document from PyAV (a ComfyUI
+core dependency) when no binary resolves -- the fallback section below. The
+policies above are untouched: each caller still decides what "no probe"
+costs; the box simply has no probe far less often.
+
 Stdlib only, no ComfyUI, no torch: importing this must never pull a framework
 into memory (invariant V-12, the cold-import test). UTF-8, no BOM, ASCII source.
 """
@@ -326,6 +334,12 @@ def probe_json(path, entries=None, *, select_streams=None, extra_args=(),
     caller that asks for the document either gets a document or gets told why
     not. A caller that wants to inspect the return code itself uses
     :func:`probe_raw`.
+
+    WHEN NO BINARY RESOLVES the document is built from PyAV instead (the
+    fallback section below): same keys, same types and same omissions for
+    every query this pack makes. ``timeout`` applies to the binary only. A
+    query the fallback cannot honour raises :class:`FFprobeMissing` naming
+    it; a file it cannot read raises :class:`FFprobeError`.
     """
     argv = ["-v", "error"]
     if select_streams:
@@ -335,7 +349,13 @@ def probe_json(path, entries=None, *, select_streams=None, extra_args=(),
         for entry in ([entries] if isinstance(entries, str) else list(entries)):
             argv += ["-show_entries", str(entry)]
     argv += ["-of", "json", str(path)]
-    proc = probe_raw(argv, ffprobe=ffprobe, ffmpeg=ffmpeg, timeout=timeout)
+    try:
+        proc = probe_raw(argv, ffprobe=ffprobe, ffmpeg=ffmpeg, timeout=timeout)
+    except FFprobeMissing as missing:
+        # The cold install. A binary, when one resolves, was just preferred
+        # and is untouched; only a box with NO usable ffprobe reads the
+        # file through PyAV.
+        return _pyav_document(path, entries, select_streams, extra_args, missing)
     if proc.returncode != 0:
         raise FFprobeError("ffprobe failed for %r: %s"
                            % (str(path), (proc.stderr or "").strip()[:300]))
@@ -344,6 +364,283 @@ def probe_json(path, entries=None, *, select_streams=None, extra_args=(),
     except ValueError as exc:
         raise FFprobeError("ffprobe returned unparseable JSON for %r: %s"
                            % (str(path), exc))
+
+
+# --------------------------------------------------------------------------- #
+# The PyAV fallback -- a cold install has ffmpeg and no ffprobe
+# --------------------------------------------------------------------------- #
+# `pip install -r requirements.txt` brings the imageio-ffmpeg wheel, which
+# ships ONE binary. `resolve_ffprobe()` answers None on such a box, and until
+# 2026-09-11 the first clip probe-back ended the leg (live artifact: a Mac mini
+# M4 on 2026-09-07 rendered its audio, encoded its frames, and died at
+# `validate_silent_clip_contract(ffprobe_clip_fields(out_path), fps)`). PyAV is
+# on every ComfyUI (core requirements pin `av>=17`), and it exposes every field
+# this pack's queries read. So `probe_json` builds the SAME document from PyAV
+# when no binary resolves -- same keys, same types (counts, rates and seconds
+# are STRINGS, sizes are ints), same omissions (an unspecified colour tag is
+# ABSENT, never "unknown"). Measured 2026-09-11 against the real tool on two
+# rendered clips and one untagged PyAV-written clip: header counts, decoded
+# counts, per-stream and container durations, rates and colour tags all agree.
+#
+# What it deliberately does NOT do: `probe_raw` still refuses by name, because
+# a caller that wants ffprobe's own text cannot be served any other way; the
+# binary, when present, is untouched and preferred; and a query the fallback
+# cannot honour is refused BY NAME as `FFprobeMissing`, so the caller's own
+# policy for "no ffprobe" applies unchanged.
+
+#: The ffprobe arguments the fallback knows how to honour. Anything else is a
+#: query only the real tool can answer, and the caller is told so by name.
+_PYAV_HONOURED_ARGS = frozenset({"-count_frames", "-show_streams", "-show_format"})
+
+#: ``-select_streams`` type letters, as ffprobe spells them.
+_STREAM_TYPE_LETTERS = {"v": "video", "a": "audio", "s": "subtitle",
+                        "d": "data", "t": "attachment"}
+
+#: FFmpeg's own names for the colour enums (libavutil/pixdesc.c). ffprobe
+#: prints the name and OMITS the key when the value is unspecified (2) or has
+#: no name, which `validate_silent_clip_contract` reads as "unset". Measured
+#: 2026-09-11 on a libx264 clip: color_space=bt709 present, color_primaries and
+#: color_transfer absent, PyAV reporting 1 / 2 / 2 for the same three.
+_COLOR_SPACE_NAMES = {
+    0: "gbr", 1: "bt709", 4: "fcc", 5: "bt470bg", 6: "smpte170m",
+    7: "smpte240m", 8: "ycgco", 9: "bt2020nc", 10: "bt2020c", 11: "smpte2085",
+    12: "chroma-derived-nc", 13: "chroma-derived-c", 14: "ictcp",
+}
+_COLOR_PRIMARIES_NAMES = {
+    1: "bt709", 4: "bt470m", 5: "bt470bg", 6: "smpte170m", 7: "smpte240m",
+    8: "film", 9: "bt2020", 10: "smpte428", 11: "smpte431", 12: "smpte432",
+    22: "jedec-p22",
+}
+_COLOR_TRANSFER_NAMES = {
+    1: "bt709", 4: "bt470m", 5: "bt470bg", 6: "smpte170m", 7: "smpte240m",
+    8: "linear", 9: "log100", 10: "log316", 11: "iec61966-2-4", 12: "bt1361e",
+    13: "iec61966-2-1", 14: "bt2020-10", 15: "bt2020-12", 16: "smpte2084",
+    17: "smpte428", 18: "arib-std-b67",
+}
+
+
+def _fraction_text(value):
+    """A PyAV ``Fraction`` (or ``None``) in ffprobe's ``num/den`` spelling --
+    ``"25/1"``, ``"30000/1001"``, and ``"0/0"`` for a stream with no rate,
+    which is what ffprobe prints for every audio stream."""
+    numerator = getattr(value, "numerator", None)
+    denominator = getattr(value, "denominator", None)
+    if not value or numerator is None or denominator is None:
+        return "0/0"
+    return "%d/%d" % (numerator, denominator)
+
+
+def _seconds_text(ticks, time_base):
+    """``ticks * time_base`` printed the way ffprobe prints seconds, or
+    ``None`` when either is unknown (ffprobe then omits the key)."""
+    if ticks is None or not time_base:
+        return None
+    return "%.6f" % (ticks * time_base)
+
+
+def _wanted_entries(entries, extra_args):
+    """``{"stream": fields, "format": fields}`` -- the sections the caller
+    asked to see, each ``None`` for "every field" (``-show_streams``,
+    ``-show_format``, or a bare ``-show_entries stream``).
+
+    Raises :class:`FFprobeMissing` for an argument or section the fallback
+    cannot honour, naming it: the caller is told the real tool is required and
+    its own no-ffprobe policy applies.
+    """
+    flags = [str(a) for a in extra_args]
+    unknown = [a for a in flags if a not in _PYAV_HONOURED_ARGS]
+    if unknown:
+        raise FFprobeMissing(
+            "ffprobe not found (OTR_FFPROBE / PATH / ffmpeg sibling) and the "
+            "PyAV fallback cannot honour %s"
+            % ", ".join(repr(a) for a in unknown))
+    wanted = {}
+    if "-show_streams" in flags:
+        wanted["stream"] = None
+    if "-show_format" in flags:
+        wanted["format"] = None
+    for entry in ([entries] if isinstance(entries, str) else list(entries or ())):
+        for section_spec in str(entry).split(":"):
+            section, _, field_text = section_spec.partition("=")
+            section = section.strip()
+            if section not in ("stream", "format"):
+                raise FFprobeMissing(
+                    "ffprobe not found (OTR_FFPROBE / PATH / ffmpeg sibling) "
+                    "and the PyAV fallback cannot honour -show_entries %r"
+                    % section_spec)
+            names = {f.strip() for f in field_text.split(",") if f.strip()}
+            if not names:
+                wanted[section] = None
+            elif section in wanted and wanted[section] is None:
+                continue
+            else:
+                wanted.setdefault(section, set()).update(names)
+    return wanted
+
+
+def _select(streams, spec):
+    """The streams ``-select_streams`` names: ``v`` / ``a`` / ``v:0`` / ``1``.
+    An empty spec is every stream; an unknown spec is refused by name."""
+    text = str(spec or "").strip()
+    if not text:
+        return list(streams)
+    if text.isdigit():
+        return [s for s in streams if s.index == int(text)]
+    letter, _, ordinal = text.partition(":")
+    kind = _STREAM_TYPE_LETTERS.get(letter.strip().lower())
+    if kind is None or (ordinal and not ordinal.isdigit()):
+        raise FFprobeMissing(
+            "ffprobe not found (OTR_FFPROBE / PATH / ffmpeg sibling) and the "
+            "PyAV fallback cannot honour -select_streams %r" % text)
+    of_kind = [s for s in streams if s.type == kind]
+    if ordinal:
+        position = int(ordinal)
+        return of_kind[position:position + 1]
+    return of_kind
+
+
+def _only(document, fields):
+    return document if fields is None else {
+        k: v for k, v in document.items() if k in fields}
+
+
+def _stream_document(stream, fields, counted=None):
+    """One ffprobe stream object from a PyAV stream, in ffprobe's own types:
+    counts, rates and seconds as strings, sizes as ints, unset keys ABSENT."""
+    context = getattr(stream, "codec_context", None)
+    kind = str(getattr(stream, "type", "") or "")
+    doc = {"index": int(stream.index), "codec_type": kind}
+    codec_name = getattr(context, "name", None)
+    if codec_name:
+        doc["codec_name"] = str(codec_name)
+    if kind == "video":
+        for key in ("width", "height"):
+            value = getattr(stream, key, None)
+            if value:
+                doc[key] = int(value)
+        pix_fmt = getattr(context, "pix_fmt", None)
+        if pix_fmt:
+            doc["pix_fmt"] = str(pix_fmt)
+        for key, table, attr in (
+                ("color_space", _COLOR_SPACE_NAMES, "colorspace"),
+                ("color_primaries", _COLOR_PRIMARIES_NAMES, "color_primaries"),
+                ("color_transfer", _COLOR_TRANSFER_NAMES, "color_trc")):
+            label = table.get(getattr(context, attr, None))
+            if label:
+                doc[key] = label
+    elif kind == "audio":
+        sample_rate = getattr(stream, "sample_rate", None) \
+            or getattr(context, "sample_rate", None)
+        if sample_rate:
+            doc["sample_rate"] = str(int(sample_rate))
+        channels = getattr(stream, "channels", None)
+        if not channels:
+            channels = getattr(getattr(stream, "layout", None), "nb_channels", None)
+        if channels:
+            doc["channels"] = int(channels)
+        sample_fmt = getattr(getattr(context, "format", None), "name", None)
+        if sample_fmt:
+            doc["sample_fmt"] = str(sample_fmt)
+        layout = getattr(getattr(stream, "layout", None), "name", None)
+        if layout:
+            doc["channel_layout"] = str(layout)
+    doc["r_frame_rate"] = _fraction_text(getattr(stream, "base_rate", None))
+    doc["avg_frame_rate"] = _fraction_text(getattr(stream, "average_rate", None))
+    time_base = getattr(stream, "time_base", None)
+    if time_base:
+        doc["time_base"] = _fraction_text(time_base)
+    for key, attr in (("start_time", "start_time"), ("duration", "duration")):
+        text = _seconds_text(getattr(stream, attr, None), time_base)
+        if text is not None:
+            doc[key] = text
+    bit_rate = getattr(stream, "bit_rate", None)
+    if bit_rate:
+        doc["bit_rate"] = str(int(bit_rate))
+    frames = getattr(stream, "frames", None)
+    if frames:
+        doc["nb_frames"] = str(int(frames))
+    if counted is not None:
+        doc["nb_read_frames"] = str(int(counted))
+    return _only(doc, fields)
+
+
+def _format_document(container, path, fields):
+    """The ffprobe ``format`` object: container-level facts, seconds and sizes
+    as strings, ``nb_streams`` an int."""
+    doc = {"filename": str(path), "nb_streams": len(container.streams)}
+    format_name = getattr(getattr(container, "format", None), "name", None)
+    if format_name:
+        doc["format_name"] = str(format_name)
+    for key in ("start_time", "duration"):
+        value = getattr(container, key, None)
+        if value is not None:
+            # Container times are in AV_TIME_BASE units (microseconds).
+            doc[key] = "%.6f" % (value / 1000000.0)
+    size = getattr(container, "size", None)
+    if size:
+        doc["size"] = str(int(size))
+    bit_rate = getattr(container, "bit_rate", None)
+    if bit_rate:
+        doc["bit_rate"] = str(int(bit_rate))
+    return _only(doc, fields)
+
+
+def _decoded_counts(container, streams):
+    """``{stream index: decoded frame count}`` -- what ``-count_frames``
+    measures: the picture data, not the header. Expensive by design, exactly
+    like the tool (measured 2026-09-11: 625 frames in 0.17 s, 2829 in 2.2 s)."""
+    targets = [s for s in streams if s.type in ("video", "audio")]
+    counts = {s.index: 0 for s in targets}
+    if not targets:
+        return counts
+    for stream in targets:
+        if stream.type == "video":
+            try:
+                stream.thread_type = "AUTO"
+            except (AttributeError, ValueError):  # pragma: no cover -- older PyAV
+                pass
+    for packet in container.demux(*targets):
+        counts[packet.stream.index] += len(packet.decode())
+    return counts
+
+
+def _pyav_document(path, entries, select_streams, extra_args, missing):
+    """The ffprobe JSON document for ``path`` built from PyAV -- the fallback
+    for a box with ffmpeg and no ffprobe. ``missing`` is the FFprobeMissing
+    that sent us here; every refusal raised from this path says WHY the real
+    tool was not available, so the operator reads the whole story.
+
+    Raises :class:`FFprobeMissing` when PyAV itself is absent or the query is
+    one only ffprobe can answer, and :class:`FFprobeError` when PyAV cannot
+    read the file -- the same split the binary path makes between "no tool"
+    and "bad media". ``timeout`` has no meaning here: PyAV reads in-process.
+    """
+    wanted = _wanted_entries(entries, extra_args)
+    try:
+        import av  # lazily, on purpose: the boundary stays stdlib-only at import
+    except ImportError as exc:
+        raise FFprobeMissing(
+            "%s; the PyAV fallback is unavailable too (%s)" % (missing, exc)
+        ) from missing
+    read_errors = (getattr(av, "FFmpegError", OSError), OSError, ValueError)
+    count_frames = "-count_frames" in {str(a) for a in extra_args}
+    try:
+        with av.open(str(path)) as container:
+            selected = _select(container.streams, select_streams)
+            counted = _decoded_counts(container, selected) if count_frames else {}
+            document = {}
+            if "stream" in wanted:
+                document["streams"] = [
+                    _stream_document(s, wanted["stream"], counted.get(s.index))
+                    for s in selected]
+            if "format" in wanted:
+                document["format"] = _format_document(
+                    container, path, wanted["format"])
+            return document
+    except read_errors as exc:
+        raise FFprobeError(
+            "ffprobe unavailable (%s) and PyAV could not read %r: %s"
+            % (missing, str(path), exc))
 
 
 def parse_rate(rate):
