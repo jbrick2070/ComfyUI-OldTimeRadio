@@ -69,6 +69,17 @@ GHOST_PROMPT_VERSION_V2 = "ghost_signal_v2"
 #: stored `motif_cue` NOR the stored `drawable_beat`. The authored object stays
 #: on the row untouched, which is what lets a frozen ledger replay under v3 with
 #: byte-identical seeds and a different picture.
+#: NOT bumped for the 2026-09-12 kernel-parity change, and the reason is
+#: worth keeping: the cast-time PREFLIGHT now resolves the same ordinal as
+#: the durable row (it used to sit at 0), and `render_driver._beat_text_for_shot`
+#: joins dialogue on `line_id` before the legacy `beat_id` match. Every
+#: shipping writer stamps `beat_id == line_id` on spoken lines
+#: (production_ledger.py, _otr_my_story.py, _otr_scifi_news_pro.py), so the
+#: RENDER path composes the byte-identical prompt it did before; only the
+#: admission check moved, and a receipt version that forces every cached
+#: Ghost row to re-render for an unchanged prompt would be a lie in the
+#: other direction. (A first draft bumped to v3.2 on the belief that
+#: production lines were never matched; cursor's hardening pass refuted it.)
 GHOST_PROMPT_VERSION_V3 = "ghost_signal_v3.1"
 
 #: ``prompt_source`` for :func:`render_driver._stamp_prompt_meta`.

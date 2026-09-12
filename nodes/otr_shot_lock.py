@@ -1789,7 +1789,8 @@ def _resolve_writer_llm(meta: dict, warnings: list,
 def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                                                policy, subject_sigils=None,
                                                ghost_prompts=None,
-                                               ghost_subjects=None):
+                                               ghost_subjects=None,
+                                               planned_ordinal=None):
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
     except ImportError:
@@ -1860,6 +1861,13 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
         "source_line_ids": [beat.get("beat_id", "")],
         "target_frame_count": cast_frame_count,
     }
+    # THE PROSPECTIVE ORDINAL (2026-09-12). The durable row this beat becomes
+    # sits at its index in `beats`, and the render driver cycles the Ghost
+    # kernel's PLACE by that index. Stamped here so the preflight composes the
+    # same kernel the row will; `render_driver._planned_ordinal_for_shot`
+    # reads it. Default None keeps every existing caller working unchanged.
+    if planned_ordinal is not None:
+        shot["planned_ordinal"] = int(planned_ordinal)
     if beat.get("_synthetic_open"):
         shot["start_s"] = beat.get("_start_s", 0.0)
         shot["dur_s"] = beat.get("dur_s")
@@ -1890,14 +1898,16 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
         # the v3 branch that calls `finalize_ghost_prompt_v3`. Same absence rule
         # as the sigil and the object above.
         #
-        # PARITY OF THE SUBJECT, NOT OF THE KERNEL. This temporary shot is
-        # `shot_id = beat_id`; the durable row is `shot_<beat_id>`; the render
-        # driver looks the ordinal up by exact shot id, so the preflight always
-        # resolves at ordinal 0 and the resolver cycles the PLACE by ordinal.
-        # The same subject can compose "in the archive" here and "in the yard"
-        # on the row. That divergence predates Half B and affected the
-        # deterministic tier identically; it is a GO_FORWARD row. Nothing here
-        # claims the two kernels are equal -- only that the subject is.
+        # PARITY OF THE SUBJECT AND, SINCE 2026-09-12, OF THE KERNEL. This
+        # temporary shot is `shot_id = beat_id`; the durable row is
+        # `shot_<beat_id>`; the render driver used to look the ordinal up by
+        # exact shot id, so the preflight always resolved at ordinal 0 while
+        # the resolver cycles the PLACE by ordinal -- the same subject composed
+        # "in the archive" here and "in the yard" on the row. The preflight now
+        # carries `planned_ordinal` (stamped above) and the driver resolves
+        # both shots through `_planned_ordinal_for_shot`, and dialogue is
+        # joined on `line_id`; `tests/test_ghost_kernel_preflight_parity.py`
+        # compares the resolver inputs between the two.
         _cast_subject = (ghost_subjects or {}).get(str(beat.get("beat_id") or ""))
         if _cast_subject:
             shot["ghost_subject"] = str(_cast_subject)
@@ -3169,12 +3179,15 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
 
     # Preflight family compatibility gate (F2):
     if ledger is not None:
-        for b in beats:
+        # `enumerate(beats)` IS the durable row's ordinal: the shots list below
+        # is built from the same `beats` in the same order, one row per beat.
+        for planned_ordinal, b in enumerate(beats):
             engine_id = engine_for(b["role"])
             if engine_id:
                 _assert_family_inputs_satisfiable_cast_time(
                     engine_id, b, ledger, policy, subject_sigils,
-                    ghost_prompts, ghost_subjects)
+                    ghost_prompts, ghost_subjects,
+                    planned_ordinal=planned_ordinal)
 
     # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
     # the retired_role_a / retired_role_b roles -- every beat renders

@@ -172,15 +172,17 @@ def test_the_preflight_and_the_durable_row_see_one_object(monkeypatch):
     original = sl._assert_family_inputs_satisfiable_cast_time
 
     def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
-             ghost_prompts=None, ghost_subjects=None):
+             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None):
         if ghost_prompts:
             key = str(beat.get("beat_id") or "")
             if key in ghost_prompts:
                 seen[key] = copy.deepcopy(ghost_prompts[key])
-        # Half B added a seventh positional argument; a double that cannot
-        # accept the real call signature is an out-of-date double.
+        # Half B added a seventh positional argument and kernel parity an
+        # eighth keyword; a double that cannot accept the real call signature
+        # is an out-of-date double.
         return original(engine_name, beat, ledger, policy, subject_sigils,
-                        ghost_prompts, ghost_subjects)
+                        ghost_prompts, ghost_subjects,
+                        planned_ordinal=planned_ordinal)
 
     monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
     _led, shots = _plan()
@@ -690,12 +692,13 @@ def test_the_preflight_and_the_durable_row_see_one_SUBJECT(monkeypatch):
     original = sl._assert_family_inputs_satisfiable_cast_time
 
     def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
-             ghost_prompts=None, ghost_subjects=None):
+             ghost_prompts=None, ghost_subjects=None, planned_ordinal=None):
         key = str(beat.get("beat_id") or "")
         if ghost_subjects and key in ghost_subjects:
             seen[key] = ghost_subjects[key]
         return original(engine_name, beat, ledger, policy, subject_sigils,
-                        ghost_prompts, ghost_subjects)
+                        ghost_prompts, ghost_subjects,
+                        planned_ordinal=planned_ordinal)
 
     monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
 
@@ -729,3 +732,57 @@ def test_the_preflight_and_the_durable_row_see_one_SUBJECT(monkeypatch):
         if shot.get("ghost_subject"):
             key = shot["source_line_ids"][0] if shot.get("source_line_ids")                 else shot["shot_id"][len("shot_"):]
             assert seen.get(str(key)) == shot["ghost_subject"]
+
+
+# --------------------------------------------------------------------------- #
+# 3. PARITY OF THE KERNEL (2026-09-12): the preflight's temporary shot and the
+#    durable row hand `finalize_ghost_prompt_v3` the SAME ordinal and the SAME
+#    beat text, measured through the production preflight, not a stub.
+# --------------------------------------------------------------------------- #
+
+def test_the_preflight_and_the_durable_row_hand_the_kernel_the_same_inputs(monkeypatch):
+    """The preflight used to resolve every beat at ordinal 0 (its temporary
+    shot is `shot_id = beat_id`, the durable row `shot_<beat_id>`, and the
+    driver matched the literal id) while `resolve_crux_kernel` cycles the
+    PLACE by ordinal; and the dialogue lookup never joined on `line_id`, the
+    key real lines carry. Spy the finalizer and compare its inputs per beat
+    between the two paths. Helper-level assertions live in
+    tests/test_ghost_kernel_preflight_parity.py; this one runs the real
+    `build_execution_plan` and the real request builder."""
+    phase_box = {"phase": None, "identity": None}
+    recorded = {"cast_preflight": {}, "render": {}}
+    original_build = rd.build_request_from_shot
+    original_final = gsa.finalize_ghost_prompt_v3
+
+    def _spy_build(shot, ledger, **kwargs):
+        phase_box["phase"] = kwargs.get("phase") or "render"
+        phase_box["identity"] = rd._beat_id_for_shot(shot)
+        return original_build(shot, ledger, **kwargs)
+
+    def _spy_final(**kw):
+        bucket = recorded.setdefault(phase_box["phase"], {})
+        bucket[phase_box["identity"]] = (int(kw.get("ordinal", 0)),
+                                         str(kw.get("beat_text") or ""))
+        return original_final(**kw)
+
+    monkeypatch.setattr(rd, "build_request_from_shot", _spy_build)
+    monkeypatch.setattr(gsa, "finalize_ghost_prompt_v3", _spy_final)
+
+    led, shots = _plan()                       # runs the cast-time preflight
+    for row in shots:
+        if row.get("ghost_prompt"):
+            rd.build_request_from_shot(row, led, master_audio_path="")
+
+    preflight = recorded["cast_preflight"]
+    render = recorded["render"]
+    assert preflight and render, (preflight, render)
+    assert set(preflight) == set(render), (sorted(preflight), sorted(render))
+    for identity in sorted(render):
+        assert preflight[identity] == render[identity], (
+            "beat %s: preflight handed the kernel %r, the row handed %r"
+            % (identity, preflight[identity], render[identity]))
+    # Ordinals are real positions, not all zero, and dialogue reaches the
+    # ranking through line_id on a ledger whose lines carry text.
+    assert len({ordinal for ordinal, _ in render.values()}) > 1 or len(render) == 1
+    assert any(text for _, text in render.values()), (
+        "no beat text reached the kernel on either path: the line_id join is dead")

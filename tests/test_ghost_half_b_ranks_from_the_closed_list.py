@@ -462,7 +462,11 @@ def test_the_PREFLIGHT_shot_carries_the_same_subject_as_the_row():
     assert "ghost_subjects=None" in pre
     assert 'shot["ghost_subject"]' in pre
     plan = inspect.getsource(otr_shot_lock.build_execution_plan)
-    assert "ghost_prompts, ghost_subjects)" in plan, (
+    # Kernel parity (2026-09-12) added a keyword after the subjects; the call
+    # is now two lines and the second one is what proves the ordinal reaches
+    # the preflight.
+    assert ("ghost_prompts, ghost_subjects," in plan
+            and "planned_ordinal=planned_ordinal" in plan), (
         "the plan builder no longer hands the preflight the subjects")
 
 

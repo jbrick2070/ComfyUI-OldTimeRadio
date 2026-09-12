@@ -1,3 +1,64 @@
+## 2026-09-12 (midday) -- the cast-time preflight composes the Ghost kernel the row will
+
+**Row:** section 2, "Cast-time preflight resolves a DIFFERENT Ghost kernel
+than the render". Leaves the plan.
+
+**The defect, grounded** (Sonnet reader, then the driver): the preflight's
+temporary shot is `shot_id = beat_id`, the durable row is `shot_<beat_id>`,
+and `render_driver` matched the literal id, so the preflight always resolved
+at ordinal 0 while `resolve_crux_kernel` cycles the PLACE by ordinal. Not
+crash-class: an admission check answering on different grounds than the
+render.
+
+**Shipped.** `_planned_ordinal_for_shot(ledger, shot)` in `render_driver`:
+an explicit `planned_ordinal` on the shot wins, else the shot's canonical
+identity (`_beat_id_for_shot`) among the planned rows, else 0. The preflight
+stamps `enumerate(beats)` -- the same list, same order, one durable row per
+beat, synthetic open included -- and `build_execution_plan` passes it.
+`_beat_text_for_shot` joins on `line_id` first and runs the legacy
+shot_id / beat_id match only when no line matched by `line_id`.
+
+**Reviewers, and the one that earned it.** codex on the finished diff:
+RIGHT-WITH-FIXES, three folded (two spies in
+`tests/test_ghost_prompt_v2_lane.py` now accept and forward the keyword; a
+real-plan parity test there spies the production preflight and the durable
+request builder and compares the exact `(ordinal, beat_text)` the finalizer
+receives; and a receipt-version bump). Sonnet QA: WRONG on the pre-fold
+tree, one new item folded (a source-inspection test pinned the old one-line
+call shape). Then, because codex had surfaced several issues, **cursor as
+the hardening pass -- and it overturned a premise all three of us shared.**
+Codex, Sonnet and the driver had all claimed the old `beat_id` join "never
+matched outside fixtures", so the render path was about to see dialogue for
+the first time and the prompt version was bumped to v3.2. Cursor read the
+writers: `production_ledger.py:1497-1499`, `_otr_my_story.py:816` and
+`_otr_scifi_news_pro.py:4416` all stamp `beat_id == line_id` on every spoken
+line, and a real ledger from last night confirms it. The composed prompt on
+a shipping ledger is byte-identical before and after; the bump would have
+forced every cached Ghost row to re-render for nothing. **Reverted to v3.1**,
+the comment now says exactly what changed (the preflight; a hardened join
+for ledgers that lack or foreign-key `beat_id`), and cursor's second catch
+-- my call-site assertion fell through to the whole module and was satisfied
+by the signature's own default -- is fixed to read `build_execution_plan`
+by name. `tests/test_ghost_kernel_preflight_parity.py` (six helper-level
+cases) plus the real-plan test.
+
+**Blast radius:** shared canonical code, both boxes identically, Ghost v3
+lanes only (`animatediff15_v3_haunted_video` on the 5080 and 4060 haunted
+profiles); non-Ghost engines untouched; render output unchanged on shipping
+ledgers; no leg run (testing closed).
+
+**Also grounded this pass, for the next two rows.** The "four tests fail in
+isolation" premise is wrong on this box: the three lightning-lane tests fail
+in the full run too (they are in the 49 baseline), because they read this
+host's real 63 GB through `latent_ceiling_for_host` instead of pinning the
+16 GB calibration anchor the file already pins elsewhere; and the weight-floor
+test fails because `unified_memory_budget_mb` reads physical RAM while the
+test pinned only `free_vram_mb`. Both are one-line pins. And the bark output
+guard: codex refuted the 0.5 threshold as resting on two probes, and a
+calibration render of real bark takes is in progress to set it from data --
+first numbers already show one preset scoring near zero on every line, which
+is exactly the false-reject codex predicted.
+
 ## 2026-09-12 (late morning) -- section 1 emptied: seven arcs settled, three of them into code
 
 **His instruction:** *"keep arcing and coding so we can get to testing"*, then

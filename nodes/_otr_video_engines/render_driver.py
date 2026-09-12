@@ -1639,6 +1639,34 @@ def _beat_id_for_shot(shot):
     return sid[len("shot_"):] if sid.startswith("shot_") else sid
 
 
+def _planned_ordinal_for_shot(ledger, shot) -> int:
+    """The shot's position in the ledger's planned order -- the ordinal
+    `resolve_crux_kernel` cycles episode vocabulary with.
+
+    THE PREFLIGHT AND THE ROW MUST AGREE (2026-09-12). The cast-time preflight
+    builds a temporary shot whose `shot_id` is the bare beat id; the durable
+    row is `shot_<beat_id>`; matching the literal id therefore always put the
+    preflight at ordinal 0 while the row sat at its real index, and the same
+    object composed "in the archive" at preflight and "in the yard" on the row.
+    Three answers, in order: an explicit `planned_ordinal` stamped on the shot
+    (the preflight knows its prospective index); else the shot's canonical
+    identity (`_beat_id_for_shot`) found among the planned rows; else 0, which
+    costs that one beat its variety and never its picture.
+    """
+    try:
+        stamped = (shot or {}).get("planned_ordinal")
+        if stamped is not None:
+            return max(0, int(stamped))
+    except (TypeError, ValueError):
+        pass
+    planned = ((ledger or {}).get("video") or {}).get("shots") or []
+    wanted = _beat_id_for_shot(shot or {})
+    for index, row in enumerate(planned):
+        if isinstance(row, dict) and _beat_id_for_shot(row) == wanted:
+            return index
+    return 0
+
+
 def _beat_text_for_shot(ledger, shot) -> str:
     """The spoken text of the beat this shot renders, for CRUX RANKING only.
 
@@ -1662,15 +1690,27 @@ def _beat_text_for_shot(ledger, shot) -> str:
         return ""
     sid = str((shot or {}).get("shot_id") or "")
     bid = _beat_id_for_shot(shot or {})
-    out = []
+    # THE JOIN KEY IS `line_id` (2026-09-12). ShotLock derives every beat id
+    # from the line's `line_id` (otr_shot_lock: `beat_id = ln["line_id"]`).
+    # Every shipping writer also stamps `beat_id == line_id` on a spoken
+    # line, so on a real ledger the legacy `beat_id` match found the same
+    # text this one does -- the composed prompt is unchanged there. What the
+    # real key hardens is a ledger that omits `beat_id` (the v2-lane fixture)
+    # or carries a foreign one: the legacy shot_id / beat_id match runs only
+    # when no line matched this shot by `line_id`.
+    by_line_id = []
+    legacy = []
     for ln in lines:
         if not isinstance(ln, dict):
             continue
-        if str(ln.get("shot_id") or "") == sid or str(ln.get("beat_id") or "") == bid:
-            txt = str(ln.get("text") or "").strip()
-            if txt:
-                out.append(txt)
-    return " ".join(out)
+        txt = str(ln.get("text") or "").strip()
+        if not txt:
+            continue
+        if str(ln.get("line_id") or "") == bid:
+            by_line_id.append(txt)
+        elif str(ln.get("shot_id") or "") == sid or str(ln.get("beat_id") or "") == bid:
+            legacy.append(txt)
+    return " ".join(by_line_id or legacy)
 
 
 #: Mirrors ``otr_shot_lock.OPENING_MUSIC_BEAT_ID`` -- duplicated as a local
@@ -3277,13 +3317,11 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # vocabulary with. A shot the plan does not list falls back to 0
             # rather than guessing, which costs that one beat its variety and
             # never its picture.
-            _g_planned = ((ledger or {}).get("video") or {}).get("shots") or []
-            _g_ordinal = 0
-            for _g_i, _g_row in enumerate(_g_planned):
-                if str((_g_row or {}).get("shot_id") or "") == str(
-                        shot.get("shot_id") or ""):
-                    _g_ordinal = _g_i
-                    break
+            # Resolved through ONE helper for the preflight's temporary shot
+            # and the durable row alike (`_planned_ordinal_for_shot`): the
+            # preflight stamps its prospective index, the row is found by its
+            # canonical identity, and the two compose the same kernel.
+            _g_ordinal = _planned_ordinal_for_shot(ledger, shot)
             # PROMPT v3 ("draw the crux"): composed from the EPISODE -- its
             # `key_objects`, its setting, its light -- and from the stored
             # object's MODE alone. The stored `motif_cue` and `drawable_beat`
