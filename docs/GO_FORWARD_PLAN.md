@@ -196,6 +196,51 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   the anime pack uses it, absent means the stock model, and nothing fails
   either way. Documented in the README as opt-in. **This feature is DONE.**
 
+* **THE GROOVE DEFECT IS FOUND, IT IS ONE LINE, AND IT IS THE DRIVER'S OWN BUG
+  FROM 2026-09-12.** A 26-agent panel refuted the driver's seed-variance theory
+  by measurement and found the real cause. **Awaiting his go/no-go only because
+  it touches the render path and the wave head is frozen.**
+
+  **NOT the seed.** Same prompt, different seeds, ruled `small_base` arm: pulse
+  spread 0.016 (house) / 0.065 (techno), tempo never missed, 6 of 6 locked.
+  A variable with a range of 0.065 cannot produce the shipped range of 0.78.
+  Renders are exactly reproducible -- 18 cross-boot pairs agree on every
+  recorded digit of seven metrics -- so a retry-on-tempo guard would be
+  strictly wasteful: re-rolling the seed at a fixed prompt buys ~0.065 of pulse
+  for a whole extra render.
+
+  **The driver's premise was FALSE.** It claimed the two contrasting episodes
+  had byte-identical prompts. They have different prompt hashes. What differs is
+  the brief-mined MOOD WORDS, and they sit IN FRONT of the tempo instruction:
+
+  | lead words | tempo | pulse | his verdict |
+  |---|---|---|---|
+  | suspenseful, **driving**, dark | 120.2 | 0.74 | -- |
+  | tension, ominous, **frantic** | 123.0 | 0.42 | *"perfect music"* |
+  | ominous, suspenseful, eerie | 156.6 | 0.29 | *"no beats, maybe one slight beat"* |
+
+  The two that locked lead with a MOTION word. The one that failed is pure
+  texture. `nodes/_otr_music_prompt.py::compose_music_prompt` appends
+  `mood_terms` BEFORE `palette.idiom`, so three atmosphere words stand in front
+  of "Chicago house at 122 BPM".
+
+  **This is the exact failure the module's own docstring already names** for the
+  neutral "atmospheric" default -- and the 2026-09-12 fix only skipped the
+  DEFAULT, leaving a real brief's mood words leading on a groove bank. Half a
+  fix.
+
+  **THE FIX, one line:** on a `groove_arc` palette, append `palette.idiom`
+  FIRST and the mood terms after it, so the genre and its BPM lead. Nothing else
+  changes; sustained banks keep today's order exactly.
+
+  **ALSO FOUND, a real bug in a bench tool:** `scripts/music_model_bench.py:295`
+  derives the seed from the index into the FILTERED family list while the
+  filename records only the family and a k-index, so the same filename means
+  different seeds between a smoke run and a full run. That invalidates the
+  determinism control cited in
+  `docs/2026-09-12-music-model-bench/driver_anchor.md:94-96`. The conclusion
+  there survives on other evidence; the cited proof does not.
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
