@@ -93,6 +93,31 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   before it claims `shipping`, and it is NOT edited while the wave head is
   frozen.
 
+* **HIS EAR CALIBRATED THE METRIC, 2026-09-12, and this is the most useful
+  thing in this file.** Two `public_domain` episodes, the SAME bank, a
+  BYTE-IDENTICAL composed prompt, opposite verdicts:
+
+  | episode | opening cue | tempo error vs the 122 BPM asked for | his words |
+  |---|---|---|---|
+  | `the_clanking_chains_153041` | 0.42 / 123.0 BPM | **1.0** | *"perfect music"* |
+  | `firelight_skepticism_151426` | 0.29 / 156.6 BPM | **34.6** | *"just house chords no rhythm"* |
+
+  **TEMPO ERROR is the discriminator, and onset periodicity is not.** The two
+  differ 35-fold on tempo error and only 0.42 vs 0.29 on periodicity -- a gap
+  far too small to have predicted his verdict. Any future guard, bench or
+  A/B on groove cues binds to |measured BPM - requested BPM|, never to a
+  periodicity floor.
+
+  **It also means the wording is exonerated twice over.** Those two cues asked
+  for the same thing in the same words and one was perfect. The variable is the
+  render, not the prompt -- so the fix is a recipe or a re-roll, not more
+  prompt-craft.
+
+  **A FALSIFIABLE PREDICTION, left here on purpose:**
+  `shadows_on_the_catwalk_144526` measures 0.74 / 120.2, i.e. **1.8 BPM off**.
+  If tempo error really is the thing his ear tracks, he should like that one
+  too. If he does not, this calibration is wrong and the row reopens.
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
