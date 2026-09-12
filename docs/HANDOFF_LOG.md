@@ -1,3 +1,71 @@
+## 2026-09-12 (dawn) -- a genre per bank, and a build-breaker the legs caught
+
+**His instruction:** *"sci-fi news is Detroit techno, media archive will be jazz
+quartet, original will be salsa, public domain Chicago house, people can fill in
+their own music in the widget fields"*, then narrowing it: *"no, only My Story
+allows an original music prompt"*, and on the framing: *"ok but these are the new
+defaults."*
+
+**Shipped, four pushes:** `037bf489` (the genres, the `rhythmic` flag, the
+`music_style` widget and the canonical wiring), `c24865f7` (a build-breaker,
+below), `17238f4f` (the codex fold). Reviewed by codex r1, verdict
+yes-with-fixes, all three must-fixes folded.
+
+**THE DESIGN POINT, and it is tonight's lesson applied.** Every rule in the
+palette module was written for a four-to-twelve-second ORCHESTRAL UNDERSCORE and
+three of them cancel these genres outright: sustained instruments must lead
+(but a techno bed IS the drum machine), the negative prompt bans loop, ostinato,
+drum machine and beat (every one a REQUIREMENT of house), and the period bands
+read the year first (so a Victorian public-domain source would never reach
+Chicago house). A palette now declares whether it is `rhythmic`, and that single
+fact switches all three. A bank without a declared genre is untouched.
+
+**THE BUILD-BREAKER, and why legs exist.** `eng_stable_audio_3._CKPT` stopped
+being the checkpoint filename when the engine began choosing between the base
+and post-trained files; it became the operator's override and is empty by
+default. `_otr_visual_assets.native_requests` still read it as a filename, so
+the preflight asked ComfyUI to find a weight called `""` and killed EVERY
+canonical render that did not pin `OTR_SA3_CKPT` -- twelve seconds in, since
+`b52c1a86`. The unit suite cannot see that path, and the A/B that proved the
+guidance fix pinned the checkpoint explicitly on both arms, which hid it
+perfectly. The first leg that did not pin it found it immediately.
+PBUG-20260912-05. Guarded by a test that greps every module for a read of that
+constant outside the engine that owns it -- which caught a stale comment on the
+day it was written.
+
+**THE CODEX FOLD, sharpest finding:** the style field's rule was written as
+"biased toward rhythmic on doubt" and the code did the opposite. Anything the
+word list missed came back sustained and collected the anti-loop negative, so
+"shoegaze" would have been asked for and then forbidden its own drums. The rule
+now runs the other way and is pinned by a test: sustained only when the text
+says something sustained, everything else rhythm-friendly.
+
+**FOUR LIVE 1-ACT LEGS, one per bank, all published to `otr/obs`:**
+
+| bank | palette in the receipt | cue tempo measured | artifacts |
+|---|---|---|---|
+| scifi_news_pro | detroit_techno | none | 0 |
+| public_domain | chicago_house | none | 0 |
+| media_archive | jazz_quartet | 115.4 BPM (closing) | 0 |
+| original | salsa_conjunto | 98.4 BPM (opening, asked 100) | 0 |
+
+Every receipt carries the right palette and the rhythm-friendly negative, and
+no cue carries an off-grid broadband event.
+
+**WHAT IS NOT SETTLED, stated plainly:** the genres land UNEVENLY at cue length.
+Salsa and jazz produced real grooves (139 and 83 onsets a minute); techno and
+house came back nearer pads (20-68 a minute, no tempo the estimator will
+commit to). The likely cause is the 3x conditioning window: `_sa3_clip_window`
+widens every cue so it is a SLICE of a longer piece, which is exactly right for
+anti-loop underscore and probably wrong for a genre bed, where a self-contained
+loop is the thing you want. Making the ratio follow `rhythmic` is the obvious
+next experiment and is NOT done -- it trades against a deliberate anti-loop
+mechanism and wants his word and a measurement, not a guess at 6am.
+
+**Pending for the operator:** listen to the four banks in
+`output/otr/obs/bank_genres/`, and rule on whether a rhythmic bank should get a
+1x conditioning window.
+
 ## 2026-09-12 (small hours) -- the music was running a guidance its model cannot answer
 
 **His words, watching the episode:** *"levels good but still squally tapy ting

@@ -14800,3 +14800,31 @@ The live lever is `seconds_total`, the other half of the same function.
 **Verify:** `tests/test_music_prompts_are_musical.py::test_the_placement_knob_does_not_claim_to_have_reached_the_model`,
 and `comfy/model_base.py` -- `StableAudio3.extra_conds` reads `seconds_total`
 only, against `StableAudio1` at the same file's lines 805-835.
+
+## PBUG-20260912-05 -- the visual preflight read an override as a filename (fixed `c24865f7`)
+
+**Artifact:** four canonical 1-act legs, one per source bank, each dying at
+`OTR_WorkflowValidator` in about twelve seconds with `VisualAssetError`.
+
+**Cause:** `eng_stable_audio_3._CKPT` used to BE the SA3 checkpoint filename.
+When the engine began resolving between the base and post-trained checkpoints at
+load time (`b52c1a86`), that constant became the operator's OVERRIDE and is
+empty by default. `_otr_visual_assets.native_requests` still read it as a
+filename, so the preflight asked ComfyUI to locate a weight named `""` and
+raised before a frame rendered. Every canonical render without `OTR_SA3_CKPT`
+pinned was broken from that commit onward.
+
+**Why nothing caught it:** the unit suite never exercises the preflight's
+ComfyUI path, and the canonical A/B that qualified the guidance fix pinned
+`OTR_SA3_CKPT` explicitly on BOTH arms, which made the constant non-empty and
+hid the defect completely. Only a leg that did not pin the checkpoint could find
+it -- and the first one did, immediately.
+
+**Fix:** the preflight asks the engine which checkpoint it will load
+(`StableAudio3Engine.resolve_ckpt()`) instead of reading its constant, so it
+also names the right file on a box that holds the base checkpoint.
+
+**Verify:** `tests/test_music_prompts_are_musical.py::test_no_other_module_reads_the_checkpoint_constant_as_a_filename`
+greps every module under `nodes/` for a read of that constant outside the engine
+that owns it, and `::test_the_visual_preflight_resolves_the_checkpoint_it_will_load`
+pins the positive half. Four live legs published to `otr/obs` after the fix.
