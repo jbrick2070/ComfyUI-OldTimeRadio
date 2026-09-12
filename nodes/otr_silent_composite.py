@@ -163,16 +163,16 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     return resolve_ffmpeg(ffmpeg) or ""
 
 
-def _ffprobe_bin() -> str:
-    """The ffprobe this box should run, or ``""`` when it has none.
-
-    THE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: every probe here answers
-    ``-1`` / ``0.0`` on an absent tool and the composite carries on, because a
-    finished episode is not thrown away over a missing diagnostic. Only the
-    SEARCH is shared, which is how ``OTR_FFPROBE`` finally reaches the A/V-sync
-    frame count.
-    """
-    return _ffp.resolve_ffprobe() or ""
+# THE PROBE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: every probe here
+# answers -1 / 0.0 / {} when NOTHING on the box can measure, and the composite
+# carries on, because a finished episode is not thrown away over a missing
+# diagnostic. Since 2026-09-11 the probes go through the boundary's
+# `probe_json`, which reads the file through PyAV when no ffprobe binary
+# resolves -- so on a cold install (ffmpeg from the imageio wheel, no ffprobe)
+# they still MEASURE. Measured that day on the 5080 with ffprobe made
+# unresolvable: the private resolve-or-empty helper + subprocess that lived
+# here answered -1 to the V-1 gate below, the gate read -1 as a violation, and
+# a 514-second render was lost at the caption burn as "input video missing".
 
 
 def _run(cmd):
@@ -181,28 +181,29 @@ def _run(cmd):
 
 
 def count_audio_streams(path: str) -> int:
-    fp = _ffprobe_bin()
-    if not fp:
+    """How many audio streams ``path`` carries; ``-1`` when it cannot be
+    measured (no probe on the box, or an unreadable file)."""
+    try:
+        doc = _ffp.probe_json(path, "stream=index", select_streams="a")
+    except _ffp.FFprobeError:
         return -1
-    p = _run([fp, "-v", "error", "-select_streams", "a", "-show_entries",
-              "stream=index", "-of", "csv=p=0", path])
-    return len([ln for ln in (p.stdout or "").splitlines() if ln.strip()])
+    return len(doc.get("streams") or [])
 
 
 def probe_video(path: str) -> dict:
     """w,h,pix_fmt,avg_frame_rate of v:0 (for the CFR / color / mod-2 asserts)."""
-    fp = _ffprobe_bin()
-    if not fp:
+    try:
+        doc = _ffp.probe_json(
+            path, "stream=width,height,pix_fmt,avg_frame_rate,r_frame_rate",
+            select_streams="v:0")
+    except _ffp.FFprobeError:
         return {}
-    p = _run([fp, "-v", "error", "-select_streams", "v:0", "-show_entries",
-              "stream=width,height,pix_fmt,avg_frame_rate,r_frame_rate",
-              "-of", "default=noprint_wrappers=1", path])
-    out: dict = {}
-    for line in (p.stdout or "").splitlines():
-        if "=" in line:
-            k, v = line.split("=", 1)
-            out[k.strip()] = v.strip()
-    return out
+    streams = doc.get("streams") or []
+    if not streams:
+        return {}
+    # The shape this function has always answered: every value a STRING
+    # (the old default= writer printed text), parsed by the callers.
+    return {str(k): str(v) for k, v in streams[0].items()}
 
 
 def _even(n: int) -> int:
@@ -374,10 +375,16 @@ def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
     if p.returncode != 0:
         raise ValueError(f"OTR_SilentComposite: ffmpeg failed :: {p.stderr.strip()[:300]}")
 
-    # gate: the composite MUST be silent (V-1) + yuv420p + even dims.
+    # gate: the composite MUST be silent (V-1) + yuv420p + even dims. An
+    # UNMEASURABLE count (-1: nothing on this box can probe) is UNPROVEN,
+    # said out loud -- the output was encoded with -an and is not thrown away.
     na = count_audio_streams(out_path)
-    if na != 0:
+    if na > 0:
         raise ValueError(f"OTR_SilentComposite: output has {na} audio stream(s); must be 0 (V-1)")
+    if na < 0:
+        log.warning("[OTR_SilentComposite] V-1 UNPROVEN: no probe on this box could "
+                    "count the audio streams of %r (encoded with -an; carrying on)",
+                    out_path)
     info = probe_video(out_path)
     if info.get("pix_fmt") and info["pix_fmt"] != "yuv420p":
         raise ValueError(f"OTR_SilentComposite: pix_fmt {info['pix_fmt']} != yuv420p")
@@ -401,29 +408,27 @@ def normalize_to_silent_canonical(in_path: str, out_path: str, *, w: int = 1472,
 def count_video_frames(path: str) -> int:
     """Authoritative decoded frame count of v:0 (the assemble A/V-sync gate);
     -1 when ffprobe or the file is missing."""
-    fp = _ffprobe_bin()
-    if not fp or not os.path.isfile(path):
+    if not os.path.isfile(path):
         return -1
-    p = _run([fp, "-v", "error", "-select_streams", "v:0", "-count_frames",
-              "-show_entries", "stream=nb_read_frames", "-of", "csv=p=0", path])
-    out = (p.stdout or "").strip().splitlines()
-    if out and out[0].strip().isdigit():
-        return int(out[0].strip())
-    return -1
+    try:
+        doc = _ffp.probe_json(path, "stream=nb_read_frames", select_streams="v:0",
+                              extra_args=("-count_frames",))
+    except _ffp.FFprobeError:
+        return -1
+    streams = doc.get("streams") or []
+    raw = str((streams[0] if streams else {}).get("nb_read_frames") or "").strip()
+    return int(raw) if raw.isdigit() else -1
 
 
 def _probe_duration(path):
     """Container duration in seconds (the master length the assembled video must
     match); 0.0 when unavailable."""
-    fp = _ffprobe_bin()
-    if not fp or not os.path.isfile(path):
+    if not os.path.isfile(path):
         return 0.0
-    p = _run([fp, "-v", "error", "-show_entries", "format=duration",
-              "-of", "default=noprint_wrappers=1:nokey=1", path])
-    out = (p.stdout or "").strip().splitlines()
     try:
-        return float(out[0]) if out else 0.0
-    except (ValueError, IndexError):
+        doc = _ffp.probe_json(path, "format=duration")
+        return float((doc.get("format") or {}).get("duration"))
+    except (_ffp.FFprobeError, TypeError, ValueError):
         return 0.0
 
 
@@ -434,16 +439,13 @@ def _probe_audio_duration(path):
     the master mix it carries (its own silent post-roll), so capping the
     assembled length at the base's AUDIO duration keeps the credits riding
     under the closing theme while honoring the terminal mux's v<=a gate."""
-    fp = _ffprobe_bin()
-    if not fp or not os.path.isfile(path):
+    if not os.path.isfile(path):
         return 0.0
-    p = _run([fp, "-v", "error", "-select_streams", "a:0",
-              "-show_entries", "stream=duration",
-              "-of", "default=noprint_wrappers=1:nokey=1", path])
-    out = (p.stdout or "").strip().splitlines()
     try:
-        return float(out[0]) if out else 0.0
-    except (ValueError, IndexError):
+        doc = _ffp.probe_json(path, "stream=duration", select_streams="a:0")
+        streams = doc.get("streams") or []
+        return float(streams[0]["duration"]) if streams else 0.0
+    except (_ffp.FFprobeError, KeyError, TypeError, ValueError, IndexError):
         return 0.0
 
 
@@ -1170,7 +1172,11 @@ def _run_model_pipeline(*, fb, src, seg_path, n_frames, w, h, fps,
                 "ffmpeg encode rc=%s :: %s"
                 % (enc.returncode, _tail_path(enc_stderr_path, 400)))
         got_frames = count_video_frames(seg_path)
-        if got_frames != int(n_frames):
+        if got_frames < 0:
+            log.warning("[OTR_SilentComposite] segment frame count UNPROVEN for %r "
+                        "(no probe on this box); %d frames were requested",
+                        seg_path, int(n_frames))
+        elif got_frames != int(n_frames):
             error_raised = True
             raise RuntimeError(
                 "segment frame count mismatch: %d != %d (src=%r seg=%r)"
@@ -1318,7 +1324,8 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
         raise ValueError("OTR_SilentComposite: ffmpeg not found (%r)" % ffmpeg)
     w, h, fps = _even(w), _even(h), max(1, int(fps))
     floor_ok = bool(base_video_path) and os.path.isfile(base_video_path)
-    floor_frames = count_video_frames(base_video_path) if floor_ok else 0
+    # An unmeasurable floor (-1) is no floor: black fill rather than a guess.
+    floor_frames = max(0, count_video_frames(base_video_path)) if floor_ok else 0
     # The post-audio ledger's accepted timeline boundary is primary. Positioned
     # manifests may overlap full render requests at audio crossfades, so their
     # render-work sum is deliberately NOT the output length. Legacy/sequential
@@ -1465,11 +1472,19 @@ def assemble_silent_timeline(manifest, base_video_path, out_path, *, w=1472,
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
     na = count_audio_streams(out_path)
-    if na != 0:
+    if na > 0:
         raise ValueError("OTR_SilentComposite: assembled has %d audio stream(s); "
                          "must be 0 (V-1)" % na)
+    if na < 0:
+        log.warning("[OTR_SilentComposite] V-1 UNPROVEN: no probe on this box could "
+                    "count the audio streams of %r (concatenated with -an; carrying on)",
+                    out_path)
     got = count_video_frames(out_path)
-    if got != total:
+    if got < 0:
+        log.warning("[OTR_SilentComposite] A/V sync guard UNPROVEN: the assembled frame "
+                    "count of %r could not be measured on this box (budget %d frames)",
+                    out_path, total)
+    elif got != total:
         raise ValueError("OTR_SilentComposite: assembled %d frames != audio-derived "
                          "budget %d frames (A/V sync guard)" % (got, total))
     info = probe_video(out_path)

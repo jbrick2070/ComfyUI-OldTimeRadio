@@ -259,14 +259,12 @@ def _probe_is_portrait(path, ffprobe, cache):
     res = None
     try:
         if path and os.path.isfile(path):
-            out = _ffp.probe_raw(
-                ["-v", "error", "-select_streams", "v:0",
-                 "-show_entries", "stream=width,height", "-of", "csv=p=0:s=x",
-                 path],
-                ffprobe=ffprobe, timeout=10)
-            txt = (out.stdout or "").strip().splitlines()
-            if out.returncode == 0 and txt:
-                w, h = (int(x) for x in txt[0].split("x")[:2])
+            doc = _ffp.probe_json(path, "stream=width,height",
+                                  select_streams="v:0", ffprobe=ffprobe,
+                                  timeout=10)
+            streams = doc.get("streams") or []
+            if streams:
+                w, h = int(streams[0]["width"]), int(streams[0]["height"])
                 res = h > w
     except Exception as exc:  # noqa: BLE001
         log.warning("[SceneAwareScopes] ffprobe failed for %r (%s) -> suppress",

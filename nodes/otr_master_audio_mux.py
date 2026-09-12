@@ -104,15 +104,12 @@ def _ffmpeg_bin(ffmpeg: str) -> str:
     return resolve_ffmpeg(ffmpeg) or ""
 
 
-def _ffprobe_bin() -> str:
-    """The ffprobe this box should run, or ``""`` when it has none.
-
-    THE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: an absent probe yields
-    ``-1`` and a duration receipt that says UNPROVEN out loud, never a lost
-    episode. Only the SEARCH is shared -- and sharing it is why ``OTR_FFPROBE``
-    now reaches the duration gate, which it never did before.
-    """
-    return _ffp.resolve_ffprobe() or ""
+# THE PROBE POLICY IS THIS MODULE'S AND IT DOES NOT MOVE: an unmeasurable
+# duration yields -1 and a receipt that says UNPROVEN out loud, never a lost
+# episode. Since 2026-09-11 the probe goes through the boundary's `probe_json`,
+# which reads the file through PyAV when no ffprobe binary resolves, so a cold
+# install (ffmpeg from the imageio wheel, no ffprobe) still MEASURES and the
+# gate is proven rather than skipped.
 
 
 def _run(cmd):
@@ -121,22 +118,19 @@ def _run(cmd):
 
 
 def _probe_float(path: str, stream: str) -> float:
-    """Duration (s) of the first ``stream`` (``v:0`` / ``a:0``) via ffprobe."""
-    fp = _ffprobe_bin()
-    if not fp:
-        return -1.0
-    p = _run([fp, "-v", "error", "-select_streams", stream, "-show_entries",
-              "stream=duration", "-of", "default=nokey=1:noprint_wrappers=1", path])
+    """Duration (s) of the first ``stream`` (``v:0`` / ``a:0``), the container
+    duration when the stream carries none, ``-1.0`` when nothing can measure."""
     try:
-        return float((p.stdout or "").strip().splitlines()[0])
-    except (ValueError, IndexError):
+        doc = _ffp.probe_json(path, "stream=duration", select_streams=stream)
+        streams = doc.get("streams") or []
+        value = (streams[0] if streams else {}).get("duration")
+        if value not in (None, ""):
+            return float(value)
         # container duration fallback
-        p2 = _run([fp, "-v", "error", "-show_entries", "format=duration",
-                   "-of", "default=nokey=1:noprint_wrappers=1", path])
-        try:
-            return float((p2.stdout or "").strip())
-        except ValueError:
-            return -1.0
+        doc = _ffp.probe_json(path, "format=duration")
+        return float((doc.get("format") or {}).get("duration"))
+    except (_ffp.FFprobeError, TypeError, ValueError):
+        return -1.0
 
 
 # `_count_audio_streams` was removed 2026-08-28: no caller anywhere. The

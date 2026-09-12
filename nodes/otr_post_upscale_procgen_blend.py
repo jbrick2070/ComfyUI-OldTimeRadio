@@ -299,15 +299,14 @@ def _probe_dims(path: Path, ffmpeg: str = "ffmpeg") -> "Optional[tuple]":
     tries its sibling before anything else -- but a box that pins OTR_FFPROBE
     is now heard too, which the hand-rolled ``ffprobe.exe`` swap never was."""
     try:
-        out = _ffp.probe_raw(
-            ["-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=width,height", "-of", "csv=s=x:p=0",
-             str(path)],
-            ffmpeg=ffmpeg, timeout=30)
-        if out.returncode != 0:
-            return None
-        w, h = (out.stdout or "").strip().split("x")[:2]
-        return int(w), int(h)
+        # Through probe_json since 2026-09-11: on a cold install with no
+        # ffprobe the boundary reads the file through PyAV, so the blend
+        # gets the real dimensions instead of the legacy self-referential
+        # scale. The resolved ffmpeg still threads through (sibling rule).
+        doc = _ffp.probe_json(str(path), "stream=width,height",
+                              select_streams="v:0", ffmpeg=ffmpeg, timeout=30)
+        stream = (doc.get("streams") or [{}])[0]
+        return int(stream["width"]), int(stream["height"])
     except Exception:  # noqa: BLE001
         return None
 
@@ -575,14 +574,10 @@ def _probe_fps(path: Path, ffmpeg: str) -> float:
     rational rate a THIRD time, in a third dialect. Both jobs are the shared
     boundary's now; the 25.0 fallback is still this node's own call."""
     try:
-        out = _ffp.probe_raw(
-            ["-v", "error", "-select_streams", "v:0",
-             "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0",
-             str(path)],
-            ffmpeg=ffmpeg, timeout=30)
-        if out.returncode != 0:
-            return 25.0
-        return _ffp.parse_rate((out.stdout or "").strip()) or 25.0
+        doc = _ffp.probe_json(str(path), "stream=r_frame_rate",
+                              select_streams="v:0", ffmpeg=ffmpeg, timeout=30)
+        stream = (doc.get("streams") or [{}])[0]
+        return _ffp.parse_rate(stream.get("r_frame_rate")) or 25.0
     except Exception:  # noqa: BLE001
         return 25.0
 
