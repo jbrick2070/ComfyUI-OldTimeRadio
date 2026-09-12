@@ -188,6 +188,14 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   **NOT RUN, on his instruction:** *"I don't want to spend any more time chasing
   before release."* This row is for after.
 
+* **RULED 2026-09-12: no auto-fetch row for the anime checkpoint.** His words:
+  *"I don't think we will set an auto fetch file because it's so specialised."*
+  Correct, and it settles the last open question on that feature: a 4.24 GB
+  download for one style most users never pick is the wrong default. The
+  checkpoint stays OPT-IN, which is exactly what already ships -- present means
+  the anime pack uses it, absent means the stock model, and nothing fails
+  either way. Documented in the README as opt-in. **This feature is DONE.**
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,

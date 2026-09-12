@@ -547,6 +547,17 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** |
+
+> **A visual style may name its own SD 1.5 checkpoint, and it is OPT-IN.** A
+> style pack can carry a `checkpoint` key; `sd15` loads that file *only if it is
+> already in `models/checkpoints`*, and otherwise falls back to `OTR_SD15_CKPT`
+> and then to the stock checkpoint above. Nothing is auto-downloaded for this
+> and nothing breaks without it -- a pack naming a file you do not have simply
+> renders on the stock model. Today only the `anime` pack names one,
+> `Counterfeit-V3.0_fp16.safetensors` (ungated, CreativeML OpenRAIL-M, the same
+> licence as the stock checkpoint). Drop it in yourself if you want the anime
+> style to look properly drawn; skip it and everything still works.
+
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered |
