@@ -227,12 +227,19 @@ def test_legacy_three_cue_byte_parity(monkeypatch):
     manifest = CM.parse_manifest(out[1], batch_size=2)
 
     # Each batch row, sliced by manifest sample_count, is byte-identical to a
-    # standalone (canonicalized) render of that cue's exact prompt+seed.
+    # standalone render of that cue's exact prompt+seed put through the SAME
+    # two stages the node applies: the music bus ceiling (2026-09-12 -- the
+    # engines set no ceiling and the wav writer hard-clips) and the mono
+    # downmix. The parity claim is about pack/pad/slice losing nothing, and
+    # it still holds exactly; the ceiling is simply part of the path now.
+    from nodes.stable_audio_theme import StableAudioTheme as _Theme
     for row in manifest["cues"]:
         bi = row["batch_index"]
         sc = row["sample_count"]
         call = calls[bi]
-        expected = mono_safe(_det_clip(
-            call["prompt"], call["duration_s"], call["seed"]))["waveform"][0]
+        raw = _det_clip(call["prompt"], call["duration_s"], call["seed"])
+        ceilinged, info = _Theme._ceiling_the_cue(raw, "parity")
+        assert info["engaged"], "this fixture is deliberately far over the ceiling"
+        expected = mono_safe(ceilinged)["waveform"][0]
         assert int(expected.shape[-1]) == sc
         assert torch.equal(batch[bi, :, :sc], expected)

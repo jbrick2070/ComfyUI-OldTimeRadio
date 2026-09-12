@@ -78,18 +78,58 @@ def test_the_style_roll_is_not_an_input():
 
 def test_mood_words_become_musical_devices_in_mood_order():
     devices = P.mood_devices(["tense", "moonlit", "secretive"])
-    assert devices == ["minor key, tremolo strings, low brass swells",
-                       "celesta, harp glissandi, shimmering strings"]
-    assert P.mood_devices(["sombre", "uneasy", "menacing"])[0].startswith("slow cello")
+    assert devices == ["minor key, low brass swells, slow rising strings",
+                       "shimmering sustained strings, soft celesta colour"]
+    assert P.mood_devices(["sombre", "uneasy", "menacing"])[0].startswith("a slow cello")
+
+
+def test_one_pace_per_cue_a_contradictory_second_device_is_dropped():
+    """The defect the operator heard on 2026-09-12: "melancholic, playful"
+    asked one 12-second cue to be slow/held AND pizzicato/brushed-drums, and
+    the model answered with a loop. A second device now joins only when its
+    pace agrees."""
+    both = P.mood_devices(["folk", "melancholic", "playful"])
+    assert both == ["a slow cello line over held minor chords"], both
+    assert P.mood_pace(["folk", "melancholic", "playful"]) == "slow"
+    # two SLOW moods still stack -- the rule drops contradictions, not depth
+    agree = P.mood_devices(["melancholic", "mysterious"])
+    assert len(agree) == 2, agree
+    # a neutral device joins either pace
+    assert len(P.mood_devices(["heroic", "playful"])) == 2
+
+
+def test_every_cue_is_told_how_fast_to_play():
+    """Duration never reaches the text, so without this the model picks its
+    own pace -- and at 4-12 seconds it picks a repeating figure."""
+    assert P.tempo_phrase(["melancholic"]) == "slow tempo, unhurried, expressive rubato"
+    assert P.tempo_phrase(["frantic"]) == "moving tempo, flowing line"
+    assert P.tempo_phrase(["heroic"]) == "steady unhurried tempo"
+    assert P.tempo_phrase([]) == "slow tempo, unhurried, expressive rubato"
+    assert P.tempo_phrase(None) and P.tempo_phrase(["zzz"])
+
+
+def test_no_device_and_no_palette_names_a_drum():
+    """A drum in a 4-to-12-second background cue can only be a loop. Every
+    percussion phrase that used to live here was in a cue the operator heard
+    as a tape deck."""
+    percussion = ("drum", "snare", "timpani", "pizzicato", "brushed",
+                  "percussion", "beat", "tremolo")
+    haystack = " ".join(d for _p, d, _pace in P._MOOD_DEVICES).lower()
+    haystack += " " + " ".join(
+        pal.instruments.lower() for pal in (
+            P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
+            P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA))
+    hits = [w for w in percussion if w in haystack]
+    assert not hits, hits
 
 
 def test_short_stems_are_bounded_so_warm_is_not_war_and_moonlight_is_not_light():
     assert P.mood_devices(["warm"]) == ["major key, legato strings, soft woodwinds"]
-    assert P.mood_devices(["war"]) == ["driving rhythm, staccato strings, snare accents"]
-    assert P.mood_devices(["moonlight"]) == ["celesta, harp glissandi, shimmering strings"]
-    assert P.mood_devices(["lighthearted"]) == ["pizzicato strings, bright woodwinds, brushed drums"]
+    assert P.mood_devices(["war"]) == ["urgent strings climbing over a restless bass line"]
+    assert P.mood_devices(["moonlight"]) == ["shimmering sustained strings, soft celesta colour"]
+    assert P.mood_devices(["lighthearted"]) == ["a light dancing woodwind melody, bright major colour"]
     # despair is not warmth: the stems that used to swallow their opposites
-    sad = "slow cello line, muted piano, held minor chords"
+    sad = "a slow cello line over held minor chords"
     warm = "major key, legato strings, soft woodwinds"
     assert P.mood_devices(["hopeless"]) == [sad]
     assert P.mood_devices(["loveless"]) == [sad]
@@ -103,7 +143,9 @@ def test_no_mood_or_junk_still_yields_a_musical_instruction():
     assert P.mood_devices(None) == [P.DEFAULT_DEVICE]
     assert P.mood_devices(["zzz", 42, None, ""]) == [P.DEFAULT_DEVICE]
     assert P.mood_devices(["tense", "tense", "dread"]) == [
-        "minor key, tremolo strings, low brass swells"], "one device per idea"
+        "minor key, low brass swells, slow rising strings"], "one device per idea"
+    # tense and warm are both SLOW, so both land; grand is neutral and would
+    # land too, but the limit stops at two unless it is raised
     assert len(P.mood_devices(["tense", "warm", "grand"], limit=3)) == 3
 
 
@@ -112,6 +154,6 @@ def test_nothing_in_the_palette_names_the_withdrawn_texture():
         p.instruments + " " + p.idiom
         for p in (P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
                   P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA)
-    ) + " " + " ".join(d for _, d in P._MOOD_DEVICES) + " " + P.DEFAULT_DEVICE
+    ) + " " + " ".join(d for _p, d, _pace in P._MOOD_DEVICES) + " " + P.DEFAULT_DEVICE
     low = text.lower()
     assert not [w for w in _NOISE_WORDS if w in low], low

@@ -44,7 +44,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ._otr_brief_reader import _read_brief_field, spoken_term
-from ._otr_music_palette import mood_devices, story_palette
+from ._otr_music_palette import mood_devices, story_palette, tempo_phrase
 
 # Three fixed cues + durations (seconds). Durations are part of cue identity;
 # keep stable (mirrors the legacy MusicGen cue durations).
@@ -57,7 +57,10 @@ _PROMPT_TAIL = ", instrumental only, no dialogue, no vocals"
 # "intro" / "outro" words are kept on purpose: the SA3 engine's context window
 # still falls back to them for a caller that hands over no placement.
 _CUE_CHARACTER: dict[str, str] = {
-    "opening":      "a rising overture that settles into a steady theme, "
+    # "settles into a STEADY theme" asked for the repetition this module
+    # spent 2026-09-12 removing; a theme that FLOWS is the same musical idea
+    # without the word that invites a two-bar loop.
+    "opening":      "a rising overture that settles into a flowing theme, "
                     "instrumental intro",
     "closing":      "a final statement of the theme resolving to a warm held "
                     "chord, instrumental outro",
@@ -73,7 +76,18 @@ PRODUCTION_ANCHOR = "clearly recorded, clean balanced studio mix, natural room"
 #: withdrawn texture explicitly so the model steers away from it.
 NEGATIVE_PROMPT_DEFAULT = (
     "noise, static, hiss, white noise, radio static, crackle, distortion, "
-    "clipping, silence, speech, vocals, singing, lyrics, spoken word")
+    "clipping, silence, speech, vocals, singing, lyrics, spoken word, "
+    # The loop half, added 2026-09-12. Stable Audio Open is built to make
+    # loops and one-shots, so a cue has to say that it is not one. RANKED
+    # first among the levers tried, on a lab bench over four seeds (closing
+    # cue envelope periodicity 0.78 -> 0.26) -- DIRECTION ONLY: that bench
+    # could not reproduce a shipped cue from its own receipt (correlation
+    # 0.92), so the number that counts is the canonical one. On the first
+    # canonical leg with the whole change the two cues measured 0.109 and
+    # 0.286 against 0.485 and 0.713 the night before, and the repeat lag
+    # moved from 0.25 s to 2.2-4.2 s (`scripts/otr_music_ab.py`).
+    "loop, looping, repetitive, ostinato, sequencer, arpeggiator, drum "
+    "machine, metronome, click track, drum loop, beat")
 
 #: The smallest engine budget in the pack (`eng_cloud_sonilo` refuses a
 #: longer prompt with a ValueError, and a render must never die on length).
@@ -176,6 +190,10 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     # the musical devices those words call for, then the period idiom.
     parts.append(", ".join(mood_terms) if mood_terms else "atmospheric")
     parts.extend(mood_devices(mood_terms))
+    # The ONLY musical-time information the model gets: duration is a
+    # separate return value and never reaches the text, so without this the
+    # model chooses its own pace and at this length it chooses a loop.
+    parts.append(tempo_phrase(mood_terms))
     parts.append(palette.idiom)
     if setting_str:
         parts.append(f"evokes {setting_str}")

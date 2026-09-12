@@ -20,29 +20,28 @@ def test_sa3_clip_window_places_cue_in_context_bug408():
     ctx = 30.0
     # opening (intro) -> head/build
     s, t = _sa3_clip_window("slow build, instrumental intro", 12.0, ctx)
-    assert s == 0.0 and t == 30.0
+    assert s == 0.0 and t == 36.0, "the 3x floor widens a 12 s cue past 30 s"
     # closing (outro) -> tail/resolving
     s, t = _sa3_clip_window("gentle decay, instrumental outro", 8.0, ctx)
     assert abs(s - 22.0) < 1e-6 and t == 30.0
     # interstitial (neither) -> middle/unresolved bridge
     s, t = _sa3_clip_window("short instrumental transition", 4.0, ctx)
     assert abs(s - 13.0) < 1e-6 and t == 30.0
-    # context is never shorter than the clip (a long clip widens the context)
+    # a cue longer than the asked-for context widens it rather than clamping
     s, t = _sa3_clip_window("instrumental intro", 40.0, 30.0)
-    assert t == 40.0 and s == 0.0
+    assert t == 120.0 and s == 0.0
     # "opening"/"closing" cue words also map (belt-and-braces alongside intro/outro)
-    # -- baked default context is 12s (= the longest cue, a tight phrase)
     s, t = _sa3_clip_window("opening theme, slow build", 12.0, 12.0)
-    assert s == 0.0 and t == 12.0
+    assert s == 0.0 and t == 36.0
     s, t = _sa3_clip_window("closing theme, gentle decay", 8.0, 12.0)
-    assert abs(s - 4.0) < 1e-6 and t == 12.0
+    assert abs(s - 16.0) < 1e-6 and t == 24.0
 
 
 def test_sa3_clip_window_is_driven_by_the_placement_name_first():
     """The theme node hands the cue's placement over (2026-09-11); a bare
     placement word resolves the window without any prompt text at all."""
-    assert _sa3_clip_window("opening", 12.0, 12.0) == (0.0, 12.0)
+    assert _sa3_clip_window("opening", 12.0, 12.0) == (0.0, 36.0)
     s, t = _sa3_clip_window("closing", 8.0, 12.0)
-    assert abs(s - 4.0) < 1e-6 and t == 12.0
+    assert abs(s - 16.0) < 1e-6 and t == 24.0
     s, t = _sa3_clip_window("interstitial", 4.0, 12.0)
     assert abs(s - 4.0) < 1e-6 and t == 12.0

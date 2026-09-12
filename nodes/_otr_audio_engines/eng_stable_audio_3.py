@@ -77,6 +77,16 @@ def _env_int(name, default):
         return int(default)
 
 
+#: The conditioning window must be LONGER than the cue, or the model is
+#: asked for a complete self-contained piece that begins and ends inside its
+#: own world -- which is a loop-shaped request, and is what BUG-408 set out
+#: to remove. It stayed live for the longest cue: at the shipped 12 s context
+#: the 12 s opening cue got seconds_total == dur exactly. Measured
+#: 2026-09-12. The ratio is the floor, not the value; OTR_SA3_CONTEXT_S
+#: still wins whenever it asks for more.
+_SA3_MIN_CONTEXT_RATIO = 3.0
+
+
 def _sa3_clip_window(prompt: str, dur: float, context_s: float):
     """Place the ``dur``-second clip within a ``context_s`` structural window per
     cue so SA3 renders a real slice of a longer piece: an ``outro`` sits at the
@@ -85,11 +95,13 @@ def _sa3_clip_window(prompt: str, dur: float, context_s: float):
     latent length stays ``dur`` -- only the CONDITIONING window changes, so clip
     length + seed determinism are unchanged."""
     dur = float(dur)
-    ctx = max(float(context_s), dur)
-    if float(context_s) < dur:
-        log.warning("[OTR.sa3] OTR_SA3_CONTEXT_S (%.1fs) < cue dur (%.1fs) -- "
-                    "context clamped to the cue length (structural context lost)",
-                    float(context_s), dur)
+    floor = dur * _SA3_MIN_CONTEXT_RATIO
+    ctx = max(float(context_s), floor)
+    if float(context_s) < floor:
+        log.info("[OTR.sa3] context %.1fs is not longer than the %.1fs cue by "
+                 "the %.1fx floor -- widening to %.1fs so the cue is a SLICE "
+                 "of a longer piece rather than a self-contained loop",
+                 float(context_s), dur, _SA3_MIN_CONTEXT_RATIO, ctx)
     low = (prompt or "").lower()
     if "outro" in low or "closing" in low:
         start = max(0.0, ctx - dur)          # resolving tail
@@ -178,9 +190,15 @@ class StableAudio3Engine:
         # context with a per-cue seconds_start. The LATENT stays exactly dur, so
         # clip length + seed determinism are unchanged; only the conditioning
         # window + prompt change. All knobs env-overridable for A/B tuning.
-        # Defaults TUNED 2026-06-14 (roundtable). context=12s (= the longest
-        # cue) so each short cue is a coherent SLICE of a tight musical phrase,
-        # not an aimless fragment of a 30s piece; cfg=7.0 -- NOT, as this comment long claimed, the "SA3 native
+        # Defaults TUNED 2026-06-14 (roundtable). OTR_SA3_CONTEXT_S=12 was
+        # chosen then so each short cue would be a coherent SLICE of a tight
+        # phrase rather than an aimless fragment of a 30 s piece. It is now a
+        # FLOOR-ADJUSTED request, not the final window: `_sa3_clip_window`
+        # widens it to at least 3x the cue (2026-09-12), because at 12 s the
+        # 12 s opening cue got seconds_total == dur -- a self-contained,
+        # loop-shaped request, and the exact condition BUG-408 existed to
+        # remove. Live windows today: opening 36 s, closing 24 s,
+        # interstitial 12 s. cfg=7.0 -- NOT, as this comment long claimed, the "SA3 native
         # default": Comfy-Org ships its checkpoints in matched base/non-base
         # pairs and gives each its own recipe, verified against the two
         # templates in comfyui_workflow_templates 0.11.55 --

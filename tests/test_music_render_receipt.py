@@ -28,7 +28,7 @@ def _stub(monkeypatch, recorder):
     def _gen(prompt, duration_s, seed, **kwargs):
         recorder.append({"prompt": prompt, "seed": int(seed), **kwargs})
         wave = torch.full((1, 1, 64), 0.5, dtype=torch.float32)
-        wave[0, 0, 3] = 1.0  # one full-scale sample the receipt must count
+        wave[0, 0, 3] = 1.0  # one full-scale sample the CEILING must take down
         return {"waveform": wave, "sample_rate": 32000,
                 "receipt": {"engine": "stub", "seed": int(seed), "cfg": 7.0}}
     monkeypatch.setattr(engine, "generate_clip", _gen)
@@ -65,11 +65,40 @@ def test_every_cue_row_carries_what_the_engine_heard_and_did(monkeypatch):
         assert receipt["palette_key"] == "early_consort"
         assert receipt["params"] == {"engine": "stub", "seed": heard["seed"], "cfg": 7.0}
         assert receipt["sample_rate"] == 32000
-        assert receipt["clipped_samples"] == 1
-        assert receipt["peak_dbfs"] == 0.0
+        # The bus ceiling ran before the wav writer, so the full-scale sample
+        # is at -1 dBFS and NOTHING is clipped. Before 2026-09-12 this read
+        # peak 0.0 dBFS with one clipped sample, and on 14% of real cues it
+        # read thousands.
+        assert receipt["clipped_samples"] == 0
+        assert receipt["peak_dbfs"] == pytest.approx(-1.0, abs=0.05)
         # the ROW text (identity) is untouched by the engine prompt
         assert row["prompt"].startswith("tense, moonlit")
         assert not row["prompt"].startswith(P.EARLY_CONSORT.instruments)
+
+
+def test_the_music_bus_has_a_ceiling_and_leaves_a_quiet_cue_alone():
+    """MEASURED 2026-09-12: 280 of 1,984 cue wavs on the dev box carried more
+    than four hard-clipped samples (worst 4,710), because ComfyUI pins a
+    Stable Audio render's RMS but not its peak, only `eng_musicgen`
+    normalises, and `_write_cue_wav` casts to int16 with a hard clip."""
+    from nodes.stable_audio_theme import StableAudioTheme as _Theme
+
+    hot = {"waveform": torch.full((1, 2, 4096), 3.0), "sample_rate": 44100}
+    limited, info = _Theme._ceiling_the_cue(hot, "hot")
+    assert info["engaged"] is True
+    assert float(limited["waveform"].abs().max()) <= 10.0 ** (-1.0 / 20.0) + 1e-6
+    assert limited["sample_rate"] == 44100
+
+    quiet = {"waveform": torch.full((1, 2, 4096), 0.2), "sample_rate": 44100}
+    same, info = _Theme._ceiling_the_cue(quiet, "quiet")
+    assert info["engaged"] is False
+    assert torch.equal(same["waveform"], quiet["waveform"]), (
+        "a cue under the ceiling is untouched -- this is a ceiling, not a "
+        "normalisation, so the music never moves against the dialogue")
+
+    # a ceiling is worth having and never worth an episode
+    broken, info = _Theme._ceiling_the_cue({"sample_rate": 44100}, "broken")
+    assert info["engaged"] is False and broken == {"sample_rate": 44100}
 
 
 def test_the_receipt_reaches_the_ledger_on_create_and_on_an_identity_match(monkeypatch):

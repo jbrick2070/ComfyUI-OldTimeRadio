@@ -28,7 +28,16 @@ import gc
 import logging
 
 from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
+import math
+
 from ._otr_music_prompt import compose_engine_prompt, compose_music_prompt
+
+#: Where a music cue's peak is allowed to sit. The same -1 dBFS the
+#: delivery master uses, and the level `eng_musicgen` has always
+#: peak-normalised to ("to match the legacy bus"); every other music engine
+#: had no ceiling at all until 2026-09-12.
+_CUE_CEILING_DBFS = -1.0
+_CUE_CEILING = 10.0 ** (_CUE_CEILING_DBFS / 20.0)
 
 log = logging.getLogger("OTR")
 
@@ -296,6 +305,7 @@ class StableAudioTheme:
                     engine_prompt.text, duration_s, engine_seed,
                     placement=spec["placement"],
                     negative_prompt=engine_prompt.negative)
+            clip, ceiling = self._ceiling_the_cue(clip, spec["cue_id"])
             cue_rows.append({
                 "cue_id": spec["cue_id"],
                 "placement": spec["placement"],
@@ -440,6 +450,60 @@ class StableAudioTheme:
         except Exception:  # noqa: BLE001
             return None
         return None
+
+    @staticmethod
+    def _ceiling_the_cue(clip, cue_id):
+        """Take a cue's overshoot out before anything downstream sees it.
+
+        THE ONE OWNER OF THE MUSIC BUS'S CEILING, and it had none until
+        2026-09-12. ComfyUI's `VAEDecodeAudio` pins a Stable Audio render's
+        RMS near -14 dBFS but says nothing about its PEAK, `eng_musicgen`
+        peak-normalises to -1 dBFS while no other music engine does, and
+        `_write_cue_wav` below casts to int16 with a hard clip. Measured on
+        this box: 280 of 1,984 cue wavs (14%) carry more than four clipped
+        samples, worst 4,710 -- audible distortion in one episode in seven.
+
+        A CEILING, NOT A NORMALISATION: a cue already under the ceiling is
+        returned untouched, so the music's level against the dialogue is
+        unchanged and no quiet cue is made loud. A LIMITER, not a whole-cue
+        scale, so one spike cannot drag ten seconds of music down with it --
+        `scene_sequencer._limit_peaks` is the same tool the delivery master
+        uses, imported rather than re-implemented (the master mux sets the
+        precedent for reaching into the sequencer for its audio helpers).
+
+        Returns ``(clip, info)``; a failure to limit returns the clip
+        untouched, because a ceiling is worth having and never worth an
+        episode.
+"""
+        import torch
+
+        waveform = clip.get("waveform") if isinstance(clip, dict) else None
+        if waveform is None:
+            return clip, {"engaged": False}
+        try:
+            try:
+                from .scene_sequencer import _limit_peaks
+            except ImportError:  # pragma: no cover -- flat (sys.path) load
+                from scene_sequencer import _limit_peaks  # type: ignore
+            sample_rate = int(clip.get("sample_rate") or 44100)
+            before = float(torch.nan_to_num(
+                waveform, nan=0.0, posinf=0.0, neginf=0.0).abs().max())
+            limited, info = _limit_peaks(waveform, _CUE_CEILING, sample_rate)
+        except Exception as exc:  # noqa: BLE001 -- never cost a cue
+            log.warning("[OTR.music] cue %s: the ceiling could not be applied "
+                        "(%s); shipping the cue as the engine returned it", cue_id, exc)
+            return clip, {"engaged": False}
+        if not info.get("engaged"):
+            return clip, info
+        log.info("[OTR.music] cue %s peaked %+.2f dBFS -- limited to %.1f dBFS "
+                 "(max reduction %.1f dB, engaged %.1f%%). The engine sets no "
+                 "ceiling and the wav writer clips; this is where that stops.",
+                 20.0 * math.log10(max(before, 1e-12)), _CUE_CEILING_DBFS,
+                 info.get("max_reduction_db", 0.0),
+                 100.0 * float(info.get("engaged_fraction", 0.0)))
+        out = dict(clip)
+        out["waveform"] = limited
+        return out, info
 
     @staticmethod
     def _render_receipt(row, waveform, sample_rate):

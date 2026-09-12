@@ -68,18 +68,20 @@ def test_the_row_text_reads_as_a_musical_instruction_about_this_story():
                                            moods=("enchanted", "playful", "tension-building")),
                                      "opening")
     assert row.startswith("enchanted, playful, tension-building"), "the brief's words lead"
-    assert "celesta, harp glissandi, shimmering strings" in row
-    assert "pizzicato strings, bright woodwinds, brushed drums" in row
+    assert "shimmering sustained strings, soft celesta colour" in row
     assert "Elizabethan consort music" in row
     assert "evokes forest, moonlit night" in row
-    assert "a rising overture that settles into a steady theme" in row
+    assert "a rising overture that settles into a flowing theme" in row
+    assert "slow tempo, unhurried, expressive rubato" in row, "the model is told the pace"
+    # "enchanted" is slow and "playful" is fast: the contradiction is dropped
+    assert "dancing woodwind" not in row
 
 
 def test_the_engine_prompt_leads_with_the_ensemble_and_a_clean_recording():
     meta = _meta("shakespeare", "c. 1595")
     row, _ = MP.compose_music_prompt(meta, "closing")
     engine = MP.compose_engine_prompt(meta, row)
-    assert engine.text.startswith("lute, viol consort, recorder, harpsichord, "
+    assert engine.text.startswith("viol consort, recorders, soft bowed strings, gentle lute, "
                                   "clearly recorded, clean balanced studio mix, natural room. ")
     assert engine.text.endswith(row)
     assert engine.palette_key == "early_consort"
@@ -90,6 +92,17 @@ def test_the_negative_prompt_names_the_withdrawn_texture_and_speech():
     low = MP.NEGATIVE_PROMPT_DEFAULT.lower()
     for word in ("hiss", "static", "noise", "vocals", "speech", "clipping"):
         assert word in low
+
+
+def test_the_negative_prompt_says_this_is_not_a_loop():
+    """Measured 2026-09-12 as the single biggest lever: these words alone
+    took the closing cue's envelope periodicity from 0.78 to 0.26 over four
+    seeds. Stable Audio Open is built to make loops, so a cue must say it is
+    not one."""
+    low = MP.NEGATIVE_PROMPT_DEFAULT.lower()
+    for word in ("loop", "repetitive", "ostinato", "sequencer", "metronome",
+                 "drum machine", "click track", "beat"):
+        assert word in low, word
 
 
 def test_an_authored_prompt_survives_verbatim_inside_the_engine_prompt():
@@ -155,12 +168,29 @@ def test_sa3_sends_the_composed_prompt_verbatim_and_uses_the_composer_negative()
 
 
 def test_sa3_window_follows_the_placement_not_a_word_in_the_prompt():
+    """The window is placed by PLACEMENT, and is always longer than the cue
+    (the floor below), so no cue is ever a self-contained piece."""
     ctx = 12.0
-    assert SA3._sa3_clip_window("opening", 12.0, ctx) == (0.0, 12.0)
+    start, total = SA3._sa3_clip_window("opening", 12.0, ctx)
+    assert start == 0.0 and total == 36.0, "12 s cue in a 12 s window was a loop"
     start, total = SA3._sa3_clip_window("closing", 8.0, ctx)
-    assert abs(start - 4.0) < 1e-6 and total == 12.0
+    assert abs(start - 16.0) < 1e-6 and total == 24.0
     start, total = SA3._sa3_clip_window("interstitial", 4.0, ctx)
-    assert abs(start - 4.0) < 1e-6 and total == 12.0
+    assert abs(start - 4.0) < 1e-6 and total == 12.0, "already 3x: unchanged"
+
+
+def test_a_cue_is_never_a_self_contained_piece():
+    """BUG-408 existed to kill seconds_total == dur, and it stayed live for
+    the longest cue: at the shipped 12 s context the 12 s opening cue got
+    exactly that, which is a loop-shaped request (measured 2026-09-12)."""
+    for placement, dur in (("opening", 12.0), ("closing", 8.0), ("interstitial", 4.0)):
+        for ctx in (4.0, 8.0, 12.0, 45.0):
+            start, total = SA3._sa3_clip_window(placement, dur, ctx)
+            assert total >= dur * SA3._SA3_MIN_CONTEXT_RATIO - 1e-6, (placement, dur, ctx, total)
+            assert total > dur, (placement, dur, ctx, total)
+            assert 0.0 <= start <= total - dur + 1e-6, (placement, dur, ctx, start)
+    # an operator who asks for MORE context still gets it
+    assert SA3._sa3_clip_window("opening", 12.0, 90.0)[1] == 90.0
 
 
 # --------------------------------------------------------------------------- #
