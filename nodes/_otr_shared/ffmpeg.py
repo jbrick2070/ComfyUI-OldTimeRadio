@@ -242,11 +242,17 @@ def probe_ffmpeg_capabilities(path=None) -> dict:
     if cached is not None:
         return dict(cached)
 
-    import subprocess
+    try:
+        from . import proc as otr_proc
+    except ImportError:  # pragma: no cover -- loaded flat
+        try:
+            from _otr_shared import proc as otr_proc  # type: ignore  # nodes/ on sys.path
+        except ImportError:
+            import proc as otr_proc  # type: ignore  # _otr_shared/ on sys.path
 
     def _lists(flag):
         try:
-            done = subprocess.run(
+            done = otr_proc.run(
                 [resolved, "-hide_banner", flag],
                 capture_output=True, text=True, timeout=30, check=False,
             )

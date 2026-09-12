@@ -147,7 +147,7 @@ try:
         # OTR_MPS_PYTORCH_ATTENTION=0 restores ComfyUI's stock Mac behaviour so
         # the two backends can be A/B'd on identical inputs. Anyone re-testing
         # the claim in PBUG-20260907-11 needs to be able to turn it off.
-        if os.environ.get("OTR_MPS_PYTORCH_ATTENTION", "1").strip() in ("0", "false", "no"):
+        if environ.get("OTR_MPS_PYTORCH_ATTENTION", "1").strip() in ("0", "false", "no"):
             logging.getLogger("OTR").info(
                 "[OldTimeRadio] mps: OTR_MPS_PYTORCH_ATTENTION=0 -- leaving ComfyUI's "
                 "stock attention selection alone (sub-quadratic). Measured WRONG on "

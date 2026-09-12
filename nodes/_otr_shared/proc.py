@@ -89,6 +89,12 @@ ALLOWED_EXECUTABLES = {
     "git": "the ledger's commit stamp (rev-parse --short HEAD)",
     "nvidia-smi": "GPU specs when torch cannot answer",
     "blender": "the mesh stage's headless render",
+    # The two macOS memory probes joined on 2026-09-12: they had been the
+    # last two direct spawns in the tree (the registry scanner flags any
+    # spawn outside this boundary), and a probe the pack runs belongs in
+    # the list of things the pack runs.
+    "vm_stat": "macOS free memory (page counts) for the motion budget",
+    "sysctl": "macOS physical RAM (hw.memsize) for the unified-memory budget",
 }
 
 #: basename PREFIX -> why. For tools whose PACKAGING puts a version or a

@@ -539,11 +539,11 @@ def _available_ram_mb():
     to total RAM -- never to "unlimited".
     """
     import re
-    import subprocess
+    from .._otr_shared import proc as otr_proc
     try:
-        out = subprocess.run(["vm_stat"], capture_output=True, text=True,
-                             timeout=5)
-    except (OSError, subprocess.SubprocessError):
+        out = otr_proc.run(["vm_stat"], capture_output=True, text=True,
+                           timeout=5)
+    except Exception:  # noqa: BLE001 -- not macOS, vm_stat absent, or refused
         return None
     if out.returncode != 0 or not out.stdout:
         return None
@@ -626,9 +626,9 @@ def unified_memory_budget_mb():
     curve; widen this the moment a third receipt lands, in either direction.
     """
     try:
-        import subprocess
-        raw = subprocess.run(["sysctl", "-n", "hw.memsize"],
-                             capture_output=True, text=True, timeout=5).stdout
+        from .._otr_shared import proc as otr_proc
+        raw = otr_proc.run(["sysctl", "-n", "hw.memsize"],
+                           capture_output=True, text=True, timeout=5).stdout
         physical_mb = float(raw.strip()) / (1024.0 * 1024.0)
     except Exception:  # noqa: BLE001 -- not macOS / sysctl absent
         return None

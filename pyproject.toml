@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0-alpha.29"
+version = "2.0.0-alpha.30"
 description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -102,6 +102,10 @@ dependencies = [
     # ffmpeg-downloader installs a matched ffmpeg+ffprobe PAIR in one directory,
     # which is how _otr_shared.ffprobe finds ffprobe (as an ffmpeg sibling).
     "ffmpeg-downloader>=0.5",
+    # PyAV: what the pack measures media with on a box that has ffmpeg and no
+    # ffprobe (_otr_shared/ffprobe.py, 2026-09-11). ComfyUI core pins av>=17
+    # itself; declared here so the pack states its own need.
+    "av>=17.0.0",
 ]
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
