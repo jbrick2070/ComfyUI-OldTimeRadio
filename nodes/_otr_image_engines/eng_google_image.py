@@ -221,6 +221,14 @@ def _extract_image_data(response: dict) -> dict:
     error.http_status = None
     error.failure_kind = "empty_response"
     error.retryable = False
+    # ROUTING, not diagnosis (plan row, 2026-09-11): the dispatcher splits
+    # failures by kind -- an engine failure hard-fails the episode, a model
+    # refusal skips the one card as a sanctioned gap with evidence (operator
+    # 2026-08-22: "why is refusing card killing the episode"). A completed,
+    # image-less 200 is the MODEL declining this card, whatever it declined
+    # to say about why; `failure_kind` above keeps the honest "empty_response"
+    # label, and this flag keeps one blemish from destroying the episode.
+    error.is_model_refusal = True
     raise error
 
 

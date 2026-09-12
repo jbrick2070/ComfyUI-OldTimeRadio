@@ -97,14 +97,17 @@ def test_a_MISSING_INPUT_is_not_a_capability_gap(monkeypatch, tmp_path):
         "the pipeline-defect branch must stay a plain ValueError")
 
 
-def test_a_PLANNED_TITLE_still_refuses_on_a_capability_gap(
+def test_a_PLANNED_TITLE_passes_the_clean_master_through_on_a_capability_gap(
         monkeypatch, tmp_path):
-    """POLICY IS UNCHANGED, and this test exists to prove it.
+    """THE POLICY WAS REOPENED AND DECIDED (plan row, 2026-09-11 evening).
 
-    The reverted change made a planned title pass through. This one does not:
-    classification shipped alone. When the policy question is reopened, THIS is
-    the test that has to be deliberately rewritten -- which is the point of
-    pinning it now."""
+    This test used to pin the opposite -- "classification shipped alone; a
+    planned title still refuses on a capability gap" -- and said it would have
+    to be deliberately rewritten when the policy question was reopened. It was:
+    under the bar ("only an OOM should fail"; never reduce what reaches
+    otr/obs) a PROBE-CONFIRMED host gap passes the clean master through, LOUD,
+    with the missing title card named in the receipt. An UNCLASSIFIED burn
+    failure with a planned title still refuses (tests/test_section3_bar_policies.py)."""
     monkeypatch.setattr(
         burn_mod, "_parse_title_plan",
         lambda _j: ({"card": "x"}, "plan: 1 card"))
@@ -121,17 +124,19 @@ def test_a_PLANNED_TITLE_still_refuses_on_a_capability_gap(
                         lambda **k: None, raising=False)
 
     node = burn_mod.OTRCaptionBurn()
-    with pytest.raises(RuntimeError, match="hero title card was planned"):
-        node.burn(
-            video_path="/out/otr/episodes/ep/final.mp4",
-            ledger_path="",
-            output_path="/out/otr/episodes/ep/final_captioned.mp4",
-            burn_captions=True,
-            caption_style="",
-            fps=24,
-            ffmpeg="",
-            title_card_plan_json='{"card": "x"}',
-        )
+    out, report = node.burn(
+        video_path="/out/otr/episodes/ep/final.mp4",
+        ledger_path="",
+        output_path="/out/otr/episodes/ep/final_captioned.mp4",
+        burn_captions=True,
+        caption_style="",
+        fps=24,
+        ffmpeg="",
+        title_card_plan_json='{"card": "x"}',
+    )
+    assert out == "/out/otr/episodes/ep/final.mp4", \
+        "the clean master passes through; the episode is never lost to the host's shape"
+    assert "capability gap" in report and "title card NOT burned" in report, report
 
 
 def test_the_probe_is_actually_WIRED(monkeypatch):

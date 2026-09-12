@@ -139,6 +139,23 @@
     panel at "is this function correct", and section 9's rule still stands: do
     not burn a scalpel on a screw.
 
+- **ONE REVIEWER PER BIG DECISION; SONNET FANS OUT FOR QA AND PLANS; ULTRACODE AS
+  NEEDED (operator directive 2026-09-11 evening).** Operator: *"strategically call
+  on /kibitz codex and cursor and opus for big decisions (only pick ONE per big
+  decision) and remember Sonnet fan-outs for post-code QA or complex coding
+  plans"*; *"yes you can ultracode as needed."*
+  * **A big decision gets ONE contrarian** -- codex, cursor or an Opus subagent,
+    whichever fits the decision (file-grounded code claims -> codex/cursor; a
+    judgment between documents -> Opus). Not all three by default.
+  * **Sonnet fan-outs** ground a complex coding plan across many files and run
+    the post-code QA on the finished diff.
+  * **Ultracode / workflows** are opted in: use them for fan-out grounding and
+    adversarial verification, never for a one-file edit.
+  * **The exception, earned once:** an item the operator names must-not-fail
+    ("we want shakespeare to be rock solid") gets codex + cursor + Opus IN
+    PARALLEL on the design round -- on 2026-09-11 each found something the other
+    two missed -- then one contrarian on the diff by execution, Sonnet QA, and a
+    live leg on the FINAL tree. State the roster exactly in the receipt.
 - **A HELPER IS WIRED IN THE SAME CHANGE THAT BUILDS IT, OR THE ROW SAYS WHY NOT
   (measured 2026-09-11 -- FOUR instances found in one day).** Correct, tested code
   that nothing calls is this repo's most repeated defect, and it is invisible to

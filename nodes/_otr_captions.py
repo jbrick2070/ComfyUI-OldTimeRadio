@@ -466,6 +466,8 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         # Reachable, and it used to be silent: this (None, reason) becomes a
         # ValueError in burn_captions_on_video, which the node caught and turned
         # into a clean-master passthrough -- dropping the title with no error.
+        # With a PLANNED title that ValueError now REFUSES (an unclassified
+        # failure); only a probe-confirmed host capability gap passes through.
         return (None, f"unknown style {style!r}; choices: {sorted(STYLES)}")
     mv = int(margin_v) if margin_v is not None else int(st["margin_v"])
 

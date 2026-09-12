@@ -7,8 +7,11 @@ untouched, and ``burn_captions`` DEFAULTS TO FALSE:
   2. no timed ledger resolves
   3. the caption style is unknown       -- (None, reason) -> ValueError -> caught
   4. the ledger has no speech lines     -- same route
-  5. any other ValueError from the burn -- ffmpeg missing, input missing, the
-     ffmpeg call itself failing
+  5. any other ValueError from the burn -- input missing, the ffmpeg call
+     itself failing. (A MISSING ffmpeg, or one without libass, is a
+     CLASSIFIED capability gap since 2026-09-11 and passes the clean master
+     through even with a planned title -- the host's shape, not the
+     episode's fault; pinned in tests/test_section3_bar_policies.py.)
 
 All five were harmless while the title was baked into procgen pixels. The moment
 the title lives ONLY in the ASS, each one publishes an episode with NO TITLE and
@@ -34,6 +37,7 @@ pytest.importorskip("PIL")
 
 from nodes._otr_captions import (TitlePlanError, build_ass_from_ledger,  # noqa: E402
                                  title_events_from_plan)
+from nodes import otr_caption_burn as burn_mod  # noqa: E402
 from nodes.otr_caption_burn import OTRCaptionBurn  # noqa: E402
 from nodes.video_engine import _CRTRenderer  # noqa: E402
 
@@ -69,18 +73,31 @@ def test_no_plan_still_passes_through_when_captions_are_off():
     assert "passthrough" in report.lower()
 
 
-def test_a_plan_burns_even_though_captions_are_off(plan_json, tmp_path):
+def test_a_plan_burns_even_though_captions_are_off(plan_json, tmp_path,
+                                                   monkeypatch):
     """The title is NOT a caption. It must not inherit the caption on/off widget.
 
-    ffmpeg is absent here, so the burn fails -- the point is WHICH failure: a
-    refusal, never the silent clean-master passthrough that exit 1 used to give.
+    The burn is made to fail with an UNCLASSIFIED error, so the host is
+    irrelevant: this test used to lean on ffmpeg being absent, which it is not
+    on the 5080 (the refusal fired there for an unrelated reason) and which,
+    on a box without it, is now a classified capability gap that passes the
+    clean master through -- a different contract, pinned elsewhere. The point
+    is that the burn is ATTEMPTED with captions off, and WHICH failure follows:
+    a refusal, never the silent clean-master passthrough that exit 1 used to
+    give.
     """
     vid = tmp_path / "ep_silent.mp4"
     vid.write_bytes(b"\x00\x00")
+    attempts = []
+
+    def _attempted(*args, **kwargs):
+        attempts.append((args, kwargs))
+        raise ValueError("OTR_CaptionBurn: ffmpeg ass-burn failed :: exit 1")
+    monkeypatch.setattr(burn_mod, "burn_captions_on_video", _attempted)
     with pytest.raises(RuntimeError, match="hero title card was planned"):
         OTRCaptionBurn().burn(str(vid), burn_captions=False,
-                              ffmpeg="definitely-not-a-real-ffmpeg-binary",
                               title_card_plan_json=plan_json)
+    assert attempts, "a planned title must be burned even with captions OFF"
 
 
 # ---------------------------------------------------------------------------
@@ -154,7 +171,15 @@ def test_a_title_only_burn_writes_its_ass_beside_the_episode_not_into_the_cwd(
 # EXIT 3 -- the unknown style, the fifth exit a third reviewer found
 # ---------------------------------------------------------------------------
 
-def test_an_unknown_style_refuses_instead_of_dropping_the_title(plan_json, tmp_path):
+def test_an_unknown_style_refuses_instead_of_dropping_the_title(
+        plan_json, tmp_path, monkeypatch):
+    """The style lookup sits AFTER the capability probe inside the burn, so on
+    a box without ffmpeg/libass the probe would classify a gap first and pass
+    the clean master through. The probe is answered "no gap" here so the
+    unknown style is what fails, on every host."""
+    from nodes._otr_shared import ffmpeg as ffmpeg_boundary
+    monkeypatch.setattr(burn_mod, "_ffmpeg_bin", lambda _widget: "ffmpeg")
+    monkeypatch.setattr(ffmpeg_boundary, "caption_support_gap", lambda _bin: None)
     vid = tmp_path / "ep_silent.mp4"
     vid.write_bytes(b"\x00\x00")
     with pytest.raises(RuntimeError, match="hero title card was planned"):

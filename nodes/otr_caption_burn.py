@@ -579,6 +579,26 @@ class OTRCaptionBurn:
                 video_path, led, out, style=style, fps=int(fps), ffmpeg=ffmpeg,
                 title_plan=title_plan,
             )
+        except CaptionCapabilityGapError as exc:
+            # A PROBE-CONFIRMED capability gap (no ffmpeg, or an ffmpeg with no
+            # libass / drawtext) is the HOST'S shape, not this episode's fault,
+            # and it cannot be repaired by refusing. Under the bar ("only an OOM
+            # should fail"; never reduce what reaches otr/obs) the clean master
+            # passes through even when a title card was planned -- LOUD, named,
+            # and receipted in the return string so the lane can phone it home.
+            # The generic ValueError branch below keeps refusing a title-less
+            # master on an UNCLASSIFIED burn failure, exactly as before.
+            log.error(
+                "[OTR_CaptionBurn] CAPABILITY GAP on this host -- %s; passthrough "
+                "of the clean master%s. Fix the host (ffmpeg with libass), not "
+                "the episode.",
+                exc, " WITHOUT the planned title card" if title_required else "",
+            )
+            return (
+                video_path,
+                f"OTR_CaptionBurn: capability gap ({exc}); passthrough (clean "
+                f"master{', title card NOT burned' if title_required else ''})",
+            )
         except ValueError as exc:
             if title_required:
                 # REFUSE. The alternative is a published episode with no title

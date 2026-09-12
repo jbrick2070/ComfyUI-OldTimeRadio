@@ -28,13 +28,15 @@ label rather than the samples. That is precisely the silent-wrong case the chang
 claimed to avoid. It now CONVERTS OR RAISES, and `MemoryError` propagates untouched
 so resource death stays loud.
 
-NOT IN THIS FILE ANY MORE: the caption-burn title-card refusal. It was changed to
-degrade, and the change was REVERTED the same hour -- that branch catches every
-ValueError, including an unknown caption style, where refusing is correct because a
-misconfiguration would otherwise ship untitled episodes forever in silence. Making it
-degrade only on a platform-capability gap needs a classification that does not exist
-yet, which is a design choice with more than one defensible answer. See the
-GO_FORWARD row.
+NOT IN THIS FILE: the caption-burn title-card policy. A first attempt made a
+planned title degrade on ANY ValueError and was reverted the same hour -- an
+unknown caption style is a misconfiguration that would ship untitled episodes
+forever in silence. The classification that separates the two shipped later
+(`CaptionCapabilityGapError`, 2026-09-11) and the policy was decided that evening:
+a PROBE-CONFIRMED host gap (no ffmpeg, no libass) passes the clean master
+through even with a planned title; an unclassified failure still refuses.
+Pinned in tests/test_section3_bar_policies.py and
+tests/test_caption_failures_are_classified.py.
 """
 from __future__ import annotations
 
