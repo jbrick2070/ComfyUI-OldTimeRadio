@@ -14724,3 +14724,79 @@ relationship between cues that the mix depends on. Receipted per cue.
 
 **Verify:** `tests/test_music_render_receipt.py`; re-measure the cue stems of the
 next canonical episode -- peak at or under -1.00 dBFS with zero clipped samples.
+
+## PBUG-20260912-03 -- the music ran a guidance its own checkpoint cannot answer (fixed this push)
+
+**Artifact:** `shrieking_walls_of_iastrae_20260912_015033`, published to `otr/obs`.
+Operator, watching it: *"levels good but still squally tapy ting here ... around
+47 but not at opening ... i guess i still think something wrong sounds like an
+odd tape loop scratch."* Measured at 46.6-47.0 s of the master, inside the
+closing cue stem at 2.05-2.45 s: a 400 ms burst, spectral flatness 0.002 -> 0.35,
+energy above 4 kHz 0.000 -> 0.57, full bandwidth to 22 kHz on the spectrogram,
+peak pinned at the -1 dBFS cue ceiling, **and the RMS unmoved**. A timbre event,
+not a level event, sitting on top of music that continues underneath it.
+
+**Cause:** Stability ships every Stable Audio 3 model in a BASE and a
+POST-TRAINED form. Their inference guide lists `small-music` -- the file this
+pack loads -- as post-trained, and puts `cfg_scale` and `negative_prompt` under
+a "Base models only" note: *"these parameters have no effect on post-trained
+checkpoints"*. ComfyUI does not know that; it drops the unconditional branch
+only when cfg is exactly 1.0, so at 7.0 it applies a sevenfold extrapolation off
+a branch the post-training collapsed. A few latent frames land off the manifold
+and the decoder renders them as broadband noise.
+
+Two consequences, both of which had been read as separate mysteries. The pack's
+entire anti-loop negative prompt -- the lever measured on 2026-09-12 as the
+biggest single improvement -- was INERT on this checkpoint. And lengthening the
+negative made the artifact WORSE, 11 bursts to 47 over the same four control
+pieces, which is the opposite of a working negative prompt and exactly what an
+off-manifold uncond branch does.
+
+**Measured, 65 renders against the live server on four fixed organ pieces**
+(an organ is sustained and has no transients of its own, so anything broadband
+came from the model):
+
+| checkpoint | cfg | renders | bursts |
+|---|---|---|---|
+| small_music (post-trained) | 7.0 | 17 | 74 |
+| small_music (post-trained) | 1.0 | 16 | 0 |
+| small_music_base (base) | 1.0-6.0 | 24 | 0 |
+| small_music_base (base) | 7.0 | 8 | 2 |
+
+**Fix:** the engine resolves a checkpoint it can steer and a guidance that
+checkpoint supports. The BASE file is preferred when present, because that is
+the only place the negative prompt is live; cfg follows the checkpoint (4.0 for
+base, measured clean with the healthiest peak; 1.0 for post-trained, its
+documented default and the only value ComfyUI stops extrapolating at). An
+install holding only the post-trained file downloads nothing and simply gets
+the quieter guidance.
+
+**Verify:** `tests/test_music_prompts_are_musical.py`; and the canonical A/B,
+one leg each, same profile and act count --
+`signal_lost_the_borrowed_voice_20260912_023252` (post-trained, cfg 7) carries
+2 bursts in its opening cue, and `signal_lost_the_jars_secret_20260912_024354`
+(base, cfg 4) carries **zero in either cue**, both published to `otr/obs`.
+
+## PBUG-20260912-04 -- the cue placement knob never reached the model
+
+**Artifact:** every SA3 music cue this pack has ever rendered. The render
+receipt records `seconds_start` per cue, the server log prints it, and
+`_sa3_clip_window` computes it from the cue's role -- an outro at the TAIL of
+its window, an intro at the HEAD.
+
+**Cause:** `StableAudio3.extra_conds` in ComfyUI's `comfy/model_base.py` embeds
+`seconds_total` and nothing else. Only the older `StableAudio1` class has a
+`seconds_start` embedder, and this checkpoint carries no such tensor at all. The
+placement half of the window has therefore never reached the model. It was
+computed, sent, logged and written into a receipt, all describing something that
+did not happen -- which is worse than doing nothing, because two nights of
+reasoning about opening-versus-closing behaviour leaned on it.
+
+**Fix:** the value is still sent, because the node takes it and a future
+checkpoint may read it, but nothing claims it worked: the log says
+`(IGNORED by SA3)` and the receipt carries `seconds_start_read_by_model: false`.
+The live lever is `seconds_total`, the other half of the same function.
+
+**Verify:** `tests/test_music_prompts_are_musical.py::test_the_placement_knob_does_not_claim_to_have_reached_the_model`,
+and `comfy/model_base.py` -- `StableAudio3.extra_conds` reads `seconds_total`
+only, against `StableAudio1` at the same file's lines 805-835.

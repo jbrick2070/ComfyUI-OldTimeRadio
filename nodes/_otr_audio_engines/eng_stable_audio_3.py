@@ -32,7 +32,32 @@ except ImportError:  # pragma: no cover -- flat test imports
 log = logging.getLogger("OTR")
 
 # Default model files in ComfyUI's models/ tree (Comfy-Org/stable-audio-3).
-_CKPT = otr_env.get("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
+#
+#: THE BASE CHECKPOINT IS PREFERRED, AND THE REASON IS THE NEGATIVE PROMPT
+#: (measured 2026-09-12, 65 renders). Stability ships each model in a BASE
+#: and a POST-TRAINED form and documents that `cfg_scale` and
+#: `negative_prompt` "have no effect on post-trained checkpoints". Every
+#: anti-loop word this pack spent a campaign writing lives in the negative
+#: prompt, so on a post-trained checkpoint that work is inert -- and worse,
+#: ComfyUI still applies the guidance (it drops the uncond branch only at
+#: cfg 1.0), extrapolating off a branch the post-training collapsed. The
+#: result is the broadband burst the operator hears as "an odd tape loop
+#: scratch": 74 bursts in 17 renders of the shipped combination against 2
+#: in 48 renders of every other one.
+#:
+#: So: take the base file when it is on disk, and fall back to whatever is
+#: there otherwise. An existing install downloads nothing and still gets a
+#: clean cue, because the cfg below follows the checkpoint.
+_CKPT_PREFERENCE = ("stable_audio_3_small_music_base.safetensors",
+                    "stable_audio_3_small_music.safetensors")
+#: A base checkpoint can be steered, so it gets real guidance: 4.0 measured
+#: clean across a 1.0-6.0 sweep with the healthiest peak (-2.2 dBFS). A
+#: post-trained one cannot, so it gets the value its own publisher
+#: documents, which is also the only value ComfyUI turns the extrapolation
+#: off at.
+_CFG_FOR_BASE = 4.0
+_CFG_FOR_POST_TRAINED = 1.0
+_CKPT = otr_env.get("OTR_SA3_CKPT", "")
 _TENC = otr_env.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
 _CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 
@@ -98,6 +123,37 @@ def _env_int(name, default):
 #: arm and exactly what makes it wrong to ship, so it warns every time it
 #: is used and the invariant below is claimed only at the default.
 _SA3_MIN_CONTEXT_RATIO_DEFAULT = 3.0
+
+
+#: SA3 NEVER READS `seconds_start`. VERIFIED IN THE RUNTIME, 2026-09-12:
+#: `StableAudio3.extra_conds` (comfy/model_base.py) embeds `seconds_total` and
+#: nothing else, and the checkpoint carries no seconds_start embedder at all --
+#: only the older `StableAudio1` class has one (model_base.py:805-835). So the
+#: placement half of `_sa3_clip_window` -- "an outro sits at the TAIL, an intro
+#: at the HEAD" -- has never reached this model. It is computed, sent, logged
+#: and written into the render receipt, describing something that did not
+#: happen.
+#:
+#: It is still SENT, because ComfyUI's ConditioningStableAudio node takes the
+#: argument and a future checkpoint may read it. What changes is that nothing
+#: CLAIMS it worked: the log says it is ignored and the receipt records it as
+#: ignored, so a reader chasing the music never again reasons from a field that
+#: describes nothing. The lever that IS live is `seconds_total`, the other half
+#: of the same function.
+_SA3_READS_SECONDS_START = False
+
+
+def _sa3_guidance(is_base: bool) -> float:
+    """The guidance this checkpoint can actually answer.
+
+    A BASE checkpoint is trained with classifier-free guidance and a negative
+    prompt, so it gets real guidance. A POST-TRAINED one is documented by its
+    publisher as ignoring both -- and ComfyUI only stops extrapolating off the
+    unconditional branch at exactly 1.0, so anything else there is a 7x pull
+    off a branch the post-training collapsed. That is the broadband burst.
+    """
+    return _env_float("OTR_SA3_CFG",
+                      _CFG_FOR_BASE if is_base else _CFG_FOR_POST_TRAINED)
 
 
 def _sa3_context_ratio() -> float:
@@ -173,10 +229,30 @@ class StableAudio3Engine:
             ) from exc
         return comfy_nodes, audio_nodes
 
+    @staticmethod
+    def resolve_ckpt():
+        """The checkpoint this render will use, and whether it is a BASE one.
+
+        An explicit ``OTR_SA3_CKPT`` always wins -- that is how the A/B
+        harness moves the variable. Otherwise the base file is taken when it
+        is on disk and the post-trained one when it is not, so an install
+        that never downloads anything keeps rendering.
+        """
+        if _CKPT:
+            return _CKPT, _CKPT.endswith("_base.safetensors")
+        try:
+            import folder_paths
+            for name in _CKPT_PREFERENCE:
+                if folder_paths.get_full_path("checkpoints", name):
+                    return name, name.endswith("_base.safetensors")
+        except Exception:  # noqa: BLE001 -- resolution never costs a render
+            pass
+        return _CKPT_PREFERENCE[-1], False
+
     def _ckpt_present(self):
         try:
             import folder_paths
-            return folder_paths.get_full_path("checkpoints", _CKPT)
+            return folder_paths.get_full_path("checkpoints", self.resolve_ckpt()[0])
         except Exception:
             return None
 
@@ -186,11 +262,18 @@ class StableAudio3Engine:
         if self._ckpt_present() is None:
             raise EngineUnusable(
                 self.name, "music", EngineUsabilityReason.MISSING_MODEL,
-                "SA3 checkpoint %r not found in ComfyUI/models/checkpoints -- "
-                "fetch Comfy-Org/stable-audio-3 (ungated) first" % _CKPT,
+                "no SA3 checkpoint found in ComfyUI/models/checkpoints -- "
+                "fetch Comfy-Org/stable-audio-3 (ungated) first. Either %s "
+                "works; the first is preferred because its negative prompt "
+                "is live." % " or ".join(_CKPT_PREFERENCE),
             )
         comfy_nodes, _ = self._native()
-        model, clip, vae = comfy_nodes.CheckpointLoaderSimple().load_checkpoint(_CKPT)
+        name, is_base = self.resolve_ckpt()
+        log.info("[OTR.sa3] checkpoint %s (%s; guidance %s)", name,
+                 "base -- negative prompt is live" if is_base
+                 else "post-trained -- negative prompt is inert, per Stability",
+                 _CFG_FOR_BASE if is_base else _CFG_FOR_POST_TRAINED)
+        model, clip, vae = comfy_nodes.CheckpointLoaderSimple().load_checkpoint(name)
         # SA3 ships t5gemma separately; if the checkpoint did not carry a usable
         # conditioner, load it explicitly. Defensive: prefer the bundled clip.
         if clip is None:
@@ -263,7 +346,10 @@ class StableAudio3Engine:
         neg_text = (otr_env.get("OTR_SA3_NEG_PROMPT") or negative_prompt
                     or NEGATIVE_PROMPT_DEFAULT)
         steps = _env_int("OTR_SA3_STEPS", 100)
-        cfg = _env_float("OTR_SA3_CFG", 7.0)
+        # THE GUIDANCE FOLLOWS THE CHECKPOINT. A constant here is what put
+        # a 7x extrapolation on a model that cannot answer one.
+        ckpt_name, is_base = self.resolve_ckpt()
+        cfg = _sa3_guidance(is_base)
         sampler = otr_env.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
         scheduler = otr_env.get("OTR_SA3_SCHEDULER", "exponential")
         denoise = _env_float("OTR_SA3_DENOISE", 1.0)
@@ -279,9 +365,10 @@ class StableAudio3Engine:
         audio = audio_nodes.VAEDecodeAudio().decode(vae, sampled)[0]
         # traceability for A/B listens (no determinism impact)
         _phash = hashlib.blake2s((pos_text + "||" + neg_text).encode()).hexdigest()[:8]
-        log.info("[OTR.sa3] cue_window start=%.1fs total=%.1fs dur=%.1fs seed=%d "
+        log.info("[OTR.sa3] cue_window start=%.1fs%s total=%.1fs dur=%.1fs seed=%d "
                  "steps=%d cfg=%.1f sampler=%s/%s prompt_hash=%s",
-                 seconds_start, seconds_total, dur, seed, steps, cfg,
+                 seconds_start, "" if _SA3_READS_SECONDS_START else " (IGNORED by SA3)",
+                 seconds_total, dur, seed, steps, cfg,
                  sampler, scheduler, _phash)
         # native AUDIO dict already carries {"waveform","sample_rate"}.
         sr = int(audio.get("sample_rate", self.sample_rate))
@@ -298,7 +385,19 @@ class StableAudio3Engine:
                             "negative_prompt": str(neg_text),
                             "denoise": float(denoise),
                             "context_ratio": _sa3_context_ratio(),
+                            # WHICH MODEL MADE THIS CUE. The family ships a
+                            # small variant its own publisher describes as
+                            # "on-device-friendly loops" and a medium one
+                            # built for "stronger structure and musicality";
+                            # a receipt that does not say which one played
+                            # cannot answer the operator's question about
+                            # the music, and the A/B harness refuses to
+                            # measure an arm it cannot attribute.
+                            "ckpt": str(ckpt_name),
                             "seconds_start": float(seconds_start),
+                            # Recorded so the receipt cannot be read as proof
+                            # that the placement reached the model. It did not.
+                            "seconds_start_read_by_model": _SA3_READS_SECONDS_START,
                             "seconds_total": float(seconds_total),
                             "duration_s": float(dur), "seed": int(seed),
                             "prompt_hash": _phash}}

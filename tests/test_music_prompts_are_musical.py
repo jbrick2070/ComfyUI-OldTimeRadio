@@ -277,3 +277,95 @@ def test_every_music_adapter_accepts_placement_and_negative_prompt(module, cls):
         params = inspect.signature(klass.generate_clip).parameters
         assert params["placement"].kind is inspect.Parameter.KEYWORD_ONLY, klass
         assert params["negative_prompt"].kind is inspect.Parameter.KEYWORD_ONLY, klass
+
+
+# --------------------------------------------------------------------------- #
+# the guidance follows the checkpoint (measured 2026-09-12, 65 renders)
+# --------------------------------------------------------------------------- #
+def test_a_post_trained_checkpoint_never_gets_a_guidance_it_cannot_answer(monkeypatch):
+    """THE SCRATCH, AND WHY IT HAPPENED. Stability ships each Stable Audio 3
+    model in a BASE and a POST-TRAINED form and documents that `cfg_scale` and
+    `negative_prompt` "have no effect on post-trained checkpoints". ComfyUI
+    drops the unconditional branch only at cfg 1.0, so at 7.0 it extrapolates
+    sevenfold off a branch the post-training collapsed, and a few latent frames
+    land off the manifold. Measured: 74 bursts in 17 renders of that
+    combination against 2 in 48 renders of every other one.
+
+    Every anti-loop word this pack wrote lives in the negative prompt, so the
+    base file is preferred when it exists -- that is the only place the work is
+    live."""
+    engine = SA3.StableAudio3Engine
+    assert SA3._CKPT_PREFERENCE[0].endswith("_base.safetensors"), "base is preferred"
+    assert SA3._CFG_FOR_POST_TRAINED == 1.0, (
+        "the only value ComfyUI turns the extrapolation off at")
+    assert SA3._CFG_FOR_BASE > 1.0, "a base checkpoint can be steered"
+
+    # an explicit override always wins -- that is how the A/B harness moves it
+    monkeypatch.setattr(SA3, "_CKPT", "stable_audio_3_medium_base.safetensors")
+    assert engine.resolve_ckpt() == ("stable_audio_3_medium_base.safetensors", True)
+    monkeypatch.setattr(SA3, "_CKPT", "stable_audio_3_small_music.safetensors")
+    assert engine.resolve_ckpt() == ("stable_audio_3_small_music.safetensors", False)
+
+
+def test_an_install_with_only_the_post_trained_file_still_renders(monkeypatch):
+    """Nobody has to download anything. A box that has only the file it always
+    had keeps working and simply gets the quieter guidance."""
+    monkeypatch.setattr(SA3, "_CKPT", "")
+    import sys
+    import types
+    fake = types.ModuleType("folder_paths")
+    fake.get_full_path = lambda kind, name: (
+        r"C:\models\%s" % name if name == SA3._CKPT_PREFERENCE[-1] else None)
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
+    assert name == SA3._CKPT_PREFERENCE[-1] and is_base is False
+
+    # and when the base file IS there, it wins
+    fake.get_full_path = lambda kind, name: r"C:\models\%s" % name
+    name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
+    assert name == SA3._CKPT_PREFERENCE[0] and is_base is True
+
+
+def test_resolution_never_raises_when_comfy_is_absent(monkeypatch):
+    """This runs inside a render and off it; an import that is not there is not
+    a reason to lose an episode."""
+    monkeypatch.setattr(SA3, "_CKPT", "")
+    import sys
+    monkeypatch.setitem(sys.modules, "folder_paths", None)
+    name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
+    assert name == SA3._CKPT_PREFERENCE[-1] and is_base is False
+
+
+def test_the_guidance_a_checkpoint_gets_is_the_one_it_can_answer(monkeypatch):
+    """The mechanism, callable. A constant here is what put a sevenfold
+    extrapolation on a model whose publisher documents that guidance does
+    nothing -- and it is the one combination, of four measured, that makes the
+    scratch."""
+    monkeypatch.delenv("OTR_SA3_CFG", raising=False)
+    assert SA3._sa3_guidance(True) == SA3._CFG_FOR_BASE
+    assert SA3._sa3_guidance(False) == SA3._CFG_FOR_POST_TRAINED
+    assert SA3._sa3_guidance(True) != SA3._sa3_guidance(False), (
+        "the whole point is that they differ")
+    # the operator's override still wins on both
+    monkeypatch.setenv("OTR_SA3_CFG", "6.5")
+    assert SA3._sa3_guidance(True) == 6.5 and SA3._sa3_guidance(False) == 6.5
+
+
+def test_the_placement_knob_does_not_claim_to_have_reached_the_model():
+    """VERIFIED IN THE RUNTIME, 2026-09-12. `StableAudio3.extra_conds` in
+    comfy/model_base.py embeds `seconds_total` and nothing else; the checkpoint
+    has no seconds_start embedder, and only the older StableAudio1 class carries
+    one. So "an outro sits at the TAIL, an intro at the HEAD" has never reached
+    this model -- it was computed, sent, logged and receipted all the same.
+
+    The value still goes to the node, because the node takes it and a future
+    checkpoint may read it. What must never happen again is a log line or a
+    receipt field that lets a reader believe it worked."""
+    assert SA3._SA3_READS_SECONDS_START is False
+    body = inspect.getsource(SA3.StableAudio3Engine.generate_clip)
+    assert "IGNORED by SA3" in body, "the log tells the truth"
+    assert '"seconds_start_read_by_model": _SA3_READS_SECONDS_START' in body, (
+        "the receipt tells the truth")
+    # and the window is still computed and still sent -- this is a truth fix,
+    # not a removal
+    assert "seconds_start, seconds_total = _sa3_clip_window(" in body

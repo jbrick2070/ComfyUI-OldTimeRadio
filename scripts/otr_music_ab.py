@@ -390,7 +390,8 @@ _RECEIPT_FIELDS = {"OTR_SA3_SAMPLER": "sampler",
                    "OTR_SA3_CFG": "cfg",
                    "OTR_SA3_DENOISE": "denoise",
                    "OTR_SA3_NEG_PROMPT": "negative_prompt",
-                   "OTR_SA3_CONTEXT_RATIO": "context_ratio"}
+                   "OTR_SA3_CONTEXT_RATIO": "context_ratio",
+                   "OTR_SA3_CKPT": "ckpt"}
 
 
 def _safe_cue_name(cue_id) -> str:

@@ -1,3 +1,69 @@
+## 2026-09-12 (small hours) -- the music was running a guidance its model cannot answer
+
+**His words, watching the episode:** *"levels good but still squally tapy ting
+here ... around 47 but not at opening"*, then *"i guess i still think something
+wrong sounds like an odd tape loop scratch"*, then *"make a fun musical organ
+side project and see if you can get it clean."*
+
+**The organ side project IS the instrument that found it.** An organ is
+sustained and has no transients of its own, so anything broadband in the output
+came from the model. Four fixed organ pieces, rendered 65 times across four
+recipes against the live server, separate the cause completely: the shipped
+combination is the ONLY one that makes the scratch -- 74 bursts in 17 renders,
+against 2 in the 48 renders of every other arm.
+
+**The cause, and Stability documents it.** Every Stable Audio 3 model ships in a
+BASE and a POST-TRAINED form. `small_music`, the file this pack loads, is
+post-trained, and their inference guide puts `cfg_scale` and `negative_prompt`
+under a "Base models only" note: *"these parameters have no effect on
+post-trained checkpoints."* ComfyUI drops the unconditional branch only at
+cfg 1.0, so at 7.0 it extrapolates sevenfold off a branch the post-training
+collapsed, and a few latent frames land off the manifold as broadband noise.
+
+**Two mysteries collapse into that one fact.** The anti-loop negative prompt --
+the biggest measured lever of the previous night -- was INERT on this
+checkpoint, which is why cues kept looping while the text forbade it. And
+lengthening the negative made the burst WORSE (11 to 47 over the same four
+pieces), the opposite of a working negative prompt and exactly what an
+off-manifold uncond branch does.
+
+**Fixed:** the engine now prefers the BASE checkpoint when it is on disk,
+because that is the only place the negative prompt is live, and the guidance
+follows the checkpoint -- 4.0 for base (clean across a 1.0-6.0 sweep, healthiest
+peak at -2.2 dBFS), 1.0 for post-trained (its documented default). An install
+that has only the old file downloads nothing and gets the quieter guidance.
+PBUG-20260912-03.
+
+**And a dead knob, found by the adversarial fan-out and verified by hand:**
+`StableAudio3.extra_conds` reads `seconds_total` and nothing else. Only the
+older `StableAudio1` class has a `seconds_start` embedder, and this checkpoint
+carries no such tensor. So "an outro sits at the TAIL, an intro at the HEAD"
+has never reached this model, while being computed, sent, logged and receipted.
+It still ships the value, but the log now says `(IGNORED by SA3)` and the
+receipt carries `seconds_start_read_by_model: false`. PBUG-20260912-04.
+
+**A confound worth remembering:** a burst mechanically LOWERS the loopiness
+score, because a broadband transient decorrelates the loudness envelope.
+Renders carrying a burst averaged 0.157 where clean ones averaged 0.510. Some of
+the previous night's celebrated loopiness drop was measuring artifacts, not
+music. The two numbers have to be read together.
+
+**Proof on the canonical path, one leg each, same profile and act count:**
+`signal_lost_the_borrowed_voice_20260912_023252` (post-trained, cfg 7) carries
+2 bursts in its opening cue; `signal_lost_the_jars_secret_20260912_024354`
+(base, cfg 4) carries **zero in either cue**. Both published to `otr/obs`.
+
+**Reviewers:** a 71-agent adversarial workflow refuted every theory it generated
+-- including two of mine -- and its one surviving contribution was the dead-knob
+proof, which was then verified by hand against `comfy/model_base.py`. The
+measurement, not the panel, settled the cause. 31 neuter mechanisms, 31 of 31
+red. Suite failure identities a strict subset of the pushed head (52 of 55).
+
+**Pending for the operator:** listen to `the_jars_secret` against
+`the_borrowed_voice` and say whether the scratch is gone. The medium base
+checkpoint (8.6 GB, "stronger structure and musicality") is now on disk and
+untested -- it is the next arm.
+
 ## 2026-09-12 (early hours) -- the loop, the render-killer, and a harness that cannot lie
 
 **His verdict on the newest episode:** *"like it went a bit crazy on a loop a loop

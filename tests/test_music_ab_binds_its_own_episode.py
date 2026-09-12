@@ -255,3 +255,17 @@ def test_a_defaults_arm_after_a_recipe_arm_boots_a_clean_server(monkeypatch, tmp
     assert booted == [], "the first defaults arm inherits a clean resident server"
     AB.run_arm("shipped", {}, _Args(), server_is_dirty=True)
     assert booted == [{}], "after a recipe arm it boots its own, with no overrides"
+
+
+def test_the_checkpoint_is_provable_so_a_model_swap_can_be_measured(tmp_path):
+    """The family ships a SMALL variant its publisher calls "on-device-friendly
+    loops" and a MEDIUM one built for "stronger structure and musicality". That
+    swap is the biggest single lever available on the operator's music
+    complaint, and the harness refused to measure it until the engine recorded
+    which model played -- which is the refusal working as designed."""
+    episode = _episode(tmp_path, "ep_20260912_030101",
+                       receipt={"ckpt": "stable_audio_3_medium.safetensors"})
+    assert AB.receipt_matches(
+        episode, {"OTR_SA3_CKPT": "stable_audio_3_medium.safetensors"})
+    assert not AB.receipt_matches(
+        episode, {"OTR_SA3_CKPT": "stable_audio_3_small_music.safetensors"})
