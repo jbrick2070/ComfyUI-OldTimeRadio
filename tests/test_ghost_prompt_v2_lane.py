@@ -172,13 +172,15 @@ def test_the_preflight_and_the_durable_row_see_one_object(monkeypatch):
     original = sl._assert_family_inputs_satisfiable_cast_time
 
     def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
-             ghost_prompts=None):
+             ghost_prompts=None, ghost_subjects=None):
         if ghost_prompts:
             key = str(beat.get("beat_id") or "")
             if key in ghost_prompts:
                 seen[key] = copy.deepcopy(ghost_prompts[key])
+        # Half B added a seventh positional argument; a double that cannot
+        # accept the real call signature is an out-of-date double.
         return original(engine_name, beat, ledger, policy, subject_sigils,
-                        ghost_prompts)
+                        ghost_prompts, ghost_subjects)
 
     monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
     _led, shots = _plan()
@@ -606,3 +608,124 @@ def test_writer_mixed_with_replay_uses_the_same_admission_signatures():
     assert source == 'deterministic_fallback'
     assert 'same prompt' in reason
     assert _signatures(specs[1:2], leaves)[0] not in replay.values()
+
+# --------------------------------------------------------------------------- #
+# Half B (2026-09-11): the authored subject rides beside the object on replay.
+# These drive build_execution_plan for real; the Half B test file covers the
+# pure helpers, and the round-2 contrarian was right that helpers and source
+# strings cannot prove replay.
+# --------------------------------------------------------------------------- #
+
+def test_a_stored_subject_REPLAYS_beside_its_object_on_a_second_pass():
+    """A hash-matched row carries its subject forward without regeneration."""
+    led, shots = _plan()
+    stamped = 0
+    for shot in shots:
+        if shot.get("ghost_prompt") and shot.get("role") == "character_video":
+            shot["ghost_subject"] = "ledger"
+            stamped += 1
+    assert stamped, "fixture has no character Ghost beat to stamp"
+
+    led2 = copy.deepcopy(led)
+    _led2, replayed = _plan(ledger=led2)
+    carried = [s for s in replayed if s.get("ghost_subject") == "ledger"]
+    assert len(carried) == stamped, (
+        "%d subject(s) stamped, %d replayed" % (stamped, len(carried)))
+    # The SOURCE is not this test's claim: a deterministic row keeps
+    # "deterministic_fallback" on replay, exactly as the test two above pins.
+    # What this test proves is that the subject rode beside the object.
+
+
+def test_a_LEGACY_row_with_no_subject_stays_without_one():
+    """Absence is the honest state and must not be filled in on replay."""
+    led, _shots = _plan()
+    assert all("ghost_subject" not in s for s in led["video"]["shots"]), (
+        "the deterministic author must not mint subjects it never ranked")
+    _led2, replayed = _plan(ledger=copy.deepcopy(led))
+    assert all("ghost_subject" not in s for s in replayed)
+
+
+def test_a_CHANGED_request_does_not_carry_the_old_pick():
+    """The subject rides with the object it was ranked beside. When the
+    object re-authors (hash mismatch), the old pick does not survive into a
+    row whose leaf it was never ranked against."""
+    led, shots = _plan()
+    target = next(s for s in shots
+                  if s.get("ghost_prompt") and s.get("role") == "character_video")
+    target["ghost_subject"] = "ledger"
+    # Break the hash so the row re-authors instead of replaying.
+    target["ghost_prompt"]["request_sha256"] = "0" * 64
+    _led2, replayed = _plan(ledger=copy.deepcopy(led))
+    row = next(s for s in replayed if s["shot_id"] == target["shot_id"])
+    assert row["ghost_prompt"]["source"] != "replay"
+    assert "ghost_subject" not in row, (
+        "a stale pick was carried onto a re-authored leaf")
+
+
+def test_ShotRow_accepts_a_replayed_subject():
+    """The durable schema is closed; the replayed row must still validate."""
+    led, shots = _plan()
+    for shot in shots:
+        if shot.get("ghost_prompt"):
+            shot["ghost_subject"] = "ledger"
+    for shot in shots:
+        ShotRow(**shot)
+
+def test_the_preflight_and_the_durable_row_see_one_SUBJECT(monkeypatch):
+    """Half B, round-2 contrarian. `build_request_from_shot` owns the v3 branch
+    and the preflight calls it, so a preflight shot without the subject would
+    resolve a different kernel than the durable row. Driven through a REPLAY,
+    because the deterministic author never mints a subject on a fresh plan and
+    a fresh-plan version of this test would pass vacuously."""
+    led, shots = _plan()
+    stamped = {}
+    for shot in shots:
+        if shot.get("ghost_prompt") and shot.get("role") == "character_video":
+            shot["ghost_subject"] = "ledger"
+            key = shot["source_line_ids"][0] if shot.get("source_line_ids")                 else shot["shot_id"][len("shot_"):]
+            stamped[str(key)] = "ledger"
+    assert stamped, "fixture has no character Ghost beat to stamp"
+
+    seen = {}
+    original = sl._assert_family_inputs_satisfiable_cast_time
+
+    def _spy(engine_name, beat, ledger, policy, subject_sigils=None,
+             ghost_prompts=None, ghost_subjects=None):
+        key = str(beat.get("beat_id") or "")
+        if ghost_subjects and key in ghost_subjects:
+            seen[key] = ghost_subjects[key]
+        return original(engine_name, beat, ledger, policy, subject_sigils,
+                        ghost_prompts, ghost_subjects)
+
+    monkeypatch.setattr(sl, "_assert_family_inputs_satisfiable_cast_time", _spy)
+
+    # THE STRONGER HALF: what the preflight's TEMPORARY SHOT carries when it is
+    # handed to the request builder -- not merely what dict the preflight was
+    # given. The first version of this test only checked the dict, and a neuter
+    # that removed the stamp on the temporary shot passed it. Spy the builder.
+    built = {}
+    # The preflight imports the builder LOCALLY on each call, so the patch goes
+    # on render_driver -- the module it resolves from -- not on shot_lock.
+    original_build = rd.build_request_from_shot
+
+    def _spy_build(shot, ledger, **kwargs):
+        if kwargs.get("phase") == "cast_preflight" and shot.get("ghost_prompt"):
+            sid = str(shot.get("shot_id") or "")
+            built[sid] = shot.get("ghost_subject")
+        return original_build(shot, ledger, **kwargs)
+
+    monkeypatch.setattr(rd, "build_request_from_shot", _spy_build)
+    _led2, replayed = _plan(ledger=copy.deepcopy(led))
+
+    assert seen == stamped, (
+        "the preflight saw %r; the durable rows carry %r" % (seen, stamped))
+    # The temporary shot is keyed by bare beat_id (the divergence recorded in
+    # GO_FORWARD); the subject on it must equal the one stamped for that beat.
+    for beat_id, subject in stamped.items():
+        assert built.get(beat_id) == subject, (
+            "preflight shot for %s carried %r, durable row carries %r"
+            % (beat_id, built.get(beat_id), subject))
+    for shot in replayed:
+        if shot.get("ghost_subject"):
+            key = shot["source_line_ids"][0] if shot.get("source_line_ids")                 else shot["shot_id"][len("shot_"):]
+            assert seen.get(str(key)) == shot["ghost_subject"]

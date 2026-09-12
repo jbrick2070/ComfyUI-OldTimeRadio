@@ -157,12 +157,28 @@ GHOST_BATCH_RETRY_TEMPERATURE = 0.45
 
 GHOST_BATCH_BASE_TOKENS = 64
 GHOST_BATCH_PER_SHOT_TOKENS = 48
+#: HALF B'S OUTPUT ROOM, and it is a SEPARATE constant on purpose (2026-09-11).
+#: `_template_identity()` hashes `GHOST_BATCH_PER_SHOT_TOKENS`, so raising
+#: that number would change every stored leaf's request hash and re-author
+#: every existing episode on its next plan build -- the first cut of Half B
+#: did exactly that and the contrarian pass caught it. This allowance is
+#: applied by `batch_output_tokens` ONLY when a candidate list is offered,
+#: and is deliberately NOT part of the template identity, so an episode
+#: authored before Half B hashes exactly as it did. Arithmetic, not measured:
+#: the key is ~4 tokens and a candidate is one to three short words.
+GHOST_BATCH_SUBJECT_TOKENS = 12
 
 
-def batch_output_tokens(spec_count) -> int:
-    """The output budget for a batch of ``spec_count`` leaves."""
+def batch_output_tokens(spec_count, subject_rows=0) -> int:
+    """The output budget for a batch of ``spec_count`` leaves.
+
+    ``subject_rows`` is how many of those rows were offered a candidate list and
+    may answer with a ``subject`` key; each gets `GHOST_BATCH_SUBJECT_TOKENS` of
+    extra room. Zero -- every pre-Half-B caller -- yields the historical number.
+    """
     return int(GHOST_BATCH_BASE_TOKENS
-               + GHOST_BATCH_PER_SHOT_TOKENS * int(spec_count))
+               + GHOST_BATCH_PER_SHOT_TOKENS * int(spec_count)
+               + GHOST_BATCH_SUBJECT_TOKENS * max(0, int(subject_rows or 0)))
 
 
 class GhostAuthorError(ValueError):
@@ -245,6 +261,26 @@ GHOST_BATCH_RULES = (
     "%s"
 ) % (GHOST_LEAF_ASK_WORDS_LOW, GHOST_LEAF_ASK_WORDS_HIGH, GHOST_LEAF_MAX_CHARS,
      GHOST_LEAF_MIN_WORDS, GHOST_BATCH_EXAMPLES)
+
+#: HALF B (2026-09-11): the one clause that asks the model to RANK. Added to
+#: the prompt ONLY when the episode's brief listed key objects -- an episode
+#: with none sends a prompt byte-identical to before, so a brief-failed run is
+#: not changed by this at all. Character-budgeted on purpose: it is one
+#: sentence and the candidate line, once per episode, never per shot.
+#:
+#: It asks for a CHOICE from a closed list, never a noun of the model's own.
+#: That is the whole ruling: the beat's dialogue may RANK the episode's own
+#: objects, it may never SOURCE a new one -- the truck that a line says the
+#: list "isn't just" must not become the picture.
+GHOST_BATCH_SUBJECT_RULE = (
+    '9. This extends the shape in rule 1: each row MAY carry one extra key '
+    '"subject", so a row may be {"id": "g000", "drawable_beat": "...", '
+    '"subject": "..."}. Its value is the ONE item from SUBJECTS that this shot '
+    "is most about, copied exactly as written. Leave the key out when none "
+    "fits. Rule 1 is otherwise unchanged.\n"
+)
+
+GHOST_BATCH_SUBJECT_HEADER = "SUBJECTS:"
 
 GHOST_BATCH_HEADER = "SHOTS:"
 
@@ -790,9 +826,66 @@ def output_sha256(drawable_beat) -> str:
     return hashlib.sha256(str(drawable_beat or "").encode("utf-8")).hexdigest()
 
 
-def build_batch_prompt(specs) -> str:
-    """The single user message for one whole episode's Ghost batch."""
-    lines = [GHOST_BATCH_RULES, GHOST_BATCH_HEADER]
+def ghost_subject_candidates(meta) -> list:
+    """The episode's own key objects, exactly as `resolve_crux_kernel` sees them.
+
+    ONE extraction, shared, so the list the model is offered at author time and
+    the list a pick is re-validated against at render time cannot drift apart.
+    Bounded by `GHOST_V3_TERM_LIMIT`; empty when the brief listed nothing.
+    """
+    return [_spoken_term(o) for o in ((meta or {}).get("key_objects") or [])
+            if _spoken_term(o)][:GHOST_V3_TERM_LIMIT]
+
+
+def admit_ghost_subject(raw, candidates) -> str:
+    """The candidate `raw` names, spelled as the candidate list spells it, or "".
+
+    NEVER RAISES, NEVER A GATE. This is the entire enforcement of "the beat
+    RANKS, it never SOURCES": the model was handed a closed list and may only
+    hand one of its members back. A noun the model invented, a negated noun it
+    lifted from the dialogue, a near-miss, a sentence, an empty string -- all of
+    them fail the case-fold membership check and yield "", and the row keeps its
+    leaf and falls through to the deterministic ladder unchanged. Nothing here
+    can reject a row or a batch.
+
+    Exact match after case-folding and whitespace-collapse, and nothing looser:
+    "ledger" matches "Ledger", not "ledgers" and not "the ledger". A fuzzier
+    admission would be a second extractor by another name.
+    """
+    exact = " ".join(str(raw or "").split())
+    if not exact:
+        return ""
+    # EXACT SPELLING FIRST, THEN THE FOLD. Two candidates can casefold to the
+    # same string ("waﬄe" and "waffle" -- the ligature folds to "ffl"),
+    # and returning the FIRST fold-match handed back the ligature twin for a
+    # model that wrote the plain word. Downstream, the negation guard then
+    # judged the twin's spelling, not the one the beat actually negated, and
+    # admitted a disowned object. The round-4 contrarian reproduced that at
+    # the tie-break; this closes it at the source, for every consumer.
+    for candidate in candidates or ():
+        if " ".join(str(candidate).split()) == exact:
+            return str(candidate)
+    text = exact.casefold()
+    for candidate in candidates or ():
+        if " ".join(str(candidate).split()).casefold() == text:
+            return str(candidate)
+    return ""
+
+
+def build_batch_prompt(specs, subject_candidates=()) -> str:
+    """The single user message for one whole episode's Ghost batch.
+
+    ``subject_candidates`` is the episode's closed key-object list. When it is
+    non-empty the subject rule and one SUBJECTS line are spliced in ONCE, above
+    the shots; when it is empty the message is byte-identical to the pre-Half-B
+    prompt, so an episode whose brief listed no objects is untouched.
+    """
+    lines = [GHOST_BATCH_RULES]
+    candidates = [str(c) for c in (subject_candidates or ()) if str(c).strip()]
+    if candidates:
+        lines.append(GHOST_BATCH_SUBJECT_RULE.rstrip("\n"))
+        lines.append("%s %s" % (GHOST_BATCH_SUBJECT_HEADER, ", ".join(candidates)))
+    lines.append(GHOST_BATCH_HEADER)
     for spec in specs:
         parts = ["id=%s" % spec["id"], "mode=%s" % spec["mode"],
                  "motif=%s" % spec["motif_cue"]]
@@ -826,14 +919,52 @@ def _strip_one_fence(raw) -> str:
     return match.group("body").strip() if match else text
 
 
+#: The one key a row may repeat without rejecting the batch (Half B). A
+#: duplicated "subject" is AMBIGUOUS -- two picks for one row -- and the honest
+#: answer is no pick, not a retry: the subject is an optional ranking hint and
+#: "not a gate" means a malformed hint costs the hint, never the row. Every
+#: other repeated key is still the structural fault it always was.
+_GHOST_DUPLICATE_TOLERATED_KEYS = frozenset({"subject"})
+
+
+class _AmbiguousSubject:
+    """The VALUE a duplicated ``subject`` key decodes to. Never a string.
+
+    THE HOOK MUST NOT DECIDE, because it cannot know what it is decoding: it
+    runs on every object the decoder builds -- the envelope, a legacy row, an
+    opted-in row -- and only the row logic in `parse_batch_response` knows
+    which is which. The first cut of Half B DROPPED the key here, so a
+    duplicated ``subject`` on the ENVELOPE slipped past the "exactly one key
+    'shots'" check, and a duplicated one on a LEGACY row slipped past the
+    strict field set that correctly rejects a single one. The round-3
+    contrarian reproduced both. So the hook now preserves the fact of the
+    duplicate as this sentinel and leaves the verdict to the code that has the
+    context: an envelope check still sees an extra key; a legacy row still sees
+    an extra field; only an opted-in row treats it as "no pick".
+    """
+
+    __slots__ = ()
+
+    def __repr__(self):
+        return "<ambiguous subject>"
+
+
+AMBIGUOUS_SUBJECT = _AmbiguousSubject()
+
+
 def _object_pairs_hook(pairs):
     seen = set()
-    for key, _value in pairs:
+    out = {}
+    for key, value in pairs:
         if key in seen:
+            if key in _GHOST_DUPLICATE_TOLERATED_KEYS:
+                out[key] = AMBIGUOUS_SUBJECT
+                continue
             raise GhostAuthorParseError(
                 "Ghost batch response repeats the key %r" % (key,))
         seen.add(key)
-    return dict(pairs)
+        out[key] = value
+    return out
 
 
 #: How much text either side of a JSON failure the rejection reason carries.
@@ -907,13 +1038,21 @@ def _canonical_opaque_id(shot_id, expected) -> str:
     return candidate if candidate in expected else ""
 
 
-def parse_batch_response(raw, expected_ids) -> dict:
+def parse_batch_response(raw, expected_ids, *, subjects_out=None) -> dict:
     """``{opaque_id: drawable_beat}``, or raise.
 
     ACCEPTS EXACTLY ONE SHAPE:
     ``{"shots": [{"id": "g000", "drawable_beat": "..."}, ...]}`` -- every
     expected id present exactly once, no unknown id, no extra field on the
     envelope or on a row, no trailing object after the JSON.
+
+    HALF B (2026-09-11): when ``subjects_out`` is a dict, a row MAY also carry
+    ``"subject"``, and its RAW string is collected there keyed by opaque id --
+    unadmitted, because admission is the caller's job against the live
+    candidate list. The return value is unchanged in shape and meaning, and a
+    row without the key is exactly as valid as before. With ``subjects_out``
+    left at ``None`` -- every pre-Half-B caller and test -- a ``subject`` key is
+    still the extra field it always was and still rejects the batch.
 
     ONE TOLERANCE, and it is about spelling rather than content: a row id of
     the shape ``g<digits>`` is read as the ordinal it spells, so ``g0010``
@@ -954,15 +1093,29 @@ def parse_batch_response(raw, expected_ids) -> dict:
         if not isinstance(row, dict):
             raise GhostAuthorParseError(
                 "Ghost batch row is a %s, not an object" % type(row).__name__)
-        if set(row) != {"id", "drawable_beat"}:
+        allowed = {"id", "drawable_beat"}
+        if subjects_out is not None:
+            allowed = allowed | {"subject"}
+        if not {"id", "drawable_beat"} <= set(row) or not set(row) <= allowed:
             raise GhostAuthorParseError(
-                "Ghost batch row must carry exactly id + drawable_beat; got %s"
-                % ", ".join(sorted(row)))
+                "Ghost batch row must carry exactly id + drawable_beat%s; got %s"
+                % (" (+ optional subject)" if subjects_out is not None else "",
+                   ", ".join(sorted(row))))
         shot_id = row.get("id")
         leaf = row.get("drawable_beat")
         if not isinstance(shot_id, str) or not isinstance(leaf, str):
             raise GhostAuthorParseError(
                 "Ghost batch row id/drawable_beat must both be strings")
+        # A NON-STRING SUBJECT IS DROPPED, NOT FATAL. The leaf is the contract;
+        # the subject is an optional ranking hint, and "not a gate" means a
+        # malformed hint costs the hint, never the row. A DUPLICATED subject
+        # arrives as `AMBIGUOUS_SUBJECT` (see `_object_pairs_hook`) and is the
+        # same case: two picks for one row is no pick. Only here, on an
+        # opted-in row -- the envelope and a legacy row both reached their own
+        # strict checks above with the key still present and were rejected.
+        subject = row.get("subject") if subjects_out is not None else None
+        if subject is AMBIGUOUS_SUBJECT:
+            subject = None
         canonical = _canonical_opaque_id(shot_id, expected)
         if not canonical:
             raise GhostAuthorParseError(
@@ -977,6 +1130,8 @@ def parse_batch_response(raw, expected_ids) -> dict:
             raise GhostAuthorParseError(
                 "Ghost batch repeats id %r" % (canonical,))
         out[canonical] = _norm(leaf)
+        if subjects_out is not None and isinstance(subject, str) and subject.strip():
+            subjects_out[canonical] = _norm(subject)
     missing = [i for i in expected if i not in out]
     if missing:
         raise GhostAuthorParseError(
@@ -1786,18 +1941,38 @@ def _beat_mentions_object(beat_text: str, obj: str) -> bool:
     from ``meta.key_objects``. That is the ruling's second rule: "beat reference
     RANKS candidates; it is not the source", and it is what stops the beat's
     stray nouns becoming the picture.
+
+    The boolean is the original contract, kept for every existing caller. The
+    three-state answer underneath it is `_beat_object_stance`, which Half B's
+    tier 0 needs because "absent" and "negated" are opposite verdicts there.
+    """
+    return _beat_object_stance(beat_text, obj) == "clean"
+
+
+def _beat_object_stance(beat_text: str, obj: str) -> str:
+    """``"clean"``, ``"negated"`` or ``"absent"`` -- how the beat treats ``obj``.
+
+    * ``clean``   -- at least one mention that is not inside a negation.
+    * ``negated`` -- mentioned, but EVERY mention sits inside a negation.
+    * ``absent``  -- not mentioned at all.
+
+    Split out of the boolean above for Half B (2026-09-11): the authored tier
+    admits a subject the dialogue never mentions (that is the 74% of beats the
+    tier exists for), but must REFUSE one the dialogue explicitly negates --
+    "it isn't a truck" ranked as ``truck`` is the b002 defect wearing the
+    author's clothes. The boolean collapsed those two into ``False``.
     """
     text = " ".join(str(beat_text or "").lower().split())
     head = " ".join(str(obj or "").lower().split())
     if not text or not head:
-        return False
+        return "absent"
     # Match on the object's most specific word rather than the whole phrase:
     # `key_objects` entries read like "handwritten municipal ledger" and the
     # dialogue says "ledger".
     words = [w.strip(".,;:!?'\"()") for w in head.split()]
     words = [w for w in words if len(w) > 3]
     if not words:
-        return False
+        return "absent"
     haystack = text.split()
     for probe in (head, words[-1]):
         if probe not in text:
@@ -1817,13 +1992,13 @@ def _beat_mentions_object(beat_text: str, obj: str) -> bool:
                     break
             back = " ".join(window)
             if not any(cue in back for cue in _CRUX_NEGATION_CUES):
-                return True      # at least one clean mention
-        return False             # every mention was negated
-    return False
+                return "clean"       # at least one clean mention
+        return "negated"             # every mention was negated
+    return "absent"
 
 
 def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
-                        beat_text="") -> tuple:
+                        beat_text="", authored_subject="") -> tuple:
     """The beat's SUBJECT: the story's own thing, in the story's own place.
 
     TOTAL BY CONSTRUCTION -- four tiers, and the last one cannot fail. It never
@@ -1834,8 +2009,18 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
 
     The tiers, in order:
 
-    1. ``meta.key_objects[i]`` in ``story_brief_terms.setting[j]`` -- the
-       story's own object in the story's own place. This is the whole point.
+    1. a ``key_objects`` entry the beat's own dialogue CLEANLY names -- the
+       ruling's "especially if referred to in the beat". Measured on 26.3% of
+       beats. Strongest evidence there is, so it goes first.
+    1b. ``authored_subject`` (Half B, 2026-09-11) -- the object the batched
+       Ghost author RANKED for this beat, re-admitted here against the LIVE
+       ``key_objects`` list on every call. Fills the ~74% the dialogue leaves
+       open. The author ranks from the row's SANITIZED INTENT, emotion and arc
+       -- never the spoken line, which is deliberately kept out of that prompt
+       (cast-name leakage, and the operator's character budget). Refused when
+       the beat text NEGATES it; admitted when the beat text is silent.
+    1c. ``meta.key_objects[ordinal % n]`` in the odometer's place -- position,
+       when neither the dialogue nor the author decided.
     2. the setting term alone, when the brief gave a place but no objects.
     3. a bounded slice of ``meta.story_brief``, when only the prose survived.
     4. the beat's BOOKEND RADIO OBJECT -- a bakelite radio set, a glowing radio
@@ -1852,12 +2037,14 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
     real episode reaches.
 
     Returns ``(kernel, source)`` where source is one of ``bookend_radio``,
-    ``key_object``, ``setting``, ``brief`` or ``bookend``, and is receipted so a
-    published episode says which tier fed it.
+    ``authored_subject``, ``key_object_in_beat``, ``key_object``, ``setting``,
+    ``brief`` or ``bookend``, and is receipted so a published episode says which
+    tier fed it.
     """
     ordinal = max(int(ordinal or 0), 0)
-    objects = [_spoken_term(o) for o in ((meta or {}).get("key_objects") or [])
-               if _spoken_term(o)][:GHOST_V3_TERM_LIMIT]
+    # ONE extraction authority. The author offers this exact list to the model
+    # and tier 0 re-admits against it, so the two must not be able to drift.
+    objects = ghost_subject_candidates(meta)
     places = _setting_terms(meta)
 
     def _in_place(subject):
@@ -1916,9 +2103,56 @@ def resolve_crux_kernel(meta, *, ordinal=0, role="", mode="",
         # dialogue names one of the episode's own key_objects on 26.3% of beats
         # and 29.5% of character beats. On the other ~74% nothing is referenced
         # and the odometer below still runs, byte-identical to today.
-        for obj in objects:
-            if _beat_mentions_object(beat_text, obj):
-                return _in_place(obj), "key_object_in_beat"
+        # THE RULING'S ORDER, IN THE RULING'S WORDS: "the PHYSICAL ARTIFACTS in
+        # the story, and ESPECIALLY IF REFERRED TO IN THE BEAT". So a clean
+        # reference in the dialogue wins FIRST -- it is the strongest evidence
+        # there is, and it is measured to exist on 26.3% of beats. The first
+        # cut of Half B put the author's pick above this and inverted the
+        # operator's stated preference; the round-2 contrarian caught it.
+        referenced = [obj for obj in objects
+                      if _beat_mentions_object(beat_text, obj)]
+        if referenced:
+            # AMONG CLEAN REFERENCES, THE AUTHOR BREAKS THE TIE. The ruling
+            # makes reference a strong PREFERENCE; it does not say the first
+            # entry in a list wins when the dialogue names two of them. With
+            # candidates [ledger, clock], a line that says "the ledger can
+            # wait, stop the clock" and an author who ranked the clock, list
+            # order drew the ledger. The round-3 contrarian executed that.
+            # So: if the admitted authored pick is itself a clean reference,
+            # it wins; otherwise the first reference does, exactly as before.
+            # A row with no authored pick is byte-identical to a074f56e --
+            # `admit_ghost_subject("")` is "" and the branch is skipped.
+            # EXACT MEMBERSHIP, NOT A SECOND CASE-FOLD. `admit_ghost_subject`
+            # already returns a candidate's OWN spelling, and it returns the
+            # FIRST case-fold match -- so with two candidates that fold to the
+            # same string (the round-4 contrarian executed "waﬄe" and
+            # "waffle", where the ligature folds to "ffl") it can hand back the
+            # one the beat NEGATES while a second case-fold comparison happily
+            # matches it against the clean one. Membership in `referenced`
+            # guarantees the candidate returned is the one that passed the
+            # clean-reference check, not a fold-collision of it.
+            picked = admit_ghost_subject(authored_subject, objects)
+            if picked and picked in referenced:
+                return _in_place(picked), "key_object_in_beat"
+            return _in_place(referenced[0]), "key_object_in_beat"
+        # THE AUTHOR'S RANKED PICK fills the ~74% the dialogue leaves open,
+        # re-admitted against the LIVE list rather than trusted from storage,
+        # so a key_objects list edited after casting cannot leave a stale pick
+        # pointing at a noun the brief no longer lists.
+        #
+        # A NEGATED PICK IS REFUSED; an absent one is admitted. The author
+        # ranks from the sanitized intent and never sees the spoken line, so it
+        # cannot know the line says "it isn't a truck" -- membership proves the
+        # noun is the episode's own; only the beat text can say the beat
+        # disowns it. (The bare phrasing "there is no X" is NOT a cue in
+        # `_CRUX_NEGATION_CUES`; that gap predates Half B and belongs to the
+        # deterministic tier.) A refused pick falls to the odometer, which can
+        # still land on the same object by position -- the guard keeps the
+        # AUTHOR from choosing a disowned noun; it does not promise the noun
+        # never appears.
+        picked = admit_ghost_subject(authored_subject, objects)
+        if picked and _beat_object_stance(beat_text, picked) != "negated":
+            return _in_place(picked), "authored_subject"
         return _in_place(objects[ordinal % len(objects)]), "key_object"
 
     if places:
@@ -2267,7 +2501,7 @@ def _apply_style_placement(composed: dict) -> dict:
 def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
                              ordinal=0, token_measure_fn=None,
                              banana_enabled=None, pack_motion="",
-                             beat_text="") -> dict:
+                             beat_text="", authored_subject="") -> dict:
     """Resolve, compose, transform, FIT and measure one Ghost v3 prompt.
 
     The v3 sibling of :func:`finalize_ghost_prompt_v2`, and deliberately a
@@ -2307,7 +2541,8 @@ def finalize_ghost_prompt_v3(*, role, style, mode, ledger_meta=None,
     """
     meta = ledger_meta if isinstance(ledger_meta, dict) else {}
     kernel, kernel_source = resolve_crux_kernel(
-        meta, ordinal=ordinal, role=role, mode=mode, beat_text=beat_text)
+        meta, ordinal=ordinal, role=role, mode=mode, beat_text=beat_text,
+        authored_subject=authored_subject)
     light = resolve_world_light(meta, ordinal=ordinal, mode=mode)
     # THE PACK'S OWN KINETIC DIRECTION WINS ON A BOOKEND BEAT (2026-09-03).
     # The operator watched a published episode and reported that the announcer

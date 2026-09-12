@@ -3321,7 +3321,10 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 role=_shot_role, style=_vstyle, mode=_g_obj["mode"],
                 ledger_meta=(ledger or {}).get("meta") or {},
                 ordinal=_g_ordinal, pack_motion=_g_pack_motion,
-                beat_text=_beat_text_for_shot(ledger, shot))
+                beat_text=_beat_text_for_shot(ledger, shot),
+                # Half B: absent on every pre-Half-B row, and re-admitted
+                # against the live key_objects inside the resolver.
+                authored_subject=str(shot.get("ghost_subject") or ""))
             _g_positive = str(_g_final["positive"]).strip()
             _g_negative = str(_g_final["negative"]).strip()
             req["text_prompt"] = _g_positive

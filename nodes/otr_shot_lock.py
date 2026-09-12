@@ -1788,7 +1788,8 @@ def _resolve_writer_llm(meta: dict, warnings: list,
 
 def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                                                policy, subject_sigils=None,
-                                               ghost_prompts=None):
+                                               ghost_prompts=None,
+                                               ghost_subjects=None):
     try:
         from ._otr_video_engines.registry import get_engine, is_registered, EngineNotRunnableError
     except ImportError:
@@ -1882,6 +1883,24 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
                 "silent v1 downgrade here is not an acceptable degradation."
                 % (beat.get("beat_id"),))
         shot["ghost_prompt"] = copy.deepcopy(_cast_ghost)
+        # HALF B: THE SAME SUBJECT VALUE THE DURABLE ROW WILL CARRY. The first
+        # cut stamped only the durable row, on the claim that the preflight
+        # validates through the v2 admission path and never reaches the kernel
+        # resolver. That claim was wrong: `build_request_from_shot` below OWNS
+        # the v3 branch that calls `finalize_ghost_prompt_v3`. Same absence rule
+        # as the sigil and the object above.
+        #
+        # PARITY OF THE SUBJECT, NOT OF THE KERNEL. This temporary shot is
+        # `shot_id = beat_id`; the durable row is `shot_<beat_id>`; the render
+        # driver looks the ordinal up by exact shot id, so the preflight always
+        # resolves at ordinal 0 and the resolver cycles the PLACE by ordinal.
+        # The same subject can compose "in the archive" here and "in the yard"
+        # on the row. That divergence predates Half B and affected the
+        # deterministic tier identically; it is a GO_FORWARD row. Nothing here
+        # claims the two kernels are equal -- only that the subject is.
+        _cast_subject = (ghost_subjects or {}).get(str(beat.get("beat_id") or ""))
+        if _cast_subject:
+            shot["ghost_subject"] = str(_cast_subject)
 
     # ONE NARROW CATCH, AND NOTHING ELSE IS SWALLOWED (2026-07-29, WIRE-W2).
     #
@@ -2588,6 +2607,34 @@ def _ghost_prior_objects(ledger) -> dict:
     return out
 
 
+def _ghost_prior_subjects(ledger) -> dict:
+    """``{beat_id: ghost_subject}`` already on the incoming ledger, for replay.
+
+    The Half B sibling of `_ghost_prior_objects`, joined the same way. A row
+    frozen before Half B simply has no key and contributes nothing -- which is
+    the honest state, not an error. The stored string is carried RAW; it is
+    re-admitted against the live candidate list at render time, never trusted.
+    """
+    out = {}
+    for shot in (((ledger or {}).get("video") or {}).get("shots") or []):
+        if not isinstance(shot, dict):
+            continue
+        subject = shot.get("ghost_subject")
+        if not isinstance(subject, str) or not subject.strip():
+            continue
+        sids = shot.get("source_line_ids")
+        beat_id = ""
+        if isinstance(sids, list) and sids:
+            beat_id = str(sids[0])
+        else:
+            shot_id = str(shot.get("shot_id") or "")
+            if shot_id.startswith("shot_"):
+                beat_id = shot_id[len("shot_"):]
+        if beat_id:
+            out[beat_id] = subject.strip()
+    return out
+
+
 def _ghost_unload_writer(warnings):
     """Release the writer before any preflight / image / video work.
 
@@ -2709,8 +2756,15 @@ def _ghost_validate_batch(leaves, specs, style, meta, names,
 
 def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
                           warnings, already_used=(), replayed_signatures=None,
-                          reuse_dispositions=None):
+                          reuse_dispositions=None, subjects_out=None):
     """``(leaves, source, fallback_reason)`` for one whole batch.
+
+    HALF B: when ``subjects_out`` is a dict, the episode's key objects are
+    offered to the model as a closed SUBJECTS list and each row's ranked pick is
+    collected there, keyed by opaque id, already ADMITTED against that list. The
+    return contract is unchanged. The deterministic fallback authors no
+    subjects -- it has no ranker -- and leaves the dict empty, which is the
+    honest state.
 
     One call for a normal episode. An invalid batch gets ONE fresh whole-batch
     retry -- not a conversation -- and a second failure receives the complete
@@ -2727,8 +2781,17 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
                                          reuse_dispositions=reuse_dispositions),
                 "deterministic_fallback", "no writer model configured")
 
-    prompt = _gsa.build_batch_prompt(specs)
-    budget = _gsa.batch_output_tokens(len(specs))
+    candidates = (_gsa.ghost_subject_candidates(meta)
+                  if subjects_out is not None else [])
+    prompt = _gsa.build_batch_prompt(specs, subject_candidates=candidates)
+    # SUBJECT ROOM FOR EVERY ROW THAT MAY ANSWER. The prompt lets any row carry
+    # a subject and the rows carry no role flag, so the model may -- and will
+    # -- answer on a bookend row too. Those picks are dropped at admission
+    # below, but the tokens they cost were already spent; budgeting only the
+    # rows we keep truncated batches. Kept OUT of the hashed per-shot constant
+    # -- see GHOST_BATCH_SUBJECT_TOKENS.
+    subject_rows = len(specs) if candidates else 0
+    budget = _gsa.batch_output_tokens(len(specs), subject_rows=subject_rows)
     ids = [spec["id"] for spec in specs]
     reason = ""
     for attempt in (1, 2):
@@ -2758,7 +2821,16 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
         # clauses instead of failing loud. Only a rejected CANDIDATE is caught
         # here; anything else is a bug and must surface.
         try:
-            leaves = _gsa.parse_batch_response(raw, ids)
+            # ALWAYS A DICT ON THIS PATH, even with no candidates. Handing the
+            # parser None makes a stray "subject" key from the model an EXTRA
+            # FIELD that rejects the whole batch and burns the informed retry
+            # -- a gate by accident, on exactly the brief-failed episodes the
+            # feature was supposed to leave untouched. With an empty candidate
+            # list every pick fails admission below and the row keeps its
+            # leaf, which is the honest outcome.
+            raw_subjects = {} if subjects_out is not None else None
+            leaves = _gsa.parse_batch_response(
+                raw, ids, subjects_out=raw_subjects)
             _ghost_validate_batch(leaves, specs, style, meta, names,
                                   already_used=tuple(already_used) +
                                   tuple(replayed_signatures.values()))
@@ -2770,6 +2842,39 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
         if attempt > 1:
             log.warning("[OTR_ShotLock] Ghost author: batch accepted on the "
                         "informed retry")
+        # ADMIT BEFORE STORING, and ONLY after the batch is accepted. A pick
+        # is kept solely when it is one of the candidates the model was shown;
+        # anything else -- an invented noun, a negated one lifted from the
+        # line, a near-miss -- is dropped here, silently, and the row keeps
+        # its leaf. This runs OUTSIDE the validate/retry try above by design:
+        # a subject can never be the reason a batch is rejected or retried.
+        if subjects_out is not None and raw_subjects:
+            # CHARACTER BEATS ONLY. The resolver returns the bookend radio
+            # before it ever looks at an authored subject, so a pick stored on
+            # an announcer or music row is data the renderer deliberately
+            # ignores. Dropping it here keeps the ledger honest about what was
+            # actually used.
+            role_by_id = {s["id"]: s.get("role") for s in specs}
+            eligible = sum(1 for r in role_by_id.values() if r == "character_video")
+            submitted = 0
+            kept = 0
+            for shot_id, raw_pick in raw_subjects.items():
+                if role_by_id.get(shot_id) != "character_video":
+                    continue
+                submitted += 1
+                admitted = _gsa.admit_ghost_subject(raw_pick, candidates)
+                if admitted:
+                    subjects_out[shot_id] = admitted
+                    kept += 1
+            # THREE NUMBERS, because one cannot answer the question. eligible
+            # = character rows that could carry a pick; submitted = the ones
+            # the model answered on; admitted = the ones that were in the
+            # list. admitted/submitted low means the model INVENTS; submitted/
+            # eligible low means it ABSTAINS. A single ratio mixed both, and
+            # counted bookend hints that were discarded on purpose.
+            log.info("[OTR_ShotLock] Ghost Half B: eligible=%d submitted=%d "
+                     "admitted=%d candidates=%d", eligible, submitted, kept,
+                     len(candidates))
         return leaves, "writer_llm", ""
     return (_gsa.deterministic_batch(specs, episode_seed=episode_seed,
                                      style=style, ledger_meta=meta,
@@ -2779,8 +2884,14 @@ def _ghost_generate_batch(gen, specs, *, style, meta, episode_seed, names,
             "deterministic_fallback", reason)
 
 
-def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
+def _author_ghost_prompts(beats, ledger, engine_for, warnings=None,
+                          subjects_out=None):
     """``{beat_id: ghost_prompt}`` for every Ghost beat in this episode.
+
+    HALF B: when ``subjects_out`` is a dict it is filled with
+    ``{beat_id: ghost_subject}`` -- replayed from the incoming ledger for a
+    hash-matched row, freshly ranked by the model for an authored one, absent
+    for a deterministic fallback. The return value is unchanged.
 
     Runs ONCE, after the effective route and the durable sigils exist and
     BEFORE the cast-time preflight -- because the preflight builds a request
@@ -2894,6 +3005,8 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
 
     specs = _gsa.build_ghost_author_specs(rows, model_id=model_id)
     prior = _ghost_prior_objects(ledger)
+    prior_subjects = (_ghost_prior_subjects(ledger)
+                      if subjects_out is not None else {})
 
     out = {}
     needs = []
@@ -2910,6 +3023,19 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
             if replayed["source"] == "writer_llm":
                 replayed["source"] = "replay"
             out[spec["beat_id"]] = replayed
+            # The subject rides with the object it was ranked beside. A row
+            # frozen before Half B has none, and that is simply absence.
+            #
+            # A DISCLOSED TRADE, kept deliberately: the request hash covers the
+            # leaf's inputs, NOT the candidate list, so a `key_objects` edit
+            # after casting reuses this pick without re-ranking. Render-time
+            # admission catches a pick that became INVALID (dropped from the
+            # list); it cannot catch one that became merely SUBOPTIMAL. The
+            # alternative -- hashing the candidates -- re-authors every stored
+            # leaf on every existing episode, which is the one outcome this
+            # design exists to avoid.
+            if subjects_out is not None and prior_subjects.get(spec["beat_id"]):
+                subjects_out[spec["beat_id"]] = prior_subjects[spec["beat_id"]]
             continue
         needs.append(spec)
 
@@ -2927,6 +3053,7 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
                         "while the request hash was computed against %r -- a "
                         "stored leaf must name the model that wrote it"
                         % (loaded_model_id, model_id))
+            batch_subjects = {} if subjects_out is not None else None
             leaves, source, reason = _ghost_generate_batch(
                 gen, needs, style=style, meta=meta, episode_seed=episode_seed,
                 names=names, warnings=warnings,
@@ -2935,7 +3062,8 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
                 # viewer watches, not of whichever subset this call authored.
                 replayed_signatures=_ghost_replayed_signatures(
                     out, specs, style=style, meta=meta),
-                reuse_dispositions=reuse_dispositions)
+                reuse_dispositions=reuse_dispositions,
+                subjects_out=batch_subjects)
         finally:
             _ghost_unload_writer(warnings)
         for spec in needs:
@@ -2944,6 +3072,8 @@ def _author_ghost_prompts(beats, ledger, engine_for, warnings=None):
                 fallback_reason=("; ".join(filter(None, (
                     reason, reuse_dispositions.get(spec["id"], ""))))
                     if source == "deterministic_fallback" else ""))
+            if batch_subjects and batch_subjects.get(spec["id"]):
+                subjects_out[spec["beat_id"]] = batch_subjects[spec["id"]]
 
     dispositions = {}
     for obj in out.values():
@@ -3031,9 +3161,11 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
     # a request per beat through the render path's own builder, so the authored
     # object has to exist before it runs and has to be the IDENTICAL object the
     # durable row will carry.
+    ghost_subjects = {}
     ghost_prompts = _author_ghost_prompts(
         beats, ledger, engine_for,
-        warnings=warnings if isinstance(warnings, list) else None)
+        warnings=warnings if isinstance(warnings, list) else None,
+        subjects_out=ghost_subjects)
 
     # Preflight family compatibility gate (F2):
     if ledger is not None:
@@ -3042,7 +3174,7 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
             if engine_id:
                 _assert_family_inputs_satisfiable_cast_time(
                     engine_id, b, ledger, policy, subject_sigils,
-                    ghost_prompts)
+                    ghost_prompts, ghost_subjects)
 
     # rip-sfx-broll (2026-07-01): the pool_n_loop still/clip POOLING died with
     # the retired_role_a / retired_role_b roles -- every beat renders
@@ -3129,6 +3261,16 @@ def build_execution_plan(beats, budget, creative, policy, ledger=None,
         _row_ghost = ghost_prompts.get(str(b.get("beat_id") or ""))
         if _row_ghost:
             shots[-1]["ghost_prompt"] = copy.deepcopy(_row_ghost)
+        # HALF B: the author's ranked subject, beside the object and under the
+        # same absence rule -- no key on a beat that has no pick. THE IDENTICAL
+        # SUBJECT VALUE the cast-time preflight above was handed, because that
+        # preflight reaches the v3 kernel resolver through
+        # `build_request_from_shot`. (The kernels themselves can still differ
+        # by PLACE, because the preflight resolves at ordinal 0 -- a
+        # pre-existing divergence recorded in GO_FORWARD, not a Half B claim.)
+        _row_subject = ghost_subjects.get(str(b.get("beat_id") or ""))
+        if _row_subject:
+            shots[-1]["ghost_subject"] = str(_row_subject)
         _stamp_frame_bounded(shots[-1])
         _stamp_coverage_plan(shots[-1], b["beat_id"],
                              max_render_frames=max_render_frames)

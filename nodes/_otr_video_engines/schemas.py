@@ -369,3 +369,16 @@ class ShotRow(_Forbid):
     #: importable with nothing installed, so the contract lives in one place
     #: rather than being half-restated here as a second model that can drift.
     ghost_prompt: Optional[dict] = None
+    #: THE AUTHOR'S RANKED SUBJECT (Half B, 2026-09-11): the one key object
+    #: the batched Ghost author chose for this beat from the episode's own
+    #: closed list, stamped beside `ghost_prompt` and read by the render
+    #: driver as tier 0 of `resolve_crux_kernel`.
+    #:
+    #: Optional, and ABSENCE is the honest state on three kinds of row: one
+    #: frozen before Half B, one whose episode listed no key objects, and one
+    #: whose pick did not survive admission. All three fall through to the
+    #: same ladder they always used. Deliberately a sibling of the closed
+    #: `ghost_prompt` object rather than a field inside it, so that object's
+    #: validator, schema version and author version are untouched and no
+    #: frozen replay bundle can fail closed over a key it never had.
+    ghost_subject: Optional[str] = None
