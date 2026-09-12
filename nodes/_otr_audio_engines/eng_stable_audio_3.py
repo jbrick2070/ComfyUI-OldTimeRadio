@@ -24,6 +24,10 @@ try:
     from .._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+try:
+    from .._otr_music_prompt import NEGATIVE_PROMPT_DEFAULT
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_music_prompt import NEGATIVE_PROMPT_DEFAULT  # type: ignore
 
 log = logging.getLogger("OTR")
 
@@ -32,38 +36,18 @@ _CKPT = otr_env.get("OTR_SA3_CKPT", "stable_audio_3_small_music.safetensors")
 _TENC = otr_env.get("OTR_SA3_TEXT_ENCODER", "t5gemma_b_b_ul2.safetensors")
 _CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 
-# BUG-408: SA3 is a different model than the old MusicGen default and does NOT
-# respond to MusicGen-shaped abstract-mood prompts the same way -- it wants a
-# genre + instrumentation + production anchor and a real negative prompt, and it
-# needs a multi-second STRUCTURAL context (seconds_total) to sound like music
-# rather than an unstructured 4-12s texture. The fixes below are SA3-only and
-# keep the shared compose_music_prompt() contract unchanged.
+# BUG-408 (2026-06): SA3 is a different model than the old MusicGen default
+# and wants genre + instrumentation + a production anchor, a real negative
+# prompt, and a multi-second STRUCTURAL context (seconds_total) to sound like
+# music rather than a 4-12 s texture. The structural window is still here.
+# The prompt anchor is NOT (2026-09-11): every branch of it said "analog tape
+# warmth" and the negative pushed "AWAY from a clean modern sound" -- the
+# radio-hiss texture the operator has now withdrawn ("make them more
+# musical"). The instruments come from the STORY through the shared composer
+# (`_otr_music_prompt.compose_engine_prompt`) for every engine; this adapter
+# sends what it is handed and reads the composer's negative unless the
+# operator overrides it with OTR_SA3_NEG_PROMPT, the one escape hatch.
 
-# Era -> genre/instrumentation anchor (deterministic; keyed on period/setting
-# keywords the brief already put in the prompt). NO fabricated musical key.
-_SA3_PERIOD_GENRE = (
-    (("1920", "1930", "roaring"),
-     "vintage instrumental big-band orchestral, warm brass, upright bass, "
-     "analog tape warmth"),
-    (("1940", "1950", "atomic", "pulp", "radio", "noir"),
-     "vintage instrumental orchestral sci-fi score, theremin, eerie strings, "
-     "brass, timpani, analog tape warmth"),
-    (("1960", "1970", "retro", "space age"),
-     "retro-futurist instrumental analog synth score, mellotron, electric "
-     "piano, tape echo, warm strings"),
-)
-_SA3_DEFAULT_GENRE = (
-    "cinematic instrumental sci-fi underscore, small orchestra, low strings, "
-    "soft brass, light percussion, analog tape warmth")
-
-# Negative prompt (roundtable 2026-06-14): the PRIMARY job is banning
-# vocals/speech (instrumental-only) + pushing AWAY from a clean modern sound
-# toward vintage tape. Deliberately does NOT ban "dissonant" / "out of tune" /
-# "harsh" / "muddy" -- those fight the wanted eerie / theremin / analog-tape
-# character (panel consensus: Opus, GPT, Gemini, Sonnet).
-_SA3_NEG_DEFAULT = (
-    "vocals, singing, speech, spoken words, lyrics, voiceover, crowd noise, "
-    "modern pristine mix, digital distortion")
 
 
 def _env_float(name, default):
@@ -91,21 +75,6 @@ def _env_int(name, default):
         log.warning("[OTR.sa3] %s=%r is not an int -- using default %s",
                     name, raw, default)
         return int(default)
-
-
-def _sa3_augment_prompt(prompt: str) -> str:
-    """Prepend an SA3-shaped genre + instrumentation + production anchor to the
-    brief-derived prompt (era-aware via keywords). Keeps the existing mood /
-    setting / cue-arc text and the instrumental-only tail. Length-capped: one
-    genre clause + the existing prompt."""
-    low = (prompt or "").lower()
-    genre = _SA3_DEFAULT_GENRE
-    for keys, g in _SA3_PERIOD_GENRE:
-        if any(k in low for k in keys):
-            genre = g
-            break
-    base = (prompt or "").strip()
-    return f"{genre}, {base}" if base else genre
 
 
 def _sa3_clip_window(prompt: str, dur: float, context_s: float):
@@ -193,7 +162,8 @@ class StableAudio3Engine:
         except Exception:  # noqa: BLE001
             pass
 
-    def generate_clip(self, prompt, duration_s, seed):
+    def generate_clip(self, prompt, duration_s, seed, *,
+                      placement="", negative_prompt=""):
         """Text prompt -> stereo AUDIO clip ``{"waveform", "sample_rate"}`` via
         ComfyUI's native SA3 graph. Determinism: KSampler takes the int seed and
         builds its generator internally (a bound torch.Generator cannot cross a
@@ -230,9 +200,16 @@ class StableAudio3Engine:
         # reference dpmpp_3m_sde_gpu @ 100 (determinism proven by the byte-
         # identical golden). All env-overridable; the operator never NEEDS to set them.
         context_s = _env_float("OTR_SA3_CONTEXT_S", 12.0)
-        seconds_start, seconds_total = _sa3_clip_window(prompt, dur, context_s)
-        pos_text = _sa3_augment_prompt(prompt)
-        neg_text = otr_env.get("OTR_SA3_NEG_PROMPT", _SA3_NEG_DEFAULT)
+        # The cue's placement names the window; the prompt-word fallback stays
+        # for a caller that hands none over (the bug408 window test pins it).
+        seconds_start, seconds_total = _sa3_clip_window(
+            placement or prompt, dur, context_s)
+        # The prompt arrives COMPOSED -- instruments, production anchor, row
+        # text (`compose_engine_prompt`) -- and is sent as handed. The negative
+        # is the composer's unless the operator overrides it.
+        pos_text = str(prompt or "").strip()
+        neg_text = (otr_env.get("OTR_SA3_NEG_PROMPT") or negative_prompt
+                    or NEGATIVE_PROMPT_DEFAULT)
         steps = _env_int("OTR_SA3_STEPS", 100)
         cfg = _env_float("OTR_SA3_CFG", 7.0)
         sampler = otr_env.get("OTR_SA3_SAMPLER", "dpmpp_3m_sde_gpu")
@@ -256,4 +233,13 @@ class StableAudio3Engine:
                  sampler, scheduler, _phash)
         # native AUDIO dict already carries {"waveform","sample_rate"}.
         sr = int(audio.get("sample_rate", self.sample_rate))
-        return {"waveform": audio["waveform"], "sample_rate": sr}
+        # The receipt rides with the clip so the ledger can say what this
+        # cue actually heard and did (prompt hash, window, sampler).
+        return {"waveform": audio["waveform"], "sample_rate": sr,
+                "receipt": {"engine": self.name, "steps": int(steps),
+                            "cfg": float(cfg), "sampler": str(sampler),
+                            "scheduler": str(scheduler),
+                            "seconds_start": float(seconds_start),
+                            "seconds_total": float(seconds_total),
+                            "duration_s": float(dur), "seed": int(seed),
+                            "prompt_hash": _phash}}

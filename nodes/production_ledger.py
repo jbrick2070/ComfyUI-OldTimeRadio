@@ -1652,6 +1652,13 @@ class Ledger:
                 "wav_path":          _safe_str(r.get("wav_path")) or None,
                 "start_s":           _safe_float(r.get("start_s")),
                 "dur_s":             _safe_float(r.get("dur_s")),
+                # What the engine heard and did for the cue (2026-09-11):
+                # render-owned, outside the cue-spec identity, and copied
+                # forward by _merge_with_disk on a match like wav_path.
+                "render_receipt":    (
+                    dict(r["render_receipt"])
+                    if isinstance(r.get("render_receipt"), dict) else None
+                ),
             }
             # Stamp the authored-spec identity with the SAME function the
             # merge gate uses, so the persisted value and the gate agree

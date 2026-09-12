@@ -222,7 +222,8 @@ class GoogleLyriaMusic(AudioEngineAdapter):
     native = False
     fixed_provider_duration_s = FIXED_CLIP_DURATION_S
 
-    def generate_clip(self, prompt, duration_s, seed):  # noqa: ARG002
+    def generate_clip(self, prompt, duration_s, seed, *,
+                      placement="", negative_prompt=""):  # noqa: ARG002
         prompt_text = str(prompt or "").strip()
         if not prompt_text:
             raise GoogleAPIRequestShapeError(

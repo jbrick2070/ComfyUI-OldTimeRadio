@@ -52,7 +52,7 @@ class _SpyClipAdapter:
         self.calls = []
         self.det_enabled_during_call = None
 
-    def generate_clip(self, prompt, duration_s, seed):
+    def generate_clip(self, prompt, duration_s, seed, **kwargs):
         self.det_enabled_during_call = torch.are_deterministic_algorithms_enabled()
         self.calls.append((prompt, duration_s, seed))
         return {"waveform": torch.zeros(1, 2, 8, dtype=torch.float32),

@@ -234,6 +234,12 @@ def _music_row_from_manifest(row: Dict[str, Any]) -> Dict[str, Any]:
         "wav_path": str(row.get("output_path") or "") or None,
         "start_s": None,
         "dur_s": None,
+        # What the engine heard and did (2026-09-11). Render-owned like
+        # wav_path: outside the cue-spec identity, carried on a match.
+        "render_receipt": (
+            dict(row["render_receipt"])
+            if isinstance(row.get("render_receipt"), dict) else None
+        ),
     }
 
 
@@ -314,6 +320,9 @@ def reconcile_ledger_music(
         if output_path:
             paths_updated += int(current.get("wav_path") != output_path)
             current["wav_path"] = output_path
+        receipt = manifest_row.get("render_receipt")
+        if isinstance(receipt, dict):
+            current["render_receipt"] = dict(receipt)
         matched += 1
 
     ledger["music"] = music

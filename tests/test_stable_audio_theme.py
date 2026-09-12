@@ -28,8 +28,9 @@ def _stub_musicgen_generate_clip(monkeypatch, recorder):
 
     musicgen = get_engine("musicgen")
 
-    def _gen(prompt, duration_s, seed):
-        recorder.append({"prompt": prompt, "duration_s": duration_s, "seed": seed})
+    def _gen(prompt, duration_s, seed, **kwargs):
+        recorder.append({"prompt": prompt, "duration_s": duration_s,
+                         "seed": seed, **kwargs})
         return {"waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
                 "sample_rate": 32000}
 
@@ -224,8 +225,16 @@ def test_scifi_news_pro_music_rows_render_by_cue_id(monkeypatch):
     })
     out = StableAudioTheme().generate(script_json=ledger, engine="musicgen")
     assert len(calls) == 3
-    # authored prompts pass through verbatim (composer NOT invoked)
-    assert {c["prompt"] for c in calls} == {"slow open", "bridge", "resolve"}
+    # authored prompts pass through VERBATIM inside the engine prompt: the
+    # row composer is NOT invoked, and the engine composer only puts the
+    # story palette + production anchor in FRONT of the authored text
+    from nodes import _otr_music_palette as P
+    heard = [c["prompt"] for c in calls]
+    assert {h.rsplit(". ", 1)[-1] for h in heard} == {"slow open", "bridge", "resolve"}
+    assert all(h.startswith(P.HOUSE_PALETTE.instruments) for h in heard)
+    # the cue's placement and the negative prompt reach the adapter
+    assert {c["placement"] for c in calls} == {"opening", "interstitial", "closing"}
+    assert all("hiss" in c["negative_prompt"] for c in calls)
     manifest = CM.parse_manifest(out[1], batch_size=3)
     by_cue = {r["cue_id"]: r for r in manifest["cues"]}
     assert set(by_cue) == {"opening", "inter_01", "closing"}

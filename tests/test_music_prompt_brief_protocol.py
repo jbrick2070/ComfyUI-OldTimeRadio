@@ -21,7 +21,6 @@ def _meta_full() -> dict:
             "atmosphere": ["sweat", "smoke", "tense"],
         },
         "music_mood_terms": ["sombre", "uneasy", "menacing"],
-        "gen_params_initial": {"period_voice": {"descriptor": "1940s brass and strings"}},
     }
 
 
@@ -43,9 +42,14 @@ def test_setting_clause_from_brief():
     assert "interrogation room" in prompt or "steel table" in prompt
 
 
-def test_period_descriptor_from_brief():
+def test_period_idiom_from_the_story_palette():
+    """The period used to be a `gen_params_initial.period_voice` overlay that
+    nothing ever produced; since 2026-09-11 the story palette owns it."""
     prompt, _ = compose_music_prompt(_meta_full(), "opening")
-    assert "1940s brass and strings" in prompt
+    assert "1940s radio drama orchestra" in prompt
+    meta = dict(_meta_full(), source_bank="shakespeare", source_meta={"year": "c. 1595"})
+    prompt, _ = compose_music_prompt(meta, "opening")
+    assert "Elizabethan consort music" in prompt
 
 
 def test_atmosphere_fallback_when_no_music_mood():
@@ -65,9 +69,9 @@ def test_neutral_default_and_tail_when_brief_empty():
 
 def test_cue_character_and_duration_per_slot():
     for slot, marker in (
-        ("opening", "atmospheric build"),
-        ("closing", "resolving cadence"),
-        ("interstitial", "textural bridge"),
+        ("opening", "rising overture"),
+        ("closing", "resolving to a warm held chord"),
+        ("interstitial", "melodic bridge"),
     ):
         prompt, dur = compose_music_prompt(_meta_full(), slot)
         assert marker in prompt

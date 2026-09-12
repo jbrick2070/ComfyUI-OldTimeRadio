@@ -7,22 +7,44 @@ the story/Meta brief on the ledger meta, read via the brief-reader protocol
 local template. This is the same downstream-consumer contract the visual slots
 (FLUX / LTX / HuMo / portraits) follow, so music generation pulls period,
 setting, and mood from the same propagating creative brief as every other
-creative call. Cue-specific shaping (the per-cue character template) is layered
-on top of the brief-derived context.
+creative call.
+
+TWO PRODUCTS since 2026-09-11 (operator, after listening to `moonlit_deception`:
+"the 'music' needs to be improved, doesn't sound like music ... sounds like
+radio hiss, which is what we asked. So I am asking to go over ALL musical
+prompts and make them more musical ... ideally it is relevant to the story"):
+
+* ``compose_music_prompt(meta, cue_id) -> (row_text, duration)`` -- the ROW
+  text: the ledger's ``generation_prompt`` / ``description`` for the cue, the
+  text hashed into ``cue_spec_sha256``, and what a reader of the ledger sees.
+  The brief's mood words, the musical DEVICES they call for, the story's
+  period idiom, the setting it evokes, the cue's arc, and the instrumental-only
+  tail. Story-relevant, and it reads as a musical instruction.
+* ``compose_engine_prompt(meta, row_text) -> EnginePrompt`` -- what the ENGINE
+  hears: the story palette's instruments first (`_otr_music_palette`), a
+  clean-studio production anchor, then the row text -- or an AUTHORED row's
+  text verbatim on the my_story / scifi_news_pro lanes -- capped at the
+  smallest engine budget (Sonilo refuses above 1000 characters) by trimming
+  the row text at a clause boundary, never raising. Plus the one negative
+  prompt for every engine that takes one. The per-engine "analog tape warmth
+  / vintage / radio" anchors that used to be prepended were the withdrawn ask
+  and appear nowhere.
 
 Mood resolution cascade (preserved from the audited musicgen path so a given
 brief yields the same music): v2 `music_mood_terms` (top 3) -> v1
-`story_brief_terms.atmosphere` (top 3) -> keyword-mined `news.script_brief` ->
-neutral "atmospheric". Plus a setting "evokes ..." clause, an optional period
-descriptor, the cue character, and the instrumental-only tail.
+`story_brief_terms.atmosphere` (top 3) -> keyword-mined produced logline /
+`news.script_brief` -> neutral "atmospheric".
 
-PURE: no I/O, no GPU, no engine imports. Consumers (the theme node + the legacy
-musicgen node until it is retired) import from here; this module imports only the
-brief reader. UTF-8 no BOM, ASCII-only, no em-dashes.
+PURE: no I/O, no GPU, no engine imports. Consumers (the theme node) import from
+here; this module imports only the brief reader and the palette. UTF-8 no BOM,
+ASCII-only, no em-dashes.
 """
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from ._otr_brief_reader import _read_brief_field, spoken_term
+from ._otr_music_palette import mood_devices, story_palette
 
 # Three fixed cues + durations (seconds). Durations are part of cue identity;
 # keep stable (mirrors the legacy MusicGen cue durations).
@@ -31,16 +53,41 @@ CUE_DURATIONS: dict[str, int] = {"opening": 12, "closing": 8, "interstitial": 4}
 # Universal instrumental-only tail, applied last so it always lands at the end.
 _PROMPT_TAIL = ", instrumental only, no dialogue, no vocals"
 
-# Per-cue musical character templates (the cue-specific shaping layered on top of
-# the brief-derived mood/setting/period context).
+# Per-cue ARC -- what the music DOES over its length, in musical terms. The
+# "intro" / "outro" words are kept on purpose: the SA3 engine's context window
+# still falls back to them for a caller that hands over no placement.
 _CUE_CHARACTER: dict[str, str] = {
-    "opening":      "slow atmospheric build, introduces the scene, "
-                    "ends on a sustained chord, instrumental intro",
-    "closing":      "resolving cadence, gentle decay into silence, "
-                    "instrumental outro",
-    "interstitial": "brief textural bridge, unresolved, short "
+    "opening":      "a rising overture that settles into a steady theme, "
+                    "instrumental intro",
+    "closing":      "a final statement of the theme resolving to a warm held "
+                    "chord, instrumental outro",
+    "interstitial": "a brief melodic bridge that hands off cleanly, short "
                     "instrumental transition",
 }
+
+#: What every engine hears after the instruments: a clean recording, not a
+#: degraded one. This is the ONLY production language in any music prompt.
+PRODUCTION_ANCHOR = "clearly recorded, clean balanced studio mix, natural room"
+
+#: The one negative prompt, for the engines that take one. It names the
+#: withdrawn texture explicitly so the model steers away from it.
+NEGATIVE_PROMPT_DEFAULT = (
+    "noise, static, hiss, white noise, radio static, crackle, distortion, "
+    "clipping, silence, speech, vocals, singing, lyrics, spoken word")
+
+#: The smallest engine budget in the pack (`eng_cloud_sonilo` refuses a
+#: longer prompt with a ValueError, and a render must never die on length).
+ENGINE_PROMPT_MAX_CHARS = 1000
+
+
+@dataclass(frozen=True)
+class EnginePrompt:
+    """What one engine call hears: the positive ``text``, the ``negative``
+    prompt, and the ``palette_key`` of the ensemble that leads the text."""
+    text: str
+    negative: str
+    palette_key: str
+
 
 # Keyword-mined mood tags from news.script_brief (last-ditch fallback when the
 # brief carries no music_mood_terms and no atmosphere). Case-insensitive.
@@ -74,24 +121,23 @@ def _mood_suffix(script_brief: str) -> str:
 
 
 def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
-    """Compose a music cue prompt from the Meta brief, returning (prompt,
+    """Compose a music cue's ROW text from the Meta brief, returning (prompt,
     duration_sec). Reads every brief field through the brief-reader protocol;
     never crashes on an absent / malformed brief (falls through to a neutral
-    atmospheric default + the cue character template).
+    atmospheric default + the house palette + the cue's arc).
     """
     terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
     if not isinstance(terms, dict):
         terms = {}
-
     setting_raw = terms.get("setting") or []
     if not isinstance(setting_raw, list):
         setting_raw = []
-    # Normalised: this is composed into the MusicGen TEXT prompt below, and the
+    # Normalised: this is composed into the music TEXT prompt below, and the
     # brief emits identifier case (PBUG-20260903-04).
     setting_terms = [spoken_term(t) for t in setting_raw if spoken_term(t)]
 
     # Mood: v2 music_mood_terms (via the protocol reader) -> v1 atmosphere ->
-    # keyword-mined news.script_brief.
+    # keyword-mined produced logline / news.script_brief.
     mood_terms: list[str] = []
     music_mood_raw = _read_brief_field(meta, "music_mood_terms", default=[])
     if isinstance(music_mood_raw, list):
@@ -123,24 +169,43 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
             mood_terms = [t.strip() for t in kw.split(",") if t.strip()] if kw else []
 
     setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""
-
-    # Period overlay: gen_params_initial.period_voice descriptor, read through
-    # the protocol so a future nested move needs no consumer change.
-    period_descriptor = ""
-    gen_params = meta.get("gen_params_initial") if isinstance(meta, dict) else None
-    if isinstance(gen_params, dict):
-        pv = gen_params.get("period_voice")
-        if isinstance(pv, dict):
-            descriptor = pv.get("descriptor") or pv.get("music_descriptor")
-            if isinstance(descriptor, str) and descriptor.strip():
-                period_descriptor = descriptor.strip()
+    palette = story_palette(meta)
 
     parts: list[str] = []
+    # The brief's own words first (story relevance a reader can check), then
+    # the musical devices those words call for, then the period idiom.
     parts.append(", ".join(mood_terms) if mood_terms else "atmospheric")
+    parts.extend(mood_devices(mood_terms))
+    parts.append(palette.idiom)
     if setting_str:
         parts.append(f"evokes {setting_str}")
-    if period_descriptor:
-        parts.append(period_descriptor)
     parts.append(_CUE_CHARACTER[cue_id])
     prompt = ", ".join(parts) + _PROMPT_TAIL
     return prompt, CUE_DURATIONS[cue_id]
+
+
+def _trim_at_clause(text: str, budget: int) -> str:
+    """``text`` cut to at most ``budget`` characters at a clause boundary when
+    one sits in the second half of the cut, else at the budget."""
+    cut = text[:max(0, budget)]
+    at = max(cut.rfind(", "), cut.rfind("; "), cut.rfind(". "))
+    if at > budget // 2:
+        cut = cut[:at]
+    return cut.rstrip(" ,;.")
+
+
+def compose_engine_prompt(meta: dict, row_text: str) -> EnginePrompt:
+    """What the engine hears for one cue: the story palette's instruments, the
+    production anchor, then ``row_text`` -- the composed row text on the
+    legacy lane, or an AUTHORED row's ``generation_prompt`` verbatim on the
+    my_story / scifi_news_pro lanes (the palette and anchor only ever go in
+    FRONT of it). Capped at ``ENGINE_PROMPT_MAX_CHARS`` by trimming the row
+    text at a clause boundary; never raises."""
+    palette = story_palette(meta)
+    head = f"{palette.instruments}, {PRODUCTION_ANCHOR}. "
+    body = str(row_text or "").strip()
+    budget = ENGINE_PROMPT_MAX_CHARS - len(head)
+    if len(body) > budget:
+        body = _trim_at_clause(body, budget)
+    return EnginePrompt(text=(head + body).strip(), negative=NEGATIVE_PROMPT_DEFAULT,
+                        palette_key=palette.key)

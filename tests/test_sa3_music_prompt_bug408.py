@@ -1,29 +1,19 @@
-"""BUG-LOCAL-408: SA3 music prompt + conditioning helpers (pure, no GPU).
+"""BUG-LOCAL-408: SA3 conditioning window (pure, no GPU).
 
-SA3 replaced MusicGen as the default music engine (2026-06-03) but sounded
-non-musical because the MusicGen-shaped abstract-mood prompts and the
-``seconds_total == dur`` conditioning gave it no genre/instrument anchor and no
-structural context. These helpers add an SA3-shaped genre anchor + a per-cue
-structural window. They are pure (no ComfyUI runtime) so they unit-test here.
+SA3 replaced MusicGen as the default music engine (2026-06-03) and sounded
+non-musical because ``seconds_total == dur`` gave it no structural context.
+``_sa3_clip_window`` places each cue inside a longer conditioning window: an
+opening at the head, a closing at the tail, an interstitial in the middle.
+
+The OTHER half of the 408 fix -- an SA3-only era/genre anchor prepended to
+the prompt, with "analog tape warmth" in every branch -- was retired on
+2026-09-11: the operator withdrew the radio-hiss texture ("make them more
+musical") and the instruments now come from the story palette through the
+shared composer (`_otr_music_prompt.compose_engine_prompt`), for EVERY engine.
+`tests/test_music_prompts_are_musical.py` pins that the engine no longer
+prepends anything.
 """
-from nodes._otr_audio_engines.eng_stable_audio_3 import (
-    _sa3_augment_prompt, _sa3_clip_window, _SA3_DEFAULT_GENRE,
-)
-
-
-def test_sa3_augment_prepends_genre_keeps_prompt_bug408():
-    base = ("minor mode, unresolved tension, evokes derelict station, slow "
-            "atmospheric build, instrumental only, no dialogue, no vocals")
-    out = _sa3_augment_prompt(base)
-    assert out.endswith(base)                 # original brief text preserved
-    assert out != base                        # a genre anchor was prepended
-    # era-aware: a 1950s cue gets the vintage sci-fi anchor (theremin etc.)
-    assert "theremin" in _sa3_augment_prompt("1950s atomic-age, instrumental intro")
-    # no era keyword -> the default cinematic anchor leads
-    assert _sa3_augment_prompt("just vibes").startswith(_SA3_DEFAULT_GENRE)
-    # empty / None safe
-    assert _sa3_augment_prompt("") == _SA3_DEFAULT_GENRE
-    assert _sa3_augment_prompt(None) == _SA3_DEFAULT_GENRE
+from nodes._otr_audio_engines.eng_stable_audio_3 import _sa3_clip_window
 
 
 def test_sa3_clip_window_places_cue_in_context_bug408():
@@ -45,4 +35,14 @@ def test_sa3_clip_window_places_cue_in_context_bug408():
     s, t = _sa3_clip_window("opening theme, slow build", 12.0, 12.0)
     assert s == 0.0 and t == 12.0
     s, t = _sa3_clip_window("closing theme, gentle decay", 8.0, 12.0)
+    assert abs(s - 4.0) < 1e-6 and t == 12.0
+
+
+def test_sa3_clip_window_is_driven_by_the_placement_name_first():
+    """The theme node hands the cue's placement over (2026-09-11); a bare
+    placement word resolves the window without any prompt text at all."""
+    assert _sa3_clip_window("opening", 12.0, 12.0) == (0.0, 12.0)
+    s, t = _sa3_clip_window("closing", 8.0, 12.0)
+    assert abs(s - 4.0) < 1e-6 and t == 12.0
+    s, t = _sa3_clip_window("interstitial", 4.0, 12.0)
     assert abs(s - 4.0) < 1e-6 and t == 12.0

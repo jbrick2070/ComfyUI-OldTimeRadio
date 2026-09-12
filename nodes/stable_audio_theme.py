@@ -28,7 +28,7 @@ import gc
 import logging
 
 from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
-from ._otr_music_prompt import compose_music_prompt
+from ._otr_music_prompt import compose_engine_prompt, compose_music_prompt
 
 log = logging.getLogger("OTR")
 
@@ -220,6 +220,7 @@ class StableAudioTheme:
                     "cue_spec_sha256": row.get("cue_spec_sha256"),
                     "placement": row["placement"],
                     "anchor_line_id": row.get("anchor_line_id"),
+                    "render_receipt": self._render_receipt(row, cue_slice, int(sr)),
                     "seed": int(row["seed"]),
                     "requested_duration_s": float(row["requested_duration_s"]),
                     "actual_duration_s": float(sample_count) / float(sr),
@@ -283,13 +284,28 @@ class StableAudioTheme:
             prompt = spec["prompt"]
             duration_s = spec["requested_duration_s"]
             engine_seed = _seed_to_int64(music_seed_base, spec["seed_key"])  # G1
+            # The ROW text stays the cue's identity (ledger generation_prompt,
+            # cue_spec_sha256). The ENGINE hears the story palette and a clean
+            # production anchor in front of it, plus the negative prompt --
+            # one composer for every engine (2026-09-11: "make it musical").
+            engine_prompt = compose_engine_prompt(meta, prompt)
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
             with deterministic_inference(engine_seed, warn_only=True):
-                clip = adapter.generate_clip(prompt, duration_s, engine_seed)
+                clip = adapter.generate_clip(
+                    engine_prompt.text, duration_s, engine_seed,
+                    placement=spec["placement"],
+                    negative_prompt=engine_prompt.negative)
             cue_rows.append({
                 "cue_id": spec["cue_id"],
                 "placement": spec["placement"],
+                "engine_prompt": engine_prompt.text,
+                "negative_prompt": engine_prompt.negative,
+                "palette_key": engine_prompt.palette_key,
+                "engine_receipt": (
+                    dict(clip.get("receipt") or {})
+                    if isinstance(clip, dict) and isinstance(clip.get("receipt"), dict)
+                    else {}),
                 "prompt": prompt,
                 "seed": int(engine_seed),
                 "requested_duration_s": float(duration_s),
@@ -424,6 +440,37 @@ class StableAudioTheme:
         except Exception:  # noqa: BLE001
             return None
         return None
+
+    @staticmethod
+    def _render_receipt(row, waveform, sample_rate):
+        """What the engine actually heard and did for this cue, plus the peak
+        facts of what came back -- the receipt the ledger carries so a
+        listening verdict can be traced to a prompt, a seed and a window
+        (operator 2026-09-11: "the music needs to be improved"). Best-effort:
+        a failure to measure is a receipt with nulls, never a lost cue."""
+        receipt = {
+            "engine_prompt": str(row.get("engine_prompt") or ""),
+            "negative_prompt": str(row.get("negative_prompt") or ""),
+            "palette_key": str(row.get("palette_key") or ""),
+            "params": dict(row.get("engine_receipt") or {}),
+            "sample_rate": int(sample_rate),
+            "peak_dbfs": None,
+            "clipped_samples": None,
+        }
+        try:
+            import math
+            import numpy as np
+            arr = (waveform.detach().cpu().numpy()
+                   if hasattr(waveform, "detach") else np.asarray(waveform))
+            arr = np.nan_to_num(np.asarray(arr, dtype=np.float64),
+                                nan=0.0, posinf=0.0, neginf=0.0)
+            peak = float(np.max(np.abs(arr))) if arr.size else 0.0
+            receipt["peak_dbfs"] = (round(20.0 * math.log10(peak), 2)
+                                    if peak > 0.0 else None)
+            receipt["clipped_samples"] = int(np.count_nonzero(np.abs(arr) >= 1.0))
+        except Exception:  # noqa: BLE001 -- a receipt never costs a cue
+            pass
+        return receipt
 
     @staticmethod
     def _write_cue_wav(audio_dir, cue_id, waveform, sample_rate):

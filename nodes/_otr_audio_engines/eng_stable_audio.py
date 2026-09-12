@@ -103,7 +103,8 @@ class StableAudioMusicEngine:
     def unload(self):
         self._model = None
 
-    def generate_clip(self, prompt, duration_s, seed):
+    def generate_clip(self, prompt, duration_s, seed, *,
+                      placement="", negative_prompt=""):  # noqa: ARG002
         """Text prompt -> stereo AUDIO clip ``{"waveform", "sample_rate"}``.
 
         Implemented to the documented assumed_call:

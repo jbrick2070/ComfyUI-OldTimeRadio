@@ -279,9 +279,9 @@ class TestV2PathCoexistsWithCompositionSpine:
         """Each cue's per-cue character template still appends."""
         meta = _meta_v2_full()
         for cue_id, expected_marker in (
-            ("opening",      "atmospheric build"),
-            ("closing",      "resolving cadence"),
-            ("interstitial", "textural bridge"),
+            ("opening",      "rising overture"),
+            ("closing",      "resolving to a warm held chord"),
+            ("interstitial", "melodic bridge"),
         ):
             prompt, _ = _compose_music_prompt(meta, cue_id)
             assert expected_marker in prompt, (

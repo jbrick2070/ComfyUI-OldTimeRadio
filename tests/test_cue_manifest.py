@@ -214,7 +214,7 @@ def test_legacy_three_cue_byte_parity(monkeypatch):
 
     calls = []
 
-    def _gen(prompt, duration_s, seed):
+    def _gen(prompt, duration_s, seed, **kwargs):
         calls.append({"prompt": prompt, "duration_s": duration_s, "seed": seed})
         return _det_clip(prompt, duration_s, seed)
 

@@ -90,7 +90,8 @@ class MusicGenEngine:
         except Exception:  # noqa: BLE001 -- teardown must never raise
             pass
 
-    def generate_clip(self, prompt, duration_s, seed):
+    def generate_clip(self, prompt, duration_s, seed, *,
+                      placement="", negative_prompt=""):  # noqa: ARG002
         """One music cue -> mono AUDIO {"waveform":[1,1,T], "sample_rate"}.
 
         Runs inside the caller's deterministic_inference wrap; seeds torch from

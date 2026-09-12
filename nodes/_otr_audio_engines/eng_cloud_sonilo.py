@@ -110,7 +110,8 @@ class SoniloCloudMusic:
     def unload(self) -> None:
         return None
 
-    def generate_clip(self, prompt, duration_s, seed):
+    def generate_clip(self, prompt, duration_s, seed, *,
+                      placement="", negative_prompt=""):  # noqa: ARG002
         """One theme cue -> a canonicalized stereo AUDIO clip, via Comfy Cloud.
 
         FAIL-LOUD, NO FALLBACK: a blank prompt or any provider/auth/budget failure
