@@ -115,6 +115,7 @@ full denominator.
 
 | Row | What to write |
 |---|---|
+| ROCm tester recruitment (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm sooner than later, to see if they know a good way to rent a cheap cloud ROCm box, or if someone wants to volunteer testing -- but let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* In order: (1) a generated variant of the canonical workflow pinned to the engines most likely to run on ROCm (pure PyTorch; no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) via `scripts/build_variants.py` -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install (the registry serves alpha.24, git gives the tree), the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste (never posted by a window). A side-quest chip was spawned for this the same night; if it was not started, this row is the work. |
 | 2.4 audit tail, model-root | The four-owner model-root merge, or nothing. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `flux2_klein.py:209-215`. |
 
 ### 5B. NEEDS A MEASUREMENT OR A DECISION, not another round
@@ -128,6 +129,37 @@ full denominator.
 
 ## 6. Blocked on the operator -- each unblocks with one word
 
+* **A per-style SD1.5 checkpoint (your idea, 2026-09-11 night: "maybe we should
+  be loading different SD1.5 models per visual pack -- an anime SD1.5 would really
+  pop").** Today the still engine (`nodes/_otr_image_engines/sd15.py`) loads ONE
+  checkpoint for every style, `v1-5-pruned-emaonly-fp16.safetensors`, and
+  `OTR_SD15_CKPT` overrides it globally; the style catalog
+  (`nodes/_otr_visual_styles.py`) has no per-style model field, and the anime
+  style contributes only the words "anime style" to the prompt. The build is
+  small and settled in shape: a `checkpoint` key per style in the catalog, the
+  engine resolving it through the one resolver (style first, then the env, then
+  the default), the file under `C:\ComfyUI-Models\checkpoints`, a variant note for
+  8 GB cards (SD1.5 fits). **Unblocks with the checkpoint name you want for anime**
+  (and any other style you want re-pointed); the measurement is one style, two
+  checkpoints, your eye.
+* **An IP-Adapter on the AnimateDiff lanes (your question, 2026-09-11 night:
+  "wondering if we should be using an IP adapter so AnimateDiff can take ref
+  images").** Grounded: the pack has five AnimateDiff SD1.5 lanes (the ghost-signal
+  family in `nodes/_otr_video_engines/eng_ghost_signal*.py`: v2, v3, v3 haunted,
+  Lightning, and the still-conditioned lab lane, which already takes the beat's
+  own still as its init image); AnimateLCM was deliberately refused by the ghost
+  recipe (documented at `eng_ghost_signal.py:102`, the recipe runs cfg 1.0 with
+  its own scheduler pair); and there is NO IP-Adapter anywhere in the pack. An
+  IP-Adapter drives STYLE from a reference image (CLIP-vision, not the init
+  latent) and would need the IP-Adapter model files plus a node that ComfyUI
+  does not ship natively (the IPAdapter-plus pack), so it is a new dependency
+  decision for the registry story, and a video-lane recipe change (recipes are
+  hard-won: one lane, A/B against itself, your eye). The other three tricks in
+  the tutorial you pasted the pack already does: the ghost lanes lean on grain
+  and degradation to hide morphing, they run low cfg, and the title / timecode /
+  captions are burned in post by the caption burn, not generated. **Unblocks
+  with: which lane to try it on and where the reference image comes from (the
+  episode's own style card, the beat still, or a fixed mood board).**
 * **5.1-5.2 release after physical 8 GB proof.** After the wave reports the 4060's
   physical 8 GB legs, rule on promoting the 8 GB ship set.
 * **Unruled product choices and Bible fan-out candidates.** The pointer is to a

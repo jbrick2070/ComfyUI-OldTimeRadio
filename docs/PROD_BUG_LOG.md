@@ -14650,3 +14650,31 @@ probe-back path the Mac artifact died in.
 
 **Verify:** `tests/test_cold_install_composite_and_mux.py`; live leg `laughter_in_the_shadows_20260911_214126` on
 the same cold environment: RESULT SUCCESS, obs_publish OK, 478 s; the composite, mux, scopes and blend measured through PyAV with no ffprobe on the box.
+
+## PBUG-20260911-07 -- one transient set the level of the whole episode (fixed `10ab1f0c`)
+
+**Artifact:** `moonlit_deception_20260911_185439` final: **-29.44 LUFS** integrated
+(sample peak -1.00 dBFS) against the project's -14 target; the operator: *"I'm
+worried our volume is too low ... may not be normalizing right, or we need to bump
+it up."* The same code shipped `laughter_in_the_shadows_20260911_214126` at -14.98.
+
+**Cause:** `scene_sequencer._master_loudness` measured LUFS, applied one gain to
+target, then guarded the ceiling with a WHOLE-FILE scale (`waveform * ceiling /
+new_peak`), whose comment said it "does not fire" on real episodes. It fired by
+15.42 dB: the opening music cue carried a clipped noise burst at 9.6 s, the gain
+pushed it far over the ceiling, and the rail scaled the entire 113 s master back
+down until that one burst sat at -1 dBFS -- dialogue included. The receipt did not
+record how much the rail took.
+
+**Fix:** the rail is a deterministic look-ahead limiter (`_limit_peaks`: 1 ms
+blocks, 5 ms look-ahead, 60 dB/s release, the block value held under the ramp so
+no sample escapes, numpy only, no RNG) that touches only the samples around a
+peak; a bounded correction pass (at most two) re-measures after limiting so the
+delivered level reaches the target; the receipt carries the total overshoot, the
+engaged fraction, the corrections, the delivered LUFS and the rail residue; a hard
+day is logged as a MIX problem, never a failure. Design reviewed by codex r1
+(yes-with-fixes; both must-fixes folded).
+
+**Verify:** `tests/test_master_loudness_limiter.py`; the real master of
+`moonlit_deception` re-mastered offline: old rail -29.42 LUFS, new limiter
+**-14.44 LUFS**, peak -1.00 dBFS, engaged 1.1% of the time, zero rail residue.

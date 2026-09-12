@@ -39,8 +39,19 @@ diff (clean; the one regex misfire it found -- "hopeless" read as warmth -- is
 fixed in the follow-up commit with the loudness limiter). Neuter passes:
 10/10, 22/22, 13/13. Full-suite failure identities 51 == 51 before every push.
 
+**Then the volume (his message, same night: "our volume is too low ... may not be
+normalizing right, or we need to bump it up").** Measured: `moonlit_deception` final
+-29.44 LUFS, `laughter_in_the_shadows` -14.98, target -14. The loudness master's
+peak rail was a WHOLE-FILE scale, so the clipped music burst pinned the entire
+episode 15 dB low. `10ab1f0c`: the rail is a look-ahead limiter
+(PBUG-20260911-07); moonlit's own master re-mastered offline lands at -14.44 LUFS.
+Reviewed by codex r1 (yes-with-fixes, folded) and Sonnet QA. The same commit
+carries the two music QA follow-ups (bounded hope/love stems; the composed row
+keeps its instrumental tail on overflow) and the mux docstring.
+
 **Pending for the operator:** listen to `laughter_in_the_shadows_20260911_214126` (music) and say whether the
-music is now music; `pyproject.toml` gets `av>=17.0.0` at the next version bump
+music is now music; the NEXT episode rendered carries the limiter -- listen for
+level and for pumping around any loud moment; `pyproject.toml` gets `av>=17.0.0` at the next version bump
 (plan row); the 4060 / Mac / RunPod wave stays parked until released.
 
 **Still open, unchanged:** the wave paste blocks (freeze at the final hash once
