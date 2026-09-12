@@ -199,8 +199,12 @@ PIECES = [
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("--ckpt", default="stable_audio_3_small_music.safetensors")
-    ap.add_argument("--cfg", type=float, default=7.0)
+    # Defaults are what the engine SHIPS for a base checkpoint (2026-09-12):
+    # the base file and its guidance. The old pair -- the post-trained file
+    # at cfg 7 -- is PBUG-20260912-03 itself, and a bench whose default arm
+    # is the defect measures the wrong thing unless every caller remembers.
+    ap.add_argument("--ckpt", default="stable_audio_3_small_music_base.safetensors")
+    ap.add_argument("--cfg", type=float, default=4.0)
     ap.add_argument("--steps", type=int, default=100)
     ap.add_argument("--sampler", default="dpmpp_3m_sde_gpu")
     ap.add_argument("--scheduler", default="exponential")

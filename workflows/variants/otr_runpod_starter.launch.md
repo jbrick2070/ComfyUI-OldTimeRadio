@@ -35,7 +35,7 @@ This file is a generated profile manifest, not a second RunPod guide. Use the si
 - Wan2.2-TI2V-5B-Q5_K_M.gguf
 - umt5-xxl-encoder-Q5_K_M.gguf
 - wan2.2_vae.safetensors
-- stable_audio_3_small_music.safetensors
+- stable_audio_3_small_music_base.safetensors
 - t5gemma_b_b_ul2.safetensors
 - qwen_3_4b.safetensors
 - ae.safetensors

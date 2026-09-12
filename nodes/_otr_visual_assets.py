@@ -1,8 +1,9 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the SEVEN allowlisted default
-files below can be fetched (three z_image_turbo, two ltx_8gb, two stable_audio_3 --
-it said five until the stable_audio_3 rows landed 2026-09-06). Existing native loader choices are preserved, not
+No model imports or network at module import. Only the EIGHT allowlisted
+files below can be fetched (three z_image_turbo, two ltx_8gb, three stable_audio_3 --
+it said five until the stable_audio_3 rows landed 2026-09-06, and seven until the
+base checkpoint row landed 2026-09-12). Existing native loader choices are preserved, not
 rehash-qualified, and readiness is NOT a claim of GPU/render compatibility.
 Other engines keep their existing adapter checks with explicit uncovered logs.
 """
@@ -32,8 +33,21 @@ _SOURCES = (
     # fetching. That left musicgen as the only music engine that self-supplies,
     # and musicgen is CC-BY-NC -- so every published episode carried a
     # non-commercial music bed by default. Filenames verified against the live
-    # Hub listing and against the checkpoint the SA3 engine resolves
-    # (StableAudio3Engine.resolve_ckpt) plus its ._TENC text encoder.
+    # Hub listing.
+    #
+    # TWO CHECKPOINT ROWS FOR ONE ENGINE, AND THE PREFERENCE IS THE ENGINE'S,
+    # NOT THIS TABLE'S (2026-09-12). `native_requests` downloads whatever
+    # name `StableAudio3Engine.resolve_ckpt()` returns; this table only says
+    # what it is ALLOWED to download. With nothing on disk the engine names
+    # its fetch default -- the BASE checkpoint, the only one whose cfg and
+    # negative prompt are live (PBUG-20260912-03) -- and a test pins that the
+    # fetch default is a key here, because until 2026-09-12 the engine fell
+    # through to the post-trained name and every fresh install fetched the
+    # wrong file. The post-trained row stays so an explicit OTR_SA3_CKPT pin
+    # (the A/B harness's control arm) can still be fetched on a box that
+    # lacks it; it is never chosen by default.
+    ("checkpoints", "Comfy-Org/stable-audio-3",
+     "checkpoints/stable_audio_3_small_music_base.safetensors"),  # 2,270,384,940 B
     ("checkpoints", "Comfy-Org/stable-audio-3",
      "checkpoints/stable_audio_3_small_music.safetensors"),   # 2,270,384,940 B
     ("text_encoders", "Comfy-Org/stable-audio-3",
@@ -419,10 +433,9 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # Being in `_COVERED` even suppressed the "coverage unavailable" note
         # that would otherwise have said so out loud.
         #
-        # `_CKPT` / `_TENC` are the adapter's own resolved names and already
-        # honour OTR_SA3_CKPT / OTR_SA3_TEXT_ENCODER, so an operator pin is
-        # passed through as `explicit` exactly as the Z-Image branch does with
-        # its own env keys.
+        # `resolve_ckpt()` / `_TENC` already honour OTR_SA3_CKPT /
+        # OTR_SA3_TEXT_ENCODER, so an operator pin is passed through as
+        # `explicit` exactly as the Z-Image branch does with its own env keys.
         if sa3 is None:
             raise VisualAssetError("stable_audio_3 adapter resolution is unavailable")
         # ASK THE ADAPTER, DO NOT READ ITS CONSTANT (2026-09-12). `_CKPT` used

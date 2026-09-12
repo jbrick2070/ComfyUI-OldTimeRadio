@@ -119,7 +119,12 @@ def _scan(path: str) -> dict:
             continue
         src += "\n" + io.open(extra, encoding="utf-8", errors="replace").read()
     return {
-        "weights": sorted(set(_WEIGHT_RE.findall(src))),
+        # A SUFFIX IS NOT A FILE (2026-09-12). `endswith("_base.safetensors")`
+        # in the SA3 adapter matched the weight regex and the index told
+        # readers to download a file called `_base.safetensors`. A real
+        # weight name never starts with the separator.
+        "weights": sorted({w for w in _WEIGHT_RE.findall(src)
+                           if not w.startswith(("_", ".", "-"))}),
         "repos": sorted({r for r in _REPO_RE.findall(src)
                          if any(r.startswith(p) for p in _PUBLISHERS)}),
         "env": sorted({e for e in _ENV_RE.findall(src)

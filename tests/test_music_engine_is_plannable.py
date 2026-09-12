@@ -155,8 +155,19 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
             return [str(ROOT / "_nonexistent" / category)]
 
     class _SA3:
-        _CKPT = "stable_audio_3_small_music.safetensors"
+        """The adapter surface the preflight uses: `resolve_ckpt()` -- the
+        name it WILL load, which on an empty disk is the BASE fetch default
+        (2026-09-12) -- and the text-encoder constant. `_CKPT` is the
+        operator's override and is empty by default (PBUG-20260912-05); the
+        preflight must never read it as a filename."""
+        _CKPT = ""
+        _FETCH_DEFAULT = "stable_audio_3_small_music_base.safetensors"
         _TENC = "t5gemma_b_b_ul2.safetensors"
+
+        class StableAudio3Engine:
+            @staticmethod
+            def resolve_ckpt():
+                return ("stable_audio_3_small_music_base.safetensors", True)
 
     def test_selecting_the_music_engine_requests_its_two_files(self):
         reqs = VA.native_requests({"stable_audio_3"},
@@ -165,7 +176,7 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
         got = {(r["category"], r["token"]) for r in reqs}
         self.assertEqual(
             got,
-            {("checkpoints", self._SA3._CKPT),
+            {("checkpoints", self._SA3._FETCH_DEFAULT),
              ("text_encoders", self._SA3._TENC)},
             "the music engine must request the checkpoint AND its text encoder")
         for r in reqs:
@@ -176,7 +187,7 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
     def test_both_files_are_in_the_allowlist(self):
         """download_verified refuses anything not in MANIFEST.values(), so a
         request whose spec is absent would fail at transfer rather than here."""
-        for category, token in (("checkpoints", self._SA3._CKPT),
+        for category, token in (("checkpoints", self._SA3._FETCH_DEFAULT),
                                 ("text_encoders", self._SA3._TENC)):
             self.assertIn((category, token), VA.MANIFEST,
                           "%s/%s is not allowlisted" % (category, token))
@@ -186,6 +197,42 @@ class PlannedEngineBecomesADownloadRequestTests(unittest.TestCase):
             VA.native_requests({"stable_audio_3"},
                                folder_paths=self._FolderPaths(),
                                sa3=None, env={})
+
+    def test_the_real_adapter_on_an_empty_disk_requests_its_fetch_default(self):
+        """THE WIRING, NOT THE STUB (cursor, finished-diff review 2026-09-12).
+        The stub above mirrors the adapter's intended answer, so it cannot
+        notice the adapter changing its mind. This hands `native_requests`
+        the REAL engine module with nothing installed and asserts that the
+        checkpoint it asks for is the engine's own fetch default -- a base
+        file -- and that the manifest can supply it. Until 2026-09-12 this
+        path requested the post-trained file on every fresh install."""
+        import sys
+        import types
+        from nodes._otr_audio_engines import eng_stable_audio_3 as real_sa3
+        fake = types.ModuleType("folder_paths")
+        fake.get_full_path = lambda kind, name: None
+        saved_ckpt = real_sa3._CKPT
+        saved_module = sys.modules.get("folder_paths")
+        real_sa3._CKPT = ""
+        sys.modules["folder_paths"] = fake
+        try:
+            reqs = VA.native_requests({"stable_audio_3"},
+                                      folder_paths=self._FolderPaths(),
+                                      sa3=real_sa3, env={})
+        finally:
+            real_sa3._CKPT = saved_ckpt
+            if saved_module is None:
+                sys.modules.pop("folder_paths", None)
+            else:
+                sys.modules["folder_paths"] = saved_module
+        ckpt = [r for r in reqs if r["category"] == "checkpoints"]
+        self.assertEqual(len(ckpt), 1, reqs)
+        self.assertEqual(ckpt[0]["token"], real_sa3._FETCH_DEFAULT)
+        self.assertTrue(ckpt[0]["token"].endswith("_base.safetensors"),
+                        "a fresh install must be sent to a BASE checkpoint")
+        self.assertIsNotNone(ckpt[0]["spec"],
+                             "the fetch default has no manifest spec, so it "
+                             "could never download")
 
 
 class ShippedGraphWiresTheAudioChainTests(unittest.TestCase):

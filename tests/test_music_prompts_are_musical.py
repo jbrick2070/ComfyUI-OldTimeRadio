@@ -328,12 +328,45 @@ def test_an_install_with_only_the_post_trained_file_still_renders(monkeypatch):
 
 def test_resolution_never_raises_when_comfy_is_absent(monkeypatch):
     """This runs inside a render and off it; an import that is not there is not
-    a reason to lose an episode."""
+    a reason to lose an episode. With nothing to ask, the answer is the file a
+    fresh install should FETCH -- the base one -- never the post-trained
+    fallback: falling through to the fallback is what sent every fresh
+    install the wrong download until 2026-09-12."""
     monkeypatch.setattr(SA3, "_CKPT", "")
     import sys
     monkeypatch.setitem(sys.modules, "folder_paths", None)
     name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
-    assert name == SA3._CKPT_PREFERENCE[-1] and is_base is False
+    assert name == SA3._FETCH_DEFAULT and is_base is True
+
+
+def test_a_fresh_install_is_sent_to_a_file_the_manifest_can_fetch(monkeypatch):
+    """THE WIRING THAT WAS MISSING. The visual-asset preflight downloads
+    whatever name `resolve_ckpt()` returns, and on an empty disk that name
+    used to be the post-trained file: a fresh install fetched the one
+    checkpoint whose negative prompt is inert and ran PBUG-20260912-03's
+    configuration forever, on every machine but this one. The engine's fetch
+    default must be a BASE file, must be in its own preference ladder, and
+    must be a name the manifest is allowed to download -- otherwise the
+    preflight refuses the download and the wrong render becomes a dead one."""
+    from nodes import _otr_visual_assets as VA
+    monkeypatch.setattr(SA3, "_CKPT", "")
+    import sys
+    import types
+    fake = types.ModuleType("folder_paths")
+    fake.get_full_path = lambda kind, name: None          # nothing on disk
+    monkeypatch.setitem(sys.modules, "folder_paths", fake)
+    name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
+    assert name == SA3._FETCH_DEFAULT and is_base is True
+    assert name.endswith("_base.safetensors")
+    assert name in SA3._CKPT_PREFERENCE
+    assert ("checkpoints", name) in VA.MANIFEST, (
+        "a fresh install would ask to download %s and the manifest would "
+        "refuse it" % name)
+    # The post-trained file stays ALLOWLISTED (an explicit OTR_SA3_CKPT pin,
+    # the A/B harness's control arm, must still be fetchable) but is never
+    # what an empty disk is sent to fetch.
+    assert ("checkpoints", SA3._CKPT_PREFERENCE[-1]) in VA.MANIFEST
+    assert SA3._CKPT_PREFERENCE[-1] != name
 
 
 def test_the_guidance_a_checkpoint_gets_is_the_one_it_can_answer(monkeypatch):

@@ -50,6 +50,19 @@ log = logging.getLogger("OTR")
 #: clean cue, because the cfg below follows the checkpoint.
 _CKPT_PREFERENCE = ("stable_audio_3_small_music_base.safetensors",
                     "stable_audio_3_small_music.safetensors")
+#: WHAT A FRESH INSTALL IS SENT TO FETCH (2026-09-12). With NO checkpoint on
+#: disk, `resolve_ckpt` used to fall through to the LAST entry above -- the
+#: post-trained file -- and the visual-asset preflight downloads whatever
+#: name the engine returns. So every fresh install fetched the one file whose
+#: negative prompt is inert and then ran it forever: the exact configuration
+#: PBUG-20260912-03 was written to escape, on every machine except the one
+#: where the base file had been fetched by hand. The fall-through now names
+#: the base file, and `tests/test_music_prompts_are_musical.py` pins that
+#: this name is one `_otr_visual_assets.MANIFEST` is allowed to download.
+#: The medium checkpoint was benched against this one the same day
+#: (docs/2026-09-12-music-model-bench/): 9.22 GB, unproven on 8 GB, and the
+#: operator's ear decides it -- it is not a default.
+_FETCH_DEFAULT = _CKPT_PREFERENCE[0]
 #: A base checkpoint can be steered, so it gets real guidance: 4.0 measured
 #: clean across a 1.0-6.0 sweep with the healthiest peak (-2.2 dBFS). A
 #: post-trained one cannot, so it gets the value its own publisher
@@ -242,8 +255,11 @@ class StableAudio3Engine:
 
         An explicit ``OTR_SA3_CKPT`` always wins -- that is how the A/B
         harness moves the variable. Otherwise the base file is taken when it
-        is on disk and the post-trained one when it is not, so an install
-        that never downloads anything keeps rendering.
+        is on disk and the post-trained one when only it is there, so an
+        install that never downloads anything keeps rendering. With NOTHING
+        on disk, or no ComfyUI to ask, the answer is ``_FETCH_DEFAULT``: the
+        file a fresh install should download, never the fallback it should
+        merely tolerate -- the preflight fetches whatever name this returns.
         """
         if _CKPT:
             return _CKPT, _CKPT.endswith("_base.safetensors")
@@ -254,7 +270,9 @@ class StableAudio3Engine:
                     return name, name.endswith("_base.safetensors")
         except Exception:  # noqa: BLE001 -- resolution never costs a render
             pass
-        return _CKPT_PREFERENCE[-1], False
+        # Derived, not hardcoded: if the fetch default ever moved to a
+        # post-trained name, a literal True here would hand it base guidance.
+        return _FETCH_DEFAULT, _FETCH_DEFAULT.endswith("_base.safetensors")
 
     def _ckpt_present(self):
         try:
@@ -322,15 +340,21 @@ class StableAudio3Engine:
         # 12 s opening cue got seconds_total == dur -- a self-contained,
         # loop-shaped request, and the exact condition BUG-408 existed to
         # remove. Live windows today: opening 36 s, closing 24 s,
-        # interstitial 12 s. cfg=7.0 -- NOT, as this comment long claimed, the "SA3 native
-        # default": Comfy-Org ships its checkpoints in matched base/non-base
-        # pairs and gives each its own recipe, verified against the two
-        # templates in comfyui_workflow_templates 0.11.55 --
+        # interstitial 12 s. THE GUIDANCE APPLIED BELOW IS `_sa3_guidance(is_base)`:
+        # 4.0 on a base checkpoint, 1.0 on a post-trained one
+        # (PBUG-20260912-03) -- not the cfg=7.0 this comment long called the
+        # "SA3 native default". Comfy-Org ships its checkpoints in matched
+        # base/non-base pairs and gives each its own recipe, verified against
+        # the two templates in comfyui_workflow_templates 0.11.55 --
         #   audio_stable_audio_3_medium.json       steps=8  cfg=1 lcm simple
         #   audio_stable_audio_3_medium_base.json  steps=50 cfg=7 lcm simple
-        # We load stable_audio_3_small_music, the NON-base (distilled) member,
-        # so Comfy-Org's own default for it is cfg=1 / 8 steps. Ours is the
-        # base recipe and then double the steps. MEASURED A/B on a Mac mini M4
+        # We PREFER the base member (`_CKPT_PREFERENCE`, 2026-09-12), whose
+        # PUBLISHED recipe is cfg=7 / 50 steps; we run 4.0, measured clean
+        # across a 1.0-6.0 sweep with the healthiest peak. A box holding only
+        # the post-trained member gets cfg=1, its own publisher's default.
+        # The sampler pair is `dpmpp_3m_sde_gpu` / `exponential` at 100 steps
+        # -- the Stable Audio 1.0 template's, not any SA3 template's; the
+        # "Which SA3 recipe ships" plan row owns that. MEASURED A/B on a Mac mini M4
         # (same checkpoint, seed and prompt, one 12 s cue): ours 22.3 s, theirs
         # 2.1 s -- 10.6x -- with both producing valid non-silent audio at an
         # identical 0.0003 dBFS peak (RMS -14.76 vs -16.17, noise floor -37.4
@@ -392,14 +416,15 @@ class StableAudio3Engine:
                             "negative_prompt": str(neg_text),
                             "denoise": float(denoise),
                             "context_ratio": _sa3_context_ratio(),
-                            # WHICH MODEL MADE THIS CUE. The family ships a
-                            # small variant its own publisher describes as
-                            # "on-device-friendly loops" and a medium one
-                            # built for "stronger structure and musicality";
-                            # a receipt that does not say which one played
-                            # cannot answer the operator's question about
-                            # the music, and the A/B harness refuses to
-                            # measure an arm it cannot attribute.
+                            # WHICH MODEL MADE THIS CUE. The family ships
+                            # small and medium checkpoints, each in a base
+                            # and a post-trained form, and they render the
+                            # same prompt differently (measured 2026-09-12,
+                            # docs/2026-09-12-music-model-bench/); a receipt
+                            # that does not say which one played cannot
+                            # answer the operator's question about the
+                            # music, and the A/B harness refuses to measure
+                            # an arm it cannot attribute.
                             "ckpt": str(ckpt_name),
                             "seconds_start": float(seconds_start),
                             # Recorded so the receipt cannot be read as proof

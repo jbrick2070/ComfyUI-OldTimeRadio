@@ -1,3 +1,123 @@
+## 2026-09-12 (mid-morning) -- which music model ships, benched; and the fetch path finally names a base file
+
+**Rows taken:** section 1 "Which music model ships" and section 2 "The music
+fix reaches only this machine". Both leave the plan; one new one-word ruling
+enters section 3. Operator, in his words this morning: *"the whole machine is
+yours"* and *"feel free to kill all comfy processes unless you need them"*.
+
+**THE ROW'S PREMISE WAS WRONG, AND IT DID NOT MATTER.** *"Small-Music is a
+LOOP model by its publisher's own description"* is not on the card. The live
+`stabilityai/stable-audio-3-small-music` card says "variable length audio
+generation ... several minutes of audio" and its own example asks for 120 s;
+the words "loop" and "one-shot" do not appear. The loop wording belongs to
+Stable Audio OPEN 1.0 and reached us through a comment in
+`_otr_music_prompt.py` written about that other model. What is true is the
+measurement: the operator's cue had a ~0.25 s envelope period. So the bench
+asked the real question -- does a bigger checkpoint render the show's cues
+with less repeat, at a cost the pack can carry.
+
+**THE BENCH** (`docs/2026-09-12-music-model-bench/`, scripts and per-render
+JSON beside the anchor; 56 MP3 clips plus a README in
+`output/otr/obs/music_model_bench/`, same seed and prompt across arms). Three
+arms: small base (0.6B, on disk), medium base (2B, 9.22 GB, on disk since
+02:24), ACE-Step 1.5 (fetched this session, 14.7 GB, blueprint recipe). Six
+prompt families -- two organ pieces as the burst control, the Shakespeare
+opening and closing cues composed by the pack's own composer, the Chicago
+house and Detroit techno opening cues -- three seeds each, 54 renders, against
+the resident server. The two SA3 arms held the engine's shipped base recipe
+(cfg 4.0, 100 steps, dpmpp_3m_sde_gpu / exponential, 3x window) so the
+checkpoint was the only variable.
+
+| | small base | medium base | ACE-Step 1.5 |
+|---|---|---|---|
+| bursts / 18 | 3 (all on rhythmic lanes) | 0 | 1 |
+| sustained-lane beat clarity (12 renders) | 0.31-0.50 | 0.05-0.17 | 0.26-0.45 |
+| genre lanes hit the asked tempo | 6 of 6 | 6 of 6 | 4 of 6 |
+| level | techno at full scale on 3 of 3 seeds | never above -1.8 dBFS | RMS -14 to -40 dBFS across seeds of one prompt |
+| same seed twice | identical | -- | different music (corr -0.01) |
+| wall per cue | 6.9 s | 9.3 s | 5.6 s |
+| GPU total during render | 5.8 GB | 9.3 GB | 15.5 GB |
+
+Medium is cleanly better on the sustained lane (a held chord reads as a held
+chord; small carries a beat-like periodicity on 12 of 12 sustained renders),
+mixed on the genre lanes (house pulse lower, techno higher), never hot.
+ACE-Step is cut on durability: its loudness is not a property of the prompt
+(16 dB between seeds), it is not reproducible from its seed, it missed the
+house tempo twice, and it is the largest footprint by far.
+
+**THE DECISION, AND WHY THE FIRST DRAFT WAS WRONG.** The first anchor flipped
+the engine's preference ladder so this box would render medium from its next
+boot. Two contrarians (cursor, then an Opus subagent seated in parallel when
+cursor had been silent ten minutes) refuted that independently and were
+right: a stock-node bench is a measurement, not a proof; "only the canonical
+path ships"; recipes are hard-won; and the operator's ear judges radio drama.
+So: **the fetch fix ships now on the small BASE file; "small or medium" goes
+to section 3 with the paired clips; the ladder does not change today.** If
+he says "medium", it is one tuple, one fetch lane (`stable_audio_3_medium`,
+which the asset index will then advertise, so its row must say 16 GB and
+unproven on 8 GB), the provisioner's music lane forked on `low_vram` exactly
+as `otr_provision.py:1749` already forks the image lane, and a 4060 proof.
+
+**THE CODE, and it was more than one word at three sites.** `resolve_ckpt()`
+fell through to `_CKPT_PREFERENCE[-1]` -- the POST-TRAINED file -- with
+nothing on disk, and the visual-asset preflight downloads whatever name the
+engine returns. Repointing the three provisioning sites alone would have made
+the preflight ask for a name the manifest no longer allowed, and
+`native_requests` refuses that with `VisualAssetError`: a dead render instead
+of a wrong one. Shipped: a named `_FETCH_DEFAULT` (the small base file) is
+what the fall-through returns, with `is_base` derived from the name; the
+manifest gains the base row and KEEPS the post-trained row for explicit
+`OTR_SA3_CKPT` pins (the A/B control arm); `scripts/otr_fetch_lane_weights.py`'s
+`stable_audio_3` lane and `config/profiles/otr_runpod_starter.json` repointed
+together (that profile's `required_models` is an enforced presence gate, so a
+persistent pod volume holding only the post-trained file gets a loud, named
+`PREFLIGHT FAIL` until the repointed lane fetches the base file; a fresh pod
+fetches it at start); variants regenerated (93 emitted, `--check` clean);
+`scripts/otr_organ_bench.py` defaults moved off the PBUG-20260912-03 pair;
+stale comments at the engine's recipe block, its receipt (which quoted a
+publisher "loops" line no card carries) and the preflight's `_CKPT` note.
+**Existing installs are untouched by design:** a box holding only the
+post-trained file resolves it and downloads nothing (a deliberate prior
+ruling, `test_an_install_with_only_the_post_trained_file_still_renders`);
+the one command that upgrades such a box is now
+`python scripts/otr_fetch_lane_weights.py stable_audio_3`. **The 4060 is such
+a box** (`docs/4060_DRILL_LOG.md:4832`); its window owns that call.
+
+**Tests.** `test_a_fresh_install_is_sent_to_a_file_the_manifest_can_fetch`
+(empty disk mocked; the fall-through must be a base file, in the ladder, and
+a `MANIFEST` key; the post-trained name stays allowlisted but is not the
+default) and `test_the_real_adapter_on_an_empty_disk_requests_its_fetch_default`
+(the REAL engine module through `native_requests`, the wiring the stub could
+not see -- cursor's finished-diff catch). `test_resolution_never_raises_when_comfy_is_absent`
+now expects the fetch default. The planner test's `_SA3` stub predated
+`resolve_ckpt` and had been failing on HEAD; it now mirrors the adapter.
+
+**THE ASSET INDEX WAS DRIFTED ON HEAD FOR A REASON WORTH KNOWING.**
+`scripts/otr_asset_index.py`'s weight regex harvested the literal
+`"_base.safetensors"` from the engine's `endswith(...)` and the generator
+listed a file that does not exist. It now skips suffix fragments;
+`docs/MODEL_ASSET_INDEX.md` is regenerated and its drift test passes.
+
+**Reviewers, roster exact.** codex: DEAD -- `codex exec` failed at 08:41
+with `token_revoked`; the operator has to sign in again; no codex round ran.
+Design round: cursor (REFUTED, 14 items, 19 min) and an Opus 5 subagent
+(REFUTED, 11 items, 7 min); 24 of 25 items grounded and folded, one refuted
+(`add()` consults the manifest only for an absent file). Finished diff: cursor
+(RIGHT-WITH-FIXES, 13 items; three folded: the recipe comment, the real-adapter
+wiring test, the derived `is_base`). Dispositions in the anchor's section 8.
+
+**Suite:** 47 failed / 15,385 collected on this box, normal checkout, against
+the 49 / 15,383 baseline measured on the untouched tree this session. Failing
+SET diffed, not the count: zero new, two fixed (the planner stub and the
+asset-index drift). `tests/conftest.py` still carries an empty
+`EXPECTED_FAILED_NODEIDS`, so the guard reports all 47 as new.
+
+**Box:** server PID 56996 stayed resident through the bench (booted 06:20,
+code through `17238f4f`) -- it does NOT hold this change; reset per section 4
+before any leg meant to prove the fetch path. ACE-Step's four files (14.7 GB)
+sit under `C:\ComfyUI-Models` unreferenced; his to keep or delete. No
+canonical leg was run; testing stays closed.
+
 ## 2026-09-12 (morning) -- the plan becomes only the work, in the order it gets done
 
 **His instruction:** *"the go-forward plan should only be what needs to be done,

@@ -394,9 +394,14 @@ LANES = {
         ("Comfy-Org/z_image_turbo",
          "split_files/vae/ae.safetensors", "vae"),                  # 0.31 GB
     ],
+    # THE BASE CHECKPOINT, NOT THE POST-TRAINED ONE (2026-09-12). The engine
+    # prefers the base file because it is the only one whose cfg and negative
+    # prompt do anything (PBUG-20260912-03); fetching the post-trained file
+    # here handed every fresh install the checkpoint the fix exists to escape.
+    # Same repo, same byte count, one word.
     "stable_audio_3": [
         ("Comfy-Org/stable-audio-3",
-         "checkpoints/stable_audio_3_small_music.safetensors",
+         "checkpoints/stable_audio_3_small_music_base.safetensors",
          "checkpoints"),                                                 # 2.27 GB
         ("Comfy-Org/stable-audio-3",
          "text_encoders/t5gemma_b_b_ul2.safetensors",
@@ -511,9 +516,10 @@ def _already_present(root, entry, *, verify_hash=False):
 def fetch(entry, root: str, dry_run: bool) -> bool:
     """Fetch one manifest row into its exact destination.
 
-    Some engines look for names upstream does not use -- Stable Audio 3 ships
-    ``model.safetensors`` and OTR asks for ``stable_audio_3_small_music.safetensors``
-    -- so a row can name the final file directly. A bare directory such as
+    Some engines look for names upstream does not use -- Stability's own
+    Stable Audio 3 repos ship ``model.safetensors`` and OTR asks for
+    ``stable_audio_3_small_music_base.safetensors`` -- so a row can name the
+    final file directly. A bare directory such as
     ``"checkpoints"`` keeps the legacy behaviour of taking the upstream
     basename, which is what every pre-existing lane row relies on.
     """
