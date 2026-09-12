@@ -14618,3 +14618,35 @@ own sayable check) were review-found and are pinned by tests, not filed as PBUGs
 **Verify:** `tests/test_shakespeare_verbatim_executor.py`; live leg
 `unfurling_the_kingdom_20260911_183749` (Lear 1.1, LEAR + GONERIL): the four character
 rows equal the raw scene window word for word, `text_for_tts` carries every word.
+
+## PBUG-20260911-06 -- a cold install (ffmpeg, no ffprobe) lost the episode at the silent composite (fixed `9b879207`)
+
+**Artifact:** `signal_lost_the_asss_head_20260911_211825` on the 5080 with ffprobe
+made unresolvable (PATH without the WinGet dir, `OTR_FFMPEG` pinned to the
+imageio-ffmpeg wheel binary, `OTR_FFPROBE` unset -- the shape `pip install -r
+requirements.txt` gives a fresh Mac or pod). The render cleared the writer, every
+engine, every per-beat probe-back, the decoded frame counts and the composite
+ENCODE, then died at 514 s: `[OTR_SilentComposite] assembled has -1 audio
+stream(s); must be 0 (V-1)` -> `PostUpscaleProcgenBlend: source mp4 missing or not
+a file: ''` -> `OTR_CaptionBurn: a hero title card was planned ... input video
+missing: ''` (refused, correctly: a missing input is a pipeline defect, not a host
+gap). Nothing in obs.
+
+**Cause:** the composite kept a private "resolve ffprobe or empty string" helper
+plus its own subprocess, documented as "-1 / 0.0 on an absent tool and the
+composite carries on" -- but its own V-1 gate compared `na != 0` and read the -1
+sentinel as a violation. The master mux, the scopes planner and the procgen blend
+kept the same private spawn (degrading to -1 / suppress / a legacy scale). The
+boundary's PyAV fallback (`6223b972`) could not reach any of them because none
+asked it. A degrade sentinel is a contract with every consumer, and one consumer
+had never heard of it.
+
+**Fix:** every probe in the four modules goes through
+`_otr_shared.ffprobe.probe_json` (PyAV when no binary resolves) with its own policy
+kept; the composite's V-1, A/V-sync and per-segment gates say UNPROVEN (a warning)
+on -1 and still raise on a real violation; an unmeasurable floor is no floor.
+Second half of the cold-install row; the first half (`6223b972`) fixed the
+probe-back path the Mac artifact died in.
+
+**Verify:** `tests/test_cold_install_composite_and_mux.py`; live leg `laughter_in_the_shadows_20260911_214126` on
+the same cold environment: RESULT SUCCESS, obs_publish OK, 478 s; the composite, mux, scopes and blend measured through PyAV with no ffprobe on the box.

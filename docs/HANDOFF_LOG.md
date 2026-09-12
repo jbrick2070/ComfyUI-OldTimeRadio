@@ -1,3 +1,51 @@
+## 2026-09-11 (night) -- the music is music, and a cold install renders
+
+**Shipped, four pushes:** `3e97d831` (section-3 rows: a probe-confirmed caption
+capability gap passes the clean master through even with a planned title; an
+image-less Google 200 is a refusal for routing), `6223b972` (the ffprobe boundary
+builds the same JSON document from PyAV when no binary resolves -- a cold install
+no longer dies at the first clip probe-back), `9b879207` (cold install part 2:
+the silent composite, the master mux, the scopes planner and the procgen blend
+measure through the boundary; the composite's gates say UNPROVEN instead of
+raising on an unmeasurable count -- found by the live cold leg, PBUG-20260911-06),
+and `beaa232f` (every music prompt is musical and story-keyed: a story
+palette names the ensemble by the source's year and bank, mood words become
+musical devices, the composer emits the row text AND the engine prompt for every
+engine, the SA3 era anchor with "analog tape warmth" in every branch is gone, the
+placement drives the SA3 window, and a `render_receipt` on every cue reaches the
+ledger). Operator's ask, verbatim: *"go over ALL musical prompts and make them more
+musical ... ideally it is relevant to the story."*
+
+**Cut on measurement (Opus refutation, recorded in
+`docs/2026-09-11-music-musical/build_plan_r2.md`):** M5 (a true-peak gain to
+-1 dBFS would have attenuated the whole cue 13-21 dB against a -16 dBFS lane
+contract) and M6 (the 12 s opening render is the crossfade's headroom, not a
+second owner). The ~9 s burst is addressed by the prompt first; a soft limiter on
+the CUE is the next row only if a burst survives.
+
+**The live leg on the new tree, cold environment:** `laughter_in_the_shadows_20260911_214126` -- RESULT SUCCESS, obs_publish OK, 478 s; the composite, mux, scopes and blend measured through PyAV with no ffprobe on the box.
+Cue stems by the one acceptance estimator (1 s Hann flatness 20 Hz-8 kHz,
+at-peak samples, loudest 100 ms vs body): opening cue flatness 0.003-0.016 per second (one second at 0.102), 1 at-peak sample, loudest 100 ms -11.8 dBFS over a -14.5 dBFS body (+0.3 dB, no burst); closing cue flatness 0.000-0.003, peak -1.43 dBFS; the episode masters to -15.0 LUFS integrated where moonlit_deception sat at -29.4 LUFS. Baseline
+(`moonlit_deception_20260911_185439` opening cue): flatness 0.092 at 5-6 s and
+0.177 at 9-10 s, 979 at-peak samples (156 at 3-4 s, 814 at 9-10 s), loudest 100 ms
+-6.06 dBFS at 9.6 s over a -15.95 body. **HIS EAR decides.**
+
+**Reviewers, exactly:** section-3 -> Sonnet QA (one blocker, fixed: two tests drove
+the refusal through the host). ffprobe -> codex r1 on the design (no, five
+must-fixes folded), Sonnet QA on the diff (clean). Cold install part 2 -> Sonnet QA
+(see its verdict in the commit). Music -> Opus 5 refuter on the design
+(yes-with-fixes: eight must-fixes folded, two mechanisms cut), Sonnet QA on the
+diff (clean; the one regex misfire it found -- "hopeless" read as warmth -- is
+fixed in the follow-up commit with the loudness limiter). Neuter passes:
+10/10, 22/22, 13/13. Full-suite failure identities 51 == 51 before every push.
+
+**Pending for the operator:** listen to `laughter_in_the_shadows_20260911_214126` (music) and say whether the
+music is now music; `pyproject.toml` gets `av>=17.0.0` at the next version bump
+(plan row); the 4060 / Mac / RunPod wave stays parked until released.
+
+**Still open, unchanged:** the wave paste blocks (freeze at the final hash once
+his ear passes), the 5A model-root cut, the 5B rows.
+
 ## 2026-09-11 (evening) -- Shakespeare performs its own words
 
 **Shipped:** the verbatim executor (`187baff0`), plan row 3.6 in full. A bank whose
