@@ -32,7 +32,8 @@ _SOURCES = (
     # fetching. That left musicgen as the only music engine that self-supplies,
     # and musicgen is CC-BY-NC -- so every published episode carried a
     # non-commercial music bed by default. Filenames verified against the live
-    # Hub listing and against eng_stable_audio_3._CKPT / ._TENC.
+    # Hub listing and against the checkpoint the SA3 engine resolves
+    # (StableAudio3Engine.resolve_ckpt) plus its ._TENC text encoder.
     ("checkpoints", "Comfy-Org/stable-audio-3",
      "checkpoints/stable_audio_3_small_music.safetensors"),   # 2,270,384,940 B
     ("text_encoders", "Comfy-Org/stable-audio-3",
@@ -424,7 +425,14 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         # its own env keys.
         if sa3 is None:
             raise VisualAssetError("stable_audio_3 adapter resolution is unavailable")
-        add("checkpoints", sa3._CKPT,
+        # ASK THE ADAPTER, DO NOT READ ITS CONSTANT (2026-09-12). `_CKPT` used
+        # to BE the filename; it is now the operator's override and is EMPTY by
+        # default, because the engine picks between the base and post-trained
+        # checkpoints at load time. Reading the raw constant here asked the
+        # preflight to find a weight called "" and killed every render that did
+        # not set OTR_SA3_CKPT -- found by the first canonical leg after the
+        # change, which is exactly what legs are for.
+        add("checkpoints", sa3.StableAudio3Engine.resolve_ckpt()[0],
             explicit=str((env or {}).get("OTR_SA3_CKPT") or ""))
         add("text_encoders", sa3._TENC,
             explicit=str((env or {}).get("OTR_SA3_TEXT_ENCODER") or ""))

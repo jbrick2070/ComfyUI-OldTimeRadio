@@ -436,3 +436,45 @@ def test_the_theme_node_offers_the_style_field_and_threads_it():
     # and it is carried to the palette by the one route the composers use
     body = inspect.getsource(T.StableAudioTheme._render_clips)
     assert 'meta = dict(meta, music_style=' in body
+
+
+def test_no_other_module_reads_the_checkpoint_constant_as_a_filename():
+    """A BUILD-BREAKER THAT SHIPPED, and the class is worth a guard.
+
+    `eng_stable_audio_3._CKPT` used to BE the checkpoint filename. Since the
+    engine began choosing between the base and post-trained checkpoints at load
+    time it is the operator's OVERRIDE, and it is empty by default. One other
+    module still read it as a filename -- the visual-asset preflight -- so it
+    asked ComfyUI to find a weight called "" and killed every canonical render
+    that did not set OTR_SA3_CKPT. The unit suite could not see it; the first
+    live leg after the change died in twelve seconds.
+
+    Anything outside the engine wanting to know which checkpoint will actually
+    load must ASK (`StableAudio3Engine.resolve_ckpt()`), never read the
+    constant."""
+    import pathlib
+    root = pathlib.Path(__file__).resolve().parents[1] / "nodes"
+    offenders = []
+    for path in root.rglob("*.py"):
+        if path.name == "eng_stable_audio_3.py":
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for n, line in enumerate(text.splitlines(), 1):
+            if "sa3._CKPT" in line or "eng_stable_audio_3._CKPT" in line:
+                offenders.append("%s:%d %s" % (path.name, n, line.strip()))
+    assert not offenders, (
+        "these read the override constant as if it were a filename:\n  %s"
+        % "\n  ".join(offenders))
+
+
+def test_the_visual_preflight_resolves_the_checkpoint_it_will_load():
+    """The positive half: the preflight must name the file that will actually
+    be loaded, so a box missing it is told before a render starts rather than
+    after twenty minutes of work."""
+    import inspect
+    from nodes import _otr_visual_assets as VA
+    body = inspect.getsource(VA.native_requests)
+    assert "resolve_ckpt()" in body
+    name, is_base = SA3.StableAudio3Engine.resolve_ckpt()
+    assert name.endswith(".safetensors") and name, name
+    assert isinstance(is_base, bool)
