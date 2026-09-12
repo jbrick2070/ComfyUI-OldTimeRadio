@@ -62,9 +62,44 @@ loop is the thing you want. Making the ratio follow `rhythmic` is the obvious
 next experiment and is NOT done -- it trades against a deliberate anti-loop
 mechanism and wants his word and a measurement, not a guess at 6am.
 
-**Pending for the operator:** listen to the four banks in
-`output/otr/obs/bank_genres/`, and rule on whether a rhythmic bank should get a
-1x conditioning window.
+**THE WINDOW QUESTION IS CLOSED, AND THE ANSWER IS NO.** Measured after the
+legs, on the bench where a render costs eight seconds instead of eleven minutes,
+using the techno bank's own cue prompt at 12 s, ten seeds per arm:
+
+| conditioning window | beat found | median onsets/min | tempos found |
+|---|---|---|---|
+| 3x (shipped) | 9/10 | 144.1 | eight at 128, one at 130 |
+| 1x (self-contained) | 9/10 | 139.1 | six at 128, two at 130, one at 120 |
+| 2x | 8/10 | 131.7 | seven at 128 |
+
+The window does not decide whether a genre bed grooves. All three arms find a
+beat 80-90% of the time at the requested tempo, and the shipped 3x is as good as
+anything. My hypothesis was wrong and the anti-loop floor stays exactly as it
+is. (The canonical A/B that preceded this was inconclusive for the reason this
+project keeps relearning: one leg per arm, two cues each, and the variance
+between cues inside an arm was larger than the difference between arms.)
+
+**THE REAL CAUSE, from the receipt.** The sci-fi news lane AUTHORS its own music
+rows, and an authored row bypasses the composed genre row entirely -- the bank
+genre then supplies only the instrument head. The engine prompt on
+`cell_wars` reads:
+
+> Roland TR-909 drum machine, deep analog sub bass, detuned synth stabs, warm
+> Juno pads, clearly recorded, clean balanced studio mix, natural room.
+> **Tense strings, pulsating rhythm**
+
+The head asks for a drum machine and the authored body asks for tense strings.
+The model resolved that contradiction toward the strings, which is why the bank
+came back a pad. Salsa, whose row was COMPOSED, carried the full idiom and
+grooved at 98.4 BPM against a requested 100. Same defect class as everything
+else today: a request that contains its own opposite.
+
+**Pending for the operator, and it is a one-word ruling.** On a bank with a
+declared genre, should the genre outrank an authored music row? "sci fi news is
+Detroit techno" reads as yes, but authored rows are a deliberate feature of that
+lane and overriding them is a behaviour change on a path not studied here, so it
+is not shipped. Also still pending: listen to the four banks in
+`output/otr/obs/bank_genres/`.
 
 ## 2026-09-12 (small hours) -- the music was running a guidance its model cannot answer
 
