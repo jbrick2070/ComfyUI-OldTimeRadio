@@ -43,6 +43,13 @@ CLAUDE.md sections 4 and 5):
 
 An arm is ``name`` or ``name:KEY=VALUE,KEY=VALUE``; the bare name ``shipped``
 sets nothing and renders the current defaults.
+
+AN ARM THAT SETS AN ENGINE VARIABLE GETS ITS OWN SERVER. ``OTR_SA3_*`` and
+friends are read inside the ComfyUI process, and the runner only POSTs a
+prompt to whatever server is already listening -- so setting them on the
+runner does nothing at all. Such an arm therefore resets and boots its own
+server first (CLAUDE.md sections 4 and 5), which costs about a minute.
+``--no-boot`` refuses those arms loudly rather than measuring nothing.
 """
 from __future__ import annotations
 
@@ -60,12 +67,20 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "scripts" / "otr_canonical_api_run.py"
+LAUNCHER = REPO_ROOT / "scripts" / "_otr_soak_server_launch.cmd"
 CANONICAL = REPO_ROOT / "workflows" / "otr_canonical.json"
 #: Where episodes land. The operator's own output tree, never a test rig
 #: (memory: "obs is always the local output folder").
 EPISODES = Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes")
 DEFAULT_PROFILE = "otr_w45_still_flat"
 LEG_TIMEOUT_S = 3600
+BOOT_TIMEOUT_S = 300
+#: Engine settings that only exist inside the SERVER process. An arm that
+#: sets one of these needs its own server, because the runner merely POSTs a
+#: prompt to a server that was booted with whatever environment it was booted
+#: with. Setting them on the runner is a silent no-op -- the first cut of
+#: this harness did exactly that and would have reported "no difference".
+SERVER_SIDE_PREFIXES = ("OTR_SA3_", "OTR_MUSIC_", "OTR_MASTER_", "OTR_SEGMENT_")
 
 
 def _say(message: str) -> None:
@@ -164,6 +179,67 @@ def receipt_of(episode_dir: Path) -> dict:
 # --------------------------------------------------------------------------- #
 # rendering -- the ONE path
 # --------------------------------------------------------------------------- #
+def needs_its_own_server(env_overrides: dict) -> bool:
+    """True when a setting is read inside the server rather than the runner."""
+    return any(key.startswith(SERVER_SIDE_PREFIXES) for key in env_overrides)
+
+
+def server_is_up() -> bool:
+    import socket
+    with socket.socket() as probe:
+        probe.settimeout(2.0)
+        return probe.connect_ex(("127.0.0.1", 8000)) == 0
+
+
+def boot_server(env_overrides: dict, log_path: Path) -> bool:
+    """Reset per CLAUDE.md section 4, then boot the shipped launcher with
+    ``env_overrides`` in its environment (section 5: the .cmd is launched
+    directly, never through a cmd.exe /c whose quoting eats the log path).
+
+    Kills SELECTIVELY by command line -- a blanket python kill would sever
+    the tooling running this harness.
+    """
+    import signal
+
+    killed = []
+    try:
+        listing = subprocess.run(
+            ["wmic", "process", "where", "name='python.exe'", "get",
+             "ProcessId,CommandLine", "/format:csv"],
+            capture_output=True, text=True, timeout=60).stdout
+    except Exception:  # noqa: BLE001 -- wmic absent on newer Windows
+        listing = ""
+    for line in listing.splitlines():
+        if "main.py" not in line or "ComfyUI" not in line:
+            continue
+        pid = line.rsplit(",", 1)[-1].strip()
+        if pid.isdigit():
+            try:
+                os.kill(int(pid), signal.SIGTERM)
+                killed.append(pid)
+            except OSError:
+                pass
+    if killed:
+        _say("reset: stopped server pid(s) %s" % ", ".join(killed))
+    time.sleep(6)
+
+    env = dict(os.environ, PYTHONUTF8="1", **env_overrides)
+    _say("booting a server for this arm with %s" % (env_overrides or "no overrides"))
+    subprocess.Popen([str(LAUNCHER), str(log_path)], cwd=str(REPO_ROOT), env=env,
+                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
+    deadline = time.time() + BOOT_TIMEOUT_S
+    while time.time() < deadline:
+        time.sleep(5)
+        if log_path.is_file():
+            text = log_path.read_text(encoding="utf-8", errors="replace")
+            if "To see the GUI go to" in text:
+                _say("server up")
+                return True
+            if "SERVER DID NOT COME UP" in text:
+                return False
+    return False
+
+
 def parse_arm(text: str) -> tuple[str, dict]:
     """``name`` or ``name:KEY=VALUE,KEY=VALUE`` -> ``(name, env)``."""
     name, _, rest = text.partition(":")
@@ -221,6 +297,26 @@ def run_arm(name: str, env_overrides: dict, args) -> dict:
     log_path = REPO_ROOT / "tmp" / ("_music_ab_%s.log" % "".join(
         c if c.isalnum() else "_" for c in name))
     log_path.parent.mkdir(parents=True, exist_ok=True)
+    if env_overrides and needs_its_own_server(env_overrides):
+        if args.no_boot:
+            raise SystemExit(
+                "arm %r sets %s, which the SERVER reads, but --no-boot was "
+                "given. The runner only POSTs to a server that is already "
+                "running, so these settings would be silently ignored and the "
+                "arm would measure nothing. Drop --no-boot, or boot the server "
+                "yourself with them set." % (
+                    name, ", ".join(sorted(env_overrides))))
+        boot_log = REPO_ROOT / "tmp" / ("_music_ab_server_%s.log" % "".join(
+            c if c.isalnum() else "_" for c in name))
+        if not boot_server(env_overrides, boot_log):
+            return {"arm": name, "env": env_overrides, "exit": -2,
+                    "minutes": 0.0, "log": boot_log.name, "episode": None,
+                    "error": "the server did not come up for this arm"}
+    elif not server_is_up():
+        raise SystemExit(
+            "no server is listening on :8000. Boot one (scripts/"
+            "_otr_soak_server_launch.cmd) or let an arm with server-side "
+            "settings boot its own.")
     command = [sys.executable, str(RUNNER),
                "--profile", args.profile,
                "--act-count", str(args.acts),
@@ -283,6 +379,9 @@ def main(argv=None) -> int:
                         help="re-measure the newest episodes instead of rendering")
     parser.add_argument("--episodes", nargs="*", default=None,
                         help="with --measure-only: episode directory names")
+    parser.add_argument("--no-boot", action="store_true",
+                        help="never reset/boot a server; refuses any arm whose "
+                             "settings the server would have to be booted with")
     parser.add_argument("--json-out", default=None)
     args = parser.parse_args(argv)
 
