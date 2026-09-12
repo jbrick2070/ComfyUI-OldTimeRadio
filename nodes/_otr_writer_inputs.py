@@ -37,6 +37,7 @@ from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
 from . import _otr_story_input as _otr_story_input
 from . import _otr_story_routing as _otr_story_routing
+from . import _otr_verbatim_lane as _otr_verbatim_lane
 from ._otr_shared import llm_policy as _llm_policy
 
 try:
@@ -339,6 +340,12 @@ def _resolve_inputs(
     # None means "no whole-body grounding available", which every consumer
     # must handle rather than assume.
     source_document = None
+    # The line-structured scene text for a bank that performs its source
+    # verbatim (transient, like the document); None on every other branch.
+    # `_verbatim_raw_reason` explains a missing text when the bank asked
+    # for one, so the plan step can receipt WHY it could not run.
+    source_text = None
+    _verbatim_raw_reason = ""
     if _user_fields:
         # THE PERSON'S OWN WORDS ARE THE SOURCE. No fetch, no spark draw, no
         # manifest: the four creative fields are projected into the same
@@ -407,6 +414,18 @@ def _resolve_inputs(
         seed_source = _source_snapshot.seed_source
         source_meta = dict(_source_snapshot.source_meta)
         source_rights = dict(_source_snapshot.source_rights)
+        if _otr_verbatim_lane.bank_is_verbatim(_rb_bank):
+            # The snapshot carries the payload, never the raw file. Re-read
+            # the scene through the BASE bank's own fetcher by its pinned
+            # reference and prove the bytes match the snapshot's raw_sha256;
+            # a mismatch is receipted as a miss, never performed as if it
+            # were the captured scene.
+            source_text, _verbatim_raw_reason = (
+                _otr_verbatim_lane.raw_text_for_snapshot(
+                    _source_snapshot,
+                    source_ref=str(source_meta.get("source_ref") or ""),
+                )
+            )
         log.info(
             "[OTR_LedgerScriptWriter] source-snapshot REPLAY: bank=%r base=%r "
             "seed_source=%r sha=%s",
@@ -516,18 +535,22 @@ def _resolve_inputs(
         # authors would otherwise read a prefix of a work that can run 25,000
         # words. The document is deliberately kept OUT of source_meta, which
         # is copied into durable ledger metadata at :3548.
+        _fetch_result = _fetch_entry.fetch(
+            bank=_fetch_bank,
+            technical_model=technical_model,
+            source_ref=source_ref,
+            load_config=technical_load_config,
+            policy=preflight_policy,
+        )
         news_article, source_meta, source_rights, source_document = (
             _otr_source_payload.normalize_fetch_result_with_document(
-                _fetch_entry.fetch(
-                    bank=_fetch_bank,
-                    technical_model=technical_model,
-                    source_ref=source_ref,
-                    load_config=technical_load_config,
-                    policy=preflight_policy,
-                ),
+                _fetch_result,
                 origin=_fetch_origin,
             )
         )
+        # The raw, line-structured body rides the fetch result itself (a
+        # legacy fetcher returning a bare payload carries none -> None).
+        source_text = getattr(_fetch_result, "source_text", None)
         news_seed = news_article["seed_text"]
         seed_source = _fetch_entry.seed_source
 
@@ -548,6 +571,56 @@ def _resolve_inputs(
     ).strip()
     if _requested_source_ref and _requested_source_ref != _selected_source_ref:
         source_meta.setdefault("requested_source_ref", _requested_source_ref)
+
+    # ---- The verbatim executor's PLAN step (defaults.verbatim_passage) ----
+    # Pure Python: select the passage, cut it to the dial's beats, and
+    # re-project the payload so the interpreter and the outline's macro pass
+    # read the PASSAGE as the material (the headline, synopsis and rights
+    # stay the scene's). Every other bank leaves this block with the key
+    # absent and nothing touched. A miss is receipted, never raised.
+    verbatim_plan = None
+    verbatim_receipt: dict[str, Any] = {}
+    if _otr_verbatim_lane.bank_is_verbatim(_rb_bank):
+        if news_seed_receipt:
+            # The writer re-derives that receipt from full_text and raises
+            # on a mismatch; only the RSS wrapper stamps one, so this is a
+            # configuration the lane refuses to project rather than lie.
+            _verbatim_raw_reason = (
+                "the bank stamps a fetch-time body receipt; the passage "
+                "projection would falsify it"
+            )
+        verbatim_plan, verbatim_receipt = (
+            _otr_verbatim_lane.plan_verbatim_passage(
+                source_text=source_text,
+                source_meta=source_meta,
+                num_characters=num_characters,
+                act_count=act_count_int,
+                source_ref=_selected_source_ref,
+                unavailable_reason=_verbatim_raw_reason,
+            )
+        )
+        if verbatim_plan is not None:
+            news_article = _otr_source_payload.validate_source_payload(
+                _otr_verbatim_lane.project_payload(news_article, verbatim_plan),
+                origin="_resolve_inputs verbatim projection",
+            )
+            news_seed = news_article["seed_text"]
+            log.info(
+                "[OTR_LedgerScriptWriter] verbatim passage PLANNED: %s "
+                "speeches %d-%d, %d words, %d beat(s), speakers=%s "
+                "(seed %s)",
+                _selected_source_ref, verbatim_receipt["first_index"],
+                verbatim_receipt["last_index"], verbatim_receipt["word_count"],
+                verbatim_receipt["beat_count"], verbatim_receipt["speakers"],
+                verbatim_receipt["seed_source"],
+            )
+        else:
+            log.warning(
+                "[OTR_LedgerScriptWriter] verbatim passage UNAVAILABLE for %s: "
+                "%s -- the episode runs the model-written path and its "
+                "credits say so",
+                _selected_source_ref, verbatim_receipt.get("reason"),
+            )
 
     return {
         "news_seed":            news_seed,
@@ -618,6 +691,10 @@ def _resolve_inputs(
         # field, because source_meta is copied wholesale into durable ledger
         # metadata and this holds the complete work. Nothing may stamp it.
         "source_document": source_document,
+        # The verbatim executor's plan (transient, never serialized) and its
+        # body-free receipt; None / {} on every bank without the gate.
+        "verbatim_plan": verbatim_plan,
+        "verbatim_receipt": dict(verbatim_receipt),
         # The cameo decision as a tri-state: None = roll, True/False = forced.
         # Every consumer -- the legacy block and every dispatched lane runner --
         # reads THIS key. The widget string is resolved exactly once, here.

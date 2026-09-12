@@ -147,7 +147,8 @@
         "selection_mode": "random",
         "source_ref": "folger-macbeth:act1-scene3-witches",
         "style_pool_class": "adaptation",
-        "propagate_adaptation_cast": true
+        "propagate_adaptation_cast": true,
+        "verbatim_passage": true
       },
       "required_seams": [
         "outline_macro_system",

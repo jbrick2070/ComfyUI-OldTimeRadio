@@ -7,6 +7,7 @@ public-domain-safe source banks.
 """
 from __future__ import annotations
 
+import hashlib
 import html
 import json
 import random
@@ -511,6 +512,12 @@ def source_meta_from_scene(
         presence = cast_presence_from_text(text)
         if presence:
             meta["cast_hints_presence"] = presence
+        # The raw file's identity, durable and body-free. A source-snapshot
+        # replay of a verbatim bank re-reads the scene file by reference and
+        # must prove it is the SAME bytes the snapshot was cut from -- a
+        # pinned reference does not pin the file behind it.
+        meta["raw_sha256"] = hashlib.sha256(
+            str(text).encode("utf-8")).hexdigest()
     return meta
 
 
@@ -566,6 +573,10 @@ def fetch_shakespeare_scene(*, bank: Any, source_ref: str = "") -> "_osp.SourceF
         # "the adaptation lanes".
         source_document=source_document_from_text(
             text, source_ref=resolved.source_ref),
+        # The line-structured body the verbatim executor parses. The
+        # document above has its whitespace collapsed by design and cannot
+        # be split into speeches; this is the file as read.
+        source_text=text,
     )
 
 

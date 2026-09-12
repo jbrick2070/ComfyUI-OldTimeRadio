@@ -27,6 +27,13 @@ from pathlib import Path
 from . import _otr_voice_route as _ROUTE
 
 try:
+    from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
+    from ._otr_script_prep import keep_spoken_parentheticals as _keep_spoken_parentheticals
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
+    from _otr_script_prep import keep_spoken_parentheticals as _keep_spoken_parentheticals  # type: ignore
+
+try:
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
@@ -1166,6 +1173,14 @@ class OTRVoiceNodeBase:
                 # absent/stale stamp).
                 canonical_text, _delivery_text = resolve_line_delivery(ln, _delivery_mode)
                 text = _delivery_text.strip()
+                if _row_is_verbatim(ln):
+                    # The source's own parentheses are SPEECH on a verbatim row
+                    # ("(God shield us!)" is Bottom's line, not a direction --
+                    # 39 spoken words across four corpus speeches sit inside
+                    # them). Drop the glyphs HERE, before any engine cleaner
+                    # runs, so no paren-stripping rule downstream can silence
+                    # the words. The ledger row keeps the author's punctuation.
+                    text = _keep_spoken_parentheticals(text).strip()
                 char_id = str(ln.get("char_id") or "")
                 line_id = str(ln.get("line_id") or "")
                 cast = _OTRLC.cast_lookup(led, char_id)

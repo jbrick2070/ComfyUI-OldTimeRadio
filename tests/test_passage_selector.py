@@ -14,7 +14,7 @@ from nodes._otr_episode_budget import BEAT_WORD_HARD_MAX
 from nodes._otr_passage_selector import (
     Passage,
     PassageError,
-    beats_for_words,
+    chunk_speech,
     eligible_windows,
     parse_speeches,
     select_passage,
@@ -147,11 +147,12 @@ class TestSelection:
         # consecutive beats in the same voice. Ignoring this produced a Macbeth
         # passage carrying a 91-word Banquo speech that would have failed
         # validation downstream.
-        assert beats_for_words(10) == 1
-        assert beats_for_words(80) == 1
-        assert beats_for_words(81) == 2
-        assert beats_for_words(91) == 2
-        assert beats_for_words(240) == 3
+        one = "word " * 10
+        assert len(chunk_speech(one.strip())) == 1
+        lines = "\n".join(["ten words in this line of verse to count it"] * 9)
+        assert len(chunk_speech(lines)) == 2          # 90 words, whole lines
+        assert len(chunk_speech("word " * 81)) == 2   # one over-cap line splits
+        assert len(chunk_speech(lines, cap=30)) == 3
 
     def test_beat_budget_counts_split_speeches_not_speech_count(self):
         long_speech = "ORLANDO\n" + ("word " * 200).strip() + "\n\nCELIA\nShort reply.\n"
@@ -270,7 +271,7 @@ class TestAgainstTheRealCorpus:
                 seed=path.stem,
             )
             recomputed = sum(
-                beats_for_words(s.word_count) for s in passage.speeches
+                len(chunk_speech(s.text)) for s in passage.speeches
             )
             assert recomputed == passage.beat_cost <= 14, path.name
             # Every speech is still whole -- splitting is pacing, not cutting.

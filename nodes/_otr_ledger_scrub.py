@@ -12,7 +12,10 @@ from dataclasses import dataclass, field
 import json
 from typing import Any, Dict, List, Optional
 
-from ._otr_text_metrics import set_line_text_metrics
+try:
+    from ._otr_text_metrics import set_line_text_metrics
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
 
 _SPOKEN_ROLES = frozenset({"character", "announcer"})
@@ -21,6 +24,22 @@ _SPOKEN_ROLES = frozenset({"character", "announcer"})
 def is_spoken_role(role: Any) -> bool:
     """Return whether a ledger role owns spoken delivery text."""
     return str(role or "").strip().lower() in _SPOKEN_ROLES
+
+
+# A character row whose words are the SOURCE's own (the verbatim executor,
+# 2026-09-11). Python owns that text end to end: no judge, no transport
+# scrub and no sayable-surface clear may rewrite it, and the TTS projection
+# keeps the author's parentheses spoken. One constant, read by every later
+# owner; it lives here because this is the lightest module they all reach.
+VERBATIM_SOURCE_FLAG = "verbatim_source"
+
+
+def row_is_verbatim(row: Any) -> bool:
+    """Does this ledger row carry the source's own words?"""
+    if not isinstance(row, dict):
+        return False
+    flags = row.get("compose_flags")
+    return bool(flags) and VERBATIM_SOURCE_FLAG in flags
 
 
 def append_compose_flag(row: Any, flag: str) -> None:
@@ -212,6 +231,13 @@ def scrub_ledger(ledger: Dict[str, Any]) -> ScrubResult:
         if not isinstance(row, dict) or row.get("skip"):
             continue
         if not is_spoken_role(row.get("speaker_role")):
+            continue
+        if row_is_verbatim(row):
+            # Response transport is a MODEL habit ("BANQUO: ...", a line wrapped
+            # in quotes, markdown). The source's own quotation marks and
+            # apostrophes are the words -- Malvolio reading Olivia's letter
+            # aloud is exactly the shape the unwrap eats (measured: 5 corpus
+            # chunks). Hands off.
             continue
         canonical = row.get("text")
         if not isinstance(canonical, str):

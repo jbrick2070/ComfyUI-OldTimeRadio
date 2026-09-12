@@ -3570,6 +3570,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             else ""
         )
         _stamp_news_seed_receipt(meta, resolved)
+        # The verbatim executor's plan (transient) and its body-free receipt,
+        # resolved with the inputs (`_otr_verbatim_lane`). The receipt is
+        # stamped NOW so an UNAVAILABLE plan is on the ledger even if a later
+        # stage dies; the compose loop adds each beat's id after it writes.
+        # None / absent on every bank without `defaults.verbatim_passage`.
+        _verbatim_plan = resolved.get("verbatim_plan")
+        if resolved.get("verbatim_receipt"):
+            meta["verbatim_passage"] = dict(resolved["verbatim_receipt"])
         # kibitz r2-r4 provenance: any bank whose defaults define
         # credits_source_line gets it stamped (data-driven -- the
         # original_radio row always defines it, so its credits line is
@@ -3658,6 +3666,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 _pc = _OTRPROV.printed_credit_line(_prov)
                 if _pc:
                     meta["credits_source_line"] = _pc
+            # A bank that performs its source verbatim but could not (a
+            # custom premise, a snapshot cut from a changed file, a source with
+            # no performable window) publishes a MODEL-WRITTEN episode. That
+            # is visible on the printed credits, not just in a receipt.
+            _vr = resolved.get("verbatim_receipt") or {}
+            if _vr and str(_vr.get("status") or "") != "planned":
+                try:
+                    from . import _otr_verbatim_lane as _OTRVL
+                except ImportError:  # pragma: no cover -- flat load
+                    import _otr_verbatim_lane as _OTRVL  # type: ignore
+                meta["credits_source_line"] = _OTRVL.non_verbatim_credit_line(
+                    str(meta.get("credits_source_line") or ""))
             # A NON-COMMERCIAL SOURCE HAS TO REACH A HUMAN (2026-08-04).
             # commercial_use_allowed was already validated, carried and
             # normalized -- and shown to nobody. An operator publishing a
@@ -3873,11 +3893,21 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # Invention lanes never set this key -> casting is byte-identical (C7).
             if (_source_bank_row.defaults or {}).get(
                     "propagate_adaptation_cast"):
-                _adapt_names = list(
-                    getattr(briefs, "character_names", None)
-                    or (meta.get("source_meta") or {}).get("cast_hints")
-                    or []
-                )
+                if _verbatim_plan is not None:
+                    # THE CAST FOLLOWS FROM THE CUT. The passage's speakers, in
+                    # order, are the people this episode performs: SOURCE
+                    # names, seated before any line exists, so the 2026-08-20
+                    # cast-first ruling holds -- this is the source's roster
+                    # for the window, not a script's. The scene's wider
+                    # cast_hints would seat people the passage never voices
+                    # and could drop one it does.
+                    _adapt_names = list(_verbatim_plan.speakers)
+                else:
+                    _adapt_names = list(
+                        getattr(briefs, "character_names", None)
+                        or (meta.get("source_meta") or {}).get("cast_hints")
+                        or []
+                    )
                 if _adapt_names:
                     meta["_adaptation_character_names"] = _adapt_names
                     # Join those names to the gender the SOURCE records, so the
@@ -4166,7 +4196,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         with slot_scheduler.helper_context("lock_cast"):
             cast_rows, cast_meta = _OTRCAST.lock_cast(
                 creative_fn=creative_generate_fn,
-                num_characters=resolved["num_characters"],
+                # On the verbatim lane the EXECUTABLE size: the passage's own
+                # speakers, so the pool can never invent a name and voice
+                # replay reads the size of the cast that exists. The operator's
+                # request is recorded on the contract, never reassigned.
+                num_characters=(
+                    len(_verbatim_plan.speakers) if _verbatim_plan is not None
+                    else resolved["num_characters"]
+                ),
                 news_seed=resolved["news_seed"],
                 casting_brief=casting_brief,
                 style=(contract.label if contract else ""),
@@ -4203,6 +4240,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             "casting_attempts":       cast_meta["casting_attempts"],
             "num_characters_request": cast_meta["num_characters_request"],
             "num_characters_locked":  cast_meta["num_characters_locked"],
+            # The widget value as asked, which the verbatim lane may execute
+            # at a smaller size (the passage's speakers). `_request` above is
+            # what lock_cast was handed and what voice replay reads.
+            "num_characters_operator_request": int(resolved["num_characters"]),
             # Sprint 2 (a): persist the cast RNG seed so OTR_CastLock can REPLAY
             # the deterministic bark voice assignment byte-identically. It drives
             # the whole cast rng and is OS-entropy per episode, so it cannot be
@@ -4414,6 +4455,16 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 outline_req,
                 creative_repo_id=resolved["creative_writing_model"],
                 source_bank_id=resolved["source_bank"],
+                # Verbatim lane: speakers in passage order and the fixed words
+                # per beat; empty tuples everywhere else (byte-identical).
+                speaker_plan=(
+                    tuple(e.speaker for e in _verbatim_plan.entries)
+                    if _verbatim_plan is not None else ()
+                ),
+                verbatim_texts=(
+                    tuple(e.text for e in _verbatim_plan.entries)
+                    if _verbatim_plan is not None else ()
+                ),
             )
 
         # Length is an OBSERVATION (2026-08-14). Nothing was requested, so
@@ -5240,7 +5291,22 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # resident (same slot the per-beat composer uses).
         # LLM slot: creative -- compose_exchange renders dialogue
         # (subtext / refusal / reversal) via creative_generate_fn (rule 6).
-        _ex_use: bool = bool(resolved.get("use_exchange", False))
+        try:
+            from . import _otr_ledger_scrub as _OTRSCRUB
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_ledger_scrub as _OTRSCRUB  # type: ignore
+        _verbatim_entries = (
+            tuple(_verbatim_plan.entries) if _verbatim_plan is not None else ()
+        )
+        _verbatim_cursor = 0
+        _verbatim_beat_ids: list[str] = []
+        # The grouped exchange composes MODEL text into character beats. On the
+        # verbatim lane the words are fixed, so the widget yields to the lane
+        # (the widget itself is untouched; a bank that performs verbatim simply
+        # has no exchange to compose).
+        _ex_use: bool = (
+            bool(resolved.get("use_exchange", False)) and not _verbatim_entries
+        )
         _ex_lines_by_beat_id: dict[str, str] = {}
         if _ex_use:
             # Lane-enablement chunk 2 (2026-07-05): the exchange STATIC
@@ -5304,7 +5370,37 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             cid: str
             beat_compose_flags: tuple[str, ...] = ()
 
-            if beat.speaker_role == "character":
+            if beat.speaker_role == "character" and _verbatim_entries:
+                # THE EXECUTOR. This beat's words are the passage's, cut at the
+                # plan step: no composer, no exchange, no validator -- the model
+                # is never handed a chance to paraphrase. The plan and the
+                # outline were built from the same entries in the same order,
+                # so a speaker mismatch here is a wiring defect and dies LOUD
+                # rather than publishing one voice's words in another's mouth.
+                if _verbatim_cursor >= len(_verbatim_entries):
+                    raise RuntimeError(
+                        f"[OTR_LedgerScriptWriter] verbatim plan exhausted at "
+                        f"{beat.beat_id!r}: the outline carries more character "
+                        f"beats than the plan's {len(_verbatim_entries)}"
+                    )
+                _entry = _verbatim_entries[_verbatim_cursor]
+                _verbatim_cursor += 1
+                if str(_entry.speaker) != str(beat.speaker):
+                    raise RuntimeError(
+                        f"[OTR_LedgerScriptWriter] verbatim plan/outline drift at "
+                        f"{beat.beat_id!r}: the plan says {_entry.speaker!r}, the "
+                        f"outline says {beat.speaker!r}"
+                    )
+                cleaned = _entry.text
+                beat_compose_flags = (_OTRSCRUB.VERBATIM_SOURCE_FLAG,)
+                _verbatim_beat_ids.append(beat.beat_id)
+                cid = char_id_by_name[beat.speaker]
+                if cleaned:
+                    last_lines.append((beat.speaker, cleaned))
+                    if len(last_lines) > LAST_LINES_WINDOW:
+                        last_lines.pop(0)
+
+            elif beat.speaker_role == "character":
                 line_req = _build_line_request_for_beat(
                     beat, is_announcer=False,
                 )
@@ -5595,6 +5691,36 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             }
             _OTRL.patch_line_fields(led.data, beat.beat_id, _line_fields)
             led.save()
+
+        if _verbatim_entries:
+            if _verbatim_cursor != len(_verbatim_entries):
+                raise RuntimeError(
+                    f"[OTR_LedgerScriptWriter] verbatim plan has "
+                    f"{len(_verbatim_entries) - _verbatim_cursor} unperformed "
+                    f"beat(s): the outline carries fewer character beats than "
+                    f"the plan"
+                )
+            _vp = dict(meta.get("verbatim_passage") or {})
+            _vp_beats = [dict(b) for b in (_vp.get("beats") or [])]
+            for _bid, _b in zip(_verbatim_beat_ids, _vp_beats):
+                _b["beat_id"] = _bid
+            _vp["beats"] = _vp_beats
+            _gm = {str(k).strip().upper()
+                   for k in (meta.get("_adaptation_character_genders") or {})}
+            # Names the roster, the supplement and the index could not gender
+            # -- these rows keep the existing roll (ARIEL and ROBIN by the
+            # operator's own locked ruling). Enumerated, never asserted away.
+            _vp["unresolved_genders"] = [
+                n for n in _verbatim_plan.speakers
+                if str(n).strip().upper() not in _gm
+            ]
+            meta["verbatim_passage"] = _vp
+            log.info(
+                "[OTR_LedgerScriptWriter] verbatim executor: %d character "
+                "beat(s) written from the source (%s), unresolved genders=%s",
+                len(_verbatim_beat_ids), _vp.get("source_ref"),
+                _vp["unresolved_genders"],
+            )
 
         # --- I.4.9. Post-composition announcer-intro REWRITE ----------
         # (INTRO_REWRITE_SPEC 2026-07-09, kibitz r2-r4, shape A.) The

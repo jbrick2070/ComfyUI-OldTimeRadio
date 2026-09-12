@@ -152,6 +152,14 @@ class SourceFetchResult:
     source_meta: dict | None = None
     source_rights: dict | None = None
     source_document: object | None = None
+    # TRANSIENT like ``source_document``, and different in kind from it: the
+    # PRE-normalization body exactly as read from disk, line structure intact.
+    # The verbatim executor's parser is line-based (a Folger speech prefix is
+    # a line shape), and ``canonical_body`` has had every newline collapsed,
+    # so nothing derived from the document can be parsed into speeches. Set
+    # only by fetchers whose bank performs source text verbatim; ``None`` for
+    # everyone else. Never serialized -- receipts carry ``sha256(raw)``.
+    source_text: str | None = None
 
 
 def validate_source_payload(payload, origin: str) -> dict:

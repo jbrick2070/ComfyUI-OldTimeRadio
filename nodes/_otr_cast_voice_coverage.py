@@ -47,6 +47,11 @@ from __future__ import annotations
 
 from typing import Any, Mapping
 
+try:
+    from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
+
 __all__ = ["CastVoiceCoverageError", "is_announcer_cast_row",
            "require_voice_coverage"]
 
@@ -106,7 +111,7 @@ class CastVoiceCoverageError(ValueError):
             % (self.owner_bank, len(self.missing), self.cast_total, names))
 
 
-def _sayable(text: Any) -> bool:
+def _sayable(text: Any, *, keep_parentheticals: bool = False) -> bool:
     """True when the row's text survives the SAME stripper TTS uses.
 
     This is the whole point of the gate: raw non-empty text is what the old
@@ -122,7 +127,7 @@ def _sayable(text: Any) -> bool:
         from ._otr_script_prep import clean_spoken_text
     except ImportError:  # pragma: no cover -- flat test/standalone load
         from _otr_script_prep import clean_spoken_text  # type: ignore
-    return bool(clean_spoken_text(raw).strip())
+    return bool(clean_spoken_text(raw, keep_parentheticals=keep_parentheticals).strip())
 
 
 def require_voice_coverage(ledger_data: Mapping[str, Any], *,
@@ -146,7 +151,8 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
     for row in lines:
         if bool(row.get("skip")):
             continue
-        if not _sayable(row.get("text")):
+        if not _sayable(row.get("text"),
+                        keep_parentheticals=_row_is_verbatim(row)):
             continue
         cid = str(row.get("char_id") or "").strip()
         if cid.lower() == ANNOUNCER_SENTINEL:

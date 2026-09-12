@@ -1390,6 +1390,11 @@ def content_owned_cast_contract(
         # recorded. Neither is a gate -- THE LAW.
         "num_characters_request": int(num_characters_request),
         "num_characters_locked":  int(num_characters_locked),
+        # The widget value AS ASKED. Equal to `_request` on a content-owned lane
+        # (the cast is built from the script, never clamped to a passage); the
+        # key exists so both contract shapes stay uniform -- the verbatim lane
+        # executes at the passage's own speaker count and records the ask here.
+        "num_characters_operator_request": int(num_characters_request),
     }
 
 
@@ -1641,8 +1646,21 @@ def _apply_llm_slot_fill(
     (isolated rng), so the result is always coherent in strict mode.
     """
     meta["name_mode"] = "llm_slot_fill"
+    # A SOURCE-OWNED slot is the play's own person (MACBETH, seated from the
+    # passage or the scene roster). Renaming it "JOHN SMITH" was always a
+    # fidelity defect; with the verbatim executor it is fatal, because the
+    # outline checks the passage's speakers against the locked cast by exact
+    # name (codex r3). The overlay names only the pool-rolled slots.
+    _named_slots = [s for s in ensemble_slots
+                    if not getattr(s, "source_owned", False)]
+    if not _named_slots:
+        log.info(
+            "[OTR_Casting] llm_slot_fill: every open slot is source-owned; "
+            "nothing to rename")
+        meta["llm_naming_applied"] = False
+        return cast
     plan = _CASTPLAN.build_cast_plan(
-        ensemble_slots, voice_by_char_id, age_band_by_char_id=age_by_char_id)
+        _named_slots, voice_by_char_id, age_band_by_char_id=age_by_char_id)
     prompt = _build_pass1_prompt(plan, news_seed, style)
     # The reply is one JSON row PER SLOT, so its length scales with the cast --
     # a flat budget is the PBUG-20260903-07 defect class (the same shape cost

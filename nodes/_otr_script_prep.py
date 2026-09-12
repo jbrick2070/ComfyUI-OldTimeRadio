@@ -14,20 +14,35 @@ import re
 
 _SPEAKER_PREFIX = re.compile(r"^[A-Z][A-Z .'\-]{1,30}:\s*")
 _PAREN = re.compile(r"\([^)]{1,80}\)")
+# The glyphs alone. On a verbatim row the parenthetical is the author's own
+# speech -- Folger prints "(God shield us!)" inside Bottom's line -- so the
+# words stay and only the brackets go.
+_PAREN_GLYPHS = re.compile(r"[()]")
 _BRACKET = re.compile(r"\[[^\]]{1,40}\]")
 _WS = re.compile(r"\s+")
 
 
-def clean_spoken_text(text: str) -> str:
+def clean_spoken_text(text: str, *, keep_parentheticals: bool = False) -> str:
     """Strip a leading speaker label, parenthetical stage directions, and
     bracket tags; collapse whitespace. Idempotent and deterministic.
+
+    ``keep_parentheticals`` (the verbatim lane): a parenthetical is the
+    source's own speech, so its words are kept and only the glyphs go.
     """
     t = text or ""
     t = _SPEAKER_PREFIX.sub("", t)
-    t = _PAREN.sub(" ", t)
+    t = _PAREN_GLYPHS.sub(" ", t) if keep_parentheticals else _PAREN.sub(" ", t)
     t = _BRACKET.sub(" ", t)
     t = _WS.sub(" ", t).strip()
     return t
+
+
+def keep_spoken_parentheticals(text: str) -> str:
+    """The verbatim lane's delivery projection: drop only the parenthesis
+    glyphs so that NO later cleaner -- the engine hooks above, Bark's own
+    paren stripper inside synthesis -- can find a parenthetical to delete.
+    Every word survives; whitespace is collapsed downstream as always."""
+    return _PAREN_GLYPHS.sub(" ", text or "")
 
 
 PREPARE_TEXT_VERSION = "1"

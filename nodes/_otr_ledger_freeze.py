@@ -54,6 +54,11 @@ except ImportError:  # pragma: no cover
     )
     from _otr_script_prep import clean_spoken_text  # type: ignore
 
+try:  # pragma: no cover - package and standalone import styles
+    from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
+except ImportError:  # pragma: no cover
+    from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
+
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -365,7 +370,12 @@ def _check_per_line_invariants(
                     errors.append(
                         f"line_id={line_id!r} (voiced, not skipped) has empty text"
                     )
-                elif not clean_spoken_text(text):
+                elif not clean_spoken_text(
+                        text, keep_parentheticals=_row_is_verbatim(ln)):
+                    # A verbatim row made only of a Folger parenthetical
+                    # ("(For so this side of our known world esteemed him)",
+                    # Hamlet 1.1) is SPEECH; the invention-lane stripper
+                    # would call it empty and fail the freeze (codex r3).
                     errors.append(
                         f"line_id={line_id!r} (voiced, not skipped) cleans to "
                         "empty spoken text"

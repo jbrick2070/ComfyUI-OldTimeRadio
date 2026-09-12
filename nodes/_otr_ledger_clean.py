@@ -246,6 +246,15 @@ LEDGER_CLEAN_VERSION = "ledger_clean_v3"
 #: would drop it to 2.
 PROTECTED_FACT_COMPONENT_FLAG = "protected_fact_component"
 
+try:
+    from ._otr_ledger_scrub import VERBATIM_SOURCE_FLAG
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_ledger_scrub import VERBATIM_SOURCE_FLAG  # type: ignore
+
+# Rows Python owns outright: a fact component it authored, or the source's
+# own words on the verbatim lane. Neither is judged, neither is repaired.
+PROTECTED_ROW_FLAGS = frozenset({PROTECTED_FACT_COMPONENT_FLAG, VERBATIM_SOURCE_FLAG})
+
 #: Stamped on a row that survived the whole repair budget still dirty, so the
 #: defect is visible in the artifact and not only in the log.
 UNCLEAN_COMPOSE_FLAG = "unclean_spoken_text"
@@ -1874,12 +1883,14 @@ def run_ledger_clean(
         # see PROTECTED_FACT_COMPONENT_FLAG. Recorded in its OWN list, never in
         # `rows`: an entry there means the judge read the row and something
         # rewrote it, which is exactly what must not have happened here.
-        if PROTECTED_FACT_COMPONENT_FLAG in (row.get("compose_flags") or ()):
+        _protected = sorted(
+            PROTECTED_ROW_FLAGS & set(row.get("compose_flags") or ()))
+        if _protected:
             receipt["protected_rows"].append(line_id)
             log.info(
-                "[ledger_clean] %s carries a Python-owned fact component; "
+                "[ledger_clean] %s carries Python-owned text; "
                 "skipped before judging (%s)",
-                line_id or "<no line_id>", PROTECTED_FACT_COMPONENT_FLAG,
+                line_id or "<no line_id>", ", ".join(_protected),
             )
             continue
 

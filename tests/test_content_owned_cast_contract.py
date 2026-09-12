@@ -45,6 +45,12 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEGACY_CONTRACT_KEYS = {
     "lemmy_hit", "lemmy_policy", "casting_attempts",
     "num_characters_request", "num_characters_locked",
+    # 2026-09-11, the verbatim executor: the widget value AS ASKED. On the
+    # shakespeare lane the executable size (`_request`, what lock_cast was
+    # handed and what voice replay reads) is the passage's own speaker count,
+    # so the operator's ask is recorded beside it, never reassigned. Both
+    # contract shapes carry it so a reader never has to know which lane.
+    "num_characters_operator_request",
     "cast_seed", "cast_seed_source",
 }
 

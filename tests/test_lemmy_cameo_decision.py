@@ -151,6 +151,11 @@ def test_no_decision_preserves_the_pre_chunk_b_contract_exactly():
         "casting_attempts": [],
         "num_characters_request": 3,
         "num_characters_locked": 4,
+        # 2026-09-11: both contract shapes carry the widget value AS ASKED
+        # (the verbatim lane executes at the passage's own speaker count and
+        # records the ask beside it); on a content-owned lane it equals the
+        # request. Held equal to the legacy block by the parity test.
+        "num_characters_operator_request": 3,
     }
 
 

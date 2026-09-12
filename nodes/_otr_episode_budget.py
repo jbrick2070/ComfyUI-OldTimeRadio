@@ -14,7 +14,7 @@ to be. Nothing here may reintroduce a length authority, in any form.
 
 `BEAT_WORD_HARD_MAX` deliberately SURVIVES that removal and is not a
 length authority: it is the Stage-3 Beat schema's structural cap, and
-`_otr_passage_selector.beats_for_words` needs it to split one long
+`_otr_passage_selector.chunk_speech` needs it to split one long
 source speech across consecutive beats. Without it the Shakespeare lane
 silently loses its best material — Banquo's 91-word speech, Lear's love
 test, Prospero's history, Juliet's balcony. It is a fixed property of
@@ -166,7 +166,7 @@ del _cfg
 
 # The Stage-3 Beat pydantic schema hard-caps one voiced beat at 80 words.
 # STRUCTURAL, NOT A LENGTH AUTHORITY -- see the module docstring. Read by
-# `_otr_passage_selector.beats_for_words` to carry a long source speech
+# `_otr_passage_selector.chunk_speech` to carry a long source speech
 # across consecutive beats instead of dropping it.
 BEAT_WORD_HARD_MAX: int = 80
 

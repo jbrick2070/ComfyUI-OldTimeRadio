@@ -6,6 +6,11 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+try:
+    from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
+
 SCHEMA_VERSION = 1
 
 
@@ -57,11 +62,12 @@ def _voiced_rows(ledger_data: Mapping[str, Any]) -> list[Mapping[str, Any]]:
         if isinstance(row, Mapping)
         and not bool(row.get("skip"))
         and not bool(row.get("skip_tts"))
-        and _sayable(row.get("text"))
+        and _sayable(row.get("text"),
+                     keep_parentheticals=_row_is_verbatim(row))
     ]
 
 
-def _sayable(text: Any) -> bool:
+def _sayable(text: Any, *, keep_parentheticals: bool = False) -> bool:
     """Does this row survive the stripper TTS and the cleanup both use?
 
     Imported function-locally, matching `_otr_ledger_cleanup`, so this module
@@ -74,7 +80,7 @@ def _sayable(text: Any) -> bool:
         from ._otr_script_prep import clean_spoken_text
     except ImportError:  # pragma: no cover -- flat test/standalone load
         from _otr_script_prep import clean_spoken_text  # type: ignore
-    return bool(clean_spoken_text(raw).strip())
+    return bool(clean_spoken_text(raw, keep_parentheticals=keep_parentheticals).strip())
 
 
 def build_receipt(

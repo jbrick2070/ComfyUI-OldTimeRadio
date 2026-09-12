@@ -303,6 +303,7 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         "propagate_adaptation_cast",
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer
         "scene_coherence_check",  # v4 P1(vi): opt-in header<->scene structural gate
+        "verbatim_passage",  # 2026-09-11: the source's own speeches ARE the dialogue
     ):
         _bval = defaults.get(_bkey)
         if _bval is not None and not isinstance(_bval, bool):

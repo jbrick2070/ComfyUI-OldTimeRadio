@@ -37,13 +37,14 @@ same voice, split at line boundaries. That is pacing, not paraphrase -- the word
 are untouched -- and without it the lane silently loses its best material: Banquo's
 "Good sir, why do you start" (91 words) sits inside the Macbeth prophecy, and Lear's
 love test, Prospero's history and Juliet's balcony speeches all exceed the cap.
-Beat cost is therefore ``ceil(words / cap)`` per speech, never a flat one.
+Beat cost is therefore the number of line-packed chunks a speech needs
+(``chunk_speech``), never a flat one -- and the CHUNKER is the one owner of
+that number, so selection can never promise a plan execution cannot cut.
 """
 
 from __future__ import annotations
 
 import hashlib
-import math
 import re
 from dataclasses import dataclass
 
@@ -56,7 +57,12 @@ __all__ = [
     "Passage",
     "parse_speeches",
     "strip_stage_directions",
-    "beats_for_words",
+    "chunk_speech",
+    "BeatPlanEntry",
+    "build_beat_plan",
+    "render_passage_text",
+    "CHUNKER_VERSION",
+    "SELECTOR_VERSION",
     "eligible_windows",
     "select_passage",
 ]
@@ -102,16 +108,82 @@ _NON_SPEAKER_TOKENS = frozenset({
 _COLLECTIVE_SPEAKERS = frozenset({"ALL", "BOTH"})
 
 
-def beats_for_words(word_count: int, *, beat_word_cap: int = BEAT_WORD_HARD_MAX) -> int:
-    """Voiced beats one speech of this length needs.
+# Bump when window SELECTION for an unchanged source and seed would change: a
+# stored receipt's indices then name different speeches.
+SELECTOR_VERSION = "otr_passage_selector_v1"
 
-    The Beat schema rejects a beat over ``BEAT_WORD_HARD_MAX`` words, so a long
-    speech is carried across consecutive beats in the same voice rather than
-    being cut or rewritten.
+# Bump when chunk BOUNDARIES for an unchanged speech would move: a stored plan
+# receipt names (speech_index, chunk_ordinal) pairs, so a v1 receipt is not
+# comparable to a v2 one.
+CHUNKER_VERSION = "otr_verbatim_chunker_v1"
+
+
+def _line_units(text: str) -> list[str]:
+    # One space between words inside a line: a stripped stage direction leaves
+    # a run of spaces behind ("behind.   Thanks"), and a ledger line is not the
+    # place to carry the parser's scars. Words untouched.
+    return [" ".join(ln.split()) for ln in str(text or "").split("\n") if ln.strip()]
+
+
+def _split_long_line(line: str, cap: int) -> list[str]:
+    """A single line over the cap (none in the vendored corpus) splits at word
+    boundaries. Every word survives, in order."""
+    pieces: list[str] = []
+    piece: list[str] = []
+    for token in line.split():
+        piece.append(token)
+        if canonical_word_count(" ".join(piece)) >= cap:
+            pieces.append(" ".join(piece))
+            piece = []
+    if piece:
+        pieces.append(" ".join(piece))
+    return pieces
+
+
+def _pack_lines(units: list[str], cap: int) -> list[list[str]]:
+    """Greedy whole-line packing into groups of at most ``cap`` words, in order.
+    A single line over the cap becomes word-boundary pieces, one per group. This
+    is the one packing rule; ``chunk_speech`` and the beat plan both cut from it,
+    so selection can never cost a speech differently from how execution cuts it."""
+    if cap <= 0:
+        raise PassageError("cap must be positive")
+    groups: list[list[str]] = []
+    current: list[str] = []
+    current_words = 0
+    for line in units:
+        words = canonical_word_count(line)
+        if words > cap:
+            if current:
+                groups.append(current)
+                current, current_words = [], 0
+            groups.extend([piece] for piece in _split_long_line(line, cap))
+            continue
+        if current and current_words + words > cap:
+            groups.append(current)
+            current, current_words = [line], words
+        else:
+            current.append(line)
+            current_words += words
+    if current:
+        groups.append(current)
+    return groups
+
+
+def chunk_speech(text: str, *, cap: int = BEAT_WORD_HARD_MAX) -> tuple[str, ...]:
+    """Cut one speech into consecutive chunks of at most ``cap`` words, packing
+    WHOLE LINES greedily in order.
+
+    This is the ONE owner of "how many beats does a speech need": ``Speech.
+    beat_cost`` calls it, so a selected passage can always be executed exactly
+    as it was costed. The old ``ceil(words / cap)`` estimate disagreed with real
+    line packing on one corpus speech (BENEDICK, Much Ado 2.3, 309 words: 4 vs
+    5) -- an estimate the executor could not honour is a paraphrase waiting to
+    happen. A chunk's lines are joined with ONE SPACE: the words are verbatim;
+    the newline is a TTS segmentation choice (Kokoro splits synthesis on it),
+    a transcript-line choice and a caption-wrap choice, none of them the
+    play's. Never returns an empty chunk.
     """
-    if beat_word_cap <= 0:
-        raise PassageError("beat_word_cap must be positive")
-    return max(1, math.ceil(max(0, int(word_count)) / beat_word_cap))
+    return tuple(" ".join(g) for g in _pack_lines(_line_units(text), cap))
 
 
 @dataclass(frozen=True)
@@ -134,7 +206,9 @@ class Speech:
         return self.speaker in _COLLECTIVE_SPEAKERS
 
     def beat_cost(self, *, beat_word_cap: int = BEAT_WORD_HARD_MAX) -> int:
-        return beats_for_words(self.word_count, beat_word_cap=beat_word_cap)
+        # The chunker is the owner: a speech costs exactly the beats the
+        # executor will cut it into at this cap, never an estimate of them.
+        return max(1, len(chunk_speech(self.text, cap=beat_word_cap)))
 
 
 @dataclass(frozen=True)
@@ -213,7 +287,7 @@ def eligible_windows(
 
     Returned as (first_index, last_index) pairs, inclusive. A window's beat cost
     is the sum of each speech's own cost, so one long speech can consume several
-    beats -- see ``beats_for_words``.
+    beats -- see ``chunk_speech``.
 
     ``min_words`` / ``max_words`` override the tolerance band with explicit
     inclusive bounds; ``max_words=None`` with ``min_words=0`` means "words do not
@@ -348,3 +422,133 @@ def select_passage(
         last_index=last,
         eligible_count=len(windows),
     )
+
+
+# ---------------------------------------------------------------------------
+# Execution: the beat plan (cap-to-fill) and the passage renderer
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BeatPlanEntry:
+    """One voiced beat of a verbatim passage: which speech, which cut, the words."""
+
+    speaker: str
+    text: str            # this chunk's lines joined with one space; every word verbatim
+    speech_index: int    # index into ``Passage.speeches``
+    chunk_ordinal: int   # 0-based position of this chunk within its speech
+    chunk_count: int     # how many chunks the speech was cut into
+
+
+def _halve(group: list[str]) -> tuple[list[str], list[str]]:
+    """Split one group at the line boundary nearest its middle (by words); a
+    single line splits at its middle word. Either half may be empty only when
+    there is nothing to split, which the caller treats as a miss."""
+    if len(group) >= 2:
+        weights = [max(1, canonical_word_count(u)) for u in group]
+        total = sum(weights)
+        cum = 0
+        best, best_gap = 1, None
+        for i in range(1, len(group)):
+            cum += weights[i - 1]
+            gap = abs(cum - total / 2)
+            if best_gap is None or gap < best_gap:
+                best, best_gap = i, gap
+        return group[:best], group[best:]
+    words = group[0].split() if group else []
+    mid = len(words) // 2
+    return ([" ".join(words[:mid])] if mid else []), ([" ".join(words[mid:])] if words[mid:] else [])
+
+
+def _cut_into(text: str, parts: int, cap: int) -> list[str]:
+    """Cut a speech into exactly ``parts`` pieces, starting from the chunker's
+    own groups (each already <= cap) and halving the longest piece at a line
+    boundary until the count is reached. Halving only shrinks, so no piece can
+    ever exceed the cap (codex r3: a 140-word line could before)."""
+    groups = _pack_lines(_line_units(text), cap)
+    if len(groups) > parts:
+        raise PassageError(
+            f"a speech that packs to {len(groups)} chunk(s) cannot fit {parts} beat(s)"
+        )
+    while len(groups) < parts:
+        i = max(range(len(groups)),
+                key=lambda k: (canonical_word_count(" ".join(groups[k])), -k))
+        left, right = _halve(groups[i])
+        if not left or not right:
+            raise PassageError(
+                f"a {canonical_word_count(' '.join(groups[i]))}-word piece cannot be "
+                f"cut again to fill {parts} beats"
+            )
+        groups[i:i + 1] = [left, right]
+    return [" ".join(g) for g in groups]
+
+
+def build_beat_plan(passage: Passage, *, beat_count: int) -> tuple[BeatPlanEntry, ...]:
+    """Cut the passage into EXACTLY ``beat_count`` consecutive voiced beats.
+
+    The act topology is the operator's dial and stays the one topology owner
+    (``_otr_episode_budget``): the executor never derives an act count from the
+    passage. Instead the passage FILLS the beats the dial bought -- every speech
+    takes at least one beat, and the remaining beats go, one at a time, to the
+    speech whose beats are currently the longest, so a long speech spans several
+    consecutive beats in the same voice (pacing, not paraphrase) while a rapid
+    exchange keeps one beat per speech. There is no per-beat word floor anywhere
+    in the tree, so a short chunk is legal.
+
+    Raises ``PassageError`` when the passage cannot fill the beats -- fewer beats
+    than speeches (selection never produces this: a speech costs at least one
+    beat and the passage was chosen inside the beat budget), or fewer words than
+    beats (no vendored scene at any legal dial; a caller treats it as a miss).
+    Every entry is at most ``BEAT_WORD_HARD_MAX`` words: the plan cuts from the
+    chunker's own groups and only ever halves them.
+    """
+    speeches = passage.speeches
+    n = len(speeches)
+    if n == 0:
+        raise PassageError("cannot plan beats for an empty passage")
+    if beat_count < n:
+        raise PassageError(
+            f"{beat_count} beat(s) cannot hold {n} speech(es) -- a speech never "
+            f"shares a beat"
+        )
+    # Start every speech at the beats the chunker already needs for it (the
+    # cost selection used), then hand out the remaining beats.
+    counts = [len(_pack_lines(_line_units(s.text), BEAT_WORD_HARD_MAX))
+              for s in speeches]
+    words = [max(0, s.word_count) for s in speeches]
+    if sum(counts) > beat_count:
+        raise PassageError(
+            f"{beat_count} beat(s) cannot hold a passage that packs to "
+            f"{sum(counts)} chunk(s)"
+        )
+    for _ in range(beat_count - sum(counts)):
+        # Only a speech with more words than beats can take another cut; ties go
+        # to the earlier speech so the allocation is a pure function of the text.
+        candidates = [k for k in range(n) if words[k] > counts[k]]
+        if not candidates:
+            raise PassageError(
+                f"a {sum(words)}-word passage cannot fill {beat_count} beats"
+            )
+        k = max(candidates, key=lambda i: (words[i] / counts[i], -i))
+        counts[k] += 1
+    entries: list[BeatPlanEntry] = []
+    for index, (speech, k) in enumerate(zip(speeches, counts)):
+        pieces = _cut_into(speech.text, k, BEAT_WORD_HARD_MAX)
+        for ordinal, piece in enumerate(pieces):
+            entries.append(BeatPlanEntry(
+                speaker=speech.speaker, text=piece, speech_index=index,
+                chunk_ordinal=ordinal, chunk_count=len(pieces),
+            ))
+    if len(entries) != beat_count:  # pragma: no cover -- arithmetic guard
+        raise PassageError(
+            f"planned {len(entries)} beat(s) for a request of {beat_count}"
+        )
+    return tuple(entries)
+
+
+def render_passage_text(passage: Passage) -> str:
+    """The selected window in Folger's own verse layout -- the speaker prefix on
+    its own line, the speech beneath -- for the pre-outline authors that read the
+    lane's ``full_text``. Words verbatim; the layout is the parser's own, so the
+    result parses back into the same speeches."""
+    return "\n\n".join(f"{s.speaker}\n{s.text}" for s in passage.speeches)

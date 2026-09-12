@@ -1155,6 +1155,7 @@ def _build_beat_user_prompt(
     next_beat_speaker: Optional[str] = None,
     phase_summary: Optional[str] = None,
     story_engine: str = "",
+    verbatim_text: Optional[str] = None,
 ) -> str:
     """Stage 3 user prompt -- ask for intent + mood for one beat.
 
@@ -1217,6 +1218,26 @@ def _build_beat_user_prompt(
     _pc = req.prior_critique.strip()
     if _pc:
         parts.append(f"Address this weakness: {_pc}")
+    if verbatim_text is not None:
+        # The verbatim executor: this beat's words are the source's own and
+        # already decided. The invention-lane task below tells every beat to
+        # RAISE THE STAKE; on fixed words that instruction can only produce an
+        # intent the speech does not contain, which the Ghost author and the
+        # voice engine would then act on. So the task is REPLACED, not
+        # appended to: describe what the speech does as written.
+        parts.extend([
+            "",
+            "SPOKEN WORDS (fixed, verbatim from the source -- this beat says "
+            "exactly this, and nothing else):",
+            verbatim_text,
+            "",
+            "Task: write the intent (one sentence, NOT dialogue) and a mood "
+            "descriptor for this beat. The words above are FIXED: describe what "
+            "this speech DOES as written -- whom it addresses, what it reveals, "
+            "asks, refuses, promises or decides -- and invent no action, turn or "
+            "escalation the words do not contain. Return only the JSON object.",
+        ])
+        return "\n".join(parts)
     parts.extend([
         "",
         "Task: write the intent (one sentence, NOT dialogue) and a "
@@ -1598,6 +1619,16 @@ def generate_outline(
     # (outline_macro/phase/beat_system) via the router's repo=None lane --
     # science stays byte-identical (pack == constants, test-pinned).
     source_bank_id: str = "media_archive",
+    # The verbatim executor (2026-09-11): one speaker per voiced beat and the
+    # fixed words of each, in outline order. Non-empty ONLY on a bank that
+    # performs its source verbatim; empty on every other call, byte-identical
+    # to before. Stage 2 then assigns speakers from the plan in order (no model
+    # call, and never the sorted-cast round robin -- MALVOLIO's chunk must stay
+    # MALVOLIO's) and Stage 3 still writes intent + mood, told the words are
+    # fixed. `mood` is not telemetry: it becomes the row's traits, which the
+    # voice engines read as emotion and the Ghost author reads beside intent.
+    speaker_plan: tuple = (),
+    verbatim_texts: tuple = (),
 ) -> Outline:
     """Generate a validated Outline via a tree of small LLM calls.
 
@@ -1645,6 +1676,26 @@ def generate_outline(
     locked_cast_by_normalized = {
         _normalize_speaker(name): name for name in req.character_cast
     }
+    speaker_plan = tuple(str(s) for s in (speaker_plan or ()))
+    verbatim_texts = tuple(str(t) for t in (verbatim_texts or ()))
+    if speaker_plan or verbatim_texts:
+        # Plan and topology come from the same act dial (`build_beat_plan`
+        # cut the passage to `voiced_beat_count`), and the cast was seated
+        # from the plan's speakers. Either disagreeing is a wiring defect,
+        # not a story problem, and it dies here rather than as a paraphrase.
+        _expected = int(sum(per_phase_beats))
+        if len(speaker_plan) != _expected or len(verbatim_texts) != _expected:
+            raise ValueError(
+                f"verbatim plan carries {len(speaker_plan)} speaker(s) and "
+                f"{len(verbatim_texts)} text(s) for a topology of "
+                f"{_expected} voiced beat(s)"
+            )
+        _unseated = sorted(set(speaker_plan) - locked_cast_set)
+        if _unseated:
+            raise ValueError(
+                f"verbatim plan names speaker(s) {_unseated!r} the locked cast "
+                f"{sorted(locked_cast_set)!r} did not seat"
+            )
 
     # Sprint D D2b: creative-phase prompt routes via the resolver.
     # The new per-stage prompts replace the legacy _SYSTEM_PROMPT
@@ -1745,6 +1796,19 @@ def generate_outline(
         # and build the skeleton deterministically. This removes the
         # observed crash (num_characters=1, cast ['LEMMY'], the LLM
         # invented 'LEMMEY' / 'CAPTAIN' and raised OutlineFailedError).
+        if speaker_plan:
+            _start = sum(len(s.beats) for s in phase_skeletons)
+            skeleton = _PhaseSkeleton(beats=[
+                _PhaseBeatSeed(speaker=name)
+                for name in speaker_plan[_start:_start + phase_beat_count]
+            ])
+            log.info(
+                "[OTR_Outline.phase[%s]] verbatim plan: %d beat(s) take the "
+                "passage's speakers in order; no Stage 2 call",
+                phase_name, len(skeleton.beats),
+            )
+            phase_skeletons.append(skeleton)
+            continue
         if singleton_cast:
             skeleton = _deterministic_phase_skeleton(
                 phase_beat_count, req.character_cast,
@@ -1890,6 +1954,9 @@ def generate_outline(
                     if later_skel.beats:
                         next_beat_speaker = later_skel.beats[0].speaker
                         break
+            _global_beat = (
+                sum(len(s.beats) for s in phase_skeletons[:phase_idx]) + beat_idx
+            )
             beat_user = _build_beat_user_prompt(
                 req, macro, phase_name, beat_seed.speaker,
                 (beat_idx, n_beats),
@@ -1897,6 +1964,9 @@ def generate_outline(
                 next_beat_speaker=next_beat_speaker,
                 phase_summary=phase_summary,
                 story_engine=req.story_engine,
+                verbatim_text=(
+                    verbatim_texts[_global_beat] if verbatim_texts else None
+                ),
             )
             # LLM slot: creative -- per-beat intent/mood (narrative pass)
             try:

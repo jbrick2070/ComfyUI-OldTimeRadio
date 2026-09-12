@@ -51,6 +51,11 @@ from __future__ import annotations
 import logging
 from typing import Any, Callable, Mapping, MutableMapping
 
+try:
+    from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
+
 log = logging.getLogger("OTR.ledger_cleanup")
 
 
@@ -108,13 +113,17 @@ def _text_of(row: Mapping[str, Any]) -> str:
     return value if isinstance(value, str) else ""
 
 
-def _clean_spoken_text(text: str) -> str:
-    """The shared stage-direction stripper, imported function-locally."""
+def _clean_spoken_text(text: str, *, keep_parentheticals: bool = False) -> str:
+    """The shared stage-direction stripper, imported function-locally.
+
+    ``keep_parentheticals`` is the verbatim lane's case: a Folger
+    parenthetical is SPEECH, so a row made only of one still has a voice.
+    """
     try:
         from ._otr_script_prep import clean_spoken_text
     except ImportError:  # pragma: no cover -- flat test/standalone load
         from _otr_script_prep import clean_spoken_text  # type: ignore
-    return clean_spoken_text(text)
+    return clean_spoken_text(text, keep_parentheticals=keep_parentheticals)
 
 
 def _cast_ids(ledger_data: Mapping[str, Any]) -> "set[str]":
@@ -256,7 +265,8 @@ def _complete_deterministic(
             })
 
         if (not skipped and role in _SPOKEN_ROLES
-                and not _clean_spoken_text(text).strip()):
+                and not _clean_spoken_text(
+                    text, keep_parentheticals=_row_is_verbatim(row)).strip()):
             # A voiced row with nothing sayable cannot be voiced. Making the
             # skip EXPLICIT (with its reason) is completion; leaving it as a
             # silent hole is what breaks slicing and captions downstream.
