@@ -127,12 +127,14 @@ class StableAudioTheme:
                     "default": "",
                     "tooltip": (
                         "Your own music, in your own words -- 'gamelan "
-                        "orchestra', 'surf rock', 'solo cello'. Blank uses "
-                        "the source bank's genre: sci-fi news is Detroit "
-                        "techno, media archive a jazz quartet, original "
-                        "salsa, public domain Chicago house, Shakespeare an "
-                        "Elizabethan consort. Applies to every cue in the "
-                        "episode."
+                        "orchestra', 'surf rock', 'solo cello'. Applies to "
+                        "the generated opening and closing cues, and only "
+                        "on the listener-authored My Story bank. Blank "
+                        "uses the bank's own genre: sci-fi news is Detroit "
+                        "techno, media archive a jazz quartet, the "
+                        "LLM-written Original Radio Drama bank salsa, "
+                        "public domain Chicago house, Shakespeare an "
+                        "Elizabethan consort."
                     ),
                 }),
             },

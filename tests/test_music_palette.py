@@ -295,6 +295,22 @@ def test_a_typed_style_that_names_a_groove_is_not_told_to_avoid_one():
         assert P.custom_palette(text).rhythmic is False, text
 
 
+def test_a_style_nobody_listed_falls_to_the_negative_that_cannot_cancel_it():
+    """codex r1, 2026-09-12: the first cut CLAIMED to be "biased toward rhythmic
+    on doubt" and did the opposite -- anything the word list missed came back
+    sustained and collected the anti-loop negative, so "shoegaze" would have
+    been asked for and then forbidden its own drums.
+
+    The rule is now explicit and asymmetric, because the two failures are not
+    equal. Wrongly sustained loses a cue the anti-loop wording and risks a loop,
+    which is a disappointment. Wrongly rhythmic asks for a beat while banning
+    beats, which produced a 400 ms broadband burst every time it was
+    measured."""
+    for unknown in ("shoegaze", "musique concrete", "timpani roll",
+                    "zzzz nonsense", "vaporwave", "hurdy gurdy"):
+        assert P.custom_palette(unknown).rhythmic is True, unknown
+
+
 def test_custom_palette_never_raises_and_never_runs_away():
     """It runs inside a render and takes whatever a person typed."""
     assert P.custom_palette(None) is None and P.custom_palette("") is None

@@ -296,17 +296,35 @@ def bank_of(meta) -> str:
     return ""
 
 
-#: Words that mean the music has a groove. Used only to decide which
-#: NEGATIVE prompt a typed style receives, and deliberately generous: a
-#: style wrongly treated as rhythmic merely loses the anti-loop wording,
-#: while a rhythmic style wrongly treated as sustained is asked for a beat
-#: and forbidden one in the same breath, which is the failure that tears.
+#: WHICH WAY AN UNRECOGNISED STYLE FALLS, stated as a rule rather than left
+#: to a word list (codex r1, 2026-09-12). The first cut claimed to be
+#: "biased toward rhythmic on doubt" and did the opposite: anything the
+#: regex missed came back sustained and collected the anti-loop negative.
+#: So "shoegaze" or "musique concrete" would have been asked for and then
+#: forbidden their own drums -- the self-cancelling request that tears.
+#:
+#: The rule now: a typed style is SUSTAINED only when it names something
+#: sustained, and everything else is treated as having a groove. That is
+#: the asymmetry the measurements support. Wrongly sustained costs a cue
+#: the anti-loop wording and risks a loop, which is a disappointment;
+#: wrongly rhythmic asks for a beat while banning beats, which produced a
+#: 400 ms broadband burst every time it was measured.
 _RHYTHM_WORDS = re.compile(
     r"\b(?:techno|house|salsa|jazz|funk|disco|drum|drums|percussion|beat|"
     r"beats|groove|rhythm|rhythmic|bpm|dance|swing|reggae|ska|hip.?hop|"
     r"breakbeat|jungle|garage|electro|bossa|samba|mambo|cumbia|afrobeat|"
     r"march|marching|tango|polka|rock|metal|punk|bluegrass|banjo|"
     r"tabla|gamelan|taiko|conga|bongo|timbale|snare|kick|808|909|707)\b",
+    re.IGNORECASE)
+
+#: The other side of the rule: text that names sustained music, and is
+#: therefore safe to give the anti-loop negative to.
+_SUSTAINED_WORDS = re.compile(
+    r"\b(?:drone|ambient|chant|chanting|plainsong|gregorian|choir|choral|"
+    r"cello|violin|viola|strings|quartet|quintet|orchestra|orchestral|"
+    r"consort|chamber|organ|harp|pad|pads|atmosphere|atmospheric|soundscape|"
+    r"sustained|held|legato|nocturne|lullaby|hymn|requiem|adagio|"
+    r"harmonium|accordion|theremin|flute|clarinet|oboe|bassoon)\b",
     re.IGNORECASE)
 
 
@@ -322,8 +340,16 @@ def custom_palette(style_text) -> "Palette | None":
     if not text:
         return None
     text = " ".join(text.split())[:200]
-    return Palette("custom", text, text,
-                   rhythmic=bool(_RHYTHM_WORDS.search(text)))
+    # A named groove is rhythmic. Otherwise it is sustained ONLY if it
+    # says something sustained; anything unrecognised falls to rhythmic,
+    # because that negative cannot contradict whatever was asked for.
+    if _RHYTHM_WORDS.search(text):
+        rhythmic = True
+    elif _SUSTAINED_WORDS.search(text):
+        rhythmic = False
+    else:
+        rhythmic = True
+    return Palette("custom", text, text, rhythmic=rhythmic)
 
 
 def story_palette(meta) -> Palette:
@@ -347,11 +373,12 @@ def story_palette(meta) -> Palette:
     # news lane being Detroit techno every week is what makes it recognisable.
     # My Story is the bring-your-own lane, so it is the one that takes a
     # bring-your-own score, exactly as it already takes an authored prompt.
-    if bank_of(meta) == "my_story":
+    bank = bank_of(meta)
+    if bank == "my_story":
         typed = custom_palette(meta.get("music_style"))
         if typed is not None:
             return typed
-    declared = _BANK_PALETTES.get(bank_of(meta))
+    declared = _BANK_PALETTES.get(bank)
     if declared is not None and declared.rhythmic:
         return declared
     year = year_of(meta.get("source_meta"))

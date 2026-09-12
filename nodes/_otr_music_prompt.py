@@ -136,7 +136,7 @@ NEGATIVE_PROMPT_RHYTHMIC = (
 
 def negative_for(palette) -> str:
     """The negative prompt this ensemble should hear."""
-    return (NEGATIVE_PROMPT_RHYTHMIC if getattr(palette, "rhythmic", False)
+    return (NEGATIVE_PROMPT_RHYTHMIC if palette.rhythmic
             else NEGATIVE_PROMPT_DEFAULT)
 
 
