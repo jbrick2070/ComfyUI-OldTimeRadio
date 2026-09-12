@@ -52,119 +52,69 @@ only a ruling is left.*
 
 ## 3. Blocked on the operator -- each unblocks with one word
 
-Grouped by subject so the related listens and the related rulings sit
-together. Order inside a group is not priority; pick whichever you're in the
-mood to settle.
+**He answered all sixteen on 2026-09-12 and left to do other things, with:**
+*"i cant listen until i get back thats ok if thats the one thing waiting, dont
+stall for me, keep going and do a bunch of testing, we can fix when i get back."*
+So the rows below are what SURVIVED his answers. The twelve rows that closed are
+gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
-### Music -- five listens, one bank
+### Waiting on his ear, and nothing else
 
-* **Small or medium.** Eighteen paired clips per arm in
-  `output/otr/obs/music_model_bench/` (same family and seed number across
-  arms; the README.txt inside says what each is). On the bench
-  (`docs/2026-09-12-music-model-bench/`) medium base rendered NO pulse on
-  sustained cues where small base has one, was mixed on the genre lanes,
-  and never came back hot -- at 9.22 GB on disk, +3.4 GB of VRAM, +2.4 s a
-  cue, and unproven on 8 GB. The engine keeps preferring small base until
-  you say; "medium" is one tuple, one fetch lane and a 4060 proof.
-  **Unblocks with small or medium.**
-* **Listen for the tape scratch.** `the_jars_secret_20260912_024354` (base
-  checkpoint, cfg 4) against `the_borrowed_voice_20260912_023252` (post-trained,
-  cfg 7) -- the odd tape-loop scratch at ~0:47 should be gone from the first.
-  **Unblocks with gone or still there.**
-* **Listen for the loop on the SUSTAINED lane.** A Shakespeare leg, which is now
-  the only bank still receiving the anti-loop negative -- and that negative has
-  never been heard working, because it was inert on the old checkpoint. The
-  original loop complaint was never actually tested. **Unblocks with looping or
-  not.**
-* **Listen to the four bank genres.** Eight clips, labelled by bank, in
-  `output/otr/obs/bank_genres/` (`1_scifi_news_DETROIT_TECHNO_*` through
-  `4_original_SALSA_*`). **Unblocks with which ones are right.**
-* **Does a declared bank genre outrank an AUTHORED music row?** `scifi_news_pro`
-  writes its own ledger music rows and they bypass the composed genre row, so
-  that bank's cue asked for a TR-909 and "tense strings" in the same prompt and
-  came back a pad. *"Sci-fi news is Detroit techno"* reads as yes, but authored
-  rows are a deliberate feature of that lane and overriding them is a behaviour
-  change on a path nobody has studied. **Unblocks with yes or no.**
+* **The techno and house cues, re-rendered.** He judged `3_media_archive`
+  (jazz) and `4_original` (salsa) RIGHT, and `1_scifi_news` (Detroit techno)
+  and `2_public_domain` (Chicago house) WRONG -- *"supposed to be techno whats
+  wrong??"* and *"supposed to be house very wrong"*. Three sustained-music
+  instructions were reaching a dance cue: a pad closing both electronic
+  palettes, the neutral floor word "atmospheric" LEADING the row, and an
+  orchestral per-cue arc ("a rising overture", "resolving to a warm held
+  chord") that was appended OUTSIDE the guard already written to keep
+  orchestral language off a rhythmic palette. All three are fixed and the fix
+  is scoped by a new `Palette.groove_arc` flag to exactly the two banks he
+  rejected -- **jazz and salsa compose byte-identically to what he approved**,
+  because his ear on shipped output outranks a tidier rule (codex refuted the
+  wider blast radius and was right). **Unblocks with a listen to the new
+  cues in `otr/obs/`.**
+* **Whether the causal story is actually right.** Codex's standing objection,
+  folded rather than argued with: the operator's verdict is on OUTPUT and the
+  diagnosis is a reading of the PROMPT, with no seed-matched A/B between them.
+  The untested competitors are the checkpoint (post-trained SA3 ignores cfg and
+  negatives) and the sampler. The comments say hypothesis, not fact. **Unblocks
+  with the same listen.**
+* **The anime checkpoint, on screen.** `Counterfeit-V3.0_fp16.safetensors` is
+  fetched (4.24 GB, in `C:\ComfyUI-Models\checkpoints`) and the anime pack now
+  names it. A pack's checkpoint is a PREFERENCE and never a gate: a box without
+  the file falls through to the env override and then the shipped default, so
+  nothing greys out and no render can fail on it. **Unblocks with your eye on
+  an anime-style still minted through it** -- one style, two checkpoints.
 
-### Story and writer quality
+### Still genuinely open, and not his call
 
-* **Arm `defaults.scene_coherence_check` on any bank?** The vacuity fix
-  shipped 2026-08-28 but stays opt-in and inert everywhere
-  (`nodes/_otr_scene_guard.py:19`, "default False -> INERT"), and the offline
-  corpus measurement was never run. **Unblocks with a bank name, or not yet.**
-* **Ghost names: scrub the brief after cast lock, or propagate the pitch's
-  names?** Pitch-invented names never reach `lock_cast`, so a bio can open on
-  a name the locked cast does not use -- the Fogbound Rails bio still opens
-  "Lizzie Gray". **Unblocks with scrub or propagate.**
-* **Does `media_archive` get the same no-premise-scaffold treatment as
-  `original`?** The five-bank beat test caught it drawing an unrelated
-  premise scaffold over its own catalogued item; the scaffold-off rule has
-  only ever been stated for `original`. **Unblocks with yes or no.**
-* **Spend the one Gutenberg fetch to vendor the three refusing works?**
-  `ghost_ship`, `purple_cloud` and `beleaguered_city` still fail the
-  vendoring parser. Operator opt-in, not schedulable inside an offline
-  sprint. **Unblocks with go or skip.**
+* **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
+  not assumed.** The edition carries NO chapter divisions of any kind -- its
+  only all-caps headings are the title, "INTRODUCTION" and "THE END.", and the
+  body is broken solely by rows of asterisks. So `("chapters", 10, 11)` is
+  unsatisfiable and no chapter pair would resolve. It wants either a different
+  Gutenberg edition or a new chunk kind that slices on an explicit prose
+  landmark. It is left REFUSING on purpose: the near-miss on `ghost_ship` the
+  same day (a wrong anchor produced a clean 9,134-word "OK" line that had
+  silently swallowed an entirely different story) is the argument against
+  anchoring by feel. `ghost_ship` and `beleaguered_city` ARE vendored; the
+  manifest went 65 -> 67 and lost nothing.
 
-### Visual features
+### Held deliberately, revisit when the thing they wait on lands
 
-* **A per-style SD1.5 checkpoint** (your idea, 2026-09-11 night: *"maybe we
-  should be loading different SD1.5 models per visual pack -- an anime SD1.5
-  would really pop"*). Today the still engine (`nodes/_otr_image_engines/sd15.py`)
-  loads ONE checkpoint for every style, `v1-5-pruned-emaonly-fp16.safetensors`,
-  and `OTR_SD15_CKPT` overrides it globally; the style catalog
-  (`nodes/_otr_visual_styles.py`) has no per-style model field, and the anime
-  style contributes only the words "anime style" to the prompt. The build is
-  small and settled in shape: a `checkpoint` key per style in the catalog, the
-  engine resolving it through the one resolver (style first, then the env, then
-  the default), the file under `C:\ComfyUI-Models\checkpoints`, a variant note
-  for 8 GB cards. **Unblocks with the checkpoint name you want for anime** (and
-  any other style you want re-pointed); the measurement is one style, two
-  checkpoints, your eye.
-* **An IP-Adapter on the AnimateDiff lanes** (your question, 2026-09-11 night:
-  *"wondering if we should be using an IP adapter so AnimateDiff can take ref
-  images"*). Grounded: the pack has **three registered** AnimateDiff SD1.5 lanes
-  -- v3 haunted, Lightning, and the still-conditioned lab lane, which already
-  takes the beat's own still as its init image (the plain v2 and v3 ids are
-  tombstoned in `RETIRED_ENGINE_IDS` since 2026-08-23). AnimateLCM was
-  deliberately refused because the main recipe runs `GHOST_CFG = 8.0` with a LIVE
-  negative and the Ghost lettering defense needs real unconditional conditioning
-  (`eng_ghost_signal.py:101-106`); only the Lightning lane runs cfg 1.0. There is
-  NO IP-Adapter anywhere in the pack. An IP-Adapter drives STYLE from a reference
-  image (CLIP-vision, not the init latent) and would need the IP-Adapter model
-  files plus a node ComfyUI does not ship natively (the IPAdapter-plus pack), so
-  it is a new dependency decision for the registry story and a video-lane recipe
-  change -- recipes are hard-won: one lane, A/B against itself, your eye. The
-  other three tricks in the tutorial you pasted the pack already does: the ghost
-  lanes lean on grain and degradation to hide morphing, and the title / timecode
-  / captions are burned in post, not generated. **Unblocks with: which lane to
-  try it on and where the reference image comes from** (the episode's own style
-  card, the beat still, or a fixed mood board).
-* **Give `style_tail_policy` a third token, or rule the `ltx_radio_face`
-  path exempt?** `build_radio_host_prompt`'s `ltx_radio_mouth` branch returns
-  early and skips the tail the `ltx_audio_in` bookend declares
-  (`otr_meta_brief_image_prompt.py:196,253,286`). Unruled, the exemption
-  stands. **Unblocks with third token or exempt.**
-
-### Release and process
-
-* **Post the ROCm recruitment, or hand it back.** The pack is written and
-  pushed: `ROCM_MISSION_IMPOSSIBLE.md` at the repo root (the install, the two
-  profile ids, one headless command, what success looks like, what to send
-  back), a hero still at `docs/images/rocm_mission_hero.jpg`, both AMD
-  profiles confirmed pure-PyTorch with `build_variants --check` clean, and two
-  drafts of the post itself in `docs/rocm-recruitment-post-draft.md`. **A
-  window must never post it.** **Unblocks with posted, or with your edits.**
-* **A registry version carrying this week's work.** `pyproject.toml` is still
-  `2.0.0-alpha.30`, published 2026-09-11; **25 commits** have touched `nodes/`
-  since -- the guidance fix, the render-killing build-breaker, the bank
-  genres, the SA3 fetch fix, the Ghost-kernel preflight parity, and the bark
-  output guard among them. Editing that file auto-fires a publish and the
-  registry push is yours. **Unblocks with "publish alpha.31".**
-* **The 8 GB ship set.** Promote the 4060 profiles out of `draft` after the wave
-  reports its physical 8 GB legs. **Unblocks with promote or hold.**
-* **Does a 24 GB machine class get its own row?** No entry in
-  `config/machine_classes.json`; rentals file under the 16 GB class today.
-  Low priority. **Unblocks with yes or no.**
+* **The 8 GB ship set** stays `draft` until the wave reports its physical 8 GB
+  legs. **He ruled hold**, and it could not honestly be anything else yet.
+* **`defaults.scene_coherence_check`** stays inert on every bank. **He ruled
+  "not yet"**; story quality is closed and the offline corpus measurement was
+  never run.
+* **An IP-Adapter on the AnimateDiff lanes.** **He ruled hold.** It is a new
+  dependency for the registry story and a recipe change on hard-won recipes;
+  after the wave, if at all.
+* **The ROCm recruitment post.** Written and pushed and waiting for him --
+  `ROCM_MISSION_IMPOSSIBLE.md`, the hero still, two drafts in
+  `docs/rocm-recruitment-post-draft.md`. **He said he will post it himself.**
+  A window must never post it.
 
 ## 4. Constraints specific to this plan
 

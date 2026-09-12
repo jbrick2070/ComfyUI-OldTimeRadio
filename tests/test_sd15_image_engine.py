@@ -194,6 +194,66 @@ def test_the_checkpoint_resolver_is_one_function_and_env_overridable(
     assert S.CKPT_ENV.startswith("OTR_SD15")
 
 
+def test_a_visual_pack_may_name_its_own_checkpoint_when_that_file_exists(
+        monkeypatch):
+    """A PACK'S CHECKPOINT IS A PREFERENCE, NOT A GATE (operator, 2026-09-12:
+    *"an anime SD1.5 would really pop"*).
+
+    `_installed` asks ComfyUI's `folder_paths`, which does not exist in a test
+    process, so the installed check is what is monkeypatched here -- it is also
+    the reason a bare probe outside ComfyUI always reports the default.
+    """
+    monkeypatch.setattr(S, "_installed", lambda name: True)
+    assert S._resolve_ckpt_name("anime") == "Counterfeit-V3.0_fp16.safetensors"
+    # THE PACK OUTRANKS THE ENV, because it is the more specific statement and
+    # the env is a whole-engine escape hatch.
+    monkeypatch.setenv(S.CKPT_ENV, "something-else.safetensors")
+    assert S._resolve_ckpt_name("anime") == "Counterfeit-V3.0_fp16.safetensors"
+    # ...but only for the pack that names one.
+    assert S._resolve_ckpt_name("sci_fi_radio") == "something-else.safetensors"
+
+
+def test_a_pack_checkpoint_that_is_not_installed_costs_nothing(monkeypatch):
+    """THE WHOLE SAFETY PROPERTY. A pack naming weights this box never fetched
+    must not grey the engine out or fail a render -- it falls through to the
+    env override and then the shipped default, exactly as before the field
+    existed. `assert_usable` gates on this same resolver, so what it checks is
+    always a file that is actually present."""
+    monkeypatch.setattr(S, "_installed", lambda name: False)
+    assert S._resolve_ckpt_name("anime") == S._DEFAULT_CKPT
+    assert S._style_ckpt_name("anime") == ""
+    monkeypatch.setenv(S.CKPT_ENV, "operator-choice.safetensors")
+    assert S._resolve_ckpt_name("anime") == "operator-choice.safetensors"
+
+
+def test_an_unknown_or_blank_style_resolves_exactly_as_before():
+    """Every pre-existing caller passes nothing. A style lookup must never be
+    able to fail a mint, so a bad id is "" rather than an exception."""
+    assert S._resolve_ckpt_name() == S._DEFAULT_CKPT
+    assert S._resolve_ckpt_name("") == S._DEFAULT_CKPT
+    assert S._resolve_ckpt_name("no_such_style") == S._DEFAULT_CKPT
+    assert S._style_ckpt_name("no_such_style") == ""
+    assert S._style_ckpt_name(None) == ""
+
+
+def test_the_dispatcher_stamps_the_style_on_the_request():
+    """THE WIRING, AT ITS REAL SITE. The per-style checkpoint is unreachable
+    unless the request carries the style id, and the request never carried it
+    before this change."""
+    import inspect as _inspect
+    from nodes import otr_image_gen_dispatcher as D
+    src = _inspect.getsource(D)
+    assert '"visual_style": (str(getattr(_vstyle, "style_id", "") or "")' in src, (
+        "the engine request must stamp visual_style")
+    # and the engine must read that exact key. `_sd15_params` is a METHOD on
+    # the engine class, not a module function.
+    engine_cls = next(
+        obj for _n, obj in vars(S).items()
+        if isinstance(obj, type) and hasattr(obj, "_sd15_params"))
+    assert 'get("visual_style")' in _inspect.getsource(
+        engine_cls._sd15_params)
+
+
 def test_the_default_checkpoint_is_the_ungated_archive_copy():
     """`stabilityai/*` historically gated its SD 1.5 repo behind a terms click,
     which breaks the auto-install property. The Comfy-Org archive does not."""

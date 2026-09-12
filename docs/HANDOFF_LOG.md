@@ -1,3 +1,205 @@
+## 2026-09-12 (afternoon) -- HEAD fec7619e +this (v2.0-alpha) -- CODER (he answered all sixteen; three reviewers each changed the work)
+
+
+**He answered every open row in one message, then left:** *"i have to go, keep
+coding arc and testing even the runpod, i cant listen until i get back, thats ok
+if thats the one thing waiting, dont stall for me, keep going and do a bunch of
+testing, we can fix when i get back."* And, separately: *"be sure you consult
+codex and cursor for this audio issue since you seem to have trouble"*, and
+*"that goes for anything in general, at least 1 contrarian round, and the same
+sonnet qa round when done."*
+
+**HIS SIXTEEN ANSWERS.** small; scratch GONE; loop NOT looping; genres 3 and 4
+RIGHT, 1 and 2 WRONG; genre does NOT outrank an authored row; scene-coherence
+NOT YET; ghost names SCRUB; media_archive scaffold OFF; Gutenberg GO; anime
+checkpoint COUNTERFEIT-V3.0; IP-Adapter HOLD; style tail EXEMPT; ROCm HE POSTS
+IT; PUBLISH ALPHA.31; 8 GB profiles HOLD (*"there are no profiles just one
+json"*); no 24 GB class (*"im not posting a 24gb section in my readme just a
+16+"*); and START THE TEST WAVE.
+
+### The music work, and the two things the contrarians overturned
+
+**The diagnosis.** Durations were identical across all four banks (12.074 s /
+7.988 s by ffprobe), so length was not the variable. Composing the real prompts
+offline showed three sustained-music instructions reaching a dance cue: a PAD
+closing both electronic palettes and neither acoustic one, the neutral floor
+word "atmospheric" LEADING the row, and an orchestral per-cue arc appended
+OUTSIDE the branch already written to keep orchestral language off a rhythmic
+palette. Jazz and salsa carried the identical defect and survived it because
+their instrument lists outvoted the arc.
+
+**CODEX REFUTED THE BLAST RADIUS AND WAS RIGHT.** The first cut gated the new
+groove arc on `palette.rhythmic`, which silently rewrote the two banks he had
+just judged RIGHT. Its words: *"That may be musically plausible for salsa, but
+it is not a no-op for jazz ... The operator's existing positive judgment makes
+this a regression risk, not a proven root fix."* Folded: a new
+`Palette.groove_arc` flag, set ONLY on Detroit techno and Chicago house, so
+**jazz and salsa now compose byte-identically to what he approved** (verified by
+composing both before and after). A listening verdict outranks a tidier rule.
+
+**CODEX ALSO REFUTED THE WRITER BRIEF AS A BACK-DOOR OVERRIDE.** The brief
+ended *"Never score it with an orchestra, strings, or a sustained pad"*, and his
+ruling was that a declared genre must NOT override an authored music row.
+Codex: *"Verbatim after a constrained author is still an override."* Folded: the
+brief now states a fact and stops -- *"this programme's house band plays Detroit
+techno at 128 BPM ..."* -- with a test asserting no imperative survives in it.
+
+**CURSOR FOUND THE ONE THAT MATTERED MOST, and it is the reason the techno bank
+would still have been wrong.** `_FABLE2_FORMAT_EXAMPLE` is injected as the GOLD
+FORMAT on every sci-fi-news script call and it scored its example programme with
+*"MUSIC: a slow fiddle, up and under"*. So the writer was being told the show is
+Detroit techno in the user turn and shown a fiddle as the model answer -- cursor
+called it *"the same self-cancelling request class you diagnosed this morning"*.
+The example's music rows now name NO instrument (*"the theme, up and under"*),
+which teaches the shape without teaching a register; naming the show's own genre
+there would have been worse, since the example is a gardening programme
+precisely so its content cannot be lifted.
+
+**CURSOR ALSO ESTABLISHED WHAT THE COMPOSED-PATH FIX CANNOT REACH.**
+`stable_audio_theme.py:366-381`: on the `scifi_news_pro` lane the cue prompt is
+the AUTHORED `generation_prompt`, used verbatim; `compose_music_prompt` runs
+only when an authored row carries no prompt. So on the techno bank the operative
+changes are the palette head losing its pad and the writer brief -- the new arc
+and the dropped floor reach it only on the empty-prompt fallback. On the house
+bank, which composes, all three apply. That distinction is now written where it
+happens rather than implied.
+
+**Claims checked and NOT folded.** Cursor's "the brief still bans strings" and
+both stale-docstring items had already been fixed in the codex fold; it had read
+a moving tree. Its Q3 objection that the ruling was ungrounded is correct about
+the FILES -- the plan still listed it open -- and wrong about the world: he
+answered it in this session.
+
+### The other rows
+
+* **Ghost names -- ALREADY FIXED, and the row's evidence was a pre-fix
+  artifact.** The cited episode (`signal_lost_fogbound_rails_20260803_144159`,
+  cast PHYLLIS TERWILLIGER, description opening "40s, Lizzie Gray") predates the
+  whole naming authority by 17 days: `_otr_name_authority.py` and
+  `_enforce_name_authority` both landed in `0645839b` on 2026-08-20. Running
+  today's code against that exact ledger data CATCHES it
+  (`ForeignIdentity(identity="ELIZABETH 'LIZZIE' GRAY", matched='LIZZIE')`), and
+  `tests/test_name_authority_boundary.py:592` already pins that literal string.
+  His "scrub" is what ships. NO CODE WRITTEN.
+* **media_archive scaffold OFF** -- one key in `nodes/story_packs/banks.json`,
+  matching `original` and `my_story`.
+* **Gutenberg: two of three vendored, and the third is measured rather than
+  abandoned.** `ghost_ship` was `("whole",)` against a COLLECTION, so it pulled
+  52,199 words; `beleaguered_city` has no chapters at all (its divisions are
+  named depositions). Both now slice by title. **The near-miss worth recording:**
+  the first `ghost_ship` fix anchored on "The New Boy" and produced a clean
+  9,134-word OK line that had silently swallowed the whole of "A Drama Of Youth"
+  -- it opened on Fairfield and ended on a boy wishing he were a cat. Correct
+  anchor is "A Drama Of Youth"; it now ends on the turnips tasting of rum, 4,193
+  words. `purple_cloud` CANNOT be sliced from pg11229: the edition has no
+  chapter divisions of any kind, only rows of asterisks, so no chapter pair
+  would resolve. Left refusing on purpose. Manifest 65 -> 67, nothing lost.
+* **Per-style SD1.5 checkpoint, built and wired.** `checkpoint` is a new
+  OPTIONAL pack key (optional for the same sha256-receipt reason as
+  `negative_tail`); `sd15._resolve_ckpt_name(style_id)` takes it ONLY when
+  `folder_paths` can see the file, else the env, else the default; the
+  dispatcher now stamps `visual_style` on the engine request, which it never
+  carried before. `Counterfeit-V3.0_fp16.safetensors` fetched (4.24 GB).
+  **A pack's checkpoint can never fail a render** -- that is the property under
+  test.
+* **Style tail EXEMPT, and the row's premise was already gone.**
+  `style_tail_policy` does not exist anywhere in the live tree; it was a
+  2026-07-25 design-brief concept that never shipped as a field. So there was no
+  declaration to reconcile. The exemption is now written at the early return in
+  `otr_meta_brief_image_prompt.py` so the question does not look open again.
+
+### Gates, measured rather than asserted
+
+**Suite: 43 failed of 15,430 collected**, this box, normal checkout -- EXACTLY the
+inherited baseline, with the failing SET diffed rather than the count. The method
+is worth keeping because the count alone would have misled twice:
+
+    baseline, clean worktree at fec7619e ......... 46
+    minus 3 that fail ONLY inside a worktree ..... 43   the documented baseline
+    this tree BEFORE the QA fold ................. 45   = 43 + exactly 2 regressions
+    this tree, pushed ............................ 43   ZERO new
+
+The three worktree-only ones are `test_installed_pack_not_stale` and the two
+`test_w45_campaign_bank_pinning` rows. The collected count rises by 9: the new
+tests. `tests/conftest.py` still carries an EMPTY `EXPECTED_FAILED_NODEIDS`, so
+the guard calls all 43 new -- diff the SET, never the count.
+
+**Reviewers, roster exact, and every one of them changed the code.**
+* **codex** (contrarian, finished diff): REFUTED 2 of 5 -- the blast radius
+  (`palette.rhythmic` silently rewrote the two banks he had just approved) and
+  the writer brief as a back-door override. Both folded. It also correctly
+  refused to grant the causal story, which is now labelled a hypothesis in the
+  code rather than stated as fact.
+* **cursor** (contrarian, same brief): found `_FABLE2_FORMAT_EXAMPLE` teaching
+  "MUSIC: a slow fiddle" as the gold answer on a Detroit-techno show, and
+  established that `scifi_news_pro` bypasses the composer entirely so the
+  composed-path fix cannot reach it. Both folded. Several of its other items
+  had already been fixed in the codex fold -- it had read a moving tree.
+* **Sonnet 5** (post-code QA, read-only by brief): found TWO REAL REGRESSIONS
+  the author missed -- the missing gender sidecars and the scaffold test. The
+  suite diff then found exactly those two and nothing else, independently.
+
+**Other gates:** AST parse + no BOM on all 11 touched .py; JSON parse on all 6
+touched .json; `build_variants.py --check` 93 variants 0 failures; no workflow
+file touched, so the widget/link trio was not required and was not run.
+
+### The two regressions the QA pass caught, and the root of the first
+
+**The gender sidecars, and this one had teeth.** `ghost_ship` and
+`beleaguered_city` shipped with no `.provenance.json`. That is the file
+`cast_source_contract.gender_by_name` is fed from, so an absent one drops every
+character back to the blind 40/40/20 roll -- the mechanism behind GERTRUDE cast
+male, LORD RONALD cast female and addressed *"Miss McFiggins"*, and AHAB in a
+woman's voice. **The root was better than the symptom:** this module's docstring
+has always claimed it writes "the unit body + a provenance sidecar ... via the
+shipped fetcher", and `main()` wrote the body with a bare `out.write_text` and
+no sidecar at all. It now calls `write_source`, which is safe across the whole
+library because that function already carries the stamper-owned `characters[]`
+forward whenever the body hash is unchanged (PBUG-20260815-04). Verified: no
+other sidecar moved.
+
+Then the gender ladder was run on both. `ghost_ship` resolved from the author's
+own pronouns; `beleaguered_city` needed tier 3 and **Madame Dupin came back
+female**, which is the exact flip class the guard exists for (coverage 25% ->
+75%). One name in each declined -- an unnamed village narrator and a priest
+known only as "the Cure" -- and declining is the documented answer: it preserves
+today's roll rather than asserting a wrong gender.
+
+**The scaffold test** enumerated `media_archive` by name as keeping the
+scaffold. It now reads a `_SCAFFOLD_OFF` set carrying his ruling, plus a
+dedicated test for the new row.
+
+### Live proof, and the trap that nearly cost a false receipt
+
+**`shadows_on_the_catwalk_20260912_144526` (public_domain / Chicago house)** --
+canonical, 9.4 min, exit 0, published to `otr/obs/`, zero clipped samples. Its
+shipped engine prompt:
+
+> Roland TR-707 drum machine, rolling bass line, warm piano chords, **offbeat
+> open hi-hats and hand claps**, clearly recorded, clean balanced studio mix,
+> natural room. suspenseful, driving, dark, Chicago house at 122 BPM, soulful
+> and steady, evokes catwalk, bunker, **the groove established in the first bar
+> and held**, instrumental intro, instrumental only, no dialogue, no vocals
+
+**THE TRAP: EVERY LEG TODAY RAN ON A SERVER THAT PREDATED THE LAST FOLDS.** The
+process holding :8000 started 14:26:20; the codex/cursor folds landed 14:35:2x.
+Python imports a module once, so a resident server holds the code as of ITS
+boot -- the peer window warned about exactly this and it still nearly shipped a
+false receipt. The house leg was RESCUED rather than assumed: composing that
+episode's own meta on the final tree reproduces the shipped prompt
+BYTE-IDENTICALLY (public_domain takes the same branch before and after the
+fold), so it is valid evidence. **The techno leg is NOT** -- the format example
+and the brief wording both changed -- and it is re-rendered on the pushed tree
+rather than cited.
+
+**`cwnet_the_transparency_test_20260912_143448` (scifi_news_pro / Detroit
+techno)** -- canonical, 12.4 min, exit 0, in `otr/obs/`, zero clipped. Cited for
+DIRECTION ONLY per the paragraph above. What it showed is still the thing worth
+knowing: the writer authored **"Detroit techno heartbeat builds, analog bass
+grumbles"** where the same lane wrote "Tense strings, pulsating rhythm" before,
+and the head carried no pad.
+
+
 ## 2026-09-12 -- HEAD 93315a1f +handoff (v2.0-alpha) -- CODER (the plan's ARC and CODE sections are empty for the first time; the Bible delta is promoted; testing is the next step)
 
 **THE SHA ABOVE IS THE LAST CODE HEAD.** This handoff is a SINGLE commit in

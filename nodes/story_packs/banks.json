@@ -18,7 +18,8 @@
         "close_brief_label": "archive source note",
         "title_form_label": "archive-inspired radio drama",
         "coda_mode": "archive_source_note",
-        "style_pool_class": "media"
+        "style_pool_class": "media",
+        "story_scaffold": "off"
       },
       "required_seams": [
         "outline_macro_system",

@@ -36,6 +36,13 @@ import re
 import sys
 import urllib.request
 
+# The shipped fetcher owns writing a body AND its provenance sidecar together,
+# so this script borrows that one writer rather than keeping a second copy of
+# the rule. Its directory has to be importable because these tools are scripts,
+# not a package.
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from otr_fetch_public_domain import write_source  # noqa: E402
+
 REPO = pathlib.Path(__file__).resolve().parents[1]
 CORPUS = REPO / "config" / "source_banks" / "_corpus"
 DEST = REPO / "config" / "source_banks" / "public_domain_story" / "sources"
@@ -300,8 +307,21 @@ WORKS: list[dict] = [
          label="The Beckoning Fair One",
          synopsis="Alone in his rooms, a writer hears a drip resolve into a comb drawn slowly through long hair.",
          cast=["Paul Oleron", "Elsie Bengough", "the landlady"]),
+    # gid 11045 is the COLLECTION "The Ghost Ship and Other Stories", not the
+    # story. ("whole",) therefore vendored all 16 stories -- 52,199 words, which
+    # the MAX_UNIT_WORDS ceiling correctly refused as "end marker almost
+    # certainly missed". The story itself is headed "The Ghost-Ship" (HYPHEN,
+    # title case) at the top of the collection and ends where "The New Boy"
+    # begins; `slice_story` takes max(starts) so the upper-case book title on
+    # the cover page is skipped in favour of the story heading.
     dict(slug="ghost_ship", gid=11045, title="The Ghost Ship", author="Richard Middleton",
-         year="1912", chunk=("whole",), tag="convivial",
+    # The end anchor is the story that IMMEDIATELY follows, "A Drama Of Youth",
+    # and getting that wrong is the failure this file warns about rather than an
+    # error you would see: anchoring on "The New Boy" produced a clean 9,134-word
+    # OK line that had silently swallowed the whole of the intervening school
+    # story -- it opened on Fairfield and ended on a boy wishing he were a cat.
+         year="1912", chunk=("story", "The Ghost-Ship", "A Drama Of Youth"),
+         tag="convivial",
          label="The Ghost Ship",
          synopsis="A pirate ghost ship is blown into a turnip field, and the village negotiates with its captain over spectral rum.",
          cast=["the village narrator", "the parson", "the ghost captain"]),
@@ -338,6 +358,21 @@ WORKS: list[dict] = [
          label="The Seance",
          synopsis="A drawing-room seance materializes a smiling apparition, and a stranger walks up and breaks its neck.",
          cast=["Maskull", "Krag", "Nightspore", "Backhouse"]),
+    # STILL REFUSING, AND THE SPEC IS UNSATISFIABLE FOR THIS EDITION rather
+    # than merely mis-typed (measured 2026-09-12). pg11229 carries NO chapter
+    # divisions of any kind: the only all-caps headings in the whole file are
+    # "THE PURPLE CLOUD", "INTRODUCTION" and "THE END.", and the body between
+    # them is broken only by rows of asterisks, dozens of them, which are scene
+    # breaks and not numbered units. So ("chapters", 10, 11) cannot resolve, and
+    # neither could any other chapter pair -- `slice_chapters` is not at fault.
+    #
+    # It is LEFT REFUSING ON PURPOSE. Anchoring the wanted passage on a line of
+    # body prose would be inventing a structure the edition does not have, and
+    # the near-miss on `ghost_ship` the same day is the argument against doing
+    # that by feel: a wrong anchor there produced a clean 9,134-word OK line
+    # that had silently swallowed an entirely different story. Vendoring this
+    # one wants either a different Gutenberg edition or a new chunk kind that
+    # slices on an explicit prose landmark, and that is a decision, not a typo.
     dict(slug="purple_cloud", gid=11229, title="The Purple Cloud", author="M. P. Shiel",
          year="1901", chunk=("chapters", 10, 11), tag="desolate",
          label="Landfall in a dead Britain",
@@ -539,9 +574,15 @@ WORKS: list[dict] = [
          synopsis="A horse tied to a church steeple, half a horse drinking forever, and a post-horn that thaws out its tunes.",
          cast=["Baron Munchausen", "a credulous listener"]),
 
+    # NOT CHAPTERS. The book is a dossier of depositions and its divisions are
+    # NAMED, not numbered -- there is no "CHAPTER" anywhere in pg11521, which is
+    # why ("chapters", 2, 3) reported "chunk not found" rather than vendoring
+    # the wrong thing. The named section that IS this label is the expulsion
+    # itself, bounded by the section that follows it.
     dict(slug="beleaguered_city", gid=11521, title="A Beleaguered City",
          author="Margaret Oliphant", year="1880",
-         chunk=("chapters", 2, 3), tag="processional",
+         chunk=("story", "EXPULSION OF THE INHABITANTS.",
+                "OUTSIDE THE WALLS."), tag="processional",
          label="The city is put out of its gates",
          synopsis="A town's dead expel the living through the gates, and the mayor files a deposition about it.",
          cast=["Martin Dupin", "Paul Lecamus", "Madame Dupin", "the Cure"]),
@@ -906,8 +947,38 @@ def main(argv: list[str] | None = None) -> int:
                 failed.append((slug, f"boilerplate survived -- {leak}"))
                 print(f"  LEAK  {slug:<32} {leak}")
                 continue
-            out = DEST / f"{slug}.txt"
-            out.write_text(unit + "\n", encoding="utf-8")
+            # THROUGH THE SHIPPED FETCHER, which is what this module's own
+            # docstring has always claimed and what it did not do (found by the
+            # QA pass, 2026-09-12). A bare `out.write_text` left the unit with
+            # NO `.provenance.json`, and a missing sidecar is not a cosmetic
+            # gap: `cast_source_contract.gender_by_name` is fed from it, so an
+            # absent one drops every character in the work back to the blind
+            # 40/40/20 gender roll. That is the exact mechanism behind GERTRUDE
+            # cast male, LORD RONALD cast female and addressed "Miss
+            # McFiggins", and AHAB in a woman's voice. The two works vendored
+            # today shipped without one and
+            # `tests/test_character_gender_sidecars.py` caught it.
+            #
+            # SAFE TO RUN OVER THE WHOLE LIBRARY: `write_source` carries the
+            # stamper-owned `characters[]` / `gender_ladder` forward whenever
+            # the body hash is unchanged (PBUG-20260815-04), so a re-vendor
+            # does not wipe the gender rosters off the other 65 units.
+            #
+            # `unit=None` keeps the on-disk name `<slug>.txt`; the manifest's
+            # unit id travels in `extra` instead, matching every sidecar the
+            # fetcher already wrote.
+            out, _sidecar = write_source(
+                unit + "\n",
+                slug=slug,
+                unit=None,
+                source_url=GUTENBERG_URL.format(gid=w["gid"]),
+                work_title=w["title"],
+                author=w["author"],
+                license_label="public_domain_us",
+                word_count=words,
+                dest_dir=DEST,
+                extra={"unit": "main"},
+            )
             ok.append(dict(w, words=words, text_path=f"sources/{slug}.txt"))
             print(f"  OK    {slug:<32} {words:>6} words")
         except Exception as exc:  # noqa: BLE001 -- report, never abort the batch

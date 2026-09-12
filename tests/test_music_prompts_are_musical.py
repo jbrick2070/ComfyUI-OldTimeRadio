@@ -451,6 +451,106 @@ def test_a_rhythmic_bank_is_not_also_told_to_play_slow_and_sustained():
     assert row.startswith("ominous, suspenseful")
 
 
+def test_a_rhythmic_bank_is_not_given_a_sustained_ARC_either():
+    """THE THIRD INSTANCE OF ONE DEFECT, and the one that reached the operator's
+    ear (2026-09-12: techno and house wrong, jazz and salsa right).
+
+    The two tests above guard the NEGATIVE and the tempo/device clauses. The
+    per-cue ARC escaped both, because `_CUE_CHARACTER` is appended after the
+    rhythmic branch rather than inside it -- so a 128 BPM drum machine was asked
+    for "a rising overture" and, closing, to resolve "to a warm held chord",
+    which is a request for the pad that came back. The neutral mood floor,
+    "atmospheric", led the same prompt whenever the brief carried no moods.
+
+    Why only two of four banks showed it: the acoustic palettes name no pad and
+    their instruments outvoted the arc. The defect was in all four."""
+    sustained_arc = ("overture", "held chord", "flowing theme", "atmospheric")
+    # SCOPED TO THE TWO HE REJECTED, and that scoping is the point (codex
+    # contrarian round, same day). Jazz and salsa carry the identical defect
+    # and he judged their cues RIGHT anyway, so they keep the arc he approved:
+    # a tidier rule does not outrank a listening verdict on shipped output.
+    for bank in ("scifi_news_pro", "public_domain"):
+        assert P.story_palette(_meta(bank, None)).groove_arc is True, bank
+        # moods=() so the neutral floor would fire if it were going to
+        meta = _meta(bank, None, moods=())
+        for cue in MP.CUE_DURATIONS:
+            row, _ = MP.compose_music_prompt(meta, cue)
+            engine = MP.compose_engine_prompt(meta, row)
+            low = engine.text.lower()
+            for word in sustained_arc:
+                assert word not in low, (bank, cue, word, engine.text)
+            # the genre still leads the row now that the floor is gone
+            assert row.startswith(P.story_palette(meta).idiom), (bank, cue, row)
+
+    # THE TWO HE APPROVED ARE UNTOUCHED -- rhythmic, but not groove_arc.
+    for approved in ("media_archive", "original"):
+        pal = P.story_palette(_meta(approved, None))
+        assert pal.rhythmic is True and pal.groove_arc is False, approved
+        row, _ = MP.compose_music_prompt(_meta(approved, None, moods=()),
+                                         "opening")
+        assert "a rising overture that settles into a flowing theme" in row
+        assert row.startswith("atmospheric"), row
+
+    # A SUSTAINED BANK KEEPS ITS ORCHESTRAL ARC AND ITS FLOOR TOO.
+    sustained = _meta("shakespeare", "c. 1595", moods=())
+    row, _ = MP.compose_music_prompt(sustained, "opening")
+    assert "a rising overture that settles into a flowing theme" in row
+    assert row.startswith("atmospheric"), row
+    row_close, _ = MP.compose_music_prompt(sustained, "closing")
+    assert "resolving to a warm held chord" in row_close
+
+
+def test_no_rhythmic_palette_ends_on_a_pad():
+    """A PAD WAS THE LAST INSTRUMENT NAMED on both palettes that came back
+    wrong, and on neither that came back right. The engine prompt leads with
+    this list, so its final word is the last texture the model reads before the
+    genre -- it must not be the one word that contradicts a groove."""
+    for palette in (P.DETROIT_TECHNO, P.CHICAGO_HOUSE, P.JAZZ_QUARTET,
+                    P.SALSA_CONJUNTO):
+        assert palette.rhythmic is True, palette.key
+        low = palette.instruments.lower()
+        assert "pad" not in low, (palette.key, palette.instruments)
+        # and the list still ends on something percussive or played, never a
+        # sustained texture word
+        assert not low.rstrip().endswith(("strings", "drone", "atmosphere")), (
+            palette.key, palette.instruments)
+
+
+def test_a_lane_that_authors_its_own_music_rows_is_told_the_bank_genre():
+    """THE HALF THE PALETTE FIX CANNOT REACH. The operator ruled (2026-09-12)
+    that a declared genre does NOT override an AUTHORED music row, so on
+    `scifi_news_pro` -- the only lane that authors them -- fixing the composed
+    row changes nothing. That bank came back a pad because its writer had never
+    been told what the show sounds like and wrote "Tense strings, pulsating
+    rhythm" over a TR-909 head.
+
+    Informing the author is not overriding the author: the row it writes is
+    still used verbatim."""
+    brief = P.authored_music_brief("scifi_news_pro")
+    assert "Detroit techno" in brief
+    assert "TR-909" in brief
+    # IT INFORMS, IT DOES NOT INSTRUCT. A prohibition here would be a back-door
+    # override of the authored row under a ruling that forbids overriding it,
+    # so the brief states what the house band IS and stops.
+    for imperative in ("Never", "never", "must", "Every MUSIC row"):
+        assert imperative not in brief, (imperative, brief)
+    # inert on a bank with no groove, so the underscore lanes are untouched
+    for quiet in ("shakespeare", "my_story", "", "no_such_bank"):
+        assert P.authored_music_brief(quiet) == "", quiet
+
+
+def test_the_scifi_news_prompt_actually_carries_that_brief():
+    """THE WIRING, ASSERTED AT ITS REAL SITE. A helper nothing calls is this
+    repo's most repeated defect and a test that calls it directly proves the
+    helper, never the wiring."""
+    from nodes import _otr_scifi_news_pro as S
+    body = inspect.getsource(S._script_user_prompt)
+    assert "_music_brief_line()" in body, (
+        "the script prompt must call the brief line, not merely define it")
+    line = S._music_brief_line()
+    assert "Detroit techno" in line and line.endswith("\n\n"), line
+
+
 def test_the_theme_node_offers_the_style_field_and_threads_it():
     """The widget exists, is APPENDED last (widgets_values is positional), and
     its value actually reaches the composer -- a field that changes nothing is

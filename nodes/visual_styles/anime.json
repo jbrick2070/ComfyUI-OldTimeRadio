@@ -1,6 +1,7 @@
 {
   "style_id": "anime",
   "label": "Anime",
+  "checkpoint": "Counterfeit-V3.0_fp16.safetensors",
   "positive_tail": "anime style, expressive linework, cel-shaded color",
   "image_grade_tail": "",
   "broadcast_tail": "",

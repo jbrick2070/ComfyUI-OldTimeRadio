@@ -1,0 +1,50 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "ghost_ship",
+  "unit": "main",
+  "work_title": "The Ghost Ship",
+  "author": "Richard Middleton",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/11045/pg11045.txt",
+  "fetched_utc": "2026-09-12T21:44:57Z",
+  "body_sha256": "545028185eee128ac8c496f831da9674a89b308ac51c647aeea1793b9358bc8b",
+  "body_bytes": 22036,
+  "body_words": 4193,
+  "text_path": "config/source_banks/public_domain_story/sources/ghost_ship.txt",
+  "characters": [
+    {
+      "name": "the parson",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 26 vs she/her/hers 1 across 14 mention window(s) for 'the parson', 'parson'",
+      "aliases": [
+        "parson"
+      ]
+    },
+    {
+      "name": "the ghost captain",
+      "gender": "male",
+      "gender_source": "pronouns",
+      "gender_confidence": "known",
+      "evidence": "pronoun scan: he/him/his 36 vs she/her/hers 1 across 20 mention window(s) for 'the ghost captain', 'ghost captain', 'captain'",
+      "aliases": [
+        "ghost captain"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 2,
+      "llm_recall": 0,
+      "name_frequency": 0
+    },
+    "candidates": 3,
+    "declined": [
+      "the village narrator"
+    ],
+    "ran_utc": "2026-09-12T21:45:09+00:00"
+  }
+}

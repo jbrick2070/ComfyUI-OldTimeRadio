@@ -2312,8 +2312,30 @@ def _script_user_prompt(
         + "statistic, date, named institution, or named real person in either "
         + "one; the factual close is a separate row the producer appends "
         + "after your CODA line.\n\n"
+        # THE SHOW'S OWN GENRE, because this lane's MUSIC rows are AUTHORED and
+        # the operator ruled (2026-09-12) that an authored row is NOT overridden
+        # by the composed genre row. So the row has to be right where it is
+        # written. Without this the model had nothing naming the bank's music
+        # and the format example below scores a gardening programme with a
+        # fiddle -- it wrote "Tense strings, pulsating rhythm" against a TR-909
+        # head, and the engine resolved that contradiction toward the strings.
+        # Empty string for any bank with no declared groove, so this is inert
+        # everywhere else.
+        + _music_brief_line()
         + "Write the complete episode now."
     )
+
+
+def _music_brief_line() -> str:
+    """The bank's declared music as a prompt paragraph, or "". Split out so the
+    import stays local to the one caller that needs it (this module is imported
+    at node-registration time and the palette is not on that path)."""
+    try:
+        from ._otr_music_palette import authored_music_brief
+    except ImportError:  # noqa: BLE001 -- degrade, never refuse a render
+        return ""
+    line = authored_music_brief("scifi_news_pro")
+    return (line + "\n\n") if line else ""
 
 
 _TITLE_LINE_RE = re.compile(r"^\s*TITLE\s*:", re.IGNORECASE)
@@ -3339,8 +3361,23 @@ def _run_markup_ladder(
 #: kept getting wrong -- an event that a screenplay would narrate ("she crosses
 #: to the window") carried instead by somebody SAYING it. Radio has no camera:
 #: anything the audience must know is spoken or scored.
+#: THE MUSIC ROWS NAME NO INSTRUMENT, and that is deliberate (cursor contrarian
+#: round, 2026-09-12). They used to read "a slow fiddle, up and under" and "the
+#: fiddle returns, and out". This block is injected as the GOLD FORMAT on every
+#: script call, and this lane AUTHORS its own music rows -- so the one example
+#: the writer is shown was teaching a string register while the user turn was
+#: telling it the show is Detroit techno. It wrote "Tense strings, pulsating
+#: rhythm" over a TR-909 palette, and the engine resolved that contradiction
+#: toward the strings.
+#:
+#: Naming the show's OWN genre here instead would be worse, not better: the
+#: example is a gardening programme precisely so its content cannot be lifted,
+#: and a gardening show scored with a 909 is incoherent. So the rows teach the
+#: SHAPE of a music cue -- a theme, up and under; the theme returns, and out --
+#: and say nothing about what plays it. The genre reaches the writer through
+#: `_music_brief_line()` in the user turn, which is where it belongs.
 _FABLE2_FORMAT_EXAMPLE = """TITLE: The Frost Warning
-MUSIC: a slow fiddle, up and under
+MUSIC: the theme, up and under
 ANNOUNCER: Tonight, from the allotments: The Frost Warning.
 SCENE 1: a potting shed, before dawn
 MAUD: You are up early for a woman who hates mornings.
@@ -3352,7 +3389,7 @@ MAUD: I am not, I am walking round it, and you are holding the torch wrong.
 PERCY: There. The last row is covered.
 ANNOUNCER: The frost came at four, and found nothing to take.
 CODA: The beans lived. The argument continued.
-MUSIC: the fiddle returns, and out
+MUSIC: the theme returns, and out
 END."""
 
 

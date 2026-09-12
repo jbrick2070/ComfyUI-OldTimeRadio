@@ -58,11 +58,23 @@ class Palette:
     receives a negative prompt that does not forbid its own genre, and the
     BANK beats the period band so a public-domain story from 1890 still gets
     the house music it was promised rather than a string quartet.
+
+    ``groove_arc`` is a SEPARATE question from ``rhythmic`` and the split is
+    deliberate (codex contrarian round, 2026-09-12). ``rhythmic`` says the
+    ensemble has a beat, which decides the negative prompt and the tempo
+    clause. ``groove_arc`` says the per-cue ARC should be described in groove
+    terms ("the groove established in the first bar and held") rather than
+    orchestral ones ("a rising overture ... resolving to a warm held chord").
+    Every rhythmic palette arguably wants the groove wording, but the operator
+    LISTENED on 2026-09-12 and judged the jazz and salsa cues RIGHT with the
+    orchestral arc; his ear on shipped output outranks the tidier rule, so
+    those two keep exactly what he approved until he says otherwise.
     """
     key: str
     instruments: str
     idiom: str
     rhythmic: bool = False
+    groove_arc: bool = False
 
 
 #: The house sound of the show: a 1940s radio-drama pit orchestra.
@@ -107,12 +119,23 @@ SCIFI_ORCHESTRA = Palette(
 #: The tempo is named in the idiom because a text-to-audio model answers a
 #: BPM number accurately: measured 2026-09-12 over five renders, prompts
 #: written at 124-135 BPM came back at 125.0, 125.0, 127.7, 130.4 and 133.3.
+#: NO PADS ON THE TWO ELECTRONIC PALETTES, and that is the whole reason this
+#: comment exists (operator's ear, 2026-09-12: techno and house came back
+#: wrong while jazz and salsa came back right). A pad was the LAST instrument
+#: named in both, and "warm Juno pads" / "soft string pads" is a texture
+#: instruction sitting at the end of a list whose job is to establish a
+#: groove. The two acoustic palettes name no pad and survived the same
+#: prompt; these two did not. Each now ends on the percussion detail that
+#: MAKES the genre recognisable -- the 909 hats for Detroit, the offbeat
+#: open hat and clap for Chicago -- so the last word the model reads is
+#: rhythmic rather than sustained.
 DETROIT_TECHNO = Palette(
     "detroit_techno",
     "Roland TR-909 drum machine, deep analog sub bass, detuned synth stabs, "
-    "warm Juno pads",
+    "crisp sixteenth-note hi-hats",
     "Detroit techno at 128 BPM, hypnotic machine funk",
     rhythmic=True,
+    groove_arc=True,
 )
 JAZZ_QUARTET = Palette(
     "jazz_quartet",
@@ -130,9 +153,10 @@ SALSA_CONJUNTO = Palette(
 CHICAGO_HOUSE = Palette(
     "chicago_house",
     "Roland TR-707 drum machine, rolling bass line, warm piano chords, "
-    "soft string pads",
+    "offbeat open hi-hats and hand claps",
     "Chicago house at 122 BPM, soulful and steady",
     rhythmic=True,
+    groove_arc=True,
 )
 
 #: Period bands by the source's year: (exclusive upper bound, palette).
@@ -153,6 +177,42 @@ _BANK_PALETTES = {
     "original": SALSA_CONJUNTO,
     "public_domain": CHICAGO_HOUSE,
 }
+
+
+def authored_music_brief(bank: str) -> str:
+    """One line telling a WRITER what this show's music sounds like, or "".
+
+    WHY A LANE THAT AUTHORS ITS OWN MUSIC ROWS NEEDS THIS (operator, 2026-09-12:
+    the genre does NOT override an authored row -- so the authored row has to be
+    RIGHT at the point it is written). `scifi_news_pro` writes its own MUSIC
+    rows and they bypass the composed genre row entirely. Nothing in its prompt
+    named the bank's genre, and its format example shows a gardening programme
+    scored with "a slow fiddle", so the model wrote "Tense strings, pulsating
+    rhythm" over a TR-909 head. The engine was handed a drum machine and a
+    string section in one breath and resolved it toward the strings, which is
+    why that bank came back a pad while salsa -- whose row is COMPOSED -- grooved
+    at 98.4 BPM against a requested 100.
+
+    IT INFORMS, IT DOES NOT INSTRUCT, and the wording is load-bearing (codex
+    contrarian round, same day). A first draft ended "Never score it with an
+    orchestra, strings, or a sustained pad", and that is a prohibition -- a
+    back-door override of the row's authority under a ruling that forbids
+    overriding it. What survives states a FACT about the show and leaves the
+    choice where the operator put it: the writer is told what the house band
+    is, exactly as it is told what the show's format is, and what it writes is
+    still used verbatim.
+
+    Returns "" for a bank with no declared genre and for a declared sustained
+    one, so the underscore banks are untouched and no caller needs a condition.
+    Today every declared palette happens to be rhythmic; the guard is written
+    against the flag rather than that coincidence.
+    """
+    palette = _BANK_PALETTES.get(str(bank or "").strip().lower())
+    if palette is None or not palette.rhythmic:
+        return ""
+    return (f"THE SHOW'S MUSIC: this programme's house band plays "
+            f"{palette.idiom} -- {palette.instruments}. That is the music a "
+            f"listener hears under the titles every week.")
 
 
 def bank_music_table() -> list[tuple[str, str, bool]]:
@@ -353,6 +413,18 @@ def custom_palette(style_text) -> "Palette | None":
     if not text:
         return None
     text = " ".join(text.split())[:200]
+    # A TYPED STYLE NEVER GETS `groove_arc`, and that is a KNOWN GAP rather
+    # than a decision (cursor contrarian round, 2026-09-12). Somebody who
+    # types "Detroit techno" into My Story gets `rhythmic=True` -- the right
+    # negative and the right instrument order -- but still the orchestral
+    # per-cue arc, because `groove_arc` is currently set only on the two
+    # SHIPPED palettes the operator's ear rejected.
+    #
+    # It is left alone deliberately. The flag exists to record a listening
+    # verdict, and there is no verdict on a string somebody typed; widening it
+    # by analogy is exactly the unscoped change this round already caught once.
+    # Carried as an open line in the go-forward plan for his ear.
+    #
     # A named groove is rhythmic. Otherwise it is sustained ONLY if it
     # says something sustained; anything unrecognised falls to rhythmic,
     # because that negative cannot contradict whatever was asked for.

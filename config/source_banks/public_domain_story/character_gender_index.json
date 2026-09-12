@@ -2,6 +2,46 @@
   "schema_version": 1,
   "notes": [],
   "entries": {
+    "A BELEAGUERED CITY|MADAME DUPIN": {
+      "gender": "female",
+      "answer": "female",
+      "reason": "The title itself suggests a female character",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-12T21:50:40+00:00",
+      "locked": false
+    },
+    "A BELEAGUERED CITY|MARTIN DUPIN": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "The character is male",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-12T21:50:36+00:00",
+      "locked": false
+    },
+    "A BELEAGUERED CITY|PAUL LECAMUS": {
+      "gender": "male",
+      "answer": "male",
+      "reason": "He is referred to with male pronouns",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-12T21:50:38+00:00",
+      "locked": false
+    },
+    "A BELEAGUERED CITY|THE CURE": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-12T21:50:42+00:00",
+      "locked": false
+    },
     "A CHRISTMAS CAROL|BOB CRATCHIT": {
       "gender": "male",
       "answer": "male",
@@ -500,6 +540,16 @@
       "model": "google/gemma-4-E4B-it",
       "prompt_version": "character_gender_recall_v1",
       "asked_utc": "2026-09-02T22:00:44+00:00",
+      "locked": false
+    },
+    "THE GHOST SHIP|THE VILLAGE NARRATOR": {
+      "gender": "",
+      "answer": "unsure",
+      "reason": "unsure",
+      "asked_as": "title",
+      "model": "google/gemma-4-E4B-it",
+      "prompt_version": "character_gender_recall_v1",
+      "asked_utc": "2026-09-12T21:49:53+00:00",
       "locked": false
     },
     "THE INIMITABLE JEEVES|BERTIE WOOSTER": {

@@ -53,6 +53,19 @@ _V2_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
             # tests/test_visual_style_negative.py.
             "negative_tail"}
 
+#: Schema-optional keys a pack MAY carry and most packs correctly do not.
+#:
+#: `negative_tail` above sits in the required set instead, because every shipped
+#: pack authors one -- an empty style negative is still a statement. `checkpoint`
+#: (2026-09-12) is the opposite: it names an SD-1.5 checkpoint this pack would
+#: rather be minted with, and a pack with no model opinion should say NOTHING
+#: rather than carry an empty key. Writing `"checkpoint": ""` into all nine to
+#: satisfy an exact-set assertion would be noise dressed as uniformity.
+#:
+#: The test below still fails on a stray field, which is what it is FOR (the
+#: lab's subject/motion/ledger_directives fields must never land in a pack).
+_V2_OPTIONAL_KEYS = {"checkpoint"}
+
 _META_BRIEF = {
     "story_brief_terms": {
         "setting": ["a mars listening post", "dust-caked consoles"],
@@ -86,10 +99,14 @@ class TestRegistry:
     def test_v2_exact_keys_on_disk(self, style_id):
         raw = json.loads(
             (_STYLES_DIR / f"{style_id}.json").read_text(encoding="utf-8"))
-        assert set(raw) == _V2_KEYS, (
-            f"{style_id}: v2 schema is exact; the lab's subject/motion/"
-            f"ledger_directives fields are NOT schema fields "
-            f"(STAGE3_TOTAL_COVERAGE_SUBPLAN section 1a)")
+        keys = set(raw)
+        assert keys >= _V2_KEYS, (
+            f"{style_id}: missing required v2 key(s) {_V2_KEYS - keys}")
+        assert keys - _V2_KEYS <= _V2_OPTIONAL_KEYS, (
+            f"{style_id}: v2 schema is exact apart from {_V2_OPTIONAL_KEYS}; "
+            f"{keys - _V2_KEYS - _V2_OPTIONAL_KEYS} is not a schema field -- "
+            f"the lab's subject/motion/ledger_directives fields are NOT schema "
+            f"fields (STAGE3_TOTAL_COVERAGE_SUBPLAN section 1a)")
         assert raw["schema_version"] == "v2"
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)

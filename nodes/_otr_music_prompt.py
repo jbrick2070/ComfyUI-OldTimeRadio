@@ -35,6 +35,12 @@ brief yields the same music): v2 `music_mood_terms` (top 3) -> v1
 `story_brief_terms.atmosphere` (top 3) -> keyword-mined produced logline /
 `news.script_brief` -> neutral "atmospheric".
 
+The last step of that cascade is SKIPPED on a `groove_arc` palette (2026-09-12):
+"atmospheric" is a texture instruction, and with no brief it was the FIRST
+thing in the row -- standing in front of "Detroit techno at 128 BPM". A real
+brief's mood words are still carried on every bank, groove or not, because
+those are harmonic rather than textural and a dance cue can wear them.
+
 PURE: no I/O, no GPU, no engine imports. Consumers (the theme node) import from
 here; this module imports only the brief reader and the palette. UTF-8 no BOM,
 ASCII-only, no em-dashes.
@@ -65,6 +71,37 @@ _CUE_CHARACTER: dict[str, str] = {
     "closing":      "a final statement of the theme resolving to a warm held "
                     "chord, instrumental outro",
     "interstitial": "a brief melodic bridge that hands off cleanly, short "
+                    "instrumental transition",
+}
+
+#: THE ARC FOR A PALETTE THAT CARRIES `groove_arc` -- today Detroit techno and
+#: Chicago house, the two the operator's ear rejected on 2026-09-12.
+#:
+#: THE CONTROL-FLOW FACT, WHICH IS MEASURED AND NOT A THEORY: `_CUE_CHARACTER`
+#: was appended AFTER the rhythmic branch, unconditionally, so a 128 BPM drum
+#: machine was asked for "a rising overture" and, closing, to resolve "to a
+#: warm held chord" -- even though the same function already refuses to hand a
+#: rhythmic palette the orchestral `mood_devices` and `tempo_phrase`. The arc
+#: language walked past the guard built to stop exactly that.
+#:
+#: WHETHER THAT WORDING IS WHY THE CUES CAME BACK AS PADS IS A HYPOTHESIS, not
+#: a demonstrated cause (codex contrarian round, same day). What is established
+#: is his verdict on the output and the contradiction in the prompt; a seed-
+#: matched before/after audition is what would settle causation, and it is his
+#: ear that decides. Competing explanations that remain untested include the
+#: checkpoint (post-trained SA3 ignores cfg and negatives) and the sampler.
+#:
+#: REPETITION IS THE POINT HERE, WHICH INVERTS THE SUSTAINED LANE'S RULE.
+#: The opening above says "flowing" rather than "steady" to avoid inviting a
+#: two-bar loop; techno IS a held groove, and the rhythmic negative already
+#: drops the whole anti-loop half for these banks, so this arc is free to ask
+#: for the steadiness the other one has to avoid.
+_CUE_CHARACTER_RHYTHMIC: dict[str, str] = {
+    "opening":      "the groove established in the first bar and held, "
+                    "instrumental intro",
+    "closing":      "a last pass of the groove ending clean on the downbeat, "
+                    "instrumental outro",
+    "interstitial": "a short rhythmic break that hands off cleanly, short "
                     "instrumental transition",
 }
 
@@ -158,8 +195,9 @@ def _mood_suffix(script_brief: str) -> str:
 def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     """Compose a music cue's ROW text from the Meta brief, returning (prompt,
     duration_sec). Reads every brief field through the brief-reader protocol;
-    never crashes on an absent / malformed brief (falls through to a neutral
-    atmospheric default + the house palette + the cue's arc).
+    never crashes on an absent / malformed brief (falls through to the house
+    palette + the cue's arc, plus a neutral "atmospheric" -- except on a
+    `groove_arc` palette, which omits that word; see the module docstring).
     """
     terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
     if not isinstance(terms, dict):
@@ -208,7 +246,25 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
 
     parts: list[str] = []
     # The brief's own words first (story relevance a reader can check).
-    parts.append(", ".join(mood_terms) if mood_terms else "atmospheric")
+    #
+    # THE NEUTRAL FLOOR IS A SUSTAINED WORD, so a `groove_arc` palette does
+    # not get it (operator's ear, 2026-09-12). With no brief there are no mood
+    # terms, and "atmospheric" then LED the prompt -- a texture instruction
+    # standing in front of "Detroit techno at 128 BPM" and agreeing with the
+    # pads that used to close the palette.
+    #
+    # `groove_arc` AND NOT `rhythmic`, deliberately: jazz and salsa are
+    # rhythmic too and he judged their cues RIGHT, floor and all, so they keep
+    # the word. This condition is narrower than "a bank with a genre" and the
+    # two must not be conflated.
+    #
+    # The brief's real words are kept on every bank: moods like "ominous,
+    # uneasy" are harmonic, not textural, and a dance cue can carry them. Only
+    # the invented floor is dropped.
+    if mood_terms:
+        parts.append(", ".join(mood_terms))
+    elif not palette.groove_arc:
+        parts.append("atmospheric")
     if palette.rhythmic:
         # THE GENRE IS THE MUSICAL INSTRUCTION on a bank that has one, and
         # the orchestral devices and the anti-rhythm tempo phrase would
@@ -227,7 +283,8 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
         parts.append(palette.idiom)
     if setting_str:
         parts.append(f"evokes {setting_str}")
-    parts.append(_CUE_CHARACTER[cue_id])
+    parts.append((_CUE_CHARACTER_RHYTHMIC if palette.groove_arc
+                  else _CUE_CHARACTER)[cue_id])
     prompt = ", ".join(parts) + _PROMPT_TAIL
     return prompt, CUE_DURATIONS[cue_id]
 

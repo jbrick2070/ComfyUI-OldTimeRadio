@@ -116,12 +116,55 @@ def _fit_native(width: int, height: int, max_side: int):
     return max(8, w2), max(8, h2)
 
 
-def _resolve_ckpt_name() -> str:
+def _style_ckpt_name(style_id: str) -> str:
+    """The checkpoint this visual pack would RATHER be minted with, or "".
+
+    A PREFERENCE, NOT A GATE (operator, 2026-09-12: *"an anime SD1.5 would
+    really pop"*). Returns "" unless the pack names one AND ComfyUI can
+    actually see the file, so a pack naming weights the user never fetched
+    costs them nothing: the caller falls through to the env override and the
+    shipped default exactly as before. Total -- an unknown style, an absent
+    catalog, or a pack with no opinion all return "".
+
+    THE INSTALLED CHECK IS WHY THIS CANNOT BREAK A RENDER. `assert_usable`
+    still gates on the resolver's answer, and that answer is only ever a file
+    this box has; a missing style checkpoint is invisible rather than fatal.
+    """
+    style_id = str(style_id or "").strip()
+    if not style_id:
+        return ""
+    try:
+        try:
+            from .._otr_visual_styles import resolve_visual_style  # type: ignore
+        except ImportError:  # noqa: BLE001 -- flat layout outside the package
+            from _otr_visual_styles import resolve_visual_style  # type: ignore
+        name = str(getattr(resolve_visual_style(style_id), "checkpoint", "")
+                   or "")
+    except Exception:  # noqa: BLE001 -- a style lookup NEVER fails a mint
+        return ""
+    name = name.strip()
+    return name if (name and _installed(name)) else ""
+
+
+def _resolve_ckpt_name(style_id: str = "") -> str:
     """The checkpoint filename this engine will load. ONE resolver, shared by
     ``assert_usable`` and ``_sd15_params`` so the usability gate and the render
     path can never disagree -- the 2026-07-05 landmine that cost z_image_turbo a
-    deep FileNotFoundError instead of an early grey-out."""
-    return (otr_env.get(CKPT_ENV) or "").strip() or _DEFAULT_CKPT
+    deep FileNotFoundError instead of an early grey-out.
+
+    ORDER: the episode's visual pack (only when its file is installed), then
+    the operator's env override, then the shipped default. The pack goes first
+    because it is the most specific statement of intent and the operator's env
+    override is a whole-engine escape hatch; the installed check above is what
+    keeps the pack from ever narrowing the set of boxes that can render.
+
+    ``style_id`` defaults to "" so every existing caller -- `assert_usable`
+    among them, which is handed no request on the dispatcher path -- keeps
+    resolving exactly what it resolved before.
+    """
+    return (_style_ckpt_name(style_id)
+            or (otr_env.get(CKPT_ENV) or "").strip()
+            or _DEFAULT_CKPT)
 
 
 def _installed(name: str) -> bool:
@@ -190,7 +233,11 @@ class SD15Engine:
             lambda k, d=None: getattr(request, k, d))
         neg = str(get("negative_prompt") or "").strip().strip(",").strip()
         return {
-            "ckpt_name": _resolve_ckpt_name(),
+            # The episode's visual pack may name its own SD-1.5 checkpoint.
+            # `visual_style` is stamped on the request by the dispatcher; an
+            # absent key, an unknown style, or a pack whose file is not
+            # installed all resolve to exactly what this line resolved before.
+            "ckpt_name": _resolve_ckpt_name(str(get("visual_style") or "")),
             "prompt": str(get("prompt") or ""),
             "negative": (neg + ", " + _NEGATIVE_FLOOR) if neg else _NEGATIVE_FLOOR,
             **dict(zip(("width", "height"), _fit_native(
@@ -269,9 +316,18 @@ class SD15Engine:
 
     def assert_usable(self, host_caps, profile, request_template=None):
         """FAIL CLOSED, by NAME, when the checkpoint is not installed -- never a
-        stub and never a deep FileNotFoundError at render. Shares
-        ``_resolve_ckpt_name()`` with ``_sd15_params`` so the gate and the render
-        path cannot disagree."""
+        stub and never a deep FileNotFoundError at render.
+
+        IT GATES THE FALLBACK, WHICH IS THE ONE IT CAN REACH. This is handed no
+        request on the dispatcher path, so it cannot know the episode's visual
+        style and resolves without one; `_sd15_params` resolves WITH it, so
+        since 2026-09-12 the two can legitimately name different files. The
+        safety property is unchanged and stronger than the old "cannot
+        disagree" wording claimed: `_style_ckpt_name` only ever returns a name
+        that already passed `_installed`, so the render path can differ from
+        this gate ONLY by picking a file that is definitely present. A missing
+        pack checkpoint is invisible here and falls back, exactly as intended.
+        """
         ckpt = _resolve_ckpt_name()
         if not _installed(ckpt):
             raise EngineUnusable(

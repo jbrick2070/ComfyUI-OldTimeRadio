@@ -461,6 +461,19 @@ def build_radio_host_prompt(meta, aspect: str = "portrait",
         # lip-sync still skips the era palette AND the grade tail entirely
         # and pins the canonical demo's lighting. The console/object styles
         # below keep the full brief-driven tail (console goldens are byte-pinned).
+        #
+        # RULED EXEMPT, NOT A DEFECT (operator, 2026-09-12). The open question
+        # was whether this early return contradicts a tail policy the
+        # `ltx_audio_in` bookend declares, and whether the fix was a third
+        # policy token. His ruling is EXEMPT: this path is allowed to skip the
+        # tail, and no token is added.
+        #
+        # Grounding for the next reader, because the question will look open
+        # again otherwise: `style_tail_policy` does not exist anywhere in the
+        # live tree. It was a 2026-07-25 design-brief concept that never
+        # shipped as a field, so there is no declaration here to reconcile and
+        # nothing to keep in sync -- only this return, which is deliberate and
+        # has its reason written above it.
         return "%s, warm dramatic lighting" % prompt
     else:
         raise ValueError(

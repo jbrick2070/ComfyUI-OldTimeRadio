@@ -1,0 +1,60 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "beleaguered_city",
+  "unit": "main",
+  "work_title": "A Beleaguered City",
+  "author": "Margaret Oliphant",
+  "license_label": "public_domain_us",
+  "source_url": "https://www.gutenberg.org/cache/epub/11521/pg11521.txt",
+  "fetched_utc": "2026-09-12T21:44:57Z",
+  "body_sha256": "2e75ddffe5e6080a836f5d0fac35e098013ff99b7238530e153604ce01b9f856",
+  "body_bytes": 33858,
+  "body_words": 6441,
+  "text_path": "config/source_banks/public_domain_story/sources/beleaguered_city.txt",
+  "characters": [
+    {
+      "name": "Martin Dupin",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"A Beleaguered City\" by Margaret Oliphant: The character is male (google/gemma-4-E4B-it, 2026-09-12)",
+      "aliases": [
+        "dupin"
+      ]
+    },
+    {
+      "name": "Paul Lecamus",
+      "gender": "male",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"A Beleaguered City\" by Margaret Oliphant: He is referred to with male pronouns (google/gemma-4-E4B-it, 2026-09-12)",
+      "aliases": [
+        "lecamus"
+      ]
+    },
+    {
+      "name": "Madame Dupin",
+      "gender": "female",
+      "gender_source": "llm_recall",
+      "gender_confidence": "recalled",
+      "evidence": "recall of \"A Beleaguered City\" by Margaret Oliphant: The title itself suggests a female character (google/gemma-4-E4B-it, 2026-09-12)",
+      "aliases": [
+        "dupin"
+      ]
+    }
+  ],
+  "gender_ladder": {
+    "version": "gender_ladder_v2",
+    "tier_counts": {
+      "roster": 0,
+      "pronouns": 0,
+      "llm_recall": 3,
+      "name_frequency": 0
+    },
+    "candidates": 4,
+    "declined": [
+      "the Cure"
+    ],
+    "ran_utc": "2026-09-12T21:50:42+00:00"
+  }
+}

@@ -131,8 +131,29 @@ _REQUIRED_FIELDS: "dict[str, type]" = {
 #: trip the sha instead -- the receipt structurally forbids back-compat
 #: defaults. Optional protects frozen history; a test pins that all nine
 #: SHIPPED packs carry a non-empty value, which protects the present.
+#: `checkpoint` (2026-09-12, operator: *"maybe we should be loading different
+#: SD1.5 models per visual pack -- an anime SD1.5 would really pop"*) names an
+#: SD-1.5-architecture checkpoint this pack would RATHER be minted with. The
+#: still engine loads one model for every style today, so the anime pack
+#: contributes the words "anime style" to a photographic base model and gets
+#: about as far as that suggests.
+#:
+#: IT IS A PREFERENCE, NEVER A REQUIREMENT, and the distinction is the whole
+#: design. A pack naming a file the user does not have must not grey the engine
+#: out or fail a render: `sd15._resolve_ckpt_name` takes this only when
+#: `folder_paths` can actually see it and otherwise falls through to the env
+#: override and the shipped default. So a fresh install keeps working, an 8 GB
+#: card is free to simply not fetch the extra weights, and the pack that names
+#: one is better only where the file exists.
+#:
+#: OPTIONAL for the same hard reason as `negative_tail`: `get_visual_style`
+#: re-validates `embedded_visual_style_pack` out of FROZEN ledgers and sha256s
+#: the canonical bytes against the stored receipt, so a REQUIRED key would fail
+#: every pre-existing ledger and a compensating default would change the bytes
+#: and trip the sha instead.
 _OPTIONAL_FIELDS: "dict[str, type]" = {
     "negative_tail": str,
+    "checkpoint": str,
 }
 
 #: Every key a pack may legally carry. The unknown-key guard reads THIS;
@@ -201,6 +222,10 @@ class VisualStyle:
     # Empty means "this pack expresses no style negative"; the engine then
     # falls back to its hygiene default rather than to nothing.
     negative_tail: str = ""
+    # -- v2 MODEL surface (optional; see _OPTIONAL_FIELDS) --
+    # Empty means "mint me with whatever the engine already loads", which is
+    # every pack but the ones that name one. Never a gate: see the field note.
+    checkpoint: str = ""
 
 
 # Lazy singleton -- built on first access, never at import time.
@@ -344,6 +369,11 @@ def compose_pack_from_card(card: VisualStyleCardModel | dict) -> dict:
         # routes the mint to the engine's hygiene fallback (anti-artifact only,
         # no style opinion), which is the correct neutral answer here.
         "negative_tail": "",
+        # A CARD DESCRIBES A LOOK, NOT A MODEL. Naming a checkpoint here would
+        # have the composer invent a filename the user may not own, so an
+        # authored card always mints with whatever the engine loads. A shipped
+        # pack is where a deliberate model pick belongs.
+        "checkpoint": "",
     }
 
 
@@ -496,6 +526,9 @@ def validate_pack(raw: dict, expected_style_id: str | None = None) -> VisualStyl
         ),
         # Optional: absent on every pre-2026-08-17 frozen embedded pack.
         negative_tail=raw.get("negative_tail", ""),
+        # Optional: absent on every pre-2026-09-12 pack, and on every pack
+        # that is happy with the engine's own checkpoint.
+        checkpoint=raw.get("checkpoint", ""),
     )
 
 

@@ -1064,6 +1064,36 @@
       ]
     },
     {
+      "source_id": "ghost_ship",
+      "title": "The Ghost Ship",
+      "author": "Richard Middleton",
+      "year": "1912",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/11045/pg11045.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "convivial",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "the village narrator",
+        "the parson",
+        "the ghost captain"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The Ghost Ship",
+          "synopsis": "A pirate ghost ship is blown into a turnip field, and the village negotiates with its captain over spectral rum.",
+          "text_path": "sources/ghost_ship.txt"
+        }
+      ]
+    },
+    {
       "source_id": "white_people",
       "title": "The House of Souls",
       "author": "Arthur Machen",
@@ -1973,6 +2003,37 @@
           "label": "The Baron's tallest tales",
           "synopsis": "A horse tied to a church steeple, half a horse drinking forever, and a post-horn that thaws out its tunes.",
           "text_path": "sources/munchausen.txt"
+        }
+      ]
+    },
+    {
+      "source_id": "beleaguered_city",
+      "title": "A Beleaguered City",
+      "author": "Margaret Oliphant",
+      "year": "1880",
+      "license_status": "public_domain_us",
+      "license_url": "https://www.gutenberg.org/policy/license.html",
+      "source_url": "https://www.gutenberg.org/cache/epub/11521/pg11521.txt",
+      "source_label": "Project Gutenberg",
+      "adapter_type": "project_gutenberg_text",
+      "search_tags": [
+        "processional",
+        "public_domain",
+        "radio_adaptation"
+      ],
+      "recommended_word_budget": 320,
+      "cast_hints": [
+        "Martin Dupin",
+        "Paul Lecamus",
+        "Madame Dupin",
+        "the Cure"
+      ],
+      "units": [
+        {
+          "unit_id": "main",
+          "label": "The city is put out of its gates",
+          "synopsis": "A town's dead expel the living through the gates, and the mayor files a deposition about it.",
+          "text_path": "sources/beleaguered_city.txt"
         }
       ]
     }

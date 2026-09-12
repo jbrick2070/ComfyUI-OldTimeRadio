@@ -1751,6 +1751,15 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "kind": kind, "char_id": char_id, "beat_id": beat_id,
             "engine_id": engine_id, "engine_version": eng_version,
             "prompt": prompt, "prompt_hash": prompt_hash, "seed": seed,
+            # THE EPISODE'S VISUAL PACK, BY ID (2026-09-12). The request has
+            # always carried the pack's WORDS (prompt, negative) and never
+            # which pack they came from, so an engine could not act on the
+            # pack itself -- which is what a per-style checkpoint needs
+            # (`_otr_image_engines/sd15.py::_resolve_ckpt_name`). Engines that
+            # do not read it are unaffected; the value is already stamped on
+            # the visual rows and the ledger, so this adds no new authority.
+            "visual_style": (str(getattr(_vstyle, "style_id", "") or "")
+                             if _vstyle is not None else ""),
             # COMPOSED, never precedence (ONE STYLE AUTHORITY). The two
             # negatives are orthogonal: the pack's is about STYLE, the object's
             # (radio_host_negative) is about keeping the announcer radio-object

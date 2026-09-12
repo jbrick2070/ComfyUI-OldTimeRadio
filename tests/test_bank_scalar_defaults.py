@@ -78,22 +78,37 @@ class TestStoryScaffoldDefault:
     dressed as a "Mining Union Representative... hard hat with a union pin",
     because lock_cast was handed the catalog label as style."""
 
+    #: THE BANKS THE OPERATOR HAS RULED SCAFFOLD-OFF, and the only reason this
+    #: is a set rather than the single name "original" is that he ruled on
+    #: `media_archive` too (2026-09-12, answering the go-forward plan: *"does
+    #: media_archive get the same no-premise-scaffold treatment as original?"*
+    #: -- yes). The five-bank beat test had caught it drawing an unrelated
+    #: premise scaffold over its own catalogued item, which is the same defect
+    #: class as the `original` specimen above.
+    _SCAFFOLD_OFF = frozenset({"original", "media_archive"})
+
     def test_original_declares_scaffold_off(self):
         bank = SR.require_runnable_bank("original")
         assert (bank.defaults or {}).get("story_scaffold") == "off"
 
+    def test_media_archive_declares_scaffold_off(self):
+        """It has a real catalogued item to anchor to, so an invented premise
+        drawn over that item is a fidelity defect, not colour."""
+        bank = SR.require_runnable_bank("media_archive")
+        assert (bank.defaults or {}).get("story_scaffold") == "off"
+
     def test_every_other_runnable_bank_keeps_the_scaffold(self):
-        # Absent means "on" -- today's behaviour for every non-original bank.
-        # Enumerated from the LIVE registry rather than the EXPECTED table,
-        # which predates this key and omits the sci-fi lane (QA 2026-08-03) -- a
-        # hand-list drifts, the registry cannot.
-        others = [b for b in SR.runnable_bank_ids() if b != "original"] \
+        # Absent means "on" -- today's behaviour for every bank he has not
+        # ruled off. Enumerated from the LIVE registry rather than the EXPECTED
+        # table, which predates this key and omits the sci-fi lane (QA
+        # 2026-08-03) -- a hand-list drifts, the registry cannot.
+        others = [b for b in SR.runnable_bank_ids()
+                  if b not in self._SCAFFOLD_OFF] \
             if hasattr(SR, "runnable_bank_ids") else None
         if others is None:
-            others = [bid for bid in
-                      ("media_archive", "scifi_news_pro",
-                       "public_domain", "shakespeare")]
-        assert others, "registry returned no non-original runnable banks"
+            others = [bid for bid in ("scifi_news_pro",
+                                      "public_domain", "shakespeare")]
+        assert others, "registry returned no scaffold-on runnable banks"
         for bank_id in others:
             bank = SR.require_runnable_bank(bank_id)
             assert (bank.defaults or {}).get("story_scaffold", "on") == "on", (
