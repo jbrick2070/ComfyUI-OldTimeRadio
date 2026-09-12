@@ -171,12 +171,19 @@ def _sa3_context_ratio() -> float:
 
 
 def _sa3_clip_window(prompt: str, dur: float, context_s: float):
-    """Place the ``dur``-second clip within a ``context_s`` structural window per
-    cue so SA3 renders a real slice of a longer piece: an ``outro`` sits at the
-    TAIL (resolving), an ``intro`` at the HEAD (build), anything else in the
-    MIDDLE (unresolved bridge). Returns ``(seconds_start, seconds_total)``. The
-    latent length stays ``dur`` -- only the CONDITIONING window changes, so clip
-    length + seed determinism are unchanged."""
+    """Widen the conditioning window to ``context_s`` so SA3 renders a real
+    SLICE of a longer piece rather than a self-contained loop, and compute where
+    in that window the cue would sit. Returns ``(seconds_start, seconds_total)``.
+
+    ONLY THE SECOND VALUE REACHES THE MODEL. ``seconds_total`` is the live lever;
+    ``seconds_start`` is computed, returned and receipted but never read by this
+    model class -- see ``_SA3_READS_SECONDS_START`` above for the runtime
+    verification. So the placement rule below ("an ``outro`` at the TAIL, an
+    ``intro`` at the HEAD, anything else in the MIDDLE") describes an intent, not
+    an effect, and no reader should reason from it about how a cue sounds.
+
+    The latent length stays ``dur`` -- only the CONDITIONING window changes, so
+    clip length and seed determinism are unchanged."""
     dur = float(dur)
     ratio = _sa3_context_ratio()
     if ratio < _SA3_MIN_CONTEXT_RATIO_DEFAULT:

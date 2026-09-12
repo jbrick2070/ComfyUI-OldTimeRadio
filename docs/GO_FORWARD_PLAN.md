@@ -1,190 +1,193 @@
 # OTR Go-Forward Plan
 
-**THE ONE RULE FOR THIS FILE: ONLY UNFINISHED WORK BELONGS HERE.** When work
-finishes, its receipt moves to [HANDOFF_LOG](HANDOFF_LOG.md) or its own evidence
-folder and the row leaves this page.
+**ONLY UNFINISHED WORK BELONGS HERE.** When work finishes its receipt moves to
+[HANDOFF_LOG](HANDOFF_LOG.md) or its own evidence folder and the row leaves this
+page. A finished prerequisite earns **one clause inside the row that still needs
+it** -- never a receipt, never a measurement write-up, never a struck-through or
+"SHIPPED" row. The test is one question: *does a row still in this file stop
+making sense without that sentence?* No -> cut it.
 
-**THE ONE EXCEPTION (operator, 2026-09-11): finished work is named ONLY when a
-REMAINING row in this plan depends on it.** *"We don't call out done work unless it's
-a dependency for future work in the go-forward plan itself."* So:
+**THE ORDER IS ARC -> CODE -> TEST, AND THIS FILE IS ARRANGED IN IT** (operator,
+2026-09-12: *"optimize it for coding and arcs, and THEN testing"*). Decide first,
+build second, qualify last. A deferred arc is deferred coding, and a gate on
+evidence the test wave produces is not a valid deferral either, because the wave
+runs last: a row that can only be settled by live evidence is settled WITHOUT it
+or cut with the reason written in. **The only things that genuinely defer** are a
+row blocked on an operator ruling (section 4) and a row deliberately cut with its
+reason. Apply that test whenever a row claims to be blocked.
 
-* A prerequisite that is already satisfied gets **one clause inside the row that needs
-  it** -- "the deterministic tier is in, so what remains is X" -- because a reader who
-  cannot tell a satisfied prerequisite from an unstarted one will either redo it or
-  block on it. That clause is the row's *starting line*, not its history.
-* Everything else that is done is **gone from this page**: no receipts, no "SHIPPED"
-  rows, no struck-through rows, no measurement write-ups, no records of what was
-  refused and why, no arc summaries.
-* **The test, and it is one question: does a row still in this file stop making sense
-  without that sentence?** No -> cut it. It is a receipt wearing context's clothes,
-  and this file collects them faster than it collects work.
-
-Read AGENTS.md, CLAUDE.md and [standing rulings](OTR_STANDING_RULINGS.md) first; this
-file does not restate them. **For what has already happened -- commits, measurements,
-receipts -- read [HANDOFF_LOG](HANDOFF_LOG.md), newest entry first.**
+Read AGENTS.md, CLAUDE.md and [standing rulings](OTR_STANDING_RULINGS.md) first;
+this file does not restate them. **For what has already happened -- commits,
+measurements, receipts -- read [HANDOFF_LOG](HANDOFF_LOG.md), newest entry
+first.**
 
 ## 0. The bar
 
 > **"As long as it doesn't crash when it's not supposed to."** -- operator,
 > 2026-09-11. Exactness is not the goal: *"I'm not expecting anything exact."*
 
-**CRASH-CLASS AND DURABILITY-CLASS DEFECTS ARE THE WORK** -- an uncaught exception, a
-live asset written where a sweeper can delete it, an identity that silently resolves
-outside its episode. Rows below use the phrase "not crash-class" against this
-definition. Aesthetic drift is closed and is not work; see
-[ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
+**CRASH-CLASS AND DURABILITY-CLASS DEFECTS ARE THE WORK** -- an uncaught
+exception, a live asset written where a sweeper can delete it, an identity that
+silently resolves outside its episode, and **a machine that silently renders a
+configuration we have already proven wrong.** Rows below use the phrase "not
+crash-class" against this definition. Aesthetic drift is closed and is not work;
+see [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
 
-## 1. The sequence
+## 1. ARC -- settle these before writing the code
 
-**ARCS -> CODING -> SHAKESPEARE -> TESTING, ABSOLUTELY LAST (operator directive
-2026-09-11 -- hard, and it governs everything else in this file).**
+Every row here has more than one defensible answer, so it gets its round, its
+measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 
-| phase | what it means | done when |
-|---|---|---|
-| 1. ARCS | Every row whose design has more than one defensible answer gets its round BEFORE any code. An arc IS coding; it costs a wait, not a budget. | No row in section 5 is waiting on a design decision. |
-| 2. CODING | Build what the arcs settled, plus every row that never needed one. | Section 5 is empty of buildable work. |
-| 3. TESTING | Freeze ONE hash, then four machines qualify it. | Section 4's coverage is owed against a real head. |
+| Row | The fork, and what settles it |
+|---|---|
+| **Which music model ships** | **Small-Music is a LOOP model by its publisher's own description**, which is a strange foundation for a campaign whose complaint is that the music loops. Two candidates and their costs are very different: `stable_audio_3_medium_base.safetensors` is already on disk (9,222,116,660 B, untested), and ACE-Step 1.5 is native to the install (`ComfyUI/comfy_extras/nodes_ace.py`) but has no weights on disk, so it costs a download. Medium is the free experiment and goes first. Bench arm on `scripts/otr_organ_bench.py`, then one canonical leg on the winner. |
+| **Which SA3 recipe ships** | **Re-measure; the old numbers are void.** Every arm was measured on the post-trained checkpoint, where cfg and the negative prompt do nothing, so the comparison attributed to guidance what was really sampler and steps -- and it scored them with loopiness, which a burst pushes DOWN. The live fork is narrow: on the BASE checkpoint at cfg 4.0, `lcm`/`simple` at 50 steps against `dpmpp_3m_sde_gpu`/`exponential` at 100. Half the render time is worth an A/B. Several renders per arm through `scripts/otr_music_ab.py` (canonical only) -- one leg per arm cannot answer it; the variance between two cues inside one arm has twice beaten the difference between arms. Read burst count beside loopiness, never loopiness alone. |
+| **Why house and techno do not groove** | **The loop complaint and the groove complaint are now two different lanes, and neither has been heard yet.** Since the genres shipped, `negative_for()` gives the four declared banks the rhythm-friendly negative on purpose -- the anti-loop wording now guards only Shakespeare and an undeclared bank, and it became a live lever at all only when the base checkpoint was preferred. So the sustained lane has never once been heard with its own anti-loop negative actually working, and the genre lane is being asked FOR a repeating figure. This row is the second half. Four 1-act legs put a genre on each bank: salsa and jazz produced real grooves (139 and 83 onsets a minute), techno and house came back nearer pads. The sci-fi news lane is explained -- it AUTHORS its own music rows, which bypass the composed genre row, so the cue asked for a TR-909 and "tense strings" in one prompt. **Chicago house has no such excuse: its row was COMPOSED and it still came back a pad.** n=1 per bank, and the conditioning window is already excluded (measured, 10 seeds per arm: 1x, 2x and 3x all find a beat 80-90% of the time at the requested tempo). Take it to the bench before touching the palette. |
+| **Cast-count vocabulary disagrees across three surfaces** | `_otr_casting.py` stamps the already-clamped value as `num_characters_request`; the writer builds an `EpisodeBudget` from the UNCLAMPED request; `_otr_episode_budget.py` labels that `cast_size`. For a request of 8 those surfaces say six and eight. Decide which surface owns "the count that happened". **Do not naively retarget the replay field:** `cast_lock.py:629` consumes `num_characters_request` to replay casting. Not crash-class. |
+| **2.4 routing/canvas -- allowlist the lane at all?** | The 193-frame ceiling **cannot be asserted as production-proven** -- it is a lab-warm isolation number, and this lane has a live receipt of production peaks exceeding lab peaks. The engine already rejected capping its own declaration, and said why: `ltx_audio_in` is absent from `frame_contract.PLANNING_CAP_ENGINES`, so a ceiling there reaches nothing (`eng_ltx_av.py:1664-1672`). So the fork is whether to allowlist the lane, **and it cannot be settled without a canonical-path qualification leg on this lane first** -- that leg is the only thing that turns a lab-warm 193 into a production number. If the answer is yes it is three artifacts, and any one alone narrows nothing: add `ltx_audio_in` to `PLANNING_CAP_ENGINES`, add `video.max_render_frames` to `otr_16gb_ltx_audio_in.json` (it has no such key today; the three capped profiles carry it at `video.max_render_frames = 81`), then regenerate the variants (`build_variants.py --all`, confirm `--check`) -- `_otr_workflow_apply.py:553` flattens that key ONLY when present, so an un-regenerated variant carries the old ceiling silently -- and prove the multi-clip partition. **Not render-inert:** `assert_coverage_plans` refuses any `ltx_audio_in` ledger planned before the change and rendered after, so in-flight episodes need replanning at cutover. |
+| **2.4 model-root audit tail** | The four-owner model-root merge, or nothing -- and "nothing" is a real answer. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `nodes/_otr_image_engines/flux2_klein.py:214-220`. |
+| **3.5 per-beat reload** | **Direction undercut by prior art.** Moving this same encoder off-GPU was already tried and REVERTED on live-measured evidence that it did not move the peak (PBUG-20260616-01 / BUG-07.17). The generic scope hook also closes on engine-CHANGE, not every beat, so "even consecutive same-engine beats start cold" was wrong. Per-lane encoder device defaults differ. Decide whether it is worth doing at all before any caching work. Not OOM-proven -- wall-clock cost. |
+| **2.4 voice/credits** | **The instrument does not fit the defect.** `high_band_edge_ratio` detects edge squeal; PBUG-20260902-03 documents a SUSTAINED TONE, and a synthetic reproduction of the exact documented frequencies scored ~0 against the real function. Closing this means designing and empirically qualifying a NEW whole-clip speech-shape scorer that does not exist in the tree. Real work, for a non-crash defect -- weigh against the bar before starting. |
+| **OpenRouter catalog copy-forward** | Decide whether an existing warm in-pack cache is copied forward on first run after the path move, or close it as accepted. A cold cache is already a designed safe state (empty catalog, logged fallback, never a raise, one refresh run restores it), so this is a nicety. |
 
-**A DEFERRED ARC IS DEFERRED CODING**, and a gate on evidence the wave produces is not
-a valid deferral either, because the wave runs last. An item that can only be decided
-by live evidence is decided WITHOUT it or explicitly cut with the reason in its row.
+## 2. CODE -- the design is settled, build it
 
-**What genuinely defers is a two-item list:** a row blocked on an operator ruling, and
-a row deliberately cut from this round with the reason written in it. Nothing else.
-Apply that test whenever a row claims to be blocked.
+| Row | What to write |
+|---|---|
+| **The music fix reaches only this machine** | **The highest-value row on this page: a silent wrong render everywhere else.** The engine now PREFERS `stable_audio_3_small_music_base.safetensors`, because the base file is the only one where cfg and the negative prompt are live at all. Every fetch path still names the post-trained file -- `_otr_visual_assets.py:37-38`, `scripts/otr_fetch_lane_weights.py:398-400`, and `config/profiles/otr_runpod_starter.json:84` -- so a fresh install downloads the post-trained checkpoint, `resolve_ckpt()` falls through to it, guidance drops to 1.0, the anti-loop negative goes inert, and the box quietly runs the exact configuration PBUG-20260912-03 was written to escape. The base file is in the same repo at the same shape and byte count (`Comfy-Org/stable-audio-3`, `checkpoints/stable_audio_3_small_music_base.safetensors`, 2,270,384,940 B -- verified against the live Hub listing 2026-09-12). Point all three at it, keep the post-trained file as the documented fallback, and fix the now-false comment at `_otr_visual_assets.py:34-36` that claims the manifest is verified against what `resolve_ckpt` returns. **This path is licence-load-bearing:** it exists because an install that cannot fetch SA3 falls back to musicgen, which is CC-BY-NC. |
+| **Cast-time preflight resolves a DIFFERENT Ghost kernel than the render** | The preflight's temporary shot is `shot_id = beat_id` (`otr_shot_lock.py:1893`); the durable row is `shot_<beat_id>`, and the render driver looks the ordinal up by exact `shot_id` (`:3269`), so the preflight always resolves at ordinal 0 while `resolve_crux_kernel` cycles the PLACE by ordinal -- the same object composes "in the archive" at preflight and "in the yard" on the row. Beat text lookup matches `shot_id` or `beat_id`, not `line_id`, so the preflight can also see no dialogue where the row sees the line. Not crash-class: the preflight is an admission check and the kernel value never makes it raise. Hand the preflight the prospective plan's canonical identity and ordinal, and resolve dialogue through `source_line_ids`. Then a behavioural test comparing resolver inputs between the two -- source-string assertions cannot establish equivalence. |
+| **The new music defaults are undocumented** | Four banks now carry a fixed genre and `OTR_StableAudioTheme` carries a `music_style` widget honoured only on My Story -- *"these are the new defaults"* -- and neither string appears in `README.md` or in any `workflows/variants/*.launch.md`. A shipped, user-facing default nobody outside this repo can discover. Name the five bank genres and the widget's one-bank scope where a user reads them. |
+| **Four tests fail in isolation** | `tests/test_unified_memory_weight_floor.py` and `tests/test_ghost_signal_lightning_lane.py` carry four tests that pass in a full run and fail alone -- re-verified against the pushed head, so this is test hygiene, not a regression. It matters because it makes any focused subset run untrustworthy as evidence. Find the shared state and pin it, or mark them as requiring the full run. |
+| **ROCm tester recruitment** (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm ... let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* **The variant half already exists** -- `otr_amd16_rocm` and `otr_amd8_rocm` are generated draft variants with launch recipes, sage/bnb/fp8 already off, and both are labelled UNVERIFIED on hardware, which is precisely what the tester is being recruited to change. So: (1) confirm those two pin the pure-PyTorch engine set (no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) and regenerate through `scripts/build_variants.py` if not -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install, the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste -- never posted by a window. Check the side-quest chip before starting. |
+| **3.4 clean install, durability tail** | The crash half is closed, so what remains is the non-crash durability point: work from the full r1 review (`kibitz-runs/2026-09-11-arc-cleaninstall/r1/codex.md`), keep the existing download scope, narrow the early-tool-check proposal. Low priority. |
+| **Name the unruled product questions** | Section 4's last bullet points at a 2026-09-01 catch-all. Enumerate the live sub-questions inside it and the Bible fan-out candidates, then move each to section 4 as its own one-line bullet. A ruling needs something specific to land on. |
 
-**The head is NOT frozen.** It is frozen only when phases 1-3 are empty; the hash then
-goes into the `WAVE HEAD:` line of
-[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) and the four lanes start.
-Two heads were cut early on 2026-09-11 and withdrawn; do not cut a third early.
+## 3. TEST -- last, against a frozen head
 
-**After the wave, the next day begins in `otr/obs/`, not in the editor.** Count what
-landed against the legs promised, read the four phone-homes, and triage any crash-class
-failure FIRST. Only when that triage is empty does new work start.
+**The head is NOT frozen.** It freezes only when sections 1 and 2 are empty; the
+hash then goes into the `WAVE HEAD:` line of
+[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) and the four lanes
+start. Do not cut a head early.
 
-## 2. The wave
-
-Copy-paste prompts, one block per machine, self-contained by design:
+Copy-paste prompts, one block per machine:
 [PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) (5080, RunPod) and
 [NATIVE_PLAN_4060_AND_MAC.md](2026-09-11-four-machine-test-wave/NATIVE_PLAN_4060_AND_MAC.md)
-(4060, Mac). Lane assignments, per-lane legs and the rules every lane follows live
-THERE and are not repeated here.
-
-Not covered by the wave: **listening** -- the operator's own ear. No agent in it can
-ingest audio, and reading TTS text or checking a waveform is not listening.
-
-## 3. Open defects with an owner
-
-| Defect | Next action |
-|---|---|
-| Cast-count vocabulary disagrees across three surfaces | `_otr_casting.py` stamps the already-clamped value as `num_characters_request`; the writer builds an `EpisodeBudget` from the UNCLAMPED request; `_otr_episode_budget.py` labels that `cast_size`. For a request of 8 those surfaces say six and eight. Decide which surface owns "the count that happened". **Do not naively retarget the replay field:** `cast_lock.py:629` consumes `num_characters_request` to replay casting. Not crash-class. |
-| Cast-time preflight resolves a DIFFERENT Ghost kernel than the render | The preflight's temporary shot is `shot_id = beat_id` (`otr_shot_lock.py:~1856`); the durable row is `shot_<beat_id>`. `render_driver` looks the ordinal up by exact `shot_id` (`~3280`), so the preflight always resolves at ordinal 0, and `resolve_crux_kernel` cycles the PLACE by ordinal -- the same object composes "in the archive" at preflight and "in the yard" on the row. Beat text lookup matches `shot_id` or `beat_id`, not `line_id`, so the preflight can also see no dialogue where the row sees the line. **Predates Half B and affected the deterministic tier identically**; found by the Half B round-2 contrarian. Not crash-class: the preflight is an admission check (does the request build?) and the kernel value never makes it raise -- the durable row's kernel is what renders. Fix is to hand the preflight the prospective plan's canonical identity and ordinal, and resolve dialogue through `source_line_ids`. Then a behavioural test comparing resolver inputs between the two -- source-string assertions cannot establish equivalence. |
-| OpenRouter catalog copy-forward | Decide whether an existing warm in-pack cache is copied forward on first run after the path move, or close it as accepted. A cold cache is already a designed safe state (empty catalog, logged fallback, never a raise, one refresh run restores it), so this is a nicety. |
-
-## 4. Qualification coverage still owed
+(4060, Mac). Lane assignments, per-lane legs and the rules every lane follows
+live THERE and are not repeated here -- including the 4060's `kernel_source`
+phone-home, which is where the Ghost Half B ranked-tier number comes from.
 
 Every qualifying run loads `workflows/otr_canonical.json` through
-`scripts/otr_canonical_api_run.py` -- no `--workflow` override, no replay substitute,
-no `partial_execution_targets`. Assets go to canonical episode paths; final publication
-must exist in `otr/obs`. Coverage that is simply one of the wave's own legs lives in the
-lane documents, not here; these are the ones the wave does not already carry.
+`scripts/otr_canonical_api_run.py` -- no `--workflow` override, no replay
+substitute, no `partial_execution_targets`. Assets go to canonical episode
+paths; final publication must exist in `otr/obs`. These are the coverages the
+wave does not already carry.
 
 | Coverage | Required evidence |
 |---|---|
 | Six-act repeatability | Three fresh full canonical runs. Record observed loads/reuse; claim clean boot and resident reuse only where the runtime actually supports it. |
 | Source and cast variety | One-act monologue, three-act ensemble, detailed six-act. Requested vs actual cast, supplied/neutral byline, breaks on and off. After the wave, check what its legs already covered and run only the gap. |
-| Listening | Opening/middle/ending on at least two publications including a six-act. Operator's ear only. |
-| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. Needs a CUDA host. **Now also the first live measurement of Half B:** count `kernel_source` across the episode's shots -- `authored_subject` (the model ranked it), `key_object_in_beat` (the dialogue named it), `key_object` (odometer). The deterministic tier's ceiling was 26.3%; how far the ranked tier lifts it is the number nobody has. Report the `Ghost Half B: N/M ranked subject(s) admitted` log line too -- admission rate says whether the model is choosing from the list or inventing. |
-| 5.7 chunked music | **Settle whether this row can exist before booking the leg.** The chunk branch is `scene_sequencer.py:2130-2165` and its threshold is `_MUSIC_MAX_CHUNK_DUR_S = 22.0` (`:2094`), but the composer's own cue lengths are `CUE_DURATIONS = {opening 12, closing 8, interstitial 4}` (`nodes/_otr_music_prompt.py:51`), so a composed cue can never reach it -- `_chunk_count` is always 1. The only way in is an AUTHORED ledger music row carrying `target_duration_s > 22`, which `stable_audio_theme.py:346-351` honours over the default. So: either the leg supplies such a row (full canonical on `otr_8gb_fastwan` -- **that is the real profile id; "fastwan_8gb" appears nowhere on disk**, status `draft`), or the row closes as unreachable code that no episode exercises. |
-| Inherited regression debt | **Load-bearing, not a footnote** -- it is what makes any "suite is green" claim mean something. Re-ground 51 OTR and 10 Bible failures against baseline IDs **and normalized payloads**. The Bible strict metadata validator separately has 149 unchanged issues. Never quarantine silently; never call the suite all-green. |
+| Listening | Opening/middle/ending on at least two publications including a six-act. Operator's ear only -- no agent in the wave can ingest audio, and reading TTS text or checking a waveform is not listening. |
+| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. Needs a CUDA host. **Also the first live measurement of Half B on a forced-Ghost leg, which the wave does not carry:** count `kernel_source` across the episode's shots -- `authored_subject` (the model ranked it), `key_object_in_beat` (the dialogue named it), `key_object` (odometer). The deterministic tier's ceiling was 26.3%; how far the ranked tier lifts it is the number nobody has. Report the `[OTR_ShotLock] Ghost Half B: eligible=N submitted=N admitted=N candidates=N` line too: admitted/submitted is the admission rate, submitted/eligible the abstention rate -- together they say whether the model is choosing from the list or inventing. |
+| 5.7 chunked music | **Settle whether this leg can exist before booking it.** The chunk branch is `scene_sequencer.py:2151-2186` and its threshold is `_MUSIC_MAX_CHUNK_DUR_S = 22.0` (`:2094`), but the composer's own cue lengths are `CUE_DURATIONS = {opening 12, closing 8, interstitial 4}` (`nodes/_otr_music_prompt.py:51`), so a composed cue can never reach it and `_chunk_count` is always 1. The only way in is an AUTHORED ledger music row carrying `target_duration_s > 22`, which `stable_audio_theme.py:372` honours over the default -- and `scifi_news_pro` is the only lane that authors music rows. So: either the leg supplies such a row (full canonical on `otr_8gb_fastwan` -- that is the PROFILE id; `fastwan_8gb` is the ENGINE id inside it and is not a profile -- status `draft`), or the row closes as unreachable code that no episode exercises. |
+| Inherited regression debt | **Load-bearing, not a footnote, and right now the guard cannot do its job.** `tests/conftest.py:184` sets `EXPECTED_FAILED_NODEIDS = frozenset()` -- an EMPTY baseline -- so the known-fail guard reports every failure as a new regression and cannot tell one apart from the inherited set. Measured 2026-09-12 on the 5080 in a normal checkout: **49 failed of 15,383 collected**; the count moves with where it runs (some fail only inside a worktree, and a two-file subset still fails the four in section 2). Re-ground the OTR and Bible failure sets against baseline IDs **and normalized payloads**, then load the baseline so a real regression stands out. The Bible strict metadata validator separately has 149 unchanged issues. Never quarantine silently; never call the suite all-green. |
 
-**The six-act fixture** is specified in full in PROMPTS.md, which restates it on purpose
-so it can be pasted standalone. For every attempt record source fields,
-code/canonical/graph hashes, actual model/quantization/profile, prompt ID, elapsed time,
-memory and loads, all repair attempts, requested vs actual acts and cast, ledger seals
-and final paths. Preserve terminal failure evidence before asserting anything. Keep the
-full denominator.
+**The six-act fixture** is specified in full in PROMPTS.md, which restates it on
+purpose so it can be pasted standalone. For every attempt record source fields,
+code/canonical/graph hashes, actual model/quantization/profile, prompt ID,
+elapsed time, memory and loads, all repair attempts, requested vs actual acts and
+cast, ledger seals and final paths. Preserve terminal failure evidence before
+asserting anything. Keep the full denominator.
 
-## 5. The remaining work
+**After the wave, the next day begins in `otr/obs/`, not in the editor.** Count
+what landed against the legs promised, read the four phone-homes, and triage any
+crash-class failure FIRST.
 
-### 5A. CODE IT -- the design is settled
+## 4. Blocked on the operator -- each unblocks with one word
 
-| Row | What to write |
-|---|---|
-| ROCm tester recruitment (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm sooner than later, to see if they know a good way to rent a cheap cloud ROCm box, or if someone wants to volunteer testing -- but let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* In order: (1) a generated variant of the canonical workflow pinned to the engines most likely to run on ROCm (pure PyTorch; no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) via `scripts/build_variants.py` -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install (the registry serves 2.0.0-alpha.30, Active and verified 2026-09-12; git gives the newest tree), the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste (never posted by a window). A side-quest chip was spawned for this the same night; if it was not started, this row is the work. |
-| 2.4 audit tail, model-root | The four-owner model-root merge, or nothing. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `flux2_klein.py:209-215`. |
-
-### 5B. NEEDS A MEASUREMENT OR A DECISION, not another round
-
-| Row | What it actually needs |
-|---|---|
-| Music: is the loop gone? | **The operator's ear, on more than one leg.** The work is in (anti-loop negative, sustained wording, a conditioning window longer than the cue, one pace and one tempo per cue) and it is NOT proven: measured with the same code and recipe, `whispers_in_the_woods` scored 0.109 and `shadows_in_the_mist` 0.864, because their briefs routed to different tempo phrases. One leg is not evidence here. Render several per arm through `scripts/otr_music_ab.py` (canonical only), then listen. |
-| Music: which SA3 recipe ships | **A listening decision, measured but not settled.** On the canonical path the shipped recipe (`dpmpp_3m_sde_gpu`/`exponential`, 100 steps, cfg 7.0) measured 0.109 / 0.286 loopiness; the publishers' base template (`lcm`/`simple`, 50 steps, cfg 7.0) measured 0.151 / 0.211 at peak -1.00 dBFS with zero clipped samples and **half the steps**. Their distilled arm (cfg 1.0) is 0.508 / 0.746 and 10-18 dB quiet, because at cfg 1 there is no classifier-free guidance and the anti-loop negative is ignored -- that arm is closed. Half the render time is worth an A/B listen; the numbers do not decide it. |
-| Four tests fail in isolation | `tests/test_unified_memory_weight_floor.py` and `tests/test_ghost_signal_lightning_lane.py` carry four tests that pass in a full run and fail alone -- verified against the pushed head, so this is test hygiene, not a regression. It matters because it makes any focused subset run untrustworthy as evidence. Find the shared state and pin it, or mark them as requiring the full run. |
-| 2.4 routing/canvas | The 193-frame ceiling **cannot be asserted as production-proven** -- it is a lab-warm isolation number, and this lane has a live receipt of production peaks exceeding lab peaks. Needs a canonical-path qualification leg first, then a TWO-file diff (`frame_contract.PLANNING_CAP_ENGINES` **and** `otr_16gb_ltx_audio_in.json` `video.max_render_frames`) -- changing one alone narrows nothing. **Not render-inert:** `assert_coverage_plans` refuses any `ltx_audio_in` ledger planned before the change and rendered after, so in-flight episodes need replanning at cutover. |
-| 3.5 per-beat reload | **Direction undercut by prior art.** Moving this same encoder off-GPU was already tried and REVERTED on live-measured evidence that it did not move the peak (PBUG-20260616-01 / BUG-07.17). The generic scope hook also closes on engine-CHANGE, not every beat, so "even consecutive same-engine beats start cold" was wrong. Per-lane encoder device defaults differ. Decide whether it is worth doing at all before any caching work. Not OOM-proven -- wall-clock cost. |
-| 2.4 voice/credits | **The instrument does not fit the defect.** `high_band_edge_ratio` detects edge squeal; PBUG-20260902-03 documents a SUSTAINED TONE, and a synthetic reproduction of the exact documented frequencies scored ~0 against the real function. Closing this means designing and empirically qualifying a NEW whole-clip speech-shape scorer that does not exist in the tree. Real work, for a non-crash defect -- weigh against the bar before starting. |
-| 3.4 clean install | **The crash half is CLOSED (2026-09-11, `6223b972` + `9b879207`):** a box with ffmpeg and no ffprobe now measures media through PyAV at every probe (boundary fallback; the composite, mux, scopes and blend routed through it), and a canonical Shakespeare leg on the 5080 with ffprobe made unresolvable reached obs (`laughter_in_the_shadows_20260911_214126`). The wave's Mac and RunPod paste blocks need no `ffdl install` step for ffprobe. What remains is the non-crash durability point: work from the full r1 review (`kibitz-runs/2026-09-11-arc-cleaninstall/r1/codex.md`), keep the existing download scope, narrow the early-tool-check proposal. Low priority. |
-
-## 6. Blocked on the operator -- each unblocks with one word
-
-* **A per-style SD1.5 checkpoint (your idea, 2026-09-11 night: "maybe we should
-  be loading different SD1.5 models per visual pack -- an anime SD1.5 would really
-  pop").** Today the still engine (`nodes/_otr_image_engines/sd15.py`) loads ONE
-  checkpoint for every style, `v1-5-pruned-emaonly-fp16.safetensors`, and
-  `OTR_SD15_CKPT` overrides it globally; the style catalog
+* **Does a declared bank genre outrank an AUTHORED music row?** `scifi_news_pro`
+  writes its own ledger music rows and they bypass the composed genre row, so
+  that bank's cue asked for a TR-909 and "tense strings" in the same prompt and
+  came back a pad. *"Sci-fi news is Detroit techno"* reads as yes, but authored
+  rows are a deliberate feature of that lane and overriding them is a behaviour
+  change on a path nobody has studied. **Unblocks with yes or no.**
+* **Listen to the four bank genres.** Eight clips, labelled by bank, in
+  `output/otr/obs/bank_genres/` (`1_scifi_news_DETROIT_TECHNO_*` through
+  `4_original_SALSA_*`). **Unblocks with which ones are right.**
+* **Listen for the tape scratch.** `the_jars_secret_20260912_024354` (base
+  checkpoint, cfg 4) against `the_borrowed_voice_20260912_023252` (post-trained,
+  cfg 7) -- the odd tape-loop scratch at ~0:47 should be gone from the first.
+  **Unblocks with gone or still there.**
+* **Listen for the loop on the SUSTAINED lane.** A Shakespeare leg, which is now
+  the only bank still receiving the anti-loop negative -- and that negative has
+  never been heard working, because it was inert on the old checkpoint. The
+  original loop complaint was never actually tested. **Unblocks with looping or
+  not.**
+* **A registry version carrying this week's work.** `pyproject.toml` is still
+  `2.0.0-alpha.30`, published 2026-09-11; seven commits have touched `nodes/`
+  since, including the guidance fix, the render-killing build-breaker and the
+  bank genres. Editing that file auto-fires a publish and the registry push is
+  yours. **Unblocks with "publish alpha.31".**
+* **A per-style SD1.5 checkpoint** (your idea, 2026-09-11 night: *"maybe we
+  should be loading different SD1.5 models per visual pack -- an anime SD1.5
+  would really pop"*). Today the still engine (`nodes/_otr_image_engines/sd15.py`)
+  loads ONE checkpoint for every style, `v1-5-pruned-emaonly-fp16.safetensors`,
+  and `OTR_SD15_CKPT` overrides it globally; the style catalog
   (`nodes/_otr_visual_styles.py`) has no per-style model field, and the anime
   style contributes only the words "anime style" to the prompt. The build is
   small and settled in shape: a `checkpoint` key per style in the catalog, the
   engine resolving it through the one resolver (style first, then the env, then
-  the default), the file under `C:\ComfyUI-Models\checkpoints`, a variant note for
-  8 GB cards (SD1.5 fits). **Unblocks with the checkpoint name you want for anime**
-  (and any other style you want re-pointed); the measurement is one style, two
+  the default), the file under `C:\ComfyUI-Models\checkpoints`, a variant note
+  for 8 GB cards. **Unblocks with the checkpoint name you want for anime** (and
+  any other style you want re-pointed); the measurement is one style, two
   checkpoints, your eye.
-* **An IP-Adapter on the AnimateDiff lanes (your question, 2026-09-11 night:
-  "wondering if we should be using an IP adapter so AnimateDiff can take ref
-  images").** Grounded: the pack has five AnimateDiff SD1.5 lanes (the ghost-signal
-  family in `nodes/_otr_video_engines/eng_ghost_signal*.py`: v2, v3, v3 haunted,
-  Lightning, and the still-conditioned lab lane, which already takes the beat's
-  own still as its init image); AnimateLCM was deliberately refused by the ghost
-  recipe (documented at `eng_ghost_signal.py:102`, the recipe runs cfg 1.0 with
-  its own scheduler pair); and there is NO IP-Adapter anywhere in the pack. An
-  IP-Adapter drives STYLE from a reference image (CLIP-vision, not the init
-  latent) and would need the IP-Adapter model files plus a node that ComfyUI
-  does not ship natively (the IPAdapter-plus pack), so it is a new dependency
-  decision for the registry story, and a video-lane recipe change (recipes are
-  hard-won: one lane, A/B against itself, your eye). The other three tricks in
-  the tutorial you pasted the pack already does: the ghost lanes lean on grain
-  and degradation to hide morphing, they run low cfg, and the title / timecode /
-  captions are burned in post by the caption burn, not generated. **Unblocks
-  with: which lane to try it on and where the reference image comes from (the
-  episode's own style card, the beat still, or a fixed mood board).**
-* **5.1-5.2 release after physical 8 GB proof.** After the wave reports the 4060's
-  physical 8 GB legs, rule on promoting the 8 GB ship set.
-* **Unruled product choices and Bible fan-out candidates.** The pointer is to a
-  2026-09-01 catch-all; name the live sub-questions explicitly before asking, so a
-  ruling lands on something specific.
+* **An IP-Adapter on the AnimateDiff lanes** (your question, 2026-09-11 night:
+  *"wondering if we should be using an IP adapter so AnimateDiff can take ref
+  images"*). Grounded: the pack has **three registered** AnimateDiff SD1.5 lanes
+  -- v3 haunted, Lightning, and the still-conditioned lab lane, which already
+  takes the beat's own still as its init image (the plain v2 and v3 ids are
+  tombstoned in `RETIRED_ENGINE_IDS` since 2026-08-23). AnimateLCM was
+  deliberately refused because the main recipe runs `GHOST_CFG = 8.0` with a LIVE
+  negative and the Ghost lettering defense needs real unconditional conditioning
+  (`eng_ghost_signal.py:101-106`); only the Lightning lane runs cfg 1.0. There is
+  NO IP-Adapter anywhere in the pack. An IP-Adapter drives STYLE from a reference
+  image (CLIP-vision, not the init latent) and would need the IP-Adapter model
+  files plus a node ComfyUI does not ship natively (the IPAdapter-plus pack), so
+  it is a new dependency decision for the registry story and a video-lane recipe
+  change -- recipes are hard-won: one lane, A/B against itself, your eye. The
+  other three tricks in the tutorial you pasted the pack already does: the ghost
+  lanes lean on grain and degradation to hide morphing, and the title / timecode
+  / captions are burned in post, not generated. **Unblocks with: which lane to
+  try it on and where the reference image comes from** (the episode's own style
+  card, the beat still, or a fixed mood board).
+* **The 8 GB ship set.** Promote the 4060 profiles out of `draft` after the wave
+  reports its physical 8 GB legs. **Unblocks with promote or hold.**
+* **Unruled product choices and Bible fan-out candidates.** Waiting on section
+  2's row to name the live sub-questions; a ruling needs something specific.
 
-## 7. Constraints specific to this plan
+## 5. Constraints specific to this plan
 
 Only the ones not already in CLAUDE.md or the standing rulings.
 
-- Full listener source, no RSS. Cast count is flexible and records requested vs actual;
-  the house announcer is excluded from dramatic cast.
-- **WE DO NOT CHASE ACT COUNT** (operator, 2026-09-11), the same rule as word count: the
-  value is a request, and a run delivers the closest performable episode.
-- Model checking and a fixed attempt budget only -- no separate chunker, no recursive
-  loop.
-- An exhausted optional correction still yields a usable ledger; no predictive word or
-  duration gate.
-- Byline and attribution rules differ for My Story, Original and the adaptation banks.
-- No replay, migration or re-render project: a saved input means fresh generation.
+- Full listener source, no RSS. Cast count is flexible and records requested vs
+  actual; the house announcer is excluded from dramatic cast.
+- **WE DO NOT CHASE ACT COUNT** (operator, 2026-09-11), the same rule as word
+  count: the value is a request, and a run delivers the closest performable
+  episode.
+- Model checking and a fixed attempt budget only -- no separate chunker, no
+  recursive loop.
+- An exhausted optional correction still yields a usable ledger; no predictive
+  word or duration gate.
+- Byline and attribution rules differ for My Story, Original and the adaptation
+  banks.
+- No replay, migration or re-render project: a saved input means fresh
+  generation.
 
-## 8. Parked
+## 6. Parked
 
 Parked and tombstoned items are preserved in
-[GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md), not here -- by this file's own rule they
-are not work. That includes the unqualified installed-family and GGUF opt-in
-combinations, the H3 policy receipts, the cfg promotion comparisons, the AMD scoped pod
-and platform acceptance, the cloud billing opt-in routing, the operator-parked
-casting/adaptation ideas, OTR-Lite after v2, and the release runway.
+[GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md), not here -- by this file's own rule
+they are not work. That includes the unqualified installed-family and GGUF opt-in
+combinations, the H3 policy receipts, the cfg promotion comparisons, the AMD
+scoped pod and platform acceptance, the cloud billing opt-in routing, the
+operator-parked casting/adaptation ideas, OTR-Lite after v2, and the release
+runway.
