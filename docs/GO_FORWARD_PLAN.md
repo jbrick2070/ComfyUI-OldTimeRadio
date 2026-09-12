@@ -7,14 +7,17 @@ it** -- never a receipt, never a measurement write-up, never a struck-through or
 "SHIPPED" row. The test is one question: *does a row still in this file stop
 making sense without that sentence?* No -> cut it.
 
-**THE ORDER IS ARC -> CODE -> TEST, AND THIS FILE IS ARRANGED IN IT** (operator,
-2026-09-12: *"optimize it for coding and arcs, and THEN testing"*). Decide first,
-build second, qualify last. A deferred arc is deferred coding, and a gate on
-evidence the test wave produces is not a valid deferral either, because the wave
-runs last: a row that can only be settled by live evidence is settled WITHOUT it
-or cut with the reason written in. **The only things that genuinely defer** are a
-row blocked on an operator ruling (section 4) and a row deliberately cut with its
-reason. Apply that test whenever a row claims to be blocked.
+**THIS FILE IS ARC AND CODE. TESTING IS NOT IN IT** (operator, 2026-09-12:
+*"let's just do the coding and arcs first, let's not even talk testing yet"*).
+Decide first, build second; the coverage the wave owes is parked intact in
+[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md) and opens
+only when sections 1 and 2 here are empty. A deferred arc is deferred coding,
+and a gate on evidence a leg produces is not a valid deferral either, because
+the legs run last: a row that can only be settled by live evidence is settled
+WITHOUT it or cut with the reason written in. **The only things that genuinely
+defer** are a row blocked on an operator ruling (section 3) and a row
+deliberately cut with its reason. Apply that test whenever a row claims to be
+blocked.
 
 Read AGENTS.md, CLAUDE.md and [standing rulings](OTR_STANDING_RULINGS.md) first;
 this file does not restate them. **For what has already happened -- commits,
@@ -60,49 +63,16 @@ measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 | **Four tests fail in isolation** | `tests/test_unified_memory_weight_floor.py` and `tests/test_ghost_signal_lightning_lane.py` carry four tests that pass in a full run and fail alone -- re-verified against the pushed head, so this is test hygiene, not a regression. It matters because it makes any focused subset run untrustworthy as evidence. Find the shared state and pin it, or mark them as requiring the full run. |
 | **ROCm tester recruitment** (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm ... let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* **The variant half already exists** -- `otr_amd16_rocm` and `otr_amd8_rocm` are generated draft variants with launch recipes, sage/bnb/fp8 already off, and both are labelled UNVERIFIED on hardware, which is precisely what the tester is being recruited to change. So: (1) confirm those two pin the pure-PyTorch engine set (no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) and regenerate through `scripts/build_variants.py` if not -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install, the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste -- never posted by a window. Check the side-quest chip before starting. |
 | **3.4 clean install, durability tail** | The crash half is closed, so what remains is the non-crash durability point: work from the full r1 review (`kibitz-runs/2026-09-11-arc-cleaninstall/r1/codex.md`), keep the existing download scope, narrow the early-tool-check proposal. Low priority. |
-| **Name the unruled product questions** | Section 4's last bullet points at a 2026-09-01 catch-all. Enumerate the live sub-questions inside it and the Bible fan-out candidates, then move each to section 4 as its own one-line bullet. A ruling needs something specific to land on. |
+| **Name the unruled product questions** | Section 3's last bullet points at a 2026-09-01 catch-all. Enumerate the live sub-questions inside it and the Bible fan-out candidates, then move each to section 3 as its own one-line bullet. A ruling needs something specific to land on. |
 
-## 3. TEST -- last, against a frozen head
+**Testing is not open yet.** The coverage the wave owes is parked, intact, in
+[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md); the head is
+not frozen and no leg is booked until sections 1 and 2 above are empty. Do not
+open it, and do not start a qualification leg to answer a row in this file -- an
+arc that can only be settled by live evidence is settled without it or cut with
+the reason written in.
 
-**The head is NOT frozen.** It freezes only when sections 1 and 2 are empty; the
-hash then goes into the `WAVE HEAD:` line of
-[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) and the four lanes
-start. Do not cut a head early.
-
-Copy-paste prompts, one block per machine:
-[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) (5080, RunPod) and
-[NATIVE_PLAN_4060_AND_MAC.md](2026-09-11-four-machine-test-wave/NATIVE_PLAN_4060_AND_MAC.md)
-(4060, Mac). Lane assignments, per-lane legs and the rules every lane follows
-live THERE and are not repeated here -- including the 4060's `kernel_source`
-phone-home, which is where the Ghost Half B ranked-tier number comes from.
-
-Every qualifying run loads `workflows/otr_canonical.json` through
-`scripts/otr_canonical_api_run.py` -- no `--workflow` override, no replay
-substitute, no `partial_execution_targets`. Assets go to canonical episode
-paths; final publication must exist in `otr/obs`. These are the coverages the
-wave does not already carry.
-
-| Coverage | Required evidence |
-|---|---|
-| Six-act repeatability | Three fresh full canonical runs. Record observed loads/reuse; claim clean boot and resident reuse only where the runtime actually supports it. |
-| Source and cast variety | One-act monologue, three-act ensemble, detailed six-act. Requested vs actual cast, supplied/neutral byline, breaks on and off. After the wave, check what its legs already covered and run only the gap. |
-| Listening | Opening/middle/ending on at least two publications including a six-act. Operator's ear only -- no agent in the wave can ingest audio, and reading TTS text or checking a waveform is not listening. |
-| 2.2 Ghost CUDA | Live five-act forced-Ghost CUDA publication with stored prompt/admission/reuse inspection. Needs a CUDA host. **Also the first live measurement of Half B on a forced-Ghost leg, which the wave does not carry:** count `kernel_source` across the episode's shots -- `authored_subject` (the model ranked it), `key_object_in_beat` (the dialogue named it), `key_object` (odometer). The deterministic tier's ceiling was 26.3%; how far the ranked tier lifts it is the number nobody has. Report the `[OTR_ShotLock] Ghost Half B: eligible=N submitted=N admitted=N candidates=N` line too: admitted/submitted is the admission rate, submitted/eligible the abstention rate -- together they say whether the model is choosing from the list or inventing. |
-| 5.7 chunked music | **Settle whether this leg can exist before booking it.** The chunk branch is `scene_sequencer.py:2151-2186` and its threshold is `_MUSIC_MAX_CHUNK_DUR_S = 22.0` (`:2094`), but the composer's own cue lengths are `CUE_DURATIONS = {opening 12, closing 8, interstitial 4}` (`nodes/_otr_music_prompt.py:51`), so a composed cue can never reach it and `_chunk_count` is always 1. The only way in is an AUTHORED ledger music row carrying `target_duration_s > 22`, which `stable_audio_theme.py:372` honours over the default -- and `scifi_news_pro` is the only lane that authors music rows. So: either the leg supplies such a row (full canonical on `otr_8gb_fastwan` -- that is the PROFILE id; `fastwan_8gb` is the ENGINE id inside it and is not a profile -- status `draft`), or the row closes as unreachable code that no episode exercises. |
-| Inherited regression debt | **Load-bearing, not a footnote, and right now the guard cannot do its job.** `tests/conftest.py:184` sets `EXPECTED_FAILED_NODEIDS = frozenset()` -- an EMPTY baseline -- so the known-fail guard reports every failure as a new regression and cannot tell one apart from the inherited set. Measured 2026-09-12 on the 5080 in a normal checkout: **49 failed of 15,383 collected**; the count moves with where it runs (some fail only inside a worktree, and a two-file subset still fails the four in section 2). Re-ground the OTR and Bible failure sets against baseline IDs **and normalized payloads**, then load the baseline so a real regression stands out. The Bible strict metadata validator separately has 149 unchanged issues. Never quarantine silently; never call the suite all-green. |
-
-**The six-act fixture** is specified in full in PROMPTS.md, which restates it on
-purpose so it can be pasted standalone. For every attempt record source fields,
-code/canonical/graph hashes, actual model/quantization/profile, prompt ID,
-elapsed time, memory and loads, all repair attempts, requested vs actual acts and
-cast, ledger seals and final paths. Preserve terminal failure evidence before
-asserting anything. Keep the full denominator.
-
-**After the wave, the next day begins in `otr/obs/`, not in the editor.** Count
-what landed against the legs promised, read the four phone-homes, and triage any
-crash-class failure FIRST.
-
-## 4. Blocked on the operator -- each unblocks with one word
+## 3. Blocked on the operator -- each unblocks with one word
 
 * **Does a declared bank genre outrank an AUTHORED music row?** `scifi_news_pro`
   writes its own ledger music rows and they bypass the composed genre row, so
@@ -164,7 +134,7 @@ crash-class failure FIRST.
 * **Unruled product choices and Bible fan-out candidates.** Waiting on section
   2's row to name the live sub-questions; a ruling needs something specific.
 
-## 5. Constraints specific to this plan
+## 4. Constraints specific to this plan
 
 Only the ones not already in CLAUDE.md or the standing rulings.
 
@@ -182,7 +152,7 @@ Only the ones not already in CLAUDE.md or the standing rulings.
 - No replay, migration or re-render project: a saved input means fresh
   generation.
 
-## 6. Parked
+## 5. Parked
 
 Parked and tombstoned items are preserved in
 [GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md), not here -- by this file's own rule
