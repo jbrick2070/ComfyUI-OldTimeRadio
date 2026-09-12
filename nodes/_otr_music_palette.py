@@ -154,6 +154,19 @@ _BANK_PALETTES = {
     "public_domain": CHICAGO_HOUSE,
 }
 
+
+def bank_music_table() -> list[tuple[str, str, bool]]:
+    """``(bank, idiom, rhythmic)`` for every bank with a DECLARED palette,
+    sorted by bank -- the five in ``_BANK_PALETTES``. ``my_story`` is not
+    here because it has no fixed palette: it takes the ``music_style`` widget
+    and falls back to the house orchestra, which the docs state beside this
+    table. This is the ONE place the docs read the shipped defaults from, so
+    README and every generated launch recipe say what the composer does rather
+    than what somebody remembered (the defaults were undocumented from
+    2026-09-12 dawn until the same evening); a test pins both against it."""
+    return sorted((bank, palette.idiom, palette.rhythmic)
+                  for bank, palette in _BANK_PALETTES.items())
+
 #: The tempo words each device group asks for. TEMPO IS PER GROUP, not per
 #: pace class (Fable, 2026-09-12): "unhurried, expressive rubato" is right
 #: for grief and wrong for dread, because suspense is slow AND RIGID -- rubato

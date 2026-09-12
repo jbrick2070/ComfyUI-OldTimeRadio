@@ -1,3 +1,71 @@
+## 2026-09-12 (late morning) -- section 1 emptied: seven arcs settled, three of them into code
+
+**His instruction:** *"keep arcing and coding so we can get to testing"*, then
+*"we aren't going to run full canonical testing until all coding is done"*,
+and on tooling: *"call upon codex for help and Sonnet to QA as well."* Also,
+twice, a correction that is now in memory: he had said the techno sounded
+good, and I benched the sampler row anyway. **A lane he has judged is
+settled; rows that re-ask it get cut on his word, not benched.**
+
+**Section 1 is empty.** Seven rows, one anchor
+(`docs/2026-09-12-arc-batch-2/`), six Sonnet readers grounding one row each
+(180 tool calls, every claim with file:line), one codex contrarian over the
+whole document (4 STANDS, 3 REFUTED -- all three refutations held against the
+files and reversed the reader's verdict):
+
+| row | outcome |
+|---|---|
+| Which SA3 recipe ships | the shipped recipe stays (36-render bench: lcm is 2x faster and renders sustained beds 8-13 dB quieter, more periodic, five times the bursts); no change; and it should not have been run once he had said the lane sounded good |
+| Why house and techno do not groove | settled by the bench (12 of 12 genre renders commit to tempo); the palette is untouched; his ear on the canonical clips is already in section 3 |
+| Cast-count vocabulary | cut: `EpisodeBudget.cast_size` has no production reader; the replay key is already the clamped count |
+| 2.4 routing/canvas allowlist | cut: the engine comment is the honest record; 193 stays an unenforced lab number; five profiles carry the 81 cap, not three |
+| 3.5 per-beat reload | cut under the bar: unmeasured wall-clock, no crash; if ever wanted it is the `eng_ltx25` encoder-scope pattern, CODE not ARC |
+| 2.4 voice/credits | **codex refuted the cut**: PBUG-20260902-03 is FIX-OPEN and calls the missing bark output guard "a silent wrong render"; now a CODE row with the PBUG's own spec |
+| 2.4 model-root | **codex refuted "nothing"**: `flux2_klein` read `folder_paths` BEFORE the env roots, the reverse of `_models_root()`; fixed this push |
+| OpenRouter copy-forward | **codex refuted "close"**: a cold cache clamps to 8,192 and the file records that cutting a script off mid-JSON; fixed this push, and not as a copy-forward |
+
+**Code shipped this push** (codex finished-diff review RIGHT-WITH-FIXES, three
+of four folded, one refuted with a test; Sonnet QA on the same diff):
+
+* `resolve_context_window` heals a cold OpenRouter cache: on a slug miss with
+  the API key present it refreshes the catalog inline once per process
+  (lock-guarded flag), re-reads, and only then falls back to 8,192. No key,
+  no network; never raises; never at import or in a dropdown build. Four tests.
+* `flux2_klein._resolve_unet_path` takes the env root's file when it exists,
+  before `folder_paths`, idempotently across the two calls per usability
+  check, then `folder_paths`, then the env candidate registered as before.
+  Neither env var is set on the 5080, printed and pinned: its path is
+  unchanged. Codex asked it to scan BOTH root variables; refused with a test,
+  because `_models_root()` takes the first configured one and matching that
+  is the whole point.
+* The bank music defaults are documented from ONE source:
+  `_otr_music_palette.bank_music_table()` feeds a `## Music` block into all
+  93 generated launch recipes and a README table carries the exact idioms; a
+  test pins README, generator and committed recipes to the palette.
+
+**THE FIRST FULL RUN CAUGHT THE SUITE ON THE NETWORK.** One existing test
+set a fake API key and a cold cache; the new self-heal fetched OpenRouter's
+model list -- which needs no auth -- mid-suite, learned the real window, and
+failed the "unknown window" assertion. This box also carries a real key in
+its shell environment. `tests/conftest.py` now raises on any catalog fetch
+from a unit test and clears the once-per-process flag before every test; the
+self-heal tests replace the seam explicitly. A silent network call in the
+unit suite would have been worse than the failure that exposed it.
+
+**Suite:** 47 failed / 15,397 collected (the 49 / 15,383 baseline plus this
+session's added tests); failing set diffed against the baseline: zero new.
+
+**Box:** no server resident; ACE-Step's 13.7 GiB deleted on his word; the
+recipe-bench clips sit in `output/otr/obs/music_recipe_bench/` as the record
+of a no-change decision, not a listen he owes.
+
+**Next in the plan, all CODE, none of them music:** the Ghost-kernel preflight
+parity (grounded, minimal diff in hand: an explicit planned ordinal handed to
+the preflight, an identity-keyed ordinal lookup in the driver, the dialogue
+join on `line_id`), the bark output guard, the three lightning-lane tests
+that fail in isolation, the ROCm recruitment pack, the clean-install tail,
+and naming the unruled product questions.
+
 ## 2026-09-12 (mid-morning) -- which music model ships, benched; and the fetch path finally names a base file
 
 **Rows taken:** section 1 "Which music model ships" and section 2 "The music

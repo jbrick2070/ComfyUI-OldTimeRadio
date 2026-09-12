@@ -203,6 +203,35 @@ def _resolve_unet_path() -> str:
         return _register_loader_parent(
             "unet", os.path.abspath(os.path.expanduser(explicit)))
 
+    # THE SHARED ROOT WINS WHEN IT HOLDS THE FILE (2026-09-12). This used to
+    # ask `folder_paths` first and the env roots second -- the reverse of
+    # `_otr_gguf_backend._models_root()`, where the env vars "win outright"
+    # and every pod run is pinned by them. With a root pinned AND a second
+    # copy visible to the native loader, this engine loaded one file while
+    # the GGUF writers used another, silently. Now: the env root's file when
+    # it exists; else the native loader; else the env candidate registered
+    # as before, so an absent file still fails loud in `assert_usable`.
+    # Neither env var is set on the reference box, so its path is unchanged.
+    env_candidate = ""
+    for env_name in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
+        root = otr_env.get(env_name, "").strip()
+        if root:
+            env_candidate = os.path.abspath(os.path.join(
+                os.path.expanduser(root), "diffusion_models", _DEFAULT_CKPT))
+            break
+    if env_candidate and os.path.isfile(env_candidate):
+        # Idempotent: this runs once for the widget name and again inside
+        # `assert_usable`, so if the loader already resolves the very file the
+        # env root names, hand that back without registering its parent twice.
+        try:
+            import folder_paths
+            found = folder_paths.get_full_path("unet", _DEFAULT_CKPT)
+            if found and os.path.realpath(found) == os.path.realpath(env_candidate):
+                return os.path.abspath(found)
+        except Exception:
+            pass
+        return _register_loader_parent("unet", env_candidate)
+
     try:
         import folder_paths
         found = folder_paths.get_full_path("unet", _DEFAULT_CKPT)
@@ -211,12 +240,8 @@ def _resolve_unet_path() -> str:
     except Exception:
         pass
 
-    for env_name in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
-        root = otr_env.get(env_name, "").strip()
-        if root:
-            candidate = os.path.abspath(os.path.join(
-                os.path.expanduser(root), "diffusion_models", _DEFAULT_CKPT))
-            return _register_loader_parent("unet", candidate)
+    if env_candidate:
+        return _register_loader_parent("unet", env_candidate)
     return _DEFAULT_CKPT
 
 

@@ -299,3 +299,27 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
         # Hard exit so CI distinguishes this from a normal pytest
         # failed-test exit. Exit code 2 per S15.1 spec.
         raise SystemExit(2)
+
+
+@pytest.fixture(autouse=True)
+def _openrouter_catalog_fetch_is_never_real(monkeypatch):
+    """NO UNIT TEST MAY FETCH THE OPENROUTER CATALOG (2026-09-12).
+
+    `resolve_context_window` now refreshes a cold catalog cache inline when an
+    API key is present, and OpenRouter's model list needs no auth -- so a test
+    that set a fake key and a cold cache fetched the REAL catalog mid-suite and
+    then failed on the window it had just learned. This box also carries a real
+    key in its shell environment. Every test therefore starts with the fetch
+    seam raised and the once-per-process flag cleared; a test that wants a
+    fetch replaces the seam itself (see tests/test_openrouter_cold_cache_self_heals.py).
+    """
+    try:
+        from nodes import _otr_openrouter_backend as _orb
+    except Exception:  # pragma: no cover -- the backend is importable everywhere
+        return
+
+    def _no_network(**_kw):
+        raise AssertionError("OpenRouter catalog fetch fired from a unit test")
+
+    monkeypatch.setattr(_orb, "_fetch_models_json", _no_network, raising=False)
+    monkeypatch.setattr(_orb, "_COLD_CACHE_REFRESH_TRIED", False, raising=False)

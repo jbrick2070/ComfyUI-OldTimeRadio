@@ -1092,6 +1092,29 @@ nodes/story_packs/banks.json) with no dependency on any other lane.
 | `original` | no-source original fiction seeded from an entropy spark draw |
 | `my_story` | your idea, characters, plot and setting developed into a radio story; manual selection, optional byline |
 
+### The music each bank gets
+
+Each bank has a fixed musical identity, chosen 2026-09-12, and the composer
+leads every generated cue with it (`nodes/_otr_music_palette.py`):
+
+| Bank | Music (the composer's own idiom, verbatim) |
+|------|-------|
+| `scifi_news_pro` | Detroit techno at 128 BPM, hypnotic machine funk -- TR-909, sub bass, detuned stabs, Juno pads |
+| `media_archive` | small-group jazz quartet, relaxed swing -- brushed drums, upright bass, piano, tenor sax |
+| `original` | salsa conjunto at 100 BPM, clave-driven -- congas and timbales, montuno, tumbao, brass |
+| `public_domain` | Chicago house at 122 BPM, soulful and steady -- TR-707, rolling bass, warm piano chords, string pads |
+| `shakespeare` | Elizabethan consort music (its declared palette; the plays all predate the first period cutover, so the year lands there too) |
+| `my_story` | **yours**: the `music_style` widget on `OTR_StableAudioTheme` ("gamelan orchestra", "surf rock", "solo cello"). Blank means the house radio orchestra. |
+
+A test (`tests/test_bank_music_is_documented.py`) pins this table and every
+generated launch recipe to the palette module, so the docs cannot drift from
+what the composer actually asks for.
+
+The `music_style` widget is honoured on `my_story` ONLY -- every other bank
+keeps its genre whatever is typed, because a Shakespeare episode scored as surf
+rock is not a feature. The four genre banks carry a rhythm-friendly negative
+prompt; the sustained banks carry the anti-loop one.
+
 A typed `custom_premise` is handled by lane shape. On `my_story` it is your idea,
 alongside the four appended fields for characters, plot, setting and author. No feed
 or random premise is used. My Story requires your input and is excluded from automatic

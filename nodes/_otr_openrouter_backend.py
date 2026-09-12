@@ -32,6 +32,7 @@ import json
 import logging
 import os
 import re
+import threading
 import time
 from pathlib import Path
 from typing import Any
@@ -889,6 +890,14 @@ def _cached_model(slug: str) -> dict:
     return {}
 
 
+#: One inline refresh per process on a cold cache -- a second miss (an
+#: unknown slug, a refresh that failed) must not turn every remote call into
+#: a catalog fetch. Tests reset it. The lock guards the check-and-set only;
+#: the fetch itself runs outside it.
+_COLD_CACHE_REFRESH_TRIED = False
+_COLD_CACHE_LOCK = threading.Lock()
+
+
 def resolve_context_window(slug: str, *, row_default: int | None = None) -> int:
     """The REAL context window of the resolved remote model.
 
@@ -907,19 +916,38 @@ def resolve_context_window(slug: str, *, row_default: int | None = None) -> int:
     (see `_slim_model`), so the truth was on disk the whole time and simply was
     not read. Read it.
 
-    A cold / stale / corrupt cache has no entry for the slug. That is a
-    genuinely unknown window, so fall back to the row default and say so
-    LOUDLY -- a conservative 8,192 that the operator can see beats a confident
-    number nobody measured. Never raises: a cache miss must not break a load.
+    A cold / stale / corrupt cache has no entry for the slug. THE CACHE
+    HEALS ITSELF FIRST (2026-09-12): a fresh install of this lane is cold
+    until someone runs the refresh script by hand, and the 8,192 fallback is
+    exactly the clamp that cut a script off mid-JSON above -- a silent wrong
+    render on every first run. So on a miss, when the API key is present (the
+    call this window is for is about to reach OpenRouter anyway), refresh the
+    catalog inline ONCE per process, re-read, and only then fall back to the
+    row default and say so LOUDLY. No key, no network -- offline-first holds.
+    Never raises: a cache miss must not break a load, and `refresh_catalog_cache`
+    never raises either.
     """
+    global _COLD_CACHE_REFRESH_TRIED
     fallback = int(row_default or DEFAULT_CONTEXT_WINDOW)
-    advertised = _cached_model(slug).get("context_length")
-    try:
-        window = int(advertised)
-    except (TypeError, ValueError):
-        window = 0
+    window = _advertised_context_window(slug)
     if window > 0:
         return window
+    # Check-and-set under a lock so two concurrent cold loads cannot both
+    # decide they are the one refresh (codex, finished-diff review).
+    with _COLD_CACHE_LOCK:
+        may_refresh = not _COLD_CACHE_REFRESH_TRIED and openrouter_enabled()
+        if may_refresh:
+            _COLD_CACHE_REFRESH_TRIED = True
+    if may_refresh:
+        log.info("[OpenRouter] %s has no context_length in the catalog cache; "
+                 "refreshing the catalog once before falling back.", slug)
+        try:
+            refresh_catalog_cache()
+        except Exception as exc:  # noqa: BLE001 -- belt and braces; it never raises
+            log.warning("[OpenRouter] inline catalog refresh failed (%s).", exc)
+        window = _advertised_context_window(slug)
+        if window > 0:
+            return window
     log.warning(
         "[OpenRouter] %s has no context_length in the catalog cache (cold or "
         "stale?); falling back to %d tokens. A long artifact request will be "
@@ -928,6 +956,14 @@ def resolve_context_window(slug: str, *, row_default: int | None = None) -> int:
         slug, fallback,
     )
     return fallback
+
+
+def _advertised_context_window(slug: str) -> int:
+    """The slug's advertised ``context_length`` from the cache, or 0."""
+    try:
+        return max(0, int(_cached_model(slug).get("context_length")))
+    except (TypeError, ValueError):
+        return 0
 
 
 def _parse_iso(ts: Any) -> datetime.datetime | None:

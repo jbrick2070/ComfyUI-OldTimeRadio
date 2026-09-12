@@ -270,6 +270,31 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
     ]
     for k, v in sorted(env.items()):
         lines.append(f"- `{k}={v}`")
+    # THE SHIPPED MUSIC DEFAULTS, read from the palette so this recipe cannot
+    # drift from the composer (2026-09-12: four banks gained a fixed genre
+    # and a one-bank widget, and no user-facing file said so).
+    from nodes._otr_music_palette import bank_music_table  # noqa: E402
+    lines += [
+        "",
+        "## Music (per bank; only My Story takes its own)",
+        "",
+    ]
+    # A RHYTHMIC palette is the bank's fixed identity whatever the source's
+    # year (`story_palette`: a declared genre beats the period band). A
+    # non-rhythmic one is only the bank's default when the source carries no
+    # year; otherwise the period band decides -- and for Shakespeare every
+    # play predates the first cutover, so it lands on the same consort.
+    for bank, idiom, rhythmic in bank_music_table():
+        if rhythmic:
+            lines.append(f"- `{bank}`: {idiom} (fixed)")
+        else:
+            lines.append(f"- `{bank}`: chosen by the source's year; "
+                         f"its own default is {idiom}")
+    lines += [
+        "- `my_story`: the `music_style` widget on `OTR_StableAudioTheme` "
+        "(blank = the house radio orchestra). Every other bank keeps its "
+        "genre whatever is typed.",
+    ]
     lines += [
         "",
         "## Required key NAMES (values are NEVER stored here)",
