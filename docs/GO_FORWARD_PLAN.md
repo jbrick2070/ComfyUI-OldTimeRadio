@@ -80,12 +80,18 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   The untested competitors are the checkpoint (post-trained SA3 ignores cfg and
   negatives) and the sampler. The comments say hypothesis, not fact. **Unblocks
   with the same listen.**
-* **The anime checkpoint, on screen.** `Counterfeit-V3.0_fp16.safetensors` is
-  fetched (4.24 GB, in `C:\ComfyUI-Models\checkpoints`) and the anime pack now
-  names it. A pack's checkpoint is a PREFERENCE and never a gate: a box without
-  the file falls through to the env override and then the shipped default, so
-  nothing greys out and no render can fail on it. **Unblocks with your eye on
-  an anime-style still minted through it** -- one style, two checkpoints.
+* **SETTLED 2026-09-12 -- the anime checkpoint is IN.** His verdict on
+  `the_clanking_chains_20260912_153041__anim__stfl__sd15__...` was one word:
+  *"perfect"*. `Counterfeit-V3.0_fp16.safetensors` is fetched, the anime pack
+  names it, and the server log records `[sd15] minted still 768x432 ...
+  ckpt=Counterfeit-V3.0_fp16.safetensors` with `OTR_SD15_CKPT` unset -- so the
+  name came from the pack through the style resolver. **His ear has ruled;
+  this row does not get re-asked and the lane is not benched again.**
+  The one thing left is bookkeeping, not a question: `config/profiles/
+  otr_sd15_stills.json` is still `status: "draft"` because it was written
+  minutes before the leg. It wants a couple more episodes on other styles
+  before it claims `shipping`, and it is NOT edited while the wave head is
+  frozen.
 
 ### Still genuinely open, and not his call
 
