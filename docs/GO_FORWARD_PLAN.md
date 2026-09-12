@@ -9,9 +9,8 @@ making sense without that sentence?* No -> cut it.
 
 **THIS FILE IS ARC AND CODE. TESTING IS NOT IN IT** (operator, 2026-09-12:
 *"let's just do the coding and arcs first, let's not even talk testing yet"*).
-Decide first, build second; the coverage the wave owes is parked intact in
-[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md) and opens
-only when sections 1 and 2 here are empty. A deferred arc is deferred coding,
+Decide first, build second -- and when both are empty, section 6 at the bottom
+is what you have earned. A deferred arc is deferred coding,
 and a gate on evidence a leg produces is not a valid deferral either, because
 the legs run last: a row that can only be settled by live evidence is settled
 WITHOUT it or cut with the reason written in. **The only things that genuinely
@@ -64,13 +63,6 @@ measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 | **ROCm tester recruitment** (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm ... let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* **The variant half already exists** -- `otr_amd16_rocm` and `otr_amd8_rocm` are generated draft variants with launch recipes, sage/bnb/fp8 already off, and both are labelled UNVERIFIED on hardware, which is precisely what the tester is being recruited to change. So: (1) confirm those two pin the pure-PyTorch engine set (no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) and regenerate through `scripts/build_variants.py` if not -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install, the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste -- never posted by a window. Check the side-quest chip before starting. |
 | **3.4 clean install, durability tail** | The crash half is closed, so what remains is the non-crash durability point: work from the full r1 review (`kibitz-runs/2026-09-11-arc-cleaninstall/r1/codex.md`), keep the existing download scope, narrow the early-tool-check proposal. Low priority. |
 | **Name the unruled product questions** | Section 3's last bullet points at a 2026-09-01 catch-all. Enumerate the live sub-questions inside it and the Bible fan-out candidates, then move each to section 3 as its own one-line bullet. A ruling needs something specific to land on. |
-
-**Testing is not open yet.** The coverage the wave owes is parked, intact, in
-[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md); the head is
-not frozen and no leg is booked until sections 1 and 2 above are empty. Do not
-open it, and do not start a qualification leg to answer a row in this file -- an
-arc that can only be settled by live evidence is settled without it or cut with
-the reason written in.
 
 ## 3. Blocked on the operator -- each unblocks with one word
 
@@ -161,3 +153,24 @@ combinations, the H3 policy receipts, the cfg promotion comparisons, the AMD
 scoped pod and platform acceptance, the cloud billing opt-in routing, the
 operator-parked casting/adaptation ideas, OTR-Lite after v2, and the release
 runway.
+
+## 6. And when all of this is done -- it is time to TEST. Hurrah.
+
+When sections 1 and 2 are empty, the waiting is over and the fun part starts.
+Freeze ONE hash, write it into the `WAVE HEAD:` line of
+[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md), and turn four
+machines loose on it at once -- the 5080, the 4060, the Mac and a RunPod box,
+each running the real canonical workflow, all reporting home.
+
+Everything they owe is already written and waiting in
+[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md) beside the
+two lane documents. Nothing needs planning when the day comes; it needs starting.
+
+Until then: **do not freeze a head, do not book a leg, and do not settle a row up
+there by rendering something.** Two heads were cut early on 2026-09-11 and both
+had to be withdrawn. An arc that can only be answered by live evidence is
+answered without it, or cut with the reason written in.
+
+**Then the next morning begins in `otr/obs/`, not in the editor** -- count what
+landed against what was promised, read the four phone-homes, and triage anything
+crash-class first. That is the good problem to have.
