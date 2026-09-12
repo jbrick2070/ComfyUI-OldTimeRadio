@@ -101,13 +101,19 @@ cleared) ran the batch-2 arc contrarian and three finished-diff reviews;
 **cursor** ran one design round and one hardening pass; **Sonnet subagents**
 ran six grounding readers and three QA passes. **No full four-round arc was run
 and none is claimed** -- the 2026-08-17 amendment routes design forks to a
-contrarian per round, which is what happened. **One reviewer seat went empty:**
-the Bible cross-check reader never returned, so the 12.166 / 12.167 promotions
-and the 12.162 second-instance call are DRIVER-JUDGED, grounded by reading the
-three PBUG entries against the three nearest existing rules (12.107
-never-forwarded, 12.108 engine-owned negative, 12.162 follow-the-value) and
-citing why each did or did not cover the case. A later window may re-open that
-judgement; the evidence is in the commit message.
+contrarian per round, which is what happened. **The Bible cross-check reader
+returned LATE -- after the promotions were already pushed -- and CONCURRED with
+all three calls**, which is why this paragraph was corrected rather than left
+saying the seat was empty. It read the three PBUG entries against the Bible
+independently and reached the same verdicts: 12.166 new (distinct from 12.108
+and from 12.120, neither of which covers member-resolution plus the
+provisioning correction), 12.167 new (self-distinguishing from 12.107 and
+12.162, and the distinction holds), and PBUG-20260912-05 folded as a second
+instance rather than a third near-duplicate rule in one week. Its one
+substantive addition: **12.156 is arguably the closer mechanism** for that
+third one -- a convention changed at the writer while a separate reader kept
+the old one -- so the index row now carries that cross-reference beside
+12.162. Next free Bible id is 12.168.
 
 Three times a reviewer overturned the driver this session: codex found a scorer
 whose code did not implement the rule its own docstring claimed; cursor found
