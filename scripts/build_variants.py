@@ -318,7 +318,14 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         f"- {llama_note}",
         "- ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the "
         "build).",
-        "- minimal Linux: libcairo for viz_mandala.",
+        # Named ONLY when this profile actually selects the one engine that
+        # imports cairo (2026-09-12). Every recipe used to carry the line,
+        # including profiles pinned to the cairo-free viz_mxc_cpu -- an
+        # install step a tester would have paid for nothing.
+        *(["- minimal Linux: libcairo2-dev + pkg-config, then `pip install "
+           "pycairo` (this profile selects `viz_mxc_mandala`)."]
+          if "viz_mxc_mandala" in json.dumps(profile.get("role_overrides") or {})
+          else []),
         "",
         "## Preflight models",
         "",

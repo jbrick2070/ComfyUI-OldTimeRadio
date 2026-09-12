@@ -50,8 +50,16 @@ def _call(eng):
 
 
 def test_a_healthy_line_passes_untouched(bark_engine):
-    bark_engine._test_audio = (np.sin(np.linspace(0, 60, 24000))
-                               .astype(np.float32) * 0.35)
+    """SPEECH-SHAPED ON PURPOSE (2026-09-12). This fixture used to be
+    `np.sin(np.linspace(0, 60, 24000))` -- a ~9.5 Hz oscillation, not a
+    voice -- so once the speech-shape guard landed, the "healthy" line
+    quietly walked the whole re-roll ladder and shipped through the
+    best-take fallback while still passing these assertions. The test's own
+    name is the contract: a healthy line returns on the FIRST take."""
+    t = np.arange(24000 * 3) / 24000.0
+    bark_engine._test_audio = (
+        sum(0.35 / k * np.sin(2 * np.pi * 180.0 * k * t) for k in range(1, 8))
+    ).astype(np.float32)
     out = _call(bark_engine)
     assert out["sample_rate"] == 24000
     assert out["waveform"].shape[0:2] == (1, 1)

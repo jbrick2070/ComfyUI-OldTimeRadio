@@ -488,9 +488,15 @@ def _fake_unified_torch():
 
 
 def test_the_impure_half_actually_raises_on_an_oversized_engine(monkeypatch):
-    """The mutation test: stub the guard's body to `return` and this fails."""
+    """The mutation test: stub the guard's body to `return` and this fails.
+
+    PINNED TO THE 16 GB BUDGET (2026-09-12): the guard budgets against
+    `unified_memory_budget_mb`, which reads PHYSICAL RAM (PBUG-20260908-02),
+    not `free_vram_mb`; on the 63 GB reference box a 20 GB weight fits and
+    nothing raised, so this test failed in every run here."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
     monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
+    monkeypatch.setattr(mc, "unified_memory_budget_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 20000.0)
     with pytest.raises(mc.MotionBudgetError) as excinfo:
         mc.refuse_if_weights_exceed_unified_memory("some_engine")
@@ -502,6 +508,7 @@ def test_the_impure_half_allows_an_engine_that_fits(monkeypatch):
     here, and a guard hard-wired to return fails above."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
     monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
+    monkeypatch.setattr(mc, "unified_memory_budget_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 3000.0)
     mc.refuse_if_weights_exceed_unified_memory("some_engine")
 

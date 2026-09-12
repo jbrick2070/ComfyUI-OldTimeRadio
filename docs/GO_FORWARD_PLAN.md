@@ -44,28 +44,21 @@ measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 rows settled -- four cut or closed on the code, one settled by the bench,
 and three converted into named CODE rows below after a codex refutation.*
 
-| Row | The fork, and what settles it |
-|---|---|
-| **Which SA3 recipe ships** | **Re-measure; the old numbers are void.** Every arm was measured on the post-trained checkpoint, where cfg and the negative prompt do nothing, so the comparison attributed to guidance what was really sampler and steps -- and it scored them with loopiness, which a burst pushes DOWN. The live fork is narrow: on the BASE checkpoint at cfg 4.0, `lcm`/`simple` at 50 steps against `dpmpp_3m_sde_gpu`/`exponential` at 100. Half the render time is worth an A/B. Several renders per arm through `scripts/otr_music_ab.py` (canonical only) -- one leg per arm cannot answer it; the variance between two cues inside one arm has twice beaten the difference between arms. Read burst count beside loopiness, never loopiness alone. The 2026-09-12 music-model bench (`docs/2026-09-12-music-model-bench/`) held this recipe constant across checkpoints, so the recipe is a confound this row owns; run the A/B on whichever checkpoint the section-3 "small or medium" ruling picks. |
-| **Why house and techno do not groove** | **The loop complaint and the groove complaint are now two different lanes, and neither has been heard yet.** Since the genres shipped, `negative_for()` gives the four declared banks the rhythm-friendly negative on purpose -- the anti-loop wording now guards only Shakespeare and an undeclared bank, and it became a live lever at all only when the base checkpoint was preferred. So the sustained lane has never once been heard with its own anti-loop negative actually working, and the genre lane is being asked FOR a repeating figure. This row is the second half. Four 1-act legs put a genre on each bank: salsa and jazz produced real grooves (139 and 83 onsets a minute), techno and house came back nearer pads. The sci-fi news lane is explained -- it AUTHORS its own music rows, which bypass the composed genre row, so the cue asked for a TR-909 and "tense strings" in one prompt. **Chicago house has no such excuse: its row was COMPOSED and it still came back a pad.** n=1 per bank, and the conditioning window is already excluded (measured, 10 seeds per arm: 1x, 2x and 3x all find a beat 80-90% of the time at the requested tempo). Take it to the bench before touching the palette. **Bench, 2026-09-12** (`docs/2026-09-12-music-model-bench/`): the composed house and techno opening cues, three seeds each on both base checkpoints, all twelve committed to the asked tempo (house 120-123, techno 129; pulse 0.5-0.8) on a stock-node graph -- the n=1 pads did not reproduce. What remains is whether the canonical path differs, which is a listen (section 3), not a palette change. |
-| **Cast-count vocabulary disagrees across three surfaces** | `_otr_casting.py` stamps the already-clamped value as `num_characters_request`; the writer builds an `EpisodeBudget` from the UNCLAMPED request; `_otr_episode_budget.py` labels that `cast_size`. For a request of 8 those surfaces say six and eight. Decide which surface owns "the count that happened". **Do not naively retarget the replay field:** `cast_lock.py:629` consumes `num_characters_request` to replay casting. Not crash-class. |
-| **2.4 routing/canvas -- allowlist the lane at all?** | The 193-frame ceiling **cannot be asserted as production-proven** -- it is a lab-warm isolation number, and this lane has a live receipt of production peaks exceeding lab peaks. The engine already rejected capping its own declaration, and said why: `ltx_audio_in` is absent from `frame_contract.PLANNING_CAP_ENGINES`, so a ceiling there reaches nothing (`eng_ltx_av.py:1664-1672`). **Decide it WITHOUT a leg** -- this file's own rule: an item that can only be settled by live evidence is settled without it or cut with the reason, because the legs run last. The two defensible answers are: allowlist the lane now and let a leg PROVE the partition afterwards, or cut it and record that 193 stays an unenforced lab number with the engine comment as the honest statement. If the answer is yes it is three artifacts, and any one alone narrows nothing: add `ltx_audio_in` to `PLANNING_CAP_ENGINES`, add `video.max_render_frames` to `otr_16gb_ltx_audio_in.json` (it has no such key today; the three capped profiles carry it at `video.max_render_frames = 81`), then regenerate the variants (`build_variants.py --all`, confirm `--check`) -- `_otr_workflow_apply.py:553` flattens that key ONLY when present, so an un-regenerated variant carries the old ceiling silently -- and prove the multi-clip partition. **Not render-inert:** `assert_coverage_plans` refuses any `ltx_audio_in` ledger planned before the change and rendered after, so in-flight episodes need replanning at cutover. |
-| **2.4 model-root audit tail** | The four-owner model-root merge, or nothing -- and "nothing" is a real answer. Do NOT rip `comfy_models_dir()` / `resolve_hf_model_path()` on a caller count: they are a dead CHAIN, the archive PARKED the convention, and a FOURTH spelling lives in `nodes/_otr_image_engines/flux2_klein.py:214-220`. |
-| **3.5 per-beat reload** | **Direction undercut by prior art.** Moving this same encoder off-GPU was already tried and REVERTED on live-measured evidence that it did not move the peak (PBUG-20260616-01 / BUG-07.17). The generic scope hook also closes on engine-CHANGE, not every beat, so "even consecutive same-engine beats start cold" was wrong. Per-lane encoder device defaults differ. Decide whether it is worth doing at all before any caching work. Not OOM-proven -- wall-clock cost. |
-| **2.4 voice/credits** | **The instrument does not fit the defect.** `high_band_edge_ratio` detects edge squeal; PBUG-20260902-03 documents a SUSTAINED TONE, and a synthetic reproduction of the exact documented frequencies scored ~0 against the real function. Closing this means designing and empirically qualifying a NEW whole-clip speech-shape scorer that does not exist in the tree. Real work, for a non-crash defect -- weigh against the bar before starting. |
-| **OpenRouter catalog copy-forward** | Decide whether an existing warm in-pack cache is copied forward on first run after the path move, or close it as accepted. A cold cache is already a designed safe state (empty catalog, logged fallback, never a raise, one refresh run restores it), so this is a nicety. |
-
 ## 2. CODE -- the design is settled, build it
 
-| Row | What to write |
-|---|---|
-| **Bark output guard** (from the 2.4 voice/credits arc, codex refutation 2026-09-12) | `docs/PROD_BUG_LOG.md` PBUG-20260902-03 is STATUS FIX-OPEN and names its own fix (`:10298`): score each bark generation for speech shape -- the fraction of one-second windows whose dominant frequency sits in 70-400 Hz with spectral flatness under 0.2 -- re-roll with `seed + 1` up to twice when it fails, log every re-roll at WARNING with the score, keep the best-scoring take if all three fail; the ledger field is always filled. The record calls its absence *"a silent wrong render"*, which is the bar. Bounded to `eng_bark`'s generate path; kokoro stays the default; the two archived artifacts in the PBUG are the calibration set (the 7-second noise floor and the 2.5 kHz tone must score near zero, the two speech takes near one). `high_band_edge_ratio` is the wrong instrument and is left alone. |
-| **Four tests fail in isolation** | `tests/test_unified_memory_weight_floor.py` and `tests/test_ghost_signal_lightning_lane.py` carry four tests that pass in a full run and fail alone -- re-verified against the pushed head, so this is test hygiene, not a regression. It matters because it makes any focused subset run untrustworthy as evidence. Find the shared state and pin it, or mark them as requiring the full run. |
-| **ROCm tester recruitment** (operator, 2026-09-11 night) | *"We need at some point to make a post on r/ROCm ... let's create a best-case-scenario JSON for them first ... a ROCM_MISSION_IMPOSSIBLE.md on the repo to tempt the palate of our wannabe tester, with a flattering image."* **The variant half already exists** -- `otr_amd16_rocm` and `otr_amd8_rocm` are generated draft variants with launch recipes, sage/bnb/fp8 already off, and both are labelled UNVERIFIED on hardware, which is precisely what the tester is being recruited to change. So: (1) confirm those two pin the pure-PyTorch engine set (no sageattention / flash-attn / cuda-malloc / bitsandbytes / CUDA-only GGUF kernels; the still floors, SA3 or musicgen, Kokoro/Bark) and regenerate through `scripts/build_variants.py` if not -- never a hand-edited JSON; (2) `ROCM_MISSION_IMPOSSIBLE.md` at the repo root: clone + install, the variant to load, the one headless command, what success looks like (an mp4 in `otr/obs/`), what to report back (ledger, server log, `rocm-smi`, torch version, first traceback), what they get (credit), plus what a cheap ROCm rental needs (Linux, one MI-series or RDNA3 card, 16-24 GB, ROCm 6.x, ~50 GB disk); (3) a hero still under `docs/images/`; (4) a draft r/ROCm post for HIM to paste -- never posted by a window. Check the side-quest chip before starting. |
-| **3.4 clean install, durability tail** | The crash half is closed, so what remains is the non-crash durability point: work from the full r1 review (`kibitz-runs/2026-09-11-arc-cleaninstall/r1/codex.md`), keep the existing download scope, narrow the early-tool-check proposal. Low priority. |
-| **Name the unruled product questions** | Section 3's last bullet points at a 2026-09-01 catch-all. Enumerate the live sub-questions inside it and the Bible fan-out candidates, then move each to section 3 as its own one-line bullet. A ruling needs something specific to land on. |
+*Empty as of 2026-09-12. Every row that was here is either shipped (its
+receipt is in [HANDOFF_LOG](HANDOFF_LOG.md)) or moved to section 3 because
+only a ruling is left.*
 
 ## 3. Blocked on the operator -- each unblocks with one word
+
+* **Post the ROCm recruitment, or hand it back.** The pack is written and
+  pushed: `ROCM_MISSION_IMPOSSIBLE.md` at the repo root (the install, the two
+  profile ids, one headless command, what success looks like, what to send
+  back), a hero still at `docs/images/rocm_mission_hero.jpg`, both AMD
+  profiles confirmed pure-PyTorch with `build_variants --check` clean, and two
+  drafts of the post itself in `docs/rocm-recruitment-post-draft.md`. **A
+  window must never post it.** **Unblocks with posted, or with your edits.**
 
 * **Does a declared bank genre outrank an AUTHORED music row?** `scifi_news_pro`
   writes its own ledger music rows and they bypass the composed genre row, so
@@ -133,8 +126,35 @@ and three converted into named CODE rows below after a codex refutation.*
   card, the beat still, or a fixed mood board).
 * **The 8 GB ship set.** Promote the 4060 profiles out of `draft` after the wave
   reports its physical 8 GB legs. **Unblocks with promote or hold.**
-* **Unruled product choices and Bible fan-out candidates.** Waiting on section
-  2's row to name the live sub-questions; a ruling needs something specific.
+* **Arm `defaults.scene_coherence_check` on any bank?** The vacuity fix
+  shipped 2026-08-28 but stays opt-in and inert everywhere
+  (`nodes/_otr_scene_guard.py:19`, "default False -> INERT"), and the offline
+  corpus measurement was never run. **Unblocks with a bank name, or not yet.**
+* **Ghost names: scrub the brief after cast lock, or propagate the pitch's
+  names?** Pitch-invented names never reach `lock_cast`, so a bio can open on
+  a name the locked cast does not use -- the Fogbound Rails bio still opens
+  "Lizzie Gray". **Unblocks with scrub or propagate.**
+* **Does `media_archive` get the same no-premise-scaffold treatment as
+  `original`?** The five-bank beat test caught it drawing an unrelated
+  premise scaffold over its own catalogued item; the scaffold-off rule has
+  only ever been stated for `original`. **Unblocks with yes or no.**
+* **Spend the one Gutenberg fetch to vendor the three refusing works?**
+  `ghost_ship`, `purple_cloud` and `beleaguered_city` still fail the
+  vendoring parser. Operator opt-in, not schedulable inside an offline
+  sprint. **Unblocks with go or skip.**
+* **Give `style_tail_policy` a third token, or rule the `ltx_radio_face`
+  path exempt?** `build_radio_host_prompt`'s `ltx_radio_mouth` branch returns
+  early and skips the tail the `ltx_audio_in` bookend declares
+  (`otr_meta_brief_image_prompt.py:196,253,286`). Unruled, the exemption
+  stands. **Unblocks with third token or exempt.**
+* **Does a 24 GB machine class get its own row?** No entry in
+  `config/machine_classes.json`; rentals file under the 16 GB class today.
+  Low priority. **Unblocks with yes or no.**
+* **Run the Bible fan-out on this week's fixes.** PBUG-20260911-06 and -07
+  and PBUG-20260912-01 through -05 are each live-verified with a published
+  artifact and fixed, and none carries a Bible id yet. (The older
+  "awaiting fan-out" strings in the log are stale status text, not work:
+  their promotions already exist in the Bible.) **Unblocks with go.**
 
 ## 4. Constraints specific to this plan
 

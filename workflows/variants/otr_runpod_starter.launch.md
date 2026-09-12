@@ -37,7 +37,6 @@ This file is a generated profile manifest, not a second RunPod guide. Use the si
 - torch cu128+ build (the nv baseline is 2.10/cu130)
 - llama-cpp-python CUDA wheel
 - ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the build).
-- minimal Linux: libcairo for viz_mandala.
 
 ## Preflight models
 

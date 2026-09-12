@@ -109,12 +109,14 @@ Then restart ComfyUI so it loads the nodes.
 > publishes zero Linux wheels), so pip on Linux or Mac skips it entirely and there
 > are no headers to pre-install. Exactly ONE engine imports cairo --
 > `viz_mxc_mandala` -- and it refuses loudly, naming the pip command, if you select
-> it without cairo; every other visualizer lane is cairo-free. It is not in the
-> canonical workflow, **but the two AMD profiles do select it** (`otr_amd8_rocm` and
-> `otr_amd16_rocm` use `viz_mxc_mandala` for `music_visual`). So on Linux, and only
-> if you run an AMD profile or pick that engine: install `libcairo2-dev`
-> (Debian/Ubuntu) or your distro's equivalent plus `pkg-config`, then
-> `pip install pycairo` yourself.
+> it without cairo; every other visualizer lane is cairo-free. **No shipped
+> profile selects it** -- this paragraph used to say the two AMD profiles did,
+> and they do not: `otr_amd8_rocm` and `otr_amd16_rocm` both pin the cairo-free
+> `viz_mxc_cpu` for `announcer_visual` and `music_visual` (read the JSONs).
+> Corrected 2026-09-12; the claim would have sent an AMD tester to install a
+> dependency their profile never touches. So on Linux, and only if you pick
+> `viz_mxc_mandala` by hand: install `libcairo2-dev` (Debian/Ubuntu) or your
+> distro's equivalent plus `pkg-config`, then `pip install pycairo` yourself.
 
 **The ComfyUI Registry route works again as of `2.0.0-alpha.30`.** Checked live
 2026-09-12 against the

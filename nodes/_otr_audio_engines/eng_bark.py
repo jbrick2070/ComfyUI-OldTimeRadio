@@ -22,7 +22,11 @@ that resolution ladder. UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
 
+import logging
+
 from .registry import register
+
+log = logging.getLogger("OTR")
 
 
 class BarkSilentOutputError(RuntimeError):
@@ -167,10 +171,14 @@ class BarkEngine:
         import torch
 
         from .._otr_bark_lib import (
+            BARK_REROLLS_MAX,
+            SPEECH_SHAPE_PASS,
             _generate_single_line,
             _load_bark,
             _resolve_bark_inject_anchor,
             _resolve_bark_speech_only,
+            bark_reroll_seed,
+            speech_shape_score,
         )
         from .registry import EngineUnusable, EngineUsabilityReason
 
@@ -192,44 +200,112 @@ class BarkEngine:
         # OTR_BARK_DISABLE_THROAT_CLEAR=1 default) -- no implicit defaults.
         speech_only = _resolve_bark_speech_only()
         inject_first_line_anchor = _resolve_bark_inject_anchor()
-        audio_np, sr = _generate_single_line(
-            text, voice_preset, model, processor, is_first_line=is_first,
-            semantic_temp=semantic_temp, coarse_temp=coarse_temp,
-            fine_temp=fine_temp,
-            inject_first_line_anchor=inject_first_line_anchor,
-            speech_only=speech_only,
-            # B2: thread the EXISTING per-line seed (was dropped before) so the
-            # clip is reproducible (Bark.generate is unseeded otherwise).
-            seed=seed,
-        )
-        wav = torch.from_numpy(
-            np.asarray(audio_np, dtype=np.float32)
-        ).reshape(1, 1, -1)
-        # THE OUTPUT GATE (2026-08-28, C2 verdict after adversarial review).
-        # Every downstream contract -- packing, sequencing, enhance, mastering,
-        # mux, obs_publish -- checks shape, duration, rate and hash, and NOT
-        # ONE checks that the audio is audible. A finite, nonempty, silent
-        # tensor walks the whole path and publishes as a structurally valid
-        # clip: missing dialogue disguised as delivered dialogue. This is the
-        # ONE seam every live production Bark render passes through, so the
-        # gate lives here and nowhere wider.
-        #
-        # 1e-4 is ALIGNED WITH EXISTING SILENCE SEMANTICS, not corpus-derived:
-        # it is the exact threshold scene_sequencer._trim_trailing_silence
-        # already uses to call a sample silent (~-80 dBFS). The two modern
-        # Bark auditions on record peak ~0.35-0.41, thousands of times above
-        # it. NO remap, NO silent retry, NO duration test, NO generalisation
-        # to other engines -- each of those was argued and rejected in the
-        # review; raising HERE is early (before sequencing, images, video and
-        # mux), so it wastes a line, not a render.
-        peak = float(wav.abs().max().item()) if wav.numel() else 0.0
-        if wav.numel() == 0 or not torch.isfinite(wav).all() or peak < 1e-4:
-            raise BarkSilentOutputError(
-                "bark returned unusable audio for preset %r (samples=%d, "
-                "peak=%.2e, finite=%s): a silent-but-nonempty clip would "
-                "pack, sequence and PUBLISH as a structurally valid line, "
-                "so it is rejected at the engine instead. Re-run the line; "
-                "never remap the preset." % (
-                    voice_preset, int(wav.numel()), peak,
-                    bool(torch.isfinite(wav).all())))
-        return {"waveform": wav, "sample_rate": int(sr)}
+        # THE OUTPUT GUARD (PBUG-20260902-03, 2026-09-12), ONE ORDERED CONTRACT
+        # per take: (1) unusable audio -- empty, non-finite, or below the
+        # sequencer's silence floor -- is not a candidate and is not scored;
+        # (2) a usable take is scored for speech shape and returned the moment
+        # it passes; (3) a usable take that does not pass is kept as a
+        # candidate and the line is re-rolled on a domain-separated seed, at
+        # most BARK_REROLLS_MAX times; (4) when every take is spent, the
+        # best-scoring usable take ships (the ledger field is always filled --
+        # a hole is never the answer); (5) only when NO take was usable does
+        # the silent-output error below raise, exactly as it did before the
+        # guard existed. Every re-roll logs at WARNING with the score. The
+        # ladder is a pure function of the line seed, so a replay walks it to
+        # the same winner.
+        base_seed = seed
+        best_wav = None
+        best_score = -1.0
+        best_seed = None
+        best_sr = None
+        last_unusable = None
+        last_error = None
+        for attempt in range(1 + BARK_REROLLS_MAX):
+            seed = bark_reroll_seed(base_seed, attempt)
+            try:
+                audio_np, sr = _generate_single_line(
+                    text, voice_preset, model, processor, is_first_line=is_first,
+                    semantic_temp=semantic_temp, coarse_temp=coarse_temp,
+                    fine_temp=fine_temp,
+                    inject_first_line_anchor=inject_first_line_anchor,
+                    speech_only=speech_only,
+                    # B2: thread the EXISTING per-line seed (was dropped before)
+                    # so the clip is reproducible (Bark.generate is unseeded
+                    # otherwise). On a re-roll `seed` is the ladder's next rung.
+                    seed=seed,
+                )
+            except Exception as exc:  # noqa: BLE001 -- a thrown attempt is an
+                # UNUSABLE TAKE, NOT A LOST LINE (Sonnet QA, 2026-09-12). Before
+                # the guard, one failed generation meant one failed line and
+                # there was nothing banked to lose. Now a transient error on
+                # attempt 2 must not discard a usable take from attempt 1 --
+                # "the ledger field is always filled" has to survive it. The
+                # error is re-raised below only if NOTHING was usable, so a
+                # genuinely broken engine still fails loudly on the first line.
+                last_error = exc
+                log.warning(
+                    "[OTR.bark] preset %s attempt %d/%d raised (%s: %s); "
+                    "treating it as an unusable take",
+                    voice_preset, attempt + 1, 1 + BARK_REROLLS_MAX,
+                    type(exc).__name__, str(exc)[:200])
+                continue
+            wav = torch.from_numpy(
+                np.asarray(audio_np, dtype=np.float32)
+            ).reshape(1, 1, -1)
+            # THE OUTPUT GATE (2026-08-28, C2 verdict after adversarial review).
+            # Every downstream contract -- packing, sequencing, enhance,
+            # mastering, mux, obs_publish -- checks shape, duration, rate and
+            # hash, and NOT ONE checks that the audio is audible. 1e-4 is
+            # ALIGNED WITH EXISTING SILENCE SEMANTICS: the exact threshold
+            # scene_sequencer._trim_trailing_silence uses to call a sample
+            # silent (~-80 dBFS). NO remap, NO generalisation to other
+            # engines. A silent take is not a candidate for the guard below.
+            peak = float(wav.abs().max().item()) if wav.numel() else 0.0
+            finite = bool(torch.isfinite(wav).all()) if wav.numel() else False
+            if wav.numel() == 0 or not finite or peak < 1e-4:
+                last_unusable = (int(wav.numel()), peak, finite)
+                log.warning(
+                    "[OTR.bark] preset %s attempt %d/%d: unusable audio "
+                    "(samples=%d, peak=%.2e, finite=%s); not a candidate",
+                    voice_preset, attempt + 1, 1 + BARK_REROLLS_MAX,
+                    int(wav.numel()), peak, finite)
+                continue
+            score = float(speech_shape_score(audio_np, sr))
+            if score >= SPEECH_SHAPE_PASS:
+                if attempt:
+                    log.warning(
+                        "[OTR.bark] preset %s: re-roll %d passed the speech-shape "
+                        "guard (score %.2f, seed %d)",
+                        voice_preset, attempt, score, seed)
+                return {"waveform": wav, "sample_rate": int(sr)}
+            if score > best_score:
+                # `best_sr` rides with the take it belongs to; reading `sr`
+                # from the last iteration would mislabel the shipped audio
+                # the day anything reloads the model mid-ladder (Sonnet QA).
+                best_wav, best_score, best_seed, best_sr = wav, score, seed, sr
+            log.warning(
+                "[OTR.bark] preset %s attempt %d/%d: take is not shaped like "
+                "speech (score %.2f < %.2f, seed %d) -- %s",
+                voice_preset, attempt + 1, 1 + BARK_REROLLS_MAX, score,
+                SPEECH_SHAPE_PASS, seed,
+                "re-rolling" if attempt < BARK_REROLLS_MAX else "keeping the best take")
+        if best_wav is not None:
+            log.warning(
+                "[OTR.bark] preset %s: every take failed the speech-shape guard; "
+                "shipping the best of %d (score %.2f, seed %d). The ledger field "
+                "is filled; listen to this line.",
+                voice_preset, 1 + BARK_REROLLS_MAX, best_score, best_seed)
+            return {"waveform": best_wav, "sample_rate": int(best_sr)}
+        if last_error is not None and last_unusable is None:
+            # Every attempt threw and none produced audio at all: that is the
+            # engine failing, not the guard rejecting, so the real error is
+            # what the caller must see.
+            raise last_error
+        samples, peak, finite = last_unusable or (0, 0.0, False)
+        raise BarkSilentOutputError(
+            "bark returned unusable audio for preset %r (samples=%d, "
+            "peak=%.2e, finite=%s): a silent-but-nonempty clip would "
+            "pack, sequence and PUBLISH as a structurally valid line, "
+            "so it is rejected at the engine instead. Re-run the line; "
+            "never remap the preset." % (
+                voice_preset, int(samples), peak, finite))

@@ -1,3 +1,120 @@
+## 2026-09-12 (early afternoon) -- SECTIONS 1 AND 2 ARE EMPTY. The coding is done.
+
+**His instruction all morning:** *"keep arcing and coding so we can get to
+testing"*, and *"we aren't going to run full canonical testing until all
+coding is done."* All coding is done. Every ARC row is settled and every CODE
+row is shipped, cut with its reason, or moved to section 3 because only a
+one-word ruling is left. **Section 6 -- freeze one head and turn four machines
+loose on it -- is now the next step rather than the reward.**
+
+**The last two rows, both closed this pass.**
+
+**ROCm recruitment.** The variant half was already built; what was missing was
+everything a stranger needs. Shipped: `ROCM_MISSION_IMPOSSIBLE.md` at the repo
+root (ROCm torch first, ComfyUI, the pack, the weight fetch, the one headless
+command, `--profile otr_amd16_rocm` NOT `--machine amd`, success is an mp4 in
+`otr/obs/`, and the exact payload to send back win or lose), a hero still at
+`docs/images/rocm_mission_hero.jpg` pulled from a published episode, and two
+drafts of the post itself in `docs/rocm-recruitment-post-draft.md`. **Posting
+is his and only his**; the row moved to section 3 saying so. Both AMD profiles
+were read engine by engine and confirmed pure PyTorch -- no sageattention,
+flash-attn, bitsandbytes, fp8, or CUDA-only GGUF -- with `--check` clean, so no
+regeneration was needed on that count.
+
+**A README claim that would have cost the tester an hour.** The README said
+both AMD profiles select `viz_mxc_mandala` and therefore need `libcairo2-dev`
+plus `pycairo`. They do not: both pin the cairo-free `viz_mxc_cpu`. Worse, the
+launch-recipe generator printed "minimal Linux: libcairo for viz_mandala" into
+**every one of the 93 recipes**, including profiles that cannot use it. The
+line is now emitted only for the four profiles that actually select the engine,
+and the README says what the JSONs say. A ROCm tester would have hit a
+compile-from-source dependency for an engine their profile never touches, on
+step two of a document written to remove exactly that kind of friction.
+
+**The unruled catch-all is now seven named questions.** Section 3's last bullet
+pointed at a 2026-09-01 list that had been compressed away to nothing. Traced
+through the archive and the commits: six of its sub-questions are already
+ruled and were dropped with their citations; seven are genuinely live and each
+is now its own bullet that a word settles -- the scene-coherence check, ghost
+names, `media_archive`'s scaffold, the three refusing Gutenberg works, the
+style-tail token, a 24 GB machine class, and the Bible fan-out on this week's
+seven live-verified fixes. The older "awaiting fan-out" strings in the bug log
+are stale status text, not work: their promotions already exist in the Bible.
+
+## 2026-09-12 (early afternoon) -- bark stops shipping audio that is not speech
+
+**Rows:** section 2, "Bark output guard" (the row the 2.4 voice/credits arc
+became) and "Four tests fail in isolation". Both leave the plan.
+
+**The guard.** PBUG-20260902-03 was STATUS FIX-OPEN: bark's semantic stage
+derails on some rolls into a noise floor and a steady tone, and nothing
+downstream checks that a loud, finite, structurally valid take is speech --
+the record calls the missing guard *"a silent wrong render"*.
+`BarkEngine.generate_voice` now scores each usable take and re-rolls a
+failing one on a domain-separated seed ladder, at most twice, keeping the
+best usable take; `BarkSilentOutputError` still raises only when no take was
+usable, with its original message contract. Bounded on purpose, which is what
+the operator asked about mid-round: a passing take costs 0.13 s of numpy on a
+30-second clip, a failing line at most three bark generations, and the loop
+is `range(1 + BARK_REROLLS_MAX)` -- never unbounded.
+
+**THE PBUG'S OWN SCORER WAS MEASURED AND REJECTED.** The record specified
+"the fraction of one-second windows whose dominant frequency sits in
+70-400 Hz". Rendered against 32 real bark takes, that scored real speech from
+0.00 to 1.00: a voice whose formants carry the whole-second peak reads as not
+speech, so it would have re-rolled good takes -- expensive on an engine the
+operator describes as taking ages. What separates speech from both documented
+artifacts is PITCH, frame by frame. The shipped scorer takes the first local
+maximum of each 40 ms frame's autocorrelation after it first falls away, and
+asks whether that lag is a speaking pitch. Normal presets now score 0.60-1.00
+(median 1.00); every artifact scores 0.00; the pass line is 0.30.
+
+**Reviewers, and codex earned its keep twice.** r1 on the design: REFUTED,
+seven items -- six grounded and folded (the ordered contract between the
+silence gate and the re-roll loop; `seed + 1` replaced by a domain-separated
+stride; the threshold rebuilt from data), one refuted with evidence (cached
+bark audio cannot bypass the adapter: `use_cache` is False for every local
+profile and no cache directory exists on this box). Then the finished diff:
+**WRONG**, and it was right. Three defects, all mine, all folded:
+
+1. The scorer did not implement the first-peak rule its own docstring
+   claimed -- it took the global maximum of the tail. A voice with a loud
+   second harmonic reads an octave down.
+2. The anchor still carried the refuted first draft as active design text,
+   so the document could not audit the code.
+3. The scorer's absolute silence floor was inconsistent with the engine's
+   peak gate: a quiet-but-usable take scored 0 and would have burned two
+   renders to ship the same audio. The clip is now peak-normalised first --
+   level is the silent gate's business, not the shape scorer's.
+
+Fixing (1) and (3) made the measure sharper, not just correct: the normal
+presets' minimum rose from 0.50 to 0.60 and the median from 0.94 to 1.00.
+
+**THE LIMIT IS STATED, NOT PAPERED OVER.** A voice above 200 Hz whose second
+harmonic is several times louder than its fundamental peaks at half its pitch
+period and reads an octave high. Widening the rule to accept integer
+multiples would cover it and would also admit the 2.6 kHz tone, which is the
+defect the guard exists to catch. So the edge stays, measured across
+95-350 Hz and pinned by a test.
+
+**FOR HIS EAR, and it is a real decision.** `v2/en_speaker_5` scores
+0.00-0.50 where the other three presets score 0.60-1.00, and it IS in the
+shipped cast pool (`config/cast_pools.py:301`) and in the bark profile's
+recommended speakers. Under this guard every `en_speaker_5` line on a bark
+route spends three takes. Its four takes are in
+`output/otr/obs/bark_calibration/` with a README: if they sound like speech
+the preset should be retired or re-weighted, and if they sound broken the
+guard is doing its job on the one preset that needed it. The guard does not
+decide that; he does.
+
+**The isolation row was mis-stated and is now closed.** The three
+lightning-lane tests and the weight-floor test do NOT pass in a full run --
+they are three of the 49 baseline failures. They read this host's real 63 GB
+through `latent_ceiling_for_host` and `unified_memory_budget_mb` while
+asserting against a 16 GB calibration anchor, so they could never pass here.
+Pinned to the anchor, which is the pattern the same file already used three
+times. Four fewer baseline failures.
+
 ## 2026-09-12 (midday) -- the cast-time preflight composes the Ghost kernel the row will
 
 **Row:** section 2, "Cast-time preflight resolves a DIFFERENT Ghost kernel

@@ -922,3 +922,183 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 #   nodes/scene_sequencer.py (inline-Bark fallback)
 #   nodes/story_orchestrator.py (Bark health check + VRAM unload)
 #   tests/test_bark_ledger.py (patch target for _load_bark)
+
+
+# ---------------------------------------------------------------------------
+# THE SPEECH-SHAPE GUARD (PBUG-20260902-03, built 2026-09-12).
+#
+# Bark's semantic stage can derail on any roll into non-speech tokens: the
+# record has a 9-word line that came back as seven seconds of noise floor
+# (dominant bin 0 Hz, flatness 0.47-0.56) and two seconds of a steady tone at
+# 2,524-2,679 Hz (flatness 0.038), with nothing abnormal in the log. That is
+# the silent wrong render the standing rule licenses a guard against. This
+# scorer says whether a take is SHAPED like speech; eng_bark re-rolls a take
+# that is not, a bounded number of times, and keeps the best.
+#
+# WHAT IT MEASURES, and why not the PBUG's first draft. The record proposed
+# "the fraction of one-second windows whose dominant frequency sits in
+# 70-400 Hz". Calibrated on 32 real bark takes across four presets and four
+# deliveries (docs/2026-09-12-bark-output-guard/), that criterion scored
+# real speech anywhere from 0.00 to 1.00 -- a voice whose formants carry the
+# whole-second peak (one preset sat at 400-1,500 Hz on every line) reads as
+# "not speech" -- so it would have re-rolled good takes, which on bark costs
+# real minutes. What separates speech from the two documented artifacts is
+# PITCH: a periodicity in the 70-400 Hz range, frame by frame. A pure tone at
+# 2.5 kHz is periodic too, but its FIRST autocorrelation peak sits at 0.38 ms,
+# far below the 2.5 ms floor, which is exactly how it is convicted; a noise
+# floor has no peak at all and fails on flatness besides.
+#
+# NUMBERS, all from the calibration set: real takes of the three normal
+# presets scored 0.50-1.00 (median 0.94); every synthetic artifact -- pure
+# tone, white noise, noise then tone -- scored 0.00. The pass line sits at
+# 0.30: under every normal take, above every artifact. One preset scored
+# 0.00-0.62; whether it derails or is simply an odd voice is the operator's
+# ear (its takes are in obs), and either way the guard re-rolls it at most
+# twice per line.
+# ---------------------------------------------------------------------------
+
+#: Pitch range a human speaking voice can sit in, for the frame test.
+_SPEECH_F0_HZ = (70.0, 400.0)
+#: Analysis frame and hop for the pitch test.
+_SPEECH_FRAME_S = 0.040
+_SPEECH_HOP_S = 0.020
+#: Normalised autocorrelation a frame's first peak must reach to count as
+#: pitched.
+_SPEECH_PITCH_STRENGTH = 0.45
+#: A one-second window is speech-shaped when at least this fraction of its
+#: frames are pitched ...
+_SPEECH_VOICED_FRACTION = 0.30
+#: ... and its 20 Hz-8 kHz spectral flatness is under this (a noise floor
+#: measured 0.47-0.56 on the record; speech sits far below).
+_SPEECH_FLATNESS_MAX = 0.50
+_SPEECH_WINDOW_S = 1.0
+#: A window whose RMS is under this fraction of the CLIP'S OWN PEAK is a
+#: pause, not a verdict, and is left out of the denominator. Relative, not
+#: absolute: the clip is peak-normalised first, so a soft take is judged on
+#: shape instead of being scored 0 for being soft (codex, 2026-09-12). About
+#: -34 dB below the loudest sample, well under any spoken syllable.
+_SPEECH_PAUSE_RMS = 0.02
+#: A take PASSES the guard at this score or above (see the numbers above).
+SPEECH_SHAPE_PASS = 0.30
+#: How many EXTRA takes the guard may spend on one line. Bounded on purpose:
+#: a bark line costs tens of seconds, so a failing line costs at most three.
+BARK_REROLLS_MAX = 2
+#: A large odd stride, not `seed + 1`: engine seeds are 63-bit hashes and
+#: adjacent integers are not reserved, so a retry seed is pushed far away.
+_BARK_REROLL_STRIDE = 0x9E3779B97F4A7C15
+_BARK_SEED_MASK = 0x7FFFFFFFFFFFFFFF
+
+
+def bark_reroll_seed(seed, attempt):
+    """The seed for re-roll ``attempt`` (0 is the original line seed).
+    Deterministic, so a replay walks the same ladder to the same winner."""
+    if attempt <= 0:
+        return int(seed)
+    return (int(seed) + int(attempt) * _BARK_REROLL_STRIDE) & _BARK_SEED_MASK
+
+
+def _spectral_flatness(window, sample_rate):
+    p = np.abs(np.fft.rfft(window * np.hanning(window.size))) ** 2
+    freqs = np.fft.rfftfreq(window.size, 1.0 / sample_rate)
+    band = p[(freqs >= 20.0) & (freqs <= 8000.0)]
+    pos = band[band > 0]
+    if pos.size == 0:
+        return 1.0
+    return float(np.exp(np.mean(np.log(pos))) / np.mean(pos))
+
+
+def _pitched_fraction(window, sample_rate):
+    """Fraction of 40 ms frames whose FIRST autocorrelation peak after the
+    first dip is strong and sits at a lag in the speaking-pitch range.
+
+    THE FIRST LOCAL MAXIMUM, NOT THE STRONGEST ONE (codex, finished-diff
+    review 2026-09-12). A voice with a strong second harmonic correlates
+    even better at twice its pitch period, so taking the global maximum of
+    the tail reads a 200 Hz voice as a 100 Hz one -- still in range here,
+    but the same reasoning at the range edge demotes real speech. The first
+    local maximum after the correlation first falls away IS the pitch
+    period, which is the whole reason a 2.6 kHz tone fails: its first peak
+    sits at 0.38 ms, far below the 2.5 ms floor.
+
+    THE LIMIT, MEASURED AND STATED RATHER THAN PAPERED OVER. When a voice's
+    SECOND harmonic is several times louder than its fundamental, the first
+    peak lands at HALF the pitch period. Below 200 Hz that half-period is
+    still inside the range and the voice passes; above it, the voice reads
+    an octave high and scores zero. Measured 2026-09-12 across 95-350 Hz:
+    every balance passes up to 200 Hz, and only the second-harmonic-dominant
+    shape fails above it. Accepting integer multiples of the first peak
+    would cover that case and would also let a 2.6 kHz tone through (its
+    9-sample period times seven lands squarely in the speaking range),
+    which is the defect this guard exists to catch. So the edge stays: such
+    a line costs up to three takes and never costs the take. Every bark
+    preset measured that day sits at 95-250 Hz on a normal balance.
+    """
+    n = int(sample_rate * _SPEECH_FRAME_S)
+    hop = max(1, int(sample_rate * _SPEECH_HOP_S))
+    lag_lo = int(sample_rate / _SPEECH_F0_HZ[1])
+    lag_hi = int(sample_rate / _SPEECH_F0_HZ[0])
+    if n <= 0 or window.size < n or lag_hi >= n:
+        return 0.0
+    frames = pitched = 0
+    for start in range(0, window.size - n + 1, hop):
+        f = window[start:start + n]
+        f = f - f.mean()
+        energy = float(np.dot(f, f))
+        if energy < 1e-9:
+            continue
+        frames += 1
+        ac = np.correlate(f, f, mode="full")[n - 1:] / energy
+        # Search no further than the lowest pitch we accept; a peak beyond
+        # that is not a speaking voice whatever its strength.
+        search = ac[:lag_hi + 2]
+        below = np.where(search[1:] < _SPEECH_PITCH_STRENGTH)[0]
+        if below.size == 0:
+            continue                          # never dips: DC-like, a hum
+        first_dip = int(below[0]) + 1
+        peak_lag = -1
+        for k in range(first_dip + 1, min(lag_hi, search.size - 2) + 1):
+            if (search[k] > _SPEECH_PITCH_STRENGTH
+                    and search[k] >= search[k - 1] and search[k] >= search[k + 1]):
+                peak_lag = k                  # the FIRST qualifying peak
+                break
+        if lag_lo <= peak_lag <= lag_hi:
+            pitched += 1
+    return (pitched / frames) if frames else 0.0
+
+
+def speech_shape_score(audio, sample_rate):
+    """0.0-1.0: the fraction of non-silent one-second windows that are shaped
+    like speech (pitched in 70-400 Hz, not a noise floor). 0.0 when nothing
+    in the clip is loud enough to judge. Deterministic, numpy-only,
+    CPU-testable; a few milliseconds a line.
+
+    LEVEL IS NOT THIS FUNCTION'S BUSINESS (codex, finished-diff review
+    2026-09-12). The clip is normalised to unit peak before anything is
+    measured, so a quiet-but-usable take -- one that clears the engine's
+    1e-4 peak gate but whose RMS sits under a fixed floor -- is judged on
+    its SHAPE rather than scored 0 and re-rolled twice for being soft. The
+    pause floor below is therefore relative to this clip's own peak, and
+    every other measure here (normalised autocorrelation, spectral flatness)
+    is already scale-free.
+    """
+    x = np.asarray(audio, dtype=np.float64)
+    if x.ndim > 1:
+        x = x.reshape(-1)
+    sr = int(sample_rate)
+    n = int(sr * _SPEECH_WINDOW_S)
+    if sr <= 0 or n <= 0 or x.size < n:
+        return 0.0
+    peak = float(np.max(np.abs(x))) if x.size else 0.0
+    if peak <= 0.0:
+        return 0.0
+    x = x / peak
+    judged = shaped = 0
+    for start in range(0, x.size - n + 1, n):
+        w = x[start:start + n]
+        if float(np.sqrt(np.mean(w * w))) < _SPEECH_PAUSE_RMS:
+            continue
+        judged += 1
+        if (_pitched_fraction(w, sr) >= _SPEECH_VOICED_FRACTION
+                and _spectral_flatness(w, sr) < _SPEECH_FLATNESS_MAX):
+            shaped += 1
+    return (shaped / judged) if judged else 0.0

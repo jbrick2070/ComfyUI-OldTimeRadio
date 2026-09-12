@@ -755,10 +755,18 @@ def test_the_ruled_cadence_costs_less_on_every_real_beat(eng, target,
     assert expect_latents < eng._source_request_for(target, 2)
 
 
-def test_it_escalates_only_as_far_as_it_must(eng):
+def test_it_escalates_only_as_far_as_it_must(eng, monkeypatch):
     """Hold rises one step at a time to the FIRST value that fits, never
     straight to the maximum -- every extra step costs unique frames per second
     (12.5 at hold 2, 8.3 at 3, 6.25 at 4, 5.0 at 5)."""
+    # PINNED TO THE CALIBRATION HOST (2026-09-12). `_beat_hold` asks
+    # `latent_ceiling_for_host`, which reads this box's PHYSICAL RAM; on the
+    # 63 GB reference box the ceiling is ~700 latents and the hold never has
+    # to escalate, so these assertions -- written against the 16 GB anchor --
+    # failed here in every run. The escalation LOGIC is the thing under test.
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host",
+                        lambda *a, **k: mc.GHOST_ANCHOR_SAFE_LATENTS)
     assert eng._beat_hold(400) == 3
     assert eng._beat_hold(600) == 5
 
@@ -873,11 +881,19 @@ def test_the_receipt_names_the_cadence_that_actually_ran(eng):
     assert receipts["native_frame_count"] == 320, "delivered count is UNCHANGED"
 
 
-def test_hold_is_resolved_per_beat_and_not_stored_on_the_instance(eng):
+def test_hold_is_resolved_per_beat_and_not_stored_on_the_instance(eng, monkeypatch):
     """The registry keeps ONE shared instance per engine for the whole process,
     so a hold cached on `self` would leak from one beat to the next. And driving
     this from the existing `OTR_GHOST_HOLD_FACTOR` env knob would re-cadence
     every sibling that shares this base -- which is why it does not."""
+    # PINNED TO THE CALIBRATION HOST (2026-09-12). `_beat_hold` asks
+    # `latent_ceiling_for_host`, which reads this box's PHYSICAL RAM; on the
+    # 63 GB reference box the ceiling is ~700 latents and the hold never has
+    # to escalate, so these assertions -- written against the 16 GB anchor --
+    # failed here in every run. The escalation LOGIC is the thing under test.
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host",
+                        lambda *a, **k: mc.GHOST_ANCHOR_SAFE_LATENTS)
     before = eng.hold_factor
     assert eng._beat_hold(500) == 4, "escalates past the ruled default"
     assert eng.hold_factor == before == 3, "the instance must not be mutated"
@@ -998,10 +1014,18 @@ def test_two_different_cfgs_really_do_produce_different_cache_keys(eng,
     assert any("negative_effective=True" in str(p) for p in b)
 
 
-def test_two_different_holds_really_do_produce_different_cache_keys(eng):
+def test_two_different_holds_really_do_produce_different_cache_keys(eng, monkeypatch):
     """Same point for the hold. A 320-frame beat resolves to hold 3 and a
     250-frame beat to hold 2, and their keys must differ by more than the shot
     id -- the hold token has to actually be in there."""
+    # PINNED TO THE CALIBRATION HOST (2026-09-12). `_beat_hold` asks
+    # `latent_ceiling_for_host`, which reads this box's PHYSICAL RAM; on the
+    # 63 GB reference box the ceiling is ~700 latents and the hold never has
+    # to escalate, so these assertions -- written against the 16 GB anchor --
+    # failed here in every run. The escalation LOGIC is the thing under test.
+    from nodes._otr_video_engines import motion_common as mc
+    monkeypatch.setattr(mc, "latent_ceiling_for_host",
+                        lambda *a, **k: mc.GHOST_ANCHOR_SAFE_LATENTS)
     base = {"shot_id": "same", "text_prompt": "x", "negative_prompt": "y",
             "seed_bundle": {"request_seed": 42}}
     short = eng.shot_cache_identity(dict(base, timing={"target_frame_count": 250}))
