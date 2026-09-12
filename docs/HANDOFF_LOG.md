@@ -1,3 +1,83 @@
+## 2026-09-12 (morning) -- the plan becomes only the work, in the order it gets done
+
+**His instruction:** *"the go-forward plan should only be what needs to be done,
+and once clean, optimize it for coding and arcs, and THEN testing."*
+
+**Shipped:** `c900aada`. The file is now ARC (settle it) -> CODE (build it) ->
+TEST (qualify it last) -> blocked on the operator. Qualification coverage used
+to sit ABOVE the coding it gates, which is backwards from how the work is done.
+Nine forks, seven builds, six coverages, eight one-word rulings, and no
+receipts.
+
+**THE FIND THAT JUSTIFIED THE PASS.** The music fix reaches only this machine.
+`resolve_ckpt()` prefers `stable_audio_3_small_music_base.safetensors` because
+that is the only file where cfg and the negative prompt do anything -- but all
+three provisioning paths still name the post-trained one
+(`_otr_visual_assets.py:37`, `scripts/otr_fetch_lane_weights.py:398`,
+`config/profiles/otr_runpod_starter.json:84`). A fresh install downloads the
+post-trained file, the resolver falls through to it, guidance drops to 1.0, the
+negative goes inert, and the box silently renders the exact configuration
+PBUG-20260912-03 was written to escape. The base file is in the same HF repo at
+the same byte count (2,270,384,940 B, verified against the live listing), so the
+fix is one word at three sites. That path is licence-load-bearing: an install
+that cannot fetch SA3 falls back to musicgen, which is CC-BY-NC. Filed as the
+first CODE row; NOT fixed in this commit, because it is a provisioning change
+that deserves its own diff and its own leg.
+
+**THE LOOP QUESTION SPLIT IN TWO AND NOBODY NOTICED.** Since the genres shipped,
+`negative_for()` gives the four declared banks the rhythm-friendly negative on
+purpose, so the anti-loop wording now guards only Shakespeare and an undeclared
+bank -- and it became a live lever at all only when the base checkpoint was
+preferred. **The original loop complaint has therefore never actually been
+tested.** The sustained lane and the genre lane are now separate rows and
+separate listens.
+
+**MEASURED RATHER THAN CARRIED FORWARD.** The plan had claimed "51 OTR failures"
+since 2026-09-11 and the number appeared nowhere else on disk. A full run says
+**49 failed of 15,383 collected**, this box, normal checkout. Better than the
+number: `tests/conftest.py:184` sets `EXPECTED_FAILED_NODEIDS = frozenset()`, an
+empty baseline, so the known-fail guard reports every one of the 49 as a new
+regression and cannot distinguish an inherited failure from a fresh break. That
+is now what the regression-debt row says.
+
+**WHAT THE PAGE WAS TELLING US THAT WAS FALSE.** The IP-Adapter question
+described five AnimateDiff SD1.5 lanes running low cfg; three are registered
+(plain v2/v3 are tombstoned in `RETIRED_ENGINE_IDS`) and the recipe runs
+`GHOST_CFG = 8.0` with a live negative, which is precisely why AnimateLCM was
+refused -- so the question was being asked from a wrong picture of the pack. The
+Ghost CUDA row quoted a Half B log line that does not exist (the real one is
+`eligible=N submitted=N admitted=N candidates=N`). The ROCm row asked for a
+variant already built as `otr_amd16_rocm` / `otr_amd8_rocm`. *"fastwan_8gb
+appears nowhere on disk"* is disproved by one grep -- it is the ENGINE id; only
+the PROFILE id claim was true. Four citations had drifted.
+
+**REVIEWERS, and the lesson is about review DESIGN.** A 77-agent Sonnet
+workflow: five readers over the plan from different angles, then 72 adversarial
+verifiers, one per proposed edit, each briefed to refute and to default to
+refuted. 29 of 72 findings survived. Then codex as the finished-diff contrarian.
+
+**Codex found two things the 72 verifiers structurally could not: work LOST in
+the cleanup.** Each verifier was handed one proposed edit and asked whether it
+was justified; not one of them was looking at what had quietly vanished between
+the old file and the new. Both restored -- the `kernel_source` distribution and
+ranked-tier lift against the deterministic 26.3% ceiling on the forced-Ghost
+leg, and the canonical-path qualification leg the routing/canvas row is gated
+on. **A per-item verifier fan-out audits additions. Only a reader diffing the
+whole before against the whole after audits deletions.** Any future rewrite pass
+gets both.
+
+**Also fixed:** the `_sa3_clip_window` docstring still asserted that cue
+PLACEMENT works, forty lines below the constant recording that it never has.
+And the `otr-handoff` skill -- which is what boots the next window -- was
+sending it to read a MODEL & CREDIT BUDGET ladder, a Window packing table and a
+REVIEW ROUTING block, none of which have existed in the plan for weeks. It now
+describes the ARC -> CODE -> TEST shape and points at CLAUDE.md for routing.
+(That file lives at `~/.claude/skills/otr-handoff/SKILL.md`, outside the repo,
+so it is not in the commit.)
+
+**Suite:** 49 failed / 15,383 collected. **Box:** no server resident; no renders
+this session.
+
 ## 2026-09-12 (dawn) -- a genre per bank, and a build-breaker the legs caught
 
 **His instruction:** *"sci-fi news is Detroit techno, media archive will be jazz
