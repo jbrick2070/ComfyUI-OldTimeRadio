@@ -141,6 +141,53 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   real unconditional conditioning, which is the documented reason an AnimateLCM
   checkpoint was refused once before.
 
+* **KNOWN ISSUE, PARKED FOR AFTER RELEASE: music cues are a lottery, and the
+  prompt is not the lever.** He reported two on 2026-09-12 -- a closing cue that
+  "is like 2 seconds" and an opening that is "just house chords no rhythm,
+  maybe one slight beat". Both are real. A 19-agent panel settled the cause and
+  the answer is the same for both: **an under-constrained prompt hands the
+  outcome to the seed.** Recorded here so nobody pays for this analysis twice.
+
+  **The driver's first framing was WRONG and the panel corrected it.** It read
+  four bad closings, all on the authored `scifi_news_pro` lane, and concluded
+  "authored rows are broken". There are SIX authored closings on disk and the
+  sample omitted the two that render at 100%. Worse, within the authored group
+  the supposed cause runs BACKWARDS: 20 chars -> 100%, 27 -> 100%, 25 -> 48%,
+  45 -> 65%, 45 -> 77%, 48 -> 35%. "Soft, contemplative piano" (48%) and "A
+  soft, somber piano melody" (100%) are near-identical asks with opposite
+  outcomes. And the complained episode's OWN opening is also authored
+  ("Detroit techno, 128 BPM", no arc, no tail) and renders at 94% -- a control
+  inside the very episode that kills the missing-arc theory.
+
+  **What the panel PROVED cannot be the cause**, each grounded in the file:
+  * There is NO length-to-duration coupling anywhere.
+    `eng_stable_audio_3.py:209` computes `seconds_total = max(context_s,
+    dur * 3.0)` with no prompt term; `:392` builds the latent from `dur` alone;
+    sampler, scheduler, steps and denoise are env constants at `:378-385`.
+  * A short prompt cannot shorten any tensor. `model_base.py:895-902` pads
+    cross-attention to a fixed 256 slots plus the seconds token, all attended.
+  * The one prompt-derived path, `_sa3_clip_window`'s "outro"/"opening" text
+    fallback, is dead TWICE: `stable_audio_theme.py:331` always passes a real
+    placement, and `StableAudio3` never reads `seconds_start` at all -- the
+    receipt itself records `seconds_start_read_by_model: false`.
+  * Post-processing is clean: `_ceiling_the_cue` is a peak limiter at -1.0
+    dBFS, no fade, and the receipts show peak -1.03 / -1.00.
+
+  **The real shape:** composed closings measure 71-100%, mean ~96%, because a
+  composed row names instruments, mood, an idiom carrying a BPM, an arc and the
+  tail, leaving the sampler almost nothing to choose. Authored closings measure
+  35-100%, mean ~71% -- the same distribution with a much worse floor. It is a
+  VARIANCE difference, not a deterministic one.
+
+  **THE CHEAP TEST, already designed, ~6 minutes, no episode leg.** Call
+  `generate_clip` directly on the exact shipped closing spec at 8 seeds and
+  measure audible fraction. A 35-100% spread on one text confirms seed noise
+  and closes it; a tight cluster near 35% means the text IS deterministic and
+  the hunt moves to arm B (same text plus the arc and tail).
+
+  **NOT RUN, on his instruction:** *"I don't want to spend any more time chasing
+  before release."* This row is for after.
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
