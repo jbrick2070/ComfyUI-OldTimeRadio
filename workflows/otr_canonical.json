@@ -1561,6 +1561,15 @@
             "name": "engine"
           },
           "link": null
+        },
+        {
+          "localized_name": "music_style",
+          "name": "music_style",
+          "type": "STRING",
+          "widget": {
+            "name": "music_style"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -1602,7 +1611,8 @@
         "Node name for S&R": "OTR_StableAudioTheme"
       },
       "widgets_values": [
-        "stable_audio_3"
+        "stable_audio_3",
+        ""
       ],
       "color": "#234035",
       "bgcolor": "#162821"

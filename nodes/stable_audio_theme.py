@@ -119,6 +119,22 @@ class StableAudioTheme:
                         "here to force this node to run after it."
                     ),
                 }),
+                # APPENDED AT THE END ON PURPOSE (CLAUDE.md section 0):
+                # `widgets_values` is positional, so a new widget may only
+                # ever be added last or every saved graph silently shifts.
+                "music_style": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "tooltip": (
+                        "Your own music, in your own words -- 'gamelan "
+                        "orchestra', 'surf rock', 'solo cello'. Blank uses "
+                        "the source bank's genre: sci-fi news is Detroit "
+                        "techno, media archive a jazz quartet, original "
+                        "salsa, public domain Chicago house, Shakespeare an "
+                        "Elizabethan consort. Applies to every cue in the "
+                        "episode."
+                    ),
+                }),
             },
         }
 
@@ -130,7 +146,7 @@ class StableAudioTheme:
 
     # ------------------------------------------------------------------ #
     def generate(self, script_json, engine, ledger_json="", gate_in="",
-                 stereo_policy="mono_safe"):
+                 music_style="", stereo_policy="mono_safe"):
         # CANONICAL REPLAY (campaign item 0): the cues are inside the frozen
         # master; no music model loads. The manifest is "" on purpose -- node 7
         # takes its replay branch BEFORE the cue-pair check.
@@ -171,7 +187,7 @@ class StableAudioTheme:
 
             if interface == "clip":
                 cue_rows, sr, lines = self._render_clips(
-                    adapter, engine, script_json, ledger_json,
+                    adapter, engine, script_json, ledger_json, music_style,
                 )
                 render_log.extend(lines)
             else:
@@ -254,7 +270,8 @@ class StableAudioTheme:
         return (cue_audio, manifest_json, "\n".join(render_log), done)
 
     # ------------------------------------------------------------------ #
-    def _render_clips(self, adapter, engine, script_json, ledger_json):
+    def _render_clips(self, adapter, engine, script_json, ledger_json,
+                      music_style=""):
         """Render every cue for this episode into raw clips + metadata.
 
         scifi_news_pro lane: one clip per authored ``ledger.music[]`` row (each carries
@@ -277,6 +294,12 @@ class StableAudioTheme:
 
         led = self._load_ledger(ledger_json, script_json)
         meta = (led.get("meta") or {}) if isinstance(led, dict) else {}
+        # THE TYPED STYLE RIDES ON META so it reaches `story_palette` by the one
+        # route every composer already uses, rather than a second argument
+        # threaded through four call sites. Blank changes nothing, which is the
+        # widget's default and means "use the bank's genre".
+        if str(music_style or "").strip():
+            meta = dict(meta, music_style=str(music_style).strip())
         music_rows = (led.get("music") or []) if isinstance(led, dict) else []
         ledger_lines = (led.get("lines") or []) if isinstance(led, dict) else []
         music_seed_base = _seed_to_int64(

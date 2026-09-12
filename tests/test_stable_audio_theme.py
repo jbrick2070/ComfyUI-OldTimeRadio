@@ -80,7 +80,13 @@ def test_input_types_widget_vector_exact():
     assert "gate_in" in it.get("optional", {})
     # stereo_policy surface removed 2026-07-04 (widget-audit Batch 1); single
     # option "mono_safe" -- the generate() kwarg still defaults to "mono_safe".
-    assert _serialized_slots(it) == ["engine"]
+    # THE WIDGET VECTOR, AND ITS ORDER IS THE CONTRACT. `widgets_values` in
+    # every saved graph is positional, so `music_style` is APPENDED LAST and
+    # may never move: inserting a widget ahead of another shifts every saved
+    # value in the canonical workflow and all 93 variants at once, silently
+    # (BUG-LOCAL-097, and the 2026-08-28 incident that corrupted 63 graphs).
+    # Added 2026-09-12 for "only my story allows an original music prompt".
+    assert _serialized_slots(it) == ["engine", "music_style"]
     # 720-bakeoff C3: the 3-AUDIO opening/closing/interstitial surface is
     # retired -- ONE cue batch + manifest + render_log + done.
     assert T.RETURN_NAMES == (

@@ -119,6 +119,27 @@ _MOOD_TAGS: dict[str, str] = {
 }
 
 
+#: THE NEGATIVE FOR A BANK WHOSE GENRE HAS A BEAT (operator, 2026-09-12).
+#: What is still a defect in any music stays: noise, hiss, static, crackle,
+#: distortion, clipping and anyone singing. What goes is the entire
+#: anti-rhythm half, because on a techno, house or salsa bank those words
+#: describe the brief. Carrying the underscore's negative onto a dance
+#: floor is the same self-cancelling request that cost this project a
+#: night: a cue that asked for "raw distorted TR-909" while the negative
+#: banned distortion, and tore every time.
+NEGATIVE_PROMPT_RHYTHMIC = (
+    "noise, static, hiss, white noise, radio static, crackle, distortion, "
+    "clipping, silence, speech, vocals, singing, lyrics, spoken word, "
+    "out of tune, sloppy timing, muddy mix"
+)
+
+
+def negative_for(palette) -> str:
+    """The negative prompt this ensemble should hear."""
+    return (NEGATIVE_PROMPT_RHYTHMIC if getattr(palette, "rhythmic", False)
+            else NEGATIVE_PROMPT_DEFAULT)
+
+
 def _mood_suffix(script_brief: str) -> str:
     """Mine mood tags from the news script_brief. Returns a comma-prefixed
     suffix (e.g. ', minor mode, unresolved tension') or '' if nothing matches."""
@@ -186,15 +207,24 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     palette = story_palette(meta)
 
     parts: list[str] = []
-    # The brief's own words first (story relevance a reader can check), then
-    # the musical devices those words call for, then the period idiom.
+    # The brief's own words first (story relevance a reader can check).
     parts.append(", ".join(mood_terms) if mood_terms else "atmospheric")
-    parts.extend(mood_devices(mood_terms))
-    # The ONLY musical-time information the model gets: duration is a
-    # separate return value and never reaches the text, so without this the
-    # model chooses its own pace and at this length it chooses a loop.
-    parts.append(tempo_phrase(mood_terms))
-    parts.append(palette.idiom)
+    if palette.rhythmic:
+        # THE GENRE IS THE MUSICAL INSTRUCTION on a bank that has one, and
+        # the orchestral devices and the anti-rhythm tempo phrase would
+        # both argue with it -- "slow tempo, sustained and taut, no rubato"
+        # is a fine thing to tell a string section and a contradiction to
+        # tell a drum machine. The idiom carries the BPM instead, which is
+        # the one musical-time fact the model answers accurately.
+        parts.append(palette.idiom)
+    else:
+        parts.extend(mood_devices(mood_terms))
+        # The ONLY musical-time information the model gets: duration is a
+        # separate return value and never reaches the text, so without this
+        # the model chooses its own pace, and at this length it chooses a
+        # loop.
+        parts.append(tempo_phrase(mood_terms))
+        parts.append(palette.idiom)
     if setting_str:
         parts.append(f"evokes {setting_str}")
     parts.append(_CUE_CHARACTER[cue_id])
@@ -231,5 +261,6 @@ def compose_engine_prompt(meta: dict, row_text: str) -> EnginePrompt:
                                     budget - len(_PROMPT_TAIL)) + _PROMPT_TAIL)
         else:
             body = _trim_at_clause(body, budget)
-    return EnginePrompt(text=(head + body).strip(), negative=NEGATIVE_PROMPT_DEFAULT,
+    return EnginePrompt(text=(head + body).strip(),
+                        negative=negative_for(palette),
                         palette_key=palette.key)

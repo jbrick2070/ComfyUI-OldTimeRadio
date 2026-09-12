@@ -49,10 +49,20 @@ from dataclasses import dataclass
 class Palette:
     """A named ensemble: ``key`` is the stable receipt label, ``instruments``
     the comma list the ENGINE hears first, ``idiom`` the period phrase the ROW
-    text carries so a reader of the ledger knows what was asked for."""
+    text carries so a reader of the ledger knows what was asked for.
+
+    ``rhythmic`` says this ensemble IS its groove -- techno, house, salsa, a
+    jazz quartet with a drummer. It switches three things that the rest of
+    this module gets right only for sustained underscore: the rhythm section
+    leads the prompt instead of being pushed behind the strings, the cue
+    receives a negative prompt that does not forbid its own genre, and the
+    BANK beats the period band so a public-domain story from 1890 still gets
+    the house music it was promised rather than a string quartet.
+    """
     key: str
     instruments: str
     idiom: str
+    rhythmic: bool = False
 
 
 #: The house sound of the show: a 1940s radio-drama pit orchestra.
@@ -88,6 +98,43 @@ SCIFI_ORCHESTRA = Palette(
     "1950s science-fiction radio orchestra",
 )
 
+#: THE PER-BANK GENRES (operator, 2026-09-12). Each leads with the thing
+#: that actually defines it -- the drum machine, the congas, the rhythm
+#: section -- because for these the groove is the subject and not the
+#: backing. That is the opposite of the rule above, and the `rhythmic` flag
+#: is what makes the difference explicit instead of accidental.
+#:
+#: The tempo is named in the idiom because a text-to-audio model answers a
+#: BPM number accurately: measured 2026-09-12 over five renders, prompts
+#: written at 124-135 BPM came back at 125.0, 125.0, 127.7, 130.4 and 133.3.
+DETROIT_TECHNO = Palette(
+    "detroit_techno",
+    "Roland TR-909 drum machine, deep analog sub bass, detuned synth stabs, "
+    "warm Juno pads",
+    "Detroit techno at 128 BPM, hypnotic machine funk",
+    rhythmic=True,
+)
+JAZZ_QUARTET = Palette(
+    "jazz_quartet",
+    "brushed drums, walking upright bass, piano comping, tenor saxophone",
+    "small-group jazz quartet, relaxed swing",
+    rhythmic=True,
+)
+SALSA_CONJUNTO = Palette(
+    "salsa_conjunto",
+    "congas and timbales, piano montuno, upright bass tumbao, bright brass "
+    "section",
+    "salsa conjunto at 100 BPM, clave-driven",
+    rhythmic=True,
+)
+CHICAGO_HOUSE = Palette(
+    "chicago_house",
+    "Roland TR-707 drum machine, rolling bass line, warm piano chords, "
+    "soft string pads",
+    "Chicago house at 122 BPM, soulful and steady",
+    rhythmic=True,
+)
+
 #: Period bands by the source's year: (exclusive upper bound, palette).
 _PERIOD_BANDS = (
     (1650, EARLY_CONSORT),
@@ -101,7 +148,10 @@ _MODERN_PALETTE = ELECTRIC_COMBO
 #: A bank with no usable year still has a period of its own.
 _BANK_PALETTES = {
     "shakespeare": EARLY_CONSORT,
-    "scifi_news_pro": SCIFI_ORCHESTRA,
+    "scifi_news_pro": DETROIT_TECHNO,
+    "media_archive": JAZZ_QUARTET,
+    "original": SALSA_CONJUNTO,
+    "public_domain": CHICAGO_HOUSE,
 }
 
 #: The tempo words each device group asks for. TEMPO IS PER GROUP, not per
@@ -246,17 +296,71 @@ def bank_of(meta) -> str:
     return ""
 
 
+#: Words that mean the music has a groove. Used only to decide which
+#: NEGATIVE prompt a typed style receives, and deliberately generous: a
+#: style wrongly treated as rhythmic merely loses the anti-loop wording,
+#: while a rhythmic style wrongly treated as sustained is asked for a beat
+#: and forbidden one in the same breath, which is the failure that tears.
+_RHYTHM_WORDS = re.compile(
+    r"\b(?:techno|house|salsa|jazz|funk|disco|drum|drums|percussion|beat|"
+    r"beats|groove|rhythm|rhythmic|bpm|dance|swing|reggae|ska|hip.?hop|"
+    r"breakbeat|jungle|garage|electro|bossa|samba|mambo|cumbia|afrobeat|"
+    r"march|marching|tango|polka|rock|metal|punk|bluegrass|banjo|"
+    r"tabla|gamelan|taiko|conga|bongo|timbale|snare|kick|808|909|707)\b",
+    re.IGNORECASE)
+
+
+def custom_palette(style_text) -> "Palette | None":
+    """The operator's typed style as a Palette, or ``None`` for a blank.
+
+    The text is used VERBATIM as both the instruments and the idiom -- it is
+    what the person actually wants to hear, and second-guessing it with a
+    keyword table would be a worse instruction than their own words. Total
+    over any input: a non-string, a blank, or whitespace is ``None``.
+    """
+    text = str(style_text or "").strip()
+    if not text:
+        return None
+    text = " ".join(text.split())[:200]
+    return Palette("custom", text, text,
+                   rhythmic=bool(_RHYTHM_WORDS.search(text)))
+
+
 def story_palette(meta) -> Palette:
-    """The ensemble for this story: by the source's year when it has one,
-    else by bank, else the house orchestra. Total over every meta shape."""
+    """The ensemble for this story.
+
+    A DECLARED GENRE BEATS THE PERIOD BAND (operator, 2026-09-12). The banks
+    he named a genre for get it whatever year the source carries, because
+    "public domain is Chicago house" is a statement about the BANK and most
+    public-domain sources are Victorian -- read year-first, every one of them
+    would have come back a string quartet and the instruction would have had
+    no visible effect at all.
+
+    Everything else is unchanged: year first, then bank, then the house
+    orchestra. Total over every meta shape.
+    """
     meta = meta if isinstance(meta, dict) else {}
+    # ONLY MY STORY MAY NAME ITS OWN MUSIC (operator, 2026-09-12: "only
+    # 'my story' allows an original music prompt"). Every other bank has a
+    # fixed musical identity and that is the point of having one -- a
+    # Shakespeare episode scored as surf rock is not a feature, and the sci-fi
+    # news lane being Detroit techno every week is what makes it recognisable.
+    # My Story is the bring-your-own lane, so it is the one that takes a
+    # bring-your-own score, exactly as it already takes an authored prompt.
+    if bank_of(meta) == "my_story":
+        typed = custom_palette(meta.get("music_style"))
+        if typed is not None:
+            return typed
+    declared = _BANK_PALETTES.get(bank_of(meta))
+    if declared is not None and declared.rhythmic:
+        return declared
     year = year_of(meta.get("source_meta"))
     if year is not None:
         for upper_bound, palette in _PERIOD_BANDS:
             if year < upper_bound:
                 return palette
         return _MODERN_PALETTE
-    return _BANK_PALETTES.get(bank_of(meta), HOUSE_PALETTE)
+    return declared if declared is not None else HOUSE_PALETTE
 
 
 def mood_devices(mood_terms, *, limit: int = 2) -> list[str]:

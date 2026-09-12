@@ -37,20 +37,32 @@ def test_the_year_falls_back_to_other_date_fields_and_junk_shapes():
 
 
 @pytest.mark.parametrize("meta,key", [
+    # A DECLARED BANK GENRE BEATS THE PERIOD BAND (operator, 2026-09-12: "sci-fi
+    # news is Detroit techno, media archive will be jazz quartet, original will
+    # be salsa, public domain Chicago house"). Read year-first, every one of
+    # those banks would have come back a period ensemble and the instruction
+    # would have had no audible effect -- most public-domain sources are
+    # Victorian, so "public domain is Chicago house" has to outrank 1897.
+    ({"source_bank": "scifi_news_pro"}, "detroit_techno"),
+    ({"source_bank": "media_archive"}, "jazz_quartet"),
+    ({"source_bank": "original"}, "salsa_conjunto"),
+    ({"source_bank": "public_domain"}, "chicago_house"),
+    ({"source_bank": "public_domain", "source_meta": {"year": 1750}}, "chicago_house"),
+    ({"source_bank": "public_domain", "source_meta": {"year": 1897}}, "chicago_house"),
+    ({"source_bank": "media_archive", "source_meta": {"year": 1948}}, "jazz_quartet"),
+    # Shakespeare keeps its consort: it was never given a genre, so it still
+    # routes by year and then by bank, exactly as before.
     ({"source_bank": "shakespeare", "source_meta": {"year": "c. 1595"}}, "early_consort"),
     ({"source_bank": "shakespeare"}, "early_consort"),
-    ({"source_bank": "public_domain", "source_meta": {"year": 1750}}, "baroque_chamber"),
-    ({"source_bank": "public_domain", "source_meta": {"year": 1897}}, "romantic_chamber"),
-    ({"source_bank": "public_domain", "source_meta": {"year": 1920}}, "radio_orchestra"),
-    ({"source_bank": "public_domain", "source_meta": {"year": 1975}}, "electric_combo"),
-    ({"source_bank": "scifi_news_pro"}, "scifi_orchestra"),
-    ({"source_bank": "original"}, "radio_orchestra"),
-    ({"source_bank": "media_archive"}, "radio_orchestra"),
+    # And so does every bank without a declared genre.
     ({"source_bank": "my_story"}, "radio_orchestra"),
+    ({"source_bank": "my_story", "source_meta": {"year": 1750}}, "baroque_chamber"),
+    ({"source_bank": "my_story", "source_meta": {"year": 1897}}, "romantic_chamber"),
+    ({"source_bank": "my_story", "source_meta": {"year": 1975}}, "electric_combo"),
     ({}, "radio_orchestra"),
-    ({"source_bank": "public_domain", "source_meta": {"year": "unknown"}}, "radio_orchestra"),
+    ({"source_bank": "my_story", "source_meta": {"year": "unknown"}}, "radio_orchestra"),
 ])
-def test_the_palette_follows_the_year_then_the_bank_then_the_house(meta, key):
+def test_the_palette_follows_the_bank_genre_then_the_year_then_the_house(meta, key):
     palette = P.story_palette(meta)
     assert palette.key == key
     assert palette.instruments and palette.idiom
@@ -246,3 +258,64 @@ def test_nothing_in_the_palette_names_the_withdrawn_texture():
     ) + " " + " ".join(d for _p, d, _pace, _t in P._MOOD_DEVICES) + " " + P.DEFAULT_DEVICE
     low = text.lower()
     assert not [w for w in _NOISE_WORDS if w in low], low
+
+
+def test_only_my_story_may_name_its_own_music():
+    """Operator, 2026-09-12: "only 'my story' allows an original music prompt."
+
+    Every other bank has a fixed musical identity, and that is the point of
+    having one -- the sci-fi news lane being Detroit techno every week is what
+    makes it recognisable, and a Shakespeare episode scored as surf rock is not
+    a feature. My Story is the bring-your-own lane, so it takes a bring-your-own
+    score exactly as it already takes an authored prompt."""
+    for bank in ("shakespeare", "scifi_news_pro", "media_archive", "original",
+                 "public_domain"):
+        meta = {"source_bank": bank, "music_style": "surf rock"}
+        assert P.story_palette(meta).key != "custom", bank
+    mine = {"source_bank": "my_story", "music_style": "surf rock"}
+    assert P.story_palette(mine).key == "custom"
+    assert P.story_palette(mine).instruments == "surf rock"
+    # blank, whitespace and junk all mean "use the bank default"
+    for blank in ("", "   ", None):
+        assert P.story_palette({"source_bank": "my_story",
+                                "music_style": blank}).key == "radio_orchestra"
+
+
+def test_a_typed_style_that_names_a_groove_is_not_told_to_avoid_one():
+    """The self-cancelling request, guarded. A user who types "drum and bass"
+    and receives the underscore's negative -- which bans loop, ostinato, drum
+    machine, metronome and beat -- has asked for a genre and forbidden it in the
+    same breath. That is what tore the cues on 2026-09-12, and it is worse than
+    the opposite error, so anything that sounds like a groove is treated as
+    one."""
+    for text in ("drum and bass", "Detroit techno", "surf rock", "salsa",
+                 "gamelan orchestra", "bagpipes and a marching drum", "909 workout"):
+        assert P.custom_palette(text).rhythmic is True, text
+    for text in ("solo cello", "Gregorian chant", "string quartet", "ambient drone"):
+        assert P.custom_palette(text).rhythmic is False, text
+
+
+def test_custom_palette_never_raises_and_never_runs_away():
+    """It runs inside a render and takes whatever a person typed."""
+    assert P.custom_palette(None) is None and P.custom_palette("") is None
+    assert P.custom_palette("   	 ") is None
+    assert P.custom_palette(42).instruments == "42"
+    long = P.custom_palette("cello " * 400)
+    assert len(long.instruments) <= 200
+    assert P.custom_palette("  spaced   out   words ").instruments == "spaced out words"
+
+
+def test_every_bank_genre_leads_with_its_rhythm_section_and_is_marked_rhythmic():
+    """A genre bank inverts this module's own leading rule on purpose: for
+    techno the drum machine IS the subject, not the backing. The `rhythmic`
+    flag is what makes that inversion explicit rather than accidental, and it
+    is the same flag that picks the negative prompt."""
+    for palette, first in ((P.DETROIT_TECHNO, "Roland TR-909"),
+                           (P.JAZZ_QUARTET, "brushed drums"),
+                           (P.SALSA_CONJUNTO, "congas"),
+                           (P.CHICAGO_HOUSE, "Roland TR-707")):
+        assert palette.rhythmic is True, palette.key
+        assert palette.instruments.startswith(first), palette.key
+    for palette in (P.HOUSE_PALETTE, P.EARLY_CONSORT, P.BAROQUE_CHAMBER,
+                    P.ROMANTIC_CHAMBER, P.ELECTRIC_COMBO, P.SCIFI_ORCHESTRA):
+        assert palette.rhythmic is False, palette.key

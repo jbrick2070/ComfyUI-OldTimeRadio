@@ -129,7 +129,7 @@ def test_an_authored_prompt_survives_verbatim_inside_the_engine_prompt():
 def test_the_engine_prompt_is_capped_below_the_smallest_engine_budget_without_raising():
     long_row = ", ".join("a long clause number %d" % i for i in range(120))
     assert len(long_row) > MP.ENGINE_PROMPT_MAX_CHARS
-    engine = MP.compose_engine_prompt(_meta("original", None), long_row)
+    engine = MP.compose_engine_prompt(_meta("my_story", None), long_row)
     assert len(engine.text) <= MP.ENGINE_PROMPT_MAX_CHARS
     assert engine.text.startswith(P.HOUSE_PALETTE.instruments)
     assert engine.text.endswith("clause number %d" % (
@@ -138,7 +138,7 @@ def test_the_engine_prompt_is_capped_below_the_smallest_engine_budget_without_ra
 
 
 def test_an_overflowing_composed_row_keeps_its_instrumental_tail():
-    meta = _meta("original", None,
+    meta = _meta("my_story", None,
                  moods=tuple("mood word number %d" % i for i in range(3)),
                  setting=tuple("a setting phrase that runs long %d" % i for i in range(2)))
     row, _ = MP.compose_music_prompt(meta, "opening")
@@ -369,3 +369,70 @@ def test_the_placement_knob_does_not_claim_to_have_reached_the_model():
     # and the window is still computed and still sent -- this is a truth fix,
     # not a removal
     assert "seconds_start, seconds_total = _sa3_clip_window(" in body
+
+
+# --------------------------------------------------------------------------- #
+# a bank whose genre has a beat must not be forbidden a beat (2026-09-12)
+# --------------------------------------------------------------------------- #
+def test_a_rhythmic_bank_is_never_forbidden_its_own_genre():
+    """THE SELF-CANCELLING REQUEST, GUARDED AT THE SOURCE. The underscore's
+    negative bans loop, looping, repetitive, ostinato, sequencer, arpeggiator,
+    drum machine, metronome, click track, drum loop and beat. Every one of those
+    is a REQUIREMENT of techno, house, salsa and a swinging jazz quartet.
+
+    Shipping the underscore's negative onto a dance bank is the identical defect
+    that tore the cues earlier the same day -- a prompt asking for "raw distorted
+    TR-909" while the negative banned distortion."""
+    forbidden_of_a_groove = ("loop", "ostinato", "sequencer", "arpeggiator",
+                             "drum machine", "metronome", "click track", "beat")
+    for bank in ("scifi_news_pro", "media_archive", "original", "public_domain"):
+        meta = _meta(bank, None)
+        row, _ = MP.compose_music_prompt(meta, "opening")
+        engine = MP.compose_engine_prompt(meta, row)
+        assert P.story_palette(meta).rhythmic is True, bank
+        low = engine.negative.lower()
+        for word in forbidden_of_a_groove:
+            assert word not in low, (bank, word)
+        # what is a defect in ANY music is still banned
+        for word in ("noise", "hiss", "distortion", "clipping", "vocals"):
+            assert word in low, (bank, word)
+
+    # and a sustained bank keeps the full anti-loop negative
+    meta = _meta("shakespeare", "c. 1595")
+    row, _ = MP.compose_music_prompt(meta, "opening")
+    assert MP.compose_engine_prompt(meta, row).negative == MP.NEGATIVE_PROMPT_DEFAULT
+
+
+def test_a_rhythmic_bank_is_not_also_told_to_play_slow_and_sustained():
+    """The other half of the same contradiction. `mood_devices` and
+    `tempo_phrase` are orchestral instructions written for a held cue -- "slow
+    tempo, sustained and taut, no rubato" is a fine thing to tell a string
+    section and a contradiction to tell a 128 BPM drum machine. On a genre bank
+    the idiom carries the musical instruction instead, including the BPM."""
+    meta = _meta("scifi_news_pro", None, moods=("ominous", "suspenseful"))
+    row, _ = MP.compose_music_prompt(meta, "opening")
+    assert "Detroit techno at 128 BPM" in row
+    assert "sustained and taut" not in row
+    assert "slow rising strings" not in row
+    # the brief's own words still lead: story relevance survives the genre
+    assert row.startswith("ominous, suspenseful")
+
+
+def test_the_theme_node_offers_the_style_field_and_threads_it():
+    """The widget exists, is APPENDED last (widgets_values is positional), and
+    its value actually reaches the composer -- a field that changes nothing is
+    worse than no field."""
+    from nodes import stable_audio_theme as T
+    spec = T.StableAudioTheme.INPUT_TYPES()
+    assert "music_style" in spec["optional"]
+    assert spec["optional"]["music_style"][1]["default"] == ""
+    assert not spec["optional"]["music_style"][1].get("forceInput"), (
+        "it must be a WIDGET, not a wired input")
+    # appended last among the widgets, which is the only safe position
+    widgets = [name for name, (_t, opts) in
+               list(spec["required"].items()) + list(spec["optional"].items())
+               if not opts.get("forceInput")]
+    assert widgets[-1] == "music_style", widgets
+    # and it is carried to the palette by the one route the composers use
+    body = inspect.getsource(T.StableAudioTheme._render_clips)
+    assert 'meta = dict(meta, music_style=' in body
