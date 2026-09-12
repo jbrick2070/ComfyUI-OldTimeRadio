@@ -14597,3 +14597,24 @@ No audition was possible. Full hashes/logs/pixels/OBS file:
   episodes/_shared/tmp. They are prior evidence; nothing was moved or deleted.
   Bible01.02 (12.66 cross-reference) is updated from OPEN occurrence to fixed,
   and the portable contract this taught is promoted as its own rule.
+
+### PBUG-20260911-05 -- the shakespeare lane paraphrased its source (fixed `187baff0`)
+
+**Artifact:** `signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724`
+(Much Ado 3.1, cast BEATRICE + HERO): HERO speaks *"I hold this blade high between
+us, forcing our retreat to halt so that Ursula stands exposed..."* -- no such line,
+no blade, in the scene. 182 folger ledgers on the 5080 share the shape.
+
+**Cause:** the verbatim selector (`_otr_passage_selector.py`) had zero production
+callers; the writer's line composer wrote every character beat from the outline's
+intent and mood with no source text in reach (`LineRequest.source_block` was never
+set on the main path).
+
+**Fix:** the verbatim executor (row 3.6): the passage IS the dialogue, Python-owned to
+the end. Recorded here because the defect is a live artifact; the four reviewer
+findings on the way (three post-loop rewriters, the TTS paren stripper, the freeze's
+own sayable check) were review-found and are pinned by tests, not filed as PBUGs.
+
+**Verify:** `tests/test_shakespeare_verbatim_executor.py`; live leg
+`unfurling_the_kingdom_20260911_183749` (Lear 1.1, LEAR + GONERIL): the four character
+rows equal the raw scene window word for word, `text_for_tts` carries every word.

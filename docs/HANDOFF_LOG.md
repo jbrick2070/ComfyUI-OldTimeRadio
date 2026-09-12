@@ -1,3 +1,37 @@
+## 2026-09-11 (evening) -- Shakespeare performs its own words
+
+**Shipped:** the verbatim executor (`187baff0`), plan row 3.6 in full. A bank whose
+typed default says `verbatim_passage` (shakespeare only) selects a seeded window of
+the scene at the one input-resolution site, cuts it into exactly the voiced beats
+the act dial bought (cap-to-fill; the act count is never derived from words), seats
+the passage's speakers as the cast, builds the outline from the plan, writes each
+chunk into its beat with `verbatim_source`, and owns those rows through the judge,
+the scrub, the sayable-surface clears (cleanup, freeze, authorship receipt) and the
+TTS projection (only the parenthesis glyphs are dropped, so no engine cleaner can
+delete parenthetical speech). A miss is receipted, never raised, and the printed
+credit says "freely adapted from".
+
+**The reviewers, exactly:** codex r1 (no, 7 must-fix) -> revised anchor -> codex r2
+(no, 5), cursor r2 (no, 11), Opus r2 (yes-with-fixes, 6) -> code -> codex r3 on the
+diff (no, 2 must-fix: the freeze's own sayable check and the `llm_slot_fill` naming
+overlay renaming source-owned slots) + Sonnet QA (findings: the over-cap cut the
+r3 should-fix also named). Every claim verified against the files; the arc's own
+mechanism was wrong three times (a `source_block` prompt splice; a second
+`EpisodeBudget`; an act count derived from the passage) and the reviewers found each.
+
+**Measured:** 14/14 scenes parse; 840 dial combinations plan without a miss and every
+plan's words are the passage's in order; 21 guards proven by neutering; full suite
+51 = 51 failure identities, 0 NEW / 0 GONE; live canonical leg on the 5080 pinned to shakespeare: two published episodes (unfurling_the_kingdom_20260911_183749, Lear 1.1; moonlit_deception_20260911_185439, Midsummer 3.2, final tree) whose character rows equal the raw scene window word for word.
+
+**Not in this change, by choice:** the roster supplement rows for QUINCE / SNOUT /
+STARVELING (Opus: real correctness work, zero coupling -- its own commit next); the
+ruling's craft criteria stay unbuilt under the quality freeze. ARIEL and ROBIN stay
+on the roll by the operator's own locked ruling; the receipt enumerates
+`unresolved_genders` instead of pretending.
+
+**Receipts:** `kibitz-runs/2026-09-11-shakespeare-verbatim/` (r1-r3, final.md),
+`kibitz-runs/2026-09-11-shakespeare-verbatim-cursor/r2/`.
+
 ## 2026-09-11 (afternoon) -- arcs, four fixes, Half B built, the plan made honest
 
 **Operator rulings that reshaped the day, in order:** *"only an out of memory should
