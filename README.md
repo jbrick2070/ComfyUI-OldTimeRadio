@@ -551,12 +551,28 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 > **A visual style may name its own SD 1.5 checkpoint, and it is OPT-IN.** A
 > style pack can carry a `checkpoint` key; `sd15` loads that file *only if it is
 > already in `models/checkpoints`*, and otherwise falls back to `OTR_SD15_CKPT`
-> and then to the stock checkpoint above. Nothing is auto-downloaded for this
-> and nothing breaks without it -- a pack naming a file you do not have simply
-> renders on the stock model. Today only the `anime` pack names one,
-> `Counterfeit-V3.0_fp16.safetensors` (ungated, CreativeML OpenRAIL-M, the same
-> licence as the stock checkpoint). Drop it in yourself if you want the anime
-> style to look properly drawn; skip it and everything still works.
+> and then to the stock checkpoint above. **It is deliberately NOT auto-fetched**
+> -- it is one style's preference, not a dependency, and nobody should download
+> gigabytes for a look they never select. Nothing breaks without it: a pack
+> naming a file you do not have simply renders on the stock model.
+>
+> Today only the `anime` pack names one. If you want that style to look properly
+> drawn rather than like a photo model told to draw, fetch it yourself -- it is
+> **ungated**, so no terms click and no token, and it carries the same
+> CreativeML OpenRAIL-M licence as the stock checkpoint:
+>
+> ```bash
+> hf download gsdf/Counterfeit-V3.0 Counterfeit-V3.0_fp16.safetensors --local-dir "C:/ComfyUI-Models/checkpoints"
+> ```
+>
+> Or click it out of <https://huggingface.co/gsdf/Counterfeit-V3.0/tree/main> and
+> drop `Counterfeit-V3.0_fp16.safetensors` (4.2 GiB) into `models/checkpoints`.
+> Restart ComfyUI so it rescans, then pick the `anime` visual style as usual --
+> there is no dropdown or setting for the checkpoint itself, the pack asks for it
+> and the engine uses it when it is there.
+>
+> The same works for any style: add a `checkpoint` key to its pack JSON in
+> `nodes/visual_styles/` naming any SD-1.5-architecture file you already have.
 
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered |
