@@ -84,9 +84,23 @@ folded); codex r2 on the fold. Neuter passes 8/8 (music loop), 3/3 (cue ceiling)
 6/6 (Fable follow-ups) and 16/16 (the codex fold, markers to zero each time).
 Full-suite failure identities unchanged before every push.
 
-**Pending for the operator:** listen to the next episodes for the music and for
-pumping around any loud moment; then decide the SA3 recipe (half the steps is
-worth an A/B listen). The 4060 / Mac / RunPod wave stays parked until released.
+**THE LIVE PROOF, run after the push** (operator: *"be sure to spin the harness
+directly from canonical"*). One arm, canonical only, 9.7 minutes:
+`signal_lost_shrieking_walls_of_iastrae_20260912_015033`, published to
+`otr/obs/`. The runner named its own episode -- `[canonical-api] EPISODE
+episodes/...` -- and the harness bound it by that name, by cue freshness, and by
+a receipt equality on sampler, scheduler, steps and cfg, which is the whole
+chain cursor said a synthetic log could never prove. Cue stems: opening
+loopiness 0.457 at peak -2.67 dBFS, closing 0.187 at peak -1.00 dBFS, **zero
+clipped samples on either** (the cue ceiling holds). Against the episode that
+drew the complaint: 0.485 opening, 0.713 closing. The closing cue is where the
+work shows; the opening cue barely moved, and one leg is still not evidence.
+
+**Pending for the operator:** listen to
+`shrieking_walls_of_iastrae_20260912_015033` and the next few for the music, and
+for pumping around any loud moment; then decide the SA3 recipe (the publishers'
+base template measured better on the closing cue at HALF the steps, and that is
+a listening call). The 4060 / Mac / RunPod wave stays parked until released.
 
 ## 2026-09-11 (night) -- the music is music, and a cold install renders
 

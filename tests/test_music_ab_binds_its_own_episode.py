@@ -230,12 +230,15 @@ def test_an_arm_can_express_a_value_that_contains_commas():
                    "OTR_SA3_CFG": "7"}
 
 
-def test_a_defaults_arm_after_a_recipe_arm_boots_a_clean_server(monkeypatch):
+def test_a_defaults_arm_after_a_recipe_arm_boots_a_clean_server(monkeypatch, tmp_path):
     """cursor r3, and it is the quietest of the three: only an arm with
     server-side settings booted a server, so `--arms lcm shipped` measured the
     LCM server twice and called the second one the baseline. Argv order was
     load-bearing and nothing said so."""
     booted = []
+    # `run_arm` writes its leg log under REPO_ROOT/tmp; a unit test must not
+    # leave a file there that reads like a real leg.
+    monkeypatch.setattr(AB, "REPO_ROOT", tmp_path)
     monkeypatch.setattr(AB, "boot_server", lambda env, log: booted.append(dict(env)) or True)
     monkeypatch.setattr(AB, "server_is_up", lambda: True)
     monkeypatch.setattr(AB, "episode_from_log", lambda log, after: None)
