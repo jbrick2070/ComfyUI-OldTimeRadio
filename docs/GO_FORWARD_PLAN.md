@@ -118,6 +118,29 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   If tempo error really is the thing his ear tracks, he should like that one
   too. If he does not, this calibration is wrong and the row reopens.
 
+* **CUT 2026-09-12: the anime checkpoint does NOT go to the AnimateDiff lanes,
+  and this row is closed, not deferred.** His words: *"lets stop chasing the
+  anime things, we can leave it in there if it['s] coded, I don't want to spend
+  any more time chasing before release."*
+
+  **What SHIPS is what he already approved:** the pack checkpoint reaches the
+  STILL engine only (`nodes/_otr_image_engines/sd15.py`), which he judged
+  *"perfect"*. That stays exactly as it is.
+
+  **What is CUT:** extending it to `eng_ghost_signal.py` and the other SD1.5
+  motion lanes, where `GHOST_CHECKPOINT_NAME` stays the pinned base checkpoint.
+  A design panel on it was STOPPED mid-run on his word. Do not restart it, do
+  not "just try" the constant swap, and do not re-raise this before release --
+  he noticed the limitation himself and cut it himself, which is the strongest
+  form this ruling can take.
+
+  For a future reader who wonders why it looked easy: it was not. That swap is a
+  RECIPE BUMP -- `GHOST_RECIPE_RECEIPT` would have to be repointed or every
+  receipt already on disk stops being interpretable -- and the lane runs a LIVE
+  negative at `GHOST_CFG = 8.0` specifically because the lettering defense needs
+  real unconditional conditioning, which is the documented reason an AnimateLCM
+  checkpoint was refused once before.
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
