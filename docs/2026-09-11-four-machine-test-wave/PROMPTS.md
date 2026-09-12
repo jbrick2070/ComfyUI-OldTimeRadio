@@ -16,21 +16,22 @@ list is one fix plus the platform, which is a single bisect instead of six. So t
 frozen hash is written here before the wave starts, and nothing touching the render
 path lands after it:
 
-    WAVE HEAD: *** NOT YET FROZEN -- DO NOT START ***
+    WAVE HEAD: 1d8d5131c7a07995b258f7527478accb0fde6136
 
-    Withdrawn 2026-09-11 after being cut, and this is the SECOND withdrawal --
-    read the reason so it is not cut early a third time. The head was frozen at
-    3e692dc5 with two arcs deliberately deferred past it and 3.6 Shakespeare cut
-    from the week. The operator's ordering is:
+    FROZEN 2026-09-12 by the 5080 coder window, on the operator's word ("start
+    it"), and this is the first freeze that is not premature. The two earlier
+    cuts -- 3e692dc5 and f5f40bd4 -- were both withdrawn because arcs were still
+    deferred past them, and an ARC IS CODING. His ordering was:
 
         ARCS  ->  CODING  ->  SHAKESPEARE  ->  TESTING, ABSOLUTELY LAST
 
-    An ARC IS CODING. So a deferred arc is deferred coding, and "no testing until
-    all coding is complete" means the arcs run FIRST, their outcomes get built,
-    Shakespeare gets built, and only then is a head frozen. Neither 3e692dc5 nor
-    the withdrawn f5f40bd4 is a hash any lane may start against.
+    That order is now satisfied. Sections 1 and 2 of the go-forward plan are
+    empty, he answered all sixteen blocked rows, and everything those answers
+    turned into is built, reviewed and pushed. What is left in section 3 is his
+    EAR, which testing does not block on.
 
-    WHEN IT IS FROZEN, IT WILL BE A CODE FREEZE, NOT A COMMIT FREEZE. Commits
+
+    THIS IS A CODE FREEZE, NOT A COMMIT FREEZE. Commits
     after the hash will be documentation only -- this file's own freeze line
     among them -- so the hash you pull will legitimately be LATER than the one
     written here. That is expected: nothing touching the render path lands
