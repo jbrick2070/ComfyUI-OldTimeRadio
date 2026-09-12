@@ -68,6 +68,7 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RUNNER = REPO_ROOT / "scripts" / "otr_canonical_api_run.py"
 LAUNCHER = REPO_ROOT / "scripts" / "_otr_soak_server_launch.cmd"
+BOOT_SCRIPT = REPO_ROOT / "scripts" / "_otr_music_ab_boot.ps1"
 CANONICAL = REPO_ROOT / "workflows" / "otr_canonical.json"
 #: Where episodes land. The operator's own output tree, never a test rig
 #: (memory: "obs is always the local output folder").
@@ -192,52 +193,43 @@ def server_is_up() -> bool:
 
 
 def boot_server(env_overrides: dict, log_path: Path) -> bool:
-    """Reset per CLAUDE.md section 4, then boot the shipped launcher with
-    ``env_overrides`` in its environment (section 5: the .cmd is launched
-    directly, never through a cmd.exe /c whose quoting eats the log path).
+    """Reset and boot ONE server with ``env_overrides`` in its environment.
 
-    Kills SELECTIVELY by command line -- a blanket python kill would sever
-    the tooling running this harness.
+    Delegates to ``scripts/_otr_music_ab_boot.ps1``, and the reason is measured
+    rather than stylistic -- BOTH Python-side attempts failed SILENTLY on
+    2026-09-12:
+
+    * a ``wmic``-based selective kill does nothing at all, because wmic is gone
+      on Windows 11; the old server kept :8000 and the new one could not bind;
+    * ``subprocess.Popen`` on the launcher ``.cmd`` with ``DETACHED_PROCESS``
+      returns a pid and never runs the batch -- no log, no server, no error.
+
+    Each failure cost five minutes of boot timeout per arm and would have
+    reported "the server did not come up" without saying why. PowerShell's
+    ``Get-CimInstance`` + ``Start-Process -FilePath`` is the combination
+    CLAUDE.md sections 4 and 5 already prescribe and the only one proven here.
+
+    The arm's settings travel by ENVIRONMENT: this process -> powershell ->
+    Start-Process -> the launcher -> ComfyUI, which is the only place the
+    engine reads them.
     """
-    import signal
-
-    killed = []
-    try:
-        listing = subprocess.run(
-            ["wmic", "process", "where", "name='python.exe'", "get",
-             "ProcessId,CommandLine", "/format:csv"],
-            capture_output=True, text=True, timeout=60).stdout
-    except Exception:  # noqa: BLE001 -- wmic absent on newer Windows
-        listing = ""
-    for line in listing.splitlines():
-        if "main.py" not in line or "ComfyUI" not in line:
-            continue
-        pid = line.rsplit(",", 1)[-1].strip()
-        if pid.isdigit():
-            try:
-                os.kill(int(pid), signal.SIGTERM)
-                killed.append(pid)
-            except OSError:
-                pass
-    if killed:
-        _say("reset: stopped server pid(s) %s" % ", ".join(killed))
-    time.sleep(6)
-
     env = dict(os.environ, PYTHONUTF8="1", **env_overrides)
     _say("booting a server for this arm with %s" % (env_overrides or "no overrides"))
-    subprocess.Popen([str(LAUNCHER), str(log_path)], cwd=str(REPO_ROOT), env=env,
-                     creationflags=getattr(subprocess, "DETACHED_PROCESS", 0))
-    deadline = time.time() + BOOT_TIMEOUT_S
-    while time.time() < deadline:
-        time.sleep(5)
-        if log_path.is_file():
-            text = log_path.read_text(encoding="utf-8", errors="replace")
-            if "To see the GUI go to" in text:
-                _say("server up")
-                return True
-            if "SERVER DID NOT COME UP" in text:
-                return False
-    return False
+    done = subprocess.run(
+        ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+         "-File", str(BOOT_SCRIPT),
+         "-Launcher", str(LAUNCHER),
+         "-LogPath", str(log_path),
+         "-TimeoutSeconds", str(BOOT_TIMEOUT_S)],
+        cwd=str(REPO_ROOT), env=env, capture_output=True, text=True,
+        timeout=BOOT_TIMEOUT_S + 120)
+    for line in (done.stdout or "").splitlines():
+        if line.strip():
+            _say(line.strip())
+    if done.returncode != 0:
+        _say("boot failed (exit %s); see %s" % (done.returncode, log_path))
+        return False
+    return True
 
 
 def parse_arm(text: str) -> tuple[str, dict]:
