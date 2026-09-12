@@ -447,8 +447,14 @@ def test_a_rhythmic_bank_is_not_also_told_to_play_slow_and_sustained():
     assert "Detroit techno at 128 BPM" in row
     assert "sustained and taut" not in row
     assert "slow rising strings" not in row
-    # the brief's own words still lead: story relevance survives the genre
-    assert row.startswith("ominous, suspenseful")
+    # THE IDIOM LEADS ON A GROOVE BANK, and this assertion was flipped on
+    # purpose (2026-09-12). It used to require the brief's words first. His ear
+    # says otherwise: the two house cues that locked to the requested tempo led
+    # with a motion word, and the one he called beatless led with three texture
+    # words in front of "at 122 BPM". Story relevance is NOT lost -- the brief's
+    # words still ride, immediately behind the genre.
+    assert row.startswith("Detroit techno at 128 BPM"), row
+    assert "ominous, suspenseful" in row, "the brief's words must still ride"
 
 
 def test_a_rhythmic_bank_is_not_given_a_sustained_ARC_either():

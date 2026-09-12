@@ -261,9 +261,38 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     # The brief's real words are kept on every bank: moods like "ominous,
     # uneasy" are harmonic, not textural, and a dance cue can carry them. Only
     # the invented floor is dropped.
-    if mood_terms:
-        parts.append(", ".join(mood_terms))
-    elif not palette.groove_arc:
+    #
+    # ON A GROOVE PALETTE THE IDIOM LEADS AND THE MOOD FOLLOWS (2026-09-12,
+    # second half of the same fix). Skipping the neutral floor was only half of
+    # it: a real brief still put its OWN texture words in front of the tempo,
+    # which is the identical failure this module documents above.
+    #
+    # HIS EAR IS THE EVIDENCE, and it lines up exactly with the lead word:
+    #   "suspenseful, DRIVING, dark"   -> 120.2 BPM against 122 asked
+    #   "tension, ominous, FRANTIC"    -> 123.0 BPM, and he called it perfect
+    #   "ominous, suspenseful, eerie"  -> 156.6 BPM, "no beats, maybe one slight"
+    # The two that locked lead with a word that implies motion; the one that
+    # failed is three textures in a row. Nothing is dropped here -- the brief's
+    # words still ride, and a melancholy episode still gets a melancholy house
+    # cue. They simply stop queueing in front of the number.
+    #
+    # SCOPED TO `groove_arc`, so jazz and salsa -- rhythmic, and approved by him
+    # with the mood leading -- compose byte-identically to what he heard.
+    mood_str = ", ".join(mood_terms) if mood_terms else ""
+    if palette.groove_arc:
+        parts.append(palette.idiom)
+        if mood_str:
+            parts.append(mood_str)
+        # Setting BEFORE the arc, which is the order every other branch uses.
+        # The ONLY difference this change makes is which of mood and idiom
+        # leads; everything downstream of them keeps its place.
+        if setting_str:
+            parts.append("evokes %s" % setting_str)
+        parts.append(_CUE_CHARACTER_RHYTHMIC[cue_id])
+        return ", ".join(parts) + _PROMPT_TAIL, CUE_DURATIONS[cue_id]
+    if mood_str:
+        parts.append(mood_str)
+    else:
         parts.append("atmospheric")
     if palette.rhythmic:
         # THE GENRE IS THE MUSICAL INSTRUCTION on a bank that has one, and

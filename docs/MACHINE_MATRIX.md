@@ -113,7 +113,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  93 experimental profile(s), 42 shipping
+## 16 GB+  --  94 experimental profile(s), 42 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -160,7 +160,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>51 draft profile(s) here -- not vouched for</summary>
+<details><summary>52 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`, `word_razzle`
 
@@ -198,6 +198,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_sbcov_4` | still_pan | indextts2 |
 | `otr_sbcov_5` | still_flat | indextts2 |
 | `otr_sbcov_6` | still_motion | indextts2 |
+| `otr_sd15_stills` | still_flat | indextts2 |
 | `otr_soak_llmsweep_01` | still_pan | indextts2 |
 | `otr_soak_llmsweep_02` | still_motion | indextts2 |
 | `otr_soak_llmsweep_03` | still_flat | indextts2 |

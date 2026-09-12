@@ -84,11 +84,11 @@ Anything not listed there is a manual install -- see its row below.
 | `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | 2 profile(s) |
 | `google_lyria` | nothing on disk | - | 4 profile(s) |
 | `google_tts` | nothing on disk | - | 4 profile(s) |
-| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 81 profile(s) |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 106 profile(s) |
+| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 82 profile(s) |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 107 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 15 profile(s) |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
-| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 95 profile(s) |
+| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 96 profile(s) |
 
 ## Engines that are a separate INSTALL, not a download
 
