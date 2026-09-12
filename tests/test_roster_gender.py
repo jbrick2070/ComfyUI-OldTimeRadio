@@ -108,8 +108,10 @@ def test_supplement_loads_and_every_entry_carries_evidence():
             total += 1
             assert spec["gender"] in ("male", "female"), (play_code, name)
             assert spec["evidence"].strip(), (play_code, name)
-    assert total == 12, ("12 curated entries (LUCE and BALTHASAR of Comedy of Errors "
-                         "added 2026-09-02); ARIEL and PUCK are excluded by design")
+    assert total == 15, ("15 curated entries (LUCE and BALTHASAR of Comedy of Errors "
+                         "added 2026-09-02; QUINCE, SNOUT and STARVELING of Midsummer "
+                         "added 2026-09-11, reachable once the verbatim window can "
+                         "seat them); ARIEL and PUCK are excluded by design")
 
 
 def test_supplement_may_not_overrule_a_confirmed_sidecar_gender():

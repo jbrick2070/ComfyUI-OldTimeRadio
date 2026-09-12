@@ -55,6 +55,18 @@
         "gender": "male",
         "evidence": "Nick Bottom the weaver, one of the Athenian mechanicals; addressed throughout as a man and cast as Pyramus in their play."
       },
+      "QUINCE": {
+        "gender": "male",
+        "evidence": "Peter Quince the carpenter, one of the Athenian mechanicals (the sidecar's roster_name is PETER QUINCE; the fetched scene text never genders the entry). He directs the mechanicals' play and is addressed as a man throughout."
+      },
+      "SNOUT": {
+        "gender": "male",
+        "evidence": "Tom Snout the tinker, one of the Athenian mechanicals (roster_name TOM SNOUT); cast as Wall in their play and addressed as a man."
+      },
+      "STARVELING": {
+        "gender": "male",
+        "evidence": "Robin Starveling the tailor, one of the Athenian mechanicals (roster_name ROBIN STARVELING); cast as Moonshine and addressed as a man."
+      },
       "LYSANDER": {
         "gender": "male",
         "evidence": "One of the two Athenian young men in love with Hermia; the sidecar carries roster_name='LYSANDER' with an empty description, so the fetched Folger text simply never gendered the entry."
