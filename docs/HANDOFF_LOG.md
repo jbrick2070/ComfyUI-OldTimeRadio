@@ -1,3 +1,73 @@
+## 2026-09-11 (afternoon) -- arcs, four fixes, Half B built, the plan made honest
+
+**Operator rulings that reshaped the day, in order:** *"only an out of memory should
+fail"*; *"you kept telling me this won't work"* (stop forecasting failure, measure);
+*"otr/obs is always the local output folder -- don't confuse my testing setup with
+what ships"*; *"arcs -> coding -> Shakespeare -> testing, absolutely last"*; *"I don't
+need a full r1/r4, you decide -- a contrarian QA at each round"*; *"we don't call out
+done work unless it's a dependency for future work in the go-forward plan itself."*
+Each is now in CLAUDE.md or the plan's own preamble.
+
+**Shipped, each proven by neutering the guard and watching its tests fail:**
+
+1. **Sci-Fi repair-turn budget** (`4db32b0e`) reads the transport's REAL context
+   window via `_SlotScheduler.context_cap_for`, resolved lazily at the one site that
+   uses it, instead of a flat VRAM-shaped constant that was wrong in both directions.
+   The codex review caught that the pass-through was untested and that the morning's
+   overflow guard double-counted `cold_regenerations`; both fixed. Also ships
+   `scripts/otr_openrouter_refresh.py` via `.comfyignore` -- the only way a registry
+   install can warm its catalog, and it was being stripped.
+2. **Mixed sample rates convert instead of killing the role's audio** (`c2e48132`).
+   Live precedent `eda8590c`: the fix lived at ONE caller and died with it. Now at
+   `pack_audio_batch`, the choke point. The contrarian's flat "no" was right: the first
+   cut returned the original waveform on a failed resample and the caller LABELLED it
+   with the destination rate -- a silently wrong render. Converts or raises now;
+   `MemoryError` propagates.
+3. **The cast clamp was defeated one level up** (`4f3fdae9`). `lock_cast` clamps an
+   over-six request and logs it; the writer compared against the raw, never-reassigned
+   request and raised. `tests/test_cast_size_is_a_request.py` existed the whole time
+   and tested `lock_cast` in isolation. Fix is inline-lane only -- dispatched lanes
+   return before the guard.
+4. **OpenRouter catalog cache leaves the pack** (`41fabf8b`) to the user's own
+   `<output>/otr/episodes/_shared/cache/openrouter/`; the r1 caught that
+   `load_catalog_cache` resolved the path OUTSIDE its try on a path read at
+   INPUT_TYPES time.
+5. **Caption-burn failures classified, no policy change** (`fb6085eb`).
+   `CaptionCapabilityGapError` is a ValueError subclass; all 22 fail-closed tests
+   still pass. A degrade written on top of the unclassified catch was REVERTED the
+   same hour: an unknown caption STYLE lands in the same branch. The already-built,
+   already-tested `caption_support_gap()` had zero callers -- the fourth
+   built-and-unwired helper found in one day; that pattern is now a CLAUDE.md rule.
+6. **Ghost Half B built** (`43d177ec`). `ghost_subject`, a sibling field beside the
+   closed `ghost_prompt` object; the one batched author call ranks from the episode's
+   own key objects, admitted by exact membership, never sourced. Four contrarian
+   rounds (no, no, yes-with-fixes, yes-with-fixes); the arc itself was wrong twice
+   (the per-shot budget is HASHED; the preflight DOES reach v3) and the contrarian
+   found both. Its own words settled the priority: *"especially if referred to in the
+   beat"* -- a clean dialogue reference wins, the authored pick breaks ties and fills
+   the rest. Seventeen neuters. Receipt:
+   `kibitz-runs/2026-09-11-ghost-half-b-contrarian/final.md`.
+
+**Shipped as docs:** GO_FORWARD cut 223 -> 126 lines against a six-section liveness
+classification; the wave docs gained rule 0 (what counts as a failure), `--timeout 0`
+(the 4060's canonical is 121 min against a 90-min default), the heartbeat correction
+(the five-minute rule is a stalled `[soak] t=` line, not elapsed time -- read the other
+way it aborts every leg at minute six), and a `&&` -> `;` fix in the 4060's first
+command. This box's absolute paths were stripped from the shipped set (README and the
+refresh script's usage banner); the canonical JSON was already clean, and the
+shipped set is 628 of 3,202 tracked files.
+
+**Refused after grounding, and worth remembering why:** the obs-publish OSError row.
+Its trigger was an unmounted share -- this box's rig mistaken for the product. The
+operator's correction and the code agree: obs is `<output>/otr/obs` on every machine,
+created on demand. The question queued for him was withdrawn before it cost a ruling.
+`docs/2026-*/` and `kibitz-runs/` are gitignored by design; the wave lanes are told.
+
+**The head is NOT frozen.** Two heads were cut early and withdrawn. It is frozen when
+section 5 of the plan is empty and 3.6 Shakespeare is built; 3.6a (the verbatim lane
+never sets `source_block`; the model writes Shakespeare from intent) and 3.6b
+(`_otr_passage_selector.py`, 14 KB, tested, zero callers) are the phase-3 work.
+
 ## 2026-09-11 -- seven crash/durability fixes (the f5f40bd4 freeze was withdrawn)
 
 The receipt for the day's code, so the plan can stop carrying it. Every fix below was
