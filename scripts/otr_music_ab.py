@@ -29,6 +29,19 @@ WHAT IT MEASURES, per music cue wav in each episode:
   samples, worst 4,710.
 * ``rms_dbfs`` -- the level the cue actually sits at under the dialogue.
 
+LOOPINESS HAS A BLIND SPOT, AND IT COST A NIGHT'S CONCLUSION. It is the
+strongest autocorrelation of the loudness ENVELOPE, so it cannot tell a
+repeating figure from a SUSTAINED one: a held organ chord has a nearly constant
+envelope and scores as high as a two-bar loop. A clean 45 s cathedral piece
+measured 0.730 while its spectrogram shows the harmony changing four times and
+no repeat at all.
+
+WORSE, IT IS PUSHED DOWN BY THE OTHER DEFECT. A broadband burst decorrelates
+the envelope, so an artifact LOWERS the score: measured across 29 renders,
+those carrying a burst averaged 0.157 against 0.510 for clean ones. A drop in
+loopiness is therefore not by itself good news -- read it beside the burst count
+or it will reward the very thing this campaign is removing.
+
 IT QUALIFIES NOTHING. It reports numbers for a listening decision; the verdict
 on music is the operator's ear (docs/OTR_STANDING_RULINGS.md, "judge it as
 radio drama"). A difference here is a reason to listen, never a reason to ship.
