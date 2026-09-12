@@ -1,3 +1,124 @@
+## 2026-09-12 -- HEAD 93315a1f +handoff (v2.0-alpha) -- CODER (the plan's ARC and CODE sections are empty for the first time; the Bible delta is promoted; testing is the next step)
+
+**THE SHA ABOVE IS THE LAST CODE HEAD.** This handoff is a SINGLE commit in
+this repo, so it is the second-to-last sha on the branch once this entry lands;
+the last is this handoff commit. The authoritative post-handoff sha is the one
+in the kickoff line, read after the push.
+
+**PRE-FLIGHT, all three:**
+1. **No background tasks running.** Every CLI review returned. ONE subagent did
+   NOT: a Bible cross-check reader spawned at 13:58 was still at zero bytes at
+   14:08 and is reported as absent below rather than waited out.
+2. **Suite: 43 failed of 15,421 collected**, this box, normal checkout.
+   **THE BASELINE MOVED AND THE NEW NUMBER IS THE HONEST ONE: it was 49 of
+   15,383.** Four of those 49 could never have passed here -- three
+   lightning-lane tests and one weight-floor test read this box's real 63 GB
+   through `latent_ceiling_for_host` / `unified_memory_budget_mb` while
+   asserting against the 16 GB calibration anchor. They are pinned now; the
+   other two that left were fixed. Zero new failures across five pushes; the
+   failing SET was diffed against the baseline every time, never the count.
+   **Bible suite: 24 passed, 36 skipped, 3 xfailed, 0 failed, 352 entries.**
+3. **Box: clean.** No server on :8000, no stray python, GPU at 2.9 GB (desktop
+   only). ACE-Step's 13.7 GiB of weights were deleted on the operator's word.
+
+Did:
+* **Emptied section 1 (ARC).** Nine rows in, zero out. "Which music model
+  ships" settled by a 54-render bench (`docs/2026-09-12-music-model-bench/`):
+  medium base is measurably better on the sustained lane, mixed on the genre
+  lanes, and ACE-Step is CUT on durability -- its loudness swings 16 dB between
+  seeds of one prompt and it does not reproduce from its own seed. The other
+  seven went as one batch (`docs/2026-09-12-arc-batch-2/`) with six Sonnet
+  grounding readers and one codex contrarian: the SA3 recipe stays as shipped
+  (lcm is twice as fast and renders beds 8-13 dB quieter), cast-count
+  vocabulary CUT (the disagreeing field has no production reader), the LTX
+  allowlist CUT, per-beat reload CUT (prior art already reverted it) -- and
+  three that codex REFUTED as cuts became code rows instead.
+* **Emptied section 2 (CODE).**
+  - `595201ec` **a fresh install fetched the wrong SA3 checkpoint.** The engine
+    prefers the base file (the only one where cfg and the negative prompt are
+    live) while all three provisioning paths named the post-trained one, so
+    every new box silently ran the configuration PBUG-20260912-03 exists to
+    escape. The fall-through now names a `_FETCH_DEFAULT` the manifest can
+    supply; the post-trained row stays allowlisted for explicit pins.
+  - `8f7481af` **the cast-time preflight resolved a different Ghost kernel than
+    the render** -- the preflight sat at ordinal 0 forever while the resolver
+    cycles the PLACE by ordinal. One helper now serves both paths.
+  - `2eccb3f9` **the bark output guard** (PBUG-20260902-03, FIX-OPEN since
+    2026-09-02) plus the whole ROCm recruitment pack.
+  - `93315a1f` the plan regrouped by subject; the registry row's stale "seven
+    commits" corrected to 25.
+* **A README claim that would have cost a ROCm tester an hour.** It said both
+  AMD profiles need libcairo/pycairo for `viz_mxc_mandala`; they pin the
+  cairo-free `viz_mxc_cpu`. The generator was printing that install step into
+  **all 93 launch recipes**; it now appears only in the four that select it.
+* **The Bible delta is promoted** -- see its own section below.
+
+**BIBLE (separate repo, `ce715a0` on main, pushed and verified):**
+The answer to "is it updated" was PARTLY, and the plan's own row was stale
+about it. Of this week's seven live-verified PBUGs, four already carried Bible
+ids (-20260911-06 to 12.164, -07 to 12.162, -20260912-01 to 12.165, -02 to
+12.162). Three did not, and now do:
+* **12.166** -- a model family's BASE and POST-TRAINED members do not answer
+  the same knobs, and on the post-trained one a guidance above 1.0 is not
+  inert but DAMAGING (the framework drops the unconditional branch only at
+  exactly 1.0). Carries the provisioning half too: a resolver that prefers one
+  member while the fetcher supplies the other means every fresh install
+  silently runs the configuration you just fixed.
+* **12.167** -- a parameter can be computed, forwarded, logged and written into
+  the receipt and still never reach the model, because the framework node
+  accepts a superset of what the model class consumes. Distinct from the
+  never-forwarded class: forwarding is perfect and the terminal consumer
+  ignores it. The receipt is the aggravating half.
+* **PBUG-20260912-05 is indexed as a SECOND INSTANCE of 12.162**, not a new
+  rule -- the same follow-the-value class, with the twist that the constant
+  changed MEANING rather than content, so the stale reader got an empty string
+  rather than a wrong one.
+
+**A pre-existing Three-File Contract failure was repaired in the same change:**
+the Bible held 350 entries while the README cited 349 in three places. The
+regression test reads the HYPHENATED "349-entry" form, which is the one a
+careless fix misses -- two of the three edits would have left the suite red.
+README now cites 352 and the suite is green.
+
+Current step: **sections 1 and 2 are EMPTY.** Section 3 holds SIXTEEN questions
+(the Bible fan-out row left it), each blocked on the operator and each settled
+by a word, grouped Music (5) / Story and writer quality (4) / Visual features
+(3) / Release and process (4). Section 6 -- the four-machine test wave -- is
+reachable for the first time and is the next real step, gated on his go.
+
+Next: **do not invent work.** If he has ruled on any of the sixteen, do that
+row; several become real code the moment he answers (a "medium" answer is one
+tuple plus a fetch lane; a checkpoint name for anime is a small build;
+"publish alpha.31" is a version bump that auto-fires the registry publish). If
+he has not, ASK which he wants to settle -- the clips for all five music
+listens are already in `otr/obs/` with READMEs. Do NOT freeze a wave head or
+book a leg until he says to; two heads were cut early on 2026-09-11 and both
+had to be withdrawn.
+
+Models: Sonnet 5 and Opus 5 as drivers. Reviewers, stated exactly: **codex**
+(authenticated again mid-session after a `token_revoked` failure the operator
+cleared) ran the batch-2 arc contrarian and three finished-diff reviews;
+**cursor** ran one design round and one hardening pass; **Sonnet subagents**
+ran six grounding readers and three QA passes. **No full four-round arc was run
+and none is claimed** -- the 2026-08-17 amendment routes design forks to a
+contrarian per round, which is what happened. **One reviewer seat went empty:**
+the Bible cross-check reader never returned, so the 12.166 / 12.167 promotions
+and the 12.162 second-instance call are DRIVER-JUDGED, grounded by reading the
+three PBUG entries against the three nearest existing rules (12.107
+never-forwarded, 12.108 engine-owned negative, 12.162 follow-the-value) and
+citing why each did or did not cover the case. A later window may re-open that
+judgement; the evidence is in the commit message.
+
+Three times a reviewer overturned the driver this session: codex found a scorer
+whose code did not implement the rule its own docstring claimed; cursor found
+that three of us shared a false premise about a ledger join and stopped a
+needless composer-version bump; Sonnet found a thrown re-roll would discard a
+banked take.
+
+Commits: `595201ec`, `5202584d`, `8f7481af`, `2eccb3f9`, `93315a1f` in this
+repo, plus `ce715a0` in the Bible repo. The handoff commit lands ON TOP of
+these -- see the kickoff line for the real head.
+
 ## 2026-09-12 (early afternoon) -- SECTIONS 1 AND 2 ARE EMPTY. The coding is done.
 
 **His instruction all morning:** *"keep arcing and coding so we can get to

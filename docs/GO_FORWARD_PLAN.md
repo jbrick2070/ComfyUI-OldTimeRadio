@@ -165,11 +165,6 @@ mood to settle.
 * **Does a 24 GB machine class get its own row?** No entry in
   `config/machine_classes.json`; rentals file under the 16 GB class today.
   Low priority. **Unblocks with yes or no.**
-* **Run the Bible fan-out on this week's fixes.** PBUG-20260911-06 and -07
-  and PBUG-20260912-01 through -05 are each live-verified with a published
-  artifact and fixed, and none carries a Bible id yet. (The older
-  "awaiting fan-out" strings in the log are stale status text, not work:
-  their promotions already exist in the Bible.) **Unblocks with go.**
 
 ## 4. Constraints specific to this plan
 
