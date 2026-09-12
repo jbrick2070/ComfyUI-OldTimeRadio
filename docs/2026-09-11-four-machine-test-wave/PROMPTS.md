@@ -212,6 +212,22 @@ Then run the consumer BOTH ways: node 93 OTR_PostUpscaleProcgenBlend with bypass
 TRUE (today's canonical value) and with bypass FALSE so the scopes actually blend.
 Confirm the audio and frame contracts are unchanged between them.
 
+  ** NOT EXECUTABLE AS WRITTEN -- measured 2026-09-12, by trying it. **
+  The bypass=TRUE half needs no work: True IS the canonical value
+  (`widgets_values[5]`), so every leg already runs it. The FALSE half has no
+  sanctioned route:
+    * `otr_canonical_api_run.py --set 93.bypass=false` is REFUSED --
+      "widget 'bypass' is not on the creative whitelist; managed widgets are
+      patched ONLY via apply_profile_to_workflow(--profile)".
+    * and `config/profiles/widget_mapping.json` carries NO entry for it, so no
+      profile can set it either.
+  That leaves editing `workflows/otr_canonical.json` itself, which is the
+  shipping graph. So this sub-check wants a deliberate decision, not a lane:
+  add a `bypass` mapping entry (default-identical, since the canonical keeps
+  TRUE) and re-freeze, or drop the sub-check. It is left UNRUN rather than
+  faked, and the rest of Leg A passed -- see the receipt.
+
+
 Leg B -- the six-act Jeffrey/Codex fixture, exactly as specified in
 docs/GO_FORWARD_PLAN.md: Jeffrey and Codex getting closer to release during one
 continuous evening in Jeffrey's workspace. Jeffrey is the physically present adult;
