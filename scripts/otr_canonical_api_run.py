@@ -17,6 +17,7 @@ import argparse
 import json
 import os
 import pathlib
+import re
 import sys
 from typing import Any
 
@@ -354,6 +355,27 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     return [] if offline else list(gateable)
 
 
+def episode_of_prompt(prompt_id: str) -> str | None:
+    """The episode id this prompt wrote, read back from its own history.
+
+    Best-effort and never raises: a leg that cannot name its episode is
+    still a leg, and this runs after the render is already terminal. The
+    scan is over the raw history text rather than a known output slot on
+    purpose -- which node reports the path has changed twice, the id
+    format has not.
+    """
+    try:
+        import requests
+        raw = requests.get(f"{COMFYUI_URL}/history/{prompt_id}", timeout=20).text
+    except Exception:  # noqa: BLE001 -- naming the episode is never fatal
+        return None
+    names = []
+    for match in re.finditer(r"episodes[\\/]+([A-Za-z0-9_\-]+_\d{8}_\d{6})", raw):
+        if match.group(1) not in names:
+            names.append(match.group(1))
+    return names[-1] if names else None
+
+
 def main(argv: list[str] | None = None) -> int:
     global COMFYUI_URL
     parser = argparse.ArgumentParser(
@@ -473,6 +495,14 @@ def main(argv: list[str] | None = None) -> int:
         on_tick=heartbeat,
     )
     print(f"[canonical-api] RESULT {status} prompt_id={prompt_id}", flush=True)
+    episode = episode_of_prompt(prompt_id)
+    if episode:
+        # WHICH EPISODE DID THIS LEG MAKE? Until 2026-09-12 this process
+        # never said, and every reader -- a person reading a leg log, a
+        # harness attributing a measurement -- had to guess from directory
+        # timestamps. On a box where two renders can overlap that guess is
+        # wrong exactly when it matters (cursor r3).
+        print(f"[canonical-api] EPISODE episodes/{episode}", flush=True)
     if status == "TIMEOUT":
         # A TIMEOUT HERE IS ABOUT THIS PROCESS, NOT ABOUT THE RENDER, and saying
         # so is the whole point of this branch (2026-08-23). `--timeout`

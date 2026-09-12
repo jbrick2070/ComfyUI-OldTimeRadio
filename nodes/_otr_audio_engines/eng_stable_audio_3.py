@@ -77,14 +77,41 @@ def _env_int(name, default):
         return int(default)
 
 
-#: The conditioning window must be LONGER than the cue, or the model is
+#: The conditioning window must be LONGER than the cue AT THE DEFAULT RATIO,
+#: or the model is
 #: asked for a complete self-contained piece that begins and ends inside its
 #: own world -- which is a loop-shaped request, and is what BUG-408 set out
 #: to remove. It stayed live for the longest cue: at the shipped 12 s context
 #: the 12 s opening cue got seconds_total == dur exactly. Measured
 #: 2026-09-12. The ratio is the floor, not the value; OTR_SA3_CONTEXT_S
 #: still wins whenever it asks for more.
-_SA3_MIN_CONTEXT_RATIO = 3.0
+#: Env-tunable BECAUSE it must be measurable (Fable, 2026-09-12): the 3x
+#: floor is the change most likely to have over-corrected the music into
+#: formlessness -- the opening cue now renders the first third of a 36 s arc
+#: and may never reach the theme it is told to settle into -- and a constant
+#: cannot be A/B'd by `scripts/otr_music_ab.py`.
+#:
+#: A RATIO BELOW THE DEFAULT RESTORES THE DEFECT, not merely the old
+#: behaviour (codex, 2026-09-12): at 1.0 the 12 s opening cue is asked for
+#: as a complete self-contained piece again, which is the loop-shaped
+#: request described above. That is exactly what makes it a useful control
+#: arm and exactly what makes it wrong to ship, so it warns every time it
+#: is used and the invariant below is claimed only at the default.
+_SA3_MIN_CONTEXT_RATIO_DEFAULT = 3.0
+
+
+def _sa3_context_ratio() -> float:
+    """The conditioning-window floor multiplier this render is using.
+
+    ONE READER FOR TWO CALLERS (cursor r3, 2026-09-12). The window maths
+    below needs it, and the render receipt has to RECORD it -- a receipt
+    that carries only `seconds_total` cannot tell a 1.0 control arm from
+    the shipped default, because a 36 s window satisfies "at least 1x a
+    12 s cue" perfectly well. An A/B arm that cannot be told apart from
+    the thing it controls for measures nothing.
+    """
+    return max(1.0, _env_float("OTR_SA3_CONTEXT_RATIO",
+                               _SA3_MIN_CONTEXT_RATIO_DEFAULT))
 
 
 def _sa3_clip_window(prompt: str, dur: float, context_s: float):
@@ -95,13 +122,20 @@ def _sa3_clip_window(prompt: str, dur: float, context_s: float):
     latent length stays ``dur`` -- only the CONDITIONING window changes, so clip
     length + seed determinism are unchanged."""
     dur = float(dur)
-    floor = dur * _SA3_MIN_CONTEXT_RATIO
+    ratio = _sa3_context_ratio()
+    if ratio < _SA3_MIN_CONTEXT_RATIO_DEFAULT:
+        log.warning("[OTR.sa3] OTR_SA3_CONTEXT_RATIO=%.2f is below the %.1fx "
+                    "floor, so a cue may be asked for as a self-contained "
+                    "piece -- the loop-shaped request the floor exists to "
+                    "prevent. This is a control arm; never ship on it.",
+                    ratio, _SA3_MIN_CONTEXT_RATIO_DEFAULT)
+    floor = dur * ratio
     ctx = max(float(context_s), floor)
     if float(context_s) < floor:
         log.info("[OTR.sa3] context %.1fs is not longer than the %.1fs cue by "
                  "the %.1fx floor -- widening to %.1fs so the cue is a SLICE "
                  "of a longer piece rather than a self-contained loop",
-                 float(context_s), dur, _SA3_MIN_CONTEXT_RATIO, ctx)
+                 float(context_s), dur, ratio, ctx)
     low = (prompt or "").lower()
     if "outro" in low or "closing" in low:
         start = max(0.0, ctx - dur)          # resolving tail
@@ -257,6 +291,13 @@ class StableAudio3Engine:
                 "receipt": {"engine": self.name, "steps": int(steps),
                             "cfg": float(cfg), "sampler": str(sampler),
                             "scheduler": str(scheduler),
+                            # The text the ENGINE used, which is not always
+                            # the composer's: OTR_SA3_NEG_PROMPT overrides it
+                            # above, and a receipt that recorded the spec's
+                            # negative would describe a cue nobody heard.
+                            "negative_prompt": str(neg_text),
+                            "denoise": float(denoise),
+                            "context_ratio": _sa3_context_ratio(),
                             "seconds_start": float(seconds_start),
                             "seconds_total": float(seconds_total),
                             "duration_s": float(dur), "seed": int(seed),

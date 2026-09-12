@@ -72,7 +72,8 @@ def test_the_row_text_reads_as_a_musical_instruction_about_this_story():
     assert "Elizabethan consort music" in row
     assert "evokes forest, moonlit night" in row
     assert "a rising overture that settles into a flowing theme" in row
-    assert "slow tempo, unhurried, expressive rubato" in row, "the model is told the pace"
+    # the magic/dream group asks for a floating pulse rather than grief's rubato
+    assert "slow tempo, floating and unmetered" in row, "the model is told the pace"
     # "enchanted" is slow and "playful" is fast: the contradiction is dropped
     assert "dancing woodwind" not in row
 
@@ -103,6 +104,19 @@ def test_the_negative_prompt_says_this_is_not_a_loop():
     for word in ("loop", "repetitive", "ostinato", "sequencer", "metronome",
                  "drum machine", "click track", "beat"):
         assert word in low, word
+
+
+def test_the_positive_prompt_never_asks_for_the_thing_the_negative_forbids():
+    """codex r1, 2026-09-12: the negative prompt spent the campaign banning
+    beats and loops while `_MOOD_TAGS` -- the last-ditch keyword path into the
+    SAME row text -- was still asking for "tighter rhythm, percussive accents"
+    on any brief containing the word "urgent". A cue of four to twelve seconds
+    that is told to be percussive has only one way to answer."""
+    banned = ("rhythm", "rhythmic", "percussive", "percussion", "drum", "beat",
+              "pulse", "ostinato", "loop", "metronome", "steady")
+    for keyword, tag in MP._MOOD_TAGS.items():
+        low = tag.lower()
+        assert not [w for w in banned if w in low], (keyword, tag)
 
 
 def test_an_authored_prompt_survives_verbatim_inside_the_engine_prompt():
@@ -165,9 +179,26 @@ def test_sa3_sends_the_composed_prompt_verbatim_and_uses_the_composer_negative()
     assert "NEGATIVE_PROMPT_DEFAULT" in body
     assert "OTR_SA3_NEG_PROMPT" in body, "the operator's one override stays"
     assert "placement or prompt" in body, "the cue's placement names the window"
+    # THE RECEIPT RECORDS WHAT THE ENGINE HEARD, NOT WHAT IT WAS OFFERED
+    # (codex r2, 2026-09-12). `OTR_SA3_NEG_PROMPT` overrides the composer's
+    # negative here, so a receipt carrying only the composer's would describe a
+    # cue nobody heard -- and `scripts/otr_music_ab.py` reads exactly these two
+    # fields to prove an A/B arm actually ran.
+    assert '"negative_prompt": str(neg_text)' in body
+    assert '"denoise": float(denoise)' in body
+    # AND THE RATIO IT USED (cursor r3): `seconds_total` alone cannot tell a
+    # 1.0 control arm from the shipped default, because a 36 s window satisfies
+    # "at least 1x a 12 s cue". The one knob this campaign most wants to A/B was
+    # the one the receipt could not identify.
+    assert '"context_ratio": _sa3_context_ratio()' in body
 
 
-def test_sa3_window_follows_the_placement_not_a_word_in_the_prompt():
+def test_sa3_window_follows_the_placement_not_a_word_in_the_prompt(monkeypatch):
+    # THE ENVIRONMENT IS AN INPUT TO THIS FUNCTION (cursor r3, 2026-09-12).
+    # `_env_float` reads it live, so an A/B shell that exported the control
+    # ratio turned these assertions red -- or, far worse, green while the
+    # defect they guard was live.
+    monkeypatch.delenv("OTR_SA3_CONTEXT_RATIO", raising=False)
     """The window is placed by PLACEMENT, and is always longer than the cue
     (the floor below), so no cue is ever a self-contained piece."""
     ctx = 12.0
@@ -179,18 +210,51 @@ def test_sa3_window_follows_the_placement_not_a_word_in_the_prompt():
     assert abs(start - 4.0) < 1e-6 and total == 12.0, "already 3x: unchanged"
 
 
-def test_a_cue_is_never_a_self_contained_piece():
+def test_a_cue_is_never_a_self_contained_piece(monkeypatch):
+    monkeypatch.delenv("OTR_SA3_CONTEXT_RATIO", raising=False)
     """BUG-408 existed to kill seconds_total == dur, and it stayed live for
     the longest cue: at the shipped 12 s context the 12 s opening cue got
     exactly that, which is a loop-shaped request (measured 2026-09-12)."""
     for placement, dur in (("opening", 12.0), ("closing", 8.0), ("interstitial", 4.0)):
         for ctx in (4.0, 8.0, 12.0, 45.0):
             start, total = SA3._sa3_clip_window(placement, dur, ctx)
-            assert total >= dur * SA3._SA3_MIN_CONTEXT_RATIO - 1e-6, (placement, dur, ctx, total)
+            assert total >= dur * SA3._SA3_MIN_CONTEXT_RATIO_DEFAULT - 1e-6, (placement, dur, ctx, total)
             assert total > dur, (placement, dur, ctx, total)
             assert 0.0 <= start <= total - dur + 1e-6, (placement, dur, ctx, start)
     # an operator who asks for MORE context still gets it
     assert SA3._sa3_clip_window("opening", 12.0, 90.0)[1] == 90.0
+
+
+def test_a_ratio_below_the_floor_is_a_control_arm_and_warns_that_it_breaks_the_invariant(
+        monkeypatch, caplog):
+    """The 3x floor is the change most likely to have over-corrected the music
+    into formlessness -- the opening cue renders the first third of a 36 s arc
+    and may never reach the theme it is told to settle into -- and a module
+    constant cannot be A/B'd by scripts/otr_music_ab.py (Fable, 2026-09-12).
+
+    BUT 1.0 DOES NOT MERELY RESTORE THE OLD BEHAVIOUR, IT RESTORES THE DEFECT
+    (codex, 2026-09-12): seconds_total == dur is the self-contained,
+    loop-shaped request `test_a_cue_is_never_a_self_contained_piece` exists to
+    forbid. It stays reachable because a control arm has to reproduce what it
+    controls for, and it has to say so out loud every time."""
+    monkeypatch.setenv("OTR_SA3_CONTEXT_RATIO", "1.0")
+    with caplog.at_level("WARNING"):
+        assert SA3._sa3_clip_window("opening", 12.0, 12.0) == (0.0, 12.0)
+    assert any("control arm" in r.getMessage() for r in caplog.records), caplog.text
+    caplog.clear()
+    monkeypatch.setenv("OTR_SA3_CONTEXT_RATIO", "2.0")
+    assert SA3._sa3_clip_window("opening", 12.0, 12.0) == (0.0, 24.0)
+    # never BELOW the cue itself, whatever is asked for
+    monkeypatch.setenv("OTR_SA3_CONTEXT_RATIO", "0.1")
+    start, total = SA3._sa3_clip_window("opening", 12.0, 12.0)
+    assert total >= 12.0 and start == 0.0
+    # junk falls back to the default rather than crashing a render -- and the
+    # default is not a control arm, so it does not warn
+    caplog.clear()
+    monkeypatch.setenv("OTR_SA3_CONTEXT_RATIO", "not-a-number")
+    with caplog.at_level("WARNING"):
+        assert SA3._sa3_clip_window("opening", 12.0, 12.0)[1] == 36.0
+    assert not [r for r in caplog.records if "control arm" in r.getMessage()]
 
 
 # --------------------------------------------------------------------------- #

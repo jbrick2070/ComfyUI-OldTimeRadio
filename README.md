@@ -57,8 +57,9 @@ an out-of-memory there reboots the machine, not the render.)
 > Model Platform below), and it is the GitHub default branch, so a fresh clone lands on
 > it. The pack is also listed on the
 > [ComfyUI Registry](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio),
-> but no published version is `Active` there yet, so neither the Registry nor
-> ComfyUI-Manager can install it -- section 2 has the detail. Use the git clone.
+> where **`2.0.0-alpha.30` is Active** (verified 2026-09-12), so the Registry and
+> ComfyUI-Manager can install it -- section 2 has the detail. The git clone stays
+> the way to get the newest tree, which moves faster than the published versions.
 
 ---
 
@@ -115,15 +116,19 @@ Then restart ComfyUI so it loads the nodes.
 > (Debian/Ubuntu) or your distro's equivalent plus `pkg-config`, then
 > `pip install pycairo` yourself.
 
-**The ComfyUI Registry route does not currently work, and Manager cannot install
-this pack by any route.** No published version is `Active`
-([registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio)),
-so `latest_version` resolves to null: `@latest` has no target, and Manager
-refuses the `nightly` git path on any network-exposed instance. Checked live
-2026-09-04 -- 5 versions, 0 active: alpha.15/16/17 `Flagged`, alpha.13/14
-`Banned`. If Manager reports "not a CNR node" or
-"cannot resolve install target", that is this, not a fault on your machine. Use
-the clone above.
+**The ComfyUI Registry route works again as of `2.0.0-alpha.30`.** Checked live
+2026-09-12 against the
+[registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio):
+alpha.30 is `Active` and is what `latest_version` resolves to, so `@latest` has
+a target and Manager can install the pack.
+
+**Older published versions are not installable and will not become installable.**
+alpha.25 through .29 are `Flagged` and alpha.13 through .18 are `Banned` -- the
+registry's security scan reads the zip lexically, and every one of those versions
+tripped it. Pin `2.0.0-alpha.30` or later. If Manager reports "not a CNR node" or
+"cannot resolve install target" against this pack, you are on one of the older
+versions; take alpha.30, or use the git clone above, which is always the newest
+tree.
 
 ### 2b. ComfyUI node packs — required by some video lanes
 

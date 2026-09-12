@@ -14678,3 +14678,49 @@ day is logged as a MIX problem, never a failure. Design reviewed by codex r1
 **Verify:** `tests/test_master_loudness_limiter.py`; the real master of
 `moonlit_deception` re-mastered offline: old rail -29.42 LUFS, new limiter
 **-14.44 LUFS**, peak -1.00 dBFS, engaged 1.1% of the time, zero rail residue.
+
+## PBUG-20260912-01 -- a log line with one missing argument killed a finished episode (fixed `988e6b7e`)
+
+**Artifact:** a canonical leg died inside `OTR_StableAudioTheme` with
+`TypeError: not enough arguments for format string`, losing the episode after the
+script, the cast, the voices and the music had all rendered.
+
+**Cause:** the cue ceiling added the same night logged
+`"cue %s peaked %+.2f dBFS -- limited to %+.2f (max reduction %.2f dB, %.1f%% engaged)"`
+with FOUR arguments for FIVE placeholders (`cue_id` was missing). Python's lazy
+`%`-formatting defers the substitution to the handler, so the exception exists
+only when the level is actually enabled: the unit suite ran at WARNING and passed,
+and the server ran at INFO and raised. **A green suite cannot see this class of
+defect at all**, which is what makes it worth a Bible-shaped rule rather than a
+one-line fix.
+
+**Fix:** the missing argument. Then the class: `tests/test_music_render_receipt.py`
+gained `test_the_ceiling_log_line_actually_formats` (enables INFO on the OTR logger
+and calls `record.getMessage()`, which is where the raise lives) and
+`test_no_lazy_log_call_in_the_music_path_has_the_wrong_argument_count` (an AST
+sweep over five music modules counting `%`-placeholders against arguments for every
+`log.*` call). Both verified red against the original line.
+
+**Verify:** those two tests; and the next canonical leg reaching `obs_publish OK`.
+
+## PBUG-20260912-02 -- the music bus hard-clips at the int16 write
+
+**Artifact:** 280 of 1,984 rendered `music_cue_*.wav` files on this box (14%)
+carry more than four samples at full scale, worst 4,710 samples in one cue. The
+audible consequence is PBUG-20260911-07's root cause: the opening cue of
+`moonlit_deception_20260911_185439` carried a clipped burst at 9.6 s that pulled
+the whole 113-second master down 15 dB.
+
+**Cause:** nothing on the music path owns the level. ComfyUI's `VAEDecodeAudio`
+pins RMS but not peak; of the five music adapters only `eng_musicgen` normalises;
+and `_write_cue_wav` casts to int16, which hard-clips anything over full scale
+into square-wave edges.
+
+**Fix:** `stable_audio_theme._ceiling_the_cue` puts every cue under -1 dBFS
+through the same deterministic look-ahead limiter the master uses
+(`scene_sequencer._limit_peaks`), which is a CEILING and not a normalisation -- a
+quiet cue is left quiet, because a whole-cue scale would flatten the dynamic
+relationship between cues that the mix depends on. Receipted per cue.
+
+**Verify:** `tests/test_music_render_receipt.py`; re-measure the cue stems of the
+next canonical episode -- peak at or under -1.00 dBFS with zero clipped samples.

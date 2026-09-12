@@ -72,7 +72,9 @@ BOOT_SCRIPT = REPO_ROOT / "scripts" / "_otr_music_ab_boot.ps1"
 CANONICAL = REPO_ROOT / "workflows" / "otr_canonical.json"
 #: Where episodes land. The operator's own output tree, never a test rig
 #: (memory: "obs is always the local output folder").
-EPISODES = Path(r"C:\Users\jeffr\Documents\ComfyUI\output\otr\episodes")
+EPISODES = (Path(os.environ.get("OTR_OUTPUT_DIR")
+                 or r"C:\Users\jeffr\Documents\ComfyUI\output")
+            / "otr" / "episodes")
 DEFAULT_PROFILE = "otr_w45_still_flat"
 LEG_TIMEOUT_S = 3600
 BOOT_TIMEOUT_S = 300
@@ -159,7 +161,13 @@ def measure_episode(episode_dir: Path) -> list[dict]:
 
 def receipt_of(episode_dir: Path) -> dict:
     """What the ledger says the engine was asked for, when it recorded it."""
-    for path in glob.glob(str(episode_dir / "audio" / "*_ledger.json")):
+    # THE EPISODE'S OWN LEDGER FIRST. A stray `pending_*_ledger.json` can
+    # sit beside it and would otherwise win on glob order (cursor r3).
+    own = episode_dir / "audio" / ("%s_ledger.json" % episode_dir.name)
+    ordered = ([str(own)] if own.is_file() else []) + [
+        p for p in sorted(glob.glob(str(episode_dir / "audio" / "*_ledger.json")))
+        if Path(p) != own]
+    for path in ordered:
         try:
             ledger = json.loads(Path(path).read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
@@ -172,6 +180,10 @@ def receipt_of(episode_dir: Path) -> dict:
                     "palette": receipt.get("palette_key"),
                     "params": receipt.get("params") or {},
                     "engine_prompt": (receipt.get("engine_prompt") or "")[:240],
+                    # The COMPOSER'S negative, kept for reading. The one the
+                    # binding compares is the ENGINE'S, inside `params`,
+                    # because OTR_SA3_NEG_PROMPT overrides the composer.
+                    "negative_prompt": receipt.get("negative_prompt") or "",
                 }
         return out
     return {}
@@ -233,10 +245,18 @@ def boot_server(env_overrides: dict, log_path: Path) -> bool:
 
 
 def parse_arm(text: str) -> tuple[str, dict]:
-    """``name`` or ``name:KEY=VALUE,KEY=VALUE`` -> ``(name, env)``."""
+    """``name`` or ``name:KEY=VALUE,KEY=VALUE`` -> ``(name, env)``.
+
+    A SEMICOLON SEPARATES PAIRS WHEN ONE IS PRESENT, and then commas are
+    ordinary characters inside a value (cursor r3, 2026-09-12). Every real
+    negative prompt is a comma list, so the anti-loop negative -- the single
+    biggest lever measured in this campaign -- could not be expressed as an
+    arm at all: it either truncated at the first comma or exited.
+    """
     name, _, rest = text.partition(":")
     env = {}
-    for pair in rest.split(",") if rest else []:
+    separator = ";" if ";" in rest else ","
+    for pair in rest.split(separator) if rest else []:
         if not pair.strip():
             continue
         key, _, value = pair.partition("=")
@@ -246,13 +266,18 @@ def parse_arm(text: str) -> tuple[str, dict]:
     return name.strip() or "arm", env
 
 
-def episode_from_log(log_path: Path) -> Path | None:
+def episode_from_log(log_path: Path, after: float) -> Path | None:
     """The episode THIS arm rendered, taken from the runner's own output.
 
     Preferred over "the newest directory" because the episode root is shared:
     a second window, an overnight batch or a leg already in flight can finish
     into it while an arm runs, and a timestamp heuristic would then attribute
     somebody else's music to this arm with no error at all.
+
+    The log is this arm's and is truncated at its start, so a name in it is
+    this arm's work -- but only if the CUES were written after the arm began
+    (codex, 2026-09-12). A runner that reuses or merely mentions an earlier
+    episode would otherwise hand back music nothing in this arm rendered.
     """
     try:
         text = log_path.read_text(encoding="utf-8", errors="replace")
@@ -265,39 +290,49 @@ def episode_from_log(log_path: Path) -> Path | None:
             seen.append(name)
     for name in reversed(seen):
         candidate = EPISODES / name
-        if (candidate / "audio").is_dir():
+        if cues_written_after(candidate, after):
             return candidate
+        if (candidate / "audio").is_dir():
+            _say("%s is named in this arm's log but its music predates the "
+                 "arm -- not measuring it" % name)
     return None
 
 
-def newest_episode(after: float) -> Path | None:
-    """Fallback only, and LOUD about its own ambiguity."""
-    candidates = [Path(p) for p in glob.glob(str(EPISODES / "*"))
-                  if Path(p).is_dir() and Path(p).stat().st_mtime >= after]
-    if not candidates:
-        return None
-    if len(candidates) > 1:
-        _say("WARNING: %d episodes appeared while this arm ran (%s) and the "
-             "runner log did not name one -- attributing the newest, which "
-             "may be another window's work"
-             % (len(candidates), ", ".join(sorted(p.name for p in candidates))[:160]))
-    return max(candidates, key=lambda p: p.stat().st_mtime)
+def cues_written_after(episode_dir: Path, after: float) -> bool:
+    """Does this episode hold music cues that were written after ``after``?
+
+    NO GRACE WINDOW (codex r2). The first cut allowed a second of slack for
+    filesystem granularity, which is both unnecessary -- an arm's music is
+    written MINUTES into its render, never in the first second -- and a hole
+    wide enough to admit a neighbouring render. A proof with a tolerance is
+    not a proof.
+    """
+    cues = glob.glob(str(episode_dir / "audio" / "music_cue_*.wav"))
+    return bool(cues) and all(Path(c).stat().st_mtime >= after for c in cues)
 
 
-def run_arm(name: str, env_overrides: dict, args) -> dict:
-    """Render ONE canonical episode with ``env_overrides`` applied."""
+def run_arm(name: str, env_overrides: dict, args, *, server_is_dirty=False) -> dict:
+    """Render ONE canonical episode with ``env_overrides`` applied.
+
+    ``server_is_dirty`` means an earlier arm in this run booted a server with
+    ITS settings. A shipped-defaults arm that followed one used to reuse that
+    server and report the mutated recipe as the baseline -- argv order was
+    load-bearing and nothing said so (cursor r3, 2026-09-12). Such an arm now
+    boots a clean server of its own.
+    """
     log_path = REPO_ROOT / "tmp" / ("_music_ab_%s.log" % "".join(
         c if c.isalnum() else "_" for c in name))
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    if env_overrides and needs_its_own_server(env_overrides):
+    wants_own_server = bool(env_overrides) and needs_its_own_server(env_overrides)
+    if wants_own_server or server_is_dirty:
         if args.no_boot:
             raise SystemExit(
-                "arm %r sets %s, which the SERVER reads, but --no-boot was "
-                "given. The runner only POSTs to a server that is already "
-                "running, so these settings would be silently ignored and the "
-                "arm would measure nothing. Drop --no-boot, or boot the server "
-                "yourself with them set." % (
-                    name, ", ".join(sorted(env_overrides))))
+                "arm %r needs its own server (%s), but --no-boot was given. "
+                "The runner only POSTs to a server that is already running, so "
+                "the arm would measure whatever the resident server was booted "
+                "with. Drop --no-boot, or boot the server yourself." % (
+                    name, ", ".join(sorted(env_overrides)) if wants_own_server
+                    else "an earlier arm left this server holding ITS settings"))
         boot_log = REPO_ROOT / "tmp" / ("_music_ab_server_%s.log" % "".join(
             c if c.isalnum() else "_" for c in name))
         if not boot_server(env_overrides, boot_log):
@@ -329,7 +364,12 @@ def run_arm(name: str, env_overrides: dict, args) -> dict:
             code = -1
             handle.write("\n### runner timeout\n")
     minutes = round((time.time() - started) / 60.0, 1)
-    episode = episode_from_log(log_path) or newest_episode(started)
+    episode = episode_from_log(log_path, started)
+    if episode is not None and not receipt_matches(episode, env_overrides):
+        _say("REFUSING %s: its receipt does not carry this arm's settings, "
+             "so either it is another render or this arm never reached the "
+             "engine. Either way the number would be a lie." % episode.name)
+        episode = None
     result = {"arm": name, "env": env_overrides, "exit": code, "minutes": minutes,
               "log": log_path.name, "episode": episode.name if episode else None}
     if episode is not None:
@@ -338,6 +378,103 @@ def run_arm(name: str, env_overrides: dict, args) -> dict:
     _say("arm %r finished: exit=%s %.1f min episode=%s" % (
         name, code, minutes, result["episode"]))
     return result
+
+
+#: Server-side settings the render receipt RECORDS, and therefore the only
+#: ones an arm can be proved to have run (codex r2, 2026-09-12). An arm that
+#: sets a server-side variable outside this map is refused rather than
+#: measured, because a number nothing can attribute is worse than none.
+_RECEIPT_FIELDS = {"OTR_SA3_SAMPLER": "sampler",
+                   "OTR_SA3_SCHEDULER": "scheduler",
+                   "OTR_SA3_STEPS": "steps",
+                   "OTR_SA3_CFG": "cfg",
+                   "OTR_SA3_DENOISE": "denoise",
+                   "OTR_SA3_NEG_PROMPT": "negative_prompt",
+                   "OTR_SA3_CONTEXT_RATIO": "context_ratio"}
+
+
+def _safe_cue_name(cue_id) -> str:
+    """The cue id as the wav writer spells it (`stable_audio_theme.py:595`)."""
+    return "".join(c if (c.isalnum() or c in "._-") else "_" for c in str(cue_id))
+
+
+def _cue_id_of_wav(path) -> str:
+    """`.../music_cue_opening.wav` -> `opening`."""
+    return Path(path).stem[len("music_cue_"):]
+
+
+def receipt_matches(episode_dir: Path, env_overrides: dict) -> bool:
+    """Does this episode's music receipt carry the settings THIS arm asked
+    for? (codex, 2026-09-12.)
+
+    Naming and timing bind an episode to an arm's WINDOW; this binds it to
+    the arm's REQUEST. The engine records what it actually ran, so an arm can
+    refuse an episode whose sampler or step count is not the one it asked
+    for -- which is also the check that would have caught the inert arms of
+    2026-09-12, where the settings never reached the server at all.
+
+    Its reach is exactly the recorded fields, and an arm that reaches past
+    them is REFUSED rather than measured (codex r2): a server-side setting
+    the receipt does not record cannot be attributed to any episode, and a
+    number nothing can attribute is worse than no number. There is no
+    exception and no inequality -- every check here is an EQUALITY, because
+    the first cut compared the context ratio as a floor and a default 3x
+    episode satisfied a 1.0 control arm perfectly (cursor r3). An arm that
+    sets nothing server-side has nothing to check and passes.
+    """
+    unverifiable = [key for key in env_overrides
+                    if key.startswith(SERVER_SIDE_PREFIXES)
+                    and key not in _RECEIPT_FIELDS]
+    if unverifiable:
+        _say("REFUSING: %s is read inside the server and the receipt does not "
+             "record it, so no episode can be proved to be this arm's. Add it "
+             "to the render receipt before A/B-ing it."
+             % ", ".join(sorted(unverifiable)))
+        return False
+    checks = {field: env_overrides[key] for key, field in _RECEIPT_FIELDS.items()
+              if key in env_overrides}
+    if not checks:
+        return True
+    receipt = receipt_of(episode_dir)
+    if not receipt:
+        _say("no music receipt in %s -- cannot prove it is this arm's"
+             % episode_dir.name)
+        return False
+    # EVERY MEASURED CUE NEEDS A RECEIPT ROW (codex r2). The measurement is
+    # per wav and the check was per receipt row, so an episode with two cues
+    # and one row passed on the strength of half its music.
+    measured = {_cue_id_of_wav(path) for path in
+                glob.glob(str(episode_dir / "audio" / "music_cue_*.wav"))}
+    receipted = {_safe_cue_name(cue) for cue in receipt}
+    missing = measured - receipted
+    if missing:
+        _say("%s measures %s with no receipt row -- cannot prove it is this "
+             "arm's" % (episode_dir.name, ", ".join(sorted(missing))))
+        return False
+    for cue, row in receipt.items():
+        params = row.get("params") or {}
+        for field, wanted in checks.items():
+            if field not in params:
+                # FAIL CLOSED ON AN ABSENT FIELD. A receipt that does not
+                # record what this arm set cannot prove the arm ran, and
+                # "no field" used to read as "no objection".
+                _say("%s cue %s has no %s in its receipt, so this arm's "
+                     "%s=%s is unproven" % (episode_dir.name, cue, field,
+                                            field, wanted))
+                return False
+            if not _same_setting(params.get(field), wanted):
+                _say("%s cue %s ran %s=%s but this arm asked for %s"
+                     % (episode_dir.name, cue, field, params.get(field), wanted))
+                return False
+    return True
+
+
+def _same_setting(actual, wanted) -> bool:
+    """``100`` and ``"100"`` and ``"100.0"`` are the same request."""
+    try:
+        return abs(float(actual) - float(wanted)) < 1e-6
+    except (TypeError, ValueError):
+        return str(actual).strip() == str(wanted).strip()
 
 
 def report(results: list[dict]) -> None:
@@ -392,9 +529,12 @@ def main(argv=None) -> int:
                             "cues": measure_episode(episode),
                             "receipt": receipt_of(episode)})
     else:
+        dirty = False
         for text in args.arms:
             name, env_overrides = parse_arm(text)
-            results.append(run_arm(name, env_overrides, args))
+            results.append(run_arm(name, env_overrides, args,
+                                   server_is_dirty=dirty))
+            dirty = dirty or needs_its_own_server(env_overrides)
 
     report(results)
     if args.json_out:

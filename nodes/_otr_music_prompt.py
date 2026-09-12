@@ -109,12 +109,12 @@ _MOOD_TAGS: dict[str, str] = {
     "betrayal":   "minor mode, unresolved tension",
     "discovery":  "rising figure, slight upward motion",
     "loss":       "subdued, slow decay",
-    "urgent":     "tighter rhythm, percussive accents",
+    "urgent":     "urgent rising line, restless bass",
     "isolation":  "sparse texture, wide stereo field",
     "danger":     "building tension, dissonant cluster",
     "mystery":    "harmonic ambiguity, slow modulation",
     "triumph":    "resolving cadence, brighter register",
-    "conflict":   "rhythmic accents, opposing voices",
+    "conflict":   "opposing voices, clashing harmony",
     "silence":    "minimal density, long pauses",
 }
 

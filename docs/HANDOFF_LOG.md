@@ -1,3 +1,93 @@
+## 2026-09-12 (early hours) -- the loop, the render-killer, and a harness that cannot lie
+
+**His verdict on the newest episode:** *"like it went a bit crazy on a loop a loop
+tape deck ... the music that is ... the rest is good and better than before."*
+
+**What the loop actually was.** Not a repeated audio segment and nothing
+downstream: the cue's LOUDNESS ENVELOPE repeated on a ~0.25 s period, which is
+what a text-to-audio model returns when the request leaves it room. Four causes,
+all in the REQUEST, all fixed in `b43fb36b`: plucked instruments led the palette;
+two contradictory device sets landed in one 12-second cue; the text carried no
+tempo information at all (duration is a separate argument and never reaches the
+model); and `_sa3_clip_window` handed the 12 s opening cue `seconds_total == dur`,
+the exact degenerate case BUG-408 existed to remove. The anti-loop negative alone
+took a closing cue from 0.78 to 0.26 over four seeds. The same commit puts a
+LIMITER-shaped ceiling on each cue at -1 dBFS, because 280 of 1,984 cue wavs on
+this box (14%) hard-clip at the int16 write and nothing on the music path
+normalises.
+
+**The harness, and why it had to be rebuilt (his instruction: "you need to create
+a new harness from canonical to be safe").** The in-process bench that opened
+this investigation was WRONG in a way worth recording: reproducing a shipped cue
+from its own ledger receipt -- same prompt, same seed, same sampler settings --
+came back at correlation 0.92 and nine decibels hotter, because a bare process
+does not reproduce the server's model load. `scripts/otr_music_ab.py` therefore
+renders only through `scripts/otr_canonical_api_run.py`. Two silent failures cost
+an hour before it worked (`98cb900b`, `da9ab78e`): a `wmic` selective kill does
+nothing on Windows 11, so the old server kept :8000; and `subprocess.Popen` on the
+launcher `.cmd` with `DETACHED_PROCESS` returns a pid and never runs the batch.
+Both are replaced by `scripts/_otr_music_ab_boot.ps1` (`Get-CimInstance` +
+`Start-Process -FilePath`), which is what CLAUDE.md sections 4 and 5 already
+prescribe. **An arm that sets `OTR_SA3_*` gets its own server or it measures
+nothing** -- those are read inside the ComfyUI process and the runner only POSTs.
+
+**The render-killer (`988e6b7e`), and it is the one to read twice.** The cue
+ceiling's own log line had five format placeholders and four arguments, so
+`OTR_StableAudioTheme` raised `TypeError: not enough arguments for format string`
+and an episode died. Lazy `%`-formatting means the exception only exists when the
+level is enabled, so every test passed and the server died. Two guard tests now
+exist: one calls `getMessage()` with INFO enabled, one is an AST sweep over five
+music modules for any lazy log call whose placeholder count does not match its
+arguments.
+
+**The recipe diff against the publishers' own SA3 templates**
+(`docs/2026-09-12-sa3-graph-diff/driver_anchor.md`): ours is
+`dpmpp_3m_sde_gpu`/`exponential`, 100 steps, cfg 7.0, inherited from a Stable
+Audio **1.0** example; theirs is `lcm`/`simple` with an empty negative and no
+`ConditioningStableAudio` node at all. On the canonical path ours measured
+0.109 / 0.286 loopiness; their base template (lcm/simple, 50 steps, cfg 7)
+measured 0.151 / 0.211 at peak -1.00 dBFS with zero clipped samples and HALF the
+steps; their distilled arm (cfg 1) measured 0.508 / 0.746 and 10-18 dB quiet,
+because at cfg 1 there is no classifier-free guidance and the anti-loop negative
+is simply ignored. That arm is closed; the other is a listening decision and is
+now a plan row.
+
+**Then a Fable plan pass and a codex review of the fold** (this push). Fable found
+four defects in the night's own music work -- a banned word four lines under the
+comment banning it, a pace decided by whichever mood word the writer typed first,
+one rubato phrase covering both grief and dread, and a constant the harness could
+not move. Acting on the third created a FIFTH that the harness caught: the
+replacement tension phrase "a held and unwavering pulse" measured **0.864** on the
+next ominous leg, the worst of the campaign, against 0.485 for the episode that
+started the complaint. An unwavering pulse IS a repeating figure. codex then read
+the finished diff and returned a flat **no** with three must-fixes, all real: the
+tempo still moved with the brief's word order and could contradict its own pace;
+`OTR_SA3_CONTEXT_RATIO=1.0` restored the DEFECT rather than the old behaviour and
+did so silently; and the harness could still attribute another render's episode.
+All folded, with the arbitrations made explicit and order-free, a warning on the
+control arm, and three fail-closed bindings on the harness.
+
+**What is NOT proven, and it is the important line:** one canonical leg is not
+evidence. The same code and recipe gave 0.109 on `whispers_in_the_woods` and 0.864
+on `shadows_in_the_mist`, because their briefs routed to different tempo phrases.
+The loop work is directionally right and wants several legs per arm plus his ear.
+
+**The registry chase finished.** `2.0.0-alpha.30` is **Active** and is what
+`latest_version` resolves to (read live 2026-09-12). alpha.25-29 stay `Flagged`
+and alpha.13-18 stay `Banned` -- burned strings, not a route to reopen. The
+README's two passages claiming the Registry route is dead were WRONG and are
+corrected in this push; his words: *"I think this is wrong?"* He was right.
+
+**Reviewers, exactly:** Fable 5.1 on the plan-level pass; codex r1 on the finished
+pace/tempo diff (verdict "no", three must-fixes, two should-fixes and a rename
+folded); codex r2 on the fold. Neuter passes 8/8 (music loop), 3/3 (cue ceiling),
+6/6 (Fable follow-ups) and 16/16 (the codex fold, markers to zero each time).
+Full-suite failure identities unchanged before every push.
+
+**Pending for the operator:** listen to the next episodes for the music and for
+pumping around any loud moment; then decide the SA3 recipe (half the steps is
+worth an A/B listen). The 4060 / Mac / RunPod wave stays parked until released.
+
 ## 2026-09-11 (night) -- the music is music, and a cold install renders
 
 **Shipped, four pushes:** `3e97d831` (section-3 rows: a probe-confirmed caption
@@ -80,8 +170,8 @@ for the next window that touches those lanes.
 
 **Pending for the operator:** listen to `laughter_in_the_shadows_20260911_214126` (music) and say whether the
 music is now music; the NEXT episode rendered carries the limiter -- listen for
-level and for pumping around any loud moment; `pyproject.toml` gets `av>=17.0.0` at the next version bump
-(plan row); the 4060 / Mac / RunPod wave stays parked until released.
+level and for pumping around any loud moment; `av>=17.0.0` shipped WITH the alpha.30 bump
+in `0f6caa12`, so the plan row that asked for it later is retired; the 4060 / Mac / RunPod wave stays parked until released.
 
 **Still open, unchanged:** the wave paste blocks (freeze at the final hash once
 his ear passes), the 5A model-root cut, the 5B rows.
