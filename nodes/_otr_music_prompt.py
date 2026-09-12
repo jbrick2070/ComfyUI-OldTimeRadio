@@ -206,6 +206,12 @@ def compose_engine_prompt(meta: dict, row_text: str) -> EnginePrompt:
     body = str(row_text or "").strip()
     budget = ENGINE_PROMPT_MAX_CHARS - len(head)
     if len(body) > budget:
-        body = _trim_at_clause(body, budget)
+        if body.endswith(_PROMPT_TAIL):
+            # A composed row overflowing keeps its instrumental-only tail:
+            # the clauses that go are in the middle, never the instruction.
+            body = (_trim_at_clause(body[:-len(_PROMPT_TAIL)],
+                                    budget - len(_PROMPT_TAIL)) + _PROMPT_TAIL)
+        else:
+            body = _trim_at_clause(body, budget)
     return EnginePrompt(text=(head + body).strip(), negative=NEGATIVE_PROMPT_DEFAULT,
                         palette_key=palette.key)

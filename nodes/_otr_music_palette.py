@@ -97,7 +97,8 @@ _MOOD_DEVICES = (
      "celesta, harp glissandi, shimmering strings"),
     (r"\b(?:tense|tension|suspens|dread|fear|danger|menac|uneasy|anxi|nervous)",
      "minor key, tremolo strings, low brass swells"),
-    (r"\b(?:sad\b|grief|loss\b|mourn|melanchol|sorrow|sombre|somber|elegiac|lament)",
+    (r"\b(?:sad\b|grief|loss\b|mourn|melanchol|sorrow|sombre|somber|elegiac|lament"
+     r"|hopeless|loveless|despair|forlorn|lonel)",
      "slow cello line, muted piano, held minor chords"),
     (r"\b(?:dark\b|brood|sinister|ominous|grim\b|forebod|malevol)",
      "low strings, bass clarinet, slow dissonant chords"),
@@ -107,7 +108,8 @@ _MOOD_DEVICES = (
      "full brass fanfare, timpani, soaring strings"),
     (r"\b(?:myster|eerie|uncanny|strange|haunt|secret|shadow|deceit|decept|intrigue)",
      "sustained strings, harp arpeggios, sparse piano"),
-    (r"\b(?:warm\b|warmth|tender|love|romanc|romantic|gentle|hope|affection|joy)",
+    (r"\b(?:warm\b|warmth|tender|love\b|lovely|lover|loving|romanc|romantic|gentle"
+     r"|hope\b|hopeful|affection|joy)",
      "major key, legato strings, soft woodwinds"),
     (r"\b(?:playful|comic|comed|whims|mischie|merry|jest|light-?hearted|witty)",
      "pizzicato strings, bright woodwinds, brushed drums"),

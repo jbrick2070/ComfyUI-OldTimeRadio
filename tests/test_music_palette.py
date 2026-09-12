@@ -88,6 +88,14 @@ def test_short_stems_are_bounded_so_warm_is_not_war_and_moonlight_is_not_light()
     assert P.mood_devices(["war"]) == ["driving rhythm, staccato strings, snare accents"]
     assert P.mood_devices(["moonlight"]) == ["celesta, harp glissandi, shimmering strings"]
     assert P.mood_devices(["lighthearted"]) == ["pizzicato strings, bright woodwinds, brushed drums"]
+    # despair is not warmth: the stems that used to swallow their opposites
+    sad = "slow cello line, muted piano, held minor chords"
+    warm = "major key, legato strings, soft woodwinds"
+    assert P.mood_devices(["hopeless"]) == [sad]
+    assert P.mood_devices(["loveless"]) == [sad]
+    assert P.mood_devices(["hopeful"]) == [warm]
+    assert P.mood_devices(["lovely"]) == [warm]
+    assert P.mood_devices(["love"]) == [warm]
 
 
 def test_no_mood_or_junk_still_yields_a_musical_instruction():

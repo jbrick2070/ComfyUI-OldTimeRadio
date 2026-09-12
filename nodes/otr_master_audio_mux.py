@@ -183,7 +183,8 @@ def duration_receipt_line(v_dur: float, a_dur: float, max_tail_s: float,
     are three different claims that must never collapse into each other:
 
     ``UNPROVEN``
-        ``_probe_float`` returns ``-1.0`` when ffprobe is absent or the duration
+        ``_probe_float`` returns ``-1.0`` when nothing on the box can measure (no
+        ffprobe and no PyAV, since 2026-09-11) or the duration
         is unparsable. The budget comparison is then meaningless, so the gate is
         SKIPPED -- and a skipped gate must not report as a passed one. Reported
         rather than made fatal because this is the final sanity ceiling, not the
@@ -641,9 +642,11 @@ def _compile_foley_master(master_audio_path: str, receipts_json: str,
         % (stats["placed"], len(bearing),
            ",".join("%s:%d" % kv for kv in lanes.items()) or "none",
            stats["global_master_gain"], os.path.basename(mixed_path)),
-        "foley_loudness=%s measured=%s -> target=%s gain_db=%s peak_dbfs=%.2f"
+        "foley_loudness=%s measured=%s -> target=%s gain_db=%s peak_dbfs=%.2f "
+        "limiter_max_db=%s delivered_lufs=%s"
         % (loud.get("mode"), loud.get("measured_lufs"),
-           loud.get("target_lufs"), loud.get("gain_db"), peak_dbfs),
+           loud.get("target_lufs"), loud.get("gain_db"), peak_dbfs,
+           loud.get("limiter_max_reduction_db"), loud.get("delivered_lufs")),
     ]
     if stats["muted_samples"]:
         # MIME MUTES REAL AUDIO ON PURPOSE, and a receipt that did not say how

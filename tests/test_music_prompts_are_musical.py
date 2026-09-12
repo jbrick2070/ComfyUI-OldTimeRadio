@@ -110,6 +110,21 @@ def test_the_engine_prompt_is_capped_below_the_smallest_engine_budget_without_ra
     assert not engine.text.endswith(",")
 
 
+def test_an_overflowing_composed_row_keeps_its_instrumental_tail():
+    meta = _meta("original", None,
+                 moods=tuple("mood word number %d" % i for i in range(3)),
+                 setting=tuple("a setting phrase that runs long %d" % i for i in range(2)))
+    row, _ = MP.compose_music_prompt(meta, "opening")
+    long_row = row.replace("evokes", "evokes " + ", ".join(
+        "an extra scenic clause %d" % i for i in range(60)) + ",")
+    assert len(long_row) > MP.ENGINE_PROMPT_MAX_CHARS
+    assert long_row.endswith("instrumental only, no dialogue, no vocals")
+    engine = MP.compose_engine_prompt(meta, long_row)
+    assert len(engine.text) <= MP.ENGINE_PROMPT_MAX_CHARS
+    assert engine.text.endswith("instrumental only, no dialogue, no vocals")
+    assert engine.text.startswith(P.HOUSE_PALETTE.instruments)
+
+
 def test_junk_meta_still_composes_both_products():
     for junk in (None, {}, [], "x", {"source_meta": "c. 1595", "music_mood_terms": 3}):
         row, _ = MP.compose_music_prompt(junk if isinstance(junk, dict) else {}, "opening")

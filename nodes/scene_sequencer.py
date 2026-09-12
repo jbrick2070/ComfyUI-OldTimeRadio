@@ -337,6 +337,111 @@ _MASTER_TARGET_LUFS = -14.0
 _LUFS_MIN_SECONDS = 0.4
 
 
+#: The look-ahead peak limiter behind the delivery master (2026-09-11). ONE
+#: transient must never set the level of the whole episode: moonlit_deception
+#: shipped at -29.4 LUFS against the -14 target because a clipped music burst
+#: at 9.6 s pushed the peak rail below, and the rail scaled the ENTIRE 113 s
+#: master down by ~13 dB. Dialogue went with it (operator: "our volume is too
+#: low ... may not be normalizing right"). The rail is now a limiter that
+#: touches only the samples around a peak.
+_LIMITER_BLOCK_S = 0.001            # gain-envelope resolution: 1 ms
+_LIMITER_LOOKAHEAD_BLOCKS = 5       # the gain is down 5 ms before a peak arrives
+_LIMITER_RELEASE_DB_PER_S = 60.0    # a 12 dB reduction recovers in 200 ms
+_LIMITER_HEAVY_REDUCTION_DB = 12.0  # above this the MIX has a transient problem
+_LIMITER_HEAVY_FRACTION = 0.05      # ...or if engaged this much of the time
+_LIMITER_MAX_REDUCTION_DB = 120.0   # a finite bound: an inf sample asks for this
+
+
+def _limit_peaks(waveform, ceiling: float, sample_rate: int):
+    """A deterministic look-ahead peak limiter. Only the samples around a peak
+    above ``ceiling`` are attenuated; everything else passes with gain exactly
+    1.0, so the clip-to-clip balance the master promises survives wherever
+    the limiter is idle. Returns ``(waveform, stats)``.
+
+    Vectorised, numpy only, no RNG: the required reduction in dB is taken per
+    1 ms block (a block's peak sets its whole block), pushed EARLIER by a
+    5-block look-ahead (the max over the next blocks), released as a decaying
+    max at 60 dB/s (a cumulative max in a tilted frame -- no Python loop over
+    samples), and interpolated linearly between block starts so the attack is
+    a 1 ms ramp and the release is smooth, with the block value HELD under the
+    ramp so no sample in a block sees less than that block's full reduction. A
+    final hard clip is the last rail for float residue; its count is receipted
+    and is normally zero.
+    """
+    is_tensor = hasattr(waveform, "detach")
+    arr = waveform.detach().cpu().numpy() if is_tensor else np.asarray(waveform)
+    shape = arr.shape
+    flat = arr.reshape(-1, shape[-1]) if arr.ndim > 1 else arr.reshape(1, -1)
+    n = int(flat.shape[-1])
+    ceiling = float(ceiling)
+    idle = {"engaged": False, "max_reduction_db": 0.0,
+            "engaged_fraction": 0.0, "rail_clipped_samples": 0}
+    if n == 0 or ceiling <= 0.0:
+        return waveform, idle
+    # A non-finite sample must stay LOCAL, as it did under the old rail: a NaN
+    # asks for no reduction and an inf for a finite, bounded one, so the
+    # cumulative-max release below can never carry NaN or inf to the end of
+    # the file (Sonnet QA 2026-09-11: one NaN used to NaN the whole tail).
+    peak_track = np.nan_to_num(np.abs(flat).max(axis=0).astype(np.float64),
+                               nan=0.0, posinf=1e6, neginf=1e6)
+    if float(peak_track.max()) <= ceiling:
+        return waveform, idle
+    block = max(1, int(round(float(sample_rate) * _LIMITER_BLOCK_S)))
+    n_blocks = -(-n // block)
+    padded = np.zeros(n_blocks * block, dtype=np.float64)
+    padded[:n] = peak_track
+    block_peak = padded.reshape(n_blocks, block).max(axis=1)
+    reduction = np.minimum(_LIMITER_MAX_REDUCTION_DB, np.maximum(
+        0.0, 20.0 * np.log10(np.maximum(block_peak, 1e-12) / ceiling)))
+    look = reduction.copy()
+    for ahead in range(1, _LIMITER_LOOKAHEAD_BLOCKS + 1):
+        if ahead < n_blocks:
+            look[:-ahead] = np.maximum(look[:-ahead], reduction[ahead:])
+    slope = _LIMITER_RELEASE_DB_PER_S * _LIMITER_BLOCK_S     # dB per block
+    index = np.arange(n_blocks, dtype=np.float64)
+    envelope = np.maximum.accumulate(look + slope * index) - slope * index
+    envelope = np.maximum(envelope, look)
+    # The ramp between block starts gives the 1 ms attack and the smooth
+    # release; the block HOLD underneath it guarantees every sample of a
+    # block gets at least that block's full reduction (codex r1: a release
+    # inside the peak's own block would let a late maximum escape).
+    ramp = np.interp(np.arange(n, dtype=np.float64), index * block, envelope)
+    hold = np.repeat(envelope, block)[:n]
+    per_sample = np.maximum(ramp, hold)
+    gain = 10.0 ** (-per_sample / 20.0)
+    limited = flat * gain[None, :]
+    over = int(np.count_nonzero(np.abs(limited) > ceiling * (1.0 + 1e-9)))
+    limited = np.clip(limited, -ceiling, ceiling)
+    out = np.ascontiguousarray(limited.reshape(shape).astype(arr.dtype, copy=False))
+    stats = {"engaged": True,
+             "max_reduction_db": round(float(envelope.max()), 2),
+             "engaged_fraction": round(float(np.mean(envelope > 0.1)), 4),
+             "rail_clipped_samples": over}
+    if is_tensor:
+        out = torch.from_numpy(out).to(waveform.device)
+    return out, stats
+
+
+def _measure_lufs(waveform, sample_rate: int):
+    """Integrated loudness of ``waveform`` ((1, ch, n) / (ch, n) / (n,)), or
+    ``None`` when it cannot be measured. Never raises."""
+    try:
+        import pyloudnorm as _pln
+        arr = (waveform.detach().cpu().numpy()
+               if hasattr(waveform, "detach") else np.asarray(waveform))
+        while arr.ndim > 2:
+            arr = arr[0]
+        if arr.ndim == 2:
+            arr = arr.T
+        if arr.shape[0] < int(_LUFS_MIN_SECONDS * sample_rate):
+            return None
+        value = float(_pln.Meter(sample_rate).integrated_loudness(
+            np.ascontiguousarray(arr, dtype=np.float64)))
+        return value if value > -70.0 else None
+    except Exception:  # noqa: BLE001 -- a receipt never costs an episode
+        return None
+
+
 def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
                      target_lufs=None, sample_rate: int = 48000):
     """Final episode loudness master: measure LUFS, gain to target, peak-safe.
@@ -347,9 +452,15 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     ``_level_dialogue_clip`` on both the announcer and character buses. **The
     two do different jobs and must not be confused:** per-clip levelling makes
     one character sit correctly against another; this stage moves the finished
-    mix as a whole. Because it applies a SINGLE LINEAR GAIN it cannot disturb
-    the clip-to-clip balance established upstream -- every relative level
-    survives untouched.
+    mix as a whole. It applies a SINGLE LINEAR GAIN, so the clip-to-clip
+    balance established upstream survives untouched everywhere the limiter
+    below is idle -- which is everywhere but the few milliseconds around a
+    peak that would otherwise cross the ceiling (2026-09-11).
+
+    TWO CALL SITES, two branches, never twice on one signal: the assembler
+    masters its own pre-mix snapshot (the non-foley route), and the master
+    mux masters the foley-mixed stem (the foley route) -- see
+    ``otr_master_audio_mux.mix_and_master`` for the hand-off.
 
     WHY THIS REPLACED PEAK NORMALISATION (2026-08-19, PBUG-20260819-01,
     panelled by Fable + Sonnet on the operator's instruction to confirm best
@@ -369,6 +480,17 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     8 dB ceiling move produced a **10.3 dB** loudness move (-13.26 -> -23.58
     LUFS). A blind fader A/B on this stage cannot predict its own delivered
     level, so ``ceiling_dbfs`` must never be "tuned by ear".
+
+    THE RAIL BECAME A LIMITER (2026-09-11). The peak rail below this gain used
+    to be a whole-file scale: any peak over the ceiling scaled the ENTIRE
+    master down until that one peak sat at the ceiling. moonlit_deception
+    shipped at -29.4 LUFS that way -- a clipped music burst at 9.6 s cost the
+    whole 113 s episode ~13 dB, dialogue included. `_limit_peaks` now takes
+    the overshoot out of the samples around each peak (look-ahead, fast
+    attack, 60 dB/s release) and leaves gain 1.0 everywhere else, so the
+    delivered loudness stays at target and the clip-to-clip balance survives
+    wherever the limiter is idle. The receipt says how hard it worked; a hard
+    day is logged as a MIX problem, never a failure.
 
     Fully deterministic (no RNG). Returns ``(waveform, info)``; ``info`` carries
     the measurement for the caller's log and any receipt.
@@ -414,20 +536,66 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
     if measured is not None and measured > -70.0:
         gain_db = float(target_lufs) - measured
         waveform = waveform * (10.0 ** (gain_db / 20.0))
-        new_peak = float(waveform.abs().max())
-        limited = new_peak > ceiling
-        if limited:
-            # Safety rail only. On real episodes the gain is NEGATIVE -- we now
-            # master quieter than before -- so this does not fire; but a very
-            # peaky mix must never leave here above the ceiling.
-            waveform = waveform * (ceiling / new_peak)
+        # The limiter, not a rail: only the samples around a peak above the
+        # ceiling are attenuated, so one transient cannot set the level of
+        # the whole episode. Idle on ordinary material (gain 1.0 everywhere).
+        # The overshoot of the loudest sample above the ceiling after the FULL
+        # gain is exactly the reduction the limiter applies there -- the number
+        # the old rail used to scale the whole file by. Tracked across the
+        # correction passes below so the receipt says the total, not one pass.
+        peak_gained = float(torch.nan_to_num(
+            waveform, nan=0.0, posinf=1e6, neginf=-1e6).abs().max())
+        waveform, limiter = _limit_peaks(waveform, ceiling, sample_rate)
+        delivered = None
+        corrections = 0
+        if limiter["engaged"]:
+            # The gain above was measured on the UN-limited signal, which the
+            # burst inflated, and limiting then takes that energy out -- so
+            # the first pass lands low (codex r1). Re-measure and correct with
+            # a bounded linear gain, limited again, at most twice. Deterministic.
+            delivered = _measure_lufs(waveform, sample_rate)
+            while (delivered is not None and corrections < 2
+                   and abs(delivered - float(target_lufs)) > 0.5):
+                correction_db = max(-6.0, min(6.0, float(target_lufs) - delivered))
+                waveform = waveform * (10.0 ** (correction_db / 20.0))
+                waveform, again = _limit_peaks(waveform, ceiling, sample_rate)
+                limiter = {
+                    "engaged": True,
+                    "max_reduction_db": max(limiter["max_reduction_db"],
+                                            again["max_reduction_db"]),
+                    "engaged_fraction": max(limiter["engaged_fraction"],
+                                            again["engaged_fraction"]),
+                    "rail_clipped_samples": (limiter["rail_clipped_samples"]
+                                             + again["rail_clipped_samples"]),
+                }
+                gain_db += correction_db
+                peak_gained *= 10.0 ** (correction_db / 20.0)
+                corrections += 1
+                delivered = _measure_lufs(waveform, sample_rate)
+            limiter["max_reduction_db"] = round(max(
+                0.0, 20.0 * float(np.log10(max(peak_gained, 1e-12) / ceiling))), 2)
+            if (limiter["max_reduction_db"] > _LIMITER_HEAVY_REDUCTION_DB
+                    or limiter["engaged_fraction"] > _LIMITER_HEAVY_FRACTION):
+                log.warning(
+                    "[EpisodeAssembler] the delivery limiter worked HARD: max "
+                    "reduction %.1f dB, engaged %.1f%% of the time. The level is "
+                    "held at the target (delivered %s LUFS) but the MIX has a "
+                    "transient problem upstream -- find the burst, not the fader.",
+                    limiter["max_reduction_db"],
+                    100.0 * limiter["engaged_fraction"],
+                    "?" if delivered is None else "%.2f" % delivered)
         return waveform, {
             "mode": "lufs",
             "measured_lufs": round(measured, 2),
             "target_lufs": float(target_lufs),
             "gain_db": round(gain_db, 2),
             "ceiling_dbfs": float(ceiling_dbfs),
-            "peak_limited": bool(limited),
+            "peak_limited": bool(limiter["engaged"]),
+            "limiter_max_reduction_db": limiter["max_reduction_db"],
+            "limiter_engaged_fraction": limiter["engaged_fraction"],
+            "rail_clipped_samples": limiter["rail_clipped_samples"],
+            "limiter_corrections": corrections,
+            "delivered_lufs": (None if delivered is None else round(delivered, 2)),
             "makeup_db": 0.0,
         }
 
@@ -1570,7 +1738,13 @@ class EpisodeAssembler:
                 "%.1f dBFS%s (post-crossfade)",
                 _loud["measured_lufs"], _loud["target_lufs"], _loud["gain_db"],
                 _loud["ceiling_dbfs"],
-                " [peak-limited]" if _loud.get("peak_limited") else "")
+                ((" [limiter: max %.1f dB, %.1f%% engaged, %d correction(s), "
+                  "delivered %s LUFS]") % (
+                     float(_loud.get("limiter_max_reduction_db") or 0.0),
+                     100.0 * float(_loud.get("limiter_engaged_fraction") or 0.0),
+                     int(_loud.get("limiter_corrections") or 0),
+                     _loud.get("delivered_lufs"))
+                 if _loud.get("peak_limited") else ""))
         else:
             log.info(
                 "[EpisodeAssembler] Final loudness master: %s path, makeup %s, "
