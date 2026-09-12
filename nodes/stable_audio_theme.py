@@ -498,7 +498,7 @@ class StableAudioTheme:
         log.info("[OTR.music] cue %s peaked %+.2f dBFS -- limited to %.1f dBFS "
                  "(max reduction %.1f dB, engaged %.1f%%). The engine sets no "
                  "ceiling and the wav writer clips; this is where that stops.",
-                 20.0 * math.log10(max(before, 1e-12)), _CUE_CEILING_DBFS,
+                 cue_id, 20.0 * math.log10(max(before, 1e-12)), _CUE_CEILING_DBFS,
                  info.get("max_reduction_db", 0.0),
                  100.0 * float(info.get("engaged_fraction", 0.0)))
         out = dict(clip)

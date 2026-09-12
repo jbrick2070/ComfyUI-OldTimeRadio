@@ -12,6 +12,7 @@ projections silently dropping every unlisted key -- this file is the pin.
 from __future__ import annotations
 
 import json
+import logging
 
 import pytest
 
@@ -74,6 +75,73 @@ def test_every_cue_row_carries_what_the_engine_heard_and_did(monkeypatch):
         # the ROW text (identity) is untouched by the engine prompt
         assert row["prompt"].startswith("tense, moonlit")
         assert not row["prompt"].startswith(P.EARLY_CONSORT.instruments)
+
+
+def test_the_ceiling_log_line_actually_formats(caplog):
+    """THIS IS THE TEST THAT WAS MISSING, and its absence killed a render.
+
+    The first cut of `_ceiling_the_cue` logged "cue %s peaked ..." with five
+    placeholders and four arguments. `log.info` formats LAZILY -- the logger
+    only builds the string when the level is enabled -- so every unit test
+    passed while the server, which runs at INFO, raised TypeError inside
+    OTR_StableAudioTheme and lost a whole canonical leg (measured
+    2026-09-12: arm lcm_base, "not enough arguments for format string").
+
+    It only fired when the limiter ENGAGED, which is why the quiet path and
+    the shape assertions never saw it. Enabling the level is what catches
+    this class, so this test enables it.
+    """
+    from nodes.stable_audio_theme import StableAudioTheme as _Theme
+
+    hot = {"waveform": torch.full((1, 2, 4096), 3.0), "sample_rate": 44100}
+    with caplog.at_level(logging.INFO, logger="OTR"):
+        _limited, info = _Theme._ceiling_the_cue(hot, "opening")
+    assert info["engaged"] is True
+    messages = [r.getMessage() for r in caplog.records]      # forces formatting
+    assert any("cue opening peaked" in m for m in messages), messages
+    assert any("limited to -1.0 dBFS" in m for m in messages), messages
+
+
+def test_no_lazy_log_call_in_the_music_path_has_the_wrong_argument_count():
+    """The CLASS, not just the one line. A `%`-style logging call whose
+    placeholder count does not match its arguments raises only when that
+    level is enabled, so it survives a green suite and dies in production.
+    """
+    import ast
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    targets = ["nodes/stable_audio_theme.py", "nodes/_otr_music_prompt.py",
+               "nodes/_otr_music_palette.py",
+               "nodes/_otr_audio_engines/eng_stable_audio_3.py",
+               "nodes/scene_sequencer.py"]
+    offenders = []
+    for relative in targets:
+        path = repo / relative
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call) or not isinstance(node.func, ast.Attribute):
+                continue
+            if node.func.attr not in ("debug", "info", "warning", "error", "exception"):
+                continue
+            if not node.args or node.keywords:
+                continue
+            template = node.args[0]
+            parts = []
+            while isinstance(template, ast.BinOp):     # implicit concat is a JoinedStr
+                break
+            if isinstance(template, ast.Constant) and isinstance(template.value, str):
+                parts = [template.value]
+            if not parts:
+                continue
+            text = "".join(parts)
+            wanted = text.replace("%%", "").count("%")
+            if wanted and wanted != len(node.args) - 1:
+                offenders.append("%s:%d wants %d, given %d" % (
+                    relative, node.lineno, wanted, len(node.args) - 1))
+    assert not offenders, (
+        "a lazy-formatted log call raises only when its level is enabled: "
+        + "; ".join(offenders))
 
 
 def test_the_music_bus_has_a_ceiling_and_leaves_a_quiet_cue_alone():
