@@ -485,6 +485,12 @@ def main(argv: list[str] | None = None) -> int:
 
     def heartbeat(elapsed_s: float, status: dict) -> None:
         phase = str(status.get("status_str") or "pending")
+        # During an outage poll_history hands over the strike count; print it,
+        # or the number exists nowhere a person can read it. `unreachable
+        # (3/12)` is the whole point of counting.
+        strikes = status.get("unreachable_strikes")
+        if strikes:
+            phase = f"{phase} ({strikes}/{status.get('unreachable_limit', '?')})"
         print(
             f"[canonical-api] t={int(elapsed_s)}s prompt_id={prompt_id} "
             f"status={phase}",

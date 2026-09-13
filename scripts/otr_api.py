@@ -778,13 +778,40 @@ def describe_execution_error(messages) -> str:
     return str(messages)[:500]
 
 
+#: Consecutive REFUSED connections to /history before the poll asks /queue
+#: whether the server is really gone. At the default 5 s poll this is about a
+#: minute of nothing listening on the port -- long enough to ride out a server
+#: that is merely busy, short enough that a dead one is named in the leg log
+#: instead of hours later by a person. Measured need: three machines on
+#: 2026-09-13 each had a server die mid-render and each leg logged `pending`
+#: until someone checked the port by hand. Only `requests.ConnectionError`
+#: counts (refused, or the connect never completed); a read timeout is a slow
+#: port and a non-JSON body is an answering one, and neither is a strike.
+UNREACHABLE_STRIKES = 12
+
+#: How many consecutive ticks of "the server answered but /history has no
+#: record of this prompt" pass between /queue checks. An in-flight render ALSO
+#: has no history record until it completes, so empty history alone means
+#: nothing; the discriminator is an empty queue. Six ticks is 30 s at the
+#: default poll, so a restarted server that dropped the render is named within
+#: a minute instead of never.
+VANISHED_CHECK_EVERY = 6
+
+#: The token both dead-server messages start with, so a log classifier can
+#: tell "the harness could not reach or find the render" from "the render
+#: failed" without parsing prose. `scripts/otr_writer_bank_gate.py` maps it to
+#: HARNESS; a test pins that the two files agree on the spelling.
+SERVER_GONE_MARKER = "SERVER-GONE"
+
+
 def poll_history(
     prompt_id: str,
     timeout_s: int | None = DEFAULT_TIMEOUT_S,
     poll_s: int = DEFAULT_POLL_S,
     on_tick: Callable[[float, dict], None] | None = None,
 ) -> tuple[str, str]:
-    """Poll /history/<prompt_id> until completed/error/timeout.
+    """Poll /history/<prompt_id> until completed/error/timeout -- or until the
+    server is measurably gone, which is named rather than logged as pending.
 
     ``timeout_s <= 0`` (or ``None``) waits for a terminal ComfyUI result. This
     is an explicit operator-mode choice for campaigns whose own deterministic
@@ -793,21 +820,72 @@ def poll_history(
     Returns (status, error_message). status is "SUCCESS", "FAIL", or
     "TIMEOUT". error_message is non-empty only on FAIL.
     `on_tick(elapsed_s, status_dict)` fires once per poll for callers that
-    want to interleave their own log tail.
+    want to interleave their own log tail. During an outage the dict is
+    ``{"status_str": "unreachable", "unreachable_strikes": n,
+    "unreachable_limit": UNREACHABLE_STRIKES}`` so a heartbeat can print the
+    truth for that tick.
+
+    TWO WAYS A SERVER IS GONE, and they look different on the wire:
+      * nothing listens on the port -- UNREACHABLE_STRIKES refused connections
+        in a row, then /queue is asked once more; if /queue answers the server
+        is alive after all and the count resets (a transient outage must not
+        hand a harness a FAIL it will follow with /interrupt);
+      * the server answers but has no record of the prompt and nothing is
+        running or queued -- it restarted, or the prompt was cleared, and the
+        render is gone. A normal render also has no history record until it
+        completes, so this is only ever declared after /queue reads (0, 0)
+        AND a second look at history still finds nothing.
     """
     start = time.time()
+    unreachable = 0
+    first_miss: float | None = None
+    empty_ticks = 0
     while (
         timeout_s is None
         or timeout_s <= 0
         or time.time() - start < timeout_s
     ):
+        answered = True
         try:
             r = requests.get(
                 f"{COMFYUI_URL}/history/{prompt_id}", timeout=10
             ).json()
-        except Exception:
+        except requests.exceptions.JSONDecodeError:
+            # THE SERVER ANSWERED with a body that is not JSON -- a proxy
+            # page, a truncated response. Not a dead port. In requests 2.32
+            # this class IS a RequestException, so it has to be caught before
+            # the transport clause or it is counted as a strike (the first
+            # cut of this did exactly that).
+            r = {}
+        except requests.ConnectionError:
+            # NOTHING ACCEPTED THE CONNECTION (refused, or the connect never
+            # completed -- ConnectTimeout subclasses this). This is the only
+            # thing that means "the port is not there".
+            answered = False
+            r = {}
+            unreachable += 1
+            if first_miss is None:
+                first_miss = time.time()
+        except requests.RequestException:
+            # The port accepted and was then slow (ReadTimeout) or odd. Alive.
+            r = {}
+        except Exception:  # noqa: BLE001 -- anything else is not a dead server
+            r = {}
+        if answered:
+            unreachable = 0
+            first_miss = None
+        if not isinstance(r, dict):
             r = {}
         status = (r.get(prompt_id, {}) or {}).get("status", {}) or {}
+        if unreachable:
+            # Tell the heartbeat the truth for this tick, count and limit, so
+            # the leg log reads `unreachable (3/12)` instead of a `pending`
+            # that a person has to doubt.
+            status = {
+                "status_str": "unreachable",
+                "unreachable_strikes": unreachable,
+                "unreachable_limit": UNREACHABLE_STRIKES,
+            }
         if on_tick:
             try:
                 on_tick(time.time() - start, status)
@@ -817,6 +895,55 @@ def poll_history(
             return ("SUCCESS", "")
         if status.get("status_str") == "error":
             return ("FAIL", describe_execution_error(status.get("messages")))
+
+        if unreachable >= UNREACHABLE_STRIKES:
+            # ASK THE OTHER ENDPOINT BEFORE ACCUSING. A living /queue means the
+            # server is there and /history was the thing failing; reset and
+            # carry on rather than hand the harness a FAIL it would follow
+            # with /interrupt against a render that is fine.
+            running, pending = queue_snapshot()
+            if (running, pending) != (-1, -1):
+                unreachable = 0
+                first_miss = None
+            else:
+                gone_for = int(time.time() - (first_miss or start))
+                return (
+                    "FAIL",
+                    f"{SERVER_GONE_MARKER}: the ComfyUI server at {COMFYUI_URL} "
+                    f"stopped answering -- {unreachable} consecutive refused "
+                    f"connections to /history over {gone_for}s, and /queue is "
+                    f"unreachable too. The render is not pending; nothing is "
+                    f"listening on that port. Check the process before reading "
+                    f"any log.",
+                )
+
+        if answered and prompt_id not in r:
+            empty_ticks += 1
+            if empty_ticks % VANISHED_CHECK_EVERY == 0:
+                running, pending = queue_snapshot()
+                if (running, pending) == (0, 0):
+                    # A render can COMPLETE between the /history GET above and
+                    # the /queue GET just now: history would then hold it and
+                    # the queue would be empty. Look once more before naming.
+                    try:
+                        again = requests.get(
+                            f"{COMFYUI_URL}/history/{prompt_id}", timeout=10
+                        ).json()
+                    except Exception:  # noqa: BLE001 -- decide next tick
+                        again = {}
+                    if isinstance(again, dict) and prompt_id in again:
+                        continue
+                    return (
+                        "FAIL",
+                        f"{SERVER_GONE_MARKER}: the ComfyUI server at "
+                        f"{COMFYUI_URL} answers but has no record of prompt "
+                        f"{prompt_id}, and nothing is running or queued. The "
+                        f"server restarted, or the prompt was cleared, and the "
+                        f"render is gone. Check the server log for its boot "
+                        f"time before reading any leg log.",
+                    )
+        else:
+            empty_ticks = 0
         time.sleep(poll_s)
     return ("TIMEOUT", "")
 
@@ -992,6 +1119,9 @@ __all__ = [
     "workflow_to_api_prompt",
     "submit_prompt",
     "poll_history",
+    "UNREACHABLE_STRIKES",
+    "VANISHED_CHECK_EVERY",
+    "SERVER_GONE_MARKER",
     "queue_snapshot",
     "cancel_queue",
 ]

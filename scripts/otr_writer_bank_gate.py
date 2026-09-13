@@ -140,6 +140,15 @@ def classify_failure(log_text: str) -> str:
     # the leg proved nothing about the writer or the engine and must be re-run.
     if "Traceback (most recent call last)" in region and "scripts\\" in region:
         return "HARNESS"
+    # THE SERVER WAS NOT THERE, OR LOST THE RENDER. `poll_history` now names
+    # both cases with this token (otr_api.SERVER_GONE_MARKER; a test pins the
+    # spelling). Before it did, a dead server produced RESULT TIMEOUT with no
+    # marker and this function answered UNKNOWN -- honest. A FAIL carrying no
+    # writer marker would have answered DOWNSTREAM, which is the misleading
+    # verdict the docstring above says is worse than none. It is the HARNESS
+    # case: the leg proved nothing about the writer or the engine.
+    if "SERVER-GONE" in region:
+        return "HARNESS"
     for marker in WRITER_MARKERS:
         if marker in region:
             return "WRITER"
