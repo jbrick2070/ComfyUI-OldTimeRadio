@@ -14871,3 +14871,50 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   rows that exist when the cleanup runs.
 - confidence: HIGH (ledger row read from the pod, constructor line read,
   tail order read).
+
+## PBUG-20260913-02 -- the news lane implemented neither exit of "every cast member gets a voice": The Toad was cast, never voiced, and the gate killed the episode
+- surfaced: LIVE 4060 leg, 2026-09-13 05:48 -- `otr_8gb_animatediff`, one
+  act, bank rolled to `scifi_news_pro`, writer Qwen3.5-4B nf4, harness run
+  `D:\otr-4060-testing\ComfyUI-OldTimeRadio\otr\legs\shipping_set_20260913_045924`
+  (Codex driving the 4060; the leg log read over the direct link). The
+  operator's report: "animatediff missing dialogue for the Toad".
+- symptom: `OTR_LedgerScriptWriter` raised `CastVoiceCoverageError`:
+  `cast voice coverage failed for bank 'scifi_news_pro': 1 of 4 cast
+  member(s) have no SAYABLE line: The Toad (c04)`. RESULT FAIL at 5.8 min,
+  no episode. Same graph published on the pod and the 5080 under other banks.
+- root cause: `_otr_cast_voice_coverage.require_voice_coverage`, at the top of
+  `stamp_receipt`, refuses by design and leaves the two legal exits of the
+  2026-08-02 ruling ("either have an LLM write its lines, or entirely remove
+  the character from the ledger") to the producer -- and
+  `nodes/_otr_scifi_news_pro.py` implements neither: no `except
+  CastVoiceCoverageError` anywhere, no reroll, no removal. The 2026-08-24
+  repair pass (`_otr_cast_coverage_repair`) is deliberately skipped on this
+  content-owned lane, so a four-member cast under a one-act budget dies
+  whenever the writer leaves one member without sayable text. This is the
+  original PBUG-20260802-02 lane, still open after its third manifestation
+  fixed the other banks.
+- fix: **FIXED, live proof owed.** Operator, 2026-09-13 morning: "delete the
+  member." `remove_silent_cast_members()` (new, pure, in
+  `_otr_cast_voice_coverage.py`, sharing the one `missing_cast_members()`
+  predicate with the refusal) drops the silent member's cast row, lines,
+  beats, shots left empty and proof-map entries, recounts
+  `meta.cast_contract.num_characters_locked`, and stamps
+  `meta.cast_voice_coverage_removed`; it never removes the credited
+  announcer. The news lane calls it immediately before `stamp_receipt` --
+  before the receipt's proofs are minted and before any line is voiced,
+  captioned or credited (the voice assignment already on the cast row leaves
+  with the row; the draft proof entries the removed lines consumed leave
+  the lane's proof map with them) -- and logs the removal by name. Codex's
+  contrarian pass on the first cut caught that the lane's proof map is a
+  LIST of entries, not a dict, so the removal now filters both shapes.
+  Regression tests in `tests/test_cast_voice_coverage.py` cover both.
+- ledger fields touched, one owner each: `cast[]` (rows removed only),
+  `lines[]`/`beats[]`/`shots[]` (rows removed only, beats' `line_ids`
+  trimmed), `meta.scifi_news_pro.proof_map` (entries removed),
+  `meta.cast_contract.num_characters_locked` (recounted),
+  `meta.cast_voice_coverage_removed` (new, sole writer).
+- bible-worthy: yes -- a gate whose "legal exits belong to the caller" is a
+  contract the caller must be shown to honour; grep every `raise` of a typed
+  gate error for a producer that catches nothing.
+- confidence: HIGH on mechanism (leg log, gate code, producer grep all read);
+  the live proof is the next scifi_news_pro roll with a silent member.

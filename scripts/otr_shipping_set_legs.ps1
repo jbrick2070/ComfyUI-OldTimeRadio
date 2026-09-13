@@ -1,6 +1,6 @@
 # Run the shipped graphs through a live ComfyUI, one act each, cheapest first.
 #
-# WHY THIS EXISTS. The 18 files in workflows/variants/ are the product now --
+# WHY THIS EXISTS. The files in workflows/variants/ are the product now --
 # otr_<arch>_<tier>.json, one per machine class and episode kind. A --check that
 # proves they re-derive from the canonical is not the same as an episode
 # landing in otr/obs/, and the operator's bar is the second thing. This walks
@@ -15,7 +15,7 @@
 # NEVER --title: the harness label becomes the on-screen title card.
 #
 # usage:  powershell -File scripts\otr_shipping_set_legs.ps1 -Url http://127.0.0.1:8000
-#         -Graphs otr_16gb_low,otr_16gb_still      (default: the 8 GB + 16 GB twelve)
+#         -Graphs otr_16gb_low,otr_16gb_still      (default: the 8 GB + 16 GB NVIDIA set)
 param(
     [string]$Url = "http://127.0.0.1:8000",
     [string[]]$Graphs = @(
@@ -23,7 +23,7 @@ param(
         "otr_8gb_still", "otr_16gb_still",
         "otr_8gb_animatediff", "otr_16gb_animatediff",
         "otr_8gb_video", "otr_16gb_video",
-        "otr_8gb_mime", "otr_16gb_mime",
+        "otr_16gb_mime",
         "otr_8gb_foley", "otr_16gb_foley"
     ),
     [string]$ActCount = "1",

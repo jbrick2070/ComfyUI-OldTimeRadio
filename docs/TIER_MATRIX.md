@@ -15,7 +15,7 @@ means the lanes need no video weights.
 | **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | draft |
 | **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx_8gb | sd15 | auto | nothing | 3 | 3 | draft |
 | **foley** | `otr_8gb_foley` | Qwen3.5-4B | bnb_nf4 | ltx25_foley_plus | sd15 | manual | ComfyUI-GGUF | 3 | 3 | draft |
-| **mime** | `otr_8gb_mime` | Qwen3.5-4B | bnb_nf4 | ltx25_mime | sd15 | manual | ComfyUI-GGUF | 3 | 3 | draft |
+| mime | _not built_ | | | | | | | | | |
 | **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
 
 ### 16 GB NVIDIA

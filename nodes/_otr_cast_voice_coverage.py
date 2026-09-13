@@ -32,9 +32,13 @@ or proof ever exists for a character that will not survive).
 WHAT "REMOVE" MEANS: reroll the cast candidate upstream. NEVER post-ledger
 surgery -- a half-removed char_id today gets a real randomly-seeded fallback
 voice (`_otr_voice_node_common.py:109-127`) and the render PASSES, which is
-the worst outcome of all. This module therefore only ever REFUSES, loudly and
-by name; the two legal exits (write the lines / reroll the cast) belong to the
-producers.
+the worst outcome of all. This module REFUSES, loudly and by name, and since
+2026-09-13 it also owns the operator's second legal exit as a pure function:
+:func:`remove_silent_cast_members` drops the silent member and every row that
+referenced them BEFORE the receipt's proofs are minted and before any line is
+voiced, captioned or credited -- the gate's own placement. The voice
+assignment already on the cast row leaves with the row. The first exit (write
+the lines) belongs to the producers; the news lane chose removal (PBUG-20260913-02).
 
 Deliberately NO machine-versus-human heuristic (codex CUT 2): the schemas
 carry free-text roles, "The Relay" CAN be voiced, and a name heuristic would
@@ -45,7 +49,7 @@ exactly as `_otr_ledger_cleanup` does, so this module stays import-light.
 """
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, MutableMapping
 
 try:
     from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
@@ -53,6 +57,7 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
 
 __all__ = ["CastVoiceCoverageError", "is_announcer_cast_row",
+           "missing_cast_members", "remove_silent_cast_members",
            "require_voice_coverage"]
 
 #: The announcer's LINES carry the sentinel char_id ``"announcer"`` while its
@@ -130,16 +135,12 @@ def _sayable(text: Any, *, keep_parentheticals: bool = False) -> bool:
     return bool(clean_spoken_text(raw, keep_parentheticals=keep_parentheticals).strip())
 
 
-def require_voice_coverage(ledger_data: Mapping[str, Any], *,
-                           owner_bank: str) -> None:
-    """Raise :class:`CastVoiceCoverageError` unless every character cast row
-    owns at least one non-skipped line with SAYABLE text.
-
-    ANNOUNCER is matched by its line sentinel (`char_id == "announcer"`), not
-    by its cast-row char_id, because announcer lines deliberately carry the
-    sentinel rather than the roster id (`production_ledger.py:114-139`;
-    codex MUST-FIX 4: never compare raw IDs for ANNOUNCER). Music sentinel
-    rows are ignored -- they are cues, not voices.
+def missing_cast_members(ledger_data: Mapping[str, Any]
+                         ) -> "tuple[list[dict[str, str]], int, int]":
+    """``(missing, cast_total, voiced_total)`` -- the cast rows that own no
+    non-skipped SAYABLE line, plus the totals the refusal reports. Pure, and
+    the ONE predicate both exits share, so the refusal and the removal can
+    never disagree about who is silent.
     """
     cast_rows = [r for r in (ledger_data.get("cast") or [])
                  if isinstance(r, Mapping)]
@@ -185,7 +186,120 @@ def require_voice_coverage(ledger_data: Mapping[str, Any], *,
             missing.append({"char_id": cid,
                             "name": str(row.get("name") or "")})
 
+    return missing, len(cast_rows), len(voiced_ids)
+
+
+def require_voice_coverage(ledger_data: Mapping[str, Any], *,
+                           owner_bank: str) -> None:
+    """Raise :class:`CastVoiceCoverageError` unless every character cast row
+    owns at least one non-skipped line with SAYABLE text.
+
+    ANNOUNCER is matched by its line sentinel (`char_id == "announcer"`), not
+    by its cast-row char_id, because announcer lines deliberately carry the
+    sentinel rather than the roster id (`production_ledger.py:114-139`;
+    codex MUST-FIX 4: never compare raw IDs for ANNOUNCER). Music sentinel
+    rows are ignored -- they are cues, not voices.
+    """
+    missing, cast_total, voiced_total = missing_cast_members(ledger_data)
     if missing:
         raise CastVoiceCoverageError(
             owner_bank=owner_bank, missing=missing,
-            cast_total=len(cast_rows), voiced_total=len(voiced_ids))
+            cast_total=cast_total, voiced_total=voiced_total)
+
+
+def remove_silent_cast_members(ledger_data: "MutableMapping[str, Any]", *,
+                               owner_bank: str) -> dict:
+    """Operator ruling 2026-08-02, second exit: "entirely remove the character
+    from the ledger". Drops every cast row with no sayable line, its lines, the
+    beats those lines owned, shots left with nothing, its proof-map entries, and
+    recounts ``meta.cast_contract.num_characters_locked``. Must run before the
+    receipt's proofs are minted and before any line is voiced, captioned or
+    credited -- the same place the refusal runs -- so nothing downstream ever
+    names the removed member; the voice assignment already on the cast row
+    leaves with the row.
+
+    The credited announcer is never removed: a silent announcer is a real gap
+    this exit cannot close, so it refuses exactly as the gate does.
+
+    Returns the receipt it also stamps at ``meta.cast_voice_coverage_removed``
+    (empty ``removed`` means nothing happened). Pure: no I/O, no LLM.
+    """
+    missing, cast_total, voiced_total = missing_cast_members(ledger_data)
+    receipt: dict = {
+        "owner_bank": str(owner_bank), "ruling": "2026-08-02",
+        "removed": [], "line_ids": [], "beat_ids": [], "shot_ids": [],
+        "cast_before": cast_total, "cast_after": cast_total,
+    }
+    if not missing:
+        return receipt
+    cast_rows = [r for r in (ledger_data.get("cast") or []) if isinstance(r, Mapping)]
+    by_id = {str(r.get("char_id") or "").strip(): r for r in cast_rows}
+    for m in missing:
+        row = by_id.get(str(m.get("char_id") or ""))
+        if row is not None and is_announcer_cast_row(row):
+            raise CastVoiceCoverageError(
+                owner_bank=owner_bank, missing=missing,
+                cast_total=cast_total, voiced_total=voiced_total)
+    ids = {str(m.get("char_id") or "").strip() for m in missing}
+
+    lines = list(ledger_data.get("lines") or [])
+    gone_lines = [r for r in lines if isinstance(r, Mapping)
+                  and str(r.get("char_id") or "").strip() in ids]
+    gone_line_ids = {str(r.get("line_id") or "") for r in gone_lines}
+    ledger_data["lines"] = [r for r in lines if not any(r is g for g in gone_lines)]
+
+    kept_beats = []
+    for b in list(ledger_data.get("beats") or []):
+        if not isinstance(b, MutableMapping):
+            kept_beats.append(b)
+            continue
+        if str(b.get("char_id") or "").strip() in ids:
+            receipt["beat_ids"].append(str(b.get("beat_id") or ""))
+            continue
+        owned = list(b.get("line_ids") or [])
+        left = [l for l in owned if str(l) not in gone_line_ids]
+        if owned and not left:
+            receipt["beat_ids"].append(str(b.get("beat_id") or ""))
+            continue
+        if left != owned:
+            b["line_ids"] = left
+        kept_beats.append(b)
+    ledger_data["beats"] = kept_beats
+
+    referenced = {str(b.get("shot_id") or "") for b in kept_beats if isinstance(b, Mapping)}
+    referenced |= {str(r.get("shot_id") or "") for r in ledger_data["lines"] if isinstance(r, Mapping)}
+    kept_shots = []
+    for s in list(ledger_data.get("shots") or []):
+        if isinstance(s, Mapping) and str(s.get("shot_id") or "") not in referenced:
+            receipt["shot_ids"].append(str(s.get("shot_id") or ""))
+            continue
+        kept_shots.append(s)
+    if "shots" in ledger_data:
+        ledger_data["shots"] = kept_shots
+
+    ledger_data["cast"] = [r for r in cast_rows
+                           if str(r.get("char_id") or "").strip() not in ids]
+    meta = ledger_data.setdefault("meta", {})
+    # The news lane keeps its proof map as a LIST of entry payloads, each
+    # naming its line_id (`_otr_scifi_news_pro._spoken_row`); a dict keyed by
+    # line_id is accepted too. Either way the removed lines' entries go.
+    lane_meta = meta.get("scifi_news_pro")
+    proof_map = lane_meta.get("proof_map") if isinstance(lane_meta, MutableMapping) else None
+    if isinstance(proof_map, MutableMapping):
+        for lid in gone_line_ids:
+            proof_map.pop(lid, None)
+    elif isinstance(proof_map, list):
+        lane_meta["proof_map"] = [
+            e for e in proof_map
+            if not (isinstance(e, Mapping) and str(e.get("line_id") or "") in gone_line_ids)]
+    contract = meta.get("cast_contract")
+    if isinstance(contract, MutableMapping) and "num_characters_locked" in contract:
+        contract["num_characters_locked"] = sum(
+            1 for r in ledger_data["cast"]
+            if isinstance(r, Mapping) and not is_announcer_cast_row(r))
+
+    receipt["removed"] = [dict(m) for m in missing]
+    receipt["line_ids"] = sorted(gone_line_ids)
+    receipt["cast_after"] = len(ledger_data["cast"])
+    meta["cast_voice_coverage_removed"] = dict(receipt)
+    return receipt

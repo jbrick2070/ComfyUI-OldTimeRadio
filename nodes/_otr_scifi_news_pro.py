@@ -4612,6 +4612,28 @@ def _assemble(
     # this setdefault is a no-op on the live path and keeps the direct-call
     # tests self-consistent.
     meta.setdefault("source_bank", owner_bank)
+    # EVERY CAST MEMBER GETS A VOICE, and the operator's ruling (2026-08-02)
+    # names two exits: write the lines, or remove the character. Until
+    # 2026-09-13 this lane implemented neither -- the gate inside
+    # stamp_receipt refused and the episode died (a 4060 leg: "The Toad
+    # (c04)" cast with no sayable line, PBUG-20260913-02). Operator, that
+    # morning: "delete the member." This is the last point before the
+    # receipt's proofs are minted, any line is voiced, or a portrait or
+    # credit exists; the voice ASSIGNMENT already sitting on the cast row
+    # leaves with the row, and the draft proof entries the removed lines
+    # consumed leave the proof map with them.
+    from ._otr_cast_voice_coverage import remove_silent_cast_members
+    removal = remove_silent_cast_members(led.data, owner_bank=owner_bank)
+    if removal["removed"]:
+        log.warning(
+            "[scifi_news_pro] cast coverage: removed %s -- no sayable line "
+            "(operator ruling 2026-08-02: write the lines or remove the "
+            "character); %d line(s), %d beat(s), %d shot(s) went with them; "
+            "cast %d -> %d",
+            ", ".join("%s (%s)" % (m.get("name") or "?", m.get("char_id") or "?")
+                      for m in removal["removed"]),
+            len(removal["line_ids"]), len(removal["beat_ids"]),
+            len(removal["shot_ids"]), removal["cast_before"], removal["cast_after"])
     stamp_receipt(
         led.data, owner_bank=owner_bank,
         accepted_artifacts={

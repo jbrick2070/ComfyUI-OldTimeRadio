@@ -111,7 +111,6 @@ SHIPPING_SET = (
     "otr_8gb_still",
     "otr_8gb_video",
     "otr_8gb_foley",
-    "otr_8gb_mime",
     "otr_8gb_animatediff",
     "otr_16gb_low",
     "otr_16gb_still",

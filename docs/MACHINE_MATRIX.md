@@ -66,7 +66,7 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  25 experimental profile(s), 3 shipping
+## 8 GB  --  24 experimental profile(s), 3 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -74,7 +74,7 @@ Nothing here is inferred from "it looks like it should fit". A blank is an unkno
 | `otr_8gb_animatediff` | animatediff15_v3_haunted_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
 | `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | - | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 
-<details><summary>22 draft profile(s) here -- not vouched for</summary>
+<details><summary>21 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx25_foley_plus`, `ltx25_mime`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
 
@@ -94,7 +94,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_8gb_ltx` | ltx_8gb | - |
 | `otr_8gb_ltx25_foley` | ltx25_foley_plus | - |
 | `otr_8gb_ltx25_mime` | ltx25_mime | - |
-| `otr_8gb_mime` | ltx25_mime | - |
 | `otr_8gb_still` | still_motion | - |
 | `otr_8gb_video` | ltx_8gb | - |
 | `otr_8gb_wan` | wan_ti2v | - |

@@ -289,3 +289,95 @@ def test_a_proof_is_never_minted_from_text_the_cleanup_will_withdraw():
         pass
     assert led["lines"][2].get("skip") is True
     validate_receipt(led)        # must NOT raise: the proof set is stable
+
+
+# --------------------------------------------------------------------------- #
+# The second legal exit (operator ruling 2026-08-02, chosen for the news lane
+# on 2026-09-13 after a 4060 leg died on "The Toad (c04)"): remove the silent
+# member before any voice, portrait or proof exists.
+# --------------------------------------------------------------------------- #
+
+def _news_ledger():
+    import copy
+    from nodes._otr_cast_voice_coverage import missing_cast_members  # noqa: F401
+    ann = dict(ANN, shot_id="shot_000")
+    return {
+        "meta": {
+            "source_bank": "scifi_news_pro",
+            "cast_contract": {"num_characters_request": 3, "num_characters_locked": 3},
+            # The production shape: a LIST of entry payloads naming their line.
+            "scifi_news_pro": {"proof_map": [{"line_id": "l_ann"}, {"line_id": "l_c02"},
+                                             {"line_id": "l_c03"}, {"line_id": "l_c04"}]},
+        },
+        "cast": _cast({"char_id": "c02", "name": "Elias"},
+                      {"char_id": "c03", "name": "The Relay"},
+                      {"char_id": "c04", "name": "The Toad"}),
+        "lines": [ann,
+                  {"line_id": "l_c02", "char_id": "c02", "text": "Read it back to me.",
+                   "skip": False, "speaker_role": "character", "shot_id": "shot_001"},
+                  {"line_id": "l_c03", "char_id": "c03", "text": "Coordinates confirmed.",
+                   "skip": False, "speaker_role": "character", "shot_id": "shot_001"},
+                  {"line_id": "l_c04", "char_id": "c04", "text": "(croaks, hops away)",
+                   "skip": False, "speaker_role": "character", "shot_id": "shot_002"}],
+        "beats": [{"beat_id": "l_ann", "shot_id": "shot_000", "char_id": "announcer", "line_ids": ["l_ann"]},
+                  {"beat_id": "l_c02", "shot_id": "shot_001", "char_id": "c02", "line_ids": ["l_c02"]},
+                  {"beat_id": "l_c03", "shot_id": "shot_001", "char_id": "c03", "line_ids": ["l_c03"]},
+                  {"beat_id": "l_c04", "shot_id": "shot_002", "char_id": "c04", "line_ids": ["l_c04"]}],
+        "shots": [{"shot_id": "shot_000"}, {"shot_id": "shot_001"}, {"shot_id": "shot_002"}],
+    }
+
+
+def test_removal_drops_the_silent_member_and_everything_that_named_him():
+    from nodes._otr_cast_voice_coverage import remove_silent_cast_members
+    led = _news_ledger()
+    with pytest.raises(CastVoiceCoverageError):
+        require_voice_coverage(led, owner_bank="scifi_news_pro")
+
+    receipt = remove_silent_cast_members(led, owner_bank="scifi_news_pro")
+
+    assert receipt["removed"] == [{"char_id": "c04", "name": "The Toad"}]
+    assert receipt["line_ids"] == ["l_c04"]
+    assert receipt["beat_ids"] == ["l_c04"]
+    assert receipt["shot_ids"] == ["shot_002"]
+    assert (receipt["cast_before"], receipt["cast_after"]) == (4, 3)
+    assert [r["char_id"] for r in led["cast"]] == ["c01", "c02", "c03"]
+    assert all(r["char_id"] != "c04" for r in led["lines"])
+    assert all(b["char_id"] != "c04" for b in led["beats"])
+    assert [s["shot_id"] for s in led["shots"]] == ["shot_000", "shot_001"]
+    assert [e["line_id"] for e in led["meta"]["scifi_news_pro"]["proof_map"]] == ["l_ann", "l_c02", "l_c03"]
+    assert led["meta"]["cast_contract"]["num_characters_locked"] == 2
+    assert led["meta"]["cast_voice_coverage_removed"]["removed"][0]["name"] == "The Toad"
+    require_voice_coverage(led, owner_bank="scifi_news_pro")  # no raise now
+
+
+def test_removal_is_a_no_op_when_everyone_speaks():
+    import copy
+    from nodes._otr_cast_voice_coverage import remove_silent_cast_members
+    led = _news_ledger()
+    led["lines"][3]["text"] = "Ribbit. Yes, I heard the whole broadcast."
+    before = copy.deepcopy(led)
+    receipt = remove_silent_cast_members(led, owner_bank="scifi_news_pro")
+    assert receipt["removed"] == []
+    assert led == before
+    assert "cast_voice_coverage_removed" not in led["meta"]
+
+
+def test_removal_never_removes_the_announcer():
+    from nodes._otr_cast_voice_coverage import remove_silent_cast_members
+    led = _news_ledger()
+    led["lines"][0]["text"] = "(dead air)"          # the announcer goes silent
+    led["lines"][3]["text"] = "Ribbit. I heard it."  # the Toad speaks
+    with pytest.raises(CastVoiceCoverageError):
+        remove_silent_cast_members(led, owner_bank="scifi_news_pro")
+    assert [r["char_id"] for r in led["cast"]] == ["c01", "c02", "c03", "c04"]
+
+
+def test_a_member_with_one_sayable_line_survives_a_skip_row():
+    from nodes._otr_cast_voice_coverage import remove_silent_cast_members
+    led = _news_ledger()
+    led["lines"].append({"line_id": "l_c04b", "char_id": "c04", "text": "Ribbit. Yes.",
+                         "skip": False, "speaker_role": "character", "shot_id": "shot_002"})
+    led["lines"][3]["skip"] = True
+    receipt = remove_silent_cast_members(led, owner_bank="scifi_news_pro")
+    assert receipt["removed"] == []
+    assert any(r["char_id"] == "c04" for r in led["cast"])
