@@ -7,6 +7,19 @@ audiobook/narrative stuff, so happy to help."*
 An R9700 is RDNA4 with 32 GB. Paste the reply below; it asks for exactly one
 result and nothing else.
 
+**On the Windows push, revised 2026-09-13.** The operator sent
+`r/ROCm/comments/1wfb4qe` (CUDA workloads on AMD GPUs on Windows). Reddit
+cannot be fetched from here, but the surrounding material is clear enough:
+the maintained ZLUDA-on-Windows setup (`Speedstu/CUDA-for-AMD-Windows`)
+validates exactly one GPU, an RX 9060 XT, pins **LibTorch 2.3.0 + cu118**, and
+states that **cuDNN/MIOpen is not available** on its validated path and that
+"ZLUDA is not a complete CUDA implementation". That is not a route ComfyUI can
+take. Field reports also put ComfyUI + ROCm + Windows at "an enormous pain"
+against Linux being "pretty nice and seamless". The pack's own AMD row already
+assumes the NATIVE path -- `device_backend: "cuda"`, because PyTorch ROCm
+presents through the CUDA API -- so nothing in the code changes; what changed
+is that the reply no longer spends a volunteer's evening on our preference.
+
 **It deliberately names no other graph.** The operator owns no AMD hardware, so
 what this tester runs on 32 GB is the only AMD fact anyone will have. Pointing
 him at the graphs named for NVIDIA VRAM tiers would invite him to prove
@@ -61,9 +74,16 @@ an MP4 landed in `otr/obs`, and the first traceback if one did not. A failure
 is worth as much to me as a pass; nothing has ever run on AMD hardware, so
 every line of that is new.
 
-**Windows is the more interesting answer** if you have the choice. The pack is
-Windows-native and AMD ships a Radeon ROCm build for Windows now, but nobody
-has pointed the two at each other. Linux is welcome too.
+**Take whichever gets you to a working ComfyUI without a fight.** I had been
+saying Windows is the more interesting answer, and it is -- the pack is
+Windows-native and nobody has pointed it at a Radeon there. But the reports I
+can find say ComfyUI on Windows with AMD has been an ordeal while Linux is
+close to seamless, so I am not going to spend your evening on my curiosity. If
+you do go Windows, use AMD's native ROCm build of PyTorch, not the ZLUDA
+route: the one maintained ZLUDA-on-Windows setup pins LibTorch 2.3.0 with
+cu118 and says cuDNN/MIOpen is unavailable on its validated path, which is not
+a road ComfyUI can walk. Linux with ROCm is a completely welcome answer and I
+would rather have that result than no result.
 
 Fair warning on the time: one act is a whole episode, and this graph takes
 somewhere between fifteen minutes and an hour depending on the card.
