@@ -1,6 +1,6 @@
 """The five-minute AMD probe: what we need to know before anyone renders.
 
-WHY THIS EXISTS. `apple/ROCM.md` asks a volunteer for six commands,
+WHY THIS EXISTS. `apple/ROCM.md` lays out six commands,
 a full ComfyUI install, several gigabytes of weights and a complete episode.
 That is the right ASK eventually and the wrong FIRST ask: it is a long evening
 for a stranger, and if it dies at step 1 we learn almost nothing except that it
@@ -26,7 +26,7 @@ all. That column is not weak, it is empty.
   5. Does a plain bf16 matmul actually execute on the card?
 
 WHAT THIS DELIBERATELY DOES NOT DO: download a model, render anything, or judge
-whether an engine fits. Those need the full mission.
+whether an engine fits. Those need the full run in `apple/ROCM.md`.
 
 Run it from a ComfyUI checkout that has this pack in `custom_nodes/`:
 
@@ -233,7 +233,7 @@ Paste EVERYTHING above into the issue. Three lines decide what happens next:
     are leaving performance on the table by shipping `quant_policy: none`, and
     that is a good problem worth knowing about.
 
-If those look sane, the full mission in apple/ROCM.md is worth your
+If those look sane, the full run in apple/ROCM.md is worth your
 evening. If they do not, you have saved yourself one and taught us more than a
 failed render would have.
 """)

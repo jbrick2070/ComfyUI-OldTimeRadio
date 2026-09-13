@@ -1,23 +1,33 @@
-# ROCm Mission: Impossible
+# AMD / ROCm
 
-**Your mission, should you choose to accept it: make an AI radio drama on an
-AMD card. Nobody has.**
+**AMD is not part of v2.0. We cut our losses on it, and this page is the map we
+made before we stopped.**
 
 This pack writes a full old-time-radio episode -- script, cast, voices, music,
 pictures, video, credits -- locally, offline, on one GPU. It has run on NVIDIA
 (16 GB and 8 GB), on Apple Silicon, and on a rented Linux box. It has **never
-once run on ROCm**, because nobody involved owns an AMD card.
+once run on ROCm**, for a boring reason: nobody on the project owns an AMD card,
+and we were not going to claim a platform we could not put an episode through.
 
-Two profiles are sitting in the repo waiting for you. They are built, they are
-generated from the same source as every working profile, and every engine they
-select is plain PyTorch: no sageattention, no flash-attn, no bitsandbytes, no
-fp8, no CUDA-only GGUF kernels, no custom CUDA at all. On paper they should
-work. That is exactly the problem -- **on paper**.
+So AMD is parked. Realistically it is a 2.5 item, if it happens here at all.
 
-If you get an episode out of one, you will be the first person to do it, and
-you will be credited in this repo for it. If you get a traceback instead, that
-traceback is worth just as much: it is the first real ROCm signal this project
-has ever had, and it is the whole reason this file exists.
+**It is open source, and it is fair game.** If you have the card, everything
+needed to try is already in the repo and nothing is waiting on us:
+
+* **Two profiles are built** -- `otr_amd16_rocm` and `otr_amd8_rocm` -- generated
+  from the same source as every working profile. Every engine they select is
+  plain PyTorch: no sageattention, no flash-attn, no bitsandbytes, no fp8, no
+  CUDA-only GGUF kernels, no custom CUDA at all. On paper they should work. On
+  paper is exactly the problem.
+* **A five-minute probe exists** that answers most of the open questions without
+  downloading a model or rendering anything.
+* **The unknowns are written down** rather than hand-waved -- see the end of this
+  page.
+
+If you get an episode out of one, you are the first person to do it, and the
+credit is yours in this repo. If you get a traceback instead, that is worth just
+as much: it is the first real ROCm signal this project has ever had. Either way
+an issue with the probe output pasted in is the whole ask.
 
 ---
 

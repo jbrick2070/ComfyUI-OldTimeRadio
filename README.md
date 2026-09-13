@@ -100,7 +100,7 @@ Everything under `apple/` is in the pack, whichever way you installed it.
 |---|---|
 | [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
 | [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your own card cannot hold. |
-| [apple/ROCM.md](apple/ROCM.md) | AMD. Nothing here has ever run on ROCm; this page is the ask. |
+| [apple/ROCM.md](apple/ROCM.md) | AMD. Not in v2.0 -- cut, parked, and open to anyone who has the card. |
 | [apple/CLOUD.md](apple/CLOUD.md) | The optional paid writer lanes. Off by default; you do not need them. |
 
 | Adding to it | |
@@ -637,11 +637,16 @@ disabled rather than quietly making episodes worse. If you have a much larger
 model and want to try it, the switch is `JUDGE_ATTRIBUTION` in
 `nodes/_otr_ledger_clean.py`.
 
-**Nothing here has ever run on AMD.** The ROCm graphs are built from the same
-source as every working profile and every engine they select is plain PyTorch, so
-on paper they should work -- and on paper is exactly the problem. If you have the
-card, [apple/ROCM.md](apple/ROCM.md) is a five-minute probe that would tell the
-project more than it currently knows.
+**AMD did not make v2.0, and that is a scope cut rather than a bug.** Nobody on
+the project owns an AMD card, and we were not going to claim a platform we could
+not put an episode through. The ROCm graphs are built from the same source as
+every working profile and every engine they select is plain PyTorch, so on paper
+they should work -- and on paper is exactly the problem.
+
+It is parked, realistically for 2.5. But it is open source and it is fair game:
+[apple/ROCM.md](apple/ROCM.md) has the two built profiles, a five-minute probe
+that needs no model download, and the open questions written down. If you have
+the card, none of it is waiting on us.
 
 ---
 

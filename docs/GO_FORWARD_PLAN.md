@@ -604,12 +604,15 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   |---|---|---|---|
   | NVIDIA 8 GB (ceiling 6.8) | 3 | **2** | one short: `otr_4060_12b_gguf_offload`, `otr_nvidia_8gb_haunted` |
   | NVIDIA 16 GB (ceiling 14.5) | 3-4 | **42** | ten times too many -- CUT, do not build |
-  | AMD | ~3 | **0** | the AMD profiles exist but are all `draft` |
+  | AMD | ~3 | **0** | CUT FROM v2.0 (operator, 2026-09-13). The profiles exist and stay `draft`. |
   | Apple | (implied) | 1 | `otr_mac_mps` |
 
-  So the work is: promote one more 8 GB, promote three AMD out of draft once the
-  ROCm tester reports, and pick three or four of the 42 sixteen-gigabyte ones to
-  be the named set. The other 38 stay available; they just stop being the
+  So the work is: promote one more 8 GB, and pick three or four of the 42
+  sixteen-gigabyte ones to be the named set. **AMD leaves this table** -- the
+  operator cut it from v2.0 on 2026-09-13 rather than claim a platform nobody
+  here can put an episode through, and `apple/ROCM.md` now says so in those
+  words. The two profiles stay built and `draft`; whoever has the card is
+  welcome to them, and nothing in this release waits on that. The other 38 stay available; they just stop being the
   answer to "which one do I use".
 
   **AND THE GALLERY IS THE DELIVERY MECHANISM, which is why the set matters.**
