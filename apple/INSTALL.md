@@ -57,8 +57,10 @@ they render the whole episode and then fail at that last step with "Could not
 find tag for codec pcm_s16le", leaving a zero-byte file. Ubuntu 22.04's
 `apt install ffmpeg` is 4.4 and does exactly that.
 
-The floor is 6.1, where FFmpeg's MP4 muxer gained PCM. Measured here on
-2026-09-13: 4.4.2 fails, 7.0.2 and 8.0.1 pass; no 6.x build has been run.
+The floor is 6.1, where FFmpeg's MP4 muxer gained PCM. Measured on
+2026-09-13 by running this pack's own probe on four builds across three
+machines: 4.4.2 fails; 7.0.2-static, 8.0.1 and 9.0 pass. No 6.x build has
+been run, so the floor is documented rather than measured.
 **You do not have to work this out.** Nothing reads the version number --
 `OTR_WorkflowValidator` muxes a fifth of a second of silence when a graph
 containing the mux is queued, and refuses in about a second if the build

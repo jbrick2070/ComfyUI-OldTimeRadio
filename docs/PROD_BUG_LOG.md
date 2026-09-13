@@ -14963,6 +14963,16 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   version string, which can read `n7.0.2` or `N-109693-g...`); README step 2
   and apple/INSTALL.md say 6.1 or newer and why. Tests:
   `tests/test_ffmpeg_master_mux_capability.py` (19).
+  **Probe measured on three machines, 2026-09-13**, by running
+  `probe_ffmpeg_capabilities()` itself rather than reading a version string:
+  the 5080 (Gyan 8.0.1), the 4060 (Gyan 9.0) and the pod (johnvansickle
+  7.0.2-static) all answer `pcm_in_mp4: True` with no gap; the pod's original
+  apt 4.4.2 answered False. No 6.x build has been run anywhere, so the stated
+  6.1 floor is documented from FFmpeg's history and NOT measured.
+  **The preflight's own live proof is the 4060's `otr_8gb_animatediff` leg
+  started 12:56 local**, which is the only leg running on a server booted
+  after 55a690d3 -- the pod is at d1a81d16 and the 5080's server dates from
+  08:17, both older than the check.
   **Live proof:** the pod got the static build by hand at 18:00Z and
   `otr_16gb_low` then ran SUCCESS in 16 min at 18:14Z with
   `the_law_of_the_horn_20260913_180804...mgen_final.mp4` in obs -- the same

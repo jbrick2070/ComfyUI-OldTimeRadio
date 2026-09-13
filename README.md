@@ -42,8 +42,7 @@ builds cannot write. `winget install Gyan.FFmpeg` and `brew install ffmpeg`
 give you a current pair and nothing more to think about. On Debian/Ubuntu run
 `ffmpeg -version` first: Ubuntu 22.04's apt build is 4.4, which fails, so take
 a static build instead. The floor is 6.1, where FFmpeg's MP4 muxer gained PCM;
-what has actually been measured here is 4.4.2 failing and 7.0.2 and 8.0.1
-passing. You do not have to work this out -- nothing reads the version number.
+measured across three machines, 4.4.2 fails while 7.0.2, 8.0.1 and 9.0 pass. You do not have to work this out -- nothing reads the version number.
 The pack muxes a fifth of a second of silence at the start of a run and refuses
 in about a second if your build cannot do it, instead of at the end of a
 render. On Linux also install one monospace font (`fonts-dejavu-core` is
