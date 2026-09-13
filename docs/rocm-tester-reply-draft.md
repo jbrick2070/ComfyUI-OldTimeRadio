@@ -20,11 +20,14 @@ means you will hear things in the output I would not. Thank you.
 
 There is one graph I need run and it is the small one. Here is the whole ask:
 
-**1. Install.** ComfyUI with a ROCm build of PyTorch (AMD's own instructions
-for your OS), then the pack -- either through ComfyUI Manager, searching for
-**Old Time Radio**, or `git clone
-https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into `custom_nodes/`.
-Either branch is fine now -- `main` and `v2.0-alpha` are the same commit.
+**1. Install from git, not from Manager, for this one.** ComfyUI with a ROCm
+build of PyTorch (AMD's own instructions for your OS), then
+`git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into
+`custom_nodes/`. Either branch is fine -- `main` and `v2.0-alpha` are the same
+commit. Manager pulls the registry copy, and the graph below was added to the
+repo today, so no published version carries it yet. I will ping you when one
+does, because the one-click install is its own thing worth testing and I would
+rather learn about it from someone who is not me.
 
 **2. A current ffmpeg, with ffprobe.** Every episode is mixed and muxed
 through it, and older builds cannot write the final file -- Ubuntu 22.04 ships
