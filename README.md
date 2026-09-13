@@ -98,13 +98,12 @@ the Kokoro voices -- and then writes, casts, performs, scores and cuts an episod
 Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
 on CPU it is a long wait, and that is the model working, not a hang.
 
-**Expect the canvas to stay empty, and do not read that as failure.** This graph
-has no preview node: nothing renders a thumbnail, a video player or an image in
-the ComfyUI window, at any point, including when it finishes. The episode is a
-file on disk and the folder is the only place it appears. That surprises people
-who are used to seeing a picture arrive on the canvas -- the first person outside
-this project to run it went looking for the output in the UI, found nothing, and
-only then found the files.
+**The canvas shows you almost nothing until the end.** No thumbnail, no player,
+no progress picture while it works -- and then a single still from the finished
+episode on the last node. The file is the real product and the folder is where
+it lives; the still is only there so a finished run does not look like one that
+did nothing. The first person outside this project to run it had no still, went
+looking in the UI, found nothing, and only then found the files.
 
 That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
 finish**, however green the console looked -- go to
@@ -228,10 +227,13 @@ feature.
 
 ### The look
 
-Nine visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
+Ten visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
 production look), `anime`, `archival_documentary`, `cartoon`, `paper_origami`,
-`recur_frac`, `shakespeare_stage_realism`, `storybook_engraving` and `video_art`.
-Every style drives both the stills and the video.
+`recur_frac`, `shakespeare_stage_realism`, `storybook_engraving`, `video_art`,
+and `visual_storybased`, which is minted from the story rather than loaded from
+a pack -- which is why you will not find it among the nine files in
+`nodes/visual_styles/`, and why a rolled run lands on it about a tenth of the
+time. Every style drives both the stills and the video.
 
 ### The engines
 
@@ -299,7 +301,7 @@ decide what it loads, and therefore what you have to download. The table below
 prices each choice and says whether it runs on the three machines most people
 have. It is generated from the code -- whether a machine is offered an engine
 comes from that engine's own declaration, and sizes come from the real fetch
-manifests -- so it cannot drift from what the pack does. The same table with AMD
+manifests -- so it is generated from the profiles the pack actually loads. The same table with AMD
 and CPU-only columns, and a legend for every word in it, is
 [apple/MACHINES.md](apple/MACHINES.md) section 2.
 
@@ -564,12 +566,6 @@ mark left, on the AMD graph, and it means what it says: cut from the same source
 as the rest, with no receipts. What each machine class runs, engine by engine,
 is in [apple/MACHINES.md](apple/MACHINES.md).
 
-There is a second way to read the same hardware question, and it is worth
-knowing which you are reading. The tables above say what each **saved graph**
-selects. [apple/MACHINES.md](apple/MACHINES.md) also carries the **machine
-classes** -- what `scripts/otr_provision.py --machine <key>` would install for a
-class of card, which is a provisioning plan rather than a file on disk, and so
-names different engines for the same hardware. Both ship with the pack.
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
 Manager install. The saved graphs in `workflows/variants/` need nothing but a
 drag, and the weights a graph selects download at queue time whenever the pack
@@ -700,12 +696,13 @@ licence click on Hugging Face plus a login; every default weight is ungated.
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 all three to `sd15` first.
 
-**It ran, but nothing showed up in ComfyUI.** That is correct behaviour, not a
-fault: the graph has no preview node, so the canvas never displays the episode.
-Look in `<your ComfyUI output folder>/otr/obs/` for the finished `.mp4`, and in
-`otr/episodes/<episode>/` for the working files it was built from. If you run
-ComfyUI in Docker, that is whichever host folder you mapped to ComfyUI's output
-directory.
+**It ran, but nothing showed up in ComfyUI.** The last node draws one still
+from the finished episode; nothing else in the graph draws anything, and the
+still is skipped rather than retried if it cannot be made. Either way the
+episode is a file: look in `<your ComfyUI output folder>/otr/obs/` for the
+finished `.mp4`, and in `otr/episodes/<episode>/` for the working files it was
+built from. If you run ComfyUI in Docker, that is whichever host folder you
+mapped to ComfyUI's output directory.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
 the console first, because there are two different answers. `obs_publish

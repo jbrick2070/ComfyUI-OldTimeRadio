@@ -68,7 +68,7 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 
 **There is no ONE seed for the episode.** The two director nodes each carry
 a `seed_mode` and a `request_seed` widget for their own lane, but there is no
-sampler node and no single knob that reproduces a whole show. It has no sampler node; what makes a
+sampler node and no single knob that reproduces a whole show. What makes a
 run reproducible is the frozen ledger, not a number you set. If you want two
 comparable runs, pin `source_bank` and `visual_style` instead.
 
