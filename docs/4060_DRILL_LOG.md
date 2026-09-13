@@ -5436,3 +5436,26 @@ episode artifact. The final shot render then failed on the first shot with
 download. Queue history ended in `error` at `OTR_VideoRenderBatch`, and
 `output/otr/obs` remained absent, so the plan's publication criterion was not
 met. The 5080 and preserved source/archive trees were not touched.
+
+**CR-20260912-05 — 4060 machine:8gb one-act clean-room run: PASS, published.**
+
+The documented provision preview and check passed. The first provision command
+used the script's fallback root (`D:\`) for node packs and `C:\ComfyUI-Models`
+for weights, which was not the active Desktop install. Re-running packs-only
+with explicit active `OTR_COMFY_ROOT` installed and verified ComfyUI-GGUF,
+ComfyUI-LTXVideo, and ComfyUI-AnimateDiff-Evolved at the pinned revisions in
+the active instance. A temporary model-path addendum exposed the provisioned
+haunted weights to the active server; the addendum was removed after the run.
+
+The live machine-row dry run resolved `google/gemma-4-E2B-it`, CUDA,
+`llm_vram_ceiling_gb=6.8`, `gguf_quant=Q4_K_M`, Kokoro, MusicGen, and
+`animatediff15_v3_haunted_video`, with `act_count=1`. The API queue completed
+successfully in 40m23s: 6 speech lines, 8 haunted video clips, 1,432 source
+frames at 25 fps, 1080p compositing, SDH captions, credits, and an
+audio-byte-identical final publication. The published MP4 is 84,223,306 bytes,
+76.880 seconds, H.264/AAC, 1920x1080 at 25 fps, with SHA-256
+`8474125AD1B6F0430F267F8381099324C30B5C408A8786391DED72444D1190AF`.
+
+This is the first clean-room run in this campaign to satisfy the plan's
+`output/otr/obs` publication gate. The 5080 and preserved source/archive trees
+were not touched.
