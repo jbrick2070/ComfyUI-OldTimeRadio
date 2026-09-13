@@ -18,8 +18,8 @@
       "label": "AnimateDiff haunted video",
       "level": "PROVEN",
       "hardware": "RTX 4060 Laptop, 8 GB, Ada",
-      "date": "2026-08-29",
-      "episodes": 6,
+      "date": "2026-09-12",
+      "episodes": 10,
       "scope": "full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine",
       "evidence": "docs/4060_DRILL_LOG.md steps 7-19"
     },
@@ -102,6 +102,16 @@
       "episodes": 32,
       "scope": "full published OTR episodes",
       "evidence": "32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B, and humo; episode-ledger delivered_engine evidence"
+    },
+    {
+      "engine": "ltx_8gb",
+      "label": "LTX 0.9.8 2B local video diffusion",
+      "level": "PROVEN",
+      "hardware": "RTX 4060 Laptop, 8 GB, Ada",
+      "date": "2026-09-06",
+      "episodes": 1,
+      "scope": "full published OTR episode on 8 GB -- eight clips persisted at 512x288, credits passed, zero tracebacks in the whole log",
+      "evidence": "docs/4060_DRILL_LOG.md -- the_ash_on_the_glass_20260906_170119__anime__ltx_8gb__z_image_turbo__kokoro__original_final.mp4, obs_publish OK, 42,524,256 bytes verified on disk. ADDED 2026-09-12: docs/dropdown_matrix.json had carried ltx_8gb nv8 as proven since the 2026-09-09 harvest while this file had no 8 GB row at all, so the two curated files disagreed. An audit proposed downgrading the verdict; the receipt above is why that would have been wrong, and the gap was here instead."
     },
     {
       "engine": "minimax_h3_fl2va_raw_recipe",

@@ -369,7 +369,7 @@
   "sd15": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "size_gb": 2.0
@@ -394,7 +394,7 @@
   "stable_audio_3": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "proven"
    },
    "size_gb": 3.5
@@ -442,7 +442,7 @@
   "viz_camera": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "size_gb": null
@@ -450,7 +450,7 @@
   "viz_green": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "size_gb": null
@@ -458,7 +458,7 @@
   "viz_mxc_cpu": {
    "memory": {
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "proven"
    },
    "size_gb": null
@@ -466,7 +466,7 @@
   "viz_mxc_mandala": {
    "memory": {
     "mac16": "fits",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "fits"
    },
    "size_gb": null
@@ -502,7 +502,7 @@
     "amd": "unknown",
     "cpu": "unknown",
     "mac16": "proven",
-    "nv16": "fits",
+    "nv16": "proven",
     "nv8": "proven"
    },
    "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
@@ -519,9 +519,10 @@
   },
   "google/gemma-4-12b-it": {
    "memory": {
-    "nv16": "measured",
-    "nv8": "proven"
-   }
+    "nv16": "proven",
+    "nv8": "measured"
+   },
+   "note": "nv8 WAS 'proven' and is corrected to 'measured' on 2026-09-12. This file's own rule is that proven means a PUBLISHED EPISODE used it, and no episode has. The 4060 loads this row standalone -- 48/48 GPU layers, 7,751 MiB -- and then fails in the pipeline: 27 of 27 attempts at Step 15, and CR-20260912-06 now refuses it even earlier, at the fit gate, with 'estimated 11.9 GB peak resident vs 6.8 GB ceiling'. The drill log asks in as many words that it not be reported as qualified. nv16 goes the other way on a real receipt: the_cocks_trumpet_20260912_210724."
   },
   "google/gemma-4-E2B-it": {
    "memory": {
@@ -533,6 +534,7 @@
   },
   "google/gemma-4-E4B-it": {
    "memory": {
+    "nv16": "proven",
     "nv8": "measured"
    }
   },
