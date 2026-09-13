@@ -37,6 +37,35 @@ hardware purchase.
 
 ---
 
+## Before any of that: five minutes that might save you an evening
+
+**You do not have to commit to the whole mission to help.** Most of what we
+need to know is answerable without downloading a single model or rendering
+anything. Install a ROCm torch, clone this pack, and run one file:
+
+```bash
+pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio
+git clone https://github.com/comfyanonymous/ComfyUI && cd ComfyUI
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio custom_nodes/ComfyUI-OldTimeRadio
+python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_rocm_probe.py
+```
+
+It prints about thirty lines and stops. No weights, no render, nothing written
+outside the checkout. Paste the output into the issue and you are done -- that
+alone is more AMD evidence than this project has ever had.
+
+**Three of those lines decide whether the rest of the mission is even worth your
+time.** `is_amd()` is what our device resolution branches on and has never once
+executed on an AMD card. `vendor()` must come back `amd`; if it says `nvidia` or
+`unknown`, the pack cannot tell your card apart from a GeForce and we have a bug
+to fix before you spend an evening rendering. And if `bitsandbytes` imports with
+a working backend, then every AMD graph we ship is leaving speed on the table by
+refusing to quantise -- which is a good problem, and one nobody can discover
+without your card.
+
+If those come back sane, the full mission below is worth it. If they do not, you
+have saved yourself the evening and taught us more than a failed render would.
+
 ## The mission, in six commands
 
 **1. PyTorch for ROCm first.** A ROCm build of torch presents itself as
