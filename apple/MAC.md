@@ -204,6 +204,99 @@ comfyui-old-time-radio.nodes._otr_shared.engine_registry_base.EngineUnusable: vi
 Logs: `otr/legs/shipping_set_20260913_131946/otr_mac16_animatediff.log` in the
 checkout above. No source fixes or memory-limit changes were applied.
 
+## otr_mac16_animatediff second re-test: chunked MPS decode fix CONFIRMED, 2026-09-13
+
+Root cause of the DEPENDENCY_MISSING failure above, found jointly with the
+5080 window: my restart in the previous entry launched bare `main.py
+--listen 127.0.0.1 --port 8188` with no `--extra-model-paths-config` flag,
+so `models/checkpoints/` and `models/vae/` under `ComfyUI-Installs/ComfyUI/
+ComfyUI/` were empty (only `put_checkpoints_here` / `put_vae_here`
+placeholders) and folder_paths had nothing to resolve against. Not a code
+regression -- `nodes/_otr_video_engines/eng_ghost_signal.py`'s
+`_resolve_model_file_by_token` is a flat `folder_paths.get_full_path` call,
+untouched by any commit that day. The real checkpoint and VAE files exist,
+just outside any registered folder: `/Users/rentamac/ComfyUI-Shared/models/
+checkpoints/v1-5-pruned-emaonly-fp16.safetensors` and `.../models/vae/
+vae-ft-mse-840000-ema-pruned.safetensors`. No repo config file needed
+editing: the Comfy Desktop generated file at `~/Library/Application
+Support/Comfy Desktop/instance-model-paths/inst-1788817218536.yaml` already
+maps `checkpoints`, `vae`, `animatediff_models`, and `animatediff_motion_lora`
+to that shared folder as `base_path`.
+
+Relaunched:
+
+```
+python main.py --listen 127.0.0.1 --port 8188 \
+  --extra-model-paths-config "$HOME/Library/Application Support/Comfy Desktop/instance-model-paths/inst-1788817218536.yaml"
+```
+
+Verified before spending a leg on it, per the API rather than eyeballing
+folders:
+
+```
+curl -s http://127.0.0.1:8188/object_info/CheckpointLoaderSimple | python3 -c "..."   # -> True
+curl -s http://127.0.0.1:8188/object_info/VAELoader | python3 -c "..."                # -> True
+```
+
+Re-ran the same leg:
+
+| Graph | RESULT | Minutes | OBS filename |
+| --- | --- | ---: | --- |
+| otr_mac16_animatediff | SUCCESS | 65 | `the_sealed_compact_of_lost_lands_20260913_135656__anim__adlt__none__koko__sspr__q354b__mgen_final.mp4` |
+
+**This confirms the chunked MPS decode fix.** All 8 beats (6 story shots
+`shot_b001`-`shot_b006` plus the opening and closing music-visual beats)
+went through AnimateDiff Lightning sampling and VAE decode with zero MPS
+OOM, each logging the target line:
+
+```
+[ghost-signal] decoded 88 frame(s) in 22 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget    (shot_music_opening_001)
+[ghost-signal] decoded 76 frame(s) in 19 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget    (shot_b001)
+[ghost-signal] decoded 124 frame(s) in 31 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget   (shot_b002)
+[ghost-signal] decoded 136 frame(s) in 34 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget   (shot_b003)
+[ghost-signal] decoded 136 frame(s) in 34 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget   (shot_b004)
+[ghost-signal] decoded 88 frame(s) in 22 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget    (shot_b005)
+[ghost-signal] decoded 64 frame(s) in 16 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget    (shot_b006)
+[ghost-signal] decoded 76 frame(s) in 19 chunk(s) of 4 at 36x64 latent -- Apple silicon decode budget    (shot_music_closing_001)
+```
+
+**Discrepancy from the handoff worth flagging:** the handoff described this
+profile as 832x480 (60x104 latent) expecting one frame per decode call.
+What actually ran was 512x288 (36x64 latent) in chunks of 4 frames each.
+Both are consistent with a chunked-decode-by-budget design, just not the
+exact numbers named in the handoff -- possibly a different profile/graph
+variant than assumed, not a defect in what was observed.
+
+The pipeline completed normally after decode: composite (2799 frames @
+25fps 1920x1080), captions burned, credits appended (24.0s), master audio
+muxed (duration check `v=135.960s a=111.954s tail_budget=24.0s OK`,
+`audio_byte_identical OK`), and `obs_publish OK`.
+
+**One real miss, mine, not the fix's:** the publish landed in
+`/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs/`, not
+`/Users/rentamac/ComfyUI-Shared/output/otr/obs/` -- my restart also omitted
+an `--output-directory` override pointing at the shared output tree that
+the original (pre-crash) process evidently had, so `OTR_OUTPUT_DIR` pinned
+to the node-relative default instead. The harness's own `SUMMARY.txt`
+therefore reads `obs=0` even though the episode genuinely finished and
+published. The file is real and on disk at the path above (111,333,128
+bytes, `the_sealed_compact_of_lost_lands_20260913_135656__anim__adlt__none__koko__sspr__q354b__mgen_final.mp4`,
+dated 14:55) -- it was not moved or copied per this session's "report only,
+no fixes" instruction.
+
+Peak MPS could not be read directly from a decode-phase log line since no
+OOM ever fired to print one; the periodic `MEMORY_SNAPSHOT` instrumentation
+in this log only covers the LLM-writer phase and its high-water mark this
+run was `mps_current_bytes` 8.41 GB / `mps_driver_bytes` 18.54 GB (writer
+generation, not decode). The qualitative result stands regardless: eight
+decode calls, zero MPS OOM.
+
+Logs: `otr/legs/shipping_set_20260913_134932/otr_mac16_animatediff.log` in
+the checkout above; ComfyUI's own log is not committed (`/tmp/
+comfyui_restart3_20260913.log` on this machine, not preserved past this
+session). No source fixes or memory-limit changes were applied -- config
+and launch-flag corrections only.
+
 <details>
 <summary>otr_mac16_animatediff traceback</summary>
 
