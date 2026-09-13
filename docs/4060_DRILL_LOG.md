@@ -5459,3 +5459,16 @@ audio-byte-identical final publication. The published MP4 is 84,223,306 bytes,
 This is the first clean-room run in this campaign to satisfy the plan's
 `output/otr/obs` publication gate. The 5080 and preserved source/archive trees
 were not touched.
+
+**CR-20260912-06 — named shipping profile: FAIL before media.**
+
+The exact `otr_4060_12b_gguf_offload` profile was queued for a separate
+one-act attempt with the original bank and no substitutions. Profile preflight
+passed and the three haunted weights were visible, but
+`OTR_LedgerScriptWriter` rejected `google/gemma-4-12b-it` before model
+download: `VRAMFitFailedError: estimated 11.9 GB peak resident vs 6.8 GB
+ceiling -- pick a smaller model. ctx_cap=UNKNOWN@8192`. No audio, video, or
+`output/otr/obs` artifact was created by this attempt. The advertised 12B
+profile tuple is therefore not a successful 8 GB path under the current
+loader policy; keep it separate from the successful documented `machine:8gb`
+row and do not report it as qualified.
