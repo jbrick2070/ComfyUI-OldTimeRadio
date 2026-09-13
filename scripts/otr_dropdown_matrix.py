@@ -202,40 +202,65 @@ def self_fetching_lanes() -> set:
     six engines were being advertised as costing none: the three AnimateDiff
     lanes, both HuMo rows and ``wan_ti2v``.
 
-    WHAT ACTUALLY SELF-FETCHES is the visual-asset manifest, and the mechanism
-    is in the graph rather than in `scripts/`: ``OTR_WorkflowValidator`` -- a
-    node in the canonical workflow -- calls
+    WHAT SELF-FETCHES **FOR A LANE** is the visual-asset manifest, and the
+    mechanism is in the graph rather than in `scripts/`: ``OTR_WorkflowValidator``
+    -- a node in the canonical workflow -- calls
     ``_otr_visual_assets.ensure_prompt_visual_assets`` at queue time, which
     downloads every manifest file it is missing. So a lane is genuinely "auto"
     exactly when EVERY file it needs is in that manifest, and that is what this
     computes. It is a join, not a list: put a file in the manifest and the
     matrix says auto on the next regeneration, with nobody editing a table.
 
+    **THE SCOPE OF THAT SENTENCE IS "a lane", AND THE LIMIT MATTERS.** It is not
+    a claim that the manifest is the only download in the pack. ``eng_musicgen``
+    calls ``from_pretrained`` and ``_otr_kokoro_voice_prefetch`` calls
+    ``hf_hub_download``; both are real, legitimate, independent self-fetches. They
+    are also not lanes -- they never reach this function, because they resolve
+    through ``NO_LANE_REASON["hf_cache"]`` in the branch above, which already
+    says "auto" for exactly that reason. Two mechanisms, two code paths, both
+    correct.
+
+    **ALSO NOT A CONTRADICTION:** ``otr_provision.profile_lanes`` still reports
+    ``humo`` and ``wan_ti2v_gguf`` as "automatic". That answers a DIFFERENT
+    question -- can the dev-tree provisioner fetch it during setup -- and it is
+    right. Do not "reconcile" ``tests/test_otr_provision_humo.py`` with this
+    function; you would break a correct test.
+
     Today it resolves to ``ltx_8gb``, ``stable_audio_3`` and ``z_image`` -- the
     three the operator can and does tell people to just pick.
 
     Memoized because ``friction_for`` asks once per engine and ``_load`` re-executes
-    a module every call.
+    a module every call. The memo has no invalidation on purpose -- every caller
+    today is a fresh process or a fresh ``_generator()`` module -- so a test that
+    loads this module ONCE and then mutates ``MANIFEST`` or ``LANES`` between two
+    scenarios must call ``_SELF_FETCHING_CACHE.clear()`` itself, or it will read
+    the first answer twice with no error.
     """
     if _SELF_FETCHING_CACHE:
         return _SELF_FETCHING_CACHE[0]
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
     assets = _load("nodes/_otr_visual_assets.py", "_odm_visual_assets")
-    # The manifest is keyed (comfy_dir, filename); the fetcher's specs carry a
-    # repo-relative path on several rows, so compare basenames.
-    manifest = {name for (_dir, name) in getattr(assets, "MANIFEST", {})}
+    # MATCH ON (comfy dir, filename), NOT ON THE FILENAME ALONE. The manifest is
+    # keyed by the pair, and a bare-basename compare would call a lane "auto"
+    # because some OTHER lane put a same-named file in a different model
+    # directory -- `checkpoints/x.safetensors` is not `loras/x.safetensors`. No
+    # such collision exists today; this costs one tuple and removes the whole
+    # class (reviewer finding, 2026-09-12).
+    manifest = {(str(d), str(n)) for (d, n) in getattr(assets, "MANIFEST", {})}
     self_fetching = set()
     for lane, specs in getattr(fetcher, "LANES", {}).items():
-        names = []
+        wanted = []
         for spec in specs:
-            raw = getattr(spec, "filename", None) or getattr(spec, "name", None)
-            if raw is None and isinstance(spec, (tuple, list)):
-                raw = next((x for x in spec if isinstance(x, str)
-                            and x.endswith((".safetensors", ".ckpt", ".pth",
-                                            ".gguf"))), None)
-            if raw:
-                names.append(os.path.basename(raw))
-        if names and all(n in manifest for n in names):
+            dest = getattr(spec, "destination", None)
+            if dest:
+                # WeightSpec: destination is "<comfy dir>/<file>".
+                wanted.append((os.path.basename(os.path.dirname(str(dest))),
+                               os.path.basename(str(dest))))
+            elif isinstance(spec, (tuple, list)) and len(spec) >= 3:
+                # Legacy row: (repo, path_in_repo, comfy dir). The path is
+                # repo-relative and may be nested, so take its basename.
+                wanted.append((str(spec[2]), os.path.basename(str(spec[1]))))
+        if wanted and all(pair in manifest for pair in wanted):
             self_fetching.add(lane)
     _SELF_FETCHING_CACHE.append(self_fetching)
     return self_fetching
