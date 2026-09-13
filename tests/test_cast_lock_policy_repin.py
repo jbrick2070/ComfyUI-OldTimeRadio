@@ -122,6 +122,36 @@ def _live_indextts2_runtime() -> str:
     return ROUTE.live_engine_impl_version("indextts2")
 
 
+def _requalified_shipped_policy():
+    """The SHIPPED policy with the indextts2 record's runtime set to THIS build.
+
+    RESTORED 2026-09-12, and `_stale_shipped_policy` below records why it left:
+    between 2026-08-10 and 2026-08-18 the shipped record was itself stale, so
+    the MACHINERY tests had to repair it before they could prove anything, and
+    the repair was dropped when `prod-audition-2026-08-18` re-qualified Lemmy.
+    The IndexTTS2 timeout fix moves the fingerprint again, so the mechanism
+    tests need it again.
+
+    THE POINT OF THE SPLIT, so nobody collapses it back: a test that proves
+    STAMPING, DURABLE-RELOAD SURVIVAL or REGISTRY DETERMINISM is testing
+    machinery, and it should not go red because nobody has re-auditioned a
+    voice. A test that proves THE SHIPPED RECORD IS CURRENTLY FRESH is a
+    canary and must read the real file -- `test_the_shipped_route_proves_end_to_end`
+    is that canary and is deliberately left pointing at `cast_pools.py`.
+
+    Exactly one field differs from the real shipped evidence, so a receipt that
+    rots for any OTHER reason still fails the tests that use this.
+    """
+    import json as _json
+
+    from config.cast_pools import LEMMY_VOICE_POLICY as SHIPPED
+
+    record = _json.loads(_json.dumps(SHIPPED["approved_native_routes"]["indextts2"]))
+    record["qualification_record"]["runtime"]["engine_impl_version"] = (
+        _live_indextts2_runtime())
+    return dict(SHIPPED, approved_native_routes={"indextts2": record})
+
+
 def _stale_shipped_policy():
     """The SHIPPED policy with the indextts2 record's runtime deliberately rotted.
 
@@ -255,14 +285,31 @@ def test_a_STALE_receipt_is_not_SELECTED():
     assert claim is None
 
 
-def test_the_shipped_route_proves_end_to_end():
-    """The real SHIPPED record proves against the real bank, with the reference
-    bytes re-hashed off disk and the runtime matching the live build.
+def test_the_shipped_route_is_withdrawn_until_someone_re_auditions():
+    """THE CANARY, AND IT JUST FIRED. It is the one test here that reads the
+    real `cast_pools.py`, so it answers "is the shipped record fresh" rather
+    than "does the machinery work" -- every other route test in this file now
+    uses `_requalified_shipped_policy` for exactly that reason.
 
-    This used to need a repaired copy of the record, because the shipped one
-    was correctly demoted between 2026-08-10 and 2026-08-18. It now runs on
-    `cast_pools.py` itself, which is stronger: if a future adapter edit moves
-    the fingerprint and nobody re-auditions, this fails and says so.
+    Its previous docstring promised: "if a future adapter edit moves the
+    fingerprint and nobody re-auditions, this fails and says so." On 2026-09-12
+    the IndexTTS2 timeout fix moved it (`d47779386ce91209` ->
+    `c78934682057fc65`) and this is it saying so.
+
+    THE FIX SHIPPED ANYWAY, AND THE TRADE IS MEASURED. Both protocol reads in
+    `eng_indextts2` were unbounded, so a stalled worker held VRAM forever with
+    nothing in the log; its two sibling engines already route the identical read
+    through `_otr_sidecar.read_protocol_line`. What the withdrawal costs is
+    NOTHING ON THE SHIPPING SURFACE: this policy carries a qualified route for
+    `indextts2` ALONE, and the canonical ships `kokoro` on both voice slots, so
+    `select_policy_route` returns None there and always did. Only a graph
+    somebody switched to IndexTTS2 -- which needs a Windows-only sidecar
+    install -- ever reached this route.
+
+    TO FLIP IT BACK: re-audition on the current build and write a new
+    qualification record whose `runtime.engine_impl_version` is whatever
+    `live_engine_impl_version("indextts2")` returns then. Do not hand-edit the
+    fingerprint; `cast_pools.py` says why at length.
     """
     from datetime import datetime, timezone
     from config.cast_pools import LEMMY_VOICE_POLICY as P
@@ -274,11 +321,15 @@ def test_the_shipped_route_proves_end_to_end():
         P, "indextts2", datetime.now(timezone.utc),
         bank_entries=load_voice_bank()[0],
         path_resolver=_resolve_ref_to_disk)
-    assert claim is not None, (
-        "the shipped Lemmy route did not select -- if the adapter changed, "
-        "re-audition and re-record; do not hand-edit the fingerprint")
-    assert claim.voice_ref_id == "idx_lemmy_algenib_cockney_v1"
-    assert claim.voice_route["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
+    assert claim is None, (
+        "the shipped Lemmy route selected again -- if it was re-auditioned, "
+        "flip this test back and name the audition that did it")
+    # The record is intact and still readable; only the CLAIM is withheld.
+    record = P["approved_native_routes"]["indextts2"]
+    assert record["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
+    assert (record["qualification_record"]["runtime"]["engine_impl_version"]
+            != _live_indextts2_runtime()), (
+        "the record matches the live build again -- this test is stale")
 
 
 def test_a_bank_with_no_character_engine_is_reported_not_raised():
@@ -296,6 +347,12 @@ def test_a_bank_with_no_character_engine_is_reported_not_raised():
 def test_the_route_survives_the_DURABLE_stamp(monkeypatch):
     """Plan section 7 step 3's last clause: cast data is preserved on durable
     reload. It was the one acceptance item with no test.
+
+    RUNS ON A REPAIRED RECORD since 2026-09-12 (see
+    `_requalified_shipped_policy`). What it proves is that a QUALIFIED route
+    survives `stamp_durable`, and that is machinery: it must not go red because
+    the IndexTTS2 adapter moved and nobody has re-auditioned a voice. The
+    freshness of the shipped record is a different claim with its own canary.
 
     Not a hypothetical: `stamp_durable` replaces the `cast` section WHOLESALE on
     the singleton, so a route stamped only on the local wire dict would reach the
@@ -321,6 +378,8 @@ def test_the_route_survives_the_DURABLE_stamp(monkeypatch):
         captured["source"] = source
         return "test-mode"
 
+    monkeypatch.setattr("config.cast_pools.LEMMY_VOICE_POLICY",
+                        _requalified_shipped_policy())
     monkeypatch.setattr(pl, "stamp_durable", spy)
     monkeypatch.setattr("nodes.cast_lock.stamp_durable", spy, raising=False)
 
@@ -565,10 +624,18 @@ def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
                         cast_voice_policy="auto_registry")
 
 
-def test_auto_registry_is_deterministic_with_the_live_route():
-    """Runs on the REAL shipped record, re-qualified 2026-08-18 [QA-7]. This
-    test is about DETERMINISM of the pin, not about the staleness -- it used to
-    need a repaired copy of the record and no longer does."""
+def test_auto_registry_is_deterministic_with_the_live_route(monkeypatch):
+    """DETERMINISM of the pin, which is machinery, not the record's freshness.
+
+    It needed a repaired copy of the record between 2026-08-10 and 2026-08-18,
+    stopped needing one when Lemmy was re-qualified, and needs one again from
+    2026-09-12 because the IndexTTS2 timeout fix moved the adapter fingerprint.
+    That oscillation is exactly why `_requalified_shipped_policy` is back rather
+    than this test being flipped a third time: a determinism proof should not
+    depend on whether anyone has re-auditioned a voice this week.
+    """
+    monkeypatch.setattr("config.cast_pools.LEMMY_VOICE_POLICY",
+                        _requalified_shipped_policy())
     a = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     b = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
     assert a == b

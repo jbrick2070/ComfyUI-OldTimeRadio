@@ -275,7 +275,7 @@ def test_shipped_bank_has_no_route_exception_and_metadata_is_sha_bound(tmp_path)
 
 
 def test_exact_portable_exception_skips_private_route_and_casts_generic_lemmy(
-        tmp_path, monkeypatch):
+        tmp_path, monkeypatch, lemmy_route_qualified):
     tool = _load()
     male = tmp_path / "male.wav"
     female = tmp_path / "female.wav"
@@ -317,7 +317,7 @@ def test_exact_portable_exception_skips_private_route_and_casts_generic_lemmy(
 
 
 def test_missing_private_route_still_fails_closed_with_typo_exception(
-        tmp_path, monkeypatch):
+        tmp_path, monkeypatch, lemmy_route_qualified):
     tool = _load()
     male = tmp_path / "male.wav"
     female = tmp_path / "female.wav"
@@ -351,7 +351,7 @@ def test_missing_private_route_still_fails_closed_with_typo_exception(
 
 
 def test_private_route_id_on_wrong_engine_is_present_and_fails_closed(
-        tmp_path, monkeypatch):
+        tmp_path, monkeypatch, lemmy_route_qualified):
     tool = _load()
     male = tmp_path / "male.wav"
     female = tmp_path / "female.wav"
@@ -388,7 +388,7 @@ def test_private_route_id_on_wrong_engine_is_present_and_fails_closed(
 
 
 def test_exact_exception_does_not_waive_revoked_qualification(
-        tmp_path, monkeypatch):
+        tmp_path, monkeypatch, lemmy_route_qualified):
     tool = _load()
     male = tmp_path / "male.wav"
     female = tmp_path / "female.wav"

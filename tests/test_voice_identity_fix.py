@@ -705,15 +705,28 @@ def _stale_lemmy_policy():
                 approved_native_routes={"indextts2": stale})
 
 
-def test_the_shipped_lemmy_route_is_selected_again():
-    """The release gate, asserted from the other side: RE-QUALIFIED.
+def test_the_shipped_lemmy_route_is_withdrawn_until_someone_re_auditions():
+    """The release gate, asserted from whichever side is true today.
 
-    This test used to assert `is None`, and it was correct for exactly as long
-    as nobody had re-auditioned. `prod-audition-2026-08-18` re-qualified the
-    route on the shipped build, so the gate's own condition -- the record's
-    runtime matches the code that will render it -- is satisfied and the route
-    comes back. What must never happen is a route selecting WITHOUT that match,
-    which is what the stale-record test below still proves.
+    IT HAS FLIPPED THREE TIMES AND EACH FLIP WAS THE MECHANISM WORKING. It
+    asserted `is None` while nothing had been auditioned; `is not None` after
+    `prod-audition-2026-08-18` re-qualified Lemmy on the shipped build; and
+    `is None` again from 2026-09-12, when the IndexTTS2 timeout fix moved the
+    adapter fingerprint (`d47779386ce91209` -> `c78934682057fc65`).
+
+    THE FIX SHIPPED WITH THAT COST KNOWN AND PRICED. Both protocol reads in
+    `eng_indextts2` were unbounded, so a stalled worker held VRAM indefinitely
+    with nothing in the log, while its two sibling engines already route the
+    identical read through `_otr_sidecar.read_protocol_line`. The withdrawal
+    costs nothing on the SHIPPING surface: this policy carries a qualified route
+    for `indextts2` alone and the canonical ships `kokoro` on both voice slots,
+    so `select_policy_route` returns None there and always has.
+
+    NOTE THE OTHER TESTS DID NOT FLIP WITH IT. The machinery tests now take the
+    `lemmy_route_qualified` fixture, because "does stamping work" should never
+    depend on whether a voice is waiting on somebody's ears. This and the canary
+    in `test_cast_lock_policy_repin` are the two that read the real file on
+    purpose.
     """
     from config import cast_pools as POOLS
     from nodes import _otr_voice_route as ROUTE
@@ -721,12 +734,14 @@ def test_the_shipped_lemmy_route_is_selected_again():
     ROUTE._LIVE_FINGERPRINT_CACHE.clear()
     selected = ROUTE.select_policy_route(POOLS.LEMMY_VOICE_POLICY, "indextts2")
 
-    assert selected is not None
-    assert selected["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
-    assert (selected["qualification_record"]["runtime"]["engine_impl_version"]
-            == _live_indextts2_fingerprint()), (
-        "the shipped record no longer describes the build that would render "
-        "it -- re-audition and re-record, do not hand-edit the fingerprint")
+    assert selected is None, (
+        "the route selected again -- if it was re-auditioned, flip this back "
+        "and name the audition that did it")
+    record = POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"]
+    assert record["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
+    assert (record["qualification_record"]["runtime"]["engine_impl_version"]
+            != _live_indextts2_fingerprint()), (
+        "the record matches the live build again -- this test is stale")
 
 
 def test_a_stale_record_is_not_selected():

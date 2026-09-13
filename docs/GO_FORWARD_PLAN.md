@@ -272,13 +272,21 @@ resolution: `sd15._resolve_ckpt_name()` supports style-specific checkpoints and
 an env override, so the manifest must fetch the DEFAULT file without claiming to
 satisfy a pack checkpoint the user chose instead.
 
-`spandrel_esrgan`'s 67 MB upscale model is the same shape and the same fix, and
-it is the second of the two hand-fetches in the "Real video diffusion" row of
-the README's cheapest-setups table. So are the two AnimateDiff files the 4060
-drill died on -- `v3_sd15_mm.ckpt` and `v3_sd15_adapter.ckpt`, 1.67 GB and
-0.10 GB, already pinned with sizes in `scripts/otr_fetch_lane_weights.py`.
-Adding SD 1.5 plus those two would make the README's own 8 GB row survive to a
-published episode, which it did not on real hardware today.
+**DONE 2026-09-12 for `sd15` itself.** It is row nine of the manifest and the
+stills and LTX lanes are one click now.
+
+**THE ANIMATEDIFF FILES ARE DELIBERATELY NOT IN SCOPE.** Operator, same day:
+*"animatediff doesn't auto download, it's a niche workflow, we just need to be
+sure it works where it's supposed to and how to install it is documented."* So
+`v3_sd15_mm.ckpt` and `v3_sd15_adapter.ckpt` stay manual by choice, not by
+oversight. What that ruling DID require was closed the same hour: the two repos,
+the two destination folders and the copy-paste commands are now in README
+section 2b under "The AnimateDiff weights", because until then the filenames
+appeared only in `MODEL_ASSET_INDEX.md` with no source -- which is what the 4060
+hit, and a filename with no source is not an install instruction.
+
+`spandrel_esrgan`'s 67 MB upscale model is the one remaining hand-fetch in the
+README's cheapest-setups table, and it is the same shape as `sd15` was.
 
 ### C4. `cpu_floor` has no local writer it is allowed to use
 

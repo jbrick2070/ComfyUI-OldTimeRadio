@@ -156,6 +156,8 @@ def test_editing_the_shared_dispatcher_no_longer_costs_the_voice():
 
     ROUTE._LIVE_FINGERPRINT_CACHE.clear()
     before = ROUTE.live_engine_impl_version("indextts2")
+    selected_before = ROUTE.select_policy_route(
+        POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None
 
     path = REPO_ROOT / "nodes" / "_otr_voice_node_common.py"
     original = path.read_bytes()
@@ -165,9 +167,17 @@ def test_editing_the_shared_dispatcher_no_longer_costs_the_voice():
         assert ROUTE.live_engine_impl_version("indextts2") == before, (
             "a comment in the shared dispatcher still moves the fingerprint"
         )
-        assert ROUTE.select_policy_route(
-            POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None, (
-            "a comment in the shared dispatcher still withholds the voice"
+        # A DELTA, NOT A VERDICT (2026-09-12). This asserted `is not None`
+        # outright, which coupled it to whether the route happened to be
+        # qualified that day -- so the IndexTTS2 timeout fix turned it red for
+        # a reason it is not about. What it exists to prove is that
+        # `_otr_voice_node_common.py` is not a fingerprint source, and that
+        # holds whatever the route tier is.
+        selected_after = ROUTE.select_policy_route(
+            POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None
+        assert selected_after == selected_before, (
+            "a comment in the shared dispatcher changed whether the voice is "
+            "selected"
         )
     finally:
         path.write_bytes(original)

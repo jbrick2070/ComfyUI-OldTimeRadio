@@ -29,6 +29,7 @@ import os
 import subprocess
 import tempfile
 
+from . import _otr_sidecar as _SC
 from .registry import register
 
 # realpath (NOT abspath): under the Desktop-v2 install the OldTimeRadio custom
@@ -214,11 +215,32 @@ class IndexTTS2Engine:
         proc = subprocess.Popen(
             args, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=self._stderr,
             text=True, encoding="utf-8", bufsize=1, cwd=os.path.dirname(model_dir))
-        line = proc.stdout.readline()
+        # BOUNDED, like both siblings (2026-09-12). This was a bare
+        # `proc.stdout.readline()` with no timeout, on the engine that is the
+        # SHIPPED DEFAULT for character voices. If the worker stalls -- a CUDA
+        # deadlock, a slow first weights load, a driver hiccup -- the call never
+        # returns, so the `finally: self._teardown(adapter)` in
+        # _otr_voice_node_common never runs, and ComfyUI plus an orphaned worker
+        # hold VRAM indefinitely with nothing in the log. It is indistinguishable
+        # from a slow render, which is what makes it expensive.
+        #
+        # eng_dia and eng_chatterbox already route the identical read through
+        # this helper; this engine simply never imported it.
         try:
-            ready = json.loads(line) if line.strip() else {"ready": False, "error": "no readiness line"}
-        except ValueError:
-            ready = {"ready": False, "error": "bad readiness line: %r" % line[:200]}
+            line = _SC.read_protocol_line(
+                proc, _SC.startup_timeout(), "IndexTTS2 readiness")
+        except (TimeoutError, EOFError) as exc:
+            line = ""
+            ready = {"ready": False, "error": str(exc)}
+        else:
+            ready = None
+        if ready is None:
+            try:
+                ready = (json.loads(line) if line.strip()
+                         else {"ready": False, "error": "no readiness line"})
+            except ValueError:
+                ready = {"ready": False,
+                         "error": "bad readiness line: %r" % line[:200]}
         if not ready.get("ready"):
             try:
                 proc.kill()
@@ -507,7 +529,18 @@ class IndexTTS2Engine:
         }
         self._proc.stdin.write(json.dumps(req, ensure_ascii=True) + "\n")
         self._proc.stdin.flush()
-        resp_line = self._proc.stdout.readline()
+        # BOUNDED for the same reason as the readiness read above: this is the
+        # PER-LINE call, so an unbounded one hangs partway through an episode
+        # with some voices already rendered. A closed worker and a hung worker
+        # now both surface as a named error instead of one of them being
+        # silence forever.
+        try:
+            resp_line = _SC.read_protocol_line(
+                self._proc, _SC.request_timeout(), "IndexTTS2 response")
+        except (TimeoutError, EOFError) as exc:
+            self._proc = None
+            raise RuntimeError(
+                "IndexTTS2 worker %s (see _otr_indextts2_worker.err)" % exc)
         if not resp_line:
             self._proc = None
             raise RuntimeError(

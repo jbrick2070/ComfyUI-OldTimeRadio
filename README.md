@@ -157,6 +157,49 @@ ComfyUI.
 on Linux pods (GGUF `6ea2651e`, LTXVideo `3b9c5cde`, AnimateDiff-Evolved `92576512`,
 release 1.6.0); on Windows, install the row you need by hand as above.
 
+#### The AnimateDiff weights -- the pack is not enough, and nothing fetches these
+
+**AnimateDiff is a niche lane and its weights do NOT auto-download. That is on
+purpose** -- the rest of the pack pulls what a dropdown needs at queue time, and
+these sit outside that on the grounds that the lane is opt-in. So they are
+documented here instead, because a filename with no source is not an install
+instruction.
+
+A clean-room RTX 4060 hit exactly this on 2026-09-12: a valid script, six voice
+clips, a music master and a 78-second video, then a stop on the first shot
+naming three files it had no way to obtain (`docs/4060_DRILL_LOG.md`
+CR-20260912-04).
+
+Both repos are public and ungated -- no token, no licence click.
+
+**For `animatediff15_v3_haunted_video` and `animatediff15_v3_stillin_lab_video`**
+(the 8 GB default lane), into your ComfyUI `models/` tree:
+
+```bash
+python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_mm.ckpt'))"
+python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_adapter.ckpt'))"
+```
+
+Copy `v3_sd15_mm.ckpt` into `models/animatediff_models/` and
+`v3_sd15_adapter.ckpt` into `models/loras/`. The SD 1.5 checkpoint these sample
+against is fetched for you at queue time and needs no action.
+
+**For `animatediff15_lightning_video`** (the Apple Silicon lane) you need the
+Lightning module and the ft-mse VAE instead:
+
+```bash
+python -c "from huggingface_hub import hf_hub_download as d; print(d('ByteDance/AnimateDiff-Lightning','animatediff_lightning_8step_comfyui.safetensors'))"
+python -c "from huggingface_hub import hf_hub_download as d; print(d('stabilityai/sd-vae-ft-mse-original','vae-ft-mse-840000-ema-pruned.safetensors'))"
+```
+
+The module goes in `models/animatediff_models/`, the VAE in `models/vae/`. On
+ComfyUI Desktop the `animatediff_models` category is not mapped by default;
+`docs/MAC_PORTABILITY_GUIDE.md` section 10.7 has the `extra_model_paths`
+addendum that exposes it.
+
+**The motion module publishes no licence grant** (`commercial_clean = False` in
+the adapter), so treat the haunted lane as personal use.
+
 > **Python 3.13 and the Kokoro voice (ComfyUI Desktop and the portable build both
 > ship Python 3.13).** The torch `kokoro` package cannot be pip-installed on 3.13
 > (its newest releases declare `Requires-Python <3.13`), so since 2026-09-02 the

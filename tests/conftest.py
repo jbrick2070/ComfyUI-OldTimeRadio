@@ -323,3 +323,42 @@ def _openrouter_catalog_fetch_is_never_real(monkeypatch):
 
     monkeypatch.setattr(_orb, "_fetch_models_json", _no_network, raising=False)
     monkeypatch.setattr(_orb, "_COLD_CACHE_REFRESH_TRIED", False, raising=False)
+
+@pytest.fixture
+def lemmy_route_qualified(monkeypatch):
+    """The shipped Lemmy policy with its IndexTTS2 record matching THIS build.
+
+    WHAT IT IS FOR, and the distinction is the whole point. Two different claims
+    live in these tests and they must not share a fixture:
+
+      * "the shipped record is currently FRESH" -- a canary, which must read the
+        real `cast_pools.py` and is allowed to go red when an adapter edit moves
+        the fingerprint and nobody has re-auditioned. There is exactly one, in
+        `test_cast_lock_policy_repin.py`.
+      * "the qualified-route MACHINERY works" -- stamping, durable-reload
+        survival, registry determinism, the portable-bank fail-closed paths.
+        None of those should go red because a voice is waiting on somebody's
+        ears, and before this fixture existed they all did.
+
+    THE OSCILLATION THIS ENDS, from the repo's own history: the machinery tests
+    needed a repaired record between 2026-08-10 and 2026-08-18, stopped needing
+    one when `prod-audition-2026-08-18` re-qualified Lemmy, and needed one again
+    on 2026-09-12 when the IndexTTS2 timeout fix moved the adapter fingerprint
+    (`d47779386ce91209` -> `c78934682057fc65`). Three flips of the same tests for
+    reasons that had nothing to do with what they prove.
+
+    Exactly ONE field differs from the real shipped evidence -- the runtime
+    fingerprint -- so a receipt that rots for any other reason still fails.
+    """
+    import copy as _copy
+
+    from config import cast_pools as _pools
+    from nodes import _otr_voice_route as _route
+
+    _route._LIVE_FINGERPRINT_CACHE.clear()
+    live = _route.live_engine_impl_version("indextts2")
+    repaired = _copy.deepcopy(_pools.LEMMY_VOICE_POLICY)
+    repaired["approved_native_routes"]["indextts2"][
+        "qualification_record"]["runtime"]["engine_impl_version"] = live
+    monkeypatch.setattr("config.cast_pools.LEMMY_VOICE_POLICY", repaired)
+    return repaired
