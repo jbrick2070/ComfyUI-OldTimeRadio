@@ -241,6 +241,36 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   `docs/2026-09-12-music-model-bench/driver_anchor.md:94-96`. The conclusion
   there survives on other evidence; the cited proof does not.
 
+* **THE SHIPPING SET HE WANTS, stated 2026-09-12, and it is CURATION not
+  construction.** His words: *"we will have three NVIDIA eight gigabyte JSONs
+  and three to four NVIDIA sixteen gigabyte JSONs and maybe three AMD JSONs...
+  but right now we just have to get the original one working."*
+
+  **CANONICAL FIRST. This row is explicitly AFTER that.**
+
+  Measured against `config/profiles/` today -- 45 profiles carry
+  `status: shipping`:
+
+  | class | he wants | we have shipping | the actual gap |
+  |---|---|---|---|
+  | NVIDIA 8 GB (ceiling 6.8) | 3 | **2** | one short: `otr_4060_12b_gguf_offload`, `otr_nvidia_8gb_haunted` |
+  | NVIDIA 16 GB (ceiling 14.5) | 3-4 | **42** | ten times too many -- CUT, do not build |
+  | AMD | ~3 | **0** | the AMD profiles exist but are all `draft` |
+  | Apple | (implied) | 1 | `otr_mac_mps` |
+
+  So the work is: promote one more 8 GB, promote three AMD out of draft once the
+  ROCm tester reports, and pick three or four of the 42 sixteen-gigabyte ones to
+  be the named set. The other 38 stay available; they just stop being the
+  answer to "which one do I use".
+
+  **AND THE GALLERY IS THE DELIVERY MECHANISM, which is why the set matters.**
+  Measured against the live server: ComfyUI's template scanner globs exactly one
+  level (`*/workflows/*.json`), so `workflows/variants/` is invisible and the
+  gallery offers exactly ONE entry today. A JSON in the scanned folder becomes a
+  CHOICE and loads nothing until picked, so promoting the curated set costs
+  nothing at runtime -- but promoting all 93 would turn a gallery into a
+  haystack. That is the reason to curate before promoting, not after.
+
 ### Still genuinely open, and not his call
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
