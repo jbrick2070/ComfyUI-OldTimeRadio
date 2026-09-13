@@ -1,8 +1,8 @@
 {
   "id": "otr_amd8_rocm",
-  "display_name": "AMD 8 GB ROCm Linux (draft, UNVERIFIED on hardware)",
+  "display_name": "AMD 8 GB ROCm Windows / Linux (draft, UNVERIFIED on hardware)",
   "status": "draft",
-  "platform": "linux",
+  "platform": "any",
   "device_backend": "cuda",
   "gpu_vendor": "amd",
   "toolchains": [],
@@ -35,7 +35,7 @@
   "llm": {
     "device": "cuda",
     "attn_impl": "sdpa",
-    "quant_policy": "bnb_nf4",
+    "quant_policy": "none",
     "vram_ceiling_gb": 6.8,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",

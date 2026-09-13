@@ -20,9 +20,9 @@ all. That column is not weak, it is empty.
      `resolve_device()` shipped on 2026-09-12 and have only ever run on NVIDIA
      and Apple silicon. If they are wrong on ROCm, every AMD graph is wrong
      before a single weight loads.
-  4. Is bitsandbytes importable? Every non-CUDA profile ships
-     `quant_policy: none` on the belief that it is not. That belief is a POLICY
-     nobody has measured on real ROCm hardware.
+  4. Is bitsandbytes importable? Every AMD profile ships
+     `quant_policy: none` because a working quantised load has not been
+     measured on real ROCm hardware. Import and metadata alone do not prove it.
   5. Does a plain bf16 matmul actually execute on the card?
 
 WHAT THIS DELIBERATELY DOES NOT DO: download a model, render anything, or judge
@@ -134,24 +134,26 @@ def main() -> int:
     say("ComfyUI root found", _COMFY or "*** NONE ***")
     if _COMFY is None:
         print(
-            "\n*** STOP. `comfy` is not importable from here, so sections 2 "
-            "and 3 below report this pack's CORE-ABSENT FALLBACK, not your "
-            "machine. Those numbers are meaningless for AMD and must not be "
-            "reported as results. Run the probe from inside your ComfyUI "
+            "\n*** No ComfyUI checkout root found. Trying the Python import "
+            "path; sections 2 and 3 need a successful import before reporting "
+            "device results. Run the probe from inside your ComfyUI "
             "checkout, or set COMFYUI_ROOT to the directory that contains "
             "`comfy/model_management.py`, and run it again. ***\n",
             flush=True)
 
-    def _mm():
+    mm = None
+    try:
         import comfy.model_management as mm
-        return mm
+        say("comfy import", mm.__name__)
+    except Exception as exc:                       # noqa: BLE001 -- reporting
+        say("comfy import", "FAILED: %s: %s" % (type(exc).__name__, str(exc)[:120]))
 
-    attempt("comfy import", lambda: _mm().__name__)
-    attempt("is_amd()", lambda: _mm().is_amd())
-    attempt("is_nvidia()", lambda: _mm().is_nvidia())
-    attempt("get_torch_device()", lambda: str(_mm().get_torch_device()))
-    attempt("get_gpu_device_options()",
-            lambda: list(_mm().get_gpu_device_options()))
+    if mm is not None:
+        attempt("is_amd()", lambda: mm.is_amd())
+        attempt("is_nvidia()", lambda: mm.is_nvidia())
+        attempt("get_torch_device()", lambda: str(mm.get_torch_device()))
+        attempt("get_gpu_device_options()",
+                lambda: list(mm.get_gpu_device_options()))
 
     section("3. what THIS pack's device code resolves to")
     say("(these shipped 2026-09-12 and", "have never run on an AMD card)")
@@ -176,16 +178,20 @@ def main() -> int:
         spec.loader.exec_module(mod)
         return mod
 
-    attempt("device_options()", lambda: _devopts().device_options())
-    attempt("vendor()", lambda: _devopts().vendor())
-    attempt("resolve_device('default')",
-            lambda: _devopts().resolve_device("default"))
-    attempt("resolve_device('cuda')", lambda: _devopts().resolve_device("cuda"))
-    attempt("resolve_device('tpu') [must pass through untouched]",
-            lambda: _devopts().resolve_device("tpu"))
+    if mm is None:
+        say("pack device checks",
+            "SKIPPED: ComfyUI import failed; fallback values are not hardware evidence")
+    else:
+        attempt("device_options()", lambda: _devopts().device_options())
+        attempt("vendor()", lambda: _devopts().vendor())
+        attempt("resolve_device('default')",
+                lambda: _devopts().resolve_device("default"))
+        attempt("resolve_device('cuda')", lambda: _devopts().resolve_device("cuda"))
+        attempt("resolve_device('tpu') [must pass through untouched]",
+                lambda: _devopts().resolve_device("tpu"))
 
     section("4. is bitsandbytes real here")
-    say("(every non-CUDA profile ships", "quant_policy 'none' assuming it is not)")
+    say("AMD quant_policy", "none; quantised execution is unverified")
 
     def _bnb():
         import bitsandbytes as bnb
@@ -195,10 +201,16 @@ def main() -> int:
 
     def _bnb_backends():
         import bitsandbytes as bnb
-        fn = getattr(bnb, "supported_torch_devices", None)
-        return sorted(fn()) if callable(fn) else "no supported_torch_devices()"
+        devices = getattr(bnb, "supported_torch_devices", None)
+        if callable(devices):
+            devices = devices()
+        if devices is None:
+            return "no supported_torch_devices metadata"
+        return sorted(devices)
 
-    attempt("bitsandbytes backends", _bnb_backends)
+    attempt("bitsandbytes declared devices", _bnb_backends)
+    say("bitsandbytes execution",
+        "NOT TESTED: import/metadata do not prove a working quantised backend")
 
     section("5. does the card actually compute")
 
@@ -223,15 +235,14 @@ def main() -> int:
     print("""
 Paste EVERYTHING above into the issue. Three lines decide what happens next:
 
-  * `is_amd()` -- if this is not True, our device resolution will treat the card
-    as NVIDIA and every quantisation decision downstream is made on a wrong
-    premise. That is the single most important line here.
-  * `vendor()` -- must read `amd`. If it reads `nvidia` or `unknown`, the pack
-    cannot tell your card apart from a GeForce and we have a real bug to fix
-    before you spend an evening on a render.
-  * `bitsandbytes` -- if it imports AND lists a usable backend, the AMD profiles
-    are leaving performance on the table by shipping `quant_policy: none`, and
-    that is a good problem worth knowing about.
+  * `is_amd()` -- on a ROCm host with a successful ComfyUI import, this
+    should be True. Missing or failed imports are setup failures, not vendor
+    detection results. A non-ROCm host cannot supply an AMD receipt.
+  * `vendor()` -- must read `amd` on that ROCm host. If device checks were
+    skipped, fix the ComfyUI import and rerun before drawing conclusions.
+  * `bitsandbytes` -- import and declared devices are metadata only. A
+    quantised load and inference on the card are still needed before changing
+    quant_policy from `none`; this probe does not test those operations.
 
 If those look sane, the full run in apple/ROCM.md is worth your
 evening. If they do not, you have saved yourself one and taught us more than a

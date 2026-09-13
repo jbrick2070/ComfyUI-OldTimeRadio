@@ -76,10 +76,12 @@ alone is more AMD evidence than this project has ever had.
 time.** `is_amd()` is what our device resolution branches on and has never once
 executed on an AMD card. `vendor()` must come back `amd`; if it says `nvidia` or
 `unknown`, the pack cannot tell your card apart from a GeForce and we have a bug
-to fix before you spend an evening rendering. And if `bitsandbytes` imports with
-a working backend, then every AMD graph we ship is leaving speed on the table by
-refusing to quantise -- which is a good problem, and one nobody can discover
-without your card.
+to fix before you spend an evening rendering. The `bitsandbytes` lines report
+importability and declared device metadata,
+not a working quantised backend. A quantised load and inference on the card
+are needed before changing `quant_policy: none`. If ComfyUI cannot import,
+the pack's device checks are skipped; fix that setup failure and rerun before
+interpreting it as a vendor-detection bug.
 
 If those come back sane, the full mission below is worth it. If they do not, you
 have saved yourself the evening and taught us more than a failed render would.
@@ -131,13 +133,11 @@ no AMD graph or profile selects the one engine that wants it.
 ```bash
 python scripts/otr_fetch_lane_weights.py --list
 python scripts/otr_fetch_lane_weights.py z_image
-python scripts/otr_fetch_lane_weights.py stable_audio_3
 ```
 
 The shipped graph needs none of this by hand: Z-Image Turbo and MusicGen fetch
 themselves at the first queue, so the `z_image` line only saves you the wait.
-The `stable_audio_3` line is for the 16 GB lab profile alone; the shipped graph
-and the 8 GB profile are on MusicGen.
+All three AMD presets select MusicGen; none requires Stable Audio 3.
 
 **4. Start ComfyUI.**
 
@@ -158,11 +158,13 @@ python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_canonical_api_run.py \
 
 The two lab profiles are the alternates: `--profile otr_amd16_rocm` instead of
 `--workflow` for the 16 GB lab preset, `--profile otr_amd8_rocm` for an 8 GB
-card.
+card. Both lab profiles target Windows and Linux and use the same unquantised
+Qwen3.5-4B writer as the shipped graph. The 16 GB lab profile allows a 14.5 GB
+writer ceiling and 25 frames; the 8 GB profile uses 6.8 GB and 17 frames.
+Those limits are configuration, not measured fit guarantees.
 
-**Use `--workflow` or `--profile`, not `--machine amd`.** The `--machine amd`
-shortcut resolves to a different, unaudited engine set. The graph and the two
-profile ids above are the ones this file is about.
+Use the exact `--workflow` or `--profile` above when reporting results so the
+receipt identifies the preset used.
 
 **6. Success looks like an mp4.**
 
