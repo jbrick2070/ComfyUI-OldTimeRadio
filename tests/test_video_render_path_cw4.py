@@ -372,7 +372,8 @@ def test_master_audio_mux_publishes_final_to_obs(tmp_path, monkeypatch):
     monkeypatch.delenv("OTR_OBS_DIR", raising=False)
     _publishable_episode(tmp_path, monkeypatch, "silent")
     node = OTRMasterAudioMux()
-    final, status = node.mux(str(silent), str(master))
+    # {"ui", "result"} envelope since 2026-09-13 (canvas poster frame).
+    final, status = node.mux(str(silent), str(master))["result"]
     assert final and os.path.isfile(final)
     # THE OBS COPY IS NO LONGER NAMED LIKE THE ARCHIVAL ONE (2026-09-03). It
     # carries the five choices that made the episode instead of the pipeline

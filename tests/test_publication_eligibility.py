@@ -579,8 +579,11 @@ class TestMuxStampAndCacheKey:
             MUX.OTRMasterAudioMux, "_publish_to_obs",
             lambda self, final: published.append(final) or "obs/copy.mp4",
         )
+        # mux() returns ComfyUI's {"ui": ..., "result": ...} envelope since
+        # 2026-09-13, so the canvas can show a poster frame. The delivery
+        # contract these tests are about is unchanged, inside "result".
         path, report = MUX.OTRMasterAudioMux().mux(
-            episode["video"], episode["audio"])
+            episode["video"], episode["audio"])["result"]
         return path, report, published
 
     def test_an_INELIGIBLE_episode_still_SUCCEEDS_and_keeps_its_final(
@@ -619,7 +622,7 @@ class TestMuxStampAndCacheKey:
         )
         smuggled = str(obs_dir / "sneaky_final.mp4")
         path, report = MUX.OTRMasterAudioMux().mux(
-            episode["video"], episode["audio"], output_path=smuggled)
+            episode["video"], episode["audio"], output_path=smuggled)["result"]  # {"ui", "result"} envelope since 2026-09-13
         assert not MUX._is_inside_obs_dir(seen["out"]), seen["out"]
         assert not MUX._is_inside_obs_dir(path), path
         assert "obs_publish BLOCKED" in report
@@ -677,7 +680,7 @@ class TestMuxStampAndCacheKey:
         )
         chosen = str(tmp_path / "elsewhere" / "operator_choice.mp4")
         path, _ = MUX.OTRMasterAudioMux().mux(
-            episode["video"], episode["audio"], output_path=chosen)
+            episode["video"], episode["audio"], output_path=chosen)["result"]  # {"ui", "result"} envelope since 2026-09-13
         assert seen["out"] == chosen
         assert path == chosen
 

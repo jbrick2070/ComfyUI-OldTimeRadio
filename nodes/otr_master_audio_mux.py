@@ -32,6 +32,7 @@ import hashlib
 import json
 import math
 import os
+import uuid
 import re
 import shutil
 from pathlib import Path
@@ -146,7 +147,12 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
     frame that will not extract yields the path as text; only a truly broken
     call yields {}.
     """
-    where = str(obs_copy or final_path or "")
+    # Name the withheld case instead of showing a bare path: a poster frame
+    # beside an archival path reads as a normal publish, which is the exact
+    # confusion this preview exists to remove.
+    where = (str(obs_copy) if obs_copy
+             else ("not published (rights receipt did not clear) -- archived at "
+                   + str(final_path)) if final_path else "")
     ui: dict = {}
     try:
         if where:
@@ -165,20 +171,33 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
         ffmpeg = resolve_ffmpeg()
         if not ffmpeg:
             return ui
-        # A frame ~30% in: far enough past the title card to show the episode,
-        # early enough to exist on the shortest one-act show. An unmeasurable
-        # duration falls back to 2 s rather than skipping the preview.
+        # A frame ~30% in: past the title card, still inside the shortest
+        # one-act show. An UNMEASURABLE duration (-1.0) or a very short clip
+        # falls back to frame 0, which always exists. The earlier fallback of
+        # 2 s seeked past EOF on a sub-2-second file and yielded nothing.
         duration = _probe_float(final_path, "v:0")
-        seek = (duration * 0.3) if duration > 1.0 else 2.0
+        seek = (duration * 0.3) if duration > 1.0 else 0.0
         os.makedirs(temp_dir, exist_ok=True)
-        name = "otr_preview_%s.png" % _episode_stem(final_path)[:80]
+        # UNIQUE per run. A deterministic name served the previous render's
+        # frame from the browser cache, because the /view URL was identical;
+        # core PreviewImage appends a random suffix for the same reason.
+        name = "otr_preview_%s_%s.png" % (_episode_stem(final_path)[:64],
+                                          uuid.uuid4().hex[:8])
         out = os.path.join(temp_dir, name)
-        done = _run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
-                     "-ss", "%.3f" % max(0.0, seek), "-i", final_path,
-                     "-frames:v", "1", "-vf", "scale=640:-2", out])
+        # TIMEOUT AND -nostdin ARE NOT OPTIONAL. This runs on the ComfyUI server
+        # thread: an ffmpeg that waits on stdin or deadlocks on a bad container
+        # hangs the whole queue, and no try/except catches a process that never
+        # returns. The bound is what makes "fail-soft" true rather than hopeful.
+        done = otr_proc.run(
+            [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
+             "-ss", "%.3f" % max(0.0, seek), "-i", final_path,
+             "-frames:v", "1", "-vf", "scale=640:-2", out],
+            capture_output=True, text=True, encoding="utf-8",
+            errors="replace", timeout=20)
         if getattr(done, "returncode", 1) == 0 and os.path.isfile(out):
             ui["images"] = [{"filename": name, "subfolder": "", "type": "temp"}]
-    except Exception as exc:  # noqa: BLE001 -- a thumbnail never fails a render
+    except Exception as exc:  # noqa: BLE001 -- TimeoutExpired included: a
+        # thumbnail never fails a render and never blocks the next queue item.
         log.info("[OTR_MasterAudioMux] canvas preview skipped: %s", exc)
     return ui
 
