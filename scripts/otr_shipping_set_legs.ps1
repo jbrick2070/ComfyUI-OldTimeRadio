@@ -33,13 +33,16 @@ param(
     # clear the server before moving on if a leg did not reach SUCCESS.
     [int]$TimeoutSec = 9000,
     # Where the server publishes finished episodes on this box.
-    [string]$ObsDir = "C:\Users\jeffr\Documents\ComfyUI\output\otr\obs"
+    [string]$ObsDir = "C:\Users\jeffr\Documents\ComfyUI\output\otr\obs",
+    # The ComfyUI venv python that runs the API runner. The defaults above
+    # and here are the 5080's; the 4060 passes its own.
+    [string]$Python = "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
 )
 
 $ErrorActionPreference = "Continue"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
-$py = "C:\Users\jeffr\Documents\ComfyUI\.venv\Scripts\python.exe"
+$py = $Python
 $env:PYTHONUTF8 = "1"
 $env:PYTHONIOENCODING = "utf-8"
 # A parent that launches this file as `powershell -File ... -Graphs a,b,c` hands
