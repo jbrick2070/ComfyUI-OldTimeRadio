@@ -386,12 +386,16 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his eyeball -- registry and workflow (2026-09-13 night)
 
-* **The registry's Active version does not carry the current graphs, so a
-  Manager install is behind.** Active is alpha.30 (09-11); the HEAD graphs
-  carry `OTR_StableAudioTheme.music_style` (09-12), which alpha.30 does not
-  have, so a fresh Manager install cannot load them. Only he can move this --
-  editing `pyproject.toml` IS the registry push. Memory:
-  pod-pack-version-must-match-the-graphs.
+* **2.0.0 is PUBLISHED and waiting on Comfy-Org's scanner (2026-09-13
+  22:13Z, commit c491e86b, tag v2.0.0).** He approved it -- "WE GO MAIN NO
+  BETA" / "I APPROVE" -- after sixteen of sixteen shipping graphs proved on
+  real hardware and a full suite diffed clean against the day's baseline.
+  Until the scanner flips it to Active, `latest_version` stays alpha.30 and a
+  Manager install still cannot load the current graphs; alpha.31 waits in the
+  same queue. Nothing to do but read the registry -- and read the WHOLE
+  list: the API sorts by version string, so a bare release sorts BELOW every
+  `-alpha.N` row. Two things fire when it goes Active: the AMD volunteer's
+  ping (row below) and a refresh of this row.
   **The pod half of this row is CLOSED (2026-09-13).** It was written when the
   only route to a pod was `install_custom_node` through the MCP, which serves
   the registry version. A pod created from the PyTorch template with an SSH
@@ -655,6 +659,18 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
+* **The publish action will soon refuse `exec()` in the checkout.** Its
+  pre-scan on the 2.0.0 publish printed, against
+  `tests/test_visual_asset_validator_stdlib.py:92`, "We will soon disable
+  exec and eval ... this will be an error soon." The upload succeeded because
+  today it is a warning, and `tests/` is not in the zip -- but the pre-scan
+  runs on the CHECKOUT, not the zip, so `.comfyignore` may not save the next
+  publish. Two exits, either is fine: rewrite that seam test to build its
+  isolated class without `exec` (it compiles methods lifted from the AST; a
+  `types.FunctionType` build or a plain import with the stubs patched in
+  would do), or find the action's own ignore mechanism. Do it BEFORE 2.1, not
+  on the day 2.1 is due.
+
 * **The news lane never rerolls a decode-liveness halt (PBUG-20260913-06).**
   `GenerationDegeneracyError` is raised with its own log line saying
   "Rerollable", `_otr_slot_drama_contract.py` catches it and falls back, but
@@ -732,8 +748,9 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   Pending since 09-12 21:56Z. The reply promises him a ping when a version
   carrying it is live, so he can test the one-click Manager path too, which is
   worth having from someone who is not the author. **Owed, and easy to lose:
-  it fires on a registry state change nobody is watching.** He posts the ping;
-  a window drafts it.
+  it fires when 2.0.0 (published 2026-09-13 22:13Z, Pending) goes Active --
+  a registry state change nobody is watching.** He posts the ping; a window
+  drafts it.
 * **`otr_8gb_foley` is RETIRED (operator ruling, 2026-09-13).** He ruled on
   time, not on failure: *"4 hours for 1 act seems too long"*, then *"maybe we
   dump foley on the 8gb lane."* The measurement behind it, from the 4060's own

@@ -610,6 +610,11 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   `v2.0-alpha` whose diff touches `pyproject.toml`. Treat that file as a release trigger, not a
   config file: never edit it "just to tidy" mid-session, and never edit it while a version is
   already pending. A push that does NOT touch it never publishes.
+- **THE VERSION LIST SORTS BY STRING, SO A RELEASE SORTS LAST (measured 2026-09-13).**
+  `GET /nodes/<id>/versions` returned 2.0.0 as the 20th of 20 rows, below every
+  `2.0.0-alpha.N`, two minutes after the action logged "Upload successful". A window
+  that prints the top three rows will conclude the publish silently failed; this one
+  did, for ten minutes. Read the whole list and test for the exact string.
 - **Every publish needs a NEW version string.** `(node_id, version)` is uniquely indexed
   server-side; re-publishing the same version is refused.
 - **`.comfyignore` decides what SHIPS** (gitignore syntax, layered on top of git tracking --
