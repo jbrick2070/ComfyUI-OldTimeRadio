@@ -81,7 +81,7 @@ MACHINES = (
      "blurb": "Apple Silicon, unified memory"},
     {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd16_rocm",
      "graph_profile": "otr_amd_still",
-     "blurb": "Linux only -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
+     "blurb": "Windows or Linux -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
     {"key": "cpu", "label": "CPU only", "profile": "cpu_floor",
      "graph_profile": "otr_cpu_low",
      "blurb": "no GPU at all"},

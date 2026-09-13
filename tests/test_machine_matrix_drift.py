@@ -162,7 +162,7 @@ def test_amd_machine_declares_an_unproven_rocm_candidate_policy():
     profile = P.build_profile(row, matrix)
     assert profile["gpu_vendor"] == "amd"
     assert profile["status"] == "draft"
-    assert profile["platform"] == "linux"
+    assert profile["platform"] == "any"  # Windows first, Linux welcome (2026-09-13)
     assert profile["device_backend"] == "cuda"  # PyTorch ROCm API spelling
     assert profile["llm"]["device"] == "cuda"
     assert profile["llm"]["quant_policy"] == "none"

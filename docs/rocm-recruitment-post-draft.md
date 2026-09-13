@@ -29,8 +29,8 @@ an AMD graph nobody has ever been able to test.
 > sageattention, no flash-attn, no bitsandbytes, no fp8, no custom CUDA
 > kernels. On paper it should just work. On paper.
 >
-> If anyone here has an MI-series or RDNA3 card and an hour, there is a
-> step-by-step in the repo (apple/ROCM.md) -- six commands, about
+> If anyone here has an RDNA3, RDNA4 or MI-series card -- Windows first, Linux
+> welcome -- and an hour, there is a step-by-step in the repo (apple/ROCM.md) -- six commands, about
 > 20 GB of weights, and success is an mp4 you can actually watch. A traceback
 > is just as useful to me as a success; either way you would be the first
 > person to point this thing at an AMD GPU, and I will credit you in the
@@ -82,8 +82,9 @@ local AI radio-drama pipeline on AMD
 > pack expects. The one thing to avoid is installing `sageattention` -- it is
 > CUDA-only and the pack refuses to run if it finds it patched in.
 >
-> **What I am asking for.** An hour on an MI-series or RDNA3 card (16 GB for
-> the full profile, 8 GB for the small one), ROCm 6.x, about 50 GB of disk.
+> **What I am asking for.** An hour on an RDNA3, RDNA4 or MI-series card
+> (16 GB for the full profile, 8 GB for the small one), ROCm 7.2.x on Windows
+> (AMD's PyTorch for Radeon) or Linux, about 50 GB of disk.
 > A rented box is fine and cheap. The repo has `apple/ROCM.md`
 > with six commands start to finish and a list of exactly what to send back.
 >

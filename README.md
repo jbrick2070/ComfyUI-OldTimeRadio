@@ -512,14 +512,14 @@ what each class runs for writer, video, voice, music and image.
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | ComfyUI-GGUF | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
-| **AMD / ROCm (Linux only)** | Qwen3.5-4B | still_motion | kokoro | musicgen | z_image_turbo | none | `draft`, unproven |
+| **AMD / ROCm (Windows or Linux)** | Qwen3.5-4B | still_motion | kokoro | musicgen | z_image_turbo | none | `draft`, unproven |
 
 **Use the machine key, not an experimental profile name.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
 
 * **8 GB NVIDIA (RTX 4060, 3070, 2080)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 8gb --list`
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 16gb --list`
 * **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
-* **AMD / ROCm (Linux only)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
+* **AMD / ROCm (Windows or Linux)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
 
 Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
@@ -707,7 +707,9 @@ is built from the same source as every working graph and every engine it selects
 is plain PyTorch, so on paper it should work -- and on paper is exactly the
 problem. It ships marked experimental, with no receipts.
 
-It is parked, realistically for 2.5. But it is open source and it is fair game:
+It is parked, realistically for 2.5 -- and Windows is the target we want most,
+since the pack is Windows-native and AMD now ships a ROCm build of PyTorch for
+Radeon on Windows; Linux is welcome too. But it is open source and it is fair game:
 [apple/ROCM.md](apple/ROCM.md) has the shipped graph, two lab profiles for 16 GB
 and 8 GB cards, a five-minute probe that needs no model download, and the open
 questions written down. If you have the card, none of it is waiting on us -- and

@@ -40,10 +40,10 @@ an issue with the probe output pasted in is the whole ask.
 
 | | |
 |---|---|
-| **OS** | Linux, or Windows with AMD's ROCm build of PyTorch for Radeon -- the pack itself is Windows-native, so only the torch build is the question; neither has a receipt here |
-| **GPU** | One AMD card: MI-series, or RDNA3 (7900 XT / XTX, W7900). RDNA2 may work; nobody knows |
+| **OS** | **Windows first** -- the pack is Windows-native and AMD ships a ROCm build of PyTorch for Radeon on Windows (ROCm 7.2.x, one installer for both OSes) -- or Linux. Neither has a receipt here |
+| **GPU** | One AMD card: RDNA3 (7900 XT / XTX, W7900), RDNA4 (RX 9070 / 9070 XT, official in ROCm 7.2), or MI-series. RDNA2 may work; nobody knows |
 | **VRAM** | 16 GB for the full profile, 8 GB for the small one |
-| **ROCm** | 6.x |
+| **ROCm** | 7.2.x (Windows or Linux); 6.x still fine on Linux |
 | **Disk** | About 31 GB of weights, so 50 GB free with working room |
 | **Time** | An hour, most of it downloads |
 
@@ -56,7 +56,10 @@ hardware purchase.
 
 **You do not have to commit to the whole mission to help.** Most of what we
 need to know is answerable without downloading a single model or rendering
-anything. Install a ROCm torch, clone this pack, and run one file:
+anything. Install a ROCm torch -- on Windows, AMD's PyTorch for Radeon from the
+[ROCm on Radeon guide](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/index.html)
+instead of the pip line below; on Linux, the pip line -- clone this pack, and
+run one file:
 
 ```bash
 pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio
@@ -84,7 +87,10 @@ have saved yourself the evening and taught us more than a failed render would.
 ## The mission, in six commands
 
 **1. PyTorch for ROCm first.** A ROCm build of torch presents itself as
-`cuda` to everything above it -- that is normal and the pack expects it.
+`cuda` to everything above it -- that is normal and the pack expects it. On
+Windows, install AMD's PyTorch for Radeon per the
+[ROCm on Radeon guide](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/index.html)
+and skip the pip line; on Linux:
 
 ```bash
 pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio
@@ -118,7 +124,7 @@ continuing. Everything after this point assumes it is still True.
 
 **Do not install `sageattention`.** It is CUDA-only and the pack actively
 refuses to run if it finds it patched in. You do not need `pycairo` either --
-neither AMD profile selects the one engine that wants it.
+no AMD graph or profile selects the one engine that wants it.
 
 **3. Fetch the weights.** About 31 GB for a complete episode -- the image model is 19.26 GB of that, because this graph's `still_motion` lanes consume a still and therefore make it live. Every file, with its repository and destination folder, is in [MACHINES.md](MACHINES.md) section 3.
 
@@ -128,9 +134,10 @@ python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 ```
 
-That last line is for the **16 GB** graph, which is the one on Stable Audio 3.
-The 8 GB AMD graph uses MusicGen instead, which fetches itself at queue time —
-so on 8 GB, skip it.
+The shipped graph needs none of this by hand: Z-Image Turbo and MusicGen fetch
+themselves at the first queue, so the `z_image` line only saves you the wait.
+The `stable_audio_3` line is for the 16 GB lab profile alone; the shipped graph
+and the 8 GB profile are on MusicGen.
 
 **4. Start ComfyUI.**
 
