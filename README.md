@@ -29,9 +29,11 @@ git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 ```
 
-The branch matters: `v2.0-alpha` is the default and the only current one. `main`
-is a stale v1.7 merge thousands of commits behind. Use ComfyUI's own Python for
-the `pip install`, not a system one.
+Either branch is current: `v2.0-alpha` is the default and where the work
+lands, and `main` is kept on the same commit automatically. (It was not always
+-- `main` sat 5,029 commits behind until 2026-09-13, so an older clone of it is
+a v1.7 tree and should be re-cloned rather than pulled.) Use ComfyUI's own
+Python for the `pip install`, not a system one.
 
 **2. Put `ffmpeg` and `ffprobe` on your PATH, and make it a current one.**
 Both binaries. Every episode is mixed, captioned and muxed through them, and

@@ -19,8 +19,11 @@ it. The registry id is `comfyui-old-time-radio`, published by `fluxus`.
 git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 ```
 
-The branch matters. `v2.0-alpha` is the default branch and the only one that is
-current; `main` is a stale v1.7 merge thousands of commits behind.
+Either branch gives you the current tree. `v2.0-alpha` is the default and
+where the work lands; `main` is held on the same commit automatically, so
+cloning it plainly works too. This was not true before 2026-09-13 -- `main`
+sat 5,029 commits behind and served a v1.7 tree -- so if you cloned it before
+then, clone again rather than pull.
 
 **What you get is not the same either way.** A Manager install is a trimmed
 bundle: it has the nodes, the workflows and this folder, but not `docs/`, not
