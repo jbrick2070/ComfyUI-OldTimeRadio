@@ -80,7 +80,15 @@ def episode(tmp_path, monkeypatch):
 
 def test_renamed_episode_publishes_and_stamps_the_real_file(episode):
     args, _, path, obs, final, calls = episode
-    result, report = MUX.OTRMasterAudioMux().mux(**args)
+    out = MUX.OTRMasterAudioMux().mux(**args)
+    # Since 2026-09-13 the mux returns ComfyUI's {"ui": ..., "result": ...} so
+    # the canvas can show a poster frame instead of nothing. The episode
+    # contract is unchanged and is what this test is about.
+    assert isinstance(out, dict) and "result" in out, out
+    result, report = out["result"]
+    # The canvas payload is a courtesy and must never gate delivery: under
+    # pytest there is no ComfyUI temp dir, so it degrades to the path alone.
+    assert isinstance(out.get("ui"), dict)
     assert Path(result) == final and obs.is_file()
     assert calls == ["mux", "publish"]
     assert json.loads(path.read_text())["meta"]["obs_final_path"] == str(obs)

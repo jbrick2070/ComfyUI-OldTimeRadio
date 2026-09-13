@@ -133,6 +133,56 @@ def _probe_float(path: str, stream: str) -> float:
         return -1.0
 
 
+def _canvas_preview(final_path: str, obs_copy) -> dict:
+    """A poster frame and the path, for the ComfyUI canvas. Never raises.
+
+    Written 2026-09-13 after the first outside user reported a green run with an
+    empty canvas and went looking through the filesystem to find out whether it
+    had worked. The graph mints no preview anywhere, so this node -- the last one
+    to run -- is the only place that can answer "did it work, and where is it".
+
+    Returns a `ui` dict for ComfyUI. Degrades in steps and never blocks the
+    episode: no ComfyUI temp dir or no ffmpeg still yields the path as text; a
+    frame that will not extract yields the path as text; only a truly broken
+    call yields {}.
+    """
+    where = str(obs_copy or final_path or "")
+    ui: dict = {}
+    try:
+        if where:
+            ui["text"] = [where]
+        if not final_path or not os.path.isfile(final_path):
+            return ui
+        try:
+            import folder_paths  # ComfyUI's own; absent under bare pytest
+            temp_dir = folder_paths.get_temp_directory()
+        except Exception:  # noqa: BLE001 -- no ComfyUI, no canvas to draw on
+            return ui
+        try:
+            from ._otr_shared.ffmpeg import resolve_ffmpeg
+        except ImportError:  # pragma: no cover -- flat test import
+            from _otr_shared.ffmpeg import resolve_ffmpeg  # type: ignore
+        ffmpeg = resolve_ffmpeg()
+        if not ffmpeg:
+            return ui
+        # A frame ~30% in: far enough past the title card to show the episode,
+        # early enough to exist on the shortest one-act show. An unmeasurable
+        # duration falls back to 2 s rather than skipping the preview.
+        duration = _probe_float(final_path, "v:0")
+        seek = (duration * 0.3) if duration > 1.0 else 2.0
+        os.makedirs(temp_dir, exist_ok=True)
+        name = "otr_preview_%s.png" % _episode_stem(final_path)[:80]
+        out = os.path.join(temp_dir, name)
+        done = _run([ffmpeg, "-hide_banner", "-loglevel", "error", "-y",
+                     "-ss", "%.3f" % max(0.0, seek), "-i", final_path,
+                     "-frames:v", "1", "-vf", "scale=640:-2", out])
+        if getattr(done, "returncode", 1) == 0 and os.path.isfile(out):
+            ui["images"] = [{"filename": name, "subfolder": "", "type": "temp"}]
+    except Exception as exc:  # noqa: BLE001 -- a thumbnail never fails a render
+        log.info("[OTR_MasterAudioMux] canvas preview skipped: %s", exc)
+    return ui
+
+
 # `_count_audio_streams` was removed 2026-08-28: no caller anywhere. The
 # identically named helper in tests/test_credits_roll_spec.py is that test's
 # own local, not a consumer of this one.
@@ -1818,7 +1868,12 @@ class OTRMasterAudioMux:
             raise
         for line in report:
             log.info("[OTR_MasterAudioMux] %s", line)
-        return (final, "OTR_MasterAudioMux OK -> " + final + "\n" + "\n".join(report))
+        # The canvas gets a frame and the path. `otr_video_render_batch` already
+        # returns this shape; ComfyUI unwraps "result" and draws "ui".
+        return {"ui": _canvas_preview(final, obs_copy),
+                "result": (final,
+                           "OTR_MasterAudioMux OK -> " + final + "\n"
+                           + "\n".join(report))}
 
 
 __all__ = ["OTRMasterAudioMux", "mux_master_audio", "audio_pcm_sha",
