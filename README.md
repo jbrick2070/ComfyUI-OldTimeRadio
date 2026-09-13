@@ -563,7 +563,7 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `sd15` | manual | 2.0 GiB | fits | fits | **proven** |
+| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** |
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered |
@@ -694,28 +694,32 @@ and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 
 ### The cheapest complete setups
 
-Nothing here is gated: no account, no token, no licence to accept. Only the first
-row is also zero-effort, and the difference is one file:
+Nothing here is gated, and nothing here needs an account, a token or a licence
+click. The first two rows are pick-and-run:
 
 | | dropdowns | total download | effort |
 |---|---|---|---|
 | **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~3.8 GB** | pick and run |
-| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** | one file by hand |
-| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** | two files by hand |
+| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** | pick and run |
+| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** | one 67 MB file by hand |
 
-**The hand-fetched files, and why.** `sd15` is a ComfyUI checkpoint, so it belongs
-in `models/checkpoints/` rather than the Hugging Face cache, and its adapter will
-not pull it for you -- it stops with the exact `hf_hub_download` line to run and
-the folder to copy into. `spandrel_esrgan` is the same story for a 67 MB upscale
-model in `models/upscale_models/`. Both are ungated public downloads and both take
-about a minute; they are listed here because a stranger deserves to know which
-dropdown costs them a step before they pick it, not after. Everything else in
-these rows genuinely fetches itself on first use.
+**How the downloading happens, because it is not one mechanism.** Some engines
+are fetched by their own library through the Hugging Face cache -- that is
+`kokoro` and the writer models. The rest are fetched by a node inside the graph:
+`OTR_WorkflowValidator` looks at the dropdowns you actually selected and pulls
+only what those need, before the writer runs. `sd15` joined that list on
+2026-09-12, which is what turned the middle row from a manual step into a
+pick-and-run, and it matters more than its own row suggests -- `ltx098_low_video`
+is image-to-video, so it consumes an `sd15` still and could never be one click
+while that checkpoint was a hand fetch.
+
+`spandrel_esrgan` is the one left. It is a 67 MB upscale model that belongs in
+`models/upscale_models/`, its adapter stops with the download URL rather than
+fetching, and it is listed here so you know before you pick it rather than after.
 
 The `viz_*` lanes are audio-reactive and declare `accepts_still = False`, so they
 mint no still and never invoke an image engine -- which is why the smallest setup
-needs no image weights at all, and why it is the only row with nothing to fetch
-by hand.
+needs no image weights at all.
 
 ### One trap worth knowing before you change a dropdown
 
@@ -724,9 +728,8 @@ The image dropdowns ship defaulted to `z_image_turbo` (19.3 GB). With the defaul
 `still_*` or `ltx098_low_video` video lane and it becomes live**, because those
 declare `accepts_still = True` -- one dropdown change silently pulls 19.3 GB, and
 on a 16 GB machine it then dies in the KSampler needing ~20.4 GiB. Set the three
-image dropdowns to `sd15` (2.0 GB, same job) at the same time -- and fetch its
-checkpoint first, because `sd15` is one of the two dropdowns that does not
-download itself.
+image dropdowns to `sd15` (2.0 GB, same job) at the same time. Both fetch
+themselves; the only thing that changes is which of the two you spend.
 
 ## Running on a Mac (Apple Silicon)
 
@@ -778,7 +781,7 @@ Three things that cost a machine or an hour:
 | what | how to select it | cost and caveat | guide |
 |---|---|---|---|
 | the press-Run path | `otr_canonical` as shipped: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices (kokoro-onnx on the CPU under Python 3.13), Stable Audio 3, `viz_mxc_cpu` / `viz_green` / `viz_camera`. The device dropdowns ship as `default` and resolve to Metal here -- you do not set them | no image or video weights, no API key. The first receipt was a 135 s 1080p25 episode | 1 |
-| local stills: `sd15` | all three image dropdowns -> `sd15` | 1.99 GB, ungated, one checkpoint into `models/checkpoints/`; the long side is clamped to 768 on purpose (SD 1.5 duplicates subjects past that). Inert until a video lane consumes a still | 5 |
+| local stills: `sd15` | all three image dropdowns -> `sd15` | 1.99 GB, ungated, and it fetches itself since 2026-09-12; the long side is clamped to 768 on purpose (SD 1.5 duplicates subjects past that). Inert until a video lane consumes a still | 5 |
 | the four `still_*` lanes | a video role -> `still_motion` / `still_pan` / `still_flat` / `still_word`, with `sd15` supplying the still | about 22 minutes for a whole episode on `still_motion` | 9 |
 | local video diffusion: `ltx098_low_video` (`ltx_8gb`) | a video role -> `ltx098_low_video (16:9)` plus `sd15` on the image roles; no third-party node pack | its two weights auto-fetch (5.91 GB + 9.12 GB); one LTX lane 39:17, all three 1:07:27 with ~14 GB swapped -- the ceiling, not a comfortable setting | 7 |
 | `animatediff15_lightning_video` (EXPERIMENTAL) | a video role -> that lane; needs ComfyUI-AnimateDiff-Evolved at the pinned commit, the SD 1.5 checkpoint plus the Lightning 8-step motion module and the ft-mse VAE placed by hand, and the `extra_model_paths` addendum below | one 23-beat episode (2,736 frames, 2:32:34 wall clock) published 2026-09-09. The adaptive-hold guard written for PBUG-20260909-01 is unit-tested and has not yet fired under live fire | 8, 10.7 |
@@ -811,7 +814,7 @@ Three things that cost a machine or an hour:
 |---|---|---|
 | `ffmpeg` **and** `ffprobe` | `brew install ffmpeg`, or `ffdl install` after `pip install -r requirements.txt` (`ffmpeg-downloader` ships the fetcher, not the binaries; `imageio-ffmpeg` supplies ffmpeg only) | always -- every episode is mixed and muxed through them, and a missing one fails at the mp4 encode, hours in |
 | `tokenizers>=0.23.1,<0.24` | `pip install 'tokenizers>=0.23.1,<0.24'` with ComfyUI's own interpreter | only if you installed `2.0.0-alpha.24` through `.28`, which will not boot; `.29` or later is fine. Do not reinstall from Manager -- it serves the broken version |
-| the `sd15` checkpoint (1.99 GB) | the `hf_hub_download` line in guide section 5, then copy into `models/checkpoints/` | for any `still_*` lane and for `ltx098_low_video` |
+| the `sd15` checkpoint (1.99 GB) | **nothing -- it fetches itself since 2026-09-12**, pulled by `OTR_WorkflowValidator` at queue time when a lane you picked needs a still | for any `still_*` lane and for `ltx098_low_video` |
 | `cairo` | `brew install cairo pkg-config && pip install pycairo` | only for `viz_mxc_mandala`; `viz_green` needs nothing |
 | `git-lfs` | `brew install git-lfs && git lfs install` | before `scripts/otr_provision.py --packs-only`, which otherwise fails on ComfyUI-LTXVideo's checkout and leaves an unpinned clone behind (guide 10.2). The provisioner requires that pack unconditionally; on ComfyUI 0.34.6 no LTX lane resolves a class from it |
 | ComfyUI-AnimateDiff-Evolved plus its weights | `OTR_COMFY_ROOT=<ComfyUI> <ComfyUI Python> scripts/otr_provision.py --packs-only`, the weights by hand (guide sections 3 and 8), and `config/otr_mac_extra_model_paths.yaml` passed as a second `--extra-model-paths-config`, because Comfy Desktop's generated mapping has no `animatediff_models` category | only for the AnimateDiff lanes |

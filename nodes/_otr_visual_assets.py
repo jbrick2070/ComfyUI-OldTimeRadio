@@ -1,9 +1,10 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the EIGHT allowlisted
-files below can be fetched (three z_image_turbo, two ltx_8gb, three stable_audio_3 --
-it said five until the stable_audio_3 rows landed 2026-09-06, and seven until the
-base checkpoint row landed 2026-09-12). Existing native loader choices are preserved, not
+No model imports or network at module import. Only the NINE allowlisted files
+below can be fetched (three z_image_turbo, two ltx_8gb, three stable_audio_3,
+one sd15 -- it said five until the stable_audio_3 rows landed 2026-09-06, seven
+until the base checkpoint row landed 2026-09-12, and eight until sd15 landed
+the same day). Existing native loader choices are preserved, not
 rehash-qualified, and readiness is NOT a claim of GPU/render compatibility.
 Other engines keep their existing adapter checks with explicit uncovered logs.
 """
@@ -52,13 +53,36 @@ _SOURCES = (
      "checkpoints/stable_audio_3_small_music.safetensors"),   # 2,270,384,940 B
     ("text_encoders", "Comfy-Org/stable-audio-3",
      "text_encoders/t5gemma_b_b_ul2.safetensors"),            # 1,187,264,003 B
+    # SD 1.5, added 2026-09-12, and this one file gates more lanes than any
+    # other row here. `sd15` mints the still that the four `still_*` lanes and
+    # `ltx098_low_video` all consume -- LTX 0.9.8 is image-to-video, so its own
+    # two weights self-fetching was never enough to make that lane one click.
+    # Until now the ONLY route to this checkpoint was a `hf_hub_download` line
+    # the adapter prints inside its refusal, plus a manual copy into
+    # models/checkpoints/; `scripts/otr_fetch_lane_weights.py` can also do it,
+    # and .comfyignore strips `scripts/*` from the published bundle, so a
+    # registry install had no automated route at all.
+    #
+    # MEASURED COST OF NOT HAVING THIS: the 4060 clean-room drill
+    # (CR-20260912-04) followed the README's 8 GB row by hand, produced a valid
+    # ledger, six Kokoro clips, a music master and a 78-second 1,950-frame
+    # intermediate video, then died on the first shot with DEPENDENCY_MISSING
+    # naming this exact file. Nothing reached otr/obs.
+    #
+    # Ungated and public (verified against the Hub API, gated:false), 2.0 GB.
+    # The engine still decides WHICH checkpoint it loads -- a visual pack may
+    # name its own, and `_resolve_ckpt_name` only returns a pack name that is
+    # already installed -- so this table permits the default and never overrides
+    # a choice, exactly as the stable_audio_3 note above describes.
+    ("checkpoints", "Comfy-Org/stable-diffusion-v1-5-archive",
+     "v1-5-pruned-emaonly-fp16.safetensors"),                 # 2,132,696,762 B
 )
 MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
             {"repo_id": repo, "filename": filename}
             for category, repo, filename in _SOURCES}
 _VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_model")
 _IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
-_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "stable_audio_3"})
+_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "stable_audio_3", "sd15"})
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -366,7 +390,7 @@ def _same_file(left, right):
 
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
-                    env=None):
+                    sd15=None, env=None):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -449,6 +473,22 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             explicit=str((env or {}).get("OTR_SA3_CKPT") or ""))
         add("text_encoders", sa3._TENC,
             explicit=str((env or {}).get("OTR_SA3_TEXT_ENCODER") or ""))
+    if "sd15" in engines:
+        # ASK THE ADAPTER, for the same reason the stable_audio_3 branch above
+        # does: `_resolve_ckpt_name()` is the ONE resolver both `assert_usable`
+        # and the render path already share, so the preflight can never fetch a
+        # different file from the one that will load.
+        #
+        # IT IS CALLED WITH NO STYLE ON PURPOSE. With a style it would return a
+        # visual pack's own checkpoint -- but `_style_ckpt_name` only ever
+        # returns a name that is ALREADY INSTALLED, so a pack can never become a
+        # download here, and the file this fetches is the one the pack path
+        # falls back to anyway. Same shape as the note in the _SOURCES table:
+        # this permits the default and never overrides an operator's choice.
+        if sd15 is None:
+            raise VisualAssetError("sd15 adapter resolution is unavailable")
+        add("checkpoints", sd15._resolve_ckpt_name(),
+            explicit=str((env or {}).get(sd15.CKPT_ENV) or ""))
     return requests
 
 
@@ -603,7 +643,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths
     from comfy import model_management
-    zimage = ltx = sa3 = None
+    zimage = ltx = sa3 = sd15 = None
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo as zimage
     if "ltx_8gb" in engines:
@@ -611,10 +651,12 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         ltx = Ltx8gbEngine()
     if "stable_audio_3" in engines:
         from ._otr_audio_engines import eng_stable_audio_3 as sa3
+    if "sd15" in engines:
+        from ._otr_image_engines import sd15
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
     requests = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                               ltx=ltx, sa3=sa3, env=otr_env.snapshot())
+                               ltx=ltx, sa3=sa3, sd15=sd15, env=otr_env.snapshot())
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -690,7 +732,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
         after = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                                ltx=ltx, sa3=sa3, env=otr_env.snapshot())
+                                ltx=ltx, sa3=sa3, sd15=sd15, env=otr_env.snapshot())
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):

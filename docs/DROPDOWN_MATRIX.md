@@ -69,7 +69,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `sd15` | manual | 2.0 GiB | fits | fits | **proven** | ? | too slow |
+| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** | ? | too slow |
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |

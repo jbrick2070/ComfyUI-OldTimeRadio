@@ -184,12 +184,12 @@ _NO_LANE_WORD = {"hf_cache": "auto", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 
-#: One-slot memo for :func:`self_fetching_lanes`.
-_SELF_FETCHING_CACHE: list = []
+#: One-slot memo for :func:`graph_fetched_engines`.
+_GRAPH_FETCHED_CACHE: list = []
 
 
-def self_fetching_lanes() -> set:
-    """Fetcher lanes whose weights REALLY arrive on their own, derived.
+def graph_fetched_engines() -> set:
+    """Engines the GRAPH downloads for you, read from the one list that decides.
 
     HAVING A FETCHER LANE IS NOT THE SAME CLAIM AS "auto", and conflating them
     printed the wrong word into two shipped documents (2026-09-12). The README's
@@ -197,28 +197,29 @@ def self_fetching_lanes() -> set:
     But `scripts/` is a development-tree tool that is NOT in the registry
     bundle, and every local video adapter is fail-closed by design -- read
     ``eng_ltx_8gb`` ("the offline invariant -- no runtime fetch") and
-    ``eng_ghost_signal`` ("Fail CLOSED ... and NEVER a download"). So a lane
-    that exists only in the fetcher script costs the reader a manual step, and
-    six engines were being advertised as costing none: the three AnimateDiff
-    lanes, both HuMo rows and ``wan_ti2v``.
+    ``eng_ghost_signal`` ("Fail CLOSED ... and NEVER a download"). Six engines
+    were being advertised as costing nothing on the strength of a script the
+    reader does not have.
 
-    WHAT SELF-FETCHES **FOR A LANE** is the visual-asset manifest, and the
-    mechanism is in the graph rather than in `scripts/`: ``OTR_WorkflowValidator``
-    -- a node in the canonical workflow -- calls
-    ``_otr_visual_assets.ensure_prompt_visual_assets`` at queue time, which
-    downloads every manifest file it is missing. So a lane is genuinely "auto"
-    exactly when EVERY file it needs is in that manifest, and that is what this
-    computes. It is a join, not a list: put a file in the manifest and the
-    matrix says auto on the next regeneration, with nobody editing a table.
+    WHAT ACTUALLY FETCHES FOR A LANE is `OTR_WorkflowValidator`, a node inside
+    the canonical workflow, which calls
+    ``_otr_visual_assets.ensure_prompt_visual_assets`` at queue time. That
+    function reduces the graph's selections with ``& _COVERED`` and requests
+    weights for exactly what survives -- so ``_COVERED`` IS the answer, by
+    construction, and this returns it rather than re-deriving it.
 
-    **THE SCOPE OF THAT SENTENCE IS "a lane", AND THE LIMIT MATTERS.** It is not
-    a claim that the manifest is the only download in the pack. ``eng_musicgen``
-    calls ``from_pretrained`` and ``_otr_kokoro_voice_prefetch`` calls
-    ``hf_hub_download``; both are real, legitimate, independent self-fetches. They
-    are also not lanes -- they never reach this function, because they resolve
-    through ``NO_LANE_REASON["hf_cache"]`` in the branch above, which already
-    says "auto" for exactly that reason. Two mechanisms, two code paths, both
-    correct.
+    An earlier cut joined each fetcher lane's filenames against the MANIFEST.
+    It got the same three engines and was correct, but it was the wrong
+    primitive: it could only ever describe engines that HAVE a lane, and `sd15`
+    -- added to the manifest 2026-09-12 precisely because it had none -- would
+    have kept reading "manual" while the graph downloaded it.
+
+    **THE SCOPE OF "fetches for a lane" MATTERS.** This is not a claim that the
+    manifest is the only download in the pack. ``eng_musicgen`` calls
+    ``from_pretrained`` and ``_otr_kokoro_voice_prefetch`` calls
+    ``hf_hub_download``; both are real and legitimate. They are also not lanes,
+    so they never reach this function -- they resolve through
+    ``NO_LANE_REASON["hf_cache"]``, which already says "auto" for that reason.
 
     **ALSO NOT A CONTRADICTION:** ``otr_provision.profile_lanes`` still reports
     ``humo`` and ``wan_ti2v_gguf`` as "automatic". That answers a DIFFERENT
@@ -226,50 +227,26 @@ def self_fetching_lanes() -> set:
     right. Do not "reconcile" ``tests/test_otr_provision_humo.py`` with this
     function; you would break a correct test.
 
-    Today it resolves to ``ltx_8gb``, ``stable_audio_3`` and ``z_image`` -- the
-    three the operator can and does tell people to just pick.
-
-    Memoized because ``friction_for`` asks once per engine and ``_load`` re-executes
-    a module every call. The memo has no invalidation on purpose -- every caller
-    today is a fresh process or a fresh ``_generator()`` module -- so a test that
-    loads this module ONCE and then mutates ``MANIFEST`` or ``LANES`` between two
-    scenarios must call ``_SELF_FETCHING_CACHE.clear()`` itself, or it will read
-    the first answer twice with no error.
+    Memoized because ``friction_for`` asks once per engine and ``_load``
+    re-executes a module every call. The memo has no invalidation on purpose --
+    every caller today is a fresh process or a fresh ``_generator()`` module --
+    so a test that loads this module ONCE and then mutates ``_COVERED`` between
+    two scenarios must call ``_GRAPH_FETCHED_CACHE.clear()`` itself, or it will
+    read the first answer twice with no error.
     """
-    if _SELF_FETCHING_CACHE:
-        return _SELF_FETCHING_CACHE[0]
-    fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
+    if _GRAPH_FETCHED_CACHE:
+        return _GRAPH_FETCHED_CACHE[0]
     assets = _load("nodes/_otr_visual_assets.py", "_odm_visual_assets")
-    # MATCH ON (comfy dir, filename), NOT ON THE FILENAME ALONE. The manifest is
-    # keyed by the pair, and a bare-basename compare would call a lane "auto"
-    # because some OTHER lane put a same-named file in a different model
-    # directory -- `checkpoints/x.safetensors` is not `loras/x.safetensors`. No
-    # such collision exists today; this costs one tuple and removes the whole
-    # class (reviewer finding, 2026-09-12).
-    manifest = {(str(d), str(n)) for (d, n) in getattr(assets, "MANIFEST", {})}
-    self_fetching = set()
-    for lane, specs in getattr(fetcher, "LANES", {}).items():
-        wanted = []
-        for spec in specs:
-            dest = getattr(spec, "destination", None)
-            if dest:
-                # WeightSpec: destination is "<comfy dir>/<file>".
-                wanted.append((os.path.basename(os.path.dirname(str(dest))),
-                               os.path.basename(str(dest))))
-            elif isinstance(spec, (tuple, list)) and len(spec) >= 3:
-                # Legacy row: (repo, path_in_repo, comfy dir). The path is
-                # repo-relative and may be nested, so take its basename.
-                wanted.append((str(spec[2]), os.path.basename(str(spec[1]))))
-        if wanted and all(pair in manifest for pair in wanted):
-            self_fetching.add(lane)
-    _SELF_FETCHING_CACHE.append(self_fetching)
-    return self_fetching
+    covered = {str(e) for e in getattr(assets, "_COVERED", ())}
+    _GRAPH_FETCHED_CACHE.append(covered)
+    return covered
 
 
 def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
     """``(word, size_gb_or_None, lane_or_None)`` -- how you get the weights."""
     provision = _load("scripts/otr_provision.py", "_odm_provision")
     lane = provision.lane_for_engine(engine, namespace)
+    fetched = graph_fetched_engines()
     if lane is None:
         # "Needs nothing" is TWO different things and the columns must not
         # merge them: a procedural visualizer is pure code that runs anywhere,
@@ -283,12 +260,22 @@ def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
         # provisioner declares which. Only an engine it says nothing about is
         # a real gap.
         reason = provision.NO_LANE_REASON.get(engine)
+        # THE GRAPH OUTRANKS THE PROVISIONER'S CLASSIFICATION, and `sd15` is why
+        # (2026-09-12). It has no fetcher lane and is filed "manual_doc", which
+        # was exactly right until the visual-asset manifest started carrying its
+        # checkpoint -- at which point the truth a reader needs became "queue it
+        # and the graph downloads it", whatever the provisioner calls it. The
+        # word has to follow what actually happens on a first run, and no
+        # size comes from this path: an engine with no lane has no manifest to
+        # sum, so its figure is the curated one, as the module docstring says.
+        if engine in fetched:
+            return ("auto", None, None)
         return (_NO_LANE_WORD.get(reason, "unrouted"), None, None)
     fact = facts.get(lane.lane, {})
-    if lane.manual or lane.lane not in self_fetching_lanes():
+    if lane.manual or engine not in fetched:
         # A lane the render path will not fetch for you is a manual step, even
         # when `scripts/otr_fetch_lane_weights.py` can do it -- see
-        # self_fetching_lanes(). The gate is the visual-asset manifest, not the
+        # graph_fetched_engines(). The gate is what the graph downloads, not the
         # existence of a lane.
         word = "GATED+manual" if fact.get("gated") else "manual"
     else:
