@@ -621,9 +621,22 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   endpoint, which ONLY considers versions older than **30 minutes** (`registry.go:938`). Clean
   scan -> Active; issues found -> `Flagged` (their private Discord, not us); missing zip ->
   `Deleted`. The scanner itself is a PRIVATE repo and its schedule is not in any public config --
-  possibly nightly. **While a version is Pending, `latest_version` resolves to null, which is
-  exactly why ComfyUI Manager reports "not a CNR node" / "Cannot resolve install target".**
-  That error is NOT a local install fault -- do not send anyone chasing torch/dependency ghosts.
+  possibly nightly.
+- **A PENDING VERSION DOES NOT BLANK `latest_version`, AND THE API TELLS A PUBLISHER NOTHING
+  ABOUT WHY (measured 2026-09-13, with alpha.31 Pending for 21 hours).** An earlier version of
+  this section claimed Pending makes `latest_version` resolve to null and that this is why
+  ComfyUI Manager says "not a CNR node". **Both halves failed measurement.** With .31 Pending,
+  `GET /nodes/comfyui-old-time-radio` returns `latest_version` = 2.0.0-alpha.30, that version's
+  status Active, and node `status` NodeStatusActive -- so a Manager install WORKS while a
+  version is pending and simply serves the last Active one. If Manager reports "not a CNR node",
+  look for another cause; it is still NOT a torch/dependency ghost.
+  **There is no telemetry to read.** Three endpoints were checked --
+  `/nodes/<id>`, `/nodes/<id>/versions`, `/nodes/<id>/versions/<v>` -- and NONE returns a
+  `status_reason`, a scan result, or a queue position, not even for the Banned versions;
+  node-level `status_detail` is empty. `/versions/<v>/security-scan` is 404. The zip was on the
+  CDN two seconds after the record appeared and the publish Action succeeded, so a stuck Pending
+  is not an upload failure. **The only signal is the enum, and the only feedback channel is
+  Comfy-Org's own (their Discord).** Do not promise the operator a reason the API cannot give.
 - **There is NO publisher self-service path to Active.** Confirmed by reading
   `Comfy-Org/registry-backend`. Waiting, or asking Comfy-Org, are the only moves.
 - **DELETE ASYMMETRY, and it is a trap:** deleting the NODE is a HARD delete (row removed,
