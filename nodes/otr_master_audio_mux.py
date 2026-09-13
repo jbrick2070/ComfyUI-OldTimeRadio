@@ -191,7 +191,7 @@ def _canvas_preview(final_path: str, obs_copy) -> dict:
         done = otr_proc.run(
             [ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
              "-ss", "%.3f" % max(0.0, seek), "-i", final_path,
-             "-frames:v", "1", "-vf", "scale=640:-2", out],
+             "-an", "-frames:v", "1", "-vf", "scale=640:-2", out],
             capture_output=True, text=True, encoding="utf-8",
             errors="replace", timeout=20)
         if getattr(done, "returncode", 1) == 0 and os.path.isfile(out):
