@@ -6,7 +6,7 @@ inside ComfyUI. Drop it in, queue one workflow, walk away, and a complete episod
 your output folder.
 
 **Pipeline:** story source → LLM script → character voices + announcer + music themes (a
-swappable 7-voice / 5-music engine roster; the shipped graph runs Kokoro on both voice
+swappable 7-voice / 5-music engine roster -- six voices in a Manager install, since IndexTTS2 ships in the GitHub tree only; the shipped graph runs Kokoro on both voice
 slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic video
 (three procgen visualizer lanes by default -- zero weights; LTX, Wan, HuMo and the
 `still_*` family all remain selectable) → final MP4.
@@ -40,18 +40,23 @@ slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic v
 All of `apple/` ships with the pack. Everything under `docs/` is the development
 record and is **not** included in a Manager install -- read it on GitHub.
 
-**Fresh-install status, alpha.31.** The failure this warning used to describe is
-fixed: a clean install could get hours into writing and audio before dying on a
-visual weight it never had. The graph now fetches those at queue time, before the
-writer runs -- Z-Image-Turbo, LTX 0.9.8, Stable Audio 3 and SD 1.5 -- so the
-specific defect (`v1-5-pruned-emaonly-fp16.safetensors`, which killed the 4060
-clean-room drill) cannot recur.
+**Fresh-install status, alpha.31.** A clean install used to be able to get hours
+into writing and audio before dying on a visual weight it never had. The weights
+that lane needs now download at queue time, before the writer runs, whenever a
+dropdown selects them -- including
+`v1-5-pruned-emaonly-fp16.safetensors`, the file that killed the 4060
+clean-room drill.
 
-**It has not been re-qualified on the fixed tree**, which is a weaker claim than
-"it works": the cause is closed, the drill has not been re-run. If you are
-installing fresh, [apple/INSTALL.md](apple/INSTALL.md) is the current path and
-[apple/MACHINES.md](apple/MACHINES.md) names every weight that does *not* fetch
-itself.
+Two things that are **not** claimed by that. The canonical's three default video
+lanes mint no still, so the image model its dropdowns name is never fetched at
+all on a default run -- your first Queue is about 12 GB, not 30. And the
+AnimateDiff weights are still a hand fetch, so on that lane a late missing-weight
+stop is still possible. Nothing here has been re-qualified on the fixed tree: the
+cause is closed, the drill has not been re-run.
+
+Installing fresh: [apple/INSTALL.md](apple/INSTALL.md).
+Every weight that does *not* fetch itself, with its repository and destination
+folder: [apple/MACHINES.md](apple/MACHINES.md) section 3.
 
 **My Story qualification:** nine full canonical 5080 recovery attempts across
 recorded revisions produced four writing failures and five publications. Four
@@ -64,7 +69,7 @@ and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof keeps its
 recorded platform and scope. The [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md)
 remain recorded.
 
-100% local by default on NVIDIA, AMD **and Apple Silicon** -- no API keys required on
+100% local by default on NVIDIA **and Apple Silicon** (AMD graphs exist but nothing has ever run on ROCm -- see [apple/ROCM.md](apple/ROCM.md)) -- no API keys required on
 any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
 turn them on.
 
@@ -830,7 +835,7 @@ click. The first two rows are pick-and-run:
 
 | | dropdowns | total download | effort |
 |---|---|---|---|
-| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~3.8 GB** | pick and run |
+| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~12 GB** | pick and run -- 8.7 GB of that is the writer, which every setup needs |
 | **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** | pick and run |
 | **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** | one 67 MB file by hand |
 
@@ -980,7 +985,7 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
   `sd15` stills and `ltx_8gb` video diffusion both measured on Metal. Read
   [Running on a Mac](#running-on-a-mac-apple-silicon) before you start; 16 GB is the
   floor and it is tight, and an out-of-memory there reboots the machine.
-- **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
+- **Python:** 3.10 through 3.13 (`pyproject.toml` requires >=3.10). ComfyUI Desktop and the portable build ship 3.13, where the
   Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
   backend yet (bark replaces it with three dropdown changes).
 - **Other setups:** ONE authored graph. `workflows/otr_canonical.json` is the

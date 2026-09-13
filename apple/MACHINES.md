@@ -11,11 +11,11 @@ Every row below is a real saved graph in this repository. Drag it onto the Comfy
 | Your machine | Open this | Also install |
 |---|---|---|
 | Anything, to start | `workflows/otr_canonical.json` (Browse Templates &rarr; OTR) | nothing |
-| 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_8gb_lite.json` | ComfyUI-GGUF |
-| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_full.json` | nothing |
+| 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_nvidia_8gb_haunted.json` | ComfyUI-AnimateDiff-Evolved, ComfyUI-GGUF |
+| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/otr_canonical.json` &mdash; the per-machine graph selects `indextts2`, which is not in an installed copy | nothing |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac_mps.json` | nothing |
-| AMD ROCm -- Linux only -- and read the caveat under the table | `workflows/variants/otr_amd16_rocm.json` | nothing |
-| CPU only -- no GPU at all | `workflows/variants/otr_cpu_floor.json` | nothing |
+| AMD ROCm -- Linux only -- and read the caveat under the table | `workflows/otr_canonical.json` &mdash; the per-machine graph is still a draft | nothing |
+| CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; the per-machine graph is still a draft | nothing |
 
 Every machine needs **ffmpeg and ffprobe** on PATH, and Linux needs one monospace TTF installed for burned captions.
 

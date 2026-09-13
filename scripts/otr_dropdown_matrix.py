@@ -63,7 +63,13 @@ _END = "<!-- END GENERATED: dropdown-matrix -->"
 #: a REAL shipped profile -- the availability answer is that profile's, not an
 #: invented one, so a reader can reproduce any cell with `--profile <id>`.
 MACHINES = (
+    # `profile` is what the COLUMN is computed against, so every cell stays
+    # reproducible with `--profile 8gb_lite`. `graph_profile` is what a PERSON
+    # should open, which is a different question: 8gb_lite is a draft lab
+    # preset, while otr_nvidia_8gb_haunted is shipping and has the published
+    # 8 GB episodes.
     {"key": "nv8", "label": "8 GB NVIDIA", "profile": "8gb_lite",
+     "graph_profile": "otr_nvidia_8gb_haunted",
      "blurb": "RTX 4060 / 3070 / 2080 class"},
     {"key": "nv16", "label": "16 GB+ NVIDIA", "profile": "16gb_full",
      "blurb": "RTX 5080 / 4080 / 3090 class"},
@@ -817,6 +823,86 @@ def manual_artifacts(lane: str, provision, fetcher) -> list:
     return out
 
 
+def stripped_engines() -> set:
+    """Engine ids whose module `.comfyignore` removes from the registry bundle.
+
+    Derived, not listed: read the ignore file for engine modules, then read
+    each module for the ids its classes declare. One entry today
+    (`eng_indextts2.py`, excluded because it is byte-hashed into a voice-route
+    fingerprint), but the rule is what matters -- a second exclusion must not
+    need a human to remember this function exists.
+    """
+    ignore = os.path.join(_REPO, ".comfyignore")
+    if not os.path.exists(ignore):
+        return set()
+    out = set()
+    for line in io.open(ignore, encoding="utf-8"):
+        rel = line.strip()
+        if (not rel or rel.startswith(("#", "!"))
+                or "_engines/" not in rel or not rel.endswith(".py")):
+            continue
+        path = os.path.join(_REPO, rel.replace("/", os.sep))
+        if not os.path.exists(path):
+            continue
+        tree = ast.parse(io.open(path, encoding="utf-8").read())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef):
+                for stmt in node.body:
+                    if (isinstance(stmt, ast.Assign)
+                            and any(getattr(t, "id", "") == "name"
+                                    for t in stmt.targets)
+                            and isinstance(stmt.value, ast.Constant)
+                            and isinstance(stmt.value.value, str)):
+                        out.add(stmt.value.value)
+    return out
+
+
+def graph_engine_values(path: str) -> set:
+    """Every string a saved graph stores that is a registered engine id."""
+    known = {e for ns in registry_capabilities().values() for e in ns}
+    try:
+        graph = json.load(io.open(path, encoding="utf-8"))
+    except Exception:
+        return set()
+    out = set()
+    for node in graph.get("nodes", []):
+        for value in (node.get("widgets_values") or []):
+            if isinstance(value, str) and value in known:
+                out.add(value)
+    return out
+
+
+def recommended_graph(profile_id: str) -> tuple:
+    """``(path, caveat)`` -- the graph to open for this machine, and why.
+
+    TWO CONDITIONS, BOTH REQUIRED. The profile must be `shipping` (a `draft`
+    profile is a lab preset, not an answer for a stranger), and its generated
+    graph must not select an engine the bundle strips. Failing either, the
+    canonical is the answer: it is always present, always runnable, and
+    resolves the device at run time.
+    """
+    path = os.path.join(_REPO, "config", "profiles", "%s.json" % profile_id)
+    status = ""
+    if os.path.exists(path):
+        try:
+            status = str(json.load(io.open(path, encoding="utf-8")).get("status", ""))
+        except Exception:
+            status = ""
+    graph = _variant_for(profile_id)
+    full = os.path.join(_REPO, graph)
+    if not os.path.exists(full):
+        return ("workflows/otr_canonical.json", "no per-machine graph is generated")
+    if status != "shipping":
+        return ("workflows/otr_canonical.json",
+                "the per-machine graph is still a draft")
+    blocked = sorted(graph_engine_values(full) & stripped_engines())
+    if blocked:
+        return ("workflows/otr_canonical.json",
+                "the per-machine graph selects %s, which is not in an installed "
+                "copy" % ", ".join("`%s`" % b for b in blocked))
+    return (graph, "")
+
+
 def render_apple(rows: list) -> str:
     """`apple/MACHINES.md` -- the three questions, in the order people ask them.
 
@@ -846,13 +932,23 @@ def render_apple(rows: list) -> str:
     L.append("| Anything, to start | `workflows/otr_canonical.json` "
              "(Browse Templates &rarr; OTR) | nothing |\n")
     for machine in MACHINES:
-        graph = _variant_for(machine["profile"])
-        if not os.path.exists(os.path.join(_REPO, graph)):
-            continue
-        needed = sorted({packs[e] for e in _profile_engines(machine["profile"])
-                         if e in packs})
-        L.append("| %s -- %s | `%s` | %s |\n" % (
-            machine["label"], machine["blurb"], graph,
+        graph, caveat = recommended_graph(
+            machine.get("graph_profile") or machine["profile"])
+        if caveat:
+            # The canonical is the fallback, and its engines are what needs
+            # installing -- not the rejected graph's.
+            needed = sorted({packs[e]
+                             for e in graph_engine_values(
+                                 os.path.join(_REPO, graph)) if e in packs})
+            cell = "`%s` &mdash; %s" % (graph, caveat)
+        else:
+            needed = sorted({packs[e]
+                             for e in _profile_engines(
+                                 machine.get("graph_profile")
+                                 or machine["profile"]) if e in packs})
+            cell = "`%s`" % graph
+        L.append("| %s -- %s | %s | %s |\n" % (
+            machine["label"], machine["blurb"], cell,
             ", ".join(needed) if needed else "nothing"))
     L.append("\nEvery machine needs **ffmpeg and ffprobe** on PATH, and Linux "
              "needs one monospace TTF installed for burned captions.\n\n")
