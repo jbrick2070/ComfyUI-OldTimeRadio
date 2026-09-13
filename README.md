@@ -1,648 +1,220 @@
-# ComfyUI-OldTimeRadio (SIGNAL LOST)
+# ComfyUI-OldTimeRadio
 
-Turn **real news, public-domain stories, Shakespeare, or fully original LLM fiction** into a
-finished **radio-drama video** — script, voices, music, and CRT-style video — fully automated
-inside ComfyUI. Drop it in, queue one workflow, walk away, and a complete episode lands in
-your output folder.
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_icon.gif" alt="Old Time Radio" width="400">
+</p>
 
-**Pipeline:** story source → LLM script → character voices + announcer + music themes (a
-swappable 7-voice / 5-music engine roster -- six voices in a Manager install, since IndexTTS2 ships in the GitHub tree only; the shipped graph runs Kokoro on both voice
-slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic video
-(three procgen visualizer lanes by default -- zero weights; LTX, Wan, HuMo and the
-`still_*` family all remain selectable) → final MP4.
+> *"Good evening. This is SIGNAL LOST."*
 
-## Start here
+That is how every episode opens. What follows is a radio drama nobody has heard
+before: a script written on your own machine from tonight's news, a public-domain
+story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
+announcer; a theme in the bank's own idiom; pictures to watch while you listen;
+burned captions and a credit roll. One workflow, one press of **Queue**, and a
+finished `.mp4` lands in your output folder.
 
-**Everyone:**
+It runs entirely locally -- no account, no API key, no cloud service -- on NVIDIA
+cards and on Apple Silicon. Paid lanes exist for people who want them, and every
+one of them stays off until you turn it on.
 
-| | |
+---
+
+## Make an episode
+
+**1. Install the pack.** In ComfyUI Manager, search for **Old Time Radio** (registry
+id `comfyui-old-time-radio`, publisher `fluxus`). Or clone it into `custom_nodes/`:
+
+```bash
+git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
+```
+
+The branch matters: `v2.0-alpha` is the default and the only current one. `main`
+is a stale v1.7 merge thousands of commits behind. Use ComfyUI's own Python for
+the `pip install`, not a system one.
+
+**2. Put `ffmpeg` and `ffprobe` on your PATH.** Both. Every episode is mixed,
+captioned and muxed through them, and a missing `ffprobe` fails at the very end,
+after everything expensive has already run. `winget install Gyan.FFmpeg`,
+`brew install ffmpeg`, or `apt install ffmpeg` all supply the pair. On Linux also
+install one monospace font (`fonts-dejavu-core` is enough) for the captions.
+
+**3. Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
+**OldTimeRadio** category in the node menu.
+
+**4. Load the show.** **Workflow → Browse Templates → EXTENSIONS →
+comfyui-old-time-radio**. There is exactly one entry, **`otr_canonical`**. Open
+it and press **Queue**. You do not have to change anything: every dropdown already
+holds a working value, and the ones set to *roll* pick for themselves, so two runs
+in a row give you two different shows.
+
+**5. Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run
+downloads about **12 GB** -- the writer, the music model and its text encoder, and
+the Kokoro voices -- and then writes, casts, performs, scores and cuts an episode.
+Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
+on CPU it is a long wait, and that is the model working, not a hang.
+
+That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
+finish**, however green the console looked.
+
+The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
+and [apple/RUN.md](apple/RUN.md).
+
+### The widgets worth touching
+
+All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
+
+| Widget | What it does |
 |---|---|
-| **[apple/INSTALL.md](apple/INSTALL.md)** | Get the nodes loading. ffmpeg, Python versions, what downloads itself. |
-| **[apple/RUN.md](apple/RUN.md)** | Make your first episode, and where it lands. |
-| **[apple/MACHINES.md](apple/MACHINES.md)** | Which graph to open for your card, what runs where, and where every manual weight comes from. |
+| `episode_title` | Blank, and the show titles itself. Anything you type becomes the title card. |
+| `num_characters` | Speaking parts. Ships at 2. |
+| `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. |
+| `custom_premise` | A sentence or two of your own. Blank means the source decides. |
+| `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
+| `visual_style` | How it looks -- one of nine. Ships on *roll*. |
+| `creativity` | `balanced` by default. |
+| `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 
-**If it applies to you:**
+Pin `source_bank` and `visual_style` when you want to compare two runs; a rolled
+bank and a rolled style change more than anything else you could adjust.
 
-| | |
+**Your own story:** set `source_bank` to **`my_story`** (the dropdown lists bank
+ids, so that is the value to pick) and put your idea in `custom_premise`. The
+`story_characters`, `story_plot`, `story_setting` and `story_author` fields on the
+same node take the rest. That bank exists to produce your idea rather than adapt
+something, and it is the one bank the roll never lands on.
+
+---
+
+## The guides that ship with it
+
+Everything under `apple/` is in the pack, whichever way you installed it.
+
+| Everyone | |
+|---|---|
+| [apple/INSTALL.md](apple/INSTALL.md) | Getting the nodes loading: ffmpeg, Python versions, what downloads itself. |
+| [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
+| [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
+
+| If it applies to you | |
 |---|---|
 | [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
-| [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your card cannot hold. |
-| [apple/ROCM.md](apple/ROCM.md) | AMD. Nothing here has ever run on ROCm -- this is the ask. |
-| [apple/CLOUD.md](apple/CLOUD.md) | Optional paid writer lanes. Off by default; you do not need them. |
+| [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your own card cannot hold. |
+| [apple/ROCM.md](apple/ROCM.md) | AMD. Nothing here has ever run on ROCm; this page is the ask. |
+| [apple/CLOUD.md](apple/CLOUD.md) | The optional paid writer lanes. Off by default; you do not need them. |
 
-**Adding to it:**
-
-| | |
+| Adding to it | |
 |---|---|
-| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, or your own source bank. |
-| [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will work. |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, or a source bank of your own. |
+| [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will actually work. |
 
-All of `apple/` ships with the pack. Everything under `docs/` is the development
-record and is **not** included in a Manager install -- read it on GitHub.
-
-**Fresh-install status, alpha.31.** A clean install used to be able to get hours
-into writing and audio before dying on a visual weight it never had. The weights
-that lane needs now download at queue time, before the writer runs, whenever a
-dropdown selects them -- including
-`v1-5-pruned-emaonly-fp16.safetensors`, the file that killed the 4060
-clean-room drill.
-
-Two things that are **not** claimed by that. The canonical's three default video
-lanes mint no still, so the image model its dropdowns name is never fetched at
-all on a default run -- your first Queue is about 12 GB, not 30. And the
-AnimateDiff weights are still a hand fetch, so on that lane a late missing-weight
-stop is still possible. Nothing here has been re-qualified on the fixed tree: the
-cause is closed, the drill has not been re-run.
-
-Installing fresh: [apple/INSTALL.md](apple/INSTALL.md).
-Every weight that does *not* fetch itself, with its repository and destination
-folder: [apple/MACHINES.md](apple/MACHINES.md) section 3.
-
-**My Story qualification:** nine full canonical 5080 recovery attempts across
-recorded revisions produced four writing failures and five publications. Four
-publications have source omissions; the latest Gemma4-12B episode preserves all
-requested facts in its saved spoken dialogue and publishes to OBS. Its voice
-credits match the actual render. Visual continuity, audio listening and broader
-repeatability remain unqualified. A retained scopes-video output path still
-needs correction. See [ninth-run evidence](docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md)
-and [GO_FORWARD](docs/GO_FORWARD_PLAN.md). Existing model-matrix proof keeps its
-recorded platform and scope. The [cross-machine reports](docs/2026-09-11-my-story-cross-machine/triage.md)
-remain recorded.
-
-100% local by default on NVIDIA **and Apple Silicon** (AMD graphs exist but nothing has ever run on ROCm -- see [apple/ROCM.md](apple/ROCM.md)) -- no API keys required on
-any of them. Optional hosted LLM and all-cloud routes exist; they stay off unless you
-turn them on.
-
-(That Apple Silicon line used to read "no local image engine wired up yet, so its
-pictures come from Google's paid image API and need a key". As of 2026-09-08 that is
-wrong on both counts: `sd15` mints stills locally and `ltx_8gb` renders local video
-diffusion, both measured on a Mac mini M4 / 16 GB. **On a Mac, read
-[Running on a Mac](#running-on-a-mac-apple-silicon) before you queue anything** --
-an out-of-memory there reboots the machine, not the render.)
-
-> **Already installed it? Load the show:** **Workflow → Browse Templates →
-> EXTENSIONS → comfyui-old-time-radio**. There is exactly one entry,
-> **`otr_canonical`** -- pick it, then **Queue Prompt**. (Or drag
-> `workflows/otr_canonical.json` onto the canvas; it is the same file.) The 25
-> `OTR_` nodes are the parts; the workflow is the thing you run.
->
-> **One graph in the menu, 94 more in the folder.** `otr_canonical` is the graph
-> Browse Templates lists, and setting its dropdowns is the supported path. But
-> the pack also ships **94 generated per-machine graphs in `workflows/variants/`**,
-> one for every profile in `config/profiles/`, and they are in the registry
-> bundle too. ComfyUI's template browser globs one directory level, so it cannot
-> see them -- **drag the file onto the canvas, or use Workflow -> Open**. They
-> are generated from the canonical by `scripts/build_variants.py --all`; never
-> hand-edit one.
-
-> **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
-> Model Platform below), and it is the GitHub default branch, so a fresh clone lands on
-> it. The pack is also listed on the
-> [ComfyUI Registry](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio),
-> where **`2.0.0-alpha.30` is Active** (verified 2026-09-12), so the Registry and
-> ComfyUI-Manager can install it -- section 2 has the detail. The git clone stays
-> the way to get the newest tree, which moves faster than the published versions.
+The development record -- bug logs, measurements, design notes -- lives under
+`docs/` in the
+[GitHub tree](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-alpha/docs)
+and is **not** part of a Manager install. Nothing in this file depends on it.
 
 ---
 
-## New to ComfyUI? Start here
+## What it makes
 
-You need four things: ComfyUI, a GPU, the models, and this node pack. ~20 minutes start to finish.
+### The story
 
-### 1. Install ComfyUI
+Five source banks roll automatically; a sixth takes your own premise. Each bank is
+independent -- its own story pack, its own fetch -- and each fails closed: a bad
+source, a context overflow or a broken contract stops the run rather than shipping
+a degraded story. The language model writes every line of prose; Python validates,
+it never rewrites.
 
-Use the official [ComfyUI Desktop installer](https://www.comfy.org/download) (easiest), or a
-manual/portable ComfyUI install. Launch it once to confirm it opens in your browser.
-
-**Renting a GPU instead?** Follow [docs/RUNPOD_INSTALL.md](docs/RUNPOD_INSTALL.md) -- it covers RunPod and similar NVIDIA CUDA Linux hosts.
-
-### 2. Install this node pack
-
-**Use git.** Clone into your `ComfyUI/custom_nodes/` folder and check out the
-active branch:
-
-```
-git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
-cd ComfyUI-OldTimeRadio
-git checkout v2.0-alpha
-pip install -r requirements.txt
-```
-
-Then restart ComfyUI so it loads the nodes.
-
-> **Don't skip the `pip install`.** Manager and `comfy node registry-install` run it for you;
-> a bare `git clone` does not. Each node imports in its own `try`/`except`, so a missing
-> library doesn't break the pack — it silently *skips* the affected node and prints
-> `[OldTimeRadio] Skipped '<name>': <reason>` in the console. If a node you expect is
-> missing from the menu, that line is where to look. Use the same Python that runs
-> ComfyUI (for portable installs: `python_embeded\python.exe -m pip install -r requirements.txt`).
-
-> **Two system tools pip cannot install for you.** `ffmpeg` must already be on your
-> PATH with the libx264 and aac encoders built in (Windows: the ComfyUI portable and
-> Desktop builds bundle one; Mac: `brew install ffmpeg`; Linux: your package manager's
-> ffmpeg). OTR mixes and muxes every episode through it, and a missing ffmpeg fails at
-> render time with no earlier warning. Not on PATH? Set `OTR_FFMPEG` to the
-> binary's full path -- and set `OTR_FFPROBE` too whenever any other ffprobe is
-> on PATH, because the probe resolver takes a PATH ffprobe ahead of the pinned
-> ffmpeg's sibling. Every stage resolves ffmpeg through one owner that honours
-> that pin ahead of PATH, and a node's bare `ffmpeg` widget default never
-> overrides it. **`pycairo` is Windows-only in
-> `requirements.txt`** (`pycairo>=1.24; sys_platform == 'win32'`, because pycairo
-> publishes zero Linux wheels), so pip on Linux or Mac skips it entirely and there
-> are no headers to pre-install. Exactly ONE engine imports cairo --
-> `viz_mxc_mandala` -- and it refuses loudly, naming the pip command, if you select
-> it without cairo; every other visualizer lane is cairo-free. **No shipped
-> profile selects it** -- this paragraph used to say the two AMD profiles did,
-> and they do not: `otr_amd8_rocm` and `otr_amd16_rocm` both pin the cairo-free
-> `viz_mxc_cpu` for `announcer_visual` and `music_visual` (read the JSONs).
-> Corrected 2026-09-12; the claim would have sent an AMD tester to install a
-> dependency their profile never touches. So on Linux, and only if you pick
-> `viz_mxc_mandala` by hand: install `libcairo2-dev` (Debian/Ubuntu) or your
-> distro's equivalent plus `pkg-config`, then `pip install pycairo` yourself.
-
-**The ComfyUI Registry route works again as of `2.0.0-alpha.30`.** Checked live
-2026-09-12 against the
-[registry page](https://registry.comfy.org/publishers/fluxus/nodes/comfyui-old-time-radio):
-alpha.30 is `Active` and is what `latest_version` resolves to, so `@latest` has
-a target and Manager can install the pack.
-
-**Older published versions are not installable and will not become installable.**
-alpha.25 through .29 are `Flagged` and alpha.13 through .18 are `Banned` -- the
-registry's security scan reads the zip lexically, and every one of those versions
-tripped it. Pin `2.0.0-alpha.30` or later. If Manager reports "not a CNR node" or
-"cannot resolve install target" against this pack, you are on one of the older
-versions; take alpha.30, or use the git clone above, which is always the newest
-tree.
-
-### 2b. ComfyUI node packs — required by some video lanes
-
-A few OTR video engines drive **other people's ComfyUI nodes**. Those are node
-packs, not Python packages, so `pip install` cannot supply them and they are
-deliberately absent from `requirements.txt` and `pyproject.toml`. Install them
-into `ComfyUI/custom_nodes/` (ComfyUI-Manager, or `git clone`) and restart
-ComfyUI.
-
-| lane / profile | needs | why |
-|---|---|---|
-| `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) at commit `92576512` (release 1.6.0, the checkout behind the published receipts) | provides the `ADE_*` classes the haunted lane samples through |
-| `ltx25_*` (LTX 2.5 video, foley, mime) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at commit `6ea2651e`, **plus** the one-file patch in `patches/` (see `patches/README.md` for the exact `git apply` line), then its `requirements.txt` | the two GGUF loaders (`UnetLoaderGGUF`, `CLIPLoaderGGUF`); every other LTX 2.5 class is already in ComfyUI 0.34+. Measured on a clean Windows install 2026-09-01: without the pack the render refuses at the video stage and names both classes |
-| `flux2_klein` (image; **the 8 GB and 12 GB default** -- AMD moved off it in `b1f372a9` so those tiers need no pack) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
-| `wan22_*` / `wan_ti2v` (Wan 2.2 video) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its shipped DiT and umt5 text encoder are GGUF files (`UnetLoaderGGUF`, `CLIPLoaderGGUF`) |
-| `ltx098_low_video` (`ltx_8gb`, LTX 0.9.8 distilled 2B -- the only 0.9.x lane) | **nothing extra** | every class it resolves (`CheckpointLoaderSimple`, `ModelSamplingLTXV`, `LTXVImgToVideo`, `LTXVConditioning`, `LTXVScheduler`, `SamplerCustom`, `VAEDecode`) is stock ComfyUI, and it published episodes on a Mac with ComfyUI-LTXVideo moved aside (`docs/MAC_PORTABILITY_GUIDE.md` 10.2). Its preflight message still says "install/update ComfyUI-LTXVideo" when a class is missing; on a stock install read that as "update ComfyUI". This row used to lump it with the two LTX 2.3 lanes below as "the LTX 0.9.x lanes", which was wrong on both counts |
-| `ltx23_high_video` / `ltx23_low_audio_in` (`ltx_video` / `ltx_audio_in`, the LTX 2.3 22B GGUF lanes) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) for `UnetLoaderGGUF`; their preflight message also names [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde` **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports), and `scripts/otr_provision.py` installs both at those pins | the 22B unet is a Q3_K_M GGUF, so `UnetLoaderGGUF` is the one non-core class. Every `LTXAV*` / `LTXV*AVLatent` class they resolve is stock ComfyUI 0.34+ (`comfy_extras/nodes_lt.py`, `nodes_lt_audio.py`; checked against 0.34.6 on 2026-09-09, where ComfyUI-LTXVideo registers none of them), so on that version the pack is a provisioner requirement, not a render requirement. `ltx23_low_audio_in` also hard-requires NVML in its preflight, so it is NVIDIA-only by code, not merely by registry row |
-| `humo_1.7B*`, `humo*`, `minimax_h3_*`, every `still_*` / `viz_*` lane | **nothing extra** | all their classes ship in stock ComfyUI 0.34+ (verified against a clean portable install 2026-09-01) |
-
-`scripts/otr_provision.py` installs all three packs at their pinned commits for you
-on Linux pods (GGUF `6ea2651e`, LTXVideo `3b9c5cde`, AnimateDiff-Evolved `92576512`,
-release 1.6.0); on Windows, install the row you need by hand as above.
-
-#### The AnimateDiff weights -- the pack is not enough, and nothing fetches these
-
-**AnimateDiff is a niche lane and its weights do NOT auto-download. That is on
-purpose** -- the rest of the pack pulls what a dropdown needs at queue time, and
-these sit outside that on the grounds that the lane is opt-in. So they are
-documented here instead, because a filename with no source is not an install
-instruction.
-
-A clean-room RTX 4060 hit exactly this on 2026-09-12: a valid script, six voice
-clips, a music master and a 78-second video, then a stop on the first shot
-naming three files it had no way to obtain (`docs/4060_DRILL_LOG.md`
-CR-20260912-04).
-
-Both repos are public and ungated -- no token, no licence click.
-
-**For `animatediff15_v3_haunted_video` and `animatediff15_v3_stillin_lab_video`**
-(the 8 GB default lane), into your ComfyUI `models/` tree:
-
-```bash
-python -c "from huggingface_hub import hf_hub_download as d; print(d('Comfy-Org/stable-diffusion-v1-5-archive','v1-5-pruned-emaonly-fp16.safetensors'))"
-python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_mm.ckpt'))"
-python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_adapter.ckpt'))"
-```
-
-Copy `v1-5-pruned-emaonly-fp16.safetensors` into `models/checkpoints/`,
-`v3_sd15_mm.ckpt` into `models/animatediff_models/`, and `v3_sd15_adapter.ckpt`
-into `models/loras/`.
-
-> **All three, including the SD 1.5 checkpoint, and here is why that is not
-> obvious.** SD 1.5 auto-downloads for the `sd15` IMAGE engine, so an earlier
-> version of this paragraph said it needed no action here. That was wrong. The
-> AnimateDiff lanes declare `accepts_still = False` -- they mint no still, so
-> the graph correctly skips fetching the image engine's weights as "provably
-> unused". But the motion module animates that checkpoint, so the lane needs
-> the file for ITSELF, and nothing on this path pulls it. It is the first of
-> the three files the clean-room 4060 stopped on.
-
-**For `animatediff15_lightning_video`** (the Apple Silicon lane) you need the
-Lightning module and the ft-mse VAE instead:
-
-```bash
-python -c "from huggingface_hub import hf_hub_download as d; print(d('ByteDance/AnimateDiff-Lightning','animatediff_lightning_8step_comfyui.safetensors'))"
-python -c "from huggingface_hub import hf_hub_download as d; print(d('stabilityai/sd-vae-ft-mse-original','vae-ft-mse-840000-ema-pruned.safetensors'))"
-```
-
-The module goes in `models/animatediff_models/`, the VAE in `models/vae/`. On
-ComfyUI Desktop the `animatediff_models` category is not mapped by default;
-`docs/MAC_PORTABILITY_GUIDE.md` section 10.7 has the `extra_model_paths`
-addendum that exposes it.
-
-**The motion module publishes no licence grant** (`commercial_clean = False` in
-
-the adapter), so treat the haunted lane as personal use.
-
-
-
-#### The LTX 2.3 weights, and the two lanes we still cannot source
-
-An audit on 2026-09-12 found that the LTX 2.3 rows named eight weight files with
-no repository stated anywhere in this repo -- not in the code, not in the docs,
-not in the archival design notes. Seven of the eight were recovered the same
-evening and are written down here. **Both repositories are public and ungated.**
-
-**From `Lightricks/LTX-2.3`:**
-
-| file | goes in |
+| Bank | Where the story comes from |
 |---|---|
-| `ltx-2.3-22b-dev.safetensors` (43 GB) | `models/checkpoints/` |
-| `ltx-2.3-22b-distilled-lora-384.safetensors` | `models/loras/ltxv/ltx2/` |
-| `ltx-2.3-22b-distilled-lora-384-1.1.safetensors` | `models/loras/ltxv/ltx2/` |
-| `ltx-2.3-spatial-upscaler-x2-1.1.safetensors` | `models/latent_upscale_models/` |
+| `scifi_news_pro` | A live science feed, turned into science-fiction radio. |
+| `media_archive` | Media RSS and archive items, turned into restoration-adventure episodes. |
+| `public_domain` | A faithful radio adaptation of a public-domain source text. |
+| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
+| `original` | No source at all: original fiction seeded from an entropy draw. |
+| `my_story` | Your idea, characters, plot and setting. Never rolled; you choose it. |
 
-**From `unsloth/LTX-2.3-GGUF`:**
+### The music each bank gets
 
-| file | goes in |
+Every bank has a fixed musical identity, and the composer leads every cue with it.
+
+| Bank | Idiom |
 |---|---|
-| `ltx-2.3-22b-dev-Q3_K_M.gguf` | `models/unet/` |
-| `vae/ltx-2.3-22b-dev_video_vae.safetensors` | `models/vae/` |
-| `vae/ltx-2.3-22b-dev_audio_vae.safetensors` | `models/vae/` (the audio-in lane only) |
+| `media_archive` | small-group jazz quartet, relaxed swing -- brushed drums, walking upright bass, piano, tenor sax |
+| `original` | salsa conjunto at 100 BPM, clave-driven -- congas and timbales, montuno, tumbao, brass |
+| `public_domain` | Chicago house at 122 BPM, soulful and steady -- TR-707, rolling bass, warm piano chords |
+| `scifi_news_pro` | Detroit techno at 128 BPM, hypnotic machine funk -- TR-909, sub bass, detuned stabs |
+| `shakespeare` | Elizabethan consort music -- viols, recorders, lute |
+| `my_story` | **Yours.** Type it into the `music_style` widget on **OTR_StableAudioTheme**: "gamelan orchestra", "surf rock", "solo cello". Blank means the house radio orchestra. |
 
-**One file is still unaccounted for:** `gemma_3_12B_it_fp4_mixed.safetensors`,
-the fp4 Gemma 3 12B text encoder, which goes in `models/text_encoders/`. It is
-on the maintainer's disk and it came from somewhere; searching the Hub for that
-exact filename returns only an unrelated ablation. If you know the repository,
-an issue naming it would finish this table.
+`music_style` is honoured on `my_story` only. Every other bank keeps its idiom
+whatever is typed, because a Shakespeare episode scored as surf rock is not a
+feature.
 
-**Still genuinely unsourced, both of them:**
+### The look
 
-* **`mesh_stage`** -- a Hunyuan3D checkpoint, plus the portable Blender binary
-  it shells out to. No repository and no download URL anywhere.
-* **`wan22_high_fast`** (`fastwan_8gb`) -- its base weights come down with
-  `wan22_high_video`, but the rank-128 LoRA that makes it "fast" is named only
-  in two internal dated design notes, and the provisioner has no route for it.
+Nine visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
+production look), `anime`, `archival_documentary`, `cartoon`, `paper_origami`,
+`recur_frac`, `shakespeare_stage_realism`, `storybook_engraving` and `video_art`.
+Every style drives both the stills and the video.
 
-Everything else about these lanes is documented -- the node packs, the pinned
-commits, the destination folders -- so only the source line was ever missing.
+### The engines
 
-> **Python 3.13 and the Kokoro voice (ComfyUI Desktop and the portable build both
-> ship Python 3.13).** The torch `kokoro` package cannot be pip-installed on 3.13
-> (its newest releases declare `Requires-Python <3.13`), so since 2026-09-02 the
-> same Kokoro voices run there through **kokoro-onnx** on the CPU: `requirements.txt`
-> carries `kokoro>=0.7.16` for Python 3.12 and `kokoro-onnx>=0.6.1` for 3.13, one line
-> installs per interpreter, and the engine picks whichever is present (same engine
-> name, same 28 voices, about six times faster than realtime on a laptop CPU, no GPU
-> contention with the video). The 326 MB ONNX model is fetched once at boot into
-> `models/TTS/KokoroTTS/onnx/` when that backend will be used, never during a render.
-> **Registry installs older than 2.0.0-alpha.17 do not carry the kokoro-onnx line
-> yet:** on those, run `python -m pip install kokoro-onnx` with ComfyUI's own
-> interpreter once, or open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`,
-> `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` (bark installs
-> everywhere and downloads its own weights). A missing backend fails at the first
-> voice line with the exact pip line to run. Python 3.14 has no Kokoro backend
-> packaged yet; use bark there -- **except on a 16 GB Apple Silicon machine,
-> where bark is not a fallback at all.** Measured 2026-09-09: it drives the
-> process to an 18.0 GB phys_footprint on a 16 GB box and runs at 11.7x
-> realtime. On that machine stay on Python 3.12/3.13 and keep Kokoro. On
-> Python 3.12 nothing changes. Every voice engine and what it needs, generated from the code:
-> `docs/MACHINE_MATRIX.md`, section "Voice engines".
+The video, image, voice and music layers are each a registry of swappable
+engines, chosen per role from dropdowns. Whatever you pick is honoured exactly: a
+missing or out-of-memory engine **stops the render with a named error** rather
+than swapping in something you did not choose. There is no silent fallback.
 
-**You do not have to memorise this.** If a pack is missing, the render stops
-with a named error that now tells you which pack to install and where to get
-it — it does not fail silently or half-render. But it stops at render time,
-*after* the model weights have downloaded, which is why it is written here too.
+What the canonical ships, and why:
 
-**What the proven 8 GB episode path downloads on a clean machine: about 16
-GB.** The invoked video lane itself is
-only ~3.9 GB (SD1.5 1.99, `v3_sd15_mm` 1.56, the
-domain adapter 0.10, kokoro voices 0.30). The rest arrives through the
-Hugging Face cache the first time the pipeline runs — the writer
-(`gemma-4-E2B-it`, 6.0 GB measured on a clean install 2026-09-01), `musicgen-small`
-(~2.2 GB) and `Kokoro-82M` (~0.3 GB). The row also offers Klein as its image
-selection, but AnimateDiff accepts no init still, so provisioning does not
-download or gate the proven episode path on those extra 10,985,506,708 bytes.
-The exact optional Klein recipe is in `docs/RUNPOD_INSTALL.md` for people who
-want to qualify a still-consuming profile.
+- **Video:** three procedural, audio-reactive lanes -- `viz_mxc_cpu`, `viz_green`,
+  `viz_camera` -- one per role. They draw their own frames, download nothing, and
+  run on every machine including CPU. Real video diffusion (LTX, Wan, HuMo,
+  AnimateDiff, MiniMax H3) and the `still_*` family are all one dropdown away.
+- **Images:** `z_image_turbo`, sitting **dormant**. The three procedural video
+  lanes consume no still, so the image weights are never fetched on a default run.
+  Switch a video role to a still-consuming lane and they download then.
+- **Voices:** `kokoro` on both slots. It is the only one-click voice on every
+  platform, which is why it is the default. Six voice engines come with a Manager
+  install; the seventh, the IndexTTS2 voice cloner, ships in the GitHub tree only.
+- **Music:** `stable_audio_3`. Commercially clean and ungated. MusicGen remains
+  selectable and is noncommercial.
 
-### 2b-ii. The GGUF writer lane — install 0.3.33, not the latest
+### How it fits together
 
-> **Nothing selects this lane today, so you can skip this section.** Measured
-> 2026-09-12: the GGUF row table (`GGUF_ROWS` in `nodes/_otr_gguf_backend.py`)
-> is **empty**, so no `*-GGUF` writer appears in the picker at all. The install
-> notes below are kept because the lane is wired and the pin is a real
-> measurement; they are not a step anyone currently needs.
-
-It is the intended lane for running a large writer on a small card off NVIDIA,
-because bitsandbytes NF4 is CUDA-only. What the profiles actually ship, though,
-is transformers: `otr_amd16_rocm` and `otr_mac_mps` both write with
-`Qwen/Qwen3.5-4B` at `quant_policy "none"`, and `otr_amd8_rocm` with
-`unsloth/Llama-3.2-3B-Instruct` the same way. All three allowlist GGUF; none uses
-it. `cpu_floor` is the exception and the one to be careful with -- it is the only
-profile whose allowlist EXCLUDES transformers, so with the row table empty it has
-no local writer available at all. The `--machine amd` front door uses the smaller
-E2B transformers writer with `quant_policy=none`; that route stays a draft
-candidate until physical AMD hardware publishes an episode. No Ollama, no sidecar
-process, no extra port.
-
-```bash
-pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
-```
-
-**Pin the version. Do not take the latest.** `0.3.35` dies with
-`STATUS_ILLEGAL_INSTRUCTION` (`WinError -1073741795`) inside
-`llama_init_from_model`, before a single token. It reproduces at
-`n_gpu_layers=0`, so the fault is in the **CPU backend** and no GPU avoids it.
-`0.3.33` loads and generates on the same machine, and the two builds were
-confirmed byte-identical across two different machines by SHA-256. An unpinned
-`pip install llama-cpp-python` resolves to the broken one today.
-
-On Windows, CUDA wheels also need an importable CUDA 12 runtime:
-
-```bash
-pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12
-```
-
-These coexist safely with a CUDA 13 torch — measured on both Blackwell and Ada,
-loading llama.cpp first and then running a real CUDA matmul through torch.
-
-**Not on Windows?** The line above is the Windows CUDA recipe and the only one this
-project has measured. If you are wiring the lane up anyway, use upstream
-llama-cpp-python's own build flags for your backend
-(these are upstream's documented commands, not something this pack has proven yet;
-please report what worked):
-
-| platform | install |
-|---|---|
-| Linux, NVIDIA | try the same `--extra-index-url .../whl/cu124` wheel line as above first (unmeasured here on Linux) |
-| macOS, Apple Silicon | `CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python==0.3.33 --no-cache-dir` |
-| Linux, AMD ROCm | `CMAKE_ARGS="-DGGML_HIP=on" pip install llama-cpp-python==0.3.33 --no-cache-dir` (upstream's current flag name) |
-| CPU only | `pip install llama-cpp-python==0.3.33 --no-cache-dir` |
-
-The `0.3.33` pin is a Windows measurement. If it will not build on your platform,
-the newest release is the next thing to try.
-
-> **Test it the way OTR does.** A bare `import llama_cpp` fails even on a
-> *working* install, because OTR preloads the CUDA DLLs and extends the DLL
-> search path first. Use the pack's own path instead:
-> `from nodes._otr_gguf_backend import _import_llama_cpp; _import_llama_cpp()`
-
-### 3. Hugging Face token -- when you need one, and where to put it
-
-**You do not need a token to run OTR.** The shipped canonical workflow pins
-`Qwen/Qwen3.5-4B`, which is Apache-2.0 and ungated, so a normal first run downloads
-without any account. It is 8.68 GB on disk -- chosen because a default should be the
-row most likely to work on the machine of someone who has changed nothing.
-
-> **Read the resident figure with its quantisation attached, because the shipped
-> graph does not use the small one.** That row measures 2.99 GiB resident and
-> 14.47 tok/s on a physical 8 GB RTX 4060 **under NF4**. The canonical ships
-> `llm_quant_policy` -> `none`, which is what makes it portable -- bitsandbytes is
-> not installed on macOS -- and unquantized the same row wants roughly 8.7 GB. On a
-> 16 GB card or a 16 GB Mac that is fine. On an 8 GB card it is not: set
-> `llm_quant_policy` -> `bnb_nf4`, or load
-> `workflows/variants/otr_nvidia_8gb_haunted.json`, which carries a writer sized
-> for the card.
-The 8 GB haunted profile and everything it pulls are ungated too: verified by anonymous
-download of the real weight files, with no credential sent. Same for the voices and the
-music. You only need a token if you switch a dropdown to one of the gated rows at the
-end of this section.
-
-**Set one anyway.** Anonymous downloads are rate-limited, and a multi-gigabyte
-pull that gets throttled part-way is a failed install rather than a slow one.
-`huggingface_hub` says so itself on every anonymous fetch: *"You are sending
-unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher
-rate limits and faster downloads."* Get one at
-[huggingface.co/settings/tokens](https://huggingface.co/settings/tokens) --
-**read** scope is enough.
-
-#### Where to put it -- the safe ways, in order of preference
-
-**1. Log in once (recommended).** This writes the token to a file only your
-account can read, and nothing else ever has to know about it:
-
-```bash
-hf auth login
-```
-
-**2. Or create the token file yourself.** It is a plain text file containing
-**the raw token and nothing else** -- no quotes, no `HF_TOKEN=`, no JSON. Create
-it at:
+Audio is the source of truth. The script is written, cast and performed into one
+frozen 48 kHz master, and that master defines the timeline; video is rendered to
+fit it and muxed in last. The archival copy in `otr/episodes/` keeps that audio
+byte-identical; the published copy in `otr/obs/` re-encodes it to AAC for players.
 
 ```
-Windows   C:\Users\<you>\.cache\huggingface\token
-macOS     ~/.cache/huggingface/token
-Linux     ~/.cache/huggingface/token
+source bank -> LedgerScriptWriter -> LedgerFreezeCascade -> CastLock
+    -> character voices + announcer + theme  -> SceneSequencer -> AudioEnhance
+    -> EpisodeAssembler                                    ==> 48 kHz MASTER (frozen)
+    -> VideoDirector / ShotLock -> image prompts -> VideoRenderBatch
+    -> SilentComposite -> CaptionBurn -> CreditsRoll -> MasterAudioMux
+                                                       ==> final .mp4 in otr/obs/
 ```
 
-and the entire contents are one line:
-
-```
-hf_your_token_here
-```
-
-That is the whole file (your real token is longer; the example is kept short on
-purpose, because the registry's publish gate is a secret scanner and a
-token-shaped placeholder trips it). OTR reads this location *and* the one your `HF_HOME`
-points at, so it works whether you logged in before or after installing OTR.
-
-**3. Or an environment variable**, if you prefer or you are running headless:
-`HF_TOKEN=hf_xxxx`. OTR reads it from the process environment first, then -- on
-Windows only -- from `HKCU\Environment`. That registry fallback exists because
-**ComfyUI Desktop does not inherit user-scope environment variables**, so a token
-you set in the System Properties dialog is invisible to it until you either bake
-it in or reboot.
-
-Windows (PowerShell) -- sets it user-wide, where ComfyUI Desktop will find it:
-
-```powershell
-[Environment]::SetEnvironmentVariable("HF_TOKEN", "hf_your_token_here", "User")
-```
-
-macOS / Linux -- add to `~/.bashrc` or `~/.zshrc`:
-
-```bash
-export HF_TOKEN=hf_your_token_here
-```
-
-Restart ComfyUI afterwards.
-
-#### What NOT to do, and why it matters
-
-**Never paste a token into a node widget** -- not into OTR's, not into any other
-pack's, no matter what a Note node beside it says. A widget value is written
-into `widgets_values` in the workflow JSON, which means it travels with:
-
-* every workflow file you save, share, or attach to a bug report
-* the prompt in ComfyUI's queue and `/history`
-* **the PNG metadata of every image you generate** (that embedded workflow is
-  exactly what lets you drag a PNG back onto the canvas to restore it)
-* any traceback or support bundle that prints the node's inputs
-
-"Just don't save the workflow" is an instruction, not a control, and most of
-those paths are not a save. **OTR has no token widget anywhere and never will.**
-
-**Do not put it in a `.env` file at the ComfyUI root.** Vanilla ComfyUI does not
-read one -- there is no dotenv loader in `main.py` and `python-dotenv` is not
-even a ComfyUI dependency. It will be silently ignored.
-
-**Be careful with ComfyUI Desktop's environment-variable editor.** It can set
-`HF_TOKEN`, but Desktop itself warns those values are stored **unencrypted**.
-Prefer the login file above.
-
-#### Gated rows -- the only reason you would need the token
-
-**Gated -- you must accept the terms on the model page first, then supply a token:**
-
-| Model / weights | What it is | Accept terms at |
-|---|---|---|
-| `google/gemma-2-2b-it` | an optional writer LLM | https://huggingface.co/google/gemma-2-2b-it |
-| `Lightricks/LTX-2.5` | the LTX 2.5 **video** weights | https://huggingface.co/Lightricks/LTX-2.5 |
-
-**Ungated -- nothing required:** `google/gemma-4-12b-it`,
-`mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`, `google/gemma-4-E4B-it`,
-`Lightricks/LTX-Video` (the older 0.9.x line), and the `Comfy-Org` Wan repackages.
-
-> **Note:** Gemma **4** is Apache-2.0 and ungated, unlike Gemma **2** and Gemma **3**. Only
-> `gemma-2-2b-it` still requires a terms click (verified against the Hugging Face API, which
-> reports `"gated": "manual"` for that repo and `"gated": false` for every other curated row).
-
-> **The LTX 2.5 gate bites late, and that is why it is listed here** (added 2026-08-29 after
-> it stopped a clean-machine install). Nothing in a default first run touches it -- the
-> canonical workflow selects the three procgen visualizer lanes, which need no weights at
-> all -- so you meet it only when you select an `ltx25_*` row in `OTR_VideoDirector`. Its
-> repo reports `"gated": "auto"`: approval is automatic, but the terms click and a token are
-> both still required, and an unauthenticated fetch returns **HTTP 401** rather than
-> anything that reads like a licence problem. If an `ltx25_*` lane fails to download its
-> weights, this is why.
-
-Accepting the terms is a **manual, one-time click** while signed in to Hugging Face -- a
-token alone is not enough, and the download fails until you have done both. If a gated
-model still fails after both, the console error names the exact repo and the two steps
-it is missing.
-
-### 4. Install the models
-
-The per-machine rows in "Pick the graph" are dropdown changes to the one
-canonical graph, not separate saved JSONs. They are not substitutes for the
-exact canonical test reported here.
-
-The canonical JSON (`otr_canonical`) selects the three **procgen visualizer
-lanes** -- `viz_mxc_cpu`, `viz_green`, `viz_camera` -- for the three video
-roles, **Z-Image-Turbo** for all three image roles, **Kokoro** for both voice
-slots, and **Stable Audio 3**. It does not select `still_flat`. The local
-writer is `Qwen/Qwen3.5-4B` in both writer slots.
-
-The video default is deliberate: the visualizer lanes need **no weights at
-all**, so the shipped graph renders on a clean install with nothing downloaded
-beyond the writer, the voices and the music. LTX 0.9.8 (`ltx098_low_video`) is
-a selectable upgrade that adds about 15 GB of weights, not the default. (This
-paragraph said LTX was the default for all three roles; node 87 of the
-canonical says otherwise, and so do the other two places that repeated it.)
-
-The music engine moved from MusicGen to Stable Audio 3 in `2.0.0-alpha.28`.
-MusicGen is **CC-BY-NC**, so every episode the shipped template produced carried
-a non-commercial music bed unless the operator knew to change the dropdown.
-Stable Audio 3 is commercially clean and ungated, adds 3.5 GiB to the first
-run, and was the node's own declared default all along -- only the saved graph
-still pinned MusicGen. MusicGen remains selectable in the dropdown.
-
-**The alpha.24 mouse-only fresh-install path is not qualified.** A physical RTX
-4060 one-act diagnostic completed writing and audio, then failed after about
-four hours because the Z-Image diffusion model was unresolved. Its graph validator
-checked structure, not visual-model availability. The installed package has no
-integrated canonical visual-weight provisioning step, and excludes the CLI
-provisioning/fetch scripts advertised later in this README. Do not treat those
-development-checkout commands as an available registry-install GUI step.
-
-Kokoro and MusicGen fetched through their application paths in that diagnostic;
-this did not establish Z-Image or LTX readiness. A procedural intermediate MP4 is
-not the final AI-visual episode. See the [4060 portability report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
-for the exact result, evidence, prerequisites gap, and qualification limits.
-
-**IndexTTS2 is an OPT-IN upgrade, not a first-run requirement.** It is a voice-cloning
-engine that reads a reference WAV, and the shipped graph does not select it -- you only
-need it if you open **OTR_CastLock** and set `char_voice_engine` to `indextts2` yourself. It runs in its
-own separate Python (3.10 + torch 2.8), so choosing it means first running its one-time
-installer from a terminal in the pack folder
-(`powershell -ExecutionPolicy Bypass -File scripts\_otr_indextts2_install.ps1`, which
-builds that environment and downloads its own multi-gigabyte model; it is a PowerShell
-script, and on a 16 GB Mac the engine is OOM RISK in `docs/MAC_COMPLIANCE_MATRIX.md`).
-Select it without
-installing it and the render writes the script, then stops with
-`IndexTTS2 Path B not installed`. Other local video checkpoints — HuMo,
-Wan, AnimateDiff, MiniMax H3 — are **optional alternatives** you dial in later via the
-`OTR_VideoDirector` dropdowns; see [Which video models fit your card](#which-video-models-fit-your-card)
-before downloading any of them. If a model is missing, the engine fails **loudly** and stops —
-it never silently substitutes another model or quietly produces garbage. There is no automatic
-fallback: the procedural CRT path is a route you **select**, not a net that catches a
-failed engine. The shipped canonical requires **no video weights** -- its three visualizer
-lanes are procedural. Switch a video role to `ltx098_low_video (16:9)` and you add the
-LTX checkpoint and its T5 encoder (about 15 GB); switch an image role away from the
-default and you add that engine's weights. Watch the console on the first run; it names
-any missing weight and where it expects it.
-
-### 5. Run it
-
-**Pick the graph that matches your card.** Saved GUI graphs and `--machine`
-recipes use the same canonical workflow, but provisioning installs assets only;
-it does not silently rewrite the graph currently open in ComfyUI.
-
-| you have | load this | what it renders |
-|---|---|---|
-| 8 GB card, ready for real video | **easiest: drag `workflows/variants/otr_nvidia_8gb_haunted.json` onto the canvas** -- it already has every setting below. To do it by hand instead: `otr_canonical`, then in **OTR_VideoDirector** set the three video roles to `animatediff15_v3_haunted_video (16:9)`, and in **OTR_LedgerScriptWriter** set both writer dropdowns to `google/gemma-4-E2B-it` | AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. **Change the writer, not just the video roles.** The canonical ships `Qwen/Qwen3.5-4B` with `llm_quant_policy` -> `none`, which is a 16 GB pairing: unquantized it wants roughly 8.7 GB and an 8 GB card has about 7 GB to give. `gemma-4-E2B-it` is what the shipped 8 GB profiles pair with that same setting. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b), and its motion module publishes no licence grant -- personal use only. This is **not** the `--machine 8gb` tuple, which also moves the image and music dropdowns |
-| 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
-| GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, the three procgen visualizer lanes (`viz_mxc_cpu` / `viz_green` / `viz_camera`) for the video roles -- NOT LTX, which is a selectable upgrade -- Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
-| AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical` needs no edit at all, or drag `workflows/variants/otr_amd8_rocm.json` / `otr_amd16_rocm.json` for the tuned pick | images only: Z-Image-Turbo stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns. **Needs a ROCm torch and nothing else** -- both AMD profiles were moved off Klein 4B in `b1f372a9` precisely so no third-party node pack is required. Fully local. The device dropdowns need no edit either: ROCm torch reports itself as `cuda` and the shipped `default` asks ComfyUI what the host has. Do **not** bother setting `device_policy` -- nothing reads it (see the device-widget table below) |
-| Apple Silicon Mac (PROVEN on a Mac mini M4 / 16 GB; nine episodes published 2026-09-07 to -10) | `otr_canonical` as shipped, unchanged | **As shipped it downloads no image or video weights at all** -- the three default video roles are the procgen visualizers, which mint no still: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices, Stable Audio 3 music. That is the zero-weight lane, not the ceiling -- local stills (`sd15`) and local video diffusion (`ltx098_low_video`, `animatediff15_lightning_video`) have both published real episodes on this machine. What is proven, what will reboot the machine, and what to install: [Running on a Mac](#running-on-a-mac-apple-silicon) -- read it before you queue anything heavier, because an out-of-memory on unified memory reboots the machine. One machine is one data point, not a tier |
-
-1. Load the graph from the table. (The console prints the Browse Templates path on every
-   start, right under the `[OldTimeRadio]` load banner.)
-2. For the exact matrix row without hand-editing dropdowns, leave ComfyUI
-   running and execute this command, replacing only the exact machine key:
-
-   ```powershell
-   # Desktop/source example. Portable users point this at python_embeded\python.exe.
-   $ComfyPython = 'C:\path\to\ComfyUI\.venv\Scripts\python.exe'
-   & $ComfyPython scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0
-   ```
-
-   This loads `workflows/otr_canonical.json` and applies every matrix value
-   before Queue. Change the URL only if your running ComfyUI uses another port.
-   Use the interpreter that launches ComfyUI, never an arbitrary system
-   Python; a standard portable install uses
-   `ComfyUI_windows_portable\python_embeded\python.exe`.
-   Machine rows select Kokoro, which runs on Python 3.12 (torch) and 3.13
-   (kokoro-onnx, CPU). Only Python 3.14 has no Kokoro backend packaged yet: there,
-   replace `--machine 8gb` with `--profile otr_4060_floor` for the Bark route
-   (the selectors cannot be combined).
-3. For a saved GUI graph, hit **Queue Prompt**.
-4. Walk away. Script, voices, music, mastering, and video all run automatically. The shipped
-   graph rolls a random story bank each run and renders through the procgen visualizer lanes
-   — the fast, guaranteed-to-complete path. Swap dropdowns once you're ready for a specific bank
-   or a GPU video engine.
-5. Find the finished episode in **`output/otr/obs/`**.
+Renders are deterministic for a given request hash, and every episode carries a
+ledger (`episode_canon.json`) recording what actually ran.
 
 ---
 
-## What each dropdown costs you to download, and what will run it
+## Changing what renders it
 
-**You never need all the weights in this workflow.** One graph ships; the
-dropdowns decide what it loads, and therefore what you have to fetch. The table
-below is per DROPDOWN CHOICE, so you can price a feature -- and check your
-machine against it -- before you pick it.
+The engine dropdowns live on **OTR_VideoDirector** (video and image roles),
+**OTR_CastLock** (the two voice slots) and **OTR_StableAudioTheme** (music). The
+writer dropdowns are on **OTR_LedgerScriptWriter**.
 
-The whole table is generated from the code (`scripts/otr_dropdown_matrix.py`):
-whether a machine is offered an engine comes from that engine's own capability
-row, and the sizes come from the real fetch manifests. `docs/DROPDOWN_MATRIX.md`
-is the same table with two more machine columns (AMD ROCm and CPU-only).
+You never need all the weights in this workflow. One graph ships; the dropdowns
+decide what it loads, and therefore what you have to download. The table below
+prices each choice and says whether it runs on the three machines most people
+have. It is generated from the code -- whether a machine is offered an engine
+comes from that engine's own declaration, and sizes come from the real fetch
+manifests -- so it cannot drift from what the pack does. The same table with AMD
+and CPU-only columns, and a legend for every word in it, is
+[apple/MACHINES.md](apple/MACHINES.md) section 2.
 
 <!-- BEGIN GENERATED: dropdown-matrix -->
 
@@ -817,254 +389,54 @@ reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
 
-**My Story on the 5080:** four Qwen3.5-4B/NF4 attempts produced three writing
-failures and one source-defective publication; three Nemo/NF4 attempts published
-with source omissions. Of two Gemma4-12B/NF4 attempts, one failed before media and
-one published with all supplied facts in saved dialogue. The latter ran both
-Gemma slots, Z-Image-Turbo stills, still_pan video, IndexTTS2 character voices,
-Kokoro announcer and Stable Audio3 music on the 5080 Laptop GPU. This is measured
-publication/metadata evidence, not an audio audition or a cross-platform promise.
-Nine attempts, five publications, one saved-dialogue fidelity pass; full-media
-qualification remains open. See [the latest receipt](docs/2026-09-11-my-story-5080-qualification/pairlock_09_receipt.md)
-and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
+Two things to know before you change a dropdown:
 
-### The cheapest complete setups
+- **The image trap.** With the procedural video lanes the `z_image_turbo` default
+  costs nothing. Pick a `still_*` or `ltx098_low_video` lane and it wakes up: a
+  19 GB download, and on a 16 GB Mac an out-of-memory. If you did not mean to
+  spend that, set the three image dropdowns to `sd15` (2 GB, same job) at the
+  same time. Both fetch themselves; the only thing that changes is which one
+  you spend.
+- **The writer is the biggest single download** and, on a Mac, the biggest single
+  memory user. `Qwen/Qwen3.5-4B` is the default because it is ungated,
+  Apache-2.0, and the smallest row that runs everywhere. The writer column in the
+  table says which others fit your machine, and the pack refuses before
+  downloading if you pick one that will not.
 
-Nothing here is gated, and nothing here needs an account, a token or a licence
-click. The first two rows are pick-and-run:
+---
 
-| | dropdowns | total download | effort |
-|---|---|---|---|
-| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~12 GB** | pick and run -- 8.7 GB of that is the writer, which every setup needs |
-| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** | pick and run |
-| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** | one 67 MB file by hand |
+## A graph pre-set for your machine
 
-**How the downloading happens, because it is not one mechanism.** Some engines
-are fetched by their own library through the Hugging Face cache -- that is
-`kokoro` and the writer models. The rest are fetched by a node inside the graph:
-`OTR_WorkflowValidator` looks at the dropdowns you actually selected and pulls
-only what those need, before the writer runs. `sd15` joined that list on
-2026-09-12, which is what turned the middle row from a manual step into a
-pick-and-run, and it matters more than its own row suggests -- `ltx098_low_video`
-is image-to-video, so it consumes an `sd15` still and could never be one click
-while that checkpoint was a hand fetch.
+`otr_canonical` names no vendor anywhere and resolves your device at run time,
+so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
+skip the dropdowns, the pack also ships **94 generated per-machine graphs in
+`workflows/variants/`**, one per profile. Browse Templates lists only the
+canonical -- its scanner looks one directory deep -- so these are files you
+**drag onto the canvas** or open with Workflow → Open. Never hand-edit one; they
+are regenerated from the canonical.
 
-`spandrel_esrgan` is the one left. It is a 67 MB upscale model that belongs in
-`models/upscale_models/`, its adapter stops with the download URL rather than
-fetching, and it is listed here so you know before you pick it rather than after.
-
-The `viz_*` lanes are audio-reactive and declare `accepts_still = False`, so they
-mint no still and never invoke an image engine -- which is why the smallest setup
-needs no image weights at all.
-
-### One trap worth knowing before you change a dropdown
-
-The image dropdowns ship defaulted to `z_image_turbo` (19.3 GB). With the default
-`viz_*` video lanes that engine is never invoked, so it costs nothing. **Pick a
-`still_*` or `ltx098_low_video` video lane and it becomes live**, because those
-declare `accepts_still = True` -- one dropdown change silently pulls 19.3 GB, and
-on a 16 GB machine it then dies in the KSampler needing ~20.4 GiB. Set the three
-image dropdowns to `sd15` (2.0 GB, same job) at the same time. Both fetch
-themselves; the only thing that changes is which of the two you spend.
-
-## Running on a Mac (Apple Silicon)
-
-**The shipped canonical renders end to end on Apple Silicon and publishes to
-`otr/obs/`.** Proven on one machine -- a Mac mini M4 with 16 GB unified memory
-(macOS 26.6.2, ComfyUI Desktop 0.34.6, Python 3.13, torch 2.12.1) -- with episodes
-published on 2026-09-07, -08 and -09. One 16 GB Mac is one data point, not a tier:
-nothing above 16 GB has been measured, which is why the Mac profile (`otr_mac_mps`)
-is not promoted to a `--machine` key.
-
-This section routes. The measurements live in four documents:
-
-| read | for |
-|---|---|
-| [`docs/MAC_PORTABILITY_GUIDE.md`](docs/MAC_PORTABILITY_GUIDE.md) | the long-form guide -- what works, the setup traps, the measured cost of each lane, and the symptom table in its section 4 |
-| [`docs/MAC_COMPLIANCE_MATRIX.md`](docs/MAC_COMPLIANCE_MATRIX.md) | all 61 registered engines classified PROVEN / LIKELY / OOM RISK @16GB / WILL NOT RUN, with the reason per row and the dropdown-label mapping |
-| [`docs/MAC_LESSONS_LEARNED.md`](docs/MAC_LESSONS_LEARNED.md) | the first-contact defects and the numbers behind the guide |
-| [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) | the production record; `PBUG-20260909-01` is the reboot described next |
-
-### Read this before you select any engine: an out-of-memory here reboots the machine
-
-On a discrete GPU, running out of VRAM raises an exception and you read a
-traceback. On Apple Silicon there is no separate VRAM to spill into: the OS kills
-processes, and in practice **the whole machine goes down with no traceback** --
-the log simply stops. It has happened here twice: loading `wan_ti2v` with an fp16
-UNET (2026-09-08), and an AnimateDiff beat that asked for 160 latents at 512x288
-(PBUG-20260909-01; the ceiling on this box sits between 136 and 160). So do not
-size a model by trying it. Read the matrix's OOM RISK rows first, and know what
-the guard covers: the pack's unified-memory weight floor refuses an oversized lane
-only for the lanes it can read (`ltx_8gb`, `wan_ti2v`, `fastwan_8gb`, the `humo*`
-family, `mesh_stage`) and no image engine at all -- guide section 2, "What protects
-you, and what does not".
-
-Three things that cost a machine or an hour:
-
-* **Keep `llm_quant_policy` at `none`.** NF4 runs at 0.3-0.5 tok/s on Metal
-  (14.47 on CUDA); the 40 s `NewsCurationDeep` budget expires first and the run
-  dies with a confusing `_LLMTimeoutWorkflowPause`.
-* **Set all three image dropdowns to `sd15` before you queue a lane that consumes
-  a still.** The canonical still says `z_image_turbo` there -- inert while the
-  video roles are visualizer lanes, but the moment a `still_*` or LTX lane needs a
-  picture, the validator fetches ~20 GB of Z-Image weights that then die in the
-  KSampler needing ~20.4 GiB.
-* **The writer alone peaks near 14 GB on a 16 GB machine.** Close other
-  applications first, and do not run the test suite while a render is running.
-
-### What is proven on the M4 / 16 GB
-
-| what | how to select it | cost and caveat | guide |
-|---|---|---|---|
-| the press-Run path | `otr_canonical` as shipped: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices (kokoro-onnx on the CPU under Python 3.13), Stable Audio 3, `viz_mxc_cpu` / `viz_green` / `viz_camera`. The device dropdowns ship as `default` and resolve to Metal here -- you do not set them | no image or video weights, no API key. The first receipt was a 135 s 1080p25 episode | 1 |
-| local stills: `sd15` | all three image dropdowns -> `sd15` | 1.99 GB, ungated, and it fetches itself since 2026-09-12; the long side is clamped to 768 on purpose (SD 1.5 duplicates subjects past that). Inert until a video lane consumes a still | 5 |
-| the four `still_*` lanes | a video role -> `still_motion` / `still_pan` / `still_flat` / `still_word`, with `sd15` supplying the still | about 22 minutes for a whole episode on `still_motion` | 9 |
-| local video diffusion: `ltx098_low_video` (`ltx_8gb`) | a video role -> `ltx098_low_video (16:9)` plus `sd15` on the image roles; no third-party node pack | its two weights auto-fetch (5.91 GB + 9.12 GB); one LTX lane 39:17, all three 1:07:27 with ~14 GB swapped -- the ceiling, not a comfortable setting | 7 |
-| `animatediff15_lightning_video` (EXPERIMENTAL) | a video role -> that lane; needs ComfyUI-AnimateDiff-Evolved at the pinned commit, the SD 1.5 checkpoint plus the Lightning 8-step motion module and the ft-mse VAE placed by hand, and the `extra_model_paths` addendum below | one 23-beat episode (2,736 frames, 2:32:34 wall clock) published 2026-09-09. The adaptive-hold guard written for PBUG-20260909-01 is unit-tested and has not yet fired under live fire | 8, 10.7 |
-| `musicgen` | the music dropdown | measured on Metal (mps 14.1 s vs cpu 14.7 s for 256 tokens); CC-BY-NC, which is why it is not the default. No episode has used it here | matrix |
-| `flux2_klein` stills (GGUF) | three manual files (10.99 GB) plus ComfyUI-GGUF | minted a clean still at about 8 minutes each, on swap (20 GB `phys_footprint` on a 16 GB box). `sd15` is the practical choice | 10 |
-
-### What will not run, and what will reboot
-
-* **WILL NOT RUN on any Mac (5):** `ideogram4_local`; `h3_low_video` /
-  `h3_low_audio_in` (MiniMax H3 -- an fp4 text encoder and int8 matmul that Metal
-  does not execute); `ltx23_low_audio_in` (a hard NVML gate in its preflight);
-  `wan22_high_fast` (`fastwan_8gb`).
-* **OOM RISK @16GB (14):** `z_image_turbo`; `wan22_high_video` (`wan_ti2v`,
-  measured fatal); both `animatediff15_v3_*` lanes (no adaptive hold); `humo`,
-  `humo_1.7B` and `humo_14B_169` (the `humo14_*` and `humo17_*_portrait` rows);
-  the three `ltx25_*` lanes; `ltx23_high_video`; `flux_gen1`; `indextts2`; and
-  **`bark`**, which was superseded into this list on 2026-09-09 and is the one
-  most likely to catch you out -- its live tensors are only 4.18 GB, but it
-  drives an 18.0 GB `phys_footprint` at 11.7x realtime and strands 10.85 GB that
-  a second `torch.mps.empty_cache()` will not give back (PBUG-20260909-03). A
-  small number on the model card is not the number that reboots the machine. The
-  reason per row is in the matrix.
-* **Wan renders wrong on this macOS/torch generation even when it fits** (guide
-  section 11): an open ComfyUI issue reproduces temporal corruption with GGUF Q8
-  and fp16 alike.
-
-### What to install
-
-| need | how | when |
+| Your machine | Open | Also install |
 |---|---|---|
-| `ffmpeg` **and** `ffprobe` | `brew install ffmpeg`, or `ffdl install` after `pip install -r requirements.txt` (`ffmpeg-downloader` ships the fetcher, not the binaries; `imageio-ffmpeg` supplies ffmpeg only) | always -- every episode is mixed and muxed through them, and a missing one fails at the mp4 encode, hours in |
-| `tokenizers>=0.23.1,<0.24` | `pip install 'tokenizers>=0.23.1,<0.24'` with ComfyUI's own interpreter | only if you installed `2.0.0-alpha.24` through `.28`, which will not boot; `.29` or later is fine. Do not reinstall from Manager -- it serves the broken version |
-| the `sd15` checkpoint (1.99 GB) | **nothing -- it fetches itself since 2026-09-12**, pulled by `OTR_WorkflowValidator` at queue time when a lane you picked needs a still | for any `still_*` lane and for `ltx098_low_video` |
-| `cairo` | `brew install cairo pkg-config && pip install pycairo` | only for `viz_mxc_mandala`; `viz_green` needs nothing |
-| `git-lfs` | `brew install git-lfs && git lfs install` | before `scripts/otr_provision.py --packs-only`, which otherwise fails on ComfyUI-LTXVideo's checkout and leaves an unpinned clone behind (guide 10.2). The provisioner requires that pack unconditionally; on ComfyUI 0.34.6 no LTX lane resolves a class from it |
-| ComfyUI-AnimateDiff-Evolved plus its weights | `OTR_COMFY_ROOT=<ComfyUI> <ComfyUI Python> scripts/otr_provision.py --packs-only`, the weights by hand (guide sections 3 and 8), and `config/otr_mac_extra_model_paths.yaml` passed as a second `--extra-model-paths-config`, because Comfy Desktop's generated mapping has no `animatediff_models` category | only for the AnimateDiff lanes |
+| Anything, to start | `otr_canonical` from Browse Templates | nothing |
+| 8 GB NVIDIA (RTX 4060 / 3070 / 2080 class) | `workflows/variants/otr_nvidia_8gb_haunted.json` | ComfyUI-AnimateDiff-Evolved, ComfyUI-GGUF, and three AnimateDiff weights placed by hand |
+| 16 GB+ NVIDIA (RTX 5080 / 4080 / 3090 class) | `otr_canonical` | nothing |
+| Apple Silicon, 16 GB | `workflows/variants/otr_mac_mps.json` | nothing |
+| AMD on Linux, or CPU only | `otr_canonical` -- the per-machine graphs are drafts | nothing |
 
-Running headless (`python main.py` rather than the Desktop app)? Pass the Desktop
-mapping file too (`~/Library/Application Support/Comfy Desktop/instance-model-paths/inst-*.yaml`),
-or `ckpt_name` validates against an empty list and every prompt is rejected; and
-put every `OTR_*` knob in the server's environment, not your shell's (guide 10.5).
+The 8 GB row is the one with a real history: a physical RTX 4060 with 8 GB
+has published 7 documented full OTR episodes through it, across all five rolling
+source banks. Its writer is `google/gemma-4-E2B-it`, because the canonical's Qwen
+at `llm_quant_policy` → `none` wants roughly 8.7 GB and an 8 GB card has about 7
+to give; if you set the canonical up by hand for such a card, change the writer,
+not just the video roles. Its music is MusicGen, which is noncommercial -- switch
+the music dropdown to `stable_audio_3` if that matters to you.
 
-### What is not a Mac problem
+**On a Mac, read [apple/MAC.md](apple/MAC.md) before picking anything heavier
+than the defaults.** An out-of-memory on unified memory can reboot the machine,
+not the render, which is why the Mac column is conservative.
 
-Every cloud lane (`cloud_*`, `google_*`, `ideo`, `elevenlabs`, `sonilo`,
-`word_razzle`) needs a key or a logged-in ComfyUI Desktop session -- testing one
-measures a credential, not Metal. The local half of the cloud video path (the
-ffmpeg gate, the 1080p conform, the provider-audio strip) is proven on this Mac;
-the POST itself is untested here because Comfy Cloud auth comes from a Desktop
-session and every Mac render ran headless. And `[StoryOrchestrator] CUDA warmup
-complete` prints on a machine with no CUDA -- cosmetic, not a code path.
-
----
-
-## Requirements
-
-- **GPU:** an NVIDIA card is recommended for the local video engines. The shipped canonical
-  workflow renders through the procgen VISUALIZER lanes by default (`viz_mxc_cpu` /
-  `viz_green` / `viz_camera` — audio-reactive, no scene still, no GPU video model
-  required; it does not select `still_flat`); heavier local/cloud routing is opt-in via the `OTR_VideoDirector` dropdowns or
-  explicit profile overrides. Episode length is set by act count, not a word target.
-- **OS:** Windows or Linux for the proven NVIDIA paths (RTX 4060 8 GB and RTX 5080 16 GB
-  have both published episodes); AMD ROCm needs Linux. macOS (Apple Silicon) ships as
-  `otr_mac_mps`, verified on a Mac mini M4 / 16 GB -- fully local, no API key, with
-  `sd15` stills and `ltx_8gb` video diffusion both measured on Metal. Read
-  [Running on a Mac](#running-on-a-mac-apple-silicon) before you start; 16 GB is the
-  floor and it is tight, and an out-of-memory there reboots the machine.
-- **Python:** 3.10 through 3.13 (`pyproject.toml` requires >=3.10). ComfyUI Desktop and the portable build ship 3.13, where the
-  Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
-  backend yet (bark replaces it with three dropdown changes).
-- **Other setups:** ONE authored graph. `workflows/otr_canonical.json` is the
-  source of truth and the only file anyone edits. The 94 files in
-  `workflows/variants/` are GENERATED from it -- one per profile in
-  `config/profiles/`, produced by `python scripts/build_variants.py --all` and
-  verified by `--check`; a hand-authored file there crashes that check. They
-  ship in the registry bundle, but ComfyUI's template browser globs one
-  directory level (`*/workflows/*.json`), so only the canonical is listed in the
-  menu. To use one, drag its JSON onto the canvas or open it from Workflow ->
-  Open. A hand-maintained second graph for Apple Silicon existed briefly and was
-  deleted once it was measured: it differed from the canonical by **zero** nodes,
-  **zero** links and exactly **five widget values**. That is the argument against
-  a hand-kept second file, and it is not an argument against the generated ones,
-  which cost nothing to keep in step because nobody keeps them.
-
-  **The five settings that made it an Apple Silicon graph**, so you can
-  reproduce it in the canonical:
-
-  | node | widget | set it to |
-  |---|---|---|
-  | `OTR_LedgerScriptWriter` | creative model | `google/gemma-4-E2B-it` |
-  | `OTR_LedgerScriptWriter` | technical model | `google/gemma-4-E2B-it` |
-  | `OTR_VideoDirector` | announcer video | `animatediff15_lightning_video (16:9)` |
-  | `OTR_VideoDirector` | music video | `animatediff15_lightning_video (16:9)` |
-  | `OTR_VideoDirector` | character video | `animatediff15_lightning_video (16:9)` |
-
-  **The device widgets: three of the four do something.** Traced through the
-  render path, because a JSON that sets the wrong one looks configured and is
-  not. **As shipped you should not need to touch any of them** -- three read
-  `default` and the fourth reads `cpu`, and `default` is ComfyUI's own word for
-  "ask this host", so the canonical adapts instead of naming a vendor:
-
-  | widget | node | what it actually does |
-  |---|---|---|
-  | `llm_device` | `OTR_LedgerScriptWriter` | **load-bearing, and the one that used to break a machine silently.** It is resolved to a concrete device before the frozen `LLMRuntimePolicy` is built, so the policy and the ledger both carry what really ran rather than the word `default`. Ships `default`. |
-  | `voice_device` | `OTR_CastLock` | **load-bearing, and it drives TWO stages.** It resolves what you picked to a CONCRETE device, stamps that into `meta.voice_device`, and that becomes `requested_device` for the voice adapters AND the music adapter. Since 2026-09-12 it ships `default`, which asks ComfyUI what the host has -- so you do not set it per machine any more, and the ledger still records the device that actually ran. Naming one explicitly still works and is never second-guessed. |
-  | `upscale_device` | `OTR_SilentComposite` | **load-bearing.** `cuda` on a Mac is a named refusal at the upscale stage. Ships `cpu`, which is correct on every machine; a 67 MB upscale model does not need the card. |
-  | `device_policy` | `OTR_VideoDirector` | **decorative -- nothing reads it.** It is built into the render policy and never consumed by any video or image adapter. Setting it to `mps` buys you nothing; the video lanes pick their own device. |
-
-  `dtype_policy` is unread the same way, and so is the whole `host_caps` object
-  every adapter accepts and ignores. That is not a bug to fix here -- it is what
-  makes the shipping model work. `scripts/otr_api.py` puts it plainly, after the
-  capability cross-check was deleted on 2026-08-31: *"the dropdown decides, the
-  workflow runs it -- the matrix is the RECORD, never the controller."*
-
-  The writer matters as much as the video lane, and the reason is worth
-  understanding rather than memorising. `Qwen/Qwen3.5-4B` is the shipped default
-  BECAUSE it is the low-friction one -- ungated, Apache-2.0, 8.68 GB to
-  download, and measured at **2.99 GiB resident, 14.47 tok/s** on a physical
-  8 GB RTX 4060, the fastest and smallest row in the catalog. It is the right
-  answer on NVIDIA and nothing here changes that.
-
-  That 2.99 GiB is **under NF4**. `bitsandbytes` is excluded on macOS by
-  declared intent, so on Apple Silicon the same row loads full bf16 and measures
-  **~14 GB** -- 4.7x the memory for the identical download, purely because of
-  the platform. Its entry is therefore tagged `mac16-tight`.
-
-  **`tight` is not `avoid`, and there is no smaller writer to run to.** All
-  SEVEN episodes ever published on the 16 GB M4 used this one -- five video
-  lanes, four source banks, five visual styles -- and it is the only writer with
-  a Mac receipt at all. Against that: one hard reboot, at the writer-to-video
-  handover, with a test suite competing for RAM.
-
-  **Do not swap it for `gemma-4-E2B-it` on the download size.** That looks like
-  the smaller model (6.0 GB against 8.7) and MEASURES LARGER on Metal: ~10 GB at
-  bf16 against Qwen's ~9, like for like. Its small catalog figure is an NF4
-  number, and there is no Metal NF4 kernel, so nothing on this platform ever
-  gets it -- `bitsandbytes` is excluded on macOS by declared intent. The repo's
-  own conclusion, measured: **Qwen3.5-4B at quant `none` IS the smallest viable
-  Mac config, which is why the canonical ships exactly that.** So `tight` means
-  close other applications, not change writer.
-- **RAM:** 32 GB of system memory is the comfortable floor for the video lanes; the 8 GB
-  card streams model weights from host RAM. The measured host-RAM peaks so far are on the
-  5080 (the H3 clamped run at 27.56 GiB, the HuMo 14B lane at 27.53 GiB); LTX 2.5 on the
-  4060 has not had its host-RAM peak measured yet.
-- **Disk:** the model set is large (tens of GB). Episodes are a few dozen MB each.
-
----
+The rows below are generated from the machine classes the pack ships, and say
+what each class runs for writer, video, voice, music and image.
 
 <!-- BEGIN GENERATED: machine-matrix -->
 
@@ -1092,635 +464,239 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 <!-- END GENERATED: machine-matrix -->
 
-## Which video models fit your card
+The `scripts/otr_provision.py` commands that table prints need the **git clone**:
+`scripts/` is not in a Manager install. The saved graphs in `workflows/variants/`
+need nothing but a drag, and the weights a graph selects download at queue time
+whenever the pack can fetch them itself.
 
-**For the full picture -- writer, video, voice, music and image per machine, with what is PROVEN versus merely shipping -- see [docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md).** Its machine rows and proof receipts come from `config/machine_classes.json`; experimental profile inventory comes from `config/profiles/`. The section below is the video-specific detail behind it.
+---
 
+## Node packs some lanes need
 
-**This table is the profile.** Pick your card, read the column, choose that name
-in the `OTR_VideoDirector` dropdown. Names below are exactly the dropdown
-entries.
+A few engines build their graph out of another pack's nodes. Those are ComfyUI
+node packs, not Python packages, so `pip` cannot supply them. Install them into
+`custom_nodes/` and restart. Nothing the canonical selects needs any of these.
 
-Apple Silicon is not a column in these tables. `docs/MAC_COMPLIANCE_MATRIX.md`
-classifies every engine for a 16 GB Mac and carries the dropdown-label mapping;
-[Running on a Mac](#running-on-a-mac-apple-silicon) is the short route.
-
-Every figure is MEASURED, not estimated, and each says where it came from. A
-blank verdict means nobody has measured it -- that is recorded as unknown rather
-than guessed, because a guessed VRAM number is the one thing a user cannot
-recover from.
-
-**Read each 8 GB claim at its stated proof level.** A physical RTX 4060 8 GB
-has published 7 documented full OTR episodes (six on AnimateDiff video, one with Klein
-stills and still-motion video on a fresh Python 3.13 portable), so the invoked
-writer/video/voice/music episode path AND the row's image lane are **PROVEN**. Separately, a
-raw MiniMax H3 FL2VA ComfyUI recipe produced
-three valid 864x480x90 clips with native audio on the same physical card, with
-7.147/6.788/6.788 GiB peaks. That is **LAB-PROVEN true diffusion**, but it is
-below OTR's canonical 124-model-frame floor and did not use OTR's silent H3
-adapter, so the OTR H3 lanes remain candidates pending their own canonical run.
-
-A 5080 `--reserve-vram 12` H3 MIME render is useful comparative evidence, but
-it is a **CLAMPED SIMULATION**, not physical-8-GB proof:
-
-| | measured |
+| If you select | Install |
 |---|---|
-| peak VRAM | **7.28 GiB** (baseline 2.52) |
-| peak host RAM | **27.56 GiB** (baseline 17.35) |
-| boot lane | `sage-free, no-pinned, reserve-12gb` |
-| duration | 178.9 s |
-| verdict | `PASS (cold)`, output visually approved |
+| `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `animatediff15_lightning_video` -- including the whole `otr_nvidia_8gb_haunted` graph | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) |
+| `flux2_klein`, `ltx23_*`, `ltx25_*`, `wan22_*` | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md) |
 
-**The host RAM number is the one people miss.** 27.56 GiB peak against an
-8 GB laptop's typical 32 GiB of system memory is a tighter margin than the VRAM
-is. A machine with 16 GiB of RAM will struggle with this pipeline regardless of
-its GPU, and no VRAM table will warn you.
-
-**Two limits, stated so nobody reads more into this than it carries.** The lab's
-own rule is that a recipe is only `PASS` when a **second consecutive warm run**
-records it, and both H3 MIME receipts are `run_number 1`, cold -- so this is a
-cold pass, not a completed gate. **The physical 8 GB laptop has since rendered, and this section used to say
-otherwise.** It reported the card inventoried (**8,188 MiB VRAM, 31.7 GiB host
-RAM**) but having "rendered nothing" -- true when written, false within days,
-and left standing while an 8 GB RTX 4060 published **five of five source banks**
-on `animatediff15_v3_haunted_video` (`docs/4060_DRILL_LOG.md`, steps 7-19). That
-is why the row above reads **EPISODE PATH PROVEN** rather than `?`, and why the per-machine table
-is now GENERATED -- see
-[docs/MACHINE_MATRIX.md](docs/MACHINE_MATRIX.md). A hand-kept compatibility
-claim goes stale in the direction that costs a user the most: telling them their
-card cannot do a thing it has already done.
-
-`ltx25_high_video` peaks at **14.48 GiB** on the 16 GB card, but a peak is what
-the allocator grabbed, not a hard floor: on 2026-09-02 a physical RTX 4060 8 GB
-clean-room install rendered real LTX 2.5 clips end to end under plain stock launch
-flags, about 14 minutes a clip (the text encoder pinned to CPU by the engine, the
-video model half streamed from host RAM). It works on 8 GB; it is slow, and no
-shipped 8 GB profile wires it up yet. Receipt: `docs/ship-audit-2026-09-01/
-4060_CLEANROOM.md`, Leg C5. The same run fixed why every 8 GB still used to take
-about 42 minutes: the writer LLM was still on the card when the image stage began.
-Update to commit `da2b7a36` or later if your stills are that slow.
-
-### Local video models -- the measurements
-
-**This table is the measurement record, not the verdict.** For "will this run on
-my card", read the generated matrix above: its cells come from a 46-agent audit
-of every engine on 2026-09-09, grounded in receipts, with the load-bearing ones
-adversarially re-checked. The numbers here are what a real run actually grabbed,
-at a stated resolution and frame count, which is the thing the verdict is built
-from and the thing you cannot get from a verdict.
-
-Two tables answering the same question in different words is how a document
-starts contradicting itself, so this one no longer carries per-card columns.
-
-| Dropdown name | Measured peak VRAM | at |
-|---|---|---|
-| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights | hold-2 cadence |
-| `ltx098_low_video (16:9)` | 6.8 GiB | 512x288x161 |
-| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB | 864x480x90, raw recipe lab -- a 90-frame lab run, not an OTR episode |
-| `h3_low_video (16:9)` | 7.28 GiB | under an 8 GB clamp, so a clamp reading rather than physical 8 GB proof |
-| `ltx23_low_audio_in (16:9)` | 7.36 GiB | 1024x576x193 |
-| `wan22_high_video (16:9)` | 12.1 GiB | 832x480x193 |
-| `wan22_high_fast (16:9)` | 12.8 GiB | measured 2026-08-22 |
-| `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB | 480x832x129 |
-| `humo14_high_audio_in_wide (16:9)` | 13.06 GiB | 832x480x97 |
-| `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB | 480x832x97 |
-| `ltx23_high_video (16:9)` | 13.3 GiB | 1024x576x169 |
-| `ltx25_high_video (16:9)` | 14.48 GiB peak on a 16 GB card | what the allocator grabbed, not a floor. Also ran on a physical RTX 4060 8 GB under stock flags at ~14 min a clip, 2026-09-02 |
-| `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | -- |
-| `mesh_stage (16:9)` | not measured | -- |
-
-A measured number below your card's size is not a promise. `ltx23_high_video`
-measures 13.3 GiB and the audit still marks it OOM at 16 GB, because a peak is
-one run's allocation and the rest of the pipeline is resident around it.
-
-`animatediff15_v3_haunted_video` was the ONE surviving AnimateDiff lane after
-the 2026-08-23 directive ("delete any animatediff that are not haunted"). Its
-former peers — `animatediff15_video`, the hold-3/hold-5 cadence variants,
-`animatediff15_v2_video`, and `animatediff15_v3_video` — are retired and
-tombstoned in the engine registry; they no longer appear in any dropdown.
-**A second AnimateDiff lane joined it on 2026-09-02:**
-`animatediff15_v3_stillin_lab_video`, the still-in laboratory peer. **A third,
-`animatediff15_lightning_video`, joined on 2026-09-09** -- EXPERIMENTAL, the Ghost
-graph on a distilled 8-step module. It is the one AnimateDiff lane with adaptive
-hold (the guard written after a long beat rebooted a 16 GB Mac, PBUG-20260909-01)
-and the one proven on Apple Silicon; the haunted and still-in lanes are
-OOM RISK there for lack of that guard. All three are selectable today; the
-retired peers above are still gone.
-
-**Licensing note on this table:** most engines here are open weights, but two
-are not. `h3_low_video` / `h3_low_audio_in` (MiniMax H3) run under a personal,
-non-transferable authorization the maintainer obtained directly from MiniMax —
-it does not transfer to your install; treat H3 as off unless you have your own
-agreement with MiniMax. `animatediff15_v3_haunted_video` loads a
-motion module with **no published license grant** (`commercial_clean = False`
-in the adapter) — fine for personal/hobby use, not cleared for commercial
-redistribution. See [License & Credits](#license--credits) for the full list.
-
-### Procedural and still lanes -- these run anywhere
-
-`still_flat (16:9)`, `still_motion (16:9)`, `still_pan (16:9)`,
-`still_word (16:9)`, `viz_camera (16:9)`, `viz_green (16:9)`,
-`viz_mxc_cpu (16:9)`, `viz_mxc_mandala (16:9)`.
-
-The four `viz_*` lanes are pure numpy/PIL/ffmpeg with no model at all and no GPU
-requirement -- with one install caveat: `viz_mxc_mandala` draws through `pycairo`,
-which has no macOS or Linux wheel (section 2), so on those platforms it needs cairo
-installed first or `viz_green` in its place. The `still_*` lanes cost whatever your
-chosen IMAGE model costs,
-since the video side is a pan or a hold over a still. These are selectable
-alternatives; the canonical selects the three procgen visualizer lanes
-(`viz_mxc_cpu` / `viz_green` / `viz_camera`), which cost no weights at all — so a
-`still_*` lane is an upgrade FROM the default, not a downgrade from LTX.
-
-### Cloud lanes -- no local VRAM, but they are paid services
-
-`cloud_kling_avatar (16:9)`, `cloud_seedance_2 (16:9)`,
-`cloud_vidu_q2_pro_fast_720p (16:9)`, `cloud_wan_i2v (16:9)`,
-`cloud_wan_i2v_audio (16:9)`, `google_omni_video (16:9)`,
-`google_veo_video (16:9)`, `word_razzle (16:9)` (a Comfy Cloud partner lane
-despite the name — it renders provider-side via Pixverse). All are OFF by
-default; this project is offline-first and nothing here is required to make
-an episode.
-
-### Two lanes need their own boot
-
-`h3_low_video` and `h3_low_audio_in` require a sage-free boot with pinned memory
-disabled and VRAM reserved. They will fail preflight on a standard boot -- and
-that is the guard working, not the lane being broken. Both are also the slowest
-local lanes by a wide margin.
+If you pick one of these lanes without its pack, the render stops with an error
+that names the pack and its URL. The AnimateDiff lanes are also the one place
+where weights do not fetch themselves: the SD 1.5 checkpoint, the motion module
+and the adapter are a hand fetch, and [apple/MACHINES.md](apple/MACHINES.md)
+section 3 names each file, its repository and its folder.
 
 ---
 
-## How it works
+## Weights, tokens and downloads
 
-**Audio is the source of truth.** The writer produces a script, the voice/music engines render
-it, and everything is assembled into a single **frozen 48 kHz master mix**. That master defines
-the episode timeline and the per-beat clip budget. Video is rendered to fit the audio and is
-**muxed in last, byte-identical, in the archival copy** written to `otr/episodes/` — the audio
-there is never re-encoded or altered by the video stage. The published copy in `otr/obs/` (the
-one you actually watch) re-encodes that same audio to AAC 320 kbps for player compatibility;
-the PCM content is unchanged, only the container codec differs.
+**Most engines fetch their own weights** the first time a dropdown selects them
+-- either through the engine's own library and the Hugging Face cache, or through
+`OTR_WorkflowValidator`, a node inside the graph that looks at what you actually
+picked and pulls only that, before the writer runs. The cache lives inside your
+ComfyUI install at `models/huggingface` unless `HF_HOME` was already set when
+ComfyUI started; if that volume is short of room, set `HF_HOME` **before**
+launching, because setting it later creates a second cache rather than moving the
+first.
 
+**You do not need a Hugging Face token to run OTR.** Everything the canonical
+selects, and everything the 8 GB and Mac graphs select, is ungated. A token is
+needed only for the handful of gated rows -- `google/gemma-2-2b-it`, the LTX 2.5
+video weights, `stable_audio_music` -- and for those you accept the licence on
+the model's page while signed in, then log in locally once:
+
+```bash
+hf auth login
 ```
-Story bank → LedgerScriptWriter (LLM) → FreezeCascade → CastLock
-     → character voices + announcer + music themes (per-role engine roster)
-     → SceneSequencer → AudioEnhance → EpisodeAssembler  ==> 48 kHz MASTER (frozen)
-     → VideoDirector / ShotLock (per-role engine + per-beat prompts)
-     → VideoRenderBatch (render each beat through its engine)
-     → SilentComposite → CaptionBurn → CreditsRoll → MasterAudioMux  ==> final MP4 in otr/obs
-```
 
-Only two of the six story banks (`scifi_news_pro`, `media_archive`) actually pull from a news
-or archive feed — `public_domain` and `shakespeare` adapt a fixed source text, and `original` is
-entropy-seeded. `my_story` uses the listener's typed fields. "Story bank" covers all six; see
-[Story sources](#story-sources-source-banks) for what each one actually consumes.
+**Never paste a token into a workflow widget.** No node here asks for one, and a
+value saved into a graph travels with it -- into every workflow you share, every
+queue entry, and the metadata of every image you generate. A token in the login
+file, or in `HF_TOKEN` in the environment that launches ComfyUI, is the whole
+setup. ComfyUI Desktop on Windows does not inherit user-scope environment
+variables, which is one more reason to prefer the login file.
+
+The weights that do **not** fetch themselves -- every hand-fetched file, its
+repository, its size, and the folder under `models/` it goes in -- are listed in
+[apple/MACHINES.md](apple/MACHINES.md) section 3. Where no manifest exists, the
+engine refuses by name before anything else runs, and that refusal is the install
+instruction.
 
 ---
 
-## Story sources (source banks)
+## Two optional lanes
 
-The writer's `source_bank` dropdown selects where each episode's story comes from. The
-shipped canonical workflow rolls randomly across every eligible bank each run
-(`scifi_news_pro` is only the code-level fallback for a freshly-dropped, unconfigured node —
-pin the dropdown to one bank if you want a fixed lane). Every lane is an INDEPENDENT bank (its
-own story pack under nodes/story_packs/<bank_id>/ plus its bank row in
-nodes/story_packs/banks.json) with no dependency on any other lane.
+**A cloud writer.** If your card cannot hold a local writer, or you want to write
+scripts on a machine with no usable GPU, the script step alone can run on
+OpenRouter, Google, or Comfy Credits. Voices, music, images and video stay local.
+It costs money, it is off by default, and it exists for hardware reasons rather
+than prose quality. [apple/CLOUD.md](apple/CLOUD.md) has the three switches.
 
-| Bank | What it does |
-|------|--------------|
-| `scifi_news_pro` | sci-fi radio drawn from a live science feed; an LLM-first multipass writer using the configured model slots |
-| `media_archive` | media RSS / archive items → restoration-adventure episodes |
-| `public_domain` | faithful radio adaptation of a public-domain source |
-| `shakespeare` | Folger scene adaptation. **The Folger Digital Texts are CC BY-NC 3.0 (noncommercial)** — episodes from this bank inherit that restriction on the source text. |
-| `original` | no-source original fiction seeded from an entropy spark draw |
-| `my_story` | your idea, characters, plot and setting developed into a radio story; manual selection, optional byline |
+**The GGUF writer lane.** Nothing selects it today -- no `*-GGUF` writer appears
+in the dropdown -- but the lane is wired for people who want to run a quantized
+writer on a small card off NVIDIA. If you wire it up, pin the library:
 
-### The music each bank gets
+```bash
+pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
+```
 
-Each bank has a fixed musical identity, chosen 2026-09-12, and the composer
-leads every generated cue with it (`nodes/_otr_music_palette.py`):
+Do not take the latest. `0.3.35` dies with an illegal-instruction fault inside
+`llama_init_from_model` before a single token, on the CPU backend, so no GPU
+avoids it; an unpinned install resolves to it. That line is the Windows CUDA
+recipe, the only one measured here; on other platforms use upstream's own build
+flags with the same pin. And test it the way OTR does -- a bare `import llama_cpp`
+fails even on a working install, because the pack preloads the CUDA DLLs first:
 
-| Bank | Music (the composer's own idiom, verbatim) |
-|------|-------|
-| `scifi_news_pro` | Detroit techno at 128 BPM, hypnotic machine funk -- TR-909, sub bass, detuned stabs, Juno pads |
-| `media_archive` | small-group jazz quartet, relaxed swing -- brushed drums, upright bass, piano, tenor sax |
-| `original` | salsa conjunto at 100 BPM, clave-driven -- congas and timbales, montuno, tumbao, brass |
-| `public_domain` | Chicago house at 122 BPM, soulful and steady -- TR-707, rolling bass, warm piano chords, string pads |
-| `shakespeare` | Elizabethan consort music (its declared palette; the plays all predate the first period cutover, so the year lands there too) |
-| `my_story` | **yours**: the `music_style` widget on `OTR_StableAudioTheme` ("gamelan orchestra", "surf rock", "solo cello"). Blank means the house radio orchestra. |
-
-A test (`tests/test_bank_music_is_documented.py`) pins this table and every
-generated launch recipe to the palette module, so the docs cannot drift from
-what the composer actually asks for.
-
-The `music_style` widget is honoured on `my_story` ONLY -- every other bank
-keeps its genre whatever is typed, because a Shakespeare episode scored as surf
-rock is not a feature. The four genre banks carry a rhythm-friendly negative
-prompt; the sustained banks carry the anti-loop one.
-
-A typed `custom_premise` is handled by lane shape. On `my_story` it is your idea,
-alongside the four appended fields for characters, plot, setting and author. No feed
-or random premise is used. My Story requires your input and is excluded from automatic
-bank rolls. See [the My Story guide](docs/MY_STORY_GUIDE.md) for use and qualification status.
-On `original` the premise rides along as an
-operator hint beside the random spark draw. On the source-backed banks -- `scifi_news_pro`,
-`media_archive`, `public_domain` and `shakespeare` -- it replaces the fetch outright: your
-text becomes the whole source payload and no feed item, archive item, or source text is
-pulled for that run.
-Every lane is fail-closed: a bad source, context
-overflow, or contract violation stops loudly instead of shipping a degraded story, and
-the LLM writes all story text — Python validates, it never rewrites prose.
-
-**Add your own source bank:** every bank is independent, and you can author another
-peer — your own feed, archive, or source strategy — running through
-the same trusted writer. The requirements contract (above all: the episode ledger must
-be COMPLETE for every downstream consumer) lives in
-[`docs/EXTENDING_OTR.md`](docs/EXTENDING_OTR.md); read it before authoring.
+```python
+from nodes._otr_gguf_backend import _import_llama_cpp; _import_llama_cpp()
+```
 
 ---
 
-## v2.0-alpha — the Open Video Model Platform
+## Where things land
 
-The video layer is **model-agnostic**: a registry of pluggable engine adapters, chosen
-**per role**, with no single model treated as "primary." You pick the engine for each kind of
-beat, and that pick is honoured exactly: a missing or OOMing engine **fails loudly** and stops
-the render rather than swapping in a substitute you did not choose. The frozen audio is never
-touched either way. If you want the zero-GPU procedural CRT path, select it — it is
-an explicit alternative, not the alpha.24 canonical default or a rescue lane.
+Everything for an episode goes under your ComfyUI output folder:
 
-**Roles** (each selectable in `OTR_VideoDirector`):
+- `otr/episodes/<episode>/` -- the working files: stems, frames, intermediate
+  clips, and the ledger.
+- `otr/obs/` -- the **finished, playable episodes**.
 
-| Role | What it is | Canonical default |
-|------|------------|-------------------------------|
-| `announcer_visual` | the announcer bookends | `viz_mxc_cpu (16:9)` |
-| `music_visual` | opening/closing theme bookends | `viz_green (16:9)` |
-| `character_video` | character dialogue beats | `viz_camera (16:9)` |
-
-These are the **procgen** lanes: zero weights, so the shipped graph runs on a clean
-install. `ltx098_low_video (16:9)` is the local-video-diffusion upgrade (proven on both
-NVIDIA and Apple Silicon); the `still_*` family is the cheap middle ground and needs an
-image engine to feed it.
-
-(The former `sfx` speaker role and `scene_broll` / `background_abstract` video roles were
-removed in the 2026-07-01 cleanbreak — old ledgers using them fail loud by design.)
-
-**Engines available:** HuMo (audio-driven face, 14B + 1.7B tiers), LTX (text/image→video and
-audio-in), Wan (TI2V / I2V), AnimateDiff (Ghost Signal: the haunted lane, its still-in lab peer, and the experimental Lightning lane), MiniMax
-H3 (personal license only, see the licensing note above), `mesh_stage`, and the cheap CPU
-floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are offered only where
-audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
-renders are request-hash deterministic. The old VRAM tier system is gone — profiles plus
-the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (There is exactly one
-AUTHORED graph, the canonical; `workflows/variants/` holds 94 generated from it, one
-per profile -- see "Other setups" for how to load one and for the per-machine dropdown
-settings.)
-
-### The video model reference — read these two before adding or changing an engine
-
-| doc | what it holds | kept true by |
-|---|---|---|
-| [`docs/ENGINE_MATRIX.md`](docs/ENGINE_MATRIX.md) | **every per-model number** — clip window, frame ladder, continuity, join mode, segment counts, effective canvas | **generated + drift-gated.** `python tools/engine_matrix.py --check` is a suite test, so it cannot disagree with the adapters |
-| [`docs/2026-08-02-FINAL-all-engine-maths-and-stills.md`](docs/2026-08-02-FINAL-all-engine-maths-and-stills.md) | the things a generator cannot derive — still logic and the local/cloud re-mint split, the fix list with per-item status, the open decisions, the padding rule | by hand, with a dated verification stamp |
-
-**The rule between them: a hand-maintained doc must never re-type a number the
-generated one already owns.** That is not style. On 2026-08-06 the hand-written
-tables were found asserting 3 and 10 segments for HuMo where the live registry
-said 5 — a ceiling that had moved four days earlier — while the drift-gated
-matrix had been right the whole time. Cite the generated matrix; do not copy it.
-
-Multi-clip coverage itself (how a long beat is partitioned into chained or
-jump-cut segments) is settled in `nodes/_otr_video_engines/coverage_plan.py`, and
-the arithmetic totals exactly on every engine, local and cloud.
-
-**Padding rule (operator, 2026-08-06):** no mirror and no ping-pong anywhere —
-every second of audio gets ORIGINAL video, and a short render fails loud rather
-than filling. The single sanctioned exception is the closing-theme backdrop that
-holds the last drama clip under the closing theme; the credits roll itself
-freezes a frame and never loops.
-
-### Preflight guides -- the checklists that gate a change
-
-Each subsystem has a preflight document: a gate-by-gate checklist run whenever
-that subsystem is added to or materially changed, each backed by an enforcement
-suite so the doc cannot drift from the code.
-
-| subsystem | guide | enforced by |
-|---|---|---|
-| video models | [`docs/VIDEO_LANE_PREFLIGHT.md`](docs/VIDEO_LANE_PREFLIGHT.md) | `tests/test_lane_preflight_matrix.py` |
-| image models | [`docs/IMAGE_GEN_PREFLIGHT.md`](docs/IMAGE_GEN_PREFLIGHT.md) | `tests/test_image_gen_preflight_matrix.py` |
-| TTS voices | [`docs/TTS_VOICE_PREFLIGHT.md`](docs/TTS_VOICE_PREFLIGHT.md) | `tests/test_tts_voice_preflight_matrix.py` |
-| source banks / story | [`docs/SOURCE_BANK_PREFLIGHT.md`](docs/SOURCE_BANK_PREFLIGHT.md) | the roster/bijection suites it names |
-| LLMs (writer models) | [`docs/LLM_PREFLIGHT_GUIDE.md`](docs/LLM_PREFLIGHT_GUIDE.md) | seven gates before a row joins the dropdown |
-| driving a soak leg | [`docs/SOAK_LEG_GUIDE.md`](docs/SOAK_LEG_GUIDE.md) | not a preflight gate -- the widget map + sanctioned-lever rules for varying engines/models/upscalers across legs |
-| weights on disk | [`docs/MODEL_INVENTORY.md`](docs/MODEL_INVENTORY.md) | not a preflight gate -- the full model list under `C:\ComfyUI-Models`, what references each file, and the disk-reclaim analysis |
-
-The rule that binds them (operator, 2026-08-21): **every video lane obeys the
-per-role image-model dropdowns** -- the picture a `still_*` or motion lane holds
-is minted by whichever image engine the operator selected for that role. The
-only exemption is the `viz_*` visualizer family, which is procedural and mints
-no still -- and each of those lanes declares that exemption out loud
-(`accepts_still = False`); staying silent is a test failure. Adding your own
-engine? **[`docs/ADDING_IMAGE_AND_VIDEO_LANES.md`](docs/ADDING_IMAGE_AND_VIDEO_LANES.md)**
-walks all three levels: pointing an existing engine at a different checkpoint
-with an env var and NO code (how you run a smaller Z-Image on a low-RAM box),
-adding a custom image engine, and adding a custom video/still lane.
-`docs/EXTENDING_OTR.md` covers source banks; then run the matching preflight.
-
-### Image models
-
-The picture behind every still/motion lane and video role comes from a per-role image-model
-dropdown (`announcer_image_model`, `music_image_model`, `character_image_model`), independent
-of which video engine you picked. **`z_image_turbo` (Apache-2.0) is the shipped canonical
-default for all three roles.** Same open-set "registry IS the menu" story as video: drop in an
-adapter, no other edits, and it's selectable everywhere.
-
-| Engine | License | Notes |
-|---|---|---|
-| `z_image_turbo` | Apache-2.0 | shipped default, all three roles |
-| `lumina_image` | Apache-2.0 | ~7-12 GB measured |
-| `flux2_klein` | Apache-2.0 | FLUX.2 Klein 4B |
-| `flux_gen1` (Flux.1-dev) | **BFL non-commercial** | coded as the in-stack "gen-1" default; the canonical workflow does not select it |
-| `ideogram4_local` | **non-commercial weights, opt-in** | heaviest local image engine, 16 GB-class only; typography-first for the `still_word` title card |
-
-Six more engines run through the Comfy Cloud partner bridge (`cloud_flux_pro`,
-`cloud_nano_banana_2`, `cloud_seedream_2`, `cloud_krea_2_turbo`,
-`cloud_luma_photon_flash`, `ideo`) plus a direct Google Gemini/Nano-Banana adapter
-(`google_image`, BYO API key). All are OFF by default — same "the dropdown pick is the
-enable" pattern as the cloud video lanes, no local VRAM, budget-estimated per call, fail
-loud without credentials. Full contract: [`docs/IMAGE_GEN_PREFLIGHT.md`](docs/IMAGE_GEN_PREFLIGHT.md).
-
-### Headless canonical path
-
-Agents and API tests use exactly one workflow file: `workflows/otr_canonical.json`.
-By default, the headless wrapper applies no profile and leaves the saved dropdowns
-alone. Explicit profiles are still available for deliberate route testing, such as
-`otr_cloud_lanes` for the hosted Partner API path.
-
-Headless/API smoke runs must use the canonical workflow wrapper:
-
-```
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Acts 3
-```
-
-For a no-queue validation of the exact API prompt shape:
-
-```
-<your ComfyUI python> scripts/otr_canonical_api_run.py --offline-schemas --dry-run --act-count 3
-```
-
-> Run it with the SAME interpreter that runs ComfyUI (`.venv\Scripts\python.exe` on
-> Windows, `.venv/bin/python` on Mac/Linux). **`scripts/` is a development-tree tool and
-> is NOT in the registry bundle** -- clone the repo from GitHub if you want it.
-
-Cloud route example:
-
-```
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts\otr_headless_canonical.ps1 -Profile otr_cloud_lanes -Acts 3
-```
-
-`--words` no longer exists anywhere on this path. It went with the `target_words`
-widget: act count is the only episode-shape knob, and length is an observation.
-
-That path always loads `workflows/otr_canonical.json`; engine dropdowns move only
-through explicit profiles, and ad-hoc `--set` patches are limited to creative/story
-widgets.
-
-### Optional: hosted LLM via OpenRouter (off by default)
-
-The writer runs locally out of the box — the shipped canonical workflow pins Qwen3.5-4B for
-both the creative and technical slots, and it is also the code-level fallback for a
-freshly-dropped, unconfigured node (it replaced Mistral-Nemo there, a 24 GB download that
-then does not fit an 8 GB card at all). You can optionally route either slot to a hosted frontier
-model via OpenRouter — it activates as soon as `OPENROUTER_API_KEY` is set (no separate opt-in
-flag anymore), is cost-guarded, and fails closed. Full walkthrough:
-[`docs/openrouter-setup.md`](docs/openrouter-setup.md).
-The docs index is [`docs/README.md`](docs/README.md).
-
----
-
-## Output layout
-
-Everything for an episode lands under your ComfyUI `output/otr/` tree:
-
-- `output/otr/episodes/<episode>/` — working assets (audio, frames, intermediate clips).
-- `output/otr/obs/` — the **finished, playable episodes** (what you watch / publish).
-
-The published file is named after what produced it, so a folder of episodes is
-readable at a glance without opening any of them:
+The published file is named after what produced it, so a folder of episodes reads
+at a glance without opening any of them:
 
 ```
 <title>_<timestamp>__<style>__<video>__<image>__<tts>__<bank>_final.mp4
-
-arms_at_the_ready_20260903_092133__cartoon__wan_ti2v__z_image_turbo__indextts2__public_domain_final.mp4
 ```
 
-A lane that renders no stills reports `none` in the image field rather than
-borrowing another episode's engine. The archival copy under `episodes/` keeps a
-different, pipeline-stage name — that one is provenance, not something to read.
-
-Point OBS (or any player) at `otr/obs/` for a continuous broadcast — new finished episodes
-appear there as they render.
+A lane that renders no stills reports `none` in the image field. Point OBS, or any
+player with a watch folder, at `otr/obs/` for a continuous broadcast -- new
+episodes appear there as they render.
 
 ---
 
-## Troubleshooting
+## When something goes wrong
 
-- **"SERVER DID NOT COME UP" on headless boot** — set `PYTHONUTF8=1` and
-  `PYTHONIOENCODING=utf-8`; a non-UTF-8 console crashes on the first emoji log line.
-  (The shipped launcher `scripts/_otr_soak_server_launch.cmd` already sets both, and a
-  regression guard in the sibling survival-guide repo keeps it that way.)
-- **An engine "fails loudly" mid-render** — that's by design; check the log for the missing
-  model/dependency. The render stops there rather than substituting a different engine, so fix
-  the named dependency (or select the procedural CRT path) and run it again.
-- **Out of VRAM on a local video tier** — preserve the failure before evaluating a
-  separately selected lighter route. Note the shipped canonical IS the procedural floor
-  (three `viz_*` lanes, zero weights), so an out-of-VRAM failure means you selected a
-  heavier lane; the floor is what you fall back TO, not what failed.
-  **On Apple Silicon, do not treat out-of-memory as a recoverable render failure** — unified
-  memory has nowhere to offload, so it kills the machine rather than the render. See
-  `docs/MAC_PORTABILITY_GUIDE.md` section 1.
-- **On a Mac: `NewsCurationDeep exceeded 40s`, or a ~20 GB download starts the moment
-  you queue** -- the first is `llm_quant_policy` not at `none`; the second is the image
-  dropdowns still saying `z_image_turbo` while the video lane you picked consumes a
-  still (set all three to `sd15` before queuing). Both are in
-  `docs/MAC_PORTABILITY_GUIDE.md` section 4 with the rest of the Mac symptom table;
-  the short route is [Running on a Mac](#running-on-a-mac-apple-silicon).
-- **No audio under the end credits** — known limitation: the credits scroll can outlast the
-  master mix's closing theme. Tracked for a fix.
-- **Nodes don't appear after install** — restart ComfyUI; confirm you're on the `v2.0-alpha`
-  branch.
-- **`neither kokoro backend is installed` (or `kokoro is not installed`) at the first voice
-  line** — on Python 3.13 run `python -m pip install kokoro-onnx` with ComfyUI's own
-  interpreter (a registry install older than 2.0.0-alpha.17 does not carry it); on 3.12
-  `pip install kokoro`. The message names the exact line. Or open **OTR_CastLock** and set
-  `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine`
-  -> `bark`, then queue again.
-- **`kokoro ONNX model not found`** — the one-time boot fetch of the 326 MB model did not
-  complete (offline boot, or `HF_HUB_OFFLINE=1`). Run the `huggingface-cli download`
-  line the message prints, then queue again; nothing downloads during a render.
-- **`IndexTTS2 Path B not installed`** — this concerns an opt-in voice engine, not
-  the alpha.24 canonical's Kokoro/Kokoro defaults. See the separate setup and
-  packaging limitations in section 4 before changing a tested workflow.
-- **A still takes about 42 minutes on an 8 GB card, and the log says `loaded partially;
-  0.00 MB usable`** — the writer LLM was still on the card when the image stage began.
-  Fixed in commit `da2b7a36` (2026-09-02); update the pack. Nothing in the launch line
-  fixes it.
-- **The render says a node class is missing (`UnetLoaderGGUF`, `LTXV*`, `ADE_*`)** — that lane
-  needs one of the node packs in section 2b; the message names which.
-- **A gated model returns HTTP 401** — the LTX 2.5 weights and `gemma-2-2b-it` need a terms
-  click on Hugging Face plus a read token (section 3); every default weight is ungated.
+**The whole OldTimeRadio category is missing.** That is never a missing library
+-- each node loads in its own try/except, so a missing library costs one node and
+prints `[OldTimeRadio] Skipped '<name>': <reason>`. A total absence means the pack
+is in the wrong folder or ComfyUI crashed during startup before any node loaded.
+
+**One node is missing.** Find that `Skipped` line in the console; it names the
+library. Install it into ComfyUI's own interpreter.
+
+**The render stops naming a missing class** (`ADE_*`, `UnetLoaderGGUF`, `LTXV*`).
+The lane you picked needs a node pack from the table above; the message names it.
+
+**The render stops naming a missing file.** The lane needs weights that do not
+fetch themselves. The message names the file; it never quietly substitutes
+another. [apple/MACHINES.md](apple/MACHINES.md) section 3 says where it comes from.
+
+**It refuses before downloading, saying the writer will not fit.** You picked a
+language model bigger than your card's ceiling. Pick a smaller one.
+
+**No mp4, and the log mentions ffmpeg or ffprobe.** You need both binaries. The
+`imageio-ffmpeg` wheel that comes down with the requirements ships only ffmpeg.
+If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
+
+**`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
+3.12 run Kokoro on torch; 3.13 runs the same voices through `kokoro-onnx` on the
+CPU; 3.14 has no Kokoro build yet and is refused. The message names the exact pip
+line. Or open **OTR_CastLock** and switch both voice engines to `bark`, which
+installs everywhere -- except on a 16 GB Mac, where bark is a memory hazard;
+stay on Python 3.12 or 3.13 there and keep Kokoro.
+
+**A gated model returns HTTP 401.** The LTX 2.5 weights and `gemma-2-2b-it` need a
+licence click on Hugging Face plus a login; every default weight is ungated.
+
+**On a Mac, a 20 GB download starts the moment you queue.** The image dropdowns
+still say `z_image_turbo` while the video lane you picked consumes a still. Set
+all three to `sd15` first.
+
+**It finished but nothing is in `otr/obs/`.** Read the console from the end
+backwards for the first error. A run that ends without publishing did not
+succeed, and if it has been quiet for more than five minutes after the downloads
+finished, it is not going to.
 
 ---
 
-## Quality discipline
+## What it does not do well
 
-Development runs under a sibling QA harness — the
-[ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
-a machine-readable Bug Bible (331 entries and growing) distilled from this project's live production
-incidents, plus a static regression suite that runs against this pack after every change.
-Production bugs are staged in [`docs/PROD_BUG_LOG.md`](docs/PROD_BUG_LOG.md) and promoted
-to the Bible in verified batches. Only bugs that actually failed in a live run qualify —
-review findings never create entries on their own.
-
-### Soak runs — how a change is actually proven
-
-A green unit suite proves the code parses, not that an episode renders. Nothing here is
-called done until it has produced a finished, playable episode in `output/otr/obs/`.
-
-A **soak leg** is one real end-to-end render through the canonical workflow. It passes only
-when all three of these hold — any one alone is not a pass:
-
-| Signal | Where | Means |
-|---|---|---|
-| `RESULT SUCCESS` | leg log | the graph completed |
-| `obs_publish OK` | server log | the episode was published |
-| the `.mp4` on disk | `output/otr/obs/` | it is actually watchable |
-
-A finished render leaves the server **resident** at ~9–10 GB and 1% GPU — that is the
-no-teardown behavior, not a crash. Read the log for `Prompt executed` before declaring a
-run dead, and reset the box before the next boot.
-
-**Sweep drivers** run a matrix of legs unattended, one at a time (ComfyUI serializes
-prompts, and this project is sequential-execution only). Each waits for the queue to drain
-before submitting, so a leg's timeout measures its own render rather than its predecessor's;
-a failed leg is logged and the sweep continues; and the receipt JSON is rewritten after
-every leg, so killing a run mid-flight still leaves a complete record.
-
-- [`scripts/otr_llm_image_upscale_sweep.py`](scripts/otr_llm_image_upscale_sweep.py) —
-  every curated local LLM in both writer slots, across image engines, stills, and upscalers.
-- [`scripts/otr_bank_engine_sweep.py`](scripts/otr_bank_engine_sweep.py) — the smallest local
-  model (`gemma-4-E2B-it`, 3.0 GB) in **both** writer slots across four of the five runnable
-  source banks (`media_archive`, `original`, `public_domain`, `shakespeare` --
-  `scifi_news_pro` is deliberately absent, having qualified live on 2026-08-26) and, between
-  its two engine profiles, all five local image engines. A 2B model is the worst case for
-  structured extraction, so a bank that survives it survives everything above it.
-
-```
-<your ComfyUI python> scripts/otr_bank_engine_sweep.py
-```
-
-> Same two caveats: the interpreter that runs ComfyUI, and `scripts/` ships only in the
-> GitHub tree, not in the registry bundle.
-
-Engine dropdowns move **only** through profile `role_overrides` in `config/profiles/*.json`
-— exactly what a human clicking the announcer / music / character dropdowns and saving the
-graph would produce. A sweep driver never edits `workflows/otr_canonical.json` and never
-pokes `widgets_values`; the image and video engine widgets are managed and refuse ad-hoc
-patching by design.
-
-A `--dry-run` validates prompt shape without rendering, and **is not a pass** — it needs
-`--offline-schemas`, and a dry leg finishing in 0.1 min has proven nothing about a model.
-
----
-
-## Known limitation: character drift
-
-**Some episodes will hand a line to the wrong character**, and this pack does not
-fix that. You may hear a character claim a job that belongs to someone else, say
-they don't know something they plainly do, or — rarest and most obvious — address
+**Some episodes hand a line to the wrong character.** You may hear a character
+claim a job that belongs to someone else, or -- rarest and most obvious -- address
 themselves by name. It is uncommon, it does not break a render, and the episode
-still plays. But it is real and you should know about it before you run this.
+still plays, but it is real and you should know before you run this.
 
-Everything else in the acceptance test **is** handled. A post-story clean stage
-reads every spoken row with a model and rewrites anything that is not speech —
-stage directions, sound cues, narration that would otherwise be read aloud by the
-voice actor. That works, and it is measured (see below).
+It is not fixed because the fix did not pass. A post-story clean stage already
+reads every spoken row with a model and rewrites anything that is not speech
+(stage directions, sound cues) -- that works and is on by default. The stricter
+pass that judges *who* should be speaking was built, measured, and found unstable
+on a 12B-class model, which is the largest thing a 16 GB card holds. It ships
+disabled rather than quietly making episodes worse. If you have a much larger
+model and want to try it, the switch is `JUDGE_ATTRIBUTION` in
+`nodes/_otr_ledger_clean.py`.
 
-**Why character drift is not fixed, honestly.** It was built and tested, and it
-did not pass. On a planted test set where the same line appears twice — once in
-the wrong character's mouth and once in the right one — the detector found 3 of 6
-planted defects on one run and 1 of 6 on the next, with an identical detector and
-identical inputs. It reliably caught only the blatant case (a character naming
-themselves) and never caught the subtler ones. A detector that unstable cannot be
-trusted to rewrite dialogue, so it ships **disabled** rather than quietly making
-episodes worse.
-
-**The constraint is hardware, not design.** This project is deliberately 100%
-local and offline — the reference machine is a 16 GB laptop GPU, and the largest
-model that comfortably fits is in the 12B class. Judging whether a line belongs to
-a particular character means holding the whole cast, and who knows what, in mind
-while reading a single sentence. That is a harder ask than spotting a stage
-direction, and a 12B is not reliable at it.
-
-**If you want to chase it:** the pass is written, tested and ready — set
-`JUDGE_ATTRIBUTION = True` in `nodes/_otr_ledger_clean.py`, and use a **frontier
-model well above what a 16 GB card can run**. The measurement rig is included so
-you can check whether your model actually does better rather than taking anyone's
-word for it:
-
-```bash
-python scripts/otr_clean_stage_lab.py --f2 --model <your-model>
-```
-
-It scores recall (planted defects caught) *and* false alarms on clean lines, which
-is the half a normal render cannot show you. Do not judge a change on recall
-alone — it is easy to catch everything by suspecting everything, and that rewrites
-good dialogue.
-
-The same rig, without `--f2`, measures the stage-direction cleanup that **is**
-shipped and on by default.
+**Nothing here has ever run on AMD.** The ROCm graphs are built from the same
+source as every working profile and every engine they select is plain PyTorch, so
+on paper they should work -- and on paper is exactly the problem. If you have the
+card, [apple/ROCM.md](apple/ROCM.md) is a five-minute probe that would tell the
+project more than it currently knows.
 
 ---
 
-## The LEMMY easter egg
+## Adding to it
 
-Every so often a character named **Lemmy** makes a cameo — a small tribute carried across the
-project's generations. Born of the machine, still raising hell on the airwaves. 🤘
+Two things you can add: an **engine** -- a way of rendering video, images,
+speech, music or an upscale -- and a **source bank**, a place stories come from.
+An engine is a Python adapter in this repo; a bank can be a folder of your own
+that this repo never sees. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe
+and [apple/PREFLIGHT.md](apple/PREFLIGHT.md) is the checklist, and the rule
+underneath both is the same one the rest of the pack lives by: **green tests are
+not a lane.** The proof is one real render through `otr_canonical` that lands a
+file in `otr/obs/`.
+
+Adding a bank uses `scripts/otr_check.py`, so it wants the git clone.
+
+Development runs under a sibling QA harness, the
+[ComfyUI Custom Node Survival Guide](https://github.com/jbrick2070/comfyui-custom-node-survival-guide):
+a machine-readable bible of bugs distilled from this project's live incidents,
+with a regression suite that runs against the pack after every change. Only bugs
+that actually failed in a real run get in.
 
 ---
 
-## Changelog
+## Licence and credits
 
-The current line is **v2.0-alpha** (Open Video Model Platform; per-role video AND image
-engines; six independent story source banks; one canonical workflow whose dropdowns you set
-per machine, plus 94 per-profile graphs generated from it in `workflows/variants/`;
-frozen 48 kHz audio master, byte-identical in the archival copy).
-Full per-version history is in the git log and the GitHub Releases page.
+The pack is [MIT](LICENSE). It is built on ComfyUI and the open-weight LTX, Wan,
+HuMo, AnimateDiff, Z-Image-Turbo, Lumina, FLUX.2 Klein, Kokoro, Stable Audio,
+Qwen and Gemma ecosystems, plus the optional Chatterbox, Dia, Bark, MusicGen and
+IndexTTS2 engines -- thanks to all of their authors.
 
-## License & Credits
+**The shipped defaults are not a blanket commercial clearance.** A few optional,
+off-by-default pieces carry restricted terms:
 
-See [`LICENSE`](LICENSE). Built on ComfyUI and the open-source HuMo / LTX / Wan / AnimateDiff /
-Z-Image-Turbo / Lumina / FLUX.2 Klein / IndexTTS2 / Kokoro / Stable Audio ecosystems, plus
-several optional engines (Chatterbox, Dia, Bark, MusicGen, and others) — thanks to all of
-their authors.
-
-**A few optional, off-by-default pieces carry restricted terms, not open licenses:**
-
-- `flux_gen1` (Flux.1-dev) — BFL non-commercial license.
-- `ideogram4_local` — non-commercial model agreement; code ships, weights don't.
-- `h3_low_video` / `h3_low_audio_in` (MiniMax H3) — a personal, non-transferable
-  authorization the maintainer obtained directly from MiniMax; it does not carry over to
+- `flux_gen1` (Flux.1-dev) -- BFL non-commercial licence.
+- `ideogram4_local` -- non-commercial model agreement; the code ships, the weights do not.
+- `h3_low_video` / `h3_low_audio_in` (MiniMax H3) -- a personal, non-transferable
+  authorization the maintainer obtained directly from MiniMax. It does not carry to
   your install.
-- `animatediff15_v3_haunted_video` — the shipped motion module publishes no
-  license grant at all (`commercial_clean = False`); fine for personal use, not cleared for
-  commercial redistribution.
-- The `shakespeare` story bank adapts Folger Digital Texts, which are CC BY-NC 3.0
-  (noncommercial).
+- The three AnimateDiff lanes are declared not commercially clean. The haunted
+  lane's motion module publishes no licence grant at all; fine for personal use,
+  not cleared for commercial redistribution.
+- `musicgen` and `indextts2` carry non-commercial terms; `bark`'s are unconfirmed.
+- Several heavier video lanes -- `ltx25_*`, the `humo*` family, `mesh_stage`,
+  `wan22_high_fast` -- also declare themselves not commercially clean in their
+  adapters. Read each model's own licence.
+- The `shakespeare` bank adapts Folger Digital Texts, which are CC BY-NC.
 
-Do not treat the canonical defaults as a blanket commercial-use clearance.
-The canonical selects `stable_audio_3`, which IS commercially clean -- it replaced
-MusicGen in alpha.28 for exactly that reason. The residual exposure is elsewhere: the
-source bank you pick, and any engine you switch TO whose metadata sets
-`commercial_clean = False` (MusicGen among them, still selectable). Review the exact
-source, engine and weight licenses before commercial use; a successful render is not a
-license receipt.
+Review the exact source, engine and weight licences before commercial use. A
+successful render is not a licence receipt.
+
+---
+
+## The Lemmy easter egg
+
+Every so often a character named **Lemmy** makes a cameo -- a small tribute
+carried across the project's generations. Born of the machine, still loud on the
+airwaves.

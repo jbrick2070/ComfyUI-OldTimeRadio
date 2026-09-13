@@ -61,7 +61,10 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks — ships on *roll*, which picks any of the nine. |
 | `creativity` | `balanced` by default. |
-| `cast_seed` | Fixes which voices the cast draws. This graph has no KSampler -- the rest of the run is made reproducible by the frozen ledger, not by a sampler seed. |
+
+**There is no seed widget on this graph.** It has no sampler node; what makes a
+run reproducible is the frozen ledger, not a number you set. If you want two
+comparable runs, pin `source_bank` and `visual_style` instead.
 
 Two of those ship on **roll** on purpose: the canonical is meant to hand you a
 different show each time you press Queue. Pin them when you want to compare two
