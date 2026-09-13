@@ -1,0 +1,44 @@
+name: Keep main equal to v2.0-alpha
+
+# WHY THIS EXISTS. `main` sat 5,029 commits behind v2.0-alpha and still
+# advertised v1.7, so anyone who cloned the branch every other project calls
+# current got a stale tree that looked like it had worked. That was fixed by
+# hand on 2026-09-13 -- and a fix by hand rots the next time someone pushes.
+# This makes main a MIRROR: every push to v2.0-alpha moves main to the same
+# commit, with no one having to remember.
+#
+# The old v1.7 tip is kept on the branch `archive/main-v1.7` (0aa6d6e1). It
+# carried eleven April 2026 commits -- soak-prompt work and two README
+# updates -- that v2 never took, and they are preserved there rather than
+# discarded.
+#
+# main is a MIRROR, never a place to push. Work goes to v2.0-alpha, which is
+# the default branch and the one every machine, script and doc tracks. When v2
+# is promoted for real, the decision to make main the working branch is the
+# operator's, and this file is what gets deleted then.
+on:
+  push:
+    branches:
+      - v2.0-alpha
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  mirror:
+    name: Move main to the v2.0-alpha commit
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'jbrick2070' }}
+    steps:
+      - name: Check out the pushed commit
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Force, deliberately: main is defined as "wherever v2.0-alpha is", so a
+      # rebase or an amend on v2.0-alpha must carry main with it rather than
+      # leave the two to drift. Nothing is lost, because nothing is ever
+      # committed to main. A push made with GITHUB_TOKEN does not start another
+      # workflow run, so this cannot loop.
+      - name: Point main at this commit
+        run: git push origin ${{ github.sha }}:refs/heads/main --force
