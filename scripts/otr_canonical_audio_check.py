@@ -148,6 +148,15 @@ class CanonicalAudioRoute:
                 kwargs[item["name"]] = self.values[(link[1], link[2])]
         cls = self.classes[kind]
         result = getattr(cls(), cls.FUNCTION)(**kwargs)
+        # A ComfyUI node may return the {"ui": ..., "result": ...} envelope
+        # instead of a bare tuple, and this dispatcher would eat it SILENTLY:
+        # len() and enumerate() both walk a dict's KEYS, so a 2-key envelope
+        # passes the arity check against a 2-slot node and then stores "ui" and
+        # "result" as the node's outputs. No node in ROUTE returns the envelope
+        # today; OTR_MasterAudioMux does, which is why this unwraps before the
+        # check rather than after ROUTE grows.
+        if isinstance(result, dict):
+            result = result.get("result", ())
         require(len(result) == len(cls.RETURN_TYPES), f"{kind} returned wrong arity")
         for slot, value in enumerate(result):
             self.values[(node["id"], slot)] = value
