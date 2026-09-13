@@ -192,12 +192,14 @@ def _mood_suffix(script_brief: str) -> str:
     return (", " + ", ".join(tags)) if tags else ""
 
 
-def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
-    """Compose a music cue's ROW text from the Meta brief, returning (prompt,
-    duration_sec). Reads every brief field through the brief-reader protocol;
-    never crashes on an absent / malformed brief (falls through to the house
-    palette + the cue's arc, plus a neutral "atmospheric" -- except on a
-    `groove_arc` palette, which omits that word; see the module docstring).
+def resolve_setting_terms(meta: dict) -> list:
+    """The episode's setting words, normalised, for every consumer.
+
+    EXTRACTED 2026-09-12 alongside :func:`resolve_mood_terms` and for the same
+    reason: ``compose_brief_engine_prompt`` needs the same answer the long form
+    uses, and two copies of a resolution drift apart. Normalising through
+    ``spoken_term`` is not optional -- the brief emits identifier case
+    (PBUG-20260903-04) and this text goes into a prompt a model reads.
     """
     terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
     if not isinstance(terms, dict):
@@ -205,10 +207,21 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     setting_raw = terms.get("setting") or []
     if not isinstance(setting_raw, list):
         setting_raw = []
-    # Normalised: this is composed into the music TEXT prompt below, and the
-    # brief emits identifier case (PBUG-20260903-04).
-    setting_terms = [spoken_term(t) for t in setting_raw if spoken_term(t)]
+    return [spoken_term(t) for t in setting_raw if spoken_term(t)]
 
+
+def resolve_mood_terms(meta: dict) -> list:
+    """The episode's mood words, resolved once for every consumer.
+
+    EXTRACTED VERBATIM from ``compose_music_prompt`` on 2026-09-12, when
+    ``compose_brief_engine_prompt`` needed the same answer. The chain has
+    three fallback levels and duplicating it would have been a drift waiting
+    to happen -- the long form and the short form must agree about what this
+    episode sounds like, or the two engines tell different stories.
+    """
+    terms = (meta.get("story_brief_terms") or {}) if isinstance(meta, dict) else {}
+    if not isinstance(terms, dict):
+        terms = {}
     # Mood: v2 music_mood_terms (via the protocol reader) -> v1 atmosphere ->
     # keyword-mined produced logline / news.script_brief.
     mood_terms: list[str] = []
@@ -240,6 +253,19 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
             )
             kw = _mood_suffix(seed_text).lstrip(", ").strip()
             mood_terms = [t.strip() for t in kw.split(",") if t.strip()] if kw else []
+    return mood_terms
+
+def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
+    """Compose a music cue's ROW text from the Meta brief, returning (prompt,
+    duration_sec). Reads every brief field through the brief-reader protocol;
+    never crashes on an absent / malformed brief (falls through to the house
+    palette + the cue's arc, plus a neutral "atmospheric" -- except on a
+    `groove_arc` palette, which omits that word; see the module docstring).
+    """
+    setting_terms = resolve_setting_terms(meta)
+
+    # Mood: resolved by `resolve_mood_terms` -- one owner, two callers.
+    mood_terms = resolve_mood_terms(meta)
 
     setting_str = ", ".join(setting_terms[:2]) if setting_terms else ""
     palette = story_palette(meta)
@@ -326,6 +352,93 @@ def _trim_at_clause(text: str, budget: int) -> str:
     if at > budget // 2:
         cut = cut[:at]
     return cut.rstrip(" ,;.")
+
+
+def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePrompt:
+    """The SHORT form, for engines trained on short descriptions.
+
+    WHY IT EXISTS, measured 2026-09-12 with MusicGen's own T5 tokenizer: the
+    full form runs 72-88 tokens and Meta's own MusicGen examples are 12-14
+    ("80s pop track with bassy drums and synth"). Operator: *"musicgen, that
+    seems too long of a prompt ... for Suno maybe, musicgen nah ... especially
+    for a 10 sec clip."* Both halves hold, and the second is the sharper one:
+    the cues are 8 and 12 seconds, so an arc clause describes structure the
+    clip has no room to contain, and every token spent on it dilutes the
+    conditioning that decides whether it sounds like the genre at all.
+
+    THE DERIVED FORM NAMES NO INSTRUMENTS, and that is the operator's call
+    rather than an economy: *"probably better to keep to general, to drama, not
+    even mention instruments."* He is right for a genre-trained model --
+    "Detroit techno" already implies the TR-909, so listing it spends tokens to
+    repeat the genre and risks the model foregrounding one instrument as a solo.
+    What stays is the drama.
+
+    THAT IS A STATEMENT ABOUT THE DERIVED FORM ONLY. An AUTHORED row is his own
+    text and is carried whatever it says -- if he writes "solo piano" then the
+    prompt names an instrument, and correctly so. For the same reason the token
+    figure below describes the derived form; an authored line is not capped
+    here, because truncating his words to hit a number would be the same defect
+    as editing their punctuation.
+
+    THREE THINGS, IN THIS ORDER, and the order is the whole point:
+      1. the palette's IDIOM -- genre and BPM, which is what his ear judged;
+      2. the episode's MOOD, from the same resolver the long form uses, so the
+         music still answers to this story rather than to its bank;
+      3. the instrumental instruction.
+
+    COMPOSED, NEVER TRIMMED. ``compose_engine_prompt`` trims a long row from
+    the MIDDLE at a clause boundary -- which on these palettes cuts the genre
+    and BPM clause, because it sits after the instruments. Shortening by
+    trimming would silently reinstate the exact defect he heard in the techno
+    and house cues. Measured output: 15-28 tokens.
+    """
+    palette = story_palette(meta)
+    # AN AUTHORED ROW IS THE OPERATOR'S OWN WORDS AND OUTRANKS EVERY DERIVED
+    # CLAUSE (2026-09-12). On the my_story and scifi_news_pro lanes the ledger
+    # carries a hand-written `generation_prompt` per cue; the long form puts
+    # only the palette and anchor in FRONT of it (it does strip whitespace,
+    # and trims a row over the 1000-character engine budget), and an early
+    # cut of this short form composed
+    # from the palette alone and silently threw it away. Caught by
+    # `test_scifi_news_pro_music_rows_render_by_cue_id`. The genre still leads,
+    # because that is what his ear judged, and his line follows it.
+    authored = str(authored_text or "").strip()
+    if authored:
+        # NEVER EDIT HIS WORDS. An earlier cut here ran `.rstrip(",.")`, which
+        # turned an authored "Resolve." into "Resolve" -- mutating the operator's
+        # own text inside the branch whose entire job is to preserve it (codex
+        # contrarian, 2026-09-12). Only whitespace is stripped now. The tail is
+        # joined so it reads correctly whatever the line ends with, instead of
+        # the text being changed to suit the join.
+        if authored.endswith((".", "!", "?")):
+            tail = " instrumental, no vocals"
+        elif authored.endswith(","):
+            tail = " instrumental, no vocals"
+        else:
+            tail = ", instrumental, no vocals"
+        return EnginePrompt(
+            text="%s, %s%s" % (palette.idiom, authored, tail),
+            negative=negative_for(palette),
+            palette_key=palette.key)
+    moods = resolve_mood_terms(meta)
+    setting = resolve_setting_terms(meta)
+    # ONE mood word, and it LEADS as an adjective on the genre rather than
+    # trailing as its own clause -- "tense Detroit techno", the way the
+    # operator says it out loud and the way MusicGen's own examples are
+    # written ("80s pop track with bassy drums and synth"). A comma-separated
+    # mood list read as a second subject and cost tokens for less signal.
+    lead = ("%s %s" % (moods[0], palette.idiom)).strip() if moods else palette.idiom
+    parts = [lead]
+    # ONE setting phrase -- "a bit of the story feels", in his words. This is
+    # the only thing in the short form that changes between two episodes on the
+    # same bank with the same mood, so it is what keeps the music answering to
+    # THIS story instead of to its genre.
+    if setting:
+        parts.append("in %s" % setting[0])
+    parts.append("instrumental, no vocals")
+    return EnginePrompt(text=", ".join(parts),
+                        negative=negative_for(palette),
+                        palette_key=palette.key)
 
 
 def compose_engine_prompt(meta: dict, row_text: str) -> EnginePrompt:

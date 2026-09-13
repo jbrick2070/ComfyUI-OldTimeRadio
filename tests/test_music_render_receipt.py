@@ -20,6 +20,7 @@ torch = pytest.importorskip("torch")
 
 from nodes import _otr_cue_manifest as CM  # noqa: E402
 from nodes import _otr_music_palette as P  # noqa: E402
+from nodes import _otr_music_prompt as MP  # noqa: E402
 
 
 def _stub(monkeypatch, recorder):
@@ -60,7 +61,20 @@ def test_every_cue_row_carries_what_the_engine_heard_and_did(monkeypatch):
         receipt = row["render_receipt"]
         heard = calls[row["batch_index"]]
         assert receipt["engine_prompt"] == heard["prompt"]
-        assert receipt["engine_prompt"].startswith(P.EARLY_CONSORT.instruments)
+        # MusicGen takes the BRIEF form since 2026-09-12, which leads with the
+        # palette idiom rather than its instrument list -- the receipt still
+        # records exactly what the engine heard, which is the real invariant.
+        # `in`, not `startswith`: the brief form leads with the episode MOOD as
+        # an adjective on the genre ("stately Elizabethan consort music"), so
+        # the idiom is the second thing in the string, not the first.
+        assert P.EARLY_CONSORT.idiom in receipt["engine_prompt"]
+        assert receipt["engine_prompt"].endswith("instrumental, no vocals")
+        # THE POINT OF THE SHORT FORM, ASSERTED DIRECTLY: no instrument list and
+        # no production anchor. Checking only that the idiom appears somewhere
+        # would pass on the long prompt too, which is what this replaced (codex
+        # contrarian, 2026-09-12).
+        assert P.EARLY_CONSORT.instruments not in receipt["engine_prompt"]
+        assert MP.PRODUCTION_ANCHOR not in receipt["engine_prompt"]
         assert receipt["negative_prompt"] == heard["negative_prompt"]
         assert "hiss" in receipt["negative_prompt"]
         assert receipt["palette_key"] == "early_consort"

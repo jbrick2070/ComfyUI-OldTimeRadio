@@ -236,8 +236,28 @@ def test_scifi_news_pro_music_rows_render_by_cue_id(monkeypatch):
     # story palette + production anchor in FRONT of the authored text
     from nodes import _otr_music_palette as P
     heard = [c["prompt"] for c in calls]
-    assert {h.rsplit(". ", 1)[-1] for h in heard} == {"slow open", "bridge", "resolve"}
-    assert all(h.startswith(P.HOUSE_PALETTE.instruments) for h in heard)
+    # AUTHORED TEXT SURVIVES THE SHORT FORM, and that is what this asserts.
+    # MusicGen asks for the brief prompt (2026-09-12), so the shape changed:
+    # the palette's IDIOM leads instead of its instrument list, and there is no
+    # production anchor. What must not change is the operator's own words -- an
+    # early cut of the brief composed from the palette alone and threw them
+    # away, which this test caught.
+    assert all(h.endswith(", instrumental, no vocals") for h in heard)
+    # ONE AUTHORED LINE PER PROMPT, AND A DIFFERENT ONE EACH TIME. An earlier
+    # version of this assertion asked only whether each fragment appeared in
+    # SOME prompt, which all three prompts carrying all three fragments would
+    # have passed (codex contrarian, 2026-09-12). This pins the bijection the
+    # old set-equality proved, without counting comma fields from either end --
+    # an idiom may itself contain a comma ("Detroit techno at 128 BPM, hypnotic
+    # machine funk"), so index arithmetic is a trap here.
+    AUTHORED = ("slow open", "bridge", "resolve")
+    found = []
+    for h in heard:
+        hits = [a for a in AUTHORED if ", %s, instrumental, no vocals" % a in h]
+        assert len(hits) == 1, "prompt carries %d authored lines: %s" % (len(hits), h)
+        found.append(hits[0])
+    assert sorted(found) == sorted(AUTHORED), found
+    assert all(h.startswith(P.HOUSE_PALETTE.idiom) for h in heard)
     # the cue's placement and the negative prompt reach the adapter
     assert {c["placement"] for c in calls} == {"opening", "interstitial", "closing"}
     assert all("hiss" in c["negative_prompt"] for c in calls)
@@ -265,8 +285,15 @@ def test_musicgen_clip_prompt_from_meta_brief(monkeypatch):
     }
     StableAudioTheme().generate(script_json=_ledger(meta), engine="musicgen")
     opening = calls[0]["prompt"]
-    assert "sombre" in opening
-    assert opening.endswith("instrumental only, no dialogue, no vocals")
+    # The episode's mood still reaches MusicGen -- it is the thing that makes
+    # two episodes on one bank sound different -- but it now LEADS as an
+    # adjective on the genre rather than trailing as its own clause, and the
+    # instrumental tail is the short one. Operator, 2026-09-12: *"techno is
+    # tense techno music, lighthearted techno music in space ... but add a bit
+    # of the story feel."*
+    assert opening.startswith("sombre ")
+    assert opening.endswith("instrumental, no vocals")
+    assert len(opening) < 200, "the brief form must stay brief: " + opening
 
 
 def test_dispatch_fails_closed_with_taxonomy(monkeypatch):

@@ -35,6 +35,20 @@ class MusicGenEngine:
     supports_external_generator = False  # MusicGen.generate binds no external Generator
     model_id = _MUSICGEN_MODEL_ID
     guidance_scale = 3.0                 # == music_musicgen_v1 profile default (pinned)
+    #: ASK FOR THE SHORT PROMPT. Measured 2026-09-12 with this model's own T5
+    #: tokenizer: the pack's full cue prompt runs 72-88 tokens, and Meta's own
+    #: MusicGen examples are 12-14 ("80s pop track with bassy drums and synth").
+    #: Our cues are 8 and 12 seconds long, so most of that text describes
+    #: structure the clip cannot contain and only dilutes the conditioning that
+    #: decides whether it sounds like the genre at all.
+    #:
+    #: THE FLAG LIVES HERE, ON THE ENGINE, because prompt length is a fact
+    #: about the model rather than about the story -- Stable Audio 3 takes the
+    #: long form happily and keeps it. `stable_audio_theme` reads this and asks
+    #: `_otr_music_prompt.compose_brief_engine_prompt` instead; the short form
+    #: is COMPOSED from the palette, never trimmed from the long one, because
+    #: trimming cuts the middle and the genre/BPM clause sits there.
+    wants_brief_prompt = True
 
     def __init__(self):
         self._model = None

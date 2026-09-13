@@ -30,7 +30,8 @@ import logging
 from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
 import math
 
-from ._otr_music_prompt import compose_engine_prompt, compose_music_prompt
+from ._otr_music_prompt import (compose_brief_engine_prompt,
+                                compose_engine_prompt, compose_music_prompt)
 
 #: Where a music cue's peak is allowed to sit. The same -1 dBFS the
 #: delivery master uses, and the level `eng_musicgen` has always
@@ -322,7 +323,18 @@ class StableAudioTheme:
             # cue_spec_sha256). The ENGINE hears the story palette and a clean
             # production anchor in front of it, plus the negative prompt --
             # one composer for every engine (2026-09-11: "make it musical").
-            engine_prompt = compose_engine_prompt(meta, prompt)
+            # ASK THE ADAPTER HOW MUCH TEXT IT WANTS (2026-09-12). One
+            # composer still serves every engine -- what changed is that the
+            # engine now says which FORM it was trained for. MusicGen sets
+            # `wants_brief_prompt` because its own examples are 12-14 tokens
+            # and ours ran 72-88 for an 8-second bed; Stable Audio 3 says
+            # nothing and keeps the full form. The default is False, so an
+            # engine that never heard of this flag is byte-identical.
+            if getattr(adapter, "wants_brief_prompt", False):
+                engine_prompt = compose_brief_engine_prompt(
+                    meta, prompt if spec.get("authored") else "")
+            else:
+                engine_prompt = compose_engine_prompt(meta, prompt)
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
             with deterministic_inference(engine_seed, warn_only=True):
@@ -368,7 +380,14 @@ class StableAudioTheme:
                     continue
                 placement = self._canonical_placement(row.get("placement"), cue_id)
                 prompt = row.get("generation_prompt") or row.get("description") or ""
-                if str(prompt).strip():
+                # WHOSE WORDS ARE THESE. Recorded here because this is the only
+                # place that can still tell: below, an authored prompt and a
+                # composed one are both just `spec["prompt"]`. The brief form
+                # for MusicGen has to keep an author's line and must not keep a
+                # composed row, which is 300+ characters of the thing it exists
+                # to shorten.
+                authored = bool(str(prompt).strip())
+                if authored:
                     dur = row.get("target_duration_s")
                     duration_s = (
                         float(dur)
@@ -384,6 +403,7 @@ class StableAudioTheme:
                     "cue_id": cue_id,
                     "placement": placement,
                     "prompt": str(prompt),
+                    "authored": authored,
                     "requested_duration_s": float(duration_s),
                     "seed_key": cue_id,
                     "anchor_line_id": row.get("anchor_line_id"),
