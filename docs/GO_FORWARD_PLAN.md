@@ -140,6 +140,62 @@ RTX A4500 20 GB and the Mac mini M4. `docs/4060_DRILL_LOG.md` around lines
 probably to add the row rather than to retract the verdict. Two hand-curated
 files feed two generated docs and nothing enforces agreement between them.
 
+### C6. NO SHIPPED JSON MAY NEED GGUF -- and 48 recipes currently do
+
+**Operator ruling, 2026-09-12:** *"GGUF is empty because it doesn't auto
+download, so we don't ship to the public any JSON with GGUF because it's high
+friction if possible."* This is broader than the 2026-09-06 directive that
+emptied `GGUF_ROWS`: that one removed the GGUF WRITER, this one covers every
+GGUF weight in a graph we hand someone.
+
+**Measured across all 118 recipes: 48 select at least one GGUF-dependent
+engine.**
+
+| engine | recipes | why it is GGUF |
+|---|---|---|
+| `flux2_klein` | 32 | its DiT is a 2.6 GB GGUF file through `UnetLoaderGGUF` |
+| `wan_ti2v` | 8 | GGUF DiT + GGUF umt5 encoder |
+| `ltx_video` | 4 | GGUF UNET |
+| `ltx_audio_in` | 3 | GGUF UNET, and NVML-gated besides |
+| `fastwan_8gb` | 3 | a `wan_ti2v` subclass |
+| `minimax_h3_video` | 2 | operator-only tier |
+| the three `ltx25_*` lanes | 1 each | GGUF + a patched ComfyUI-GGUF |
+
+**EVERY 8 GB RECIPE NAMES `flux2_klein`**, including `otr_nvidia_8gb_haunted`,
+the one with eleven published episodes behind it. It is INERT there -- all four
+of the 4060's clean-room receipts show the image shortcode as `none`, because
+the haunted video lane mints no still -- but a shipped graph that names a
+pack-dependent engine is a trap set for the first person who switches a video
+lane.
+
+**THE PRECEDENT IS SIX DAYS OLD AND IS THE SAME REASONING.** `b1f372a9` moved
+both AMD recipes off `flux2_klein` and onto `z_image_turbo` for exactly this,
+titled "Make the AMD tiers installable with nothing extra". The 8 GB set never
+got the same pass.
+
+**TWO CANDIDATES, and the choice is his because it is a friction-versus-receipt
+trade:**
+
+| | nv8 verdict | download | pack | note |
+|---|---|---|---|---|
+| `z_image_turbo` | **proven** | 19.3 GB | none | what AMD was moved to |
+| `sd15` | fits | **2.0 GB** | none | auto-downloads since tonight; proven on Mac |
+
+`sd15` is 17 GB lighter and is the lower-friction answer his ruling points at;
+`z_image_turbo` is the one with an 8 GB receipt. Either removes the pack.
+
+**WHAT CANNOT BE FIXED BY AN IMAGE SWAP, and must be said plainly:**
+`otr_8gb_wan` and `otr_8gb_fastwan` are GGUF at their CORE -- their video lane
+is the GGUF Wan stack. Making them ship-clean means changing what they are, not
+retouching a dropdown. The same is true of every `ltx25_*` and `ltx_video`
+recipe. Those are candidates for "not part of the public set" rather than for
+repair.
+
+**NOT SWEPT ON MY OWN INITIATIVE.** Scoped the way the kokoro ruling was: the
+SHIPPING set gets the rule, and a soak or rotation recipe whose entire purpose
+is to exercise `wan_ti2v` or `ltx25` keeps it, because changing those deletes
+the test.
+
 ### C0. Kokoro is the default voice in every shipped JSON (operator ruling, 2026-09-12)
 
 Operator: *"for maybe Mac and AMD, well, at least Mac, we'll ship Kokoro because
