@@ -13,6 +13,14 @@
 
 > *"Good evening. This is SIGNAL LOST."*
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in" width="760">
+</p>
+<p align="center"><em>A frame from <strong>The Shivering Gauge</strong> — a film archivist and his apprentice
+racing vinegar syndrome through one night in the lab. Written, cast, performed,
+scored, drawn and cut on one machine, from a Library of Congress feed, in about
+ninety seconds of finished radio.</em></p>
+
 That is how every episode opens. What follows is a radio drama nobody has heard
 before: a script written on your own machine from tonight's news, a public-domain
 story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
@@ -42,7 +50,7 @@ pressing **Queue** is the whole path.
 
 | Your machine | What to expect on a first short episode |
 |---|---|
-| NVIDIA, 16 GB or more | Minutes. Every default is proven here, and all but the heaviest video lanes are open to you. |
+| NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
@@ -102,6 +110,11 @@ That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
 finish**, however green the console looked -- go to
 [When something goes wrong](#when-something-goes-wrong).
 
+To stop a run, press **Cancel** in the ComfyUI menu (or clear the queue). It
+stops at the next step rather than instantly, so a long video beat finishes
+first. Nothing is published, and the part-built episode stays in
+`otr/episodes/<episode>/`.
+
 **The one exception, and it is deliberate.** Publication is a separate decision
 from production. If an episode's rights receipt does not clear -- a
 research-only source, or a receipt the terminal node cannot match to this
@@ -128,7 +141,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 |---|---|
 | `episode_title` | Blank, and the show titles itself. Anything you type becomes the title card. |
 | `num_characters` | Speaking parts. Ships at 2. |
-| `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. Episodes published here run about one to four minutes; this is the main lever on that. |
+| `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. **This is what moves the clock** -- episodes here run about one to four minutes, and three acts is roughly three times the render, not three times the fun. |
 | `custom_premise` | A sentence or two of your own. Blank means the source decides. |
 | `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks -- one of ten. Ships on *roll*. |
@@ -619,32 +632,12 @@ instruction.
 
 ---
 
-## Two optional lanes
+## If your card cannot hold a writer
 
-**A cloud writer.** If your card cannot hold a local writer, or you want to write
-scripts on a machine with no usable GPU, the script step alone can run on
-OpenRouter, Google, or Comfy Credits. Voices, music, images and video stay local.
-It costs money, it is off by default, and it exists for hardware reasons rather
-than prose quality. [apple/CLOUD.md](apple/CLOUD.md) has the three switches.
-
-**The GGUF writer lane.** Nothing selects it today -- no `*-GGUF` writer appears
-in the dropdown -- but the lane is wired for people who want to run a quantized
-writer on a small card off NVIDIA. If you wire it up, pin the library:
-
-```bash
-pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
-```
-
-Do not take the latest. `0.3.35` dies with an illegal-instruction fault inside
-`llama_init_from_model` before a single token, on the CPU backend, so no GPU
-avoids it; an unpinned install resolves to it. That line is the Windows CUDA
-recipe, the only one measured here; on other platforms use upstream's own build
-flags with the same pin. And test it the way OTR does -- a bare `import llama_cpp`
-fails even on a working install, because the pack preloads the CUDA DLLs first:
-
-```python
-from nodes._otr_gguf_backend import _import_llama_cpp; _import_llama_cpp()
-```
+The script step alone can run on OpenRouter, Google, or Comfy Credits; voices,
+music, images and video stay local either way. It costs money, it is off until
+you turn it on, and it is there for hardware reasons rather than better prose.
+[apple/CLOUD.md](apple/CLOUD.md) has the three switches.
 
 ---
 
@@ -723,16 +716,14 @@ read the console from the end backwards for the first error, and if it has been
 quiet for more than five minutes after the downloads finished, it is not going
 to finish.
 
-**Two GPUs, and it measured the wrong one.** Memory is read from CUDA device 0
-in four places, so on a machine where device 0 is an integrated or smaller card
-the pack sizes its budget against that card and can refuse or run badly. Until
-that is fixed, launch ComfyUI with `CUDA_VISIBLE_DEVICES` set so the card you
-want is the only one it sees.
+**Two GPUs, and it measured the wrong one.** Launch ComfyUI with
+`CUDA_VISIBLE_DEVICES` set so the card you want is the only one it sees. The
+pack reads VRAM from CUDA device 0, so a box whose device 0 is an integrated or
+smaller card gets sized against that one.
 
-**`BUG-LOCAL-098` on a second queue.** The message names a quantized load that
-did not materialize -- bitsandbytes silently falling back to fp16 on a reload.
-The check is doing its job: it refuses a wrongly-quantized model rather than
-rendering with one. Restart ComfyUI and queue again.
+**`BUG-LOCAL-098` on a second queue.** Restart ComfyUI and queue again. The
+check caught bitsandbytes silently falling back to fp16 on a reload, and refused
+the wrongly-quantized model rather than rendering with it.
 
 ---
 
@@ -743,23 +734,15 @@ claim a job that belongs to someone else, or -- rarest and most obvious -- addre
 themselves by name. It is uncommon, it does not break a render, and the episode
 still plays, but it is real and you should know before you run this.
 
-It is not fixed because the fix did not pass. A post-story clean stage already
-reads every spoken row with a model and rewrites anything that is not speech
-(stage directions, sound cues) -- that works and is on by default. The stricter
-pass that judges *who* should be speaking was built, measured, and found unstable
-on a 12B-class model, which is the largest thing a 16 GB card holds. It ships
-disabled rather than quietly making episodes worse. If you have a much larger
-model and want to try it, the switch is `JUDGE_ATTRIBUTION` in
-`nodes/_otr_ledger_clean.py`.
+The automatic fix for it made episodes worse on a 12B-class model -- the
+largest a 16 GB card holds -- so it ships disabled rather than quietly degrading
+the writing. On a much larger model you can try it: the switch is
+`JUDGE_ATTRIBUTION` in `nodes/_otr_ledger_clean.py`.
 
-**It expects one episode at a time, and one GPU.** Two habits are baked in
-from the machine it was written on. Queueing several prompts at once is not
-supported: the production ledger keeps the current episode in a module-level
-global, and a node that cannot see its wired input falls back to the
-newest ledger on disk by modification time -- which, with two runs in flight, may
-belong to the other one. And VRAM is read from CUDA device 0 rather than from
-the device ComfyUI selected, so a multi-GPU box wants `CUDA_VISIBLE_DEVICES`.
-Neither is hard to fix and neither is fixed; both are listed because a stranger
+**It expects one episode at a time, and one GPU.** Do not queue several
+prompts at once -- the ledger that carries an episode between nodes is held per
+process, and two runs in flight can read each other's. On a multi-GPU box, set
+`CUDA_VISIBLE_DEVICES`. Neither is hard to fix and neither is fixed, and you
 should not have to discover them.
 
 **Two of the voice engines assume Windows.** The Chatterbox and Dia sidecars
