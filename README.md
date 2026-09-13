@@ -11,6 +11,17 @@ slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic v
 (three procgen visualizer lanes by default -- zero weights; LTX, Wan, HuMo and the
 `still_*` family all remain selectable) → final MP4.
 
+## Start here
+
+| | |
+|---|---|
+| **[apple/INSTALL.md](apple/INSTALL.md)** | Get the nodes loading. ffmpeg, Python versions, what downloads itself. |
+| **[apple/RUN.md](apple/RUN.md)** | Make your first episode, and where it lands. |
+| **[apple/MACHINES.md](apple/MACHINES.md)** | Which graph to open for your card, what runs where, and where every manual weight comes from. |
+
+Those three ship with the pack. Everything under `docs/` is the development
+record and is **not** included in a Manager install -- read it on GitHub.
+
 **Alpha.24 qualification warning:** the mouse-only fresh-install path is not yet
 qualified. See [the physical 4060 report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
 before queuing the canonical: missing visual weights were detected only after
@@ -208,7 +219,10 @@ ComfyUI Desktop the `animatediff_models` category is not mapped by default;
 addendum that exposes it.
 
 **The motion module publishes no licence grant** (`commercial_clean = False` in
+
 the adapter), so treat the haunted lane as personal use.
+
+
 
 #### The LTX 2.3 weights, and the two lanes we still cannot source
 

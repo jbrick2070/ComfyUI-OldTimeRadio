@@ -49,6 +49,12 @@ _REPO = os.path.dirname(_HERE)
 _DOC = os.path.join(_REPO, "docs", "DROPDOWN_MATRIX.md")
 _CURATED = os.path.join(_REPO, "docs", "dropdown_matrix.json")
 _README = os.path.join(_REPO, "README.md")
+#: The SHIPPING copy. `docs/` is excluded from the registry bundle
+#: (`.comfyignore` line 178) and `apple/` is not, so this is the only machine
+#: table an installed user can read. It is generated for the same reason the
+#: other two are: a hand-kept copy of a derived table is a place for the same
+#: fact to be wrong in.
+_APPLE = os.path.join(_REPO, "apple", "MACHINES.md")
 
 _BEGIN = "<!-- BEGIN GENERATED: dropdown-matrix -->"
 _END = "<!-- END GENERATED: dropdown-matrix -->"
@@ -659,6 +665,311 @@ def render_doc(rows: list) -> str:
     return "".join(L)
 
 
+#: Loader-class prefix -> the pack that provides it, read from the ONE table
+#: the runtime error message already uses, so a document and an error can never
+#: name different packs. Source: `_PACK_FOR_PREFIX`,
+#: `nodes/_otr_video_engines/wrapper_bridge.py`.
+def _pack_prefixes() -> tuple:
+    bridge = os.path.join(_REPO, "nodes", "_otr_video_engines", "wrapper_bridge.py")
+    tree = ast.parse(io.open(bridge, encoding="utf-8").read())
+    for node in tree.body:
+        if isinstance(node, ast.Assign) and any(
+                getattr(t, "id", "") == "_PACK_FOR_PREFIX" for t in node.targets):
+            return tuple((p, pack) for p, pack, _url in ast.literal_eval(node.value))
+    raise SystemExit("wrapper_bridge.py no longer defines _PACK_FOR_PREFIX")
+
+
+def packs_by_engine() -> dict:
+    """``{engine: "ComfyUI-GGUF"}`` -- what to install BEYOND this pack.
+
+    DERIVED, because the hand-typed equivalent has already drifted. Two passes:
+
+    1. A module NEEDS a pack when its own source emits a class whose name
+       starts with one of the bridge's prefixes (``ADE_``, ``VHS_``,
+       ``UnetLoaderGGUF``, ``CLIPLoaderGGUF``).
+    2. A module INHERITS that need when it imports a module which has it --
+       ``eng_ghost_signal_official`` subclasses ``GhostSignalEngine`` and names
+       no ``ADE_`` class of its own, so a source scan alone would report it as
+       needing nothing. This is exactly the case the hand table's own comment
+       says to follow, and the case a naive scan gets wrong.
+
+    An engine is attributed to the module whose source contains its id as a
+    string literal. A module registering several engines gives all of them the
+    same answer, which is correct: they share the graph it emits.
+    """
+    prefixes = _pack_prefixes()
+    # `wrapper_bridge` DEFINES the prefix table, and every registry names every
+    # engine id; scanning either credits the whole roster with every pack. That
+    # is not a hypothetical -- it is what the first run of this function did.
+    skip = {"wrapper_bridge", "registry", "__init__"}
+    declares, emits, imports = {}, {}, {}
+    for _ns, rel in _REGISTRIES:
+        folder = os.path.join(_REPO, os.path.dirname(rel))
+        siblings = {f[:-3] for f in os.listdir(folder) if f.endswith(".py")}
+        for fn in sorted(os.listdir(folder)):
+            if not fn.endswith(".py") or fn[:-3] in skip:
+                continue
+            mod = fn[:-3]
+            text = io.open(os.path.join(folder, fn), encoding="utf-8").read()
+            found = {pack for prefix, pack in prefixes if prefix in text}
+            if found:
+                emits[mod] = found
+            edges = set()
+            try:
+                for node in ast.walk(ast.parse(text)):
+                    if isinstance(node, (ast.Import, ast.ImportFrom)):
+                        # `from .X import Y` puts X in `module`; `from . import
+                        # X` puts it in `names`; `import a.b.X` puts it in the
+                        # dotted alias. Collect all three spellings.
+                        mod_name = getattr(node, "module", None)
+                        if mod_name:
+                            edges.add(mod_name.rsplit(".", 1)[-1])
+                        for alias in node.names:
+                            edges.add(alias.name.rsplit(".", 1)[-1])
+            except SyntaxError:
+                pass
+            imports[mod] = {m for m in siblings
+                            if m != mod and m not in skip and m in edges}
+            # An adapter DECLARES its id: `name = "z_image_turbo"`. Identity,
+            # not "the file mentions this string somewhere".
+            try:
+                tree = ast.parse(text)
+            except SyntaxError:
+                continue
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    for stmt in node.body:
+                        if (isinstance(stmt, ast.Assign)
+                                and any(getattr(t, "id", "") == "name"
+                                        for t in stmt.targets)
+                                and isinstance(stmt.value, ast.Constant)
+                                and isinstance(stmt.value.value, str)):
+                            declares.setdefault(mod, set()).add(stmt.value.value)
+
+    # Propagate along import edges to a fixpoint: a subclass inherits the graph
+    # its base emits (eng_ghost_signal_official names no ADE_ class of its own).
+    changed = True
+    while changed:
+        changed = False
+        for mod, deps in imports.items():
+            inherited = set()
+            for dep in deps:
+                inherited |= emits.get(dep, set())
+            if inherited - emits.get(mod, set()):
+                emits.setdefault(mod, set()).update(inherited)
+                changed = True
+
+    known = {e for ns in registry_capabilities().values() for e in ns}
+    out = {}
+    for mod, packs in emits.items():
+        for engine in declares.get(mod, set()):
+            if engine in known:
+                out.setdefault(engine, set()).update(packs)
+    return {e: " + ".join(sorted(p)) for e, p in out.items()}
+
+
+def _variant_for(profile_id: str) -> str:
+    """The saved graph a profile emits, by `build_variants.py`'s own rule.
+
+    `build_variants.py:135-148` globs `config/profiles/*.json`, takes each
+    stem, and refuses outright when a bare `X` would collide with an existing
+    `otr_X`. So the mapping is total and unambiguous: prefix unless already
+    prefixed.
+    """
+    stem = profile_id if profile_id.startswith("otr_") else "otr_%s" % profile_id
+    return "workflows/variants/%s.json" % stem
+
+
+def manual_artifacts(lane: str, provision, fetcher) -> list:
+    """Every artifact a manual lane needs, from whichever manifest owns it.
+
+    THREE MANIFESTS, NOT ONE, and reading only the first is what made the
+    first cut of section 3 silently omit six of nine manual lanes:
+
+    * ``MANUAL_TIERS`` in the provisioner -- dicts, receipts complete.
+    * ``LANES`` in the fetcher -- ``WeightSpec`` namedtuples, except the lanes
+      that predate receipts, which are still bare 3-tuples of
+      ``(repo, path_in_repo, destination)``. Both shapes are read; a legacy
+      tuple simply has no size to report.
+    * The OPERATOR-ONLY ALIAS: ``h3_operator_only`` is the provisioner's name
+      for artifacts the fetcher keeps under ``minimax_h3``. The mapping is
+      declared in ``OPERATOR_ONLY_FETCH_LANES`` and is read from there, so a
+      future alias needs no change here.
+
+    Returns ``[]`` when no manifest owns the lane -- the caller must SAY so
+    rather than print nothing.
+    """
+    tiers = getattr(provision, "MANUAL_TIERS", {})
+    if lane in tiers:
+        return [dict(spec) for spec in tiers[lane]]
+    alias = getattr(provision, "OPERATOR_ONLY_FETCH_LANES", {}).get(lane, lane)
+    out = []
+    for spec in getattr(fetcher, "LANES", {}).get(alias, []) or []:
+        if hasattr(spec, "repo"):                 # a WeightSpec
+            out.append({"repo": spec.repo, "path": spec.path_in_repo,
+                        "destination": spec.destination,
+                        "bytes": getattr(spec, "expected_bytes", None) or 0,
+                        "gated": False})
+        else:                                     # a legacy bare 3-tuple
+            parts = list(spec) + ["", "", ""]
+            out.append({"repo": parts[0], "path": parts[1],
+                        "destination": parts[2], "bytes": 0, "gated": False})
+    return out
+
+
+def render_apple(rows: list) -> str:
+    """`apple/MACHINES.md` -- the three questions, in the order people ask them.
+
+    1. Which graph do I open?  2. Will this engine run here?  3. Where do the
+    manual weights come from? The third has never been answered anywhere: the
+    document the matrix points at for manual rows lists filenames with no
+    repository and no destination directory, while `MANUAL_TIERS` has carried
+    `repo`, `revision`, `path`, `destination`, `bytes` and `gated` per artifact
+    the whole time.
+    """
+    provision = _load("scripts/otr_provision.py", "_odm_provision")
+    packs = packs_by_engine()
+    by_engine = {row["engine"]: row for row in rows}
+    L = ["# Which machine runs what\n\n",
+         "Generated by `scripts/otr_dropdown_matrix.py` -- do not hand-edit; "
+         "run `python scripts/otr_dropdown_matrix.py` and the change lands in "
+         "every copy at once.\n\n",
+         "Three questions, in the order people ask them.\n\n"]
+
+    # ---------------------------------------------------------------- 1. graph
+    L.append("## 1. Which graph do I open?\n\n")
+    L.append("Every row below is a real saved graph in this repository. Drag it "
+             "onto the ComfyUI canvas, or use **Browse Templates** for the "
+             "canonical. If your machine is not listed, open the canonical: it "
+             "names no vendor anywhere and resolves your device at run time.\n\n")
+    L.append("| Your machine | Open this | Also install |\n")
+    L.append("|---|---|---|\n")
+    L.append("| Anything, to start | `workflows/otr_canonical.json` "
+             "(Browse Templates &rarr; OTR) | nothing |\n")
+    for machine in MACHINES:
+        graph = _variant_for(machine["profile"])
+        if not os.path.exists(os.path.join(_REPO, graph)):
+            continue
+        needed = sorted({packs[e] for e in _profile_engines(machine["profile"])
+                         if e in packs})
+        L.append("| %s -- %s | `%s` | %s |\n" % (
+            machine["label"], machine["blurb"], graph,
+            ", ".join(needed) if needed else "nothing"))
+    L.append("\nEvery machine needs **ffmpeg and ffprobe** on PATH, and Linux "
+             "needs one monospace TTF installed for burned captions.\n\n")
+    if packs:
+        L.append("If you change a dropdown yourself, these are the only "
+                 "picks that need anything beyond this pack. Everything "
+                 "not listed here runs on what you already have.\n\n")
+        L.append("| If you select | Install |\n|---|---|\n")
+        def _label(engine):
+            row = by_engine.get(engine)
+            return row["public"] if row else engine
+        for engine in sorted(packs, key=lambda e: (packs[e], _label(e))):
+            L.append("| `%s` | %s |\n" % (_label(engine), packs[engine]))
+        L.append("\n")
+
+    # --------------------------------------------------------------- 2. table
+    L.append("## 2. Will this engine run on my machine?\n\n")
+    L.append(render_table(rows).strip() + "\n\n")
+
+    # ------------------------------------------------------------- 3. weights
+    L.append("## 3. Where do the manual weights come from?\n\n")
+    L.append("Every file a **manual** row needs: the repository to download it "
+             "from, and the folder under your ComfyUI `models/` directory to "
+             "put it in. `gated` means you must accept the model's licence on "
+             "Hugging Face first, while signed in.\n\n")
+    L.append("Two engines can share one group and still download different "
+             "amounts, because they draw different files from it. **The size "
+             "in section 2 is what YOUR pick costs**; the total on a heading "
+             "here is the whole group. A heading with no total means that "
+             "group's manifest predates byte receipts -- section 2 still has "
+             "the figure.\n\n")
+    fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
+    lane_to_engines, unsourced = {}, []
+    for row in rows:
+        if "manual" not in str(row["friction"]).lower():
+            continue
+        lane = str(row["lane"]) if row["lane"] else ""
+        specs = manual_artifacts(lane, provision, fetcher) if lane else []
+        if specs:
+            lane_to_engines.setdefault(lane, []).append(row["public"])
+        else:
+            unsourced.append(row["public"])
+
+    for lane in sorted(lane_to_engines):
+        specs = manual_artifacts(lane, provision, fetcher)
+        users = sorted(set(lane_to_engines[lane]))
+        total = sum(int(s.get("bytes", 0) or 0) for s in specs)
+        head = "### %s" % lane
+        if total:
+            head += " &mdash; %.1f GiB total" % (total / 2 ** 30)
+        L.append(head + "\n\n")
+        L.append("Selected by: %s\n\n" % ", ".join("`%s`" % u for u in users))
+        L.append("| File | From | Put it in | Size | Gated |\n")
+        L.append("|---|---|---|---|---|\n")
+        for spec in specs:
+            dest = str(spec.get("destination") or "")
+            folder = dest.rsplit("/", 1)[0] if "/" in dest else "(models root)"
+            size = int(spec.get("bytes", 0) or 0)
+            L.append("| `%s` | [`%s`](https://huggingface.co/%s) | `models/%s/` "
+                     "| %s | %s |\n" % (
+                         str(spec.get("path", "")).rsplit("/", 1)[-1],
+                         spec.get("repo", "?"), spec.get("repo", ""),
+                         folder,
+                         "%.2f GiB" % (size / 2 ** 30) if size else "--",
+                         "yes" if spec.get("gated") else "no"))
+        L.append("\n")
+
+    if unsourced:
+        L.append("### No manifest ships for these\n\n")
+        L.append("This pack cannot fetch them, and no table here can tell you "
+                 "the filename, because the engine chooses it. Select one "
+                 "anyway and it refuses by name before anything else runs -- "
+                 "**that refusal is the install instruction**: it prints the "
+                 "exact file it wants and the folder it expects. It never "
+                 "quietly substitutes another.\n\n")
+        for public in sorted(set(unsourced)):
+            L.append("* `%s`\n" % public)
+        L.append("\n")
+
+    L.append("## What the words mean\n\n")
+    L.append(_LEGEND.strip() + "\n")
+    return "".join(L)
+
+
+def _profile_engines(profile_id: str) -> set:
+    """Every engine id a profile selects, public labels resolved to real ids."""
+    path = os.path.join(_REPO, "config", "profiles", "%s.json" % profile_id)
+    if not os.path.exists(path):
+        return set()
+    data = json.load(io.open(path, encoding="utf-8"))
+    picked = set()
+    for block in ("role_overrides", "slot_overrides"):
+        for value in (data.get(block) or {}).values():
+            if isinstance(value, str):
+                picked.add(value)
+    known = {e for ns in registry_capabilities().values() for e in ns}
+    public = _load("nodes/_otr_shared/public_engines.py", "_odm_public")
+    resolved = set()
+    for name in picked:
+        if name in known:
+            resolved.add(name)
+            continue
+        # A recipe legitimately names the DROPDOWN LABEL a human sees
+        # (`h3_low_video`) rather than the internal id (`minimax_h3_video`).
+        # There is exactly one function that maps one to the other; a substring
+        # test is not a second one, and using it credited every profile with
+        # every engine.
+        try:
+            engine = public.resolve_engine_id(name)
+        except Exception:
+            continue
+        if engine in known:
+            resolved.add(engine)
+    return resolved
+
+
 def render_readme_block(rows: list) -> str:
     """The README injection -- the three machines a stranger is likely on."""
     machines = [m for m in MACHINES if m["key"] in ("nv8", "nv16", "mac16")]
@@ -695,12 +1006,17 @@ def main(argv=None) -> int:
 
     doc = render_doc(rows)
     block = render_readme_block(rows)
+    apple = render_apple(rows)
     current = io.open(_DOC, encoding="utf-8").read() if os.path.exists(_DOC) else None
+    current_apple = (io.open(_APPLE, encoding="utf-8").read()
+                     if os.path.exists(_APPLE) else None)
 
     if args.check:
         stale = []
         if current != doc:
             stale.append("docs/DROPDOWN_MATRIX.md")
+        if current_apple != apple:
+            stale.append("apple/MACHINES.md")
         if not inject_readme(block, write=False):
             stale.append("README's dropdown-matrix block")
         if stale:
@@ -711,9 +1027,12 @@ def main(argv=None) -> int:
         return 0
 
     io.open(_DOC, "w", encoding="utf-8").write(doc)
+    os.makedirs(os.path.dirname(_APPLE), exist_ok=True)
+    io.open(_APPLE, "w", encoding="utf-8").write(apple)
     inject_readme(block, write=True)
-    print("wrote %s (%d bytes) and injected the README block; %d engines"
-          % (os.path.relpath(_DOC, _REPO), len(doc), len(rows)))
+    print("wrote %s (%d bytes) and %s (%d bytes), injected the README block; "
+          "%d engines" % (os.path.relpath(_DOC, _REPO), len(doc),
+                          os.path.relpath(_APPLE, _REPO), len(apple), len(rows)))
     return 0
 
 
