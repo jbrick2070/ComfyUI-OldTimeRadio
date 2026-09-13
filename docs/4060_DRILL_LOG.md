@@ -5536,3 +5536,23 @@ frames. The ledger freeze retained one soft cleanup warning, but the queue
 advanced into shot generation. No OBS publication is claimed at this checkpoint;
 the final disk artifact and metadata will be appended after independent
 verification.
+
+**CR-20260912-11 — Plan 4 `original` one-act leg: STOPPED BY OPERATOR.**
+
+The live run passed the 23-node / 63-link workflow validator and completed the
+writer and audio stages under the proven `machine:8gb` tuple with
+`act_count=1`: title `Whispers Under Midnight`, 6 lines / 106 words, 3
+continuity facts, and a 53.61-second / 1,341-frame audio budget. The ledger
+freeze retained one soft cleanup warning and continued. Shot-lock authored 8
+beats after two rejected ghost-author responses, using its deterministic
+fallback; the first visual beat was rendering when the operator requested
+stand-down at approximately t=862s.
+
+The canonical API runner and Comfy backend were stopped by operator request.
+Port 8188 and backend PID 27528 were independently verified stopped. No new
+`output/otr/obs` artifact was claimed. The exact interrupted episode directory
+and prompt dump were moved to the recoverable quarantine
+`C:\\Users\\jeffr\\AppData\\Local\\Temp\\otr_interrupted_20260912_215804`;
+the four previously verified OBS publications remain intact. The source
+checkout was clean and synced with `origin/v2.0-alpha` before this checkpoint;
+the stand-down entry is the only pending report change.
