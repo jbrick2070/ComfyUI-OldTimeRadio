@@ -14828,3 +14828,46 @@ also names the right file on a box that holds the base checkpoint.
 greps every module under `nodes/` for a read of that constant outside the engine
 that owns it, and `::test_the_visual_preflight_resolves_the_checkpoint_it_will_load`
 pins the positive half. Four live legs published to `otr/obs` after the fix.
+
+## PBUG-20260913-01 -- the cast-coverage repair stamps a null tts_skip_reason on the row it just voiced, after cleanup has already run
+- surfaced: LIVE pod leg, 2026-09-13 -- `otr_8gb_low` (one act, bank
+  `public_domain`, writer Qwen3.5-4B nf4) on RunPod `zuihlk2y9dpl82`
+  (RTX PRO 4000, Python 3.13, torch 2.10.0+cu128), the first leg of the
+  shipping-set ladder. Leg log
+  `otr/legs/shipping_set_20260913_134051/otr_8gb_low.log`, server log
+  `/workspace/comfy_night.log`, ledger
+  `output/otr/episodes/pending_20260913_134059/audio/pending_20260913_134059_ledger.json`.
+- symptom: `OTR_CastLock: freeze cascade stamped freeze_verdict='needs_full_rerun'
+  for structural ledger corruption`; `[LFC:phase_0] ... line_id='b007'
+  tts_skip_reason is null; expected str` -- the same text PBUG-20260824-06
+  fixed for the cleanup pass. Five minutes in, no episode.
+- root cause: the ledger's b007 was a `cast_coverage_repair` row (c04 had
+  no lines; the pass minted one), and
+  `nodes/_otr_cast_coverage_repair.py` patched it with
+  `"tts_skip_reason": None` -- an explicit null, `patch_line_fields` is a
+  plain `dict.update`. The writer tail's order is ledger_clean ->
+  ledger_cleanup -> cast_coverage_repair, so the cleanup normalizer that
+  PBUG-20260824-06 widened had already run and never saw the row; the
+  freeze gate (`_otr_ledger_freeze.py`, "must be string when present")
+  then refused. Both the repair pass and the null were introduced together
+  in 8ca3f13a (2026-08-24). It fires only when a cast member is left silent
+  -- rarer with the 12B writer at three acts, which is why the 5080's
+  public_domain episodes kept passing.
+- fix: **FIXED, live proof owed.** The repaired row now carries
+  `tts_skip_reason: ""` (the empty reason every voiced row carries).
+  Regression `test_a_repaired_row_carries_an_empty_skip_reason_never_null`
+  in `tests/test_cast_coverage_repair.py` covers both repair modes.
+  The composed text on the live row duplicated the announcer's coda line
+  (the 4B model parroted `last_lines`); that is writer quality, out of
+  scope by the 2026-08-04 directive, and is noted here only so the ledger
+  reads correctly.
+- related: PBUG-20260710-07 (root cause OPEN: "postamble row arrived
+  speaker_role=character ... tts_skip_reason=null ... an unsanctioned
+  cast-keyed mutator") -- this pass did not exist in July, so it is not
+  that mutator, but it is the same shape and the same fatal line.
+- bible-worthy: yes, as the second instance of the 08-24 lesson -- a
+  field's owner must stamp the contract value, not a placeholder, when it
+  runs AFTER the normalizer; "null-repair in the cleanup pass" only covers
+  rows that exist when the cleanup runs.
+- confidence: HIGH (ledger row read from the pod, constructor line read,
+  tail order read).

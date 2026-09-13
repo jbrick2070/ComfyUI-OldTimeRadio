@@ -189,6 +189,44 @@ def test_mode1_fills_an_existing_silent_slot():
     assert sum(1 for r in data["lines"] if r["char_id"] == "c03") == 1
 
 
+def test_a_repaired_row_carries_an_empty_skip_reason_never_null():
+    """The writer tail runs clean, cleanup, THEN this repair, so nothing
+    re-normalizes a row it writes -- and the freeze gate rejects a
+    present-but-null ``tts_skip_reason`` as structural corruption. A pod leg
+    died exactly there on 2026-09-13 (otr_8gb_low, public_domain:
+    ``line_id='b007' tts_skip_reason is null; expected str``) because this
+    pass stamped ``None`` on the row it had just voiced. Both modes must
+    leave a string behind: the empty reason a voiced row carries."""
+    # Mode 2: MARIA has no row at all, so one is minted.
+    minted = _base_ledger()
+    repair.repair_zero_coverage_cast(
+        _Led(minted), creative_fn=_creative_fn("Get you all three into the boxtree."),
+        canon_header="TITLE: Malvolio's Letter", style_descriptor="",
+        source_bank_id="shakespeare", meta=minted["meta"],
+    )
+    # Mode 1: MARIA's existing slot produced nothing and was skipped.
+    filled = _base_ledger()
+    filled["lines"].append({
+        "line_id": "b003", "beat_id": "b003", "char_id": "c03",
+        "speaker": "MARIA", "text": "", "skip": True,
+        "tts_skip_reason": "empty_spoken_text_at_ledger_cleanup",
+        "arc_phase": "setup", "beat_intent": "React to the trap.",
+        "compose_flags": [],
+    })
+    repair.repair_zero_coverage_cast(
+        _Led(filled), creative_fn=_creative_fn("Get you all three into the boxtree."),
+        canon_header="TITLE: Malvolio's Letter", style_descriptor="",
+        source_bank_id="shakespeare", meta=filled["meta"],
+    )
+    repaired = [r for d in (minted, filled) for r in d["lines"]
+                if "cast_coverage_repair" in (r.get("compose_flags") or [])]
+    assert len(repaired) == 2
+    for row in repaired:
+        assert row["skip"] is False
+        assert "tts_skip_reason" in row
+        assert row["tts_skip_reason"] == ""
+
+
 # --------------------------------------------------------------------------- #
 # repair_zero_coverage_cast -- MODE 2 (Stage 2 never allocated a beat at all)
 # --------------------------------------------------------------------------- #

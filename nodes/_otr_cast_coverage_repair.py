@@ -227,9 +227,15 @@ def repair_zero_coverage_cast(
             continue
 
         _OTRL.patch_line_text(data, line_id, result.text)
+        # A voiced row carries an EMPTY reason, never null: this pass runs
+        # after `_otr_ledger_cleanup` (the tail order is clean, cleanup,
+        # repair), so nothing downstream re-normalizes it, and the freeze
+        # gate rejects a present-but-null reason as structural corruption.
+        # A pod leg on 2026-09-13 (otr_8gb_low, public_domain) died exactly
+        # there -- "line_id='b007' tts_skip_reason is null; expected str".
         _OTRL.patch_line_fields(data, line_id, {
             "skip": False,
-            "tts_skip_reason": None,
+            "tts_skip_reason": "",
             "compose_flags": list(result.compose_flags) + ["cast_coverage_repair"],
         })
         receipt["repaired"].append(char_id)
