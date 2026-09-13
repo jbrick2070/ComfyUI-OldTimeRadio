@@ -18,9 +18,8 @@
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",
     "cast_voice_policy": "auto_registry",
-    "char_voice_engine": "kokoro",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "stable_audio_3",
+    "music_engine": "musicgen",
     "video_render_engine": "minimax_h3_video"
   },
   "features": {
@@ -36,12 +35,12 @@
   "llm": {
     "device": "cuda",
     "attn_impl": "sdpa",
-    "quant_policy": "none",
+    "quant_policy": "bnb_nf4",
     "vram_ceiling_gb": 6.8,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",
-    "creative_model": "google/gemma-4-E2B-it",
-    "technical_model": "google/gemma-4-E2B-it",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
     "openrouter_slot_a_model": "(enable OpenRouter)",
     "openrouter_slot_b_model": "(enable OpenRouter)",
     "comfy_slot_a_model": "(enable Comfy Credits)",

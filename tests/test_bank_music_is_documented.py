@@ -38,9 +38,9 @@ def test_every_generated_launch_recipe_carries_the_table():
         "_bv_for_music_docs", ROOT / "scripts" / "build_variants.py")
     bv = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(bv)
-    _variant, _rel, recipe = bv.build_variant("otr_runpod_starter")
+    _variant, _rel, recipe = bv.build_variant("otr_16gb_foley")
     assert "## Music" in recipe
-    committed = (ROOT / "workflows" / "variants" / "otr_runpod_starter.launch.md"
+    committed = (ROOT / "workflows" / "variants" / "otr_16gb_foley.launch.md"
                  ).read_text(encoding="utf-8")
     for bank, idiom, rhythmic in P.bank_music_table():
         # A rhythmic palette is the bank's fixed identity; a non-rhythmic one

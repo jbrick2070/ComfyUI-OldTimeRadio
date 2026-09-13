@@ -151,7 +151,10 @@ def test_apply_8gb_lite_lands_its_overrides(schemas, master_copy, mapping):
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     for dotted, value in (
         ("role_overrides.announcer_visual", prof["role_overrides"]["announcer_visual"]),
-        ("slot_overrides.char_voice_engine", prof["slot_overrides"]["char_voice_engine"]),
+        # voice is deliberately NOT overridden any more -- it splices from
+        # the canonical so it can never drift. music_engine is a key this
+        # profile genuinely does set, which is what this test is about.
+        ("slot_overrides.music_engine", prof["slot_overrides"]["music_engine"]),
         ("seed_policy.request_seed", prof["seed_policy"]["request_seed"]),
     ):
         for node_type, widget in mapping["managed"][dotted]["targets"]:

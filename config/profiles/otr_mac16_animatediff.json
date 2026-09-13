@@ -1,0 +1,91 @@
+{
+  "id": "otr_mac16_animatediff",
+  "display_name": "Apple Silicon -- AnimateDiff Lightning, the variant proven on Apple Silicon (the haunted lane is OOM here). SD 1.5 stills, Kokoro voices, MusicGen, no upscaler. Proven on a 16 GB M4.",
+  "status": "shipping",
+  "platform": "mac",
+  "device_backend": "mps",
+  "gpu_vendor": "apple",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "animatediff15_lightning_video",
+    "music_visual": "animatediff15_lightning_video",
+    "character_visual": "animatediff15_lightning_video",
+    "announcer_image": "sd15",
+    "music_image": "sd15",
+    "character_image": "sd15"
+  },
+  "slot_overrides": {
+    "voice_bank": "kokoro_builtin",
+    "cast_voice_policy": "auto_registry",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "musicgen",
+    "video_render_engine": "animatediff15_lightning_video"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard",
+    "act_count": "3",
+    "num_characters": 3
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "mps",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 10.0,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "mps",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "mps"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "v1-5-pruned-emaonly-fp16.safetensors"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}

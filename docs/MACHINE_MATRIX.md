@@ -66,43 +66,54 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  18 experimental profile(s), 2 shipping
+## 8 GB  --  25 experimental profile(s), 3 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
-| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
+| `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | - | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_animatediff` | animatediff15_v3_haunted_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | - | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 
-<details><summary>16 draft profile(s) here -- not vouched for</summary>
+<details><summary>22 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx25_foley_plus`, `ltx25_mime`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
-| `8gb_lite` | still_motion | bark |
-| `otr_4060_floor` | viz_camera | bark |
-| `otr_4060_h3_nano` | minimax_h3_video | kokoro |
-| `otr_4060_haunted_e4b` | animatediff15_v3_haunted_video | kokoro |
-| `otr_4060_haunted_local` | animatediff15_v3_haunted_video | kokoro |
-| `otr_4060_high_probe` | animatediff15_v3_haunted_video | kokoro |
-| `otr_4060_nano` | ltx_8gb | kokoro |
-| `otr_4060_nano_local` | ltx_8gb | kokoro |
-| `otr_8gb_fastwan` | fastwan_8gb | bark |
-| `otr_8gb_ltx` | ltx_8gb | bark |
+| `8gb_lite` | still_motion | - |
+| `otr_4060_floor` | viz_camera | - |
+| `otr_4060_h3_nano` | minimax_h3_video | - |
+| `otr_4060_haunted_e4b` | animatediff15_v3_haunted_video | - |
+| `otr_4060_haunted_local` | animatediff15_v3_haunted_video | - |
+| `otr_4060_high_probe` | animatediff15_v3_haunted_video | - |
+| `otr_4060_nano` | ltx_8gb | - |
+| `otr_4060_nano_local` | ltx_8gb | - |
+| `otr_8gb_fastwan` | fastwan_8gb | - |
+| `otr_8gb_foley` | ltx25_foley_plus | - |
+| `otr_8gb_low` | viz_camera | - |
+| `otr_8gb_ltx` | ltx_8gb | - |
 | `otr_8gb_ltx25_foley` | ltx25_foley_plus | - |
 | `otr_8gb_ltx25_mime` | ltx25_mime | - |
-| `otr_8gb_wan` | wan_ti2v | bark |
-| `otr_amd8_rocm` | still_motion | kokoro |
-| `otr_nvidia_8gb_h3` | minimax_h3_video | kokoro |
-| `otr_qwen2507_haunted_proof` | animatediff15_v3_haunted_video | kokoro |
+| `otr_8gb_mime` | ltx25_mime | - |
+| `otr_8gb_still` | still_motion | - |
+| `otr_8gb_video` | ltx_8gb | - |
+| `otr_8gb_wan` | wan_ti2v | - |
+| `otr_amd8_rocm` | still_motion | - |
+| `otr_amd_still` | still_motion | - |
+| `otr_nvidia_8gb_h3` | minimax_h3_video | - |
+| `otr_qwen2507_haunted_proof` | animatediff15_v3_haunted_video | - |
 
 </details>
 
-## 10-15 GB  --  4 experimental profile(s), 1 shipping
+## 10-15 GB  --  8 experimental profile(s), 5 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_mac_mps` | viz_camera | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac_animatediff` | animatediff15_lightning_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac_low` | viz_camera | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac_mps` | viz_camera | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac_still` | still_motion | - | musicgen | sd15 | `shipping` | missing exact owner |
+| `otr_mac_video` | ltx098_low_video | - | musicgen | sd15 | `shipping` | missing exact owner |
 
 <details><summary>3 draft profile(s) here -- not vouched for</summary>
 
@@ -110,30 +121,34 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 | profile | video | voice |
 |---|---|---|
-| `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | kokoro |
-| `otr_4060_viz_12b` | viz_camera | kokoro |
-| `otr_nv40_12gb` | wan_ti2v | indextts2 |
+| `otr_4060_haunted_12b` | animatediff15_v3_haunted_video | - |
+| `otr_4060_viz_12b` | viz_camera | - |
+| `otr_nv40_12gb` | wan_ti2v | - |
 
 </details>
 
-## 16 GB+  --  94 experimental profile(s), 42 shipping
+## 16 GB+  --  100 experimental profile(s), 46 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `16gb_full` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `16gb_full` | viz_camera | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_foley` | ltx25_foley_plus | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_16gb_low` | viz_camera | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_mime` | ltx25_mime | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_16gb_video` | ltx25_high_video | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_bark_announcer_acceptance` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete |
-| `otr_g4_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_g4_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_g4_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_ltx_video` | ltx_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_h3_low_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_h3_low_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_ltx25_foley_flux2klein` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | flux2_klein | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_ltx25_high_foley_plus` | ltx25_high_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_ltx25_high_mime` | ltx25_high_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_ltx25_high_video` | ltx25_high_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_g4_fastwan` | fastwan_8gb | - | musicgen | z_image_turbo | `shipping` | missing exact owner |
+| `otr_g4_humo` | humo | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_g4_ltx_8gb` | ltx_8gb | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_g4_ltx_audio_in` | ltx_audio_in | - | musicgen | z_image_turbo | `shipping` | missing exact owner |
+| `otr_g4_ltx_video` | ltx_video | - | musicgen | z_image_turbo | `shipping` | missing exact owner |
+| `otr_g4_wan_ti2v` | wan_ti2v | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_h3_low_audio_in` | h3_low_audio_in | - | musicgen | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_h3_low_video` | h3_low_video | - | musicgen | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_ltx25_foley_flux2klein` | ltx25_high_foley_plus | - | musicgen | flux2_klein | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_foley_plus` | ltx25_high_foley_plus | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_mime` | ltx25_high_mime | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_video` | ltx25_high_video | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_animatediff15_lightning_video` | animatediff15_lightning_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
@@ -163,7 +178,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>52 draft profile(s) here -- not vouched for</summary>
+<details><summary>54 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`, `word_razzle`
 
@@ -173,12 +188,14 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `google_omni_media` | google_omni_video | - |
 | `google_veo_all` | google_veo_video | google_tts |
 | `google_veo_media` | google_veo_video | - |
-| `otr_16gb_ltx_audio_in` | ltx_audio_in | indextts2 |
-| `otr_16gb_ltx_video` | ltx_video | indextts2 |
-| `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | kokoro |
-| `otr_amd16_rocm` | still_motion | kokoro |
+| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - |
+| `otr_16gb_ltx_audio_in` | ltx_audio_in | - |
+| `otr_16gb_ltx_video` | ltx_video | - |
+| `otr_16gb_still` | still_motion | - |
+| `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | - |
+| `otr_amd16_rocm` | still_motion | - |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
-| `otr_ideogram4_local_still_word` | still_word | kokoro |
+| `otr_ideogram4_local_still_word` | still_word | - |
 | `otr_lemmy_kokoro_diag` | still_flat | kokoro |
 | `otr_rot_h3_lumina` | h3_low_video | indextts2 |
 | `otr_rot_humo_klein` | humo | indextts2 |
@@ -224,20 +241,21 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 
 </details>
 
-## unstated  --  4 experimental profile(s), 0 shipping
+## unstated  --  5 experimental profile(s), 0 shipping
 
 **No shipping experimental profile at this tier.**
 
-<details><summary>4 draft profile(s) here -- not vouched for</summary>
+<details><summary>5 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_video`, `still_motion`
+Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_video`, `still_motion`, `viz_camera`
 
 | profile | video | voice |
 |---|---|---|
-| `cpu_floor` | still_motion | kokoro |
+| `cpu_floor` | still_motion | - |
 | `otr_cloud_hq` | google_veo_video | google_tts |
 | `otr_cloud_lanes` | cloud_wan_i2v_audio | elevenlabs |
 | `otr_cloud_low` | cloud_wan_i2v | google_tts |
+| `otr_cpu_low` | viz_camera | - |
 
 </details>
 

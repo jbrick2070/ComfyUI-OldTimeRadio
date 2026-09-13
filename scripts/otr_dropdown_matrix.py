@@ -726,12 +726,12 @@ def packs_by_engine() -> dict:
                     if isinstance(node, (ast.Import, ast.ImportFrom)):
                         # `from .X import Y` puts X in `module`; `from . import
                         # X` puts it in `names`; `import a.b.X` puts it in the
-                        # dotted alias. Collect all three spellings.
+                        # dotted name. Collect all three spellings.
                         mod_name = getattr(node, "module", None)
                         if mod_name:
                             edges.add(mod_name.rsplit(".", 1)[-1])
-                        for alias in node.names:
-                            edges.add(alias.name.rsplit(".", 1)[-1])
+                        for imported in node.names:
+                            edges.add(imported.name.rsplit(".", 1)[-1])
             except SyntaxError:
                 pass
             imports[mod] = {m for m in siblings

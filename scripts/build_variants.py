@@ -93,6 +93,40 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
                 "otr_soak_llmsweep_07")
 
 
+#: THE SHIPPING SET (2026-09-13). The ONLY profiles that emit a graph into
+#: `workflows/variants/`. Named `otr_<arch>_<tier>` so the filename says which
+#: machine it is for and what the episode will be; the tiers are the operator's
+#: -- low, still, video, foley, mime, animatediff.
+#:
+#: EVERY OTHER PROFILE STILL WORKS. `--profile <id>` loads any of the ~100 lab
+#: fixtures exactly as before, and about sixty of them are referenced by tests
+#: and sweep scripts, which is why they are not deleted. They simply do not
+#: write a file into the user-facing variant folder -- for the same reason
+#: LANE_PRESETS gives above: nobody installs OTR to run a soak.
+#:
+#: An allow-list rather than a deny-list, deliberately: a new lab profile then
+#: defaults to NOT shipping, which is the safe direction to be wrong in.
+SHIPPING_SET = (
+    "otr_8gb_low",
+    "otr_8gb_still",
+    "otr_8gb_video",
+    "otr_8gb_foley",
+    "otr_8gb_mime",
+    "otr_8gb_animatediff",
+    "otr_16gb_low",
+    "otr_16gb_still",
+    "otr_16gb_video",
+    "otr_16gb_foley",
+    "otr_16gb_mime",
+    "otr_16gb_animatediff",
+    "otr_mac16_low",
+    "otr_mac16_still",
+    "otr_mac16_video",
+    "otr_mac16_animatediff",
+    "otr_amd_still",
+    "otr_cpu_low",
+)
+
 class EmitRefused(RuntimeError):
     """Emission refused (ratify gate or self-check failure)."""
 
@@ -135,6 +169,9 @@ def _committed_profile_ids() -> list[str]:
     out = []
     for p in sorted(Path(PROFILE_DIR).glob("*.json")):
         if p.stem == "widget_mapping":
+            continue
+        if p.stem not in SHIPPING_SET:
+            # A lab fixture. Still loadable with --profile; just not shipped.
             continue
         out.append(p.stem)
     # Stem-collision guard (post-ship audit): a bare id X and a prefixed

@@ -16,7 +16,6 @@
     "character_image": "sd15"
   },
   "slot_overrides": {
-    "voice_bank": "default",
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
     "music_engine": "musicgen",

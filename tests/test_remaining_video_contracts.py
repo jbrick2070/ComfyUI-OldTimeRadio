@@ -134,8 +134,10 @@ def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned():
         return _node_of(graph, "OTR_VideoDirector")["widgets_values"][14]
 
     assert _director_ceiling("otr_8gb_wan") == 81
-    for stem in ("otr_16gb_full", "otr_16gb_ltx_video", "otr_8gb_ltx",
-                 "otr_nv40_12gb", "otr_cpu_floor"):
+    # The 2026-09-13 curation renamed the shipping set; these are the tiers
+    # that exist now and legitimately carry no planner ceiling.
+    for stem in ("otr_16gb_low", "otr_16gb_video", "otr_8gb_low",
+                 "otr_8gb_still", "otr_cpu_low"):
         assert _director_ceiling(stem) == 0, stem
 
 

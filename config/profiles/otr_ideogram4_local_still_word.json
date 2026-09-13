@@ -18,7 +18,6 @@
   "slot_overrides": {
     "voice_bank": "kokoro_builtin",
     "cast_voice_policy": "auto_registry",
-    "char_voice_engine": "kokoro",
     "announcer_voice_engine": "kokoro",
     "music_engine": "musicgen",
     "video_render_engine": "still_word"

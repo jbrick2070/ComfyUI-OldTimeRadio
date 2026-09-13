@@ -1,0 +1,91 @@
+{
+  "id": "otr_mac16_low",
+  "display_name": "Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+  "status": "shipping",
+  "platform": "mac",
+  "device_backend": "mps",
+  "gpu_vendor": "apple",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "viz_mxc_cpu",
+    "music_visual": "viz_green",
+    "character_visual": "viz_camera",
+    "announcer_image": "sd15",
+    "music_image": "sd15",
+    "character_image": "sd15"
+  },
+  "slot_overrides": {
+    "voice_bank": "kokoro_builtin",
+    "cast_voice_policy": "auto_registry",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "musicgen",
+    "video_render_engine": "viz_camera"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard",
+    "act_count": "3",
+    "num_characters": 3
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "mps",
+    "attn_impl": "sdpa",
+    "quant_policy": "none",
+    "vram_ceiling_gb": 10.0,
+    "gguf_n_ctx": 4096,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "mps",
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "image": {
+    "dtype_policy": "no_fp8_no_fp4"
+  },
+  "audio": {
+    "voice_device": "mps"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 17,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "v1-5-pruned-emaonly-fp16.safetensors"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}

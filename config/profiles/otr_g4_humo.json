@@ -16,11 +16,9 @@
     "character_image": "z_image_turbo"
   },
   "slot_overrides": {
-    "voice_bank": "default",
     "cast_voice_policy": "auto_registry",
-    "char_voice_engine": "indextts2",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "stable_audio_3",
+    "music_engine": "musicgen",
     "video_render_engine": "humo"
   },
   "features": {

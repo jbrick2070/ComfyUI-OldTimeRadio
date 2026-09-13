@@ -60,7 +60,7 @@ def test_profile_usage_counts_resolve_public_video_ids_to_internal_owners():
     profiles = index.collect_profiles()
 
     assert "otr_runpod_starter" in profiles["wan_ti2v"]
-    assert len(profiles["wan_ti2v"]) == 9
+    assert len(profiles["wan_ti2v"]) == 10
     assert "wan22_high_video" not in profiles
 
 
