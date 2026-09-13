@@ -15063,3 +15063,50 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
 - bible-worthy: yes -- classify an exception by its chain, never by the
   wrapper the executor put on it.
 - confidence: HIGH (live traceback, both source sites read).
+
+## PBUG-20260913-06 -- a "Rerollable" decode-liveness halt is never rerolled in the news lane's script pass
+- surfaced: LIVE leg, 2026-09-13 -- 5080, CPU-mode server (`--cpu`, port 8001),
+  `otr_cpu_low` at 1 act, scifi_news_pro bank rolled. RESULT FAIL at 18.0min
+  (prompt_id 08962c11), node 1 (`OTR_LedgerScriptWriter`) raised
+  `GenerationDegeneracyError` from `_otr_scifi_news_pro.py::_pass_script` ->
+  `_run_markup_ladder` -> `creative_fn`. Server log: "DECODE HALTED
+  (repetition): the output repeated a run of tokens verbatim, after N
+  generated tokens ... **Rerollable**." Zero episodes reached obs for this
+  leg; the leg had been running against a correctly-booted `--cpu` server
+  (the graph's own boot-contract check had already been proven working
+  moments earlier by correctly REFUSING a GPU-mode server for the same
+  graph -- see the corrected-count note this session).
+- symptom: a single stochastic decode-repetition event kills the entire
+  episode, discarding an already-finished cast/outline/read pass, rather
+  than costing one re-authored script pass.
+- root cause: `GenerationDegeneracyError` is raised with the log line
+  literally labelled "Rerollable" (`OTR_LedgerScriptWriter.py:1189`), and a
+  SIBLING module already treats it that way --
+  `_otr_slot_drama_contract.py::_try_llm` catches
+  `(ValidationError, ValueError, JSONDecodeError, GenerationDegeneracyError)`
+  and falls back cleanly. The news lane's own script-authoring call site,
+  `run_scifi_news_pro_episode` (`_otr_scifi_news_pro.py:4976-4980`), calls
+  `_pass_script(...)` exactly ONCE with no try/except around it at all. One
+  layer down, `_run_markup_ladder` (`:3140-3152`) explicitly documents that
+  it re-raises `GenerationDegeneracyError` on purpose -- "not this guard's to
+  swallow" -- on the assumption that something ABOVE it retries. Nothing
+  above it does. The comment's assumption is false for this call path.
+- fix: **NOT APPLIED -- flagged, not fixed, deliberately.** A correct retry
+  here is a real design question, not a mechanical one: the surrounding code
+  has strict, load-bearing call-accounting invariants
+  (`box["calls"] == len(p3_attempts)`, raising
+  `NewsProScriptError("P3 attempt/call count drift")` on any mismatch) built
+  for EXACTLY ONE call per rung, and a naive retry loop around `_pass_script`
+  risks breaking that invariant rather than fixing the halt. This surfaced
+  once, not twice -- the two-strikes threshold for an unreviewed fix has not
+  been met, and the news bank has completed successfully many times today on
+  GPU without incident, so this may be rare, may be CPU-specific, or may be
+  both. The leg was re-run once immediately for a second stochastic sample
+  before concluding anything about frequency.
+- bible-worthy: yes, once fixed -- "a caller-facing error message that
+  promises a retry is a contract, and grep every raise site for a caller
+  that actually honours it" is the same lesson as the coverage-repair and
+  ffmpeg-preflight entries today, one exception class later.
+- confidence: HIGH on mechanism (leg log, both call sites read, the sibling
+  module's contrasting pattern read); LOW on frequency/reproducibility (one
+  live occurrence).
