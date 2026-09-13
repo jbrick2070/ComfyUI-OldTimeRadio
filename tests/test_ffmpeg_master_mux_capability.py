@@ -205,6 +205,54 @@ class TheMuxIsFoundWithoutAGate(unittest.TestCase):
             FF.master_mux_support_gap = real
 
 
+class TheNodeItselfRefuses(unittest.TestCase):
+    """The link the unit tests above cannot make: that `validate()` actually
+    reaches the question. Source inspection pins the call's POSITION; this
+    runs the node and reads what comes out of it."""
+
+    SENTENCE = "PRETEND THIS BUILD CANNOT FINISH"
+
+    def setUp(self):
+        import _otr_workflow_validator as WV
+        self.WV = WV
+        self._real = FF.master_mux_support_gap
+        FF.master_mux_support_gap = lambda _p=None: self.SENTENCE
+
+    def tearDown(self):
+        FF.master_mux_support_gap = self._real
+
+    def _validate(self, prompt):
+        return self.WV.WorkflowValidator().validate(
+            "workflows/otr_canonical.json", False, False,
+            prompt=prompt, unique_id="63")
+
+    def test_a_graph_with_a_mux_is_refused_by_name(self):
+        with self.assertRaises(ValueError) as caught:
+            self._validate({
+                "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+                "1": {"class_type": "OTR_LedgerScriptWriter",
+                      "inputs": {"gate_in": ["63", 0]}},
+                "85": {"class_type": "OTR_MasterAudioMux",
+                       "inputs": {"output_path": ""}}})
+        message = str(caught.exception)
+        self.assertIn("OTR_MasterAudioMux", message)
+        self.assertIn(self.SENTENCE, message)
+
+    def test_a_script_only_graph_gets_past_the_question(self):
+        # validator -> writer -> freeze publishes no media and must not be
+        # refused for a capability it never uses. Whatever else this wiring
+        # does further down, it must not die on THIS sentence.
+        try:
+            self._validate({
+                "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+                "1": {"class_type": "OTR_LedgerScriptWriter",
+                      "inputs": {"gate_in": ["63", 0]}},
+                "2": {"class_type": "OTR_LedgerFreezeCascade",
+                      "inputs": {"gate_in": ["1", 2]}}})
+        except Exception as exc:  # noqa: BLE001 -- the identity is the assertion
+            self.assertNotIn(self.SENTENCE, str(exc))
+
+
 class AProbeThatCannotRunSaysSoInstead(unittest.TestCase):
     """Codex's other finding: the probe needs lavfi, anullsrc and a writable
     temp dir; the real mux needs none of them. Without a control, a machine

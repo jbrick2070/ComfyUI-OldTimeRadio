@@ -4,9 +4,14 @@ Posted 2026-09-13 in reply to the ROCm recruitment comment: *"I've got a 32gb
 r9700 setup for Comfy as a secondary machine to an Nvidia primary. Love doing
 audiobook/narrative stuff, so happy to help."*
 
-An R9700 is RDNA4 with 32 GB, which is the best card that could have answered
-that post. Paste the reply below; it asks for exactly one result and offers a
-second only if the first works.
+An R9700 is RDNA4 with 32 GB. Paste the reply below; it asks for exactly one
+result and nothing else.
+
+**It deliberately names no other graph.** The operator owns no AMD hardware, so
+what this tester runs on 32 GB is the only AMD fact anyone will have. Pointing
+him at the graphs named for NVIDIA VRAM tiers would invite him to prove
+something about cards nobody can check, and the tier names mean nothing on his
+hardware anyway. One card, one graph, one result.
 
 ---
 
@@ -46,12 +51,5 @@ every line of that is new.
 Windows-native and AMD ships a Radeon ROCm build for Windows now, but nobody
 has pointed the two at each other. Linux is welcome too.
 
-**If the still graph works, there is a bigger one.** With 32 GB you are past
-every card I own. `otr_16gb_video` and `otr_16gb_animatediff` use real video
-diffusion instead of moved stills, and whether those run under ROCm is a
-genuinely open question -- the still graph exists because I could not answer
-it. That would be the second episode, not the first.
-
-Fair warning on the time: one act is a full episode and takes roughly fifteen
-minutes to two hours depending on the graph and the card. The still one is at
-the fast end.
+Fair warning on the time: one act is a whole episode, and this graph takes
+somewhere between fifteen minutes and an hour depending on the card.
