@@ -256,6 +256,62 @@ the two rows probably share one answer.
 * `nodes/_otr_shared/device_options.py::vendor()` still has ZERO callers. Wire it
   or write the row that says what it waits on -- A1 is that row today.
 
+## FOR THE 4060: STAND DOWN ON NEW LEGS UNTIL THE WRITER SIZING LANDS (2026-09-12 evening)
+
+**Written by the 5080 window because no 4060 session was reachable through
+`ListAgents` -- every Remote Control row was offline. The operator relayed it
+once; this file is so nobody has to again.**
+
+**STAND DOWN. Do not spend another clean-room leg tonight.** Two of the three
+walls your drills hit have moved, one has not, and the one that has not is the
+one that would eat your next run.
+
+### What your drills proved, and thank you -- both were real
+
+* **CR-20260912-03 (Plan 1)** died at `llm_device=mps` on a Windows torch.
+  **FIXED** in `8017a07e`: every device widget in the canonical now ships
+  ComfyUI's own `default` sentinel, resolved per host through
+  `comfy.model_management`. Receipt on the 5080 at 18:59 -- `--profile none
+  --act-count 1`, RESULT SUCCESS in 407 s, published to `otr/obs/`, ledger
+  recording `device: "cuda"` and `device_policy: "cuda"` from widgets that say
+  `default`.
+* **CR-20260912-04 (Plan 2)** died with `DEPENDENCY_MISSING` on three files.
+  **ONE OF THE THREE IS FIXED.** `v1-5-pruned-emaonly-fp16.safetensors` is now
+  row nine of `_otr_visual_assets.MANIFEST`, so `OTR_WorkflowValidator` fetches
+  it at queue time. `v3_sd15_mm.ckpt` and `v3_sd15_adapter.ckpt` are NOT yet.
+  A re-run would get further and stop on the motion module instead.
+
+### Why standing down is right rather than cautious
+
+**Plan 1 will still fail on your card, one stage later and 8.7 GB more
+expensive.** The device half of system-independence landed; the SIZING half did
+not. The canonical still ships `Qwen/Qwen3.5-4B` with `llm_quant_policy: none`
+and `vram_ceiling_gb: 10.0` -- byte-for-byte the `otr_mac_mps` triple, and 10.0
+is unique to that one profile across all 118. Unquantized that row wants roughly
+8.7 GB and an 8 GB card has about 7 GB to give. The fit gate says WARN and lets
+it through, so you would download 8.7 GB and then OOM at
+`model.to(device)`. That is GO_FORWARD ARC row A1 and it is waiting on an
+operator ruling, not on code.
+
+**And check which install you are testing.** Your CR-2026091 2-0x runs were on
+registry **alpha.30**, installed through the Manager. Every fix above is in the
+git tree and NOT in that published version, so `git pull` in a checkout changes
+nothing about what your ComfyUI loads unless you are running from that checkout.
+Say which one you are on in the next drill entry -- it changes how to read every
+result.
+
+### What IS worth doing when you resume, in order
+
+1. **Re-run Plan 2 only after the AnimateDiff pair is in the manifest.** That is
+   GO_FORWARD CODE row C3 and it is the next thing this window builds. One leg
+   then tells us whether the README's 8 GB row survives to a published episode,
+   which is the question your drill actually opened.
+2. **Do not re-run Plan 1 until A1 is answered.** When it is, the leg is worth a
+   lot: it is the only 8 GB receipt for the canonical that exists anywhere.
+3. **`docs/4060_DRILL_LOG.md` is yours and the entries are excellent.** Keep
+   recording the install route and the exact failing node id; both times that is
+   what made the finding actionable from here within the hour.
+
 ## 3. Blocked on the operator -- each unblocks with one word
 
 **He answered all sixteen on 2026-09-12 and left to do other things, with:**
