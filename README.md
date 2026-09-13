@@ -565,11 +565,13 @@ section 3 names each file, its repository and its folder.
 **Most engines fetch their own weights** the first time a dropdown selects them
 -- either through the engine's own library and the Hugging Face cache, or through
 `OTR_WorkflowValidator`, a node inside the graph that looks at what you actually
-picked and pulls only that, before the writer runs. The cache lives inside your
-ComfyUI install at `models/huggingface` unless `HF_HOME` was already set when
-ComfyUI started; if that volume is short of room, set `HF_HOME` **before**
-launching, because setting it later creates a second cache rather than moving the
-first.
+picked and pulls only that, before the writer runs. Where that cache lands is
+worth knowing before it fills up. `HF_HOME` wins if it was already set when
+ComfyUI started; on Windows a user-scope `HF_HOME` in the registry is read next;
+otherwise it defaults to **`C:\ComfyUI-Models\huggingface`** on Windows and
+`~/.cache/huggingface` everywhere else. If that volume is short of room, set
+`HF_HOME` **before** launching, because setting it later creates a second cache
+rather than moving the first.
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
 selects, and everything the 8 GB and Mac graphs select, is ungated. A token is
