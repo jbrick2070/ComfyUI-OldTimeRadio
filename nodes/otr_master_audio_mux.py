@@ -286,6 +286,12 @@ def _poll_interrupt():
 DEFAULT_DURATION_TOL_FRAMES = 3.0
 
 
+#: Containers whose PCM support arrived with FFmpeg 6.1 (ISOBMFF "ipcm"). The
+#: shipped episode is one of these -- `.mp4` -- and Matroska and WAV are not,
+#: so only these are gated on the capability probe.
+PCM_STRICT_CONTAINERS = frozenset({".mp4", ".m4v", ".mov", ".m4a"})
+
+
 def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: str,
                      ffmpeg: str = "ffmpeg", fps: int = 25,
                      duration_tol_frames: float = DEFAULT_DURATION_TOL_FRAMES,
@@ -316,6 +322,26 @@ def mux_master_audio(silent_video_path: str, master_audio_path: str, out_path: s
     fb = _ffmpeg_bin(ffmpeg)
     if not fb:
         raise ValueError(f"OTR_MasterAudioMux: ffmpeg not found ({ffmpeg!r})")
+    # ASK BEFORE SPENDING, the same way caption burn does: the mux copies the
+    # PCM master in losslessly, and PCM inside an ISOBMFF container is an
+    # ffmpeg 6.1+ capability. A pod running Ubuntu's ffmpeg 4.4 rendered two
+    # whole episodes and left 0-byte finals here (PBUG-20260913-03); the writer
+    # now refuses at its own start, and this is the belt to that suspender.
+    #
+    # ONLY FOR THE CONTAINERS THAT CARE. `out_path` is the caller's, and
+    # Matroska has carried PCM since long before 6.1 -- this module's own
+    # byte-identity test muxes to .mkv, and refusing that on an older build
+    # would be a fault invented by the guard rather than found by it.
+    if os.path.splitext(str(out_path))[1].lower() in PCM_STRICT_CONTAINERS:
+        try:
+            from ._otr_shared.ffmpeg import master_mux_support_gap
+        except ImportError:  # pragma: no cover -- flat load
+            from _otr_shared.ffmpeg import master_mux_support_gap  # type: ignore
+        _gap = master_mux_support_gap(fb)
+    else:
+        _gap = None
+    if _gap:
+        raise ValueError(f"OTR_MasterAudioMux: {_gap}")
     if not os.path.isfile(silent_video_path):
         raise ValueError(f"OTR_MasterAudioMux: silent video missing: {silent_video_path!r}")
     if not os.path.isfile(master_audio_path):

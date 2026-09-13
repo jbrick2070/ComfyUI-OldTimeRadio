@@ -232,6 +232,43 @@ if command -v apt-get >/dev/null 2>&1; then
     || fail "system dependencies libcairo2-dev/pkg-config failed"
 fi
 
+# ffmpeg MUST BE ABLE TO WRITE PCM AUDIO INTO AN MP4, which FFmpeg gained in
+# 6.1. The master mux copies the WAV master in losslessly by contract, so an
+# older build renders the whole episode and dies at the last node: on
+# 2026-09-13 a pod on this template (Ubuntu 22.04, apt ffmpeg 4.4.2) produced
+# two 0-byte finals that way (PBUG-20260913-03). Asked with the mux itself
+# rather than a version parse -- the capability is a property of the build,
+# and a version string can be "n7.0.2" or "N-109693-gabc" and parse to
+# nothing. The static release build is the fix; /usr/local/bin precedes
+# /usr/bin on every PATH this pod boots with.
+otr_ffmpeg_writes_pcm_in_mp4() {
+  command -v ffmpeg >/dev/null 2>&1 || return 1
+  local probe
+  probe=$(mktemp --suffix=.mp4) || return 1
+  ffmpeg -hide_banner -v error -y -f lavfi -i anullsrc=r=48000:cl=mono \
+         -t 0.2 -c:a pcm_s16le -f mp4 "$probe" >/dev/null 2>&1 \
+    && [ -s "$probe" ] && { rm -f "$probe"; return 0; }
+  rm -f "$probe"
+  return 1
+}
+if otr_ffmpeg_writes_pcm_in_mp4; then
+  echo "  ffmpeg: $(ffmpeg -version 2>/dev/null | head -1 | cut -c1-40) (writes PCM in MP4)"
+else
+  echo "  ffmpeg: $(ffmpeg -version 2>/dev/null | head -1 | cut -c1-40) cannot write PCM in MP4 -- installing the static build"
+  otr_ff_tmp=$(mktemp -d)
+  curl -fsSL -o "$otr_ff_tmp/ffmpeg.tar.xz" \
+       https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz \
+    && tar -xJf "$otr_ff_tmp/ffmpeg.tar.xz" -C "$otr_ff_tmp" \
+    && install -m 755 "$otr_ff_tmp"/ffmpeg-*-amd64-static/ffmpeg /usr/local/bin/ffmpeg \
+    && install -m 755 "$otr_ff_tmp"/ffmpeg-*-amd64-static/ffprobe /usr/local/bin/ffprobe \
+    || fail "could not install an ffmpeg that writes PCM into MP4; every episode would die at the final mux"
+  rm -rf "$otr_ff_tmp"
+  hash -r 2>/dev/null || true
+  otr_ffmpeg_writes_pcm_in_mp4 \
+    || fail "the installed ffmpeg still cannot write PCM into MP4"
+  echo "  ffmpeg: $(ffmpeg -version 2>/dev/null | head -1 | cut -c1-40) (writes PCM in MP4)"
+fi
+
 # pycairo is INSTALLED EXPLICITLY HERE, not carried by requirements.txt.
 # 2026-09-03: that file now marks it `sys_platform == 'win32'`, because pycairo
 # ships no Linux wheel and Comfy-Org's node-pack-extract container runs a bare

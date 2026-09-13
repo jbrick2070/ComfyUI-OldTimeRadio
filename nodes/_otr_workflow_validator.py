@@ -212,6 +212,61 @@ def widget_vector_drift(workflow: dict, ncm: dict) -> list[str]:
     return findings
 
 
+#: The node whose last act needs a container capability, and the input that
+#: names its destination. Empty there means the default, which is an `.mp4`.
+MASTER_MUX_CLASS = "OTR_MasterAudioMux"
+MASTER_MUX_PATH_INPUT = "output_path"
+
+
+def master_mux_gap_for_prompt(prompt):
+    """The ffmpeg gap THIS graph will hit at its final node, or None.
+
+    WHY THE GRAPH AND NOT THE HOST. Asking "can this ffmpeg write PCM into an
+    MP4?" of every run refuses work that never touches a mux: a
+    validator -> writer -> freeze wiring produces a script and no media, and a
+    text-only replay produces neither. The question is only fair when the
+    submitted graph actually contains a mux -- which this node can see, because
+    it receives the prompt.
+
+    WHY THE DESTINATION MATTERS. Matroska carried PCM long before FFmpeg 6.1,
+    so only an ISOBMFF destination is gated (`PCM_STRICT_CONTAINERS`). An empty
+    `output_path` is the node's default and is an `.mp4`.
+
+    Returns None on anything it cannot read: a missing prompt, an unparseable
+    one, or a probe that could not run. Refusing on a guess is the one outcome
+    this function exists to avoid.
+    """
+    try:
+        nodes = list((prompt or {}).values())
+    except Exception:  # noqa: BLE001 -- a prompt shape we do not recognise
+        return None
+    destinations = []
+    for node in nodes:
+        try:
+            if str(node.get("class_type", "")) != MASTER_MUX_CLASS:
+                continue
+            destinations.append(
+                str((node.get("inputs") or {}).get(MASTER_MUX_PATH_INPUT) or ""))
+        except Exception:  # noqa: BLE001 -- one odd entry is not a verdict
+            continue
+    if not destinations:
+        return None
+
+    import os
+    try:
+        from .otr_master_audio_mux import PCM_STRICT_CONTAINERS
+        from ._otr_shared.ffmpeg import master_mux_support_gap
+    except ImportError:  # pragma: no cover -- flat load
+        from otr_master_audio_mux import PCM_STRICT_CONTAINERS  # type: ignore
+        from _otr_shared.ffmpeg import master_mux_support_gap  # type: ignore
+
+    for dest in destinations:
+        ext = os.path.splitext(dest)[1].lower() if dest.strip() else ".mp4"
+        if ext in PCM_STRICT_CONTAINERS:
+            return master_mux_support_gap()
+    return None
+
+
 class WorkflowValidator:
     """OTR workflow contract validator node.
 
@@ -565,6 +620,17 @@ class WorkflowValidator:
         # never a licence to start a multi-gigabyte download for a submission
         # with no story in it. See `_admit_story_input`.
         self._admit_story_input(prompt, unique_id)
+        # THE LAST NODE'S QUESTION, ASKED AT THE FIRST (PBUG-20260913-03).
+        # Same placement and same reason as the story admission above: this
+        # runs in BOTH branches, before any asset is fetched. It refuses
+        # only a graph that really does end at a mux writing an MP4, so the
+        # script-only wiring (validator -> writer -> freeze) and a text-only
+        # replay -- neither of which ever mixes audio -- are untouched.
+        _mux_gap = master_mux_gap_for_prompt(prompt)
+        if _mux_gap:
+            raise ValueError(
+                "OTR_WorkflowValidator: this graph ends at "
+                "OTR_MasterAudioMux and could not finish -- %s" % _mux_gap)
         if not validate_anyway:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))

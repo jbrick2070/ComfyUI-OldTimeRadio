@@ -212,6 +212,12 @@ _CAPABILITY_CACHE: dict = {}
 #: cannot do the job however well it renders video.
 CAPTION_FILTER = "ass"
 CAPTION_ENCODER = "libx264"
+#: What the master mux needs: PCM audio copied into an MP4 container
+#: (ISOBMFF "ipcm", FFmpeg 6.1+). `otr_master_audio_mux` copies the WAV
+#: master losslessly by contract (`-c:a copy`, asserted), so an older
+#: build fails at the very last step with "Could not find tag for codec
+#: pcm_s16le in stream #1" -- after the whole episode has rendered.
+MASTER_MUX_PCM = "pcm_in_mp4"
 
 
 def probe_ffmpeg_capabilities(path=None) -> dict:
@@ -237,7 +243,8 @@ def probe_ffmpeg_capabilities(path=None) -> dict:
     # a missing binary silently answering "fine".
     resolved = _usable(path) if path else resolve_ffmpeg()
     if not resolved:
-        return {"path": None, CAPTION_FILTER: None, CAPTION_ENCODER: None}
+        return {"path": None, CAPTION_FILTER: None, CAPTION_ENCODER: None,
+                MASTER_MUX_PCM: None}
     cached = _CAPABILITY_CACHE.get(resolved)
     if cached is not None:
         return dict(cached)
@@ -262,8 +269,10 @@ def probe_ffmpeg_capabilities(path=None) -> dict:
 
     filters = _lists("-filters")
     encoders = _lists("-encoders")
+    pcm_in_mp4 = _probe_pcm_in_mp4(resolved, otr_proc)
     result = {
         "path": resolved,
+        MASTER_MUX_PCM: pcm_in_mp4,
         # Match the filter NAME in its own column, not anywhere in the blob:
         # "ass" appears inside "subtitles", "pass", "compass" and others.
         CAPTION_FILTER: None if filters is None else any(
@@ -273,6 +282,87 @@ def probe_ffmpeg_capabilities(path=None) -> dict:
     }
     _CAPABILITY_CACHE[resolved] = dict(result)
     return result
+
+
+def _write_silence(resolved, otr_proc, container, suffix):
+    """Mux 0.2 s of PCM silence into ``container``. True / False / None.
+
+    None is "the probe could not be run at all" -- no temp file, no process --
+    and is never evidence about the build.
+    """
+    import os
+    import tempfile
+    try:
+        fd, tmp = tempfile.mkstemp(prefix="otr_pcm_probe_", suffix=suffix)
+        os.close(fd)
+    except Exception:  # noqa: BLE001 -- no writable temp: we cannot ask
+        return None
+    try:
+        try:
+            done = otr_proc.run(
+                [resolved, "-hide_banner", "-v", "error", "-y",
+                 "-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono", "-t", "0.2",
+                 "-c:a", "pcm_s16le", "-f", container, tmp],
+                capture_output=True, text=True, timeout=30, check=False,
+            )
+        except Exception:  # noqa: BLE001 -- a probe must never kill a render
+            return None
+        try:
+            wrote = os.path.getsize(tmp) > 0
+        except OSError:
+            wrote = False
+        return bool(done.returncode == 0 and wrote)
+    finally:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+
+
+def _probe_pcm_in_mp4(resolved, otr_proc):
+    """True / False / None: can this build write PCM audio into an MP4?
+
+    Asked with a real, tiny mux rather than a version parse, because the answer
+    is a property of the build and not of the number (a distro could backport
+    it; a stripped build could lack it while numbering high).
+
+    THE CONTROL IS THE POINT, and it is what the first cut of this function got
+    wrong. The probe needs `lavfi` and `anullsrc` and a writable temp dir, none
+    of which the real mux needs -- it only copies existing streams. Without a
+    control, a build with the lavfi device disabled, or a read-only TMPDIR,
+    answered "this ffmpeg cannot write PCM into MP4" and a working machine was
+    refused. So the SAME silence is written to a WAV first: every ffmpeg ever
+    shipped can do that. If the control fails, the environment is what failed
+    and the answer is None. Only a passing control makes a failing MP4 mean the
+    container.
+    """
+    control = _write_silence(resolved, otr_proc, "wav", ".wav")
+    if control is not True:
+        return None
+    return _write_silence(resolved, otr_proc, "mp4", ".mp4")
+
+
+def master_mux_support_gap(path=None) -> Optional[str]:
+    """A sentence naming what stops this ffmpeg writing the final MP4, else None.
+
+    Same contract as :func:`caption_support_gap`: None when the mux will work
+    AND when the probe could not run. The writer asks this at its own start so
+    a box with Ubuntu 22.04's ffmpeg 4.4 refuses in a second instead of
+    rendering a whole episode and leaving a 0-byte final (PBUG-20260913-03).
+    """
+    caps = probe_ffmpeg_capabilities(path)
+    if caps["path"] is None:
+        return ("no ffmpeg was found on this host, so the episode cannot be "
+                "muxed; install ffmpeg 6.1 or newer (macOS: `brew install "
+                "ffmpeg`; Windows: `winget install Gyan.FFmpeg`; Linux: a "
+                "static build if the distro's is older) or set OTR_FFMPEG")
+    if caps.get(MASTER_MUX_PCM) is not False:
+        return None
+    return ("the ffmpeg at %s cannot write PCM audio into an MP4, which the "
+            "final mux needs (it copies the master losslessly); this is an "
+            "ffmpeg older than 6.1 -- Ubuntu 22.04's apt build is 4.4. "
+            "Install ffmpeg 6.1 or newer (a static build is fine) or set "
+            "OTR_FFMPEG to one." % caps["path"])
 
 
 def caption_support_gap(path=None) -> Optional[str]:

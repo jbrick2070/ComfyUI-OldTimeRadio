@@ -33,11 +33,15 @@ The branch matters: `v2.0-alpha` is the default and the only current one. `main`
 is a stale v1.7 merge thousands of commits behind. Use ComfyUI's own Python for
 the `pip install`, not a system one.
 
-**2. Put `ffmpeg` and `ffprobe` on your PATH.** Both. Every episode is mixed,
-captioned and muxed through them, and a missing `ffprobe` fails at the very end,
-after everything expensive has already run. `winget install Gyan.FFmpeg`,
-`brew install ffmpeg`, or `apt install ffmpeg` all supply the pair. On Linux also
-install one monospace font (`fonts-dejavu-core` is enough) for the captions.
+**2. Put `ffmpeg` and `ffprobe` on your PATH -- ffmpeg 6.1 or newer.** Both.
+Every episode is mixed, captioned and muxed through them, and the final mux
+copies the master audio into the MP4 losslessly, which only ffmpeg 6.1+ can
+write. `winget install Gyan.FFmpeg` and `brew install ffmpeg` supply a current
+pair; on Debian/Ubuntu check `ffmpeg -version` first -- Ubuntu 22.04's apt build
+is 4.4 and will not do -- and use a static build if it is older. The writer
+checks this before it loads anything, so an old build refuses in a second rather
+than at the end of a render. On Linux also install one monospace font
+(`fonts-dejavu-core` is enough) for the captions.
 
 **3. Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
 **OldTimeRadio** category in the node menu.

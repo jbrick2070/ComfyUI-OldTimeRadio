@@ -14918,3 +14918,60 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   gate error for a producer that catches nothing.
 - confidence: HIGH on mechanism (leg log, gate code, producer grep all read);
   the live proof is the next scifi_news_pro roll with a silent member.
+
+## PBUG-20260913-03 -- an ffmpeg older than 6.1 fails the final mux after the whole episode has rendered, and nothing asked first
+- surfaced: LIVE pod legs, 2026-09-13 -- RunPod `zuihlk2y9dpl82` (official
+  PyTorch template, Ubuntu 22.04, `apt` ffmpeg 4.4.2), Python 3.13 venv,
+  OTR at f94c7ed6 / 077b3f97. `otr_16gb_low` (13:46Z) and the re-run of
+  `otr_8gb_low` (17:36Z) both rendered to completion -- writer, cast,
+  voices, music, video, composite, captions, credits -- and died at
+  `OTR_MasterAudioMux`, leaving a 0-byte `*_with_credits_final.mp4` in
+  `output/otr/episodes/signal_lost_the_understudy_20260913_174440/`.
+  Server log: `OTR_MasterAudioMux: ffmpeg mux failed :: [mp4 @ ...] Could
+  not find tag for codec pcm_s16le in stream #1, codec not currently
+  supported in container`. The first of the two was misread as the volume
+  quota (which also struck that hour); the second, with writes proven
+  working, isolated ffmpeg.
+- symptom: RESULT FAIL at 20 minutes, no episode in obs, everything
+  expensive already spent.
+- root cause: `nodes/otr_master_audio_mux.py::mux_master_audio` copies the
+  PCM master into the MP4 losslessly by contract (`-c:a copy`, asserted:
+  "never re-encode"), and PCM inside an ISOBMFF container is an FFmpeg 6.1+
+  capability. The capability probe in `nodes/_otr_shared/ffmpeg.py` knew
+  about the caption filter and encoder (PBUG-20260907 class) but not about
+  this, so no stage asked before spending. Measured: 4.4.2 fails the probe,
+  7.0.2-static passes it.
+- fix: **FIXED, live proof in hand.** `probe_ffmpeg_capabilities` gains
+  `pcm_in_mp4`: a real 0.2 s silent mux, once per binary, preceded by a
+  CONTROL that writes the same silence to a WAV. The control is the whole
+  design -- the probe needs `lavfi`, `anullsrc` and a writable temp dir and
+  the real mux needs none of them, so without it a box with lavfi disabled
+  answered "this build cannot write PCM into MP4" and a working machine was
+  refused. Control fails -> None ("could not ask"); control passes and MP4
+  fails -> False, and that is the container. `master_mux_support_gap()`
+  names the binary and the fix.
+  **Asked by `OTR_WorkflowValidator`, which sees the graph.** It already
+  receives the hidden PROMPT and runs before the writer, so it asks only
+  when the submitted graph really does contain an `OTR_MasterAudioMux`
+  writing an ISOBMFF destination: the script-only wiring
+  (validator -> writer -> freeze) and a text-only replay never mux and are
+  never refused. `mux_master_audio` asks again, container-aware, as the belt
+  to that suspender -- Matroska has carried PCM since long before 6.1, and
+  this pack's own byte-identity test muxes to `.mkv`.
+  `scripts/otr_pod_provision.sh` installs the static 7.x build when the
+  system ffmpeg fails that same probe (asked by muxing, not by parsing a
+  version string, which can read `n7.0.2` or `N-109693-g...`); README step 2
+  and apple/INSTALL.md say 6.1 or newer and why. Tests:
+  `tests/test_ffmpeg_master_mux_capability.py` (19).
+  **Live proof:** the pod got the static build by hand at 18:00Z and
+  `otr_16gb_low` then ran SUCCESS in 16 min at 18:14Z with
+  `the_law_of_the_horn_20260913_180804...mgen_final.mp4` in obs -- the same
+  graph, the same tree, the same box that had produced two 0-byte finals
+  that morning. Codex refuted four points of the first cut (the missing
+  control, the unconditional writer refusal, the container assumption, and
+  the version parse); all four are folded in above.
+- bible-worthy: yes -- "a capability the last stage needs is a question the
+  first stage asks", the same lesson as the caption probe, one container
+  format later.
+- confidence: HIGH (two live failures, the exact ffmpeg error, the version
+  pair measured with the probe command itself).
