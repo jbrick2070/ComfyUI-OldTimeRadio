@@ -5510,3 +5510,18 @@ The known 23-frame closing-window tail-fill warning was reconciled back to the
 1,109-frame A/V budget. This is the third published clean-room episode and
 the second actual Plan 4 bank leg; `media_archive`, `original`, and
 `shakespeare` remain to be published.
+
+**CR-20260912-10 — Plan 4 `media_archive` one-act leg: PASS, published.**
+
+The same explicit active alpha.30 workflow and proven `machine:8gb` tuple
+completed with `act_count=1`. The media-archive bank produced an 8-line,
+198-word ledger, 8 persisted clips, 1,697 positioned frames at 25 fps,
+captions, and credits. The runner returned `status=success`; independent disk
+verification found the OBS MP4 at
+`output/otr/obs/the_marginalia_of_reel_4b_20260912_211159__scif__adhv__none__koko__marc__g4e2__mgen_final.mp4`,
+76,568,011 bytes, 88.040 seconds, H.264/AAC, 1920x1080 at 25 fps, SHA-256
+`CD9494A0BCDB6877B848902BC32E90E5CCA25EC97E6B5F1F5D03FF14D10C97AB`.
+The known 25-frame closing-window tail-fill warning was reconciled back to the
+1,697-frame A/V budget. This is the fourth published clean-room episode and
+the third actual Plan 4 bank leg; `original` and `shakespeare` remain to be
+published.
