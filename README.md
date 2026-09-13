@@ -91,6 +91,15 @@ That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
 finish**, however green the console looked -- go to
 [When something goes wrong](#when-something-goes-wrong).
 
+**The one exception, and it is deliberate.** Publication is a separate decision
+from production. If an episode's rights receipt does not clear -- a
+research-only source, or a receipt the terminal node cannot match to this
+episode -- the finished episode is still written, to
+`otr/episodes/<episode>/`, and only the `otr/obs/` copy is withheld. The run
+really did succeed. Your console says which happened, in as many words:
+`obs_publish OK -> ...` or `obs_publish BLOCKED -- ...`. Read that line before
+you conclude anything from an empty folder.
+
 The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
 
@@ -501,9 +510,13 @@ opening the graph.
 | animatediff | _not built_ | | | | | | | | | |
 <!-- END GENERATED: tier-matrix -->
 
-Weights marked **auto** download themselves the first time you queue; **manual**
-means the launch recipe beside the graph (`<graph>.launch.md`) lists what to
-fetch and where; **none** means those lanes need no video weights. Every
+Weights marked **auto** download themselves the first time you queue;
+**manual** means you fetch the file yourself, and
+[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
+it comes from and the folder it goes in; **none** means those lanes need no
+video weights. (In a git clone there is also a `<graph>.launch.md` beside each
+graph. Those are headless commands built on `scripts/`, so neither they nor the
+scripts are in a Manager install.) Every
 `shipping` graph above has put a finished episode into `otr/obs/` on the
 hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
 8 GB rows on a physical RTX 4060 laptop, which by now

@@ -1,15 +1,22 @@
 # Apple Silicon
 
 It works, and the short version is that you do not have to do anything special.
-Install as in [INSTALL.md](INSTALL.md), open the Mac graph, press Queue.
+Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Queue. Four
+ship, and each has published an episode on a Mac mini M4 / 16 GB:
 
 ```
-workflows/variants/otr_mac_mps.json
+workflows/variants/otr_mac16_low.json          procedural lanes, no weights
+workflows/variants/otr_mac16_still.json        sd15 stills with motion
+workflows/variants/otr_mac16_video.json        ltx098 video diffusion
+workflows/variants/otr_mac16_animatediff.json  SD 1.5 motion from the prompt
 ```
 
-That graph is the canonical with Mac-appropriate dropdowns already saved. The
+Start with `otr_mac16_low` if you want the fastest proof that it works at all.
+Each is the canonical with Mac-appropriate dropdowns already saved. The
 canonical itself also runs — it names no vendor and resolves your device at run
-time — but the Mac variant picks the lanes that have receipts here.
+time — but these pick the lanes that have receipts here.
+
+(`otr_mac_mps` is the PROFILE those are cut from, not a file you open.)
 
 What runs on a Mac and what does not is the **Mac 16 GB** column in
 [MACHINES.md](MACHINES.md). That table is generated from the same data the code
