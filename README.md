@@ -90,6 +90,14 @@ the Kokoro voices -- and then writes, casts, performs, scores and cuts an episod
 Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
 on CPU it is a long wait, and that is the model working, not a hang.
 
+**Expect the canvas to stay empty, and do not read that as failure.** This graph
+has no preview node: nothing renders a thumbnail, a video player or an image in
+the ComfyUI window, at any point, including when it finishes. The episode is a
+file on disk and the folder is the only place it appears. That surprises people
+who are used to seeing a picture arrive on the canvas -- the first person outside
+this project to run it went looking for the output in the UI, found nothing, and
+only then found the files.
+
 That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
 finish**, however green the console looked -- go to
 [When something goes wrong](#when-something-goes-wrong).
@@ -698,6 +706,13 @@ licence click on Hugging Face plus a login; every default weight is ungated.
 **On a Mac, a 20 GB download starts the moment you queue.** The image dropdowns
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 all three to `sd15` first.
+
+**It ran, but nothing showed up in ComfyUI.** That is correct behaviour, not a
+fault: the graph has no preview node, so the canvas never displays the episode.
+Look in `<your ComfyUI output folder>/otr/obs/` for the finished `.mp4`, and in
+`otr/episodes/<episode>/` for the working files it was built from. If you run
+ComfyUI in Docker, that is whichever host folder you mapped to ComfyUI's output
+directory.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
 the console first, because there are two different answers. `obs_publish
