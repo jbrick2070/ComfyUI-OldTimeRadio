@@ -5472,3 +5472,13 @@ ceiling -- pick a smaller model. ctx_cap=UNKNOWN@8192`. No audio, video, or
 profile tuple is therefore not a successful 8 GB path under the current
 loader policy; keep it separate from the successful documented `machine:8gb`
 row and do not report it as qualified.
+
+**CR-20260912-07 — Plan 4 source-bank dry-run coverage: PASS.**
+
+Using the active installed alpha.30 canonical workflow, the proven `machine:8gb`
+tuple, and `act_count=1`, dry-run resolution passed for all five required banks:
+`scifi_news_pro`, `public_domain`, `media_archive`, `original`, and
+`shakespeare`. Each resolved the 23-node prompt with haunted AnimateDiff,
+Kokoro, MusicGen, and the same 6.8 GB CUDA writer ceiling. Dry-run mode did
+not submit prompts or create media; this is routing/configuration evidence, not
+five published regression legs.
