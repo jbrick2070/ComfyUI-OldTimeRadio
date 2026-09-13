@@ -316,11 +316,15 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
     # v2: the llm section (constructor-based validation; ONE enum truth).
     _validate_llm_section(profile["llm"], source)
 
-    # features: bool/str values only in v1 (widget-backed BOOLEANs + COMBO styles)
+    # features: the episode-shape knobs. bool + str cover the widget-backed
+    # BOOLEANs and COMBO styles; int was added 2026-09-13 for
+    # `num_characters`, which is an INT widget. `bool` is a subclass of
+    # `int`, so the order of this check does not matter -- both pass.
     for k, v in profile["features"].items():
-        if not isinstance(k, str) or not isinstance(v, (bool, str)):
+        if not isinstance(k, str) or not isinstance(v, (bool, str, int)):
             raise ProfileError(
-                f"profile {source}: features.{k} must be bool or str; got {v!r}"
+                f"profile {source}: features.{k} must be bool, str or int; "
+                f"got {v!r}"
             )
     return profile
 

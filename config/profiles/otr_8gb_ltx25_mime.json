@@ -1,0 +1,96 @@
+{
+  "id": "otr_8gb_ltx25_mime",
+  "display_name": "8GB NVIDIA: LTX 2.5 MIME -- the same render as the foley lane, byte for byte, with one difference at the mux: the video model's own audio is DROPPED, so the cast mimes and you hear only the Kokoro voices and the music. NEEDS the ComfyUI-GGUF node pack and ~22GB of hand-placed LTX 2.5 weights, two of them behind a licence click; the SD 1.5 still and the voices and music fetch themselves. EXPERIMENTAL on 8GB: the same video render is proven here through ltx25_video, but nobody has run the mime lane on an 8GB card yet.",
+  "status": "draft",
+  "platform": "any",
+  "device_backend": "cuda",
+  "gpu_vendor": "nvidia",
+  "toolchains": [],
+  "allow_sidecars": false,
+  "role_overrides": {
+    "announcer_visual": "ltx25_mime",
+    "music_visual": "ltx25_mime",
+    "character_visual": "ltx25_mime",
+    "announcer_image": "sd15",
+    "music_image": "sd15",
+    "character_image": "sd15"
+  },
+  "slot_overrides": {
+    "voice_bank": "default",
+    "cast_voice_policy": "auto_registry",
+    "announcer_voice_engine": "kokoro",
+    "music_engine": "musicgen",
+    "video_render_engine": "ltx25_mime"
+  },
+  "features": {
+    "burn_captions": true,
+    "caption_style": "sdh_standard",
+    "act_count": "3",
+    "num_characters": 3
+  },
+  "seed_policy": {
+    "request_seed": 42,
+    "seed_mode": "request_hash",
+    "cast_seed_env": null,
+    "style_seed_env": null
+  },
+  "llm": {
+    "device": "cuda",
+    "attn_impl": "sdpa",
+    "quant_policy": "bnb_nf4",
+    "vram_ceiling_gb": 6.8,
+    "gguf_n_ctx": 2048,
+    "gguf_quant": "Q4_K_M",
+    "creative_model": "Qwen/Qwen3.5-4B",
+    "technical_model": "Qwen/Qwen3.5-4B",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "google_api_slot_a_model": "(select Google API model)",
+    "google_api_slot_b_model": "(select Google API model)",
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
+  },
+  "video": {
+    "device_policy": "cuda",
+    "dtype_policy": "fp8_ok"
+  },
+  "image": {
+    "dtype_policy": "fp8_ok"
+  },
+  "audio": {
+    "voice_device": "cuda"
+  },
+  "render": {
+    "fps": 25,
+    "canvas_w": 832,
+    "canvas_h": 480,
+    "composite_res": "1920x1080",
+    "composite_w": 1920,
+    "composite_h": 1080,
+    "frame_budget": 25,
+    "beats": 40
+  },
+  "preflight": {
+    "required_models": [
+      "LTX-2.5-Distilled-Q3_K_M.gguf",
+      "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+      "ltx-2.5-video-vae-bf16.safetensors",
+      "ltx-2.5-audio-vae-bf16.safetensors",
+      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+    ],
+    "required_keys": []
+  },
+  "launch": {
+    "boot_contract": "default",
+    "sage_attention": false,
+    "extra_args": [],
+    "env": {}
+  }
+}

@@ -66,16 +66,16 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  16 experimental profile(s), 2 shipping
+## 8 GB  --  18 experimental profile(s), 2 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 | `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 
-<details><summary>14 draft profile(s) here -- not vouched for</summary>
+<details><summary>16 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
+Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx25_foley_plus`, `ltx25_mime`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
@@ -89,6 +89,8 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_4060_nano_local` | ltx_8gb | kokoro |
 | `otr_8gb_fastwan` | fastwan_8gb | bark |
 | `otr_8gb_ltx` | ltx_8gb | bark |
+| `otr_8gb_ltx25_foley` | ltx25_foley_plus | - |
+| `otr_8gb_ltx25_mime` | ltx25_mime | - |
 | `otr_8gb_wan` | wan_ti2v | bark |
 | `otr_amd8_rocm` | still_motion | kokoro |
 | `otr_nvidia_8gb_h3` | minimax_h3_video | kokoro |
@@ -140,8 +142,8 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_humo_14b_169` | humo_14B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_humo_1_7b` | humo_1.7B | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_w45_humo_1_7b_169` | humo_1.7B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_foley_plus` | ltx25_foley_plus | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_mime` | ltx25_mime | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_foley_plus` | ltx25_foley_plus | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_mime` | ltx25_mime | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_w45_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
