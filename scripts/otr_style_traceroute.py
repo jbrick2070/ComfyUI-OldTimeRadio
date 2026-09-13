@@ -121,7 +121,7 @@ NEGATIVE_ENGINES = (
     ("lumina_image", 4.0, "request negative (env override only)"),
     ("flux_gen1", 1.0, "request negative -- INERT at cfg 1.0"),
 )
-NO_NEGATIVE_ENGINES = ("sd35_large", "flux2_klein", "hidream_i1",
+NO_NEGATIVE_ENGINES = ("flux2_klein",
                        "eng_google_image", "eng_cloud_image")
 
 #: THE VIDEO SIDE (2026-08-17, D-BIS finding 1). `VIDEO_DICT_SURFACES` has

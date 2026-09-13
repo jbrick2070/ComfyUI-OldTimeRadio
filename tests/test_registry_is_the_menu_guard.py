@@ -52,8 +52,11 @@ def test_no_registered_audio_engine_declares_a_flag():
 
 def test_dark_notimplemented_scaffolds_are_unregistered():
     # The dark scaffolds whose render path raises NotImplementedError were
-    # UNREGISTERED (C3) -- they are NOT selectable. (The source files stay on disk
-    # and return WITH their @register + a CAPABILITIES row when a real forward ships.)
+    # UNREGISTERED (C3) -- they are NOT selectable. The four 3D scaffolds' source
+    # files stay on disk; the two IMAGE scaffolds' files do not, as of 2026-09-12.
+    # `hidream_i1` and `sd35_large` were deleted outright after three months
+    # unregistered, so this assertion now guards against a REVIVAL by name rather
+    # than against a dormant file waking up.
     from nodes._otr_image_engines import registry as ireg
     from nodes._otr_video_engines import registry as vreg
     for name in ("triposr", "triposg_talk", "hunyuan3d_talk", "trellis_talk"):

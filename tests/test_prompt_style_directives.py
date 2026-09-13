@@ -59,8 +59,6 @@ _OWNERS = {
     # that matters most: `requires_flag = None`, so it is selectable as shipped
     # while its two siblings are default-OFF opt-ins.
     "flux2_klein": "nodes/_otr_image_engines/flux2_klein.py",
-    "hidream_i1": "nodes/_otr_image_engines/hidream_i1.py",
-    "sd35_large": "nodes/_otr_image_engines/sd35_large.py",
 }
 
 #: The sibling that must NOT grow its own copy of the LTX family pair.
@@ -371,25 +369,33 @@ def test_the_owner_map_still_points_at_real_files():
 
     A Sonnet QA pass found three registered local image engines outside the
     RESEARCH doc's original ten -- `flux2_klein` (`requires_flag = None`, so it is
-    NOT gated and sits live in the menu), `hidream_i1` and `sd35_large` (both
-    default-OFF opt-ins). **The operator closed that scope call on 2026-08-17 and
-    supplied all three directives himself**, drafted from public docs and then
-    validated in a v2 pass, taking the map to THIRTEEN. His three are stored
-    verbatim; the original ten remain driver-derived. Neither set is measured.
+    NOT gated and sits live in the menu), `hidream_i1` and `sd35_large`. **The
+    operator closed that scope call on 2026-08-17 and supplied all three
+    directives himself**, drafted from public docs and then validated in a v2
+    pass, taking the map to THIRTEEN. His three are stored verbatim; the
+    original ten remain driver-derived. Neither set is measured.
 
     **TWELVE since 2026-08-26**, when the local Wan 14B (`wan_i2v`) was retired
     on the operator's call -- it does not fit this card's 14.5 GiB envelope and
     `wan_ti2v` (the 5B) covers the lane. Its directive was its own, not shared
     with the 5B, so removing the row orphaned nothing.
+
+    **TEN since 2026-09-12.** `hidream_i1` and `sd35_large` were unregistered on
+    2026-06-29 and their MODULES were left on disk, unreachable, for ten weeks --
+    the half-removed state this repo's own orphan rule forbids. The files are
+    deleted now, so their rows had to go with them: this map asserts every path
+    still exists, and a row pointing at a deleted file is the map lying, which
+    is exactly what the assertion below is for.
     """
     for slug, rel_path in sorted(_OWNERS.items()):
         assert (_REPO / rel_path).is_file(), (
             "%s: %s no longer exists -- the overlay moved or the engine was "
             "renamed, and this map is now lying" % (slug, rel_path))
-    assert len(_OWNERS) == 12, (
+    assert len(_OWNERS) == 10, (
         "this map has %d. It was TEN (the RESEARCH doc's blocks), then THIRTEEN "
         "after the operator's 2026-08-17 scope call added flux2_klein, "
         "hidream_i1 and sd35_large, then TWELVE when wan_i2v was retired on "
-        "2026-08-26. Adding or removing one is a deliberate act, so update this "
-        "count in the same commit -- this assertion firing is the guard working, "
-        "not a bug." % len(_OWNERS))
+        "2026-08-26, and TEN again on 2026-09-12 when the hidream_i1 and "
+        "sd35_large modules were deleted. Adding or removing one is a deliberate "
+        "act, so update this count in the same commit -- this assertion firing "
+        "is the guard working, not a bug." % len(_OWNERS))

@@ -84,9 +84,14 @@ def _registry_engine_ids():
         eng_stable_audio, eng_stable_audio_3,
     )
     from nodes._otr_image_engines import registry as ireg
+    # `hidream_i1` and `sd35_large` left this list on 2026-09-12 for the same
+    # reason `eng_wan_i2v` left it above: the modules were DELETED, so the
+    # import is a hard ImportError rather than a missing id. Nothing is
+    # orphaned -- both had been unregistered since 2026-06-29 (their
+    # CAPABILITIES rows removed in C3), so neither contributed an engine id to
+    # this sweep even while the files existed.
     from nodes._otr_image_engines import (  # noqa: F401
-        eng_cloud_image, flux2_klein, flux_gen1, hidream_i1, lumina_image,
-        sd35_large, z_image_turbo,
+        eng_cloud_image, flux2_klein, flux_gen1, lumina_image, z_image_turbo,
     )
     return (set(vreg.all_engine_names()) | set(areg._REGISTRY)
             | set(ireg.all_engine_names()))
