@@ -29,7 +29,7 @@ has ever had, and it is the whole reason this file exists.
 | **GPU** | One AMD card: MI-series, or RDNA3 (7900 XT / XTX, W7900). RDNA2 may work; nobody knows |
 | **VRAM** | 16 GB for the full profile, 8 GB for the small one |
 | **ROCm** | 6.x |
-| **Disk** | About 50 GB for the model weights |
+| **Disk** | About 31 GB of weights, so 50 GB free with working room |
 | **Time** | An hour, most of it downloads |
 
 A rented box works fine. This is a couple of dollars of cloud GPU, not a
@@ -94,7 +94,7 @@ pip install -r requirements.txt
 refuses to run if it finds it patched in. You do not need `pycairo` either --
 neither AMD profile selects the one engine that wants it.
 
-**3. Fetch the weights.** About 20 GB for a complete episode.
+**3. Fetch the weights.** About 31 GB for a complete episode -- the image model is 19.26 GB of that, because this graph's `still_motion` lanes consume a still and therefore make it live. Every file, with its repository and destination folder, is in [MACHINES.md](MACHINES.md) section 3.
 
 ```bash
 python scripts/otr_fetch_lane_weights.py --list

@@ -645,7 +645,7 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   dependency for the registry story and a recipe change on hard-won recipes;
   after the wave, if at all.
 * **The ROCm recruitment post.** Written and pushed and waiting for him --
-  `ROCM_MISSION_IMPOSSIBLE.md`, the hero still, two drafts in
+  `apple/ROCM.md`, the hero still, two drafts in
   `docs/rocm-recruitment-post-draft.md`. **He said he will post it himself.**
   A window must never post it.
 

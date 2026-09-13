@@ -13,22 +13,45 @@ slots, with Stable Audio 3 for music) → 48 kHz master mix → model-agnostic v
 
 ## Start here
 
+**Everyone:**
+
 | | |
 |---|---|
 | **[apple/INSTALL.md](apple/INSTALL.md)** | Get the nodes loading. ffmpeg, Python versions, what downloads itself. |
 | **[apple/RUN.md](apple/RUN.md)** | Make your first episode, and where it lands. |
 | **[apple/MACHINES.md](apple/MACHINES.md)** | Which graph to open for your card, what runs where, and where every manual weight comes from. |
 
-Those three ship with the pack. Everything under `docs/` is the development
+**If it applies to you:**
+
+| | |
+|---|---|
+| [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
+| [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your card cannot hold. |
+| [apple/ROCM.md](apple/ROCM.md) | AMD. Nothing here has ever run on ROCm -- this is the ask. |
+| [apple/CLOUD.md](apple/CLOUD.md) | Optional paid writer lanes. Off by default; you do not need them. |
+
+**Adding to it:**
+
+| | |
+|---|---|
+| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, or your own source bank. |
+| [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will work. |
+
+All of `apple/` ships with the pack. Everything under `docs/` is the development
 record and is **not** included in a Manager install -- read it on GitHub.
 
-**Alpha.24 qualification warning:** the mouse-only fresh-install path is not yet
-qualified. See [the physical 4060 report](docs/4060_PORTABILITY_REPORT_2026-09-06.md)
-before queuing the canonical: missing visual weights were detected only after
-hours of writing and audio generation.
-The development branch now contains a
-[pre-writer visual-weight readiness candidate](docs/4060_VISUAL_ASSET_READINESS.md);
-it has offline tests, but has not been released or cold-install/GPU qualified.
+**Fresh-install status, alpha.31.** The failure this warning used to describe is
+fixed: a clean install could get hours into writing and audio before dying on a
+visual weight it never had. The graph now fetches those at queue time, before the
+writer runs -- Z-Image-Turbo, LTX 0.9.8, Stable Audio 3 and SD 1.5 -- so the
+specific defect (`v1-5-pruned-emaonly-fp16.safetensors`, which killed the 4060
+clean-room drill) cannot recur.
+
+**It has not been re-qualified on the fixed tree**, which is a weaker claim than
+"it works": the cause is closed, the drill has not been re-run. If you are
+installing fresh, [apple/INSTALL.md](apple/INSTALL.md) is the current path and
+[apple/MACHINES.md](apple/MACHINES.md) names every weight that does *not* fetch
+itself.
 
 **My Story qualification:** nine full canonical 5080 recovery attempts across
 recorded revisions produced four writing failures and five publications. Four

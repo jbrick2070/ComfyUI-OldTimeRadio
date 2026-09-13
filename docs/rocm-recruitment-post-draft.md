@@ -29,7 +29,7 @@ two AMD profiles nobody has ever been able to test.
 > kernels. On paper they should just work. On paper.
 >
 > If anyone here has an MI-series or RDNA3 card and an hour, there is a
-> step-by-step in the repo (ROCM_MISSION_IMPOSSIBLE.md) -- six commands, about
+> step-by-step in the repo (apple/ROCM.md) -- six commands, about
 > 20 GB of weights, and success is an mp4 you can actually watch. A traceback
 > is just as useful to me as a success; either way you would be the first
 > person to point this thing at an AMD GPU, and I will credit you in the
@@ -79,7 +79,7 @@ local AI radio-drama pipeline on AMD
 >
 > **What I am asking for.** An hour on an MI-series or RDNA3 card (16 GB for
 > the full profile, 8 GB for the small one), ROCm 6.x, about 50 GB of disk.
-> A rented box is fine and cheap. The repo has `ROCM_MISSION_IMPOSSIBLE.md`
+> A rented box is fine and cheap. The repo has `apple/ROCM.md`
 > with six commands start to finish and a list of exactly what to send back.
 >
 > **A traceback is a win.** If it dies ninety seconds in, that failure is the

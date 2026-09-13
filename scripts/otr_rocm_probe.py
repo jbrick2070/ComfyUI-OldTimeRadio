@@ -1,6 +1,6 @@
 """The five-minute AMD probe: what we need to know before anyone renders.
 
-WHY THIS EXISTS. `ROCM_MISSION_IMPOSSIBLE.md` asks a volunteer for six commands,
+WHY THIS EXISTS. `apple/ROCM.md` asks a volunteer for six commands,
 a full ComfyUI install, several gigabytes of weights and a complete episode.
 That is the right ASK eventually and the wrong FIRST ask: it is a long evening
 for a stranger, and if it dies at step 1 we learn almost nothing except that it
@@ -119,7 +119,7 @@ def main() -> int:
     except Exception as exc:                       # noqa: BLE001
         say("torch", "NOT IMPORTABLE: %s" % exc)
         print("\nNothing else can be checked without torch. Install the ROCm "
-              "build first -- see ROCM_MISSION_IMPOSSIBLE.md step 1.")
+              "build first -- see apple/ROCM.md step 1.")
         return 2
     say("torch", torch.__version__)
     say("torch.version.hip", getattr(torch.version, "hip", None))
@@ -233,7 +233,7 @@ Paste EVERYTHING above into the issue. Three lines decide what happens next:
     are leaving performance on the table by shipping `quant_policy: none`, and
     that is a good problem worth knowing about.
 
-If those look sane, the full mission in ROCM_MISSION_IMPOSSIBLE.md is worth your
+If those look sane, the full mission in apple/ROCM.md is worth your
 evening. If they do not, you have saved yourself one and taught us more than a
 failed render would have.
 """)
