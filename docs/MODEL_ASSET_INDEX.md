@@ -98,11 +98,9 @@ Anything not listed there is a manual install -- see its row below.
 | `google_image` | nothing on disk | - | - |
 | `flux2_klein` | 3 weight file(s) | manual download | - |
 | `flux_gen1` | 1 weight file(s) | manual download | - |
-| `hidream_i1` | **not declared in code -- verify** | - | - |
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |
 | `sd15` | 1 weight file(s); `Comfy-Org/stable-diffusion-v1-5-archive` | manual download | - |
-| `sd35_large` | **not declared in code -- verify** | - | - |
 | `z_image_turbo` | 3 weight file(s) | manual download | - |
 
 ## Engines that are a separate INSTALL, not a download
