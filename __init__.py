@@ -440,12 +440,18 @@ else:
 # line names one. `otr_4060_floor` remains a valid PROFILE id for
 # provisioning and the headless runner; it was never a gallery template after
 # 09-02. If a template is added or dropped, this line changes in the same edit.
+# The banner used to end with "per the README's 'Pick the graph' table".
+# That table does not exist -- grep README.md for the phrase and it is not
+# there -- so every boot pointed every user at nothing, and the advice
+# contradicted the README besides: the canonical resolves the device at run
+# time and every dropdown already holds a working value. Say what the README
+# says, or say nothing.
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
       "EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the one shipped "
       "graph -- pick it, then Queue Prompt) -- or drag "
-      "workflows/otr_canonical.json onto the canvas. There is one graph now: "
-      "set its device dropdowns to match your hardware, per the README's "
-      "\"Pick the graph\" table.")
+      "workflows/otr_canonical.json onto the canvas. Nothing needs changing: "
+      "it resolves your device at run time. The finished episode lands in "
+      "<output>/otr/obs/.")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger
