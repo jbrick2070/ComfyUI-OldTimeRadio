@@ -4,6 +4,13 @@
   <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_icon.gif" alt="Old Time Radio" width="400">
 </p>
 
+<p align="center">
+  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.downloads&label=registry%20installs&color=0a7bbb" alt="Registry installs"></a>
+  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.latest_version.version&label=registry&color=0a7bbb" alt="Registry version"></a>
+  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/stargazers"><img src="https://img.shields.io/github/stars/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="GitHub stars"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="License"></a>
+</p>
+
 > *"Good evening. This is SIGNAL LOST."*
 
 That is how every episode opens. What follows is a radio drama nobody has heard
@@ -20,6 +27,22 @@ one of them stays off until you turn it on.
 ---
 
 ## Make an episode
+
+**New to ComfyUI? This is a five-minute read and then a button.** You need a
+working ComfyUI (Desktop, portable or a git install -- any of them), about
+**25 GB of free disk** for the models the first run fetches, and one of the
+machines in the table below. You do not need an account, an API key, a paid
+service, or a single one of the sixteen saved graphs further down this page:
+those are per-machine presets you can grow into. Installing the pack and
+pressing **Queue** is the whole path.
+
+| Your machine | What to expect on a first short episode |
+|---|---|
+| NVIDIA, 16 GB or more | Minutes. Everything on this page is available to you. |
+| NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
+| Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
+| No GPU at all | About half an hour, and it works. Start ComfyUI with `--cpu`. |
+| AMD | Experimental, unproven, and honestly documented as such in [apple/ROCM.md](apple/ROCM.md). |
 
 **1. Install the pack.** In ComfyUI Manager, search for **Old Time Radio** (registry
 id `comfyui-old-time-radio`, publisher `fluxus`). Or clone it into `custom_nodes/`:
@@ -69,6 +92,12 @@ finish**, however green the console looked.
 The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
 
+**Would rather hand it to an AI agent?** [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md)
+is written for one -- Claude Code, Codex, Cursor, Gemini CLI, whatever you use --
+with a prompt to paste, a verification command for every step, and the traps that
+waste an agent's time. It is an alternative to the five steps above, not a
+requirement: nothing here needs an agent.
+
 ### The widgets worth touching
 
 All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
@@ -102,6 +131,7 @@ Everything under `apple/` is in the pack, whichever way you installed it.
 | Everyone | |
 |---|---|
 | [apple/INSTALL.md](apple/INSTALL.md) | Getting the nodes loading: ffmpeg, Python versions, what downloads itself. |
+| [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | The same install, written for an AI coding agent to run. Optional. |
 | [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
 | [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
 
