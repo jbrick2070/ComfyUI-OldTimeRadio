@@ -27,24 +27,53 @@ from nodes._otr_video_engines import render_driver as RD
 from nodes._otr_video_engines import wrapper_bridge as WB
 
 
+#: The two canvases the shipped animatediff profiles actually set, as LATENT
+#: dimensions (canvas over 8). They differ, which is the whole point of this
+#: class: config/profiles/otr_mac16_animatediff.json is 832x480 while both
+#: NVIDIA animatediff profiles are 512x288.
+NVIDIA_LATENT = (36, 64)    # 512 x 288
+MAC_LATENT = (60, 104)      # 832 x 480
+
+
 class TheDecodeIsBoundedWhereItHasToBe(unittest.TestCase):
-    def test_apple_silicon_gets_a_chunk(self):
-        self.assertEqual(GS.ghost_decode_chunk_frames("mps"),
-                         GS.GHOST_MPS_DECODE_CHUNK_FRAMES)
+    def test_the_chunk_follows_the_canvas_and_is_not_a_constant(self):
+        """The defect this replaced: a constant 4, chosen with arithmetic done
+        at 512x288, applied to a Mac that renders 832x480. Four frames there is
+        about 13 GiB of transient against a 20.13 GiB ceiling -- a fix that
+        might not have fixed anything, on the only machine it exists for."""
+        nvidia = GS.ghost_decode_chunk_frames("mps", *NVIDIA_LATENT)
+        mac = GS.ghost_decode_chunk_frames("mps", *MAC_LATENT)
+        self.assertGreater(nvidia, mac,
+                           "the bigger canvas must get the smaller chunk")
+        self.assertGreaterEqual(mac, 1)
+
+    def test_the_budget_is_what_decides(self):
+        # Each chunk's estimated cost stays inside the declared budget, at
+        # both canvases, using ComfyUI's own per-frame formula.
+        for h, w in (NVIDIA_LATENT, MAC_LATENT):
+            frames = GS.ghost_decode_chunk_frames("mps", h, w)
+            per_frame = 2178 * h * w * 64 * 4
+            self.assertLessEqual(frames * per_frame,
+                                 GS.GHOST_MPS_DECODE_BUDGET_BYTES,
+                                 "chunk at %dx%d exceeds the budget" % (h, w))
 
     def test_cuda_is_untouched_and_still_decodes_in_one_call(self):
-        # Zero means "the whole batch", which is what this lane always did.
-        self.assertEqual(GS.ghost_decode_chunk_frames("cuda"), 0)
-        self.assertEqual(GS.ghost_decode_chunk_frames("cpu"), 0)
+        # Zero means "the whole batch", which is what this lane always did --
+        # and it stays zero whatever the canvas is.
+        for h, w in (NVIDIA_LATENT, MAC_LATENT):
+            self.assertEqual(GS.ghost_decode_chunk_frames("cuda", h, w), 0)
+            self.assertEqual(GS.ghost_decode_chunk_frames("cpu", h, w), 0)
 
     def test_a_host_we_cannot_identify_is_never_given_a_changed_path(self):
-        self.assertEqual(GS.ghost_decode_chunk_frames(""), 0)
-        self.assertEqual(GS.ghost_decode_chunk_frames("xpu"), 0)
+        self.assertEqual(GS.ghost_decode_chunk_frames("", *MAC_LATENT), 0)
+        self.assertEqual(GS.ghost_decode_chunk_frames("xpu", *MAC_LATENT), 0)
 
-    def test_the_chunk_is_small_enough_to_matter(self):
-        # 88 latents at 512x288 was the failure. Anything near that is no fix.
-        self.assertGreater(GS.GHOST_MPS_DECODE_CHUNK_FRAMES, 0)
-        self.assertLessEqual(GS.GHOST_MPS_DECODE_CHUNK_FRAMES, 16)
+    def test_an_unmeasurable_latent_takes_the_conservative_end(self):
+        # A guess is worst exactly when the latent cannot be read, so the
+        # answer there is one frame, not a remembered constant.
+        self.assertEqual(GS.ghost_decode_chunk_frames("mps"),
+                         GS.GHOST_MPS_DECODE_FALLBACK_FRAMES)
+        self.assertEqual(GS.GHOST_MPS_DECODE_FALLBACK_FRAMES, 1)
 
 
 class AnOutOfMemoryIsAnOutOfMemory(unittest.TestCase):
@@ -97,7 +126,9 @@ class TheChunkingIsActuallyWired(unittest.TestCase):
                / "_otr_video_engines" / "eng_ghost_signal.py").read_text(
                    encoding="utf-8")
         self.assertIn("self._decode_latents(decode_graph, sampled_latent", src)
-        self.assertIn("ghost_decode_chunk_frames()", src)
+        # The latent must reach the budget, or it is a constant again.
+        self.assertIn("ghost_decode_chunk_frames(latent_h=lat_h, latent_w=lat_w)",
+                      src, "the chunk must be derived from the real latent")
 
     def test_the_classifier_asks_before_it_reads_the_type_name(self):
         src = (Path(__file__).resolve().parents[1] / "nodes"
@@ -149,7 +180,7 @@ class TheChunkedDecodeReturnsTheSameFrames(unittest.TestCase):
     def _decode(self, frames, chunk):
         engine = GS.GhostSignalEngine.__new__(GS.GhostSignalEngine)
         real = GS.ghost_decode_chunk_frames
-        GS.ghost_decode_chunk_frames = lambda device_type=None: chunk
+        GS.ghost_decode_chunk_frames = lambda *a, **k: chunk
         try:
             return engine._decode_latents({}, self._latent(frames), object())
         finally:

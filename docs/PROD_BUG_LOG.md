@@ -14999,10 +14999,26 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   `torch.AcceleratorError`, and an MPS exhaustion arrives as a plain
   `RuntimeError` (`comfy/sd.py` decode, `comfy/model_management.py` 380-395).
   So no layer of the stack bounded the batch and no layer caught the miss.
+- **CORRECTION, same day: the canvas is 832x480, not 512x288.**
+  `config/profiles/otr_mac16_animatediff.json` sets `canvas_w` 832 /
+  `canvas_h` 480, while BOTH NVIDIA animatediff profiles set 512x288 -- so
+  the Mac graph asks 2.7x the pixels of the 16 GB NVIDIA graph, on a machine
+  with less headroom than a discrete 16 GB card. That is the size of the
+  thing being decoded and it is a profile choice, not a code fault. By
+  ComfyUI's own estimator the per-frame decode cost is 3.24 GiB at the Mac's
+  canvas against 1.20 GiB at the NVIDIA one.
+  **The first cut of the fix did its arithmetic at the wrong canvas** and
+  picked a constant 4 frames from it -- about 13 GiB of transient at 832x480,
+  against the 20.13 GiB ceiling that had just refused 2.67 GiB. A fix that
+  might not have fixed anything, on the only machine it exists for.
 - fix: **FIXED, live proof owed (the Mac re-runs this leg).**
-  `ghost_decode_chunk_frames()` returns 8 on MPS and 0 -- meaning one call
-  with the whole batch, exactly as before -- everywhere else, including on
-  a host whose device cannot be read. `_decode_latents` runs the same
+  `ghost_decode_chunk_frames(device_type, latent_h, latent_w)` derives the
+  count from the latent actually being decoded against a declared budget
+  (`GHOST_MPS_DECODE_BUDGET_BYTES`, 5 GiB, chosen and not measured), so it
+  follows whatever canvas a profile sets: 4 frames at 512x288, 1 at 832x480,
+  1 when the latent cannot be read. It returns 0 -- meaning one call with the
+  whole batch, exactly as before -- on every host whose VAE does not decode
+  on MPS, including one whose device cannot be read. `_decode_latents` runs the same
   one-node decode graph once per chunk and concatenates in order. This is
   NOT a recipe change: the SD1.5 VAE decodes each frame independently, so
   the pixels are identical and only the peak moves; the regression test

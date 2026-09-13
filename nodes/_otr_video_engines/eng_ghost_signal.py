@@ -322,31 +322,44 @@ GHOST_NODE_CANDIDATES = {
 #: ceiling with 14.29 GiB already held, and the whole leg died AFTER all eight
 #: sampling steps had completed (PBUG-20260913-04).
 #:
-#: WHY FOUR, and what that number does and does not promise. ComfyUI's own
-#: estimator (`comfy/sd.py`, `memory_used_decode`) puts this clip at
-#: 1.196 GiB per frame at 512x288: about 4.79 GiB for four frames against
-#: roughly 37 GiB for the ~31-frame batch it chose from an over-reported free
-#: figure. Four is a deliberate small multiple of the per-frame estimate, not
-#: a proof of headroom -- the traceback records the allocator's state mid-
-#: decode and so pins neither the resident floor before decode nor this
-#: chunk's true peak. The proof owed is the Mac re-running the leg. The extra
-#: calls cost nothing worth counting: the decode is a small fraction of a leg,
-#: and the measured alternative on this hardware is losing the leg at 23
-#: minutes.
-GHOST_MPS_DECODE_CHUNK_FRAMES = 4
+#: How much transient the decode may ask for per call on Apple silicon, in
+#: bytes of ComfyUI's OWN estimate (`comfy/sd.py::memory_used_decode`, which is
+#: `2178 * latent_h * latent_w * 64 * dtype_size` and deliberately generous).
+#:
+#: A BUDGET, NOT A FRAME COUNT, and that distinction is the fix. The first cut
+#: of this was the constant 4, chosen with arithmetic done at 512x288 -- which
+#: is what both NVIDIA animatediff profiles set, and NOT what the Mac profile
+#: sets. `otr_mac16_animatediff` renders 832x480. The same estimator puts that
+#: at 3.24 GiB per frame against 1.20 at 512x288, so four frames there is
+#: roughly 13 GiB of transient against a 20.13 GiB ceiling: a fix that might
+#: not have fixed anything, on the only machine it was written for.
+#:
+#: 5 GiB is CHOSEN, not measured -- it is a little over four frames at the
+#: NVIDIA canvas and one frame at the Mac's, and it leaves the resident stack
+#: room under the ceiling that refused 2.67 GiB. The live re-run is the proof
+#: owed, and nothing here pretends otherwise.
+GHOST_MPS_DECODE_BUDGET_BYTES = 5 * 1024 ** 3
+
+#: What to use when the latent cannot be measured: one frame. The conservative
+#: end, because an unmeasurable latent is exactly when a guess is worst.
+GHOST_MPS_DECODE_FALLBACK_FRAMES = 1
 
 
-def ghost_decode_chunk_frames(device_type=None):
-    """Frames per decode call on this host: the chunk on MPS, 0 elsewhere.
+def ghost_decode_chunk_frames(device_type=None, latent_h=None, latent_w=None):
+    """Frames per decode call on this host: 0 means one call with everything.
 
-    Zero means one call with the whole batch -- the pre-existing behaviour,
-    and the answer for every non-Apple box, including one whose device cannot
-    be read at all. A host we cannot identify is never given a changed path.
+    Zero is the pre-existing behaviour and the answer for every host whose VAE
+    does not decode on MPS, including one whose device cannot be read at all.
+    A host we cannot identify is never given a changed render path.
 
     ASKS FOR THE VAE'S DEVICE, NOT THE SAMPLER'S. They differ: `--cpu-vae`
     decodes on CPU while sampling stays on MPS, and chunking a CPU decode
     would be work done for a ceiling that is not there. `vae_device()` is the
     same function `comfy.sd.VAE` uses to choose where it decodes.
+
+    THE COUNT COMES FROM THE LATENT, not from a constant, so it follows
+    whatever canvas the profile set. See
+    :data:`GHOST_MPS_DECODE_BUDGET_BYTES` for what happened when it did not.
     """
     dev = device_type
     if dev is None:
@@ -356,7 +369,14 @@ def ghost_decode_chunk_frames(device_type=None):
             dev = getattr(picker(), "type", "")
         except Exception:  # noqa: BLE001 -- off the ComfyUI box
             return 0
-    return GHOST_MPS_DECODE_CHUNK_FRAMES if str(dev) == "mps" else 0
+    if str(dev) != "mps":
+        return 0
+    if not latent_h or not latent_w:
+        return GHOST_MPS_DECODE_FALLBACK_FRAMES
+    # ComfyUI's own per-frame estimate, at 4 bytes: assuming the WIDER dtype is
+    # the safe direction, since guessing small here is what an OOM looks like.
+    per_frame = 2178 * int(latent_h) * int(latent_w) * 64 * 4
+    return max(1, int(GHOST_MPS_DECODE_BUDGET_BYTES // per_frame))
 
 
 #: The ADE optional sockets this lane deliberately leaves UNCONNECTED. Pinned as
@@ -1539,10 +1559,15 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 external_results={"sampled_latent": latent_tuple, "vae": vae},
                 terminal=NODE_DECODE)[0]
 
-        chunk = ghost_decode_chunk_frames()
         latent = sampled_latent[0] if sampled_latent else None
         samples = latent.get("samples") if isinstance(latent, dict) else None
-        total = int(getattr(samples, "shape", [0])[0]) if samples is not None else 0
+        shape = getattr(samples, "shape", None)
+        total = int(shape[0]) if shape is not None and len(shape) else 0
+        # LATENT dims, which are the canvas over 8. Read from the tensor rather
+        # than from the profile, so the budget follows what is really decoded.
+        lat_h = int(shape[-2]) if shape is not None and len(shape) >= 2 else 0
+        lat_w = int(shape[-1]) if shape is not None and len(shape) >= 1 else 0
+        chunk = ghost_decode_chunk_frames(latent_h=lat_h, latent_w=lat_w)
         if chunk <= 0 or total <= chunk:
             return _run(sampled_latent)
 
@@ -1552,8 +1577,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             part = dict(latent)
             part["samples"] = samples[start:start + chunk]
             pieces.append(_run((part,)))
-        _LOG.info("[ghost-signal] decoded %d frame(s) in %d chunk(s) of %d "
-                  "-- Apple silicon decode ceiling", total, len(pieces), chunk)
+        _LOG.info("[ghost-signal] decoded %d frame(s) in %d chunk(s) of %d at "
+                  "%dx%d latent -- Apple silicon decode budget",
+                  total, len(pieces), chunk, lat_h, lat_w)
         return torch.cat(pieces, dim=0)
 
     def _release_sampling_patchers_before_decode(self, owners):
