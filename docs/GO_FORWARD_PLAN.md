@@ -705,10 +705,30 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 * **An IP-Adapter on the AnimateDiff lanes.** **He ruled hold.** It is a new
   dependency for the registry story and a recipe change on hard-won recipes;
   after the wave, if at all.
-* **The ROCm recruitment post.** Written and pushed and waiting for him --
-  `apple/ROCM.md`, the hero still, two drafts in
-  `docs/rocm-recruitment-post-draft.md`. **He said he will post it himself.**
-  A window must never post it.
+* **The ROCm recruitment post.** Posted by him, and it WORKED -- see the row
+  below. `apple/ROCM.md`, the hero still, and the drafts in
+  `docs/rocm-recruitment-post-draft.md`. **A window must never post anything
+  there.** Every reply is drafted in that file and he sends it.
+
+### Owed to people outside this machine (2026-09-13)
+
+* **PING THE AMD VOLUNTEER WHEN A REGISTRY VERSION CARRIES `otr_amd_still`.**
+  An R9700 owner (32 GB, RDNA4) answered the recruitment post and was told to
+  clone from git, because that graph was created 2026-09-13 and exists in NO
+  published version -- Active is alpha.30 (09-12 05:45Z) and alpha.31 has been
+  Pending since 09-12 21:56Z. The reply promises him a ping when a version
+  carrying it is live, so he can test the one-click Manager path too, which is
+  worth having from someone who is not the author. **Owed, and easy to lose:
+  it fires on a registry state change nobody is watching.** He posts the ping;
+  a window drafts it.
+* **`otr_8gb_foley` lives or dies on the 4060's result.** The 5080 ran that
+  graph to SUCCESS in 131 minutes, so the GRAPH is proven; what is open is
+  whether it is survivable on 8 GB hardware. The 4060 leg started 09:54 local
+  and was still rendering at 118 minutes. **If it times out or fails, retire
+  the graph** the way `otr_8gb_mime` was retired in d1a81d16 (SHIPPING_SET,
+  the variant file and its launch.md, the harness lists, regenerate, docs).
+  His ruling already covers it: *"nix the mime and foley from 8gb if it
+  failed."*
 
 ## 4. Constraints specific to this plan
 
