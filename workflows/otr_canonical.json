@@ -8,8 +8,8 @@
       "id": 63,
       "type": "OTR_WorkflowValidator",
       "pos": [
-        80,
-        470
+        560,
+        580
       ],
       "size": [
         399.96875,
@@ -101,7 +101,10 @@
         "",
         "",
         ""
-      ]
+      ],
+      "color": "#2B3C5A",
+      "bgcolor": "#2B3C5A",
+      "title": "Workflow Validator"
     },
     {
       "id": 1,
@@ -534,7 +537,7 @@
           ]
         }
       ],
-      "title": "1. Story Writer (LPL v2.0)",
+      "title": "1 - Story Writer",
       "properties": {
         "Node name for S&R": "OTR_LedgerScriptWriter"
       },
@@ -578,13 +581,13 @@
         ""
       ],
       "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "bgcolor": "#2B3C5A"
     },
     {
       "id": 3,
       "type": "OTR_SceneSequencer",
       "pos": [
-        1740,
+        1520,
         80
       ],
       "size": [
@@ -677,7 +680,7 @@
           "links": []
         }
       ],
-      "title": "4. Scene Sequencer",
+      "title": "5 - Scene Sequencer",
       "properties": {
         "Node name for S&R": "OTR_SceneSequencer"
       },
@@ -689,13 +692,13 @@
         0
       ],
       "color": "#4A2B4D",
-      "bgcolor": "#301C32"
+      "bgcolor": "#4A2B4D"
     },
     {
       "id": 4,
       "type": "OTR_AudioEnhance",
       "pos": [
-        2280,
+        2000,
         80
       ],
       "size": [
@@ -784,7 +787,7 @@
           ]
         }
       ],
-      "title": "5. Audio Enhance",
+      "title": "6 - Audio Enhance",
       "properties": {
         "Node name for S&R": "OTR_AudioEnhance"
       },
@@ -797,13 +800,13 @@
         "off"
       ],
       "color": "#4A2B4D",
-      "bgcolor": "#301C32"
+      "bgcolor": "#4A2B4D"
     },
     {
       "id": 7,
       "type": "OTR_EpisodeAssembler",
       "pos": [
-        2800,
+        2480,
         80
       ],
       "size": [
@@ -942,7 +945,7 @@
           ]
         }
       ],
-      "title": "6. Episode Assembler",
+      "title": "7 - Episode Assembler",
       "properties": {
         "Node name for S&R": "OTR_EpisodeAssembler"
       },
@@ -953,13 +956,13 @@
         500
       ],
       "color": "#4A2B4D",
-      "bgcolor": "#301C32"
+      "bgcolor": "#4A2B4D"
     },
     {
       "id": 12,
       "type": "OTR_SignalLostVideo",
       "pos": [
-        3360,
+        2980,
         80
       ],
       "size": [
@@ -1057,7 +1060,7 @@
           ]
         }
       ],
-      "title": "8. Signal Lost Video (procgen 1080p for post-upscale blend)",
+      "title": "8 - Signal Lost Video",
       "properties": {
         "Node name for S&R": "OTR_SignalLostVideo"
       },
@@ -1070,13 +1073,13 @@
         false
       ],
       "color": "#5B3A29",
-      "bgcolor": "#3C261B"
+      "bgcolor": "#5B3A29"
     },
     {
       "id": 62,
       "type": "OTR_LedgerFreezeCascade",
       "pos": [
-        620,
+        560,
         80
       ],
       "size": [
@@ -1204,7 +1207,7 @@
           ]
         }
       ],
-      "title": "1b. Ledger Freeze Cascade (Phase 0.10)",
+      "title": "2 - Ledger Freeze",
       "properties": {
         "Node name for S&R": "OTR_LedgerFreezeCascade"
       },
@@ -1213,14 +1216,14 @@
         true
       ],
       "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "bgcolor": "#2B3C5A"
     },
     {
       "id": 80,
       "type": "OTR_CastLock",
       "pos": [
-        1060,
-        470
+        1040,
+        80
       ],
       "size": [
         399.96875,
@@ -1339,7 +1342,7 @@
           "links": []
         }
       ],
-      "title": "1c. Cast Lock (v2 ledger authority)",
+      "title": "3 - Cast Lock",
       "properties": {
         "Node name for S&R": "OTR_CastLock"
       },
@@ -1351,15 +1354,15 @@
         "kokoro",
         "default"
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#234035",
+      "bgcolor": "#234035"
     },
     {
       "id": 81,
       "type": "OTR_BatchCharacterVoices",
       "pos": [
-        1140,
-        80
+        1040,
+        440
       ],
       "size": [
         399.96875,
@@ -1426,7 +1429,7 @@
           ]
         }
       ],
-      "title": "3a. Character Voices (v2)",
+      "title": "4a - Character Voices",
       "properties": {
         "Node name for S&R": "OTR_BatchCharacterVoices"
       },
@@ -1434,14 +1437,14 @@
         "kokoro"
       ],
       "color": "#234035",
-      "bgcolor": "#162821"
+      "bgcolor": "#234035"
     },
     {
       "id": 82,
       "type": "OTR_AnnouncerVoice",
       "pos": [
-        1140,
-        330
+        1040,
+        730
       ],
       "size": [
         399.96875,
@@ -1508,7 +1511,7 @@
           ]
         }
       ],
-      "title": "3b. Announcer Voice (v2)",
+      "title": "4b - Announcer Voice",
       "properties": {
         "Node name for S&R": "OTR_AnnouncerVoice"
       },
@@ -1516,14 +1519,14 @@
         "kokoro"
       ],
       "color": "#234035",
-      "bgcolor": "#162821"
+      "bgcolor": "#234035"
     },
     {
       "id": 83,
       "type": "OTR_StableAudioTheme",
       "pos": [
-        1140,
-        580
+        1040,
+        1020
       ],
       "size": [
         399.96875,
@@ -1606,7 +1609,7 @@
           "links": []
         }
       ],
-      "title": "3c. Theme Music (v2)",
+      "title": "4c - Theme Music",
       "properties": {
         "Node name for S&R": "OTR_StableAudioTheme"
       },
@@ -1615,13 +1618,13 @@
         ""
       ],
       "color": "#234035",
-      "bgcolor": "#162821"
+      "bgcolor": "#234035"
     },
     {
       "id": 84,
       "type": "OTR_SilentComposite",
       "pos": [
-        3840,
+        3500,
         80
       ],
       "size": [
@@ -1741,7 +1744,7 @@
           "links": []
         }
       ],
-      "title": "9. Silent Composite (render -> one always-silent video)",
+      "title": "9 - Silent Composite",
       "properties": {
         "Node name for S&R": "OTR_SilentComposite"
       },
@@ -1755,13 +1758,13 @@
         "cpu"
       ],
       "color": "#5B3A29",
-      "bgcolor": "#3C261B"
+      "bgcolor": "#5B3A29"
     },
     {
       "id": 85,
       "type": "OTR_MasterAudioMux",
       "pos": [
-        4800,
+        5000,
         80
       ],
       "size": [
@@ -1871,7 +1874,7 @@
           "links": []
         }
       ],
-      "title": "10. Master Audio Mux (terminal mux-LAST)",
+      "title": "13 - Master Audio Mux",
       "properties": {
         "Node name for S&R": "OTR_MasterAudioMux"
       },
@@ -1881,13 +1884,13 @@
         ""
       ],
       "color": "#4A2B4D",
-      "bgcolor": "#301C32"
+      "bgcolor": "#4A2B4D"
     },
     {
       "id": 86,
       "type": "OTR_CaptionBurn",
       "pos": [
-        4320,
+        3980,
         80
       ],
       "size": [
@@ -1997,7 +2000,7 @@
           "links": []
         }
       ],
-      "title": "9b. Caption Burn (SDH open captions on the silent video; default-OFF)",
+      "title": "10 - Caption Burn",
       "properties": {
         "Node name for S&R": "OTR_CaptionBurn"
       },
@@ -2010,14 +2013,14 @@
         ""
       ],
       "color": "#5B3A29",
-      "bgcolor": "#3C261B"
+      "bgcolor": "#5B3A29"
     },
     {
       "id": 87,
       "type": "OTR_VideoDirector",
       "pos": [
-        620,
-        760
+        560,
+        1400
       ],
       "size": [
         379.96875,
@@ -2188,7 +2191,7 @@
           ]
         }
       ],
-      "title": "OTR_VideoDirector",
+      "title": "Video Director",
       "properties": {
         "Node name for S&R": "OTR_VideoDirector"
       },
@@ -2209,15 +2212,15 @@
         "no_fp8_no_fp4",
         0
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 88,
       "type": "OTR_ImageDirector",
       "pos": [
-        620,
-        1040
+        1040,
+        1400
       ],
       "size": [
         379.96875,
@@ -2327,7 +2330,7 @@
           ]
         }
       ],
-      "title": "OTR_ImageDirector",
+      "title": "Image Director",
       "properties": {
         "Node name for S&R": "OTR_ImageDirector"
       },
@@ -2341,15 +2344,15 @@
         "{}",
         "fp8_ok"
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 89,
       "type": "OTR_MetaBriefImagePromptGen",
       "pos": [
-        1080,
-        1040
+        1520,
+        1400
       ],
       "size": [
         379.96875,
@@ -2398,20 +2401,20 @@
           "links": []
         }
       ],
-      "title": "OTR_MetaBriefImagePromptGen",
+      "title": "Image Prompt Generator",
       "properties": {
         "Node name for S&R": "OTR_MetaBriefImagePromptGen"
       },
       "widgets_values": [],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 90,
       "type": "OTR_ShotLock",
       "pos": [
-        1129.3877825055804,
-        1199.9999999999998
+        1520,
+        1700
       ],
       "size": [
         379.96875,
@@ -2489,20 +2492,20 @@
           ]
         }
       ],
-      "title": "OTR_ShotLock",
+      "title": "Shot Lock",
       "properties": {
         "Node name for S&R": "OTR_ShotLock"
       },
       "widgets_values": [],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 91,
       "type": "OTR_ImageGenDispatcher",
       "pos": [
-        1560,
-        900
+        2000,
+        1400
       ],
       "size": [
         379.96875,
@@ -2572,20 +2575,20 @@
           "links": []
         }
       ],
-      "title": "OTR_ImageGenDispatcher",
+      "title": "Image Generator",
       "properties": {
         "Node name for S&R": "OTR_ImageGenDispatcher"
       },
       "widgets_values": [],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 92,
       "type": "OTR_VideoRenderBatch",
       "pos": [
-        2040,
-        820
+        2480,
+        1400
       ],
       "size": [
         379.96875,
@@ -2705,7 +2708,7 @@
           ]
         }
       ],
-      "title": "OTR_VideoRenderBatch",
+      "title": "Video Render Batch",
       "properties": {
         "Node name for S&R": "OTR_VideoRenderBatch"
       },
@@ -2718,15 +2721,15 @@
         "",
         ""
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#1C273C"
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A"
     },
     {
       "id": 93,
       "type": "OTR_PostUpscaleProcgenBlend",
       "pos": [
-        4440,
-        300
+        4560,
+        80
       ],
       "size": [
         339.96875,
@@ -2876,14 +2879,17 @@
         true,
         "",
         "bottom"
-      ]
+      ],
+      "color": "#5B3A29",
+      "bgcolor": "#5B3A29",
+      "title": "11 - Post-Upscale Blend"
     },
     {
       "id": 94,
       "type": "OTR_SceneAwareScopes",
       "pos": [
-        4040,
-        660
+        2980,
+        1400
       ],
       "size": [
         339.96875,
@@ -2970,14 +2976,17 @@
         1080,
         "ffmpeg",
         "off"
-      ]
+      ],
+      "color": "#3A3A5A",
+      "bgcolor": "#3A3A5A",
+      "title": "Scene-Aware Scopes"
     },
     {
       "id": 95,
       "type": "OTR_CreditsRoll",
       "pos": [
-        4620,
-        460
+        4560,
+        660
       ],
       "size": [
         370,
@@ -3030,7 +3039,10 @@
       "properties": {
         "Node name for S&R": "OTR_CreditsRoll"
       },
-      "widgets_values": []
+      "widgets_values": [],
+      "color": "#5B3A29",
+      "bgcolor": "#5B3A29",
+      "title": "12 - Credits Roll"
     }
   ],
   "links": [
@@ -3539,7 +3551,86 @@
       "STRING"
     ]
   ],
-  "groups": [],
+  "groups": [
+    {
+      "id": 1,
+      "title": "THE SCRIPT",
+      "bounding": [
+        50,
+        10,
+        939.96875,
+        1191.4375
+      ],
+      "color": "#3f5159",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 2,
+      "title": "THE CAST AND THE SOUND",
+      "bounding": [
+        1010,
+        10,
+        459.96875,
+        1271.640625
+      ],
+      "color": "#3f5f4a",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 3,
+      "title": "THE AUDIO MASTER",
+      "bounding": [
+        1490,
+        10,
+        1439.96875,
+        483.59375
+      ],
+      "color": "#5f3f5f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 4,
+      "title": "THE CUT",
+      "bounding": [
+        2950,
+        10,
+        2010,
+        810
+      ],
+      "color": "#6b4a34",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 5,
+      "title": "PUBLISH",
+      "bounding": [
+        4970,
+        10,
+        459.96875,
+        347.140625
+      ],
+      "color": "#5f3f5f",
+      "font_size": 24,
+      "flags": {}
+    },
+    {
+      "id": 6,
+      "title": "THE PICTURE",
+      "bounding": [
+        530,
+        1330,
+        2819.96875,
+        719.515625
+      ],
+      "color": "#444466",
+      "font_size": 24,
+      "flags": {}
+    }
+  ],
   "config": {},
   "extra": {
     "ds": {
