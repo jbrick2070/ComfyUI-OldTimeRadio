@@ -109,7 +109,7 @@ Everything under `apple/` is in the pack, whichever way you installed it.
 |---|---|
 | [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
 | [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your own card cannot hold. |
-| [apple/ROCM.md](apple/ROCM.md) | AMD. Not in v2.0 -- cut, parked, and open to anyone who has the card. |
+| [apple/ROCM.md](apple/ROCM.md) | AMD. Experimental in v2.0: one graph, no receipts. The first episode off a card makes it v2.1. |
 | [apple/CLOUD.md](apple/CLOUD.md) | The optional paid writer lanes. Off by default; you do not need them. |
 
 | Adding to it | |
@@ -440,9 +440,9 @@ three acts and three characters on every graph; the upscaler is off.
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | 3 | 3 | draft |
-| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | draft |
-| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx_8gb | sd15 | auto | nothing | 3 | 3 | draft |
+| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
+| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | shipping |
+| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx_8gb | sd15 | auto | nothing | 3 | 3 | shipping |
 | foley | _not built_ | | | | | | | | | |
 | mime | _not built_ | | | | | | | | | |
 | **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
@@ -452,11 +452,11 @@ three acts and three characters on every graph; the upscaler is off.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
 |---|---|---|---|---|---|---|---|---|---|---|
 | **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | draft |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | shipping |
 | **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
 | **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
 | **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_mime | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | draft |
+| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
 
 ### Apple Silicon, 16 GB
 
@@ -484,7 +484,7 @@ three acts and three characters on every graph; the upscaler is off.
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | draft |
+| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
 | still | _not built_ | | | | | | | | | |
 | video | _not built_ | | | | | | | | | |
 | foley | _not built_ | | | | | | | | | |
@@ -494,14 +494,17 @@ three acts and three characters on every graph; the upscaler is off.
 
 Weights marked **auto** download themselves the first time you queue; **manual**
 means the launch recipe beside the graph (`<graph>.launch.md`) lists what to
-fetch and where; **none** means those lanes need no video weights. A `draft`
-status is a graph cut from the same canonical that has not yet been proven on
-that hardware -- the hardware itself may be well proven: a physical RTX 4060
-with 8 GB has published 7 documented full OTR episodes through this pack, and
-the draft mark on the new 8 GB graphs says only that these particular graphs
-had not yet been run there when they were cut. The AMD graph has no receipts
-at all. What each machine class runs, engine by engine, is in
-[apple/MACHINES.md](apple/MACHINES.md).
+fetch and where; **none** means those lanes need no video weights. Every
+`shipping` graph above has put a finished episode into `otr/obs/` on the
+hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
+8 GB rows on a physical RTX 4060 laptop, which by now
+has published 11 documented full OTR episodes through this pack; the 16 GB rows
+on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
+row on that same 5080 laptop with
+ComfyUI started in `--cpu` mode, the card present and unused. `draft` is the one
+mark left, on the AMD graph, and it means what it says: cut from the same source
+as the rest, with no receipts. What each machine class runs, engine by engine,
+is in [apple/MACHINES.md](apple/MACHINES.md).
 
 **On a Mac, read [apple/MAC.md](apple/MAC.md) before picking anything heavier
 than the defaults.** An out-of-memory on unified memory can reboot the machine,
@@ -532,7 +535,7 @@ what each class runs for writer, video, voice, music and image.
 
 Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
-Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is `cpu_floor`, still unproven -- no named system has published on it.
+Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is the `otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and unused, published a three-act episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x realtime on the CPU. One system, one episode: a receipt, not a tier.
 
 <!-- END GENERATED: machine-matrix -->
 
@@ -709,16 +712,18 @@ disabled rather than quietly making episodes worse. If you have a much larger
 model and want to try it, the switch is `JUDGE_ATTRIBUTION` in
 `nodes/_otr_ledger_clean.py`.
 
-**AMD did not make v2.0, and that is a scope cut rather than a bug.** Nobody on
-the project owns an AMD card, and we were not going to claim a platform we could
-not put an episode through. The AMD graph, `workflows/variants/otr_amd_still.json`,
-is built from the same source as every working graph and every engine it selects
-is plain PyTorch, so on paper it should work -- and on paper is exactly the
-problem. It ships marked experimental, with no receipts.
+**AMD is experimental in v2.0, and that is a scope line rather than a bug.**
+Nobody on the project owns an AMD card, and we were not going to claim a platform
+we could not put an episode through. The AMD graph,
+`workflows/variants/otr_amd_still.json`, is built from the same source as every
+proven graph and every engine it selects is plain PyTorch, so on paper it should
+work -- and on paper is exactly the problem. It ships marked `draft`, with no
+receipts, while the other fifteen shipping graphs each carry one.
 
-It is parked, realistically for 2.5 -- and Windows is the target we want most,
-since the pack is Windows-native and AMD now ships a ROCm build of PyTorch for
-Radeon on Windows; Linux is welcome too. But it is open source and it is fair game:
+The first episode off a Radeon is what makes it v2.1 -- and Windows is the target
+we want most, since the pack is Windows-native and AMD now ships a ROCm build of
+PyTorch for Radeon on Windows; Linux is welcome too. It is open source and it is
+fair game:
 [apple/ROCM.md](apple/ROCM.md) has the shipped graph, two lab profiles for 16 GB
 and 8 GB cards, a five-minute probe that needs no model download, and the open
 questions written down. If you have the card, none of it is waiting on us -- and

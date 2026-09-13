@@ -9,7 +9,10 @@ pictures, video, credits -- locally, offline, on one GPU. It has run on NVIDIA
 once run on ROCm**, for a boring reason: nobody on the project owns an AMD card,
 and we were not going to claim a platform we could not put an episode through.
 
-So AMD is parked. Realistically it is a 2.5 item, if it happens here at all.
+So AMD ships EXPERIMENTAL in v2.0 -- one graph, no receipts, while the other
+fifteen shipping graphs each carry an episode. **It becomes v2.1 the day one
+of them runs on a Radeon**, and that is not a promise we can keep by
+ourselves: nobody here has the card.
 
 **It is open source, and it is fair game.** If you have the card, everything
 needed to try is already in the repo and nothing is waiting on us:

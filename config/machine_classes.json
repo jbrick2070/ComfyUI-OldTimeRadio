@@ -213,10 +213,10 @@
       "proven": [
         {
           "hardware": "RTX 4060 8 GB",
-          "episodes": 7,
-          "date": "2026-09-02",
-          "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great)",
-          "evidence": "docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B"
+          "episodes": 11,
+          "date": "2026-09-13",
+          "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great) plus four more on 2026-09-13, one for each 8 GB graph that ships in v2.0.0 -- otr_8gb_low (12.6 min), otr_8gb_still (10.7 min), otr_8gb_video (25.4 min, ltx_8gb diffusion) and otr_8gb_animatediff (46.1 min, 115,790,951 bytes), every one an act-count-1 episode published to obs on the physical card",
+          "evidence": "docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B; docs/4060_DRILL_LOG.md 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\\output\\otr\\obs\\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)"
         }
       ]
     },

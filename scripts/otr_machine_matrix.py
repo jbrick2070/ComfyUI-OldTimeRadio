@@ -458,8 +458,11 @@ def render() -> str:
       "2026-09-08, including local `sd15` stills and local `ltx_8gb` video "
       "diffusion. It is not promoted to a machine key: a machine key implies a "
       "measured VRAM tier, and one 16 GB Mac is one data point, not a tier. "
-      "Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is "
-      "`cpu_floor`, still unproven -- no named system has published on it.\n")
+      "Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is the "
+      "`otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` "
+      "on an x86 laptop, the GPU present and unused, published a three-act "
+      "episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x "
+      "realtime on the CPU. One system, one episode: a receipt, not a tier.\n")
     A("")
 
     A("## How to read the confidence column\n")

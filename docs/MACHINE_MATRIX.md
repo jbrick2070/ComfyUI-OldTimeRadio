@@ -50,7 +50,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
-Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is `cpu_floor`, still unproven -- no named system has published on it.
+Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is the `otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and unused, published a three-act episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x realtime on the CPU. One system, one episode: a receipt, not a tier.
 
 
 ## How to read the confidence column
@@ -66,15 +66,18 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  23 experimental profile(s), 3 shipping
+## 8 GB  --  23 experimental profile(s), 6 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `otr_4060_12b_gguf_offload` | animatediff15_v3_haunted_video | - | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_animatediff` | animatediff15_v3_haunted_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_low` | viz_camera | - | musicgen | sd15 | `shipping` | complete |
+| `otr_8gb_still` | still_motion | - | musicgen | sd15 | `shipping` | missing exact owner |
+| `otr_8gb_video` | ltx_8gb | - | musicgen | sd15 | `shipping` | missing exact owner |
 | `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | - | musicgen | flux2_klein | `shipping` | complete; Python <=3.13 |
 
-<details><summary>20 draft profile(s) here -- not vouched for</summary>
+<details><summary>17 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx25_foley_plus`, `ltx25_mime`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
 
@@ -89,12 +92,9 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 | `otr_4060_nano` | ltx_8gb | - |
 | `otr_4060_nano_local` | ltx_8gb | - |
 | `otr_8gb_fastwan` | fastwan_8gb | - |
-| `otr_8gb_low` | viz_camera | - |
 | `otr_8gb_ltx` | ltx_8gb | - |
 | `otr_8gb_ltx25_foley` | ltx25_foley_plus | - |
 | `otr_8gb_ltx25_mime` | ltx25_mime | - |
-| `otr_8gb_still` | still_motion | - |
-| `otr_8gb_video` | ltx_8gb | - |
 | `otr_8gb_wan` | wan_ti2v | - |
 | `otr_amd8_rocm` | still_motion | - |
 | `otr_amd_still` | still_motion | - |
@@ -125,14 +125,16 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  100 experimental profile(s), 46 shipping
+## 16 GB+  --  100 experimental profile(s), 48 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `16gb_full` | viz_camera | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_foley` | ltx25_foley_plus | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_16gb_low` | viz_camera | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_mime` | ltx25_mime | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_16gb_still` | still_motion | - | musicgen | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_video` | ltx25_high_video | - | musicgen | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_bark_announcer_acceptance` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete |
 | `otr_g4_fastwan` | fastwan_8gb | - | musicgen | z_image_turbo | `shipping` | missing exact owner |
@@ -176,7 +178,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>54 draft profile(s) here -- not vouched for</summary>
+<details><summary>52 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`, `word_razzle`
 
@@ -186,10 +188,8 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `google_omni_media` | google_omni_video | - |
 | `google_veo_all` | google_veo_video | google_tts |
 | `google_veo_media` | google_veo_video | - |
-| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - |
 | `otr_16gb_ltx_audio_in` | ltx_audio_in | - |
 | `otr_16gb_ltx_video` | ltx_video | - |
-| `otr_16gb_still` | still_motion | - |
 | `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | - |
 | `otr_amd16_rocm` | still_motion | - |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
@@ -239,13 +239,15 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 
 </details>
 
-## unstated  --  5 experimental profile(s), 0 shipping
+## unstated  --  5 experimental profile(s), 1 shipping
 
-**No shipping experimental profile at this tier.**
+| profile | video | voice | music | image | confidence | install recipe |
+|---|---|---|---|---|---|---|
+| `otr_cpu_low` | viz_camera | - | musicgen | - | `shipping` | complete; Python <=3.13 |
 
-<details><summary>5 draft profile(s) here -- not vouched for</summary>
+<details><summary>4 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_video`, `still_motion`, `viz_camera`
+Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_video`, `still_motion`
 
 | profile | video | voice |
 |---|---|---|
@@ -253,7 +255,6 @@ Video engines they select: `cloud_wan_i2v`, `cloud_wan_i2v_audio`, `google_veo_v
 | `otr_cloud_hq` | google_veo_video | google_tts |
 | `otr_cloud_lanes` | cloud_wan_i2v_audio | elevenlabs |
 | `otr_cloud_low` | cloud_wan_i2v | google_tts |
-| `otr_cpu_low` | viz_camera | - |
 
 </details>
 
@@ -281,7 +282,7 @@ There is currently no separate 24/32 GB machine key or heavy-rental profile. Mor
 
 ## Hardware episode receipts, with their exact scope
 
-* **8 GB NVIDIA (RTX 4060, 3070, 2080)** on RTX 4060 8 GB -- 7 episode(s), 2026-09-02. Scope: six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great). Evidence: docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B
+* **8 GB NVIDIA (RTX 4060, 3070, 2080)** on RTX 4060 8 GB -- 11 episode(s), 2026-09-13. Scope: six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29; the image lane was not invoked) plus one clean-room episode with THIS row's image lane (flux2_klein Q4 GGUF stills, ~20 s each) and kokoro on both voice slots through kokoro-onnx on a fresh Python 3.13 portable under stock launch flags (2026-09-02; operator eyeball: perfect, voices great) plus four more on 2026-09-13, one for each 8 GB graph that ships in v2.0.0 -- otr_8gb_low (12.6 min), otr_8gb_still (10.7 min), otr_8gb_video (25.4 min, ltx_8gb diffusion) and otr_8gb_animatediff (46.1 min, 115,790,951 bytes), every one an act-count-1 episode published to obs on the physical card. Evidence: docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B; docs/4060_DRILL_LOG.md 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\output\otr\obs\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX 5080 16 GB -- 45 episode(s), 2026-08-31. Scope: published episodes across multiple engine/profile tuples; not proof of the current row as one exact tuple. Evidence: continuous overnight 5-act loops published to otr/obs
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.

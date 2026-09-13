@@ -5591,3 +5591,27 @@ Evidence: `otr/legs/shipping_set_20260913_045924/SUMMARY.txt`, its per-leg logs 
 **Later upstream changes, not tested by this run:** `d1a81d1` adds removal of silent news cast members before authorship receipts and removes `otr_8gb_mime` from the shipping set; `1d8529c` also retires `otr_8gb_foley`. Both lanes remain shipped at 16 GB. These source changes do not convert this run's results into passes.
 
 The separately requested AnimateDiff trials at 1, 2, then 3 acts are not yet complete and are excluded from this six-leg result table.
+
+### September 13, 2026 - otr_8gb_animatediff re-test: the last 8 GB graph passes
+
+Physical RTX 4060 Laptop GPU (8 GB), driven over SSH from the 5080 window
+because this box's own Codex lane was out of credits. The morning six-leg run
+above recorded `otr_8gb_animatediff` as FAIL on `CastVoiceCoverageError` --
+The Toad had no sayable line in `scifi_news_pro`. Commit `d1a81d1` removes
+silent news cast members before the authorship receipt, which is the fix for
+exactly that; this leg is the proof, on the `original` bank.
+
+| Graph | RESULT | Minutes | OBS filename | Verified bytes |
+|---|---|---:|---|---:|
+| `otr_8gb_animatediff` | SUCCESS / PASS, rc=0 | 46.1 | `the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4` | 115,790,951 |
+
+The harness line read `obs=0` on a run that had in fact published. That is a
+harness-parameter fault and not a render fault: OTR pins `OTR_OUTPUT_DIR` to
+`D:\output` on this box, so the episode landed in `D:\output\otr\obs`, while
+`-ObsDir` had been given the server's `--output-directory`. The filename and
+byte count above were read from `D:\output\otr\obs` directly. Take the obs
+directory from the server log's pinned line, never from the launch flags.
+
+With this leg all four 8 GB graphs in the v2.0.0 shipping set have a receipt on
+this card -- low, still and video from `shipping_set_20260913_045924`, and
+animatediff here -- and all four profiles moved from `draft` to `shipping`.
