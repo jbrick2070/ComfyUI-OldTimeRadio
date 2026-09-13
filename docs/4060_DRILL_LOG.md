@@ -5556,3 +5556,38 @@ and prompt dump were moved to the recoverable quarantine
 the four previously verified OBS publications remain intact. The source
 checkout was clean and synced with `origin/v2.0-alpha` before this checkpoint;
 the stand-down entry is the only pending report change.
+
+
+### September 13, 2026 - shipping_set_20260913_045924: six 8 GB graphs
+
+Physical RTX 4060 Laptop GPU (8 GB); tested commit `c69beeba` on `v2.0-alpha`.
+The detached harness ran low, still, video, animatediff, mime, then foley,
+one act each, on loopback port 8188 with PyTorch attention and no Sage.
+All six leg logs confirm `act_count='1'`; no `--title` was passed.
+The writers used Qwen3.5-4B with `bnb_nf4`. Existing gated weights were used;
+no gated weights were fetched. No profiles, variants, or nodes were edited.
+
+The harness recorded `DONE` at 12:24:05 PDT. PASS requires a new nonempty
+episode in `output/otr/obs`; the three successful filenames and sizes below
+were independently checked on disk. All times refer to September 13, PDT.
+
+| Graph | RESULT | Minutes | OBS filename | Verified bytes |
+|---|---|---:|---|---:|
+| `otr_8gb_low` | SUCCESS / PASS, rc=0 | 12.6 | `the_august_2026_sheet_20260913_050732__pori__vcam__none__koko__marc__q354b__mgen_final.mp4` | 122,257,464 |
+| `otr_8gb_still` | SUCCESS / PASS, rc=0 | 10.7 | `drooping_fog_over_the_athenian_rivals_20260913_051634__rfrc__stmo__sd15__koko__sspr__q354b__mgen_final.mp4` | 73,811,804 |
+| `otr_8gb_video` | SUCCESS / PASS, rc=0 | 25.4 | `the_smudge_on_neds_cuff_20260913_053452__vstb__lx8g__sd15__koko__orig__q354b__mgen_final.mp4` | 53,027,446 |
+| `otr_8gb_animatediff` | FAIL, rc=1 | 5.8 | None; obs=0 | - |
+| `otr_8gb_mime` | TIMEOUT, rc=1 | 240.0 | None; obs=0 | - |
+| `otr_8gb_foley` | STOPPED BY OPERATOR; raw FAIL, rc=1 | 149.9 | None; obs=0 | - |
+
+**AnimateDiff:** node 1 (`OTR_LedgerScriptWriter`) raised `CastVoiceCoverageError` because The Toad (`c04`) had no sayable line in `scifi_news_pro`. The stack was `nodes/OTR_LedgerScriptWriter.py:3778` -> `nodes/_otr_scifi_news_pro.py:5047` -> `:4615` -> `nodes/_otr_content_authorship.py:149` -> `nodes/_otr_cast_voice_coverage.py:189`. This occurred before AnimateDiff rendering.
+
+**Mime:** the 14,400-second observation budget expired while rendering remained active. The harness then interrupted it: the server logged `Processing interrupted`, without a terminal traceback. It completed 20 of 24 planned two-stage segments and 6 of 8 assembled beats; b006's third segment was interrupted during refinement, before the closing beat. No OBS episode landed.
+
+**Foley:** the operator requested a stop; targeted cancellation returned `cancelled=true` at 12:23:55 PDT. The runner reported node 92 (`OTR_VideoRenderBatch`) interrupted and raw `RESULT FAIL`, rc=1. This is an operator stop, not a model fault. No OBS episode landed.
+
+Evidence: `otr/legs/shipping_set_20260913_045924/SUMMARY.txt`, its per-leg logs and diagnostic snapshots, `FOLEY_OPERATOR_STOP.txt`, and `otr/legs/4060_shipping_boot_20260913_0458/server2.stderr.log`. Failed legs did not prevent the harness from continuing.
+
+**Later upstream changes, not tested by this run:** `d1a81d1` adds removal of silent news cast members before authorship receipts and removes `otr_8gb_mime` from the shipping set; `1d8529c` also retires `otr_8gb_foley`. Both lanes remain shipped at 16 GB. These source changes do not convert this run's results into passes.
+
+The separately requested AnimateDiff trials at 1, 2, then 3 acts are not yet complete and are excluded from this six-leg result table.
