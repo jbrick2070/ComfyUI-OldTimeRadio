@@ -5525,3 +5525,14 @@ The known 25-frame closing-window tail-fill warning was reconciled back to the
 1,697-frame A/V budget. This is the fourth published clean-room episode and
 the third actual Plan 4 bank leg; `original` and `shakespeare` remain to be
 published.
+
+**CR-20260912-11 — Plan 4 `original` one-act leg: IN PROGRESS checkpoint.**
+
+The explicit active alpha.30 workflow and proven `machine:8gb` tuple queued
+with `act_count=1` under prompt ID
+`15ad4783-f688-404f-ac71-6e8c54777abb`. Workflow validation passed; the writer
+completed a 6-line, 106-word ledger and audio completed at 53.61 seconds / 1,341
+frames. The ledger freeze retained one soft cleanup warning, but the queue
+advanced into shot generation. No OBS publication is claimed at this checkpoint;
+the final disk artifact and metadata will be appended after independent
+verification.
