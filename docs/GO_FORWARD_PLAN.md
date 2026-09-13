@@ -655,6 +655,19 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
+* **The news lane never rerolls a decode-liveness halt (PBUG-20260913-06).**
+  `GenerationDegeneracyError` is raised with its own log line saying
+  "Rerollable", `_otr_slot_drama_contract.py` catches it and falls back, but
+  `run_scifi_news_pro_episode` calls `_pass_script(...)` exactly once with no
+  handler, and `_run_markup_ladder` re-raises it on purpose assuming a layer
+  above retries. Nothing above does. Seen once, live, on `otr_cpu_low` (the
+  second roll passed). **Held at one strike on purpose:** the fix is a design
+  question, not a patch -- the surrounding code enforces exactly one call per
+  rung (`box["calls"] == len(p3_attempts)`, `NewsProScriptError` on drift), so
+  a retry has to consume a rung honestly, the way the `prompt_no_room` path
+  already does. Do it on the second live occurrence, with one contrarian and
+  the news-lane + generation-budget suites, and a leg that forces a halt.
+
 * **Eleven shipped graphs store a bare engine id where the canvas combo
   holds the suffixed label** (`viz_camera` vs `viz_camera (16:9) (audio-reactive,
   no scene image)`). Headless queueing is unaffected -- `OTR_VideoDirector`
