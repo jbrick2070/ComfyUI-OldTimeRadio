@@ -1694,6 +1694,20 @@ NO_LANE_REASON = {
     # installed the pack the normal way it is a manual step. The README's own
     # legend defines auto as "fetched on first use ... just pick it and run",
     # which was false here.
+    #
+    # SUPERSEDED THE SAME DAY, and the entry stays for the reader rather than
+    # being deleted. At 20:43 on 2026-09-12 the checkpoint was added to
+    # `_otr_visual_assets.MANIFEST`, so `OTR_WorkflowValidator` now fetches it
+    # at queue time when a selected lane needs a still -- the word "auto" is
+    # true again, this time for a mechanism that exists. THIS FILE IS NOT THAT
+    # MECHANISM and still has no lane for it, which is why the value is
+    # unchanged; the dropdown matrix asks the GRAPH first and only falls back
+    # to this table (see `graph_fetched_engines` in otr_dropdown_matrix.py).
+    #
+    # THE ONE PLACE THIS STILL BITES: the AnimateDiff lanes need this same file
+    # for themselves and declare `accepts_still = False`, so the graph skips
+    # the image engine as "provably unused" and nobody fetches it. That path is
+    # documented by hand in README section 2b.
     "sd15": "manual_doc",
     "lumina_image": "manual_doc",
     "flux_gen1": "manual_doc",

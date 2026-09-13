@@ -210,30 +210,46 @@ addendum that exposes it.
 **The motion module publishes no licence grant** (`commercial_clean = False` in
 the adapter), so treat the haunted lane as personal use.
 
-#### Three lanes whose weights we cannot tell you where to find
+#### The LTX 2.3 weights, and the two lanes we still cannot source
 
-**Said plainly because the alternative is you discovering it mid-render.** These
-dropdown rows declare weight files, nothing fetches them, and no document in
-this repo names a source for them. An audit on 2026-09-12 grepped the whole
-tree, archival design notes included, and found no repository attribution at
-all.
+An audit on 2026-09-12 found that the LTX 2.3 rows named eight weight files with
+no repository stated anywhere in this repo -- not in the code, not in the docs,
+not in the archival design notes. Seven of the eight were recovered the same
+evening and are written down here. **Both repositories are public and ungated.**
 
-| dropdown row | files with no stated source |
+**From `Lightricks/LTX-2.3`:**
+
+| file | goes in |
 |---|---|
-| `ltx23_high_video` (`ltx_video`) | 7 files -- the 22B unet, its GGUF, the video VAE, a Gemma text encoder, two distilled LoRAs and a spatial upscaler |
-| `ltx23_low_audio_in` (`ltx_audio_in`) | the same 7, plus an audio VAE |
-| `mesh_stage` | a Hunyuan3D checkpoint, and the portable Blender binary it shells out to |
+| `ltx-2.3-22b-dev.safetensors` (43 GB) | `models/checkpoints/` |
+| `ltx-2.3-22b-distilled-lora-384.safetensors` | `models/loras/ltxv/ltx2/` |
+| `ltx-2.3-22b-distilled-lora-384-1.1.safetensors` | `models/loras/ltxv/ltx2/` |
+| `ltx-2.3-spatial-upscaler-x2-1.1.safetensors` | `models/latent_upscale_models/` |
 
-`wan22_high_fast` (`fastwan_8gb`) is a milder case of the same thing: its base
-weights come down with `wan22_high_video`, but the rank-128 LoRA that makes it
-"fast" is named only in two internal dated design notes, and the provisioner has
-no route for it either.
+**From `unsloth/LTX-2.3-GGUF`:**
 
-**What this means for you.** Pick one of these and the render will stop when it
-looks for the file. If you know where these weights live, an issue naming the
-repository is the single most useful thing you could send us. Everything else
-about these lanes is documented -- the node packs, the pinned commits, the
-destination folders -- and only the source line is missing.
+| file | goes in |
+|---|---|
+| `ltx-2.3-22b-dev-Q3_K_M.gguf` | `models/unet/` |
+| `vae/ltx-2.3-22b-dev_video_vae.safetensors` | `models/vae/` |
+| `vae/ltx-2.3-22b-dev_audio_vae.safetensors` | `models/vae/` (the audio-in lane only) |
+
+**One file is still unaccounted for:** `gemma_3_12B_it_fp4_mixed.safetensors`,
+the fp4 Gemma 3 12B text encoder, which goes in `models/text_encoders/`. It is
+on the maintainer's disk and it came from somewhere; searching the Hub for that
+exact filename returns only an unrelated ablation. If you know the repository,
+an issue naming it would finish this table.
+
+**Still genuinely unsourced, both of them:**
+
+* **`mesh_stage`** -- a Hunyuan3D checkpoint, plus the portable Blender binary
+  it shells out to. No repository and no download URL anywhere.
+* **`wan22_high_fast`** (`fastwan_8gb`) -- its base weights come down with
+  `wan22_high_video`, but the rank-128 LoRA that makes it "fast" is named only
+  in two internal dated design notes, and the provisioner has no route for it.
+
+Everything else about these lanes is documented -- the node packs, the pinned
+commits, the destination folders -- so only the source line was ever missing.
 
 > **Python 3.13 and the Kokoro voice (ComfyUI Desktop and the portable build both
 > ship Python 3.13).** The torch `kokoro` package cannot be pip-installed on 3.13
