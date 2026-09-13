@@ -48,12 +48,18 @@ ffmpeg, and several steps probe a file's duration with ffprobe first. The
 `imageio-ffmpeg` wheel that comes down with the requirements ships an ffmpeg
 binary and **no ffprobe**, so a system install is what you want.
 
-**ffmpeg 6.1 or newer.** The final mux copies the master audio into the MP4
-losslessly (PCM in an ISOBMFF container), which FFmpeg gained in 6.1. An older
-build renders the whole episode and then fails at that last step with "Could
-not find tag for codec pcm_s16le" -- Ubuntu 22.04's `apt install ffmpeg` is 4.4
-and does exactly that. The writer node checks this before it loads a model, so
-an old build refuses in a second with the same sentence.
+**Take a current build.** The final mux copies the master audio into the MP4
+losslessly (PCM in an ISOBMFF container), which older builds cannot write:
+they render the whole episode and then fail at that last step with "Could not
+find tag for codec pcm_s16le", leaving a zero-byte file. Ubuntu 22.04's
+`apt install ffmpeg` is 4.4 and does exactly that.
+
+The floor is 6.1, where FFmpeg's MP4 muxer gained PCM. Measured here on
+2026-09-13: 4.4.2 fails, 7.0.2 and 8.0.1 pass; no 6.x build has been run.
+**You do not have to work this out.** Nothing reads the version number --
+`OTR_WorkflowValidator` muxes a fifth of a second of silence when a graph
+containing the mux is queued, and refuses in about a second if the build
+cannot do it.
 
 - **Windows:** `winget install Gyan.FFmpeg`
 - **macOS:** `brew install ffmpeg`

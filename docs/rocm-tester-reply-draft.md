@@ -21,12 +21,13 @@ for your OS), then the pack -- either through ComfyUI Manager, searching for
 https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into `custom_nodes/`. The
 branch matters; `main` is a stale v1.7.
 
-**2. ffmpeg 6.1 or newer, with ffprobe.** Every episode is mixed and muxed
-through it. On Linux check `ffmpeg -version` first, because Ubuntu 22.04 ships
-4.4 and that one cannot write the final file. I learned this yesterday the
-expensive way, on a rented box that rendered two complete episodes and then
-wrote zero bytes. The pack now refuses in the first second instead, but a
-current build saves you the conversation.
+**2. A current ffmpeg, with ffprobe.** Every episode is mixed and muxed
+through it, and older builds cannot write the final file -- Ubuntu 22.04 ships
+4.4, which fails. I learned that yesterday the expensive way, on a rented box
+that rendered two complete episodes and then wrote zero bytes. The pack now
+muxes a fifth of a second of silence up front and refuses in about a second if
+your build cannot do it, so you will not be guessing; a current build just
+saves you the conversation.
 
 **3. Load `workflows/variants/otr_amd_still.json` and queue it.** First run
 pulls about 12 GB: a 4B writer, a music model, and the Kokoro voices. Nothing
