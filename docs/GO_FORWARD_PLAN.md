@@ -721,14 +721,16 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   worth having from someone who is not the author. **Owed, and easy to lose:
   it fires on a registry state change nobody is watching.** He posts the ping;
   a window drafts it.
-* **`otr_8gb_foley` lives or dies on the 4060's result.** The 5080 ran that
-  graph to SUCCESS in 131 minutes, so the GRAPH is proven; what is open is
-  whether it is survivable on 8 GB hardware. The 4060 leg started 09:54 local
-  and was still rendering at 118 minutes. **If it times out or fails, retire
-  the graph** the way `otr_8gb_mime` was retired in d1a81d16 (SHIPPING_SET,
-  the variant file and its launch.md, the harness lists, regenerate, docs).
-  His ruling already covers it: *"nix the mime and foley from 8gb if it
-  failed."*
+* **`otr_8gb_foley` is RETIRED (operator ruling, 2026-09-13).** He ruled on
+  time, not on failure: *"4 hours for 1 act seems too long"*, then *"maybe we
+  dump foley on the 8gb lane."* The measurement behind it, from the 4060's own
+  server log: `ltx25_foley_plus` averages **673.9 s per clip** over 11 clips
+  and `ltx25_mime` **655.1 s** over 20 -- the same render, differing only at
+  the mux -- both decoding at 1664x960, which is the SAME resolution the 16 GB
+  graph uses. There is no smaller foley lane to fall back to: `ltx25_high_*`
+  is the only tier the engine has, so the 8 GB graph was the 16 GB recipe on a
+  smaller card. Against that, the whole `otr_8gb_video` episode finished in
+  25.4 min on the same box. Foley and mime both remain shipped at 16 GB.
 
 ## 4. Constraints specific to this plan
 

@@ -24,7 +24,7 @@ param(
         "otr_8gb_animatediff", "otr_16gb_animatediff",
         "otr_8gb_video", "otr_16gb_video",
         "otr_16gb_mime",
-        "otr_8gb_foley", "otr_16gb_foley"
+        "otr_16gb_foley"
     ),
     [string]$ActCount = "1",
     # The runner's default observation window is 5400s and a one-act LTX 2.5

@@ -57,6 +57,6 @@ Say ("VRAM at start: " + (& nvidia-smi --query-gpu=memory.used --format=csv,nohe
 # ---- 3. the LTX graphs, cheapest first ----------------------------------
 # Called in-process so -Graphs binds as an array; a child `powershell -File`
 # would receive the list as one comma-joined string.
-$legs = @("otr_8gb_video", "otr_16gb_video", "otr_16gb_mime", "otr_8gb_foley", "otr_16gb_foley")
+$legs = @("otr_8gb_video", "otr_16gb_video", "otr_16gb_mime", "otr_16gb_foley")
 & (Join-Path $root "scripts\otr_shipping_set_legs.ps1") -Url $Url -Graphs $legs 2>&1 | ForEach-Object { Say $_ }
 Say "night done"
