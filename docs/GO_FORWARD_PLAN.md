@@ -386,15 +386,21 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his eyeball -- registry and workflow (2026-09-13 night)
 
-* **The pod cannot test the shipping graphs until a registry version that
-  carries them is Active.** `runpod create` + `install_custom_node
-  id=comfyui-old-time-radio` installs fine, but the registry's Active version
-  is alpha.30 (09-11) and alpha.31 is still Pending; the HEAD graphs carry
-  `OTR_StableAudioTheme.music_style` (09-12), so every pod leg refused at the
-  runner's widget-count guard. Unblocks with either: wait for alpha.31 to go
-  Active (alpha.31 has the widget), or bump `pyproject.toml` to alpha.32 (his
-  registry push). Git-URL installs do not reach a remote pod through the MCP,
-  and the template exposes no shell. Memory: pod-pack-version-must-match-the-graphs.
+* **The registry's Active version does not carry the current graphs, so a
+  Manager install is behind.** Active is alpha.30 (09-11); the HEAD graphs
+  carry `OTR_StableAudioTheme.music_style` (09-12), which alpha.30 does not
+  have, so a fresh Manager install cannot load them. Only he can move this --
+  editing `pyproject.toml` IS the registry push. Memory:
+  pod-pack-version-must-match-the-graphs.
+  **The pod half of this row is CLOSED (2026-09-13).** It was written when the
+  only route to a pod was `install_custom_node` through the MCP, which serves
+  the registry version. A pod created from the PyTorch template with an SSH
+  key exposes a real shell, so it runs a git checkout at HEAD like any other
+  box, and `otr_16gb_low` published from one at 18:14Z. Two things that route
+  costs, both now handled in `scripts/otr_pod_provision.sh`: the template's
+  ffmpeg is 4.4 and cannot write the master into an MP4 (PBUG-20260913-03),
+  and the network volume is shared and sits near its quota, so a long ladder
+  can hit "Disk quota exceeded" mid-episode.
 * **Fable's answer to "an auto-update agent for version control" is a
   fork-point audit in `scripts/build_variants.py --check` plus a tracked
   `.githooks/pre-push`, not an agent.** Refuse a shipping profile whose
