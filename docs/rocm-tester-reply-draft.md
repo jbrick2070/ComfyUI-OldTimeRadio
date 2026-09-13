@@ -7,18 +7,22 @@ audiobook/narrative stuff, so happy to help."*
 An R9700 is RDNA4 with 32 GB. Paste the reply below; it asks for exactly one
 result and nothing else.
 
-**On the Windows push, revised 2026-09-13.** The operator sent
-`r/ROCm/comments/1wfb4qe` (CUDA workloads on AMD GPUs on Windows). Reddit
-cannot be fetched from here, but the surrounding material is clear enough:
-the maintained ZLUDA-on-Windows setup (`Speedstu/CUDA-for-AMD-Windows`)
-validates exactly one GPU, an RX 9060 XT, pins **LibTorch 2.3.0 + cu118**, and
-states that **cuDNN/MIOpen is not available** on its validated path and that
-"ZLUDA is not a complete CUDA implementation". That is not a route ComfyUI can
-take. Field reports also put ComfyUI + ROCm + Windows at "an enormous pain"
-against Linux being "pretty nice and seamless". The pack's own AMD row already
-assumes the NATIVE path -- `device_backend: "cuda"`, because PyTorch ROCm
-presents through the CUDA API -- so nothing in the code changes; what changed
-is that the reply no longer spends a volunteer's evening on our preference.
+**On the Windows push, revised 2026-09-13, from the post itself.** The
+operator supplied the text of `r/ROCm/comments/1wfb4qe`. Its author validates
+ZLUDA + ROCm/HIP on ONE card, an RX 9060 XT (gfx1200, RDNA4), with nvcuda,
+cuBLAS/rocBLAS, cuBLASLt/hipBLASLt, cuSPARSE/rocSPARSE and cuFFT all passing,
+and a 2,216,347-parameter PPO run completing a full training iteration.
+**His own stated limit is the one that decides this for us:** *"cuDNN is also
+still a limitation with the current stable Windows HIP stack, so
+convolution-heavy workloads may not work yet."* `otr_amd_still` is SD1.5
+stills plus a VAE decode -- convolutions end to end -- and a PPO policy
+network exercises none of that. So the route is not wrong, it is simply not
+this workload, and saying that plainly is fairer to the project than "reports
+say it is painful". The pack's own AMD row already assumes the NATIVE path
+(`device_backend: "cuda"`, because PyTorch ROCm presents through the CUDA
+API), so nothing in the code changes. He is also collecting RX 9000-series
+Windows reports, and our volunteer's R9700 is one -- worth pointing at, since
+it costs the volunteer a scan and is not our test.
 
 **It deliberately names no other graph.** The operator owns no AMD hardware, so
 what this tester runs on 32 GB is the only AMD fact anyone will have. Pointing
@@ -76,14 +80,24 @@ every line of that is new.
 
 **Take whichever gets you to a working ComfyUI without a fight.** I had been
 saying Windows is the more interesting answer, and it is -- the pack is
-Windows-native and nobody has pointed it at a Radeon there. But the reports I
-can find say ComfyUI on Windows with AMD has been an ordeal while Linux is
-close to seamless, so I am not going to spend your evening on my curiosity. If
-you do go Windows, use AMD's native ROCm build of PyTorch, not the ZLUDA
-route: the one maintained ZLUDA-on-Windows setup pins LibTorch 2.3.0 with
-cu118 and says cuDNN/MIOpen is unavailable on its validated path, which is not
-a road ComfyUI can walk. Linux with ROCm is a completely welcome answer and I
-would rather have that result than no result.
+Windows-native and nobody has pointed it at a Radeon there. But I am not going
+to spend your evening on my curiosity, and if Linux is the shorter road for
+you, take it. A Linux result is worth far more to me than a Windows result I
+never get.
+
+**If you do go Windows, use AMD's native ROCm PyTorch, not ZLUDA.** Not a
+knock on that project -- its author is careful and says the limit out loud:
+cuDNN is still missing from the stable Windows HIP stack, so convolution-heavy
+workloads may not work yet. What this graph does is convolution-heavy by
+definition. It draws SD1.5 stills and decodes them through a VAE, which is
+nothing but convolutions. The training run that project proves out is a small
+policy network, which does not touch that path at all.
+
+**Unrelated to me, and worth thirty seconds of your time:** that project is
+asking specifically for RX 9000-series Windows reports to build a real
+compatibility matrix, and yours is one. Its scanner would tell you whether
+cuBLAS, cuBLASLt, cuSPARSE and cuFFT come up on your card the way they do on
+the 9060 XT. Different question from mine, useful to someone either way.
 
 Fair warning on the time: one act is a whole episode, and this graph takes
 somewhere between fifteen minutes and an hour depending on the card.
