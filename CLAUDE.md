@@ -582,6 +582,30 @@ exactly what makes the mistake convincing) and they do NOT live under the ComfyU
 The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** under publisher
 **`fluxus`** (the operator's account). `.github/workflows/publish_action.yml` publishes via
 `Comfy-Org/publish-node-action`, keyed on the repo secret `REGISTRY_ACCESS_TOKEN`.
+- **THE REGISTRY IS KEPT CURRENT FROM NOW ON (operator directive 2026-09-13 -- hard).**
+  Operator: *"we have to keep the registry current now."* Written the day the first
+  outside tester appeared. Until then a lagging Active version was an internal
+  annoyance; the moment a stranger installs the pack it is a user-facing lie. The
+  measured case: a Radeon owner volunteered to test `otr_amd_still`, and that graph
+  existed in NO published version -- it was created 2026-09-13 while Active was the
+  11th and Pending the 12th -- so "install it from Manager" would have sent him
+  hunting a file that was not in the box.
+  * **A user-visible change to the shipped surface earns a version bump, promptly:**
+    a new or removed shipping graph, a node/widget change the saved graphs need, a
+    dependency change, a fix someone outside this machine would hit. Doc-only and
+    test-only commits do not.
+  * **THIS RELAXES, BUT DOES NOT DELETE, "never while a version is pending" below.**
+    Do not stack a version for tidiness. DO publish when the Active version cannot
+    run what the repo ships -- a real gap is the reason the rule exists, not an
+    exception to it. Say in the commit which gap it closes.
+  * **NEVER PUBLISH A TREE WITH AN UNEXPLAINED REGRESSION.** Three versions
+    (alpha.26-29) were BANNED. A publish is the one action here that reaches
+    strangers and cannot be taken back -- the version string burns even on a soft
+    delete. Suite diffed against a same-HEAD baseline first, every new failure
+    explained, THEN bump.
+  * **He still owns the decision to publish.** This directive says keep it current,
+    not publish unattended: state the gap and the version, and bump when he says so
+    or when he has already asked for this specific release.
 - **EDITING `pyproject.toml` AUTO-FIRES A PUBLISH.** The workflow triggers on any push to
   `v2.0-alpha` whose diff touches `pyproject.toml`. Treat that file as a release trigger, not a
   config file: never edit it "just to tidy" mid-session, and never edit it while a version is

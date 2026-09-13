@@ -79,6 +79,14 @@ class VisualAssetValidatorTests(unittest.TestCase):
             "_resolve_workflow_path": resolve_path,
             "_load_workflow": load_workflow,
             "widget_vector_drift": widget_drift,
+            # The ffmpeg preflight (PBUG-20260913-03). This seam execs `validate`
+            # out of the AST, so every module-level name the method reaches has
+            # to be supplied here or it raises NameError -- the same lesson
+            # `_admit_story_input` left below. None means "no gap", which is
+            # what keeps these tests about asset ORDERING; that the question is
+            # asked at all, and asked early, is pinned in
+            # tests/test_ffmpeg_master_mux_capability.py.
+            "master_mux_gap_for_prompt": lambda prompt: None,
             "log": SimpleNamespace(info=lambda *args: None, error=lambda *args: None),
         }
         exec(compile(module, str(SOURCE), "exec"), namespace)
