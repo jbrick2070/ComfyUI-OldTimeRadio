@@ -5482,3 +5482,17 @@ tuple, and `act_count=1`, dry-run resolution passed for all five required banks:
 Kokoro, MusicGen, and the same 6.8 GB CUDA writer ceiling. Dry-run mode did
 not submit prompts or create media; this is routing/configuration evidence, not
 five published regression legs.
+
+**CR-20260912-08 — Plan 4 `scifi_news_pro` one-act leg: PASS, published.**
+
+The same explicit active alpha.30 workflow and proven `machine:8gb` tuple
+completed with `act_count=1`. The news bank produced a 13-line, 212-word
+ledger, 13 persisted clips, 2,541 positioned frames at 25 fps, captions, and
+credits. The runner returned `status=success`; independent disk verification
+found the OBS MP4 at 127,736,447 bytes, 125.080 seconds, H.264/AAC,
+1920x1080 at 25 fps, SHA-256
+`2A5F7E149EF43AD02917516745A49B3065CFD9BF2C39F4F627991E2565A14598`.
+The known 23-frame closing-window tail-fill warning was reconciled back to the
+2,541-frame A/V budget. This is the second published clean-room episode and
+the first actual Plan 4 bank leg; the remaining four banks are not yet
+published.
