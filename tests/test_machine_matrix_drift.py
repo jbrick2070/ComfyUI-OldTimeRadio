@@ -166,7 +166,10 @@ def test_amd_machine_declares_an_unproven_rocm_candidate_policy():
     assert profile["device_backend"] == "cuda"  # PyTorch ROCm API spelling
     assert profile["llm"]["device"] == "cuda"
     assert profile["llm"]["quant_policy"] == "none"
-    assert profile["llm"]["creative_model"] == "google/gemma-4-E2B-it"
+    # The candidate writer follows the shipped otr_amd_still graph
+    # (2026-09-13): Qwen3.5-4B unquantised, the same pick as the Mac and CPU
+    # tiers, so the AMD row and the tier matrix name one writer.
+    assert profile["llm"]["creative_model"] == "Qwen/Qwen3.5-4B"
     assert profile["video"]["device_policy"] == "cuda"
     assert profile["video"]["dtype_policy"] == "no_fp8"
     assert profile["image"]["dtype_policy"] == "no_fp8"

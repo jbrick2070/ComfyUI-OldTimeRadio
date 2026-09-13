@@ -14,9 +14,14 @@ So AMD is parked. Realistically it is a 2.5 item, if it happens here at all.
 **It is open source, and it is fair game.** If you have the card, everything
 needed to try is already in the repo and nothing is waiting on us:
 
-* **Two profiles are built** -- `otr_amd16_rocm` and `otr_amd8_rocm` -- generated
-  from the same source as every working profile. Every engine they select is
-  plain PyTorch: no sageattention, no flash-attn, no bitsandbytes, no fp8, no
+* **A graph is built and shipped** -- `workflows/variants/otr_amd_still.json`,
+  generated from `config/profiles/otr_amd_still.json` the same way as every
+  working graph and marked experimental because it has no receipts. It is the
+  still-image tier: Qwen3.5-4B writer (unquantised), `still_motion` over
+  Z-Image Turbo stills, Kokoro voices, MusicGen. Two older lab profiles,
+  `otr_amd16_rocm` and `otr_amd8_rocm`, still load with `--profile` for a 16 GB
+  or 8 GB variant of the same idea. Every engine any of them selects is plain
+  PyTorch: no sageattention, no flash-attn, no bitsandbytes, no fp8, no
   CUDA-only GGUF kernels, no custom CUDA at all. On paper they should work. On
   paper is exactly the problem.
 * **A five-minute probe exists** that answers most of the open questions without
@@ -35,7 +40,7 @@ an issue with the probe output pasted in is the whole ask.
 
 | | |
 |---|---|
-| **OS** | Linux (ROCm is Linux-only in practice) |
+| **OS** | Linux, or Windows with AMD's ROCm build of PyTorch for Radeon -- the pack itself is Windows-native, so only the torch build is the question; neither has a receipt here |
 | **GPU** | One AMD card: MI-series, or RDNA3 (7900 XT / XTX, W7900). RDNA2 may work; nobody knows |
 | **VRAM** | 16 GB for the full profile, 8 GB for the small one |
 | **ROCm** | 6.x |
@@ -133,23 +138,24 @@ so on 8 GB, skip it.
 cd ../.. && python main.py --listen 127.0.0.1 --port 8188
 ```
 
-**5. Run one episode, headless.** This is the mission. Use the 16 GB profile
-on a 16 GB+ card, the 8 GB one below that.
+**5. Run one episode, headless.** This is the mission. The shipped graph is
+the one to try first on a 16 GB+ card:
 
 ```bash
 python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_canonical_api_run.py \
   --comfyui-url http://127.0.0.1:8188 \
-  --profile otr_amd16_rocm \
+  --workflow custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/otr_amd_still.json \
   --act-count 1 \
-  --source-bank original \
   --timeout 0
 ```
 
-For an 8 GB card, `--profile otr_amd8_rocm`.
+The two lab profiles are the alternates: `--profile otr_amd16_rocm` instead of
+`--workflow` for the 16 GB lab preset, `--profile otr_amd8_rocm` for an 8 GB
+card.
 
-**Use `--profile`, not `--machine amd`.** The `--machine amd` shortcut
-resolves to a different, unaudited engine set. The two profile ids above are
-the ones this file is about.
+**Use `--workflow` or `--profile`, not `--machine amd`.** The `--machine amd`
+shortcut resolves to a different, unaudited engine set. The graph and the two
+profile ids above are the ones this file is about.
 
 **6. Success looks like an mp4.**
 

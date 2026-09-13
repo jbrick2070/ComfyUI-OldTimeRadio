@@ -39,7 +39,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
 | **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | ComfyUI-GGUF | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
-| **AMD / ROCm (Linux only)** | gemma-4-E2B | still_motion | kokoro | musicgen | flux2_klein | none | `draft`, unproven |
+| **AMD / ROCm (Linux only)** | Qwen3.5-4B | still_motion | kokoro | musicgen | z_image_turbo | none | `draft`, unproven |
 
 **Use the machine key, not an experimental profile name.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
 
