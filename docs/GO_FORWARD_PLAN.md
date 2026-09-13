@@ -140,6 +140,43 @@ RTX A4500 20 GB and the Mac mini M4. `docs/4060_DRILL_LOG.md` around lines
 probably to add the row rather than to retract the verdict. Two hand-curated
 files feed two generated docs and nothing enforces agreement between them.
 
+### C0. Kokoro is the default voice in every shipped JSON (operator ruling, 2026-09-12)
+
+Operator: *"for maybe Mac and AMD, well, at least Mac, we'll ship Kokoro because
+it's the least friction download. So Kokoro might be our all-arounder for least
+friction download and all of the JSONs, but people can change to the other one
+if they want, but they'll have to download the models themselves if it won't
+auto download."*
+
+**The measurement agrees, and it is not close.** Kokoro is the ONLY voice engine
+proven on all three machine columns, and the smallest:
+
+| engine | how you get it | size | 8 GB NV | 16 GB NV | Mac 16 |
+|---|---|---|---|---|---|
+| `kokoro` | auto (HF cache on first use) | 0.3 GiB | proven | proven | proven |
+| `bark` | auto | 4.2 GiB | proven | proven | **OOM -- reboots a Mac** |
+| `indextts2` | own Windows-only installer | 11.1 GiB | not offered | proven | not offered |
+| `chatterbox` / `dia` | own Windows-only installers | 3.0 / 6.0 GiB | not offered | fits | not offered |
+
+So kokoro is the only choice that is one click on every platform this pack
+claims to support, and the ruling makes it the floor rather than an option.
+
+**WHERE IT ALREADY HOLDS:** `otr_canonical.json` ships kokoro on both slots --
+confirmed by the 2026-09-12 no-profile receipt, whose filename carries `koko`.
+The announcer slot is kokoro in nearly every profile already.
+
+**WHERE IT DOES NOT, measured across all 118 profiles:** 79 pair
+`char_voice_engine: indextts2` with a kokoro announcer, and 5 pair `bark` with
+one. Most of those are soak/rotation/experimental profiles and are NOT the
+shipping surface, so this row is scoped deliberately: **every JSON we SHIP --
+the canonical and the per-machine set he is planning -- defaults both voice
+slots to kokoro.** A rotation profile whose whole purpose is to exercise
+IndexTTS2 keeps IndexTTS2; changing it would delete the test.
+
+The README already needs the other half of his sentence written down: switching
+to another voice engine is supported, and on `indextts2` / `chatterbox` / `dia`
+it costs a Windows-only installer run that nothing will do for you.
+
 ### C3. Put the SD 1.5 checkpoint in the visual-asset manifest -- it is what the Mac ladder is waiting on
 
 **This is the single highest-leverage item for the three Mac graphs the operator
