@@ -214,7 +214,19 @@ Every style drives both the stills and the video.
 The video, image, voice and music layers are each a registry of swappable
 engines, chosen per role from dropdowns. Whatever you pick is honoured exactly: a
 missing or out-of-memory engine **stops the render with a named error** rather
-than swapping in something you did not choose. There is no silent fallback.
+than swapping in something you did not choose. No engine is ever silently
+swapped for another one.
+
+That promise is about ENGINE CHOICE, and it is worth saying where it stops.
+Infrastructure failures below the engines do have recovery paths, and they say
+so in the log rather than in silence: if `pyloudnorm` cannot measure a master,
+the older peak-based mastering runs instead; if no monospace font can be loaded,
+the credits fall back to a bitmap font and look worse; if a voice bank cannot
+serve the requested gender, casting stamps the line `gender_unservable` and
+continues. One of them is sharper than the others: **if the master WAV cannot be
+written to disk, the run continues and produces a video-only episode** rather
+than stopping. Each of those prints what it did; none of them substitutes an
+engine you did not pick.
 
 What `otr_canonical` ships, and why:
 
@@ -686,10 +698,25 @@ licence click on Hugging Face plus a login; every default weight is ungated.
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 all three to `sd15` first.
 
-**It finished but nothing is in `otr/obs/`.** Read the console from the end
-backwards for the first error. A run that ends without publishing did not
-succeed, and if it has been quiet for more than five minutes after the downloads
-finished, it is not going to.
+**It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
+the console first, because there are two different answers. `obs_publish
+BLOCKED -- ...` means the run SUCCEEDED and the episode is in
+`otr/episodes/<episode>/`; only the published copy was withheld, because the
+rights receipt did not clear. No `obs_publish` line at all means a real failure:
+read the console from the end backwards for the first error, and if it has been
+quiet for more than five minutes after the downloads finished, it is not going
+to finish.
+
+**Two GPUs, and it measured the wrong one.** Memory is read from CUDA device 0
+in four places, so on a machine where device 0 is an integrated or smaller card
+the pack sizes its budget against that card and can refuse or run badly. Until
+that is fixed, launch ComfyUI with `CUDA_VISIBLE_DEVICES` set so the card you
+want is the only one it sees.
+
+**`BUG-LOCAL-098` on a second queue.** The message names a quantized load that
+did not materialize -- bitsandbytes silently falling back to fp16 on a reload.
+The check is doing its job: it refuses a wrongly-quantized model rather than
+rendering with one. Restart ComfyUI and queue again.
 
 ---
 
@@ -708,6 +735,22 @@ on a 12B-class model, which is the largest thing a 16 GB card holds. It ships
 disabled rather than quietly making episodes worse. If you have a much larger
 model and want to try it, the switch is `JUDGE_ATTRIBUTION` in
 `nodes/_otr_ledger_clean.py`.
+
+**It expects one episode at a time, and one GPU.** Two habits are baked in
+from the machine it was written on. Queueing several prompts at once is not
+supported: the production ledger keeps the current episode in a module-level
+global, and a node that cannot see its wired input falls back to the
+newest ledger on disk by modification time -- which, with two runs in flight, may
+belong to the other one. And VRAM is read from CUDA device 0 rather than from
+the device ComfyUI selected, so a multi-GPU box wants `CUDA_VISIBLE_DEVICES`.
+Neither is hard to fix and neither is fixed; both are listed because a stranger
+should not have to discover them.
+
+**Two of the voice engines assume Windows.** The Chatterbox and Dia sidecars
+default to a `.venv\Scripts\python.exe` layout and are installed by PowerShell
+scripts with no shell twin. They run elsewhere if you point
+`OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter, but nothing
+here has proven that. Kokoro is the default on every platform for this reason.
 
 **AMD is experimental in v2.0, and that is a scope line rather than a bug.**
 Nobody on the project owns an AMD card, and we were not going to claim a platform
