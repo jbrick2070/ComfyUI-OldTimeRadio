@@ -41,7 +41,12 @@ def _resolve_device_policy(device_policy) -> str:
         return _devopts.resolve_device(device_policy or _devopts.DEFAULT_DEVICE_OPTION,
                                        fallback="cuda")
     except Exception:  # noqa: BLE001 -- never fail a render on device naming
-        return str(device_policy or "cuda")
+        # NOT `str(device_policy)`: on the one path this function exists to
+        # protect, that would put the literal word "default" into the policy
+        # dict and then into the receipt -- exactly what the module promises
+        # never to emit (Fable review, 2026-09-12).
+        raw = str(device_policy or "cuda")
+        return "cuda" if raw == _devopts.DEFAULT_DEVICE_OPTION else raw
 
 
 def _engine_for_role(resolved_video, effective_by_role, role):
@@ -513,22 +518,28 @@ class OTRVideoDirector:
             # (ImageDirector, ShotLock, dispatcher, render_driver)
             # asserts policy_version == 2.
             "policy_version": 2,
-            # RESOLVED, NOT PASSED THROUGH, and this line is why (2026-09-12).
-            # It used to be a bare `str(device_policy or "cuda")` with NO
-            # validation, and it forwards through FIVE hops --
-            # otr_image_director -> otr_image_gen_dispatcher -> otr_shot_lock ->
-            # render_driver -- straight into torch as a literal device string.
-            # The writer and CastLock both REFUSE an unknown device loudly; this
-            # one alone accepted anything and rendered with it. Two paths that
-            # shout and one that does not is the worst shape a validation gap
-            # can take: a smoke test clearing the other two looks like it proved
-            # this one.
+            # RESOLVED SO THE RECORD IS HONEST -- and note what this is NOT.
             #
-            # `resolve_device` returns a CONCRETE device name, never the word
-            # "default", so the v2 policy every downstream consumer asserts on
-            # still carries a real device and the ledger records what actually
-            # ran. An explicitly chosen device is passed through untouched --
-            # only "default" is ever resolved for you.
+            # CORRECTION (2026-09-12, Fable design review). An earlier version
+            # of this comment claimed the value was "forwarded into torch" and
+            # that resolving it closed a validation gap. BOTH HALVES WERE
+            # FALSE, and README:840 says so plainly: `device_policy` is
+            # DECORATIVE -- it is carried in the v2 policy dict and no video or
+            # image adapter ever consumes it as a device. The video lanes pick
+            # their own. Setting it buys nothing at render time.
+            #
+            # It is resolved anyway for ONE honest reason: the widget is now
+            # "default" in the shipped canonical, and a policy dict that
+            # recorded the literal string "default" would be a receipt nobody
+            # can interpret later. So this turns it into a concrete name for
+            # the RECORD, and makes no claim about behaviour.
+            #
+            # THE REAL GAP HERE IS STILL OPEN: this node declares
+            # `VALIDATE_INPUTS` returning True, which makes ComfyUI skip its
+            # combo membership check entirely (core execution.py guards that
+            # check on the absence of a kwargs-taking validator), and nothing
+            # in this file checks the value either. That is a separate fix and
+            # it is not made here.
             "device_policy": _resolve_device_policy(device_policy),
             "dtype_policy": str(dtype_policy or "fp8_ok"),
             # WAN 8GB launch contract (2026-07-24): the per-tier render-length

@@ -1404,6 +1404,37 @@ class OTRMasterAudioMux:
         if p.returncode != 0:
             raise OSError("obs publish (aac viewing copy) failed: %s"
                           % p.stderr.strip()[:300])
+
+        # THE FILE HE ACTUALLY WATCHES GETS CHECKED LIKE ONE (2026-09-12).
+        # Until now this trusted `returncode == 0` alone, while the ARCHIVAL
+        # copy forty lines up proves itself byte-identical by SHA-256 before
+        # calling its own write a success. So the weaker check guarded the more
+        # important file: ffmpeg can exit 0 having written a truncated or empty
+        # container, and the log would still say publish OK, the ledger would
+        # record it published, and the operator would open a black screen.
+        #
+        # obs IS the success signal in this project -- a leg that does not land
+        # there did not happen -- so "the bytes exist" is not the same claim as
+        # "it plays". Both streams are probed against the source they were
+        # copied from, reusing the `_probe_float` already in this file.
+        _size = os.path.getsize(dst)
+        if _size <= 0:
+            raise OSError("obs publish wrote a ZERO-BYTE file: %s" % dst)
+        for _stream, _label in (("v:0", "video"), ("a:0", "audio")):
+            _src = _probe_float(final, _stream)
+            _got = _probe_float(dst, _stream)
+            if _got < 0:
+                raise OSError(
+                    "obs publish: %s stream of %s does not probe -- the file "
+                    "is not playable" % (_label, dst))
+            # A tenth of a second of slack: the AAC encoder pads the final
+            # frame, so an exact match is the wrong test. Anything beyond that
+            # means the copy is short, which is the failure worth catching.
+            if _src > 0 and abs(_got - _src) > 0.1:
+                raise OSError(
+                    "obs publish TRUNCATED: %s is %.2fs but the source is "
+                    "%.2fs (%s)" % (_label, _got, _src, dst))
+
         log.warning("[OTR_MasterAudioMux] LOUD publish: final episode -> %s "
                     "(%d bytes; video copy + AAC-320k viewing audio; archival "
                     "PCM byte-identical final: %s)",
