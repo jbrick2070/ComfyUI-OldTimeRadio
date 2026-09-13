@@ -10,11 +10,11 @@ Every row below is a real saved graph in this repository. Drag it onto the Comfy
 
 | Your machine | Open this | Also install |
 |---|---|---|
-| Anything, to start | `workflows/otr_canonical.json` (Browse Templates &rarr; OTR) | nothing |
+| Anything, to start | `workflows/otr_canonical.json` (Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; comfyui-old-time-radio) | nothing |
 | 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_nvidia_8gb_haunted.json` | ComfyUI-AnimateDiff-Evolved, ComfyUI-GGUF |
 | 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/otr_canonical.json` &mdash; the per-machine graph selects `indextts2`, which is not in an installed copy | nothing |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac_mps.json` | nothing |
-| AMD ROCm -- Linux only -- and read the caveat under the table | `workflows/otr_canonical.json` &mdash; the per-machine graph is still a draft | nothing |
+| AMD ROCm -- Linux only -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/otr_canonical.json` &mdash; the per-machine graph is still a draft | nothing |
 | CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; the per-machine graph is still a draft | nothing |
 
 Every machine needs **ffmpeg and ffprobe** on PATH, and Linux needs one monospace TTF installed for burned captions.
@@ -184,9 +184,9 @@ Selected by: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_vid
 
 | File | From | Put it in | Size | Gated |
 |---|---|---|---|---|
-| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/(models root)/` | -- | no |
-| `v3_sd15_mm.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/(models root)/` | -- | no |
-| `v3_sd15_adapter.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/(models root)/` | -- | no |
+| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/checkpoints/` | -- | no |
+| `v3_sd15_mm.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/animatediff_models/` | -- | no |
+| `v3_sd15_adapter.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/loras/` | -- | no |
 
 ### humo &mdash; 26.7 GiB total
 
@@ -217,9 +217,9 @@ Selected by: `animatediff15_lightning_video`
 
 | File | From | Put it in | Size | Gated |
 |---|---|---|---|---|
-| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/(models root)/` | 1.99 GiB | no |
-| `animatediff_lightning_8step_comfyui.safetensors` | [`ByteDance/AnimateDiff-Lightning`](https://huggingface.co/ByteDance/AnimateDiff-Lightning) | `models/(models root)/` | 0.85 GiB | no |
-| `vae-ft-mse-840000-ema-pruned.safetensors` | [`stabilityai/sd-vae-ft-mse-original`](https://huggingface.co/stabilityai/sd-vae-ft-mse-original) | `models/(models root)/` | 0.31 GiB | no |
+| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/checkpoints/` | 1.99 GiB | no |
+| `animatediff_lightning_8step_comfyui.safetensors` | [`ByteDance/AnimateDiff-Lightning`](https://huggingface.co/ByteDance/AnimateDiff-Lightning) | `models/animatediff_models/` | 0.85 GiB | no |
+| `vae-ft-mse-840000-ema-pruned.safetensors` | [`stabilityai/sd-vae-ft-mse-original`](https://huggingface.co/stabilityai/sd-vae-ft-mse-original) | `models/vae/` | 0.31 GiB | no |
 
 ### ltx25 &mdash; 22.2 GiB total
 
@@ -239,9 +239,9 @@ Selected by: `wan22_high_video`
 
 | File | From | Put it in | Size | Gated |
 |---|---|---|---|---|
-| `Wan2.2-TI2V-5B-Q5_K_M.gguf` | [`QuantStack/Wan2.2-TI2V-5B-GGUF`](https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF) | `models/(models root)/` | -- | no |
-| `umt5-xxl-encoder-Q5_K_M.gguf` | [`city96/umt5-xxl-encoder-gguf`](https://huggingface.co/city96/umt5-xxl-encoder-gguf) | `models/(models root)/` | -- | no |
-| `wan2.2_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/(models root)/` | -- | no |
+| `Wan2.2-TI2V-5B-Q5_K_M.gguf` | [`QuantStack/Wan2.2-TI2V-5B-GGUF`](https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF) | `models/diffusion_models/` | -- | no |
+| `umt5-xxl-encoder-Q5_K_M.gguf` | [`city96/umt5-xxl-encoder-gguf`](https://huggingface.co/city96/umt5-xxl-encoder-gguf) | `models/text_encoders/` | -- | no |
+| `wan2.2_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/vae/` | -- | no |
 
 ### No manifest ships for these
 

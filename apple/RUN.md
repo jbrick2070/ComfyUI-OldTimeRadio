@@ -61,7 +61,7 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks — ships on *roll*, which picks any of the nine. |
 | `creativity` | `balanced` by default. |
-| `seed` (on the sampler nodes) | Fix it to reproduce a run; leave it random for variety. |
+| `cast_seed` | Fixes which voices the cast draws. This graph has no KSampler -- the rest of the run is made reproducible by the frozen ledger, not by a sampler seed. |
 
 Two of those ship on **roll** on purpose: the canonical is meant to hand you a
 different show each time you press Queue. Pin them when you want to compare two
@@ -70,8 +70,10 @@ could adjust.
 
 ## Writing your own story
 
-Set `source_bank` to **My Story** and put your premise in `custom_premise`. That
-bank exists to take your idea and produce it, rather than adapting something.
+Set `source_bank` to **`my_story`** and put your premise in `custom_premise`.
+The dropdown lists bank *ids*, so `my_story` is the value you pick -- there is no
+"My Story" entry. That bank exists to take your idea and produce it, rather than
+adapting something.
 
 ## Changing what renders it
 

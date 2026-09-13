@@ -38,19 +38,23 @@ usually have, clones or fast-forwards OTR from `v2.0-alpha`, downloads the
 automatic lanes, warms the writer, verifies the manual tiers, and prints one
 receipt.
 
-For automatic selection by VRAM, clear the overrides first:
+For automatic selection by VRAM, clear the overrides, then run the script:
 
 ```bash
 unset OTR_PROVISION_PROFILE OTR_PROVISION_MACHINE OTR_WITH_INDEXTTS2
+bash scripts/otr_pod_provision.sh
 ```
 
-Or force a specific row instead of letting it detect:
+Run it from the OTR checkout. Or force a specific class instead of letting it
+detect the card:
 
 ```bash
 export OTR_PROVISION_MACHINE=16gb
+bash scripts/otr_pod_provision.sh
 ```
 
-The `--machine` keys are the same ones in [MACHINES.md](MACHINES.md).
+The class keys are `8gb`, `12gb`, `16gb` and `amd` — the names in
+`config/machine_classes.json`, not the human labels the matrix prints.
 
 Read the receipt it prints before launching anything. It is the difference
 between "the weights are there" and "the weights were attempted."
@@ -71,8 +75,12 @@ Start ComfyUI, load `workflows/otr_canonical.json`, set the dropdowns for the
 lane you rented the box for, and queue one episode.
 
 **The proof is a file in `otr/obs/`.** Not a green log, not a finished queue — a
-published episode. If more than five minutes have passed with nothing there, stop
-waiting and read the log.
+published episode.
+
+Once the weights are on disk, five quiet minutes means something is wrong and you
+should read the log. **That rule does not apply to the first run**, which is
+still downloading tens of gigabytes and then writing a whole script before it
+draws anything. Do not kill a healthy first fetch because `otr/obs/` is empty.
 
 ## 5. Pull your work off before you stop the pod
 

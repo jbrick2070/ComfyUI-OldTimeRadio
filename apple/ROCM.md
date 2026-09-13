@@ -90,6 +90,17 @@ cd ComfyUI-OldTimeRadio && git checkout v2.0-alpha
 pip install -r requirements.txt
 ```
 
+**Check torch again before going further.** Installing another project's
+requirements can replace your ROCm build with a stock PyPI wheel, and the
+symptom is a card that silently stops being visible:
+
+```bash
+python -c "import torch; print(torch.__version__, torch.cuda.is_available())"
+```
+
+If that no longer prints `True`, reinstall the ROCm wheels from step 1 before
+continuing. Everything after this point assumes it is still True.
+
 **Do not install `sageattention`.** It is CUDA-only and the pack actively
 refuses to run if it finds it patched in. You do not need `pycairo` either --
 neither AMD profile selects the one engine that wants it.
@@ -101,6 +112,10 @@ python scripts/otr_fetch_lane_weights.py --list
 python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 ```
+
+That last line is for the **16 GB** graph, which is the one on Stable Audio 3.
+The 8 GB AMD graph uses MusicGen instead, which fetches itself at queue time —
+so on 8 GB, skip it.
 
 **4. Start ComfyUI.**
 

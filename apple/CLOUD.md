@@ -7,7 +7,13 @@ the supported path and the one every published episode used.
 Read this only if you want a bigger writer than your card can hold, or you want
 to write scripts on a machine with no usable GPU at all.
 
-Nothing else in the pipeline changes. Voices, music, images and video stay local.
+For the **writer**, nothing else changes: voices, music, images and video stay
+local.
+
+**One exception worth knowing before you set a key.** `OTR_GOOGLE_API_KEY` is
+not writer-only. If a graph selects the `google_image` engine, stills are minted
+through that same key and billed the same way. Check your image dropdowns before
+setting it.
 
 ---
 
@@ -43,6 +49,11 @@ export OPENROUTER_API_KEY=sk-or-...
 
 Then restart ComfyUI.
 
+**ComfyUI Desktop does not inherit user-scope Windows variables.** The
+`SetEnvironmentVariable` line above is enough for a terminal you launch
+`python main.py` from, and is *not* enough for Desktop. Set the key in the
+environment of whatever actually starts ComfyUI.
+
 **Never put a key in a workflow widget.** No node here asks for one. A key saved
 into a graph travels with the graph to anyone you send it to.
 
@@ -64,11 +75,13 @@ current list. It is one of the few scripts that **does** ship in a registry
 install, specifically so this works there:
 
 ```bash
-python custom_nodes/comfyui-old-time-radio/scripts/otr_openrouter_refresh.py
+python scripts/otr_openrouter_refresh.py
 ```
 
-Run it with ComfyUI's own interpreter, from your ComfyUI root. Restart afterwards
-so the dropdowns rebuild.
+Run it with ComfyUI's own interpreter, **from the pack's own folder**. That
+folder is `comfyui-old-time-radio` in a registry install and
+`ComfyUI-OldTimeRadio` in a git clone, so a hard-coded path works for one and
+not the other. Restart afterwards so the dropdowns rebuild.
 
 ## What it will and will not fix
 

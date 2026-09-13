@@ -76,7 +76,7 @@ MACHINES = (
     {"key": "mac16", "label": "Mac 16 GB", "profile": "otr_mac_mps",
      "blurb": "Apple Silicon, unified memory"},
     {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd16_rocm",
-     "blurb": "Linux only -- and read the caveat under the table"},
+     "blurb": "Linux only -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
     {"key": "cpu", "label": "CPU only", "profile": "cpu_floor",
      "blurb": "no GPU at all"},
 )
@@ -930,7 +930,8 @@ def render_apple(rows: list) -> str:
     L.append("| Your machine | Open this | Also install |\n")
     L.append("|---|---|---|\n")
     L.append("| Anything, to start | `workflows/otr_canonical.json` "
-             "(Browse Templates &rarr; OTR) | nothing |\n")
+             "(Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; "
+             "comfyui-old-time-radio) | nothing |\n")
     for machine in MACHINES:
         graph, caveat = recommended_graph(
             machine.get("graph_profile") or machine["profile"])
@@ -1004,8 +1005,13 @@ def render_apple(rows: list) -> str:
         L.append("| File | From | Put it in | Size | Gated |\n")
         L.append("|---|---|---|---|---|\n")
         for spec in specs:
-            dest = str(spec.get("destination") or "")
-            folder = dest.rsplit("/", 1)[0] if "/" in dest else "(models root)"
+            # MANUAL_TIERS writes a full relative path
+            # ("vae/ltx-2.5-video-vae-bf16.safetensors"); several fetcher lanes
+            # write the destination DIRECTORY alone ("checkpoints",
+            # "animatediff_models"). Treating the second as a filename printed
+            # "(models root)" for exactly the lanes people hand-place most.
+            dest = str(spec.get("destination") or "").replace("\\", "/").strip("/")
+            folder = dest.rsplit("/", 1)[0] if "/" in dest else dest
             size = int(spec.get("bytes", 0) or 0)
             L.append("| `%s` | [`%s`](https://huggingface.co/%s) | `models/%s/` "
                      "| %s | %s |\n" % (

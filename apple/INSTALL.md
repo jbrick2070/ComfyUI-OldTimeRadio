@@ -37,8 +37,9 @@ the portable folder; if you made a venv for ComfyUI, activate it first.
 python -m pip install -r requirements.txt
 ```
 
-Manager usually does this for you. If it did, skip ahead — step 4 will tell you
-whether it worked.
+Manager usually does this for you. If it did, skip **this step only** — do not
+skip step 3. A missing ffprobe does not stop the nodes loading; it stops the
+episode at the very end, after everything expensive has already run.
 
 ## 3. ffmpeg and ffprobe
 
@@ -55,11 +56,18 @@ If you cannot install system-wide, `ffdl install` fetches both binaries into
 your user profile — `ffmpeg-downloader` comes down with the requirements in step
 2 and provides the fetcher.
 
-Check both answer:
+Check both answer. On macOS or Linux:
 
 ```bash
-ffmpeg -version && ffprobe -version
+ffmpeg -version; ffprobe -version
 ```
+
+On Windows PowerShell use `;` as above — `&&` is a parser error there.
+
+If you used `ffdl install` rather than a system package, these may report
+"not found" and still be fine: that installs into its own profile directory and
+this pack locates the pair through the `ffmpeg-downloader` package, not through
+PATH.
 
 If you keep ffmpeg somewhere unusual, set `OTR_FFMPEG` to the full path of the
 binary. That environment variable wins over PATH. (There is an `ffmpeg` widget on
@@ -138,9 +146,13 @@ That stores a token in your Hugging Face config. **Do not paste a token into a
 workflow widget** — no node here asks for one, and a token saved in a graph
 travels with the graph.
 
-Set `HF_HOME` **before** anything downloads if you want the cache somewhere with
-room. Setting it later does not move the cache, it adds a second one, and you
-will have two copies of everything.
+**By default the cache is inside your ComfyUI install**, not in your home
+directory: if `HF_HOME` is unset, this pack points it at
+`ComfyUI/models/huggingface` during startup. That is where the ~12 GB lands.
+
+If that volume is short of room, set `HF_HOME` yourself **before launching
+ComfyUI**. Setting it later does not move the cache, it adds a second one, and
+you end up with two copies of everything.
 
 ## 8. Node packs, only for some lanes
 

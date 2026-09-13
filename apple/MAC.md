@@ -49,10 +49,14 @@ did not mean to, that is the usual cause.
 
 ## Video
 
-Three procedural lanes and all four `still_*` lanes are proven here, plus LTX
-0.9.8 for real video diffusion and the AnimateDiff Lightning lane. LTX 0.9.8 is
-image-to-video, so it needs the SD 1.5 still to feed it — which the Mac graph
-already selects.
+The Mac graph ships **three procedural lanes** — they draw their own frames and
+download nothing. All four `still_*` lanes are proven here too, plus the
+AnimateDiff Lightning lane.
+
+**LTX 0.9.8 is a swap, not a default.** It is real video diffusion and it is
+proven on Apple Silicon, but selecting it starts a ~16 GiB download. It is
+image-to-video, so it consumes the SD 1.5 still — which the Mac graph already
+selects, so that half costs you nothing extra.
 
 ## Python and voices
 

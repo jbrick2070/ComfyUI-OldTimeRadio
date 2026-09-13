@@ -11,7 +11,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | 8 GB NVIDIA | RTX 4060 / 3070 / 2080 class | `config/profiles/8gb_lite.json` |
 | 16 GB+ NVIDIA | RTX 5080 / 4080 / 3090 class | `config/profiles/16gb_full.json` |
 | Mac 16 GB | Apple Silicon, unified memory | `config/profiles/otr_mac_mps.json` |
-| AMD ROCm | Linux only -- and read the caveat under the table | `config/profiles/otr_amd16_rocm.json` |
+| AMD ROCm | Linux only -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `config/profiles/otr_amd16_rocm.json` |
 | CPU only | no GPU at all | `config/profiles/cpu_floor.json` |
 
 ## Every dropdown
