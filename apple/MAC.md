@@ -103,6 +103,28 @@ OBS follows this server's `--output-directory` override. AnimateDiff-Evolved
 was already installed; the Lightning fetcher verified the checkpoint, motion
 module, and VAE before boot.
 
+**The canonical Mac launch line, found the hard way on 2026-09-13** (a bare
+restart dropped both of these and cost two wasted diagnostic passes -- see
+the animatediff entries below): a plain `python main.py --listen 127.0.0.1
+--port 8188` boots with an EMPTY `models/checkpoints/` and `models/vae/`
+(only placeholder files) and publishes to `$COMFY/output/otr/obs` instead of
+the shared one. Both flags are required together:
+
+```
+python main.py --listen 127.0.0.1 --port 8188 \
+  --extra-model-paths-config "$HOME/Library/Application Support/Comfy Desktop/instance-model-paths/inst-<id>.yaml" \
+  --output-directory /Users/rentamac/ComfyUI-Shared/output
+```
+
+The `inst-<id>.yaml` name is per-install (find it with `ls "$HOME/Library/
+Application Support/Comfy Desktop/instance-model-paths/"`); it already maps
+`checkpoints`, `vae`, `animatediff_models`, and `animatediff_motion_lora` to
+`/Users/rentamac/ComfyUI-Shared/models`, so `config/otr_mac_extra_model_paths.yaml`
+does not need to be filled in or passed alongside it for those categories.
+Verify before spending a leg on it, per the API rather than eyeballing
+folders: `curl -s http://127.0.0.1:8188/object_info/CheckpointLoaderSimple`
+should list the checkpoint under `ckpt_name`.
+
 | Graph | RESULT | Minutes | OBS filename |
 | --- | --- | ---: | --- |
 | otr_mac16_low | SUCCESS | 15 | `the_unbroken_wrist_20260913_052629__vart__vcam__none__koko__orig__q354b__mgen_final.mp4` |
