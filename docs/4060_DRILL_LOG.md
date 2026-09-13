@@ -5394,3 +5394,45 @@ not a package-install failure and not ordinary user install time. Installation,
 dependency resolution, registered-node count, templates, and Plans 1–5 remain
 unmeasured. Screenshots of the clean menu and exact search result are retained
 in the test conversation.
+
+**CR-20260912-02 — Phase 2 Manager install and Phase 3 template path: PASS with friction.**
+
+On the clean 4060 Desktop, the visible `Extensions` button opened `Nodes
+Manager`. Searching `OldTimeRadio` found `ComfyUI-OldTimeRadio` alpha.30;
+Install completed, Manager installed the declared Python dependencies, and the
+extension requested a restart. The template path worked exactly as documented:
+`Templates -> EXTENSIONS -> comfyui-old-time-radio -> otr_canonical`. The fresh
+graph loaded with 23 OTR nodes and no missing-node dialog. The Model Library
+reported zero user models after refresh. OTR prestartup automatically fetched
+Kokoro ONNX plus 28 voice files (32 files, about 324 MB) into the install-local
+TTS directory. Manager's Legacy Mode restart failed on the space-containing
+Comfy Desktop model-path argument (`FileNotFoundError` split at `Comfy`); a
+manually quoted absolute `main.py` restart was required to continue. No code was
+changed.
+
+**CR-20260912-03 — Plan 1, unchanged canonical one-act attempt: FAIL at default LLM device.**
+
+The shipped template was queued unchanged with `act_count=1`. The workflow
+validator passed: 23 nodes, 63 links, `widget_vector_drift=0`. Asset preflight
+downloaded and verified the two selected Stable Audio 3 files (about 3.46 GB
+total). The writer then failed at `Qwen/Qwen3.5-4B` because the template's
+default `llm_device=mps`, while this Windows PyTorch build has no MPS support:
+`PyTorch is not linked with support for mps devices`. Queue history ended in
+`error` at `OTR_LedgerScriptWriter`; no published artifact reached
+`output/otr/obs`.
+
+**CR-20260912-04 — Plan 2, README 8 GB settings: media pipeline reached, final render blocked.**
+
+By the UI, all three `OTR_VideoDirector` video roles were set to the exact
+README value `animatediff15_v3_haunted_video (16:9)` and
+`OTR_LedgerScriptWriter.llm_device` was set to `cuda`; `act_count` remained 1.
+The validator passed again. Qwen generated a valid one-act ledger (6 lines,
+206 words); Kokoro produced six voice clips; Stable Audio produced the master
+mix; and a 78.0-second, 1,950-frame NVENC MP4 was encoded as an intermediate
+episode artifact. The final shot render then failed on the first shot with
+`FailureKind.DEPENDENCY_MISSING`: the selected AnimateDiff engine requires
+`v1-5-pruned-emaonly-fp16.safetensors`, `v3_sd15_mm.ckpt`, and
+`v3_sd15_adapter.ckpt`. The engine reports no fallback and no render-time
+download. Queue history ended in `error` at `OTR_VideoRenderBatch`, and
+`output/otr/obs` remained absent, so the plan's publication criterion was not
+met. The 5080 and preserved source/archive trees were not touched.
