@@ -148,6 +148,17 @@ So one file stands between him and two of the three. `sd15` is ungated and
 public (`Comfy-Org/stable-diffusion-v1-5-archive`); nothing about it needs to be
 manual.
 
+**A LIVE RECEIPT LANDED THE SAME HOUR, from the other box, and it is the whole
+argument.** `docs/4060_DRILL_LOG.md` CR-20260912-04: a clean-room 4060 followed
+the README's 8 GB row by hand, got a valid ledger, six Kokoro clips, a Stable
+Audio master and a 78-second 1,950-frame intermediate MP4 -- and then the first
+shot died on `FailureKind.DEPENDENCY_MISSING` for exactly
+`v1-5-pruned-emaonly-fp16.safetensors`, `v3_sd15_mm.ckpt` and
+`v3_sd15_adapter.ckpt`. The drill's own words: *"The engine reports no fallback
+and no render-time download."* Nothing reached `otr/obs/`. That is a stranger
+losing an entire render to three files the matrix had been calling **auto**.
+The label is corrected now; the download is not.
+
 **Why it is a code row and not a one-line manifest entry.**
 `ensure_prompt_visual_assets` is SELECTION-DRIVEN -- it plans from the submitted
 prompt and intersects with `_COVERED`, so adding a row costs nobody who does not
@@ -161,7 +172,11 @@ satisfy a pack checkpoint the user chose instead.
 
 `spandrel_esrgan`'s 67 MB upscale model is the same shape and the same fix, and
 it is the second of the two hand-fetches in the "Real video diffusion" row of
-the README's cheapest-setups table.
+the README's cheapest-setups table. So are the two AnimateDiff files the 4060
+drill died on -- `v3_sd15_mm.ckpt` and `v3_sd15_adapter.ckpt`, 1.67 GB and
+0.10 GB, already pinned with sizes in `scripts/otr_fetch_lane_weights.py`.
+Adding SD 1.5 plus those two would make the README's own 8 GB row survive to a
+published episode, which it did not on real hardware today.
 
 ### C4. `cpu_floor` has no local writer it is allowed to use
 
