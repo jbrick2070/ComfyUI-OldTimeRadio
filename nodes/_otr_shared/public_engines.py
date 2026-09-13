@@ -363,6 +363,21 @@ assert len(_PUBLIC_ENGINES) == len(_INTERNAL_TO_PUBLIC), (
     "collapses _INTERNAL_TO_PUBLIC): " + repr(_PUBLIC_ENGINES))
 
 
+def public_engine_id(internal) -> str:
+    """The dropdown token for an internal engine id -- the inverse of
+    :func:`resolve_engine_id`, falling back to the input when there is no
+    mapping.
+
+    Written 2026-09-13 because the tier matrix was printing internal ids
+    (`ltx25_foley_plus`) into a README that shows the public ones
+    (`ltx25_high_foley_plus`) in the table 130 lines above it and in the saved
+    graph itself. A reader who opened the graph to check the claim found a
+    different string. Docs render what the dropdown shows; nothing else.
+    """
+    key = str(internal or "").strip()
+    return _INTERNAL_TO_PUBLIC.get(key, key)
+
+
 def resolve_engine_id(value) -> str:
     """Resolve a menu / saved / profile string to its concrete internal engine id.
 

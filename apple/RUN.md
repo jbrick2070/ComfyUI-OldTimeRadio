@@ -63,10 +63,12 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `act_count` | 1 for a short one, 3 for a full show with act breaks. Ships at 1. |
 | `custom_premise` | A sentence or two of your own. Blank means the source bank decides. |
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
-| `visual_style` | How it looks — ships on *roll*, which picks any of the nine. |
+| `visual_style` | How it looks — ships on *roll*, which picks any of the ten. |
 | `creativity` | `balanced` by default. |
 
-**There is no seed widget on this graph.** It has no sampler node; what makes a
+**There is no ONE seed for the episode.** The two director nodes each carry
+a `seed_mode` and a `request_seed` widget for their own lane, but there is no
+sampler node and no single knob that reproduces a whole show. It has no sampler node; what makes a
 run reproducible is the frozen ledger, not a number you set. If you want two
 comparable runs, pin `source_bank` and `visual_style` instead.
 

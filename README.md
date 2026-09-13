@@ -42,7 +42,7 @@ pressing **Queue** is the whole path.
 
 | Your machine | What to expect on a first short episode |
 |---|---|
-| NVIDIA, 16 GB or more | Minutes. Everything on this page is available to you. |
+| NVIDIA, 16 GB or more | Minutes. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
@@ -131,7 +131,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. Episodes published here run about one to four minutes; this is the main lever on that. |
 | `custom_premise` | A sentence or two of your own. Blank means the source decides. |
 | `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
-| `visual_style` | How it looks -- one of nine. Ships on *roll*. |
+| `visual_style` | How it looks -- one of ten. Ships on *roll*. |
 | `creativity` | `balanced` by default. |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 
@@ -483,7 +483,7 @@ opening the graph.
 |---|---|---|---|---|---|---|---|---|---|---|
 | **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
 | **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | shipping |
-| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx_8gb | sd15 | auto | nothing | 3 | 3 | shipping |
+| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | 3 | 3 | shipping |
 | foley | _not built_ | | | | | | | | | |
 | mime | _not built_ | | | | | | | | | |
 | **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
@@ -495,8 +495,8 @@ opening the graph.
 | **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
 | **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | shipping |
 | **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_mime | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
+| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
+| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
 | **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
 
 ### Apple Silicon, 16 GB

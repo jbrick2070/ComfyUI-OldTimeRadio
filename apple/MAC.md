@@ -47,8 +47,12 @@ factor on a 16 GB machine, and it is the cheapest thing you can change.
 
 ## Images
 
-The Mac graph ships **SD 1.5**, which downloads itself on first use — one 2 GB
-checkpoint, ungated, no account.
+Two of the four Mac graphs mint stills and ship **SD 1.5** for it —
+`otr_mac16_still` and `otr_mac16_video` — one 2 GB checkpoint, ungated, no
+account, fetched on first use. `otr_mac16_low`, the one to start with, draws its
+own frames and never fetches an image model at all. `otr_mac16_animatediff`
+renders from the prompt alone; its SD 1.5 checkpoint comes with
+ComfyUI-AnimateDiff-Evolved rather than from us.
 
 Z-Image-Turbo is what the NVIDIA graphs use and is a ~19 GB download; leaving it
 selected on a Mac with a still-consuming video lane starts that download. If you

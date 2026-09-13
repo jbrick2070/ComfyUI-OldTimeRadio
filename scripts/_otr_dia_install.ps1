@@ -3,7 +3,12 @@
 # build, which would conflict with the main venv -> isolate it.
 # After it finishes: RESTART ComfyUI (no enable flag -- installing IS the opt-in).
 $ErrorActionPreference = "Stop"
-$Root = "C:\Users\jeffr\Documents\ComfyUI\dia"
+# Derived from THIS script's location (scripts/ lives in the pack, which
+# lives in custom_nodes/ under a ComfyUI tree), never a hardcoded home
+# directory -- it used to name one operator's own path, which on any other
+# machine built the venv in a tree unrelated to their ComfyUI.
+$Root = if ($env:OTR_DIA_ROOT) { $env:OTR_DIA_ROOT } else {
+    Join-Path (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $PSScriptRoot))) "dia" }
 $Venv = Join-Path $Root ".venv"
 New-Item -ItemType Directory -Force -Path $Root | Out-Null
 

@@ -59,6 +59,13 @@ def _internal(engine: str) -> str:
     return resolve_engine_id(engine)
 
 
+def _public(engine: str) -> str:
+    """What the DROPDOWN calls this engine. Profiles store internal ids; every
+    other table on the page shows public ones, so the two disagreed."""
+    from nodes._otr_shared.public_engines import public_engine_id
+    return public_engine_id(engine)
+
+
 def _weights(lanes: list) -> str:
     """auto / manual / none, for the video lanes a graph selects.
 
@@ -82,7 +89,7 @@ def _row(profile_id: str, tier: str, packs: dict) -> list:
     llm = p.get("llm") or {}
     roles = p.get("role_overrides") or {}
     feats = p.get("features") or {}
-    lanes = [roles.get(k, "") for k in
+    lanes = [_public(roles.get(k, "")) for k in
              ("announcer_visual", "music_visual", "character_visual")]
     lanes_cell = (lanes[0] if len(set(lanes)) == 1 else " / ".join(lanes))
     image = roles.get("character_image") or "(canonical)"

@@ -188,7 +188,7 @@
       },
       "required_seams": [],
       "runnable": true,
-      "guide_ref": "Type your idea in Story input, optionally add characters, plot, setting and who the story is by, pick a look, and run. This bank is manual-only: a blank automatic run never rolls onto it, because it has nothing to write from. See docs/MY_STORY_GUIDE.md."
+      "guide_ref": "Type your idea in Story input, optionally add characters, plot, setting and who the story is by, pick a look, and run. This bank is manual-only: a blank automatic run never rolls onto it, because it has nothing to write from. See apple/EXTENDING.md."
     },
     {
       "source_bank_id": "custom_source_bank",
@@ -201,7 +201,7 @@
       "defaults": {},
       "required_seams": [],
       "runnable": false,
-      "guide_ref": "This row is a signpost, not a lane. If you only want to tell your own story, pick 'my_story' (My Story) instead and type it in -- no code required. To DEVELOP a bank: author a folder under user_packs/source_banks/<your_bank_id>/ (bank row, fetch/interpret module, at least one story pack), run 'otr_check bank <path> --activate', and restart ComfyUI -- your bank then appears in this dropdown as its own entry, an equal peer of every shipped bank. The full contract is docs/EXTENDING_OTR.md."
+      "guide_ref": "This row is a signpost, not a lane. If you only want to tell your own story, pick 'my_story' (My Story) instead and type it in -- no code required. To DEVELOP a bank: author a folder under user_packs/source_banks/<your_bank_id>/ (bank row, fetch/interpret module, at least one story pack), run 'otr_check bank <path> --activate', and restart ComfyUI -- your bank then appears in this dropdown as its own entry, an equal peer of every shipped bank. The contract is apple/EXTENDING.md, which ships with the pack; developing a bank also needs the GitHub clone, because otr_check lives under scripts/ and a registry install does not carry it."
     }
   ]
 }
