@@ -21,9 +21,12 @@ from; pictures to watch while you listen;
 burned captions and a credit roll. One workflow, one press of **Queue**, and a
 finished `.mp4` lands in your output folder.
 
-It runs entirely locally -- no account, no API key, no cloud service -- on NVIDIA
-cards and on Apple Silicon. Paid options exist for people who want them, and
-every one of them stays off until you turn it on.
+Every model runs on your own machine: no account, no API key, no paid service,
+on NVIDIA cards and on Apple Silicon. Two of the five story banks read public
+RSS feeds when they come up, so a default run reaches the internet for tonight's
+news and for the first model download and for nothing else. Paid options exist
+for people who want them, and every one of them stays off until you turn it
+on.
 
 ---
 

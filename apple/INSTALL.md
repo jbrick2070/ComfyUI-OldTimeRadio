@@ -178,7 +178,7 @@ you end up with two copies of everything.
 
 Most lanes need nothing beyond this pack. A few build their graph out of classes
 that belong to someone else's pack, and those are listed per engine in
-[MACHINES.md](MACHINES.md), section 1 — with which of the five shipped machine
+[MACHINES.md](MACHINES.md), section 1 — with which of the shipped machine
 graphs needs which. If you pick one of those lanes without its pack, the render
 stops with an error naming the pack and its URL.
 

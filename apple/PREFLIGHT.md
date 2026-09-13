@@ -107,6 +107,10 @@ Two things worth knowing before you add one:
 
 ## Cloud partner rows
 
+**This section needs the git clone.** `tests/` and `scripts/` are stripped
+from the registry bundle, so the test and the command below exist only if
+you cloned the repository. Everything earlier on this page works either way.
+
 **The contract lives only in a test**, `tests/test_cloud_engine_is_a_three_part_rule.py`:
 a `cloud_` id prefix, a `provider_side` attribute, and a `cloud_` node key. Read
 that file before adding one — nothing else documents it.

@@ -42,7 +42,11 @@ That is where a finished episode lands — the `.mp4`, with its audio mixed,
 captions burned and credits rolled. The working files for each run live one level
 up in `otr/episodes/<episode>/` if you want the stems.
 
-**If nothing is in `otr/obs/`, the run did not finish**, however green the console
+**If nothing is in `otr/obs/`, read the `obs_publish` line before concluding
+anything.** `obs_publish BLOCKED -- ...` means the run SUCCEEDED and the
+episode is in `otr/episodes/<episode>/`; only the published copy was
+withheld, because the rights receipt did not clear. No `obs_publish` line at
+all means the run did not finish, however green the console
 looked. That folder is the finish line.
 
 ---

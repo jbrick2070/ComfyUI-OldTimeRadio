@@ -970,10 +970,13 @@ def render_apple(rows: list) -> str:
 
     # ---------------------------------------------------------------- 1. graph
     L.append("## 1. Which graph do I open?\n\n")
-    L.append("Every row below is a real saved graph in this repository. Drag it "
-             "onto the ComfyUI canvas, or use **Browse Templates** for the "
-             "canonical. If your machine is not listed, open the canonical: it "
-             "names no vendor anywhere and resolves your device at run time.\n\n")
+    L.append("**On a first run, open the canonical.** It names no vendor "
+             "anywhere and resolves your device at run time, it is the one graph "
+             "in Browse Templates, and it fetches no video or image weights -- "
+             "which is why every machine class below can run it. The per-machine "
+             "rows are a STEP UP once that has worked: each one is the canonical "
+             "with its dropdowns pinned to heavier lanes, so the first queue on "
+             "one of them downloads whatever those lanes need.\n\n")
     L.append("| Your machine | Open this | Also install |\n")
     L.append("|---|---|---|\n")
     L.append("| Anything, to start | `workflows/otr_canonical.json` "
