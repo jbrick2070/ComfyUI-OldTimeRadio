@@ -5287,3 +5287,110 @@ used its permitted 24-frame closing-theme floor fill.  Neither condition was
 a runtime error.  No shared-core `nodes/` source was changed in this 4060
 campaign window; preserve the receipts and carry the narrow fixes to the 5080
 core window.
+
+### Step 122 — September 12, clean-room Tier B preparation (in progress)
+
+**Scope and artifact boundary.** This run follows
+`docs/4060_CLEAN_ROOM_TEST_PLAN.md`, supplied explicitly by the operator, not
+the earlier My Story regression instructions. The documentation checkout was
+fast-forwarded to `cd008416db367832f3c92eff34ae63b1fed05821` on `v2.0-alpha`.
+No OTR source was installed through Git, no code was fixed, and no workflow
+JSON was copied into the test instance. A 17:08 PDT fetch found no newer remote
+commit. The tested registry version is **not yet determined**; source HEAD
+must not be treated as the installed Manager artifact.
+
+**Phase 0 inventory.** Windows 11 Home Insider Preview, OS 10.0.26220;
+34,038,341,632 bytes physical RAM; NVIDIA GeForce RTX 4060 Laptop GPU,
+8,188 MiB VRAM, driver 616.56. Initial free space: approximately 486.82 GiB on
+C: and 944.04 GiB on D:. `python --version` selected the Windows Store alias
+and returned "Python was not found"; this was recorded, not repaired. The
+test uses managed Comfy Desktop, not the global Python command or the old
+portable build. During preparation the operator updated Desktop to v1.0.47
+and the existing ComfyUI to v0.35.1. The fresh instance's installed runtime
+will be verified after setup. Phase 0's exact start time was not captured;
+do not infer a measured phase duration from these notes.
+
+**Tier B, with a fresh Python environment.** Retain model weights/caches and
+existing input/output. The operator initiated Desktop's normal New Instance
+installation, named `ComfyUI (1)`, at 17:05:22 PDT. The NVIDIA setup screen
+advertised Python 3.13.12 and a 2,256 MB download. A fresh managed instance
+avoids reusing the old pack's installed Python dependencies without manually
+modifying pip state. This setup choice is recorded explicitly because the
+plan's two pack-deletion commands alone do not recreate a Python environment.
+
+**Teardown observations and recovery evidence.** The old active Desktop
+alpha.25 pack was present at initial inventory and already absent at the
+17:05 PDT recheck; this agent did not remove that active directory. Moving
+the disabled/trash remnant to a preservation directory outside every node-scan
+root reported an access/hidden/read-only error. Subsequent checks found its
+source absent and a preserved `.git` remnant containing 154 files totaling
+105,252,821 bytes. There was no pre-move file manifest, so this is **not a
+verified complete backup**. The move was not retried and its destination was
+not deleted. This is a teardown-operation deviation, not an OTR runtime bug.
+
+The old portable `custom_nodes/ComfyUI-OldTimeRadio` was a junction into the
+D: source checkout. At 17:07:25 PDT only that verified link was removed with
+a non-recursive operation. The source repository remained present, clean, and
+at the recorded HEAD. The removed link held no independent source files and
+can be recreated if subsequently requested. Models, caches, shared outputs,
+Desktop configuration, and unrelated node packs were not removed by this agent.
+Private recovery details are retained locally outside the source repository.
+
+**Current result: NOT YET TESTED.** At 17:09 PDT Desktop was installing its
+standard updated dependencies after downloading and unpacking the fresh
+environment. OTR absence still requires the new instance's boot-log and GUI
+node-menu checks. Manager installation, node count, template discovery,
+Plans 1–5, and OBS publication have not yet been measured. No pass is claimed.
+
+**Phone-home transport.** Available session discovery did not expose a live
+5080 OTR coder window, so the shared append-only drill log is the available
+asynchronous reporting path. No unrelated task was messaged.
+
+### Step 123 — September 12, 17:10–17:13 PDT: clean boot and Manager discovery
+
+**Phase 1 clean-instance baseline: PASS for OTR absence.** The new instance
+logged `Starting server` at 17:10:27 PDT, about 5m05s after its recorded
+17:05:22 setup start (includes download, extraction, standard dependency
+installation/update, and first boot). The log reports:
+
+```text
+Python version: 3.13.12
+pytorch version: 2.12.1+cu130
+ComfyUI version: 0.35.1
+[INFO] Starting server
+[INFO] To see the GUI go to: http://127.0.0.1:8188
+```
+
+The corresponding Python process owns the loopback listener. The fresh
+instance's custom-node root contains only `__pycache__`,
+`example_node.py.example`, and `websocket_image_save.py`. OTR directory count
+is zero; OTR/OldTimeRadio hits in the current startup logs are zero. In the
+GUI, right-click canvas -> Add Node showed only the stock category list, with
+no OTR category. The Node Library likewise showed no OTR extension category.
+No render was queued.
+
+**CR-20260912-01 — Manager entry-point wording differs on current Desktop.**
+
+| Field | Evidence |
+|---|---|
+| What was done | Followed the plan's Manager route on the fresh Desktop canvas. |
+| Expected | The plan says `Manager -> Custom Nodes Manager`. |
+| Happened | The top-bar button is `Extensions`; clicking it opens a dialog titled `Nodes Manager`, with `All Extensions` and `Not Installed` sections. There is no button with the literal documented Manager label on this canvas. |
+| Change needed to get past it | Used the visible `Extensions` button. No software/configuration change. |
+| Could a stranger work it out? | Probably, because Extensions is prominent; the literal instructions still require a label translation. Update the Desktop-specific click path. |
+
+**Phase 2 search: PASS for literal findability; install not yet attempted.**
+In Nodes Manager, typed exactly `old time radio`. One result appeared:
+`ComfyUI-OldTimeRadio`, publisher `fluxus`, version **2.0.0-alpha.30**, dated
+September 11, 2026. Its description identifies a fully local radio-drama
+generator with scripts, multi-voice TTS, 48 kHz mastering, and companion video.
+No clever alternate search was needed. The offered version matches the
+README's Active alpha.30 advice; the newer source alpha.31 was **not** selected
+or substituted. A fetch before this phase showed no remote changes.
+
+At 17:13 PDT, paused before the actual Install click for the Windows
+computer-use tool's action-time confirmation. This is an automation boundary,
+not a package-install failure and not ordinary user install time. Installation,
+dependency resolution, registered-node count, templates, and Plans 1–5 remain
+unmeasured. Screenshots of the clean menu and exact search result are retained
+in the test conversation.
