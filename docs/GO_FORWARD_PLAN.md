@@ -42,9 +42,18 @@ measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 
 ### A1. What the canonical ships for writer + quant + ceiling on an 8 GB card
 
-The device half of system-independence landed 2026-09-12 (`8017a07e`): the
-canonical no longer names a vendor, and all four device widgets now read
-`default` / `cpu`. **The sizing half did not.** The canonical still carries
+**THE DEVICE HALF IS NOW PROVEN, and this row is only about the other half.**
+`8017a07e` made the canonical stop naming a vendor; all four device widgets read
+`default` / `cpu`. Receipt, 2026-09-12 18:59 on the 5080 after a clean reset and
+a fresh boot on the post-fix tree: `otr_canonical_api_run.py --act-count 1` with
+NO profile returned RESULT SUCCESS in 407 s and published
+`the_handwritten_note_20260912_185540__cart__vcam__none__koko__marc__q354b__sa3_final.mp4`
+(86.7 MB) to `otr/obs/`. The ledger records `device: "cuda"` and
+`device_policy: "cuda"` -- the widgets said `default`, ComfyUI's own detection
+resolved them, and the receipt carries the concrete truth rather than the word
+"default". That is the leg Fable said was missing, and it passed.
+
+**The sizing half did not land.** The canonical still carries
 `Qwen/Qwen3.5-4B` + `llm_quant_policy "none"` + `vram_ceiling_gb 10.0`, which is
 byte-for-byte the `otr_mac_mps` triple -- and 10.0 is unique to that one profile
 across all 118. On an 8 GB NVIDIA card `none` means bf16, so 8.68 GB is
