@@ -175,6 +175,36 @@ class OnlyTheContainersThatCare(unittest.TestCase):
         self.assertNotIn(".wav", self.MUX.PCM_STRICT_CONTAINERS)
 
 
+class TheMuxIsFoundWithoutAGate(unittest.TestCase):
+    """The scan reads the whole prompt on purpose. OTR_MasterAudioMux carries
+    no `gate_in`, so the reachability walk `plan_prompt` uses -- the one that
+    keeps one validator out of another's subgraph -- reaches the mux never.
+    Scoping this check that way would leave correct, tested code firing on
+    nothing, which is this repo's most repeated defect. Pin the choice so the
+    next reader has to argue with it rather than quietly undo it."""
+
+    def test_the_canonical_mux_node_has_no_gate_to_walk(self):
+        import json
+        canonical = json.loads(
+            (Path(__file__).resolve().parents[1] / "workflows"
+             / "otr_canonical.json").read_text(encoding="utf-8"))
+        mux = next(n for n in canonical["nodes"]
+                   if n["type"] == "OTR_MasterAudioMux")
+        self.assertNotIn("gate_in", [i["name"] for i in mux["inputs"]])
+
+    def test_a_mux_with_no_gate_is_still_found(self):
+        import _otr_workflow_validator as WV
+        real = FF.master_mux_support_gap
+        FF.master_mux_support_gap = lambda _p=None: "FOUND IT"
+        try:
+            prompt = {"9": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+                      "85": {"class_type": "OTR_MasterAudioMux",
+                             "inputs": {"output_path": "", "fps": 25}}}
+            self.assertEqual(WV.master_mux_gap_for_prompt(prompt), "FOUND IT")
+        finally:
+            FF.master_mux_support_gap = real
+
+
 class AProbeThatCannotRunSaysSoInstead(unittest.TestCase):
     """Codex's other finding: the probe needs lavfi, anullsrc and a writable
     temp dir; the real mux needs none of them. Without a control, a machine

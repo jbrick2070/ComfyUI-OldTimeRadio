@@ -232,6 +232,20 @@ def master_mux_gap_for_prompt(prompt):
     so only an ISOBMFF destination is gated (`PCM_STRICT_CONTAINERS`). An empty
     `output_path` is the node's default and is an `.mp4`.
 
+    WHY THE WHOLE PROMPT AND NOT THIS VALIDATOR'S OWN CHAIN. `plan_prompt`
+    scopes to nodes reachable from this validator along `gate_in`, so one
+    validator never acts on another's subgraph, and the instinct here is to do
+    the same. It cannot be done: `OTR_MasterAudioMux` carries no `gate_in`
+    (canonical node 85's inputs are silent_video_path, master_audio_path,
+    audio_done, declared_credits_tail_s, clip_manifest_json, fps, ffmpeg,
+    output_path, video_policy_json, foley_receipts_json, script_json), so a
+    gate walk reaches it never and this check would fire on nothing. The cost
+    of scanning everything, stated plainly: in a prompt carrying TWO
+    independent chains where only one ends at a mux, both validators refuse,
+    and the script-only chain -- which would have finished -- does not run.
+    No shipped graph has that shape, and the submission was going to lose its
+    mux chain either way.
+
     Returns None on anything it cannot read: a missing prompt, an unparseable
     one, or a probe that could not run. Refusing on a guess is the one outcome
     this function exists to avoid.
