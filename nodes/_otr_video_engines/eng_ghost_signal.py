@@ -326,18 +326,21 @@ GHOST_NODE_CANDIDATES = {
 #: bytes of ComfyUI's OWN estimate (`comfy/sd.py::memory_used_decode`, which is
 #: `2178 * latent_h * latent_w * 64 * dtype_size` and deliberately generous).
 #:
-#: A BUDGET, NOT A FRAME COUNT, and that distinction is the fix. The first cut
-#: of this was the constant 4, chosen with arithmetic done at 512x288 -- which
-#: is what both NVIDIA animatediff profiles set, and NOT what the Mac profile
-#: sets. `otr_mac16_animatediff` renders 832x480. The same estimator puts that
-#: at 3.24 GiB per frame against 1.20 at 512x288, so four frames there is
-#: roughly 13 GiB of transient against a 20.13 GiB ceiling: a fix that might
-#: not have fixed anything, on the only machine it was written for.
+#: A BUDGET, NOT A FRAME COUNT. The first cut of this was the constant 4. A
+#: later cut replaced it with this budget on the belief that the Mac profile's
+#: 832x480 canvas meant an 832x480 DECODE, 2.7x the NVIDIA pixels -- that
+#: belief was WRONG, and the Mac's own log said so: every decode line on the
+#: passing 2026-09-13 leg reads `36x64 latent`, i.e. 512x288. The profile's
+#: canvas is the composite canvas; this engine family renders at its fixed
+#: size. So the constant was right for the decode all along.
 #:
-#: 5 GiB is CHOSEN, not measured -- it is a little over four frames at the
-#: NVIDIA canvas and one frame at the Mac's, and it leaves the resident stack
-#: room under the ceiling that refused 2.67 GiB. The live re-run is the proof
-#: owed, and nothing here pretends otherwise.
+#: The budget stays anyway, for the reason that survives the correction: it
+#: is derived from the latent that is actually being decoded, so it does the
+#: right thing whether or not the author knew the canvas -- which, measured,
+#: the author did not. At 36x64 and 4 bytes it yields 4, matching the old
+#: constant; at a bigger latent it shrinks; when the latent cannot be read it
+#: is 1. 5 GiB is CHOSEN, not measured. The live proof: 8/8 decode calls clean
+#: on the 16 GB M4, 65 min, zero OOM, at chunks of 4.
 GHOST_MPS_DECODE_BUDGET_BYTES = 5 * 1024 ** 3
 
 #: What to use when the latent cannot be measured: one frame. The conservative

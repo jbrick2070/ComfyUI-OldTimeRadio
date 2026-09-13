@@ -15009,24 +15009,30 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   `torch.AcceleratorError`, and an MPS exhaustion arrives as a plain
   `RuntimeError` (`comfy/sd.py` decode, `comfy/model_management.py` 380-395).
   So no layer of the stack bounded the batch and no layer caught the miss.
-- **CORRECTION, same day: the canvas is 832x480, not 512x288.**
-  `config/profiles/otr_mac16_animatediff.json` sets `canvas_w` 832 /
-  `canvas_h` 480, while BOTH NVIDIA animatediff profiles set 512x288 -- so
-  the Mac graph asks 2.7x the pixels of the 16 GB NVIDIA graph, on a machine
-  with less headroom than a discrete 16 GB card. That is the size of the
-  thing being decoded and it is a profile choice, not a code fault. By
-  ComfyUI's own estimator the per-frame decode cost is 3.24 GiB at the Mac's
-  canvas against 1.20 GiB at the NVIDIA one.
-  **The first cut of the fix did its arithmetic at the wrong canvas** and
-  picked a constant 4 frames from it -- about 13 GiB of transient at 832x480,
-  against the 20.13 GiB ceiling that had just refused 2.67 GiB. A fix that
-  might not have fixed anything, on the only machine it exists for.
-- fix: **FIXED, live proof owed (the Mac re-runs this leg).**
+- **CORRECTION, same day, RETRACTED THE SAME EVENING.** I wrote here that
+  the Mac decodes at 832x480 (its profile's `canvas_w`/`canvas_h`) and so
+  paid 2.7x the NVIDIA pixels, and that the constant-4 chunk was therefore
+  computed at the wrong canvas. **The Mac's own log refutes that.** Every
+  decode line on the passing leg reads `at 36x64 latent` -- 512x288. The
+  profile's canvas is the COMPOSITE canvas; the AnimateDiff engines render at
+  their fixed size regardless. The constant was right for the decode all
+  along, and the "2.7x" explanation of the OOM was mine, not the machine's.
+  The original root cause above stands unchanged: ComfyUI sized the decode
+  batch from an over-reported MPS free figure and its tiled retry never
+  fires on MPS. The latent-derived budget stays because it is correct for a
+  reason that survives this retraction -- it follows the latent that is
+  really decoded, which is exactly what let it do the right thing while its
+  author was wrong about the canvas.
+- fix: **FIXED AND LIVE-PROVEN.** `otr_mac16_animatediff` SUCCESS on the
+  16 GB M4 at 14:55 local, 65 min, `the_sealed_compact_of_lost_lands_...
+  __anim__adlt__none__koko__sspr__q354b__mgen_final.mp4`, all eight
+  ghost-signal decode lines clean (`decoded N frame(s) in M chunk(s) of 4 at
+  36x64 latent`), zero OOM, on commit bda17f48+.
   `ghost_decode_chunk_frames(device_type, latent_h, latent_w)` derives the
   count from the latent actually being decoded against a declared budget
-  (`GHOST_MPS_DECODE_BUDGET_BYTES`, 5 GiB, chosen and not measured), so it
-  follows whatever canvas a profile sets: 4 frames at 512x288, 1 at 832x480,
-  1 when the latent cannot be read. It returns 0 -- meaning one call with the
+  (`GHOST_MPS_DECODE_BUDGET_BYTES`, 5 GiB, chosen and not measured): 4 frames
+  at the 36x64 latent this family renders, fewer at a larger latent, 1 when
+  the latent cannot be read. It returns 0 -- meaning one call with the
   whole batch, exactly as before -- on every host whose VAE does not decode
   on MPS, including one whose device cannot be read. `_decode_latents` runs the same
   one-node decode graph once per chunk and concatenates in order. This is
