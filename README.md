@@ -47,11 +47,14 @@ an out-of-memory there reboots the machine, not the render.)
 > `workflows/otr_canonical.json` onto the canvas; it is the same file.) The 25
 > `OTR_` nodes are the parts; the workflow is the thing you run.
 >
-> **One graph, and you set its dropdowns.** There are no per-machine saved JSONs
-> at the moment: the machine-specific variants were removed while the canonical
-> is being proven on Apple Silicon, and they will be regenerated from it once it
-> is final. Load the canonical and change the dropdowns named in "Pick the graph"
-> below to match your hardware.
+> **One graph in the menu, 94 more in the folder.** `otr_canonical` is the graph
+> Browse Templates lists, and setting its dropdowns is the supported path. But
+> the pack also ships **94 generated per-machine graphs in `workflows/variants/`**,
+> one for every profile in `config/profiles/`, and they are in the registry
+> bundle too. ComfyUI's template browser globs one directory level, so it cannot
+> see them -- **drag the file onto the canvas, or use Workflow -> Open**. They
+> are generated from the canonical by `scripts/build_variants.py --all`; never
+> hand-edit one.
 
 > **Branch note:** active development lives on the **`v2.0-alpha`** branch (the Open Video
 > Model Platform below), and it is the GitHub default branch, so a fresh clone lands on
@@ -144,7 +147,7 @@ ComfyUI.
 |---|---|---|
 | `animatediff15_*` — including **`otr_nvidia_8gb_haunted`**, the 8 GB default | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) at commit `92576512` (release 1.6.0, the checkout behind the published receipts) | provides the `ADE_*` classes the haunted lane samples through |
 | `ltx25_*` (LTX 2.5 video, foley, mime) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at commit `6ea2651e`, **plus** the one-file patch in `patches/` (see `patches/README.md` for the exact `git apply` line), then its `requirements.txt` | the two GGUF loaders (`UnetLoaderGGUF`, `CLIPLoaderGGUF`); every other LTX 2.5 class is already in ComfyUI 0.34+. Measured on a clean Windows install 2026-09-01: without the pack the render refuses at the video stage and names both classes |
-| `flux2_klein` (image; **the 8 GB / 12 GB / AMD default**) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
+| `flux2_klein` (image; **the 8 GB and 12 GB default** -- AMD moved off it in `b1f372a9` so those tiers need no pack) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) at the same commit `6ea2651e` (the patch is harmless here) | its DiT is a 2.6 GB GGUF file loaded through `UnetLoaderGGUF`. Measured on a physical RTX 4060 8 GB under plain stock launch flags, 2026-09-02: about 21 seconds a still, no `--lowvram` needed |
 | `wan22_*` / `wan_ti2v` (Wan 2.2 video) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | its shipped DiT and umt5 text encoder are GGUF files (`UnetLoaderGGUF`, `CLIPLoaderGGUF`) |
 | `ltx098_low_video` (`ltx_8gb`, LTX 0.9.8 distilled 2B -- the only 0.9.x lane) | **nothing extra** | every class it resolves (`CheckpointLoaderSimple`, `ModelSamplingLTXV`, `LTXVImgToVideo`, `LTXVConditioning`, `LTXVScheduler`, `SamplerCustom`, `VAEDecode`) is stock ComfyUI, and it published episodes on a Mac with ComfyUI-LTXVideo moved aside (`docs/MAC_PORTABILITY_GUIDE.md` 10.2). Its preflight message still says "install/update ComfyUI-LTXVideo" when a class is missing; on a stock install read that as "update ComfyUI". This row used to lump it with the two LTX 2.3 lanes below as "the LTX 0.9.x lanes", which was wrong on both counts |
 | `ltx23_high_video` / `ltx23_low_audio_in` (`ltx_video` / `ltx_audio_in`, the LTX 2.3 22B GGUF lanes) | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) for `UnetLoaderGGUF`; their preflight message also names [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) at commit `3b9c5cde` **plus** the one-file patch `patches/ComfyUI-LTXVideo-kornia-pad.patch` (Kornia 0.8.3 removed a symbol it imports), and `scripts/otr_provision.py` installs both at those pins | the 22B unet is a Q3_K_M GGUF, so `UnetLoaderGGUF` is the one non-core class. Every `LTXAV*` / `LTXV*AVLatent` class they resolve is stock ComfyUI 0.34+ (`comfy_extras/nodes_lt.py`, `nodes_lt_audio.py`; checked against 0.34.6 on 2026-09-09, where ComfyUI-LTXVideo registers none of them), so on that version the pack is a provisioner requirement, not a render requirement. `ltx23_low_audio_in` also hard-requires NVML in its preflight, so it is NVIDIA-only by code, not merely by registry row |
@@ -195,16 +198,23 @@ want to qualify a still-consuming profile.
 
 ### 2b-ii. The GGUF writer lane — install 0.3.33, not the latest
 
-Only needed if you select a `*-GGUF` writer row. It is the established lane
-for running a large writer on a small card off NVIDIA: bitsandbytes NF4 is
-CUDA-only, so the committed Mac, AMD and CPU experimental profiles
-(`otr_amd8_rocm`, `otr_amd16_rocm`, `cpu_floor`) use GGUF through in-process
-llama.cpp. **`otr_mac_mps` does NOT** — it is `shipping` rather than
-experimental, and its proven writer is transformers at `quant_policy: "none"`
-on `mps`; GGUF is allowlisted there but has never been run. The new `--machine amd` front door instead uses
-the smaller E2B Transformers writer with `quant_policy=none`; that route is a
-draft candidate until physical AMD hardware publishes an episode. No Ollama,
-no sidecar process, no extra port.
+> **Nothing selects this lane today, so you can skip this section.** Measured
+> 2026-09-12: the GGUF row table (`GGUF_ROWS` in `nodes/_otr_gguf_backend.py`)
+> is **empty**, so no `*-GGUF` writer appears in the picker at all. The install
+> notes below are kept because the lane is wired and the pin is a real
+> measurement; they are not a step anyone currently needs.
+
+It is the intended lane for running a large writer on a small card off NVIDIA,
+because bitsandbytes NF4 is CUDA-only. What the profiles actually ship, though,
+is transformers: `otr_amd16_rocm` and `otr_mac_mps` both write with
+`Qwen/Qwen3.5-4B` at `quant_policy "none"`, and `otr_amd8_rocm` with
+`unsloth/Llama-3.2-3B-Instruct` the same way. All three allowlist GGUF; none uses
+it. `cpu_floor` is the exception and the one to be careful with -- it is the only
+profile whose allowlist EXCLUDES transformers, so with the row table empty it has
+no local writer available at all. The `--machine amd` front door uses the smaller
+E2B transformers writer with `quant_policy=none`; that route stays a draft
+candidate until physical AMD hardware publishes an episode. No Ollama, no sidecar
+process, no extra port.
 
 ```bash
 pip install llama-cpp-python==0.3.33 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124
@@ -228,10 +238,8 @@ These coexist safely with a CUDA 13 torch — measured on both Blackwell and Ada
 loading llama.cpp first and then running a real CUDA matmul through torch.
 
 **Not on Windows?** The line above is the Windows CUDA recipe and the only one this
-project has measured. The GGUF lane is the only local writer the AMD and CPU
-profiles allow (the Mac profile allowlists it too, but its proven writer is
-transformers at `quant_policy` `none`, as above), so use upstream llama-cpp-python's
-own build flags for your backend
+project has measured. If you are wiring the lane up anyway, use upstream
+llama-cpp-python's own build flags for your backend
 (these are upstream's documented commands, not something this pack has proven yet;
 please report what worked):
 
@@ -254,9 +262,18 @@ the newest release is the next thing to try.
 
 **You do not need a token to run OTR.** The shipped canonical workflow pins
 `Qwen/Qwen3.5-4B`, which is Apache-2.0 and ungated, so a normal first run downloads
-without any account. It is 8.68 GB on disk and 2.99 GiB resident under NF4 -- chosen
-because a default should be the row most likely to work on the machine of someone who
-has changed nothing, and it is measured at 14.47 tok/s on a physical 8 GB RTX 4060.
+without any account. It is 8.68 GB on disk -- chosen because a default should be the
+row most likely to work on the machine of someone who has changed nothing.
+
+> **Read the resident figure with its quantisation attached, because the shipped
+> graph does not use the small one.** That row measures 2.99 GiB resident and
+> 14.47 tok/s on a physical 8 GB RTX 4060 **under NF4**. The canonical ships
+> `llm_quant_policy` -> `none`, which is what makes it portable -- bitsandbytes is
+> not installed on macOS -- and unquantized the same row wants roughly 8.7 GB. On a
+> 16 GB card or a 16 GB Mac that is fine. On an 8 GB card it is not: set
+> `llm_quant_policy` -> `bnb_nf4`, or load
+> `workflows/variants/otr_nvidia_8gb_haunted.json`, which carries a writer sized
+> for the card.
 The 8 GB haunted profile and everything it pulls are ungated too: verified by anonymous
 download of the real weight files, with no credential sent. Same for the voices and the
 music. You only need a token if you switch a dropdown to one of the gated rows at the
@@ -397,7 +414,7 @@ canonical says otherwise, and so do the other two places that repeated it.)
 The music engine moved from MusicGen to Stable Audio 3 in `2.0.0-alpha.28`.
 MusicGen is **CC-BY-NC**, so every episode the shipped template produced carried
 a non-commercial music bed unless the operator knew to change the dropdown.
-Stable Audio 3 is commercially clean and ungated, adds 3.22 GiB to the first
+Stable Audio 3 is commercially clean and ungated, adds 3.5 GiB to the first
 run, and was the node's own declared default all along -- only the saved graph
 still pinned MusicGen. MusicGen remains selectable in the dropdown.
 
@@ -444,11 +461,11 @@ it does not silently rewrite the graph currently open in ComfyUI.
 
 | you have | load this | what it renders |
 |---|---|---|
-| 8 GB card, ready for real video | `otr_canonical`, then set the three **OTR_VideoDirector** video roles to `animatediff15_v3_haunted_video (16:9)` and `llm_device` -> `cuda` in **OTR_LedgerScriptWriter** | the proven 8 GB matrix row: AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** after loading and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b) |
+| 8 GB card, ready for real video | **easiest: drag `workflows/variants/otr_nvidia_8gb_haunted.json` onto the canvas** -- it already has every setting below. To do it by hand instead: `otr_canonical`, then in **OTR_VideoDirector** set the three video roles to `animatediff15_v3_haunted_video (16:9)`, and in **OTR_LedgerScriptWriter** set both writer dropdowns to `google/gemma-4-E2B-it` | AnimateDiff haunted video and Kokoro voices, about 16 GB of downloads. **Change the writer, not just the video roles.** The canonical ships `Qwen/Qwen3.5-4B` with `llm_quant_policy` -> `none`, which is a 16 GB pairing: unquantized it wants roughly 8.7 GB and an 8 GB card has about 7 GB to give. `gemma-4-E2B-it` is what the shipped 8 GB profiles pair with that same setting. Kokoro runs on Python 3.12 (torch) and 3.13 (kokoro-onnx, CPU) alike; only Python 3.14 has no Kokoro backend yet -- there, open **OTR_CastLock** and set `voice_bank` -> `bark_legacy`, `char_voice_engine` -> `bark`, `announcer_voice_engine` -> `bark` before you queue. Needs the AnimateDiff-Evolved pack (section 2b), and its motion module publishes no licence grant -- personal use only. This is **not** the `--machine 8gb` tuple, which also moves the image and music dropdowns |
 | 8 GB card, Klein stills and LTX 2.5 video | not a shipped graph yet -- see below | measured 2026-09-02 on a physical RTX 4060 under plain stock launch flags: Klein 4B stills at about 21 s each, LTX 2.5 clips at about 14 min each (works, slow). Needs ComfyUI-GGUF (section 2b). A shipped 8 GB profile for this pair is the next item on the plan |
 | GUI authoring baseline, exact canonical | **the same menu -> `otr_canonical`** (or drag `workflows/otr_canonical.json` onto the canvas) | Qwen3.5-4B writer, the three procgen visualizer lanes (`viz_mxc_cpu` / `viz_green` / `viz_camera`) for the video roles -- NOT LTX, which is a selectable upgrade -- Z-Image-Turbo for every image role, Kokoro voices on both slots, Stable Audio 3 music (commercially clean; was MusicGen, CC-BY-NC, before alpha.28). The mouse-only fresh-install path is still not qualified; read section 4 before queuing. This is **not** the Gemma/Wan/Kokoro/musicgen `--machine 16gb` tuple |
-| AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical`, then set `llm_device` -> `cuda` (ROCm torch reports as cuda) and `device_policy` -> `cuda` | images only: Klein 4B stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns; needs a ROCm torch and ComfyUI-GGUF. Fully local |
-| Apple Silicon Mac (PROVEN on a Mac mini M4 / 16 GB; episodes published 2026-09-07 to -09) | `otr_canonical` as shipped -- it is currently pointed at Apple Silicon (`llm_device` -> `mps`, `llm_quant_policy` -> `none`, `voice_device` -> `mps`) | fully local, no API key, no image or video weights: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices, Stable Audio 3 music, the three visualizer lanes. What else is proven, what will reboot the machine, and what to install: [Running on a Mac](#running-on-a-mac-apple-silicon) -- read it before you queue anything heavier, because an out-of-memory on unified memory reboots the machine. One machine is one data point, not a tier |
+| AMD GPU on Linux (draft, unproven on real hardware) | `otr_canonical` needs no edit at all, or drag `workflows/variants/otr_amd8_rocm.json` / `otr_amd16_rocm.json` for the tuned pick | images only: Z-Image-Turbo stills with still-motion and visualizer video, Kokoro voices (torch on 3.12, kokoro-onnx on 3.13) or bark via the CastLock dropdowns. **Needs a ROCm torch and nothing else** -- both AMD profiles were moved off Klein 4B in `b1f372a9` precisely so no third-party node pack is required. Fully local. The device dropdowns need no edit either: ROCm torch reports itself as `cuda` and the shipped `default` asks ComfyUI what the host has. Do **not** bother setting `device_policy` -- nothing reads it (see the device-widget table below) |
+| Apple Silicon Mac (PROVEN on a Mac mini M4 / 16 GB; nine episodes published 2026-09-07 to -10) | `otr_canonical` as shipped, unchanged | **As shipped it downloads no image or video weights at all** -- the three default video roles are the procgen visualizers, which mint no still: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices, Stable Audio 3 music. That is the zero-weight lane, not the ceiling -- local stills (`sd15`) and local video diffusion (`ltx098_low_video`, `animatediff15_lightning_video`) have both published real episodes on this machine. What is proven, what will reboot the machine, and what to install: [Running on a Mac](#running-on-a-mac-apple-silicon) -- read it before you queue anything heavier, because an out-of-memory on unified memory reboots the machine. One machine is one data point, not a tier |
 
 1. Load the graph from the table. (The console prints the Browse Templates path on every
    start, right under the `[OldTimeRadio]` load banner.)
@@ -510,6 +527,9 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
+| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key |
+| `cloud_seedance_2` | none, **but see below** | -- | key | key | key |
+| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key |
 | `cloud_wan_i2v` | none | -- | key | key | key |
 | `cloud_wan_i2v_audio` | none | -- | key | key | key |
 | `google_omni_video` | none | -- | key | key | key |
@@ -520,14 +540,11 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key |
-| `cloud_seedance_2` | none, **but see below** | -- | key | key | key |
-| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key |
-| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** |
-| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered |
-| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered |
+| `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** |
+| `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered |
+| `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered |
-| `wan22_high_video` | **auto** | 9.4 GiB | **no** | **proven** | not offered |
+| `wan22_high_video` | manual | 9.4 GiB | **no** | **proven** | not offered |
 | `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
@@ -537,8 +554,8 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
 | `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
 | `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered |
-| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered |
-| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered |
+| `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered |
+| `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered |
 | `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered |
 
@@ -546,7 +563,7 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
-| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** |
+| `sd15` | manual | 2.0 GiB | fits | fits | **proven** |
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered |
@@ -592,7 +609,7 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured |
+| `spandrel_esrgan` | manual | 0.1 GiB | fits | **proven** | measured |
 
 **Writer (the LLM that writes the script)**
 
@@ -605,7 +622,14 @@ is the same table with two more machine columns (AMD ROCm and CPU-only).
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | fits | **tight** |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **proven** | measured | **no** |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** |
-**How you get the weights.** **auto** -- fetched on first use, no account and no
+**How you get the weights.** Two things do the fetching for an **auto** row, and
+neither of them is a script you have to run: the engine's own library pulls it
+through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
+graph -- downloads it at queue time. A **manual** row may still have a helper in
+`scripts/`, but `scripts/` is not in the registry bundle, so from a normal
+install it is a step you take by hand and it is labelled as one.
+
+**auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
 it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
@@ -670,18 +694,28 @@ and [GO_FORWARD](docs/GO_FORWARD_PLAN.md).
 
 ### The cheapest complete setups
 
-Every engine in these three is **auto-download, ungated** -- no token, no manual
-fetch, nothing to accept:
+Nothing here is gated: no account, no token, no licence to accept. Only the first
+row is also zero-effort, and the difference is one file:
 
-| | dropdowns | total download |
-|---|---|---|
-| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~3.8 GB** |
-| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** |
-| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** |
+| | dropdowns | total download | effort |
+|---|---|---|---|
+| **Smallest** | any `viz_*` video + `kokoro` + `stable_audio_3` | **~3.8 GB** | pick and run |
+| **With pictures** | a `still_*` video + `sd15` + `kokoro` + `stable_audio_3` | **~5.8 GB** | one file by hand |
+| **Real video diffusion** | `ltx098_low_video` + `sd15` + `kokoro` + `stable_audio_3` + `spandrel_esrgan` | **~15 GB** | two files by hand |
+
+**The hand-fetched files, and why.** `sd15` is a ComfyUI checkpoint, so it belongs
+in `models/checkpoints/` rather than the Hugging Face cache, and its adapter will
+not pull it for you -- it stops with the exact `hf_hub_download` line to run and
+the folder to copy into. `spandrel_esrgan` is the same story for a 67 MB upscale
+model in `models/upscale_models/`. Both are ungated public downloads and both take
+about a minute; they are listed here because a stranger deserves to know which
+dropdown costs them a step before they pick it, not after. Everything else in
+these rows genuinely fetches itself on first use.
 
 The `viz_*` lanes are audio-reactive and declare `accepts_still = False`, so they
 mint no still and never invoke an image engine -- which is why the smallest setup
-needs no image weights at all.
+needs no image weights at all, and why it is the only row with nothing to fetch
+by hand.
 
 ### One trap worth knowing before you change a dropdown
 
@@ -690,7 +724,9 @@ The image dropdowns ship defaulted to `z_image_turbo` (19.3 GB). With the defaul
 `still_*` or `ltx098_low_video` video lane and it becomes live**, because those
 declare `accepts_still = True` -- one dropdown change silently pulls 19.3 GB, and
 on a 16 GB machine it then dies in the KSampler needing ~20.4 GiB. Set the three
-image dropdowns to `sd15` (2.0 GB, same job) at the same time.
+image dropdowns to `sd15` (2.0 GB, same job) at the same time -- and fetch its
+checkpoint first, because `sd15` is one of the two dropdowns that does not
+download itself.
 
 ## Running on a Mac (Apple Silicon)
 
@@ -741,12 +777,12 @@ Three things that cost a machine or an hour:
 
 | what | how to select it | cost and caveat | guide |
 |---|---|---|---|
-| the press-Run path | `otr_canonical` as shipped: Qwen3.5-4B writer on `mps` (~6.5 tok/s), Kokoro voices (kokoro-onnx on the CPU under Python 3.13), Stable Audio 3, `viz_mxc_cpu` / `viz_green` / `viz_camera` | no image or video weights, no API key. The first receipt was a 135 s 1080p25 episode | 1 |
+| the press-Run path | `otr_canonical` as shipped: Qwen3.5-4B writer on Metal (~6.5 tok/s), Kokoro voices (kokoro-onnx on the CPU under Python 3.13), Stable Audio 3, `viz_mxc_cpu` / `viz_green` / `viz_camera`. The device dropdowns ship as `default` and resolve to Metal here -- you do not set them | no image or video weights, no API key. The first receipt was a 135 s 1080p25 episode | 1 |
 | local stills: `sd15` | all three image dropdowns -> `sd15` | 1.99 GB, ungated, one checkpoint into `models/checkpoints/`; the long side is clamped to 768 on purpose (SD 1.5 duplicates subjects past that). Inert until a video lane consumes a still | 5 |
 | the four `still_*` lanes | a video role -> `still_motion` / `still_pan` / `still_flat` / `still_word`, with `sd15` supplying the still | about 22 minutes for a whole episode on `still_motion` | 9 |
 | local video diffusion: `ltx098_low_video` (`ltx_8gb`) | a video role -> `ltx098_low_video (16:9)` plus `sd15` on the image roles; no third-party node pack | its two weights auto-fetch (5.91 GB + 9.12 GB); one LTX lane 39:17, all three 1:07:27 with ~14 GB swapped -- the ceiling, not a comfortable setting | 7 |
 | `animatediff15_lightning_video` (EXPERIMENTAL) | a video role -> that lane; needs ComfyUI-AnimateDiff-Evolved at the pinned commit, the SD 1.5 checkpoint plus the Lightning 8-step motion module and the ft-mse VAE placed by hand, and the `extra_model_paths` addendum below | one 23-beat episode (2,736 frames, 2:32:34 wall clock) published 2026-09-09. The adaptive-hold guard written for PBUG-20260909-01 is unit-tested and has not yet fired under live fire | 8, 10.7 |
-| `bark` and `musicgen` | the `OTR_CastLock` voice dropdowns / the music dropdown | both measured on Metal; MusicGen is CC-BY-NC | matrix |
+| `musicgen` | the music dropdown | measured on Metal (mps 14.1 s vs cpu 14.7 s for 256 tokens); CC-BY-NC, which is why it is not the default. No episode has used it here | matrix |
 | `flux2_klein` stills (GGUF) | three manual files (10.99 GB) plus ComfyUI-GGUF | minted a clean still at about 8 minutes each, on swap (20 GB `phys_footprint` on a 16 GB box). `sd15` is the practical choice | 10 |
 
 ### What will not run, and what will reboot
@@ -755,10 +791,15 @@ Three things that cost a machine or an hour:
   `h3_low_audio_in` (MiniMax H3 -- an fp4 text encoder and int8 matmul that Metal
   does not execute); `ltx23_low_audio_in` (a hard NVML gate in its preflight);
   `wan22_high_fast` (`fastwan_8gb`).
-* **OOM RISK @16GB (13):** `z_image_turbo`; `wan22_high_video` (`wan_ti2v`,
+* **OOM RISK @16GB (14):** `z_image_turbo`; `wan22_high_video` (`wan_ti2v`,
   measured fatal); both `animatediff15_v3_*` lanes (no adaptive hold); `humo`,
   `humo_1.7B` and `humo_14B_169` (the `humo14_*` and `humo17_*_portrait` rows);
-  the three `ltx25_*` lanes; `ltx23_high_video`; `flux_gen1`; `indextts2`. The
+  the three `ltx25_*` lanes; `ltx23_high_video`; `flux_gen1`; `indextts2`; and
+  **`bark`**, which was superseded into this list on 2026-09-09 and is the one
+  most likely to catch you out -- its live tensors are only 4.18 GB, but it
+  drives an 18.0 GB `phys_footprint` at 11.7x realtime and strands 10.85 GB that
+  a second `torch.mps.empty_cache()` will not give back (PBUG-20260909-03). A
+  small number on the model card is not the number that reboots the machine. The
   reason per row is in the matrix.
 * **Wan renders wrong on this macOS/torch generation even when it fits** (guide
   section 11): an open ComfyUI issue reproduces temporal corruption with GGUF Q8
@@ -808,15 +849,19 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
 - **Python:** 3.12 or 3.13. ComfyUI Desktop and the portable build ship 3.13, where the
   Kokoro voice runs through kokoro-onnx on the CPU (section 2b); 3.14 has no Kokoro
   backend yet (bark replaces it with three dropdown changes).
-- **Other setups:** ONE graph, and only one. `workflows/otr_canonical.json` is
-  the whole shipping surface -- there are no per-machine JSONs, and
-  `workflows/variants/` is generated-only (every file there must come from a
-  profile of the same name; a hand-authored one crashes
-  `python scripts/build_variants.py --check`). A second graph for Apple Silicon
-  existed briefly and was deleted once it was measured: it differed from the
-  canonical by **zero** nodes, **zero** links and exactly **five widget
-  values**. Five dropdown settings are not a reason for a second file to keep in
-  step. Load `otr_canonical` and set the dropdowns for your machine.
+- **Other setups:** ONE authored graph. `workflows/otr_canonical.json` is the
+  source of truth and the only file anyone edits. The 94 files in
+  `workflows/variants/` are GENERATED from it -- one per profile in
+  `config/profiles/`, produced by `python scripts/build_variants.py --all` and
+  verified by `--check`; a hand-authored file there crashes that check. They
+  ship in the registry bundle, but ComfyUI's template browser globs one
+  directory level (`*/workflows/*.json`), so only the canonical is listed in the
+  menu. To use one, drag its JSON onto the canvas or open it from Workflow ->
+  Open. A hand-maintained second graph for Apple Silicon existed briefly and was
+  deleted once it was measured: it differed from the canonical by **zero** nodes,
+  **zero** links and exactly **five widget values**. That is the argument against
+  a hand-kept second file, and it is not an argument against the generated ones,
+  which cost nothing to keep in step because nobody keeps them.
 
   **The five settings that made it an Apple Silicon graph**, so you can
   reproduce it in the canonical:
@@ -829,14 +874,17 @@ complete` prints on a machine with no CUDA -- cosmetic, not a code path.
   | `OTR_VideoDirector` | music video | `animatediff15_lightning_video (16:9)` |
   | `OTR_VideoDirector` | character video | `animatediff15_lightning_video (16:9)` |
 
-  **The device widgets: only TWO of the three do anything.** Traced through the
+  **The device widgets: three of the four do something.** Traced through the
   render path, because a JSON that sets the wrong one looks configured and is
-  not:
+  not. **As shipped you should not need to touch any of them** -- three read
+  `default` and the fourth reads `cpu`, and `default` is ComfyUI's own word for
+  "ask this host", so the canonical adapts instead of naming a vendor:
 
   | widget | node | what it actually does |
   |---|---|---|
-  | `voice_device` | `OTR_CastLock` | **load-bearing, and it drives TWO stages.** Refuses anything but `cuda`/`cpu`/`mps` outright, then travels as `meta.voice_device` and becomes `requested_device` for the voice adapters AND the music adapter. Set this per device. |
-  | `upscale_device` | `OTR_SilentComposite` | **load-bearing.** `cuda` on a Mac is a named refusal at the upscale stage. |
+  | `llm_device` | `OTR_LedgerScriptWriter` | **load-bearing, and the one that used to break a machine silently.** It is resolved to a concrete device before the frozen `LLMRuntimePolicy` is built, so the policy and the ledger both carry what really ran rather than the word `default`. Ships `default`. |
+  | `voice_device` | `OTR_CastLock` | **load-bearing, and it drives TWO stages.** It resolves what you picked to a CONCRETE device, stamps that into `meta.voice_device`, and that becomes `requested_device` for the voice adapters AND the music adapter. Since 2026-09-12 it ships `default`, which asks ComfyUI what the host has -- so you do not set it per machine any more, and the ledger still records the device that actually ran. Naming one explicitly still works and is never second-guessed. |
+  | `upscale_device` | `OTR_SilentComposite` | **load-bearing.** `cuda` on a Mac is a named refusal at the upscale stage. Ships `cpu`, which is correct on every machine; a 67 MB upscale model does not need the card. |
   | `device_policy` | `OTR_VideoDirector` | **decorative -- nothing reads it.** It is built into the render policy and never consumed by any video or image adapter. Setting it to `mps` buys you nothing; the video lanes pick their own device. |
 
   `dtype_policy` is unread the same way, and so is the whole `host_caps` object
@@ -973,24 +1021,38 @@ shipped 8 GB profile wires it up yet. Receipt: `docs/ship-audit-2026-09-01/
 about 42 minutes: the writer LLM was still on the card when the image stage began.
 Update to commit `da2b7a36` or later if your stills are that slow.
 
-### Local video models
+### Local video models -- the measurements
 
-| Dropdown name | Measured VRAM | 8 GB | 12 GB | 16 GB |
-|---|---|:--:|:--:|:--:|
-| `ltx098_low_video (16:9)` | 6.8 GiB @ 512x288x161 | maybe | yes | yes |
-| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB @ 864x480x90 in the raw recipe lab | candidate: raw 90-frame **LAB-PROVEN**, not an OTR episode | yes | yes |
-| `h3_low_video (16:9)` | **7.28 GiB under an 8 GB clamp** | unknown: clamp only, not physical 8 GB proof | yes | yes |
-| `ltx23_low_audio_in (16:9)` | 7.36 GiB @ 1024x576x193 | maybe | yes | yes |
-| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights, hold-2 cadence | **PROVEN** | yes | **PROVEN** |
-| `wan22_high_video (16:9)` | 12.1 GiB @ 832x480x193 | no | maybe | yes |
-| `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB @ 480x832x129 | no | maybe | yes |
-| `humo14_high_audio_in_wide (16:9)` | 13.06 GiB @ 832x480x97 | no | no | yes |
-| `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB @ 480x832x97 | no | no | yes |
-| `ltx23_high_video (16:9)` | 13.3 GiB @ 1024x576x169 | no | no | yes |
-| `wan22_high_fast (16:9)` | 12.8 GiB measured 2026-08-22 | no | maybe | yes |
-| `ltx25_high_video (16:9)` | **14.48 GiB peak on a 16 GB card** (what the allocator grabbed, not a floor) | works, slow: ~14 min a clip on a physical RTX 4060 under stock flags, 2026-09-02; no shipped 8 GB profile yet | yes | **PROVEN on the 5080** |
-| `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | ? | ? | yes |
-| `mesh_stage (16:9)` | not measured | ? | ? | yes |
+**This table is the measurement record, not the verdict.** For "will this run on
+my card", read the generated matrix above: its cells come from a 46-agent audit
+of every engine on 2026-09-09, grounded in receipts, with the load-bearing ones
+adversarially re-checked. The numbers here are what a real run actually grabbed,
+at a stated resolution and frame count, which is the thing the verdict is built
+from and the thing you cannot get from a verdict.
+
+Two tables answering the same question in different words is how a document
+starts contradicting itself, so this one no longer carries per-card columns.
+
+| Dropdown name | Measured peak VRAM | at |
+|---|---|---|
+| `animatediff15_v3_haunted_video (16:9)` | ~3.9 GB of weights | hold-2 cadence |
+| `ltx098_low_video (16:9)` | 6.8 GiB | 512x288x161 |
+| `h3_low_audio_in (16:9)` | 6.9-7.2 GiB | 864x480x90, raw recipe lab -- a 90-frame lab run, not an OTR episode |
+| `h3_low_video (16:9)` | 7.28 GiB | under an 8 GB clamp, so a clamp reading rather than physical 8 GB proof |
+| `ltx23_low_audio_in (16:9)` | 7.36 GiB | 1024x576x193 |
+| `wan22_high_video (16:9)` | 12.1 GiB | 832x480x193 |
+| `wan22_high_fast (16:9)` | 12.8 GiB | measured 2026-08-22 |
+| `humo17_high_audio_in_portrait (portrait)` | 12.84 GiB | 480x832x129 |
+| `humo14_high_audio_in_wide (16:9)` | 13.06 GiB | 832x480x97 |
+| `humo14_high_audio_in_portrait (portrait)` | 13.22 GiB | 480x832x97 |
+| `ltx23_high_video (16:9)` | 13.3 GiB | 1024x576x169 |
+| `ltx25_high_video (16:9)` | 14.48 GiB peak on a 16 GB card | what the allocator grabbed, not a floor. Also ran on a physical RTX 4060 8 GB under stock flags at ~14 min a clip, 2026-09-02 |
+| `humo17_high_audio_in_wide (16:9)` | not measured at this aspect | -- |
+| `mesh_stage (16:9)` | not measured | -- |
+
+A measured number below your card's size is not a promise. `ltx23_high_video`
+measures 13.3 GiB and the audit still marks it OOM at 16 GB, because a peak is
+one run's allocation and the rest of the pipeline is resident around it.
 
 `animatediff15_v3_haunted_video` was the ONE surviving AnimateDiff lane after
 the 2026-08-23 directive ("delete any animatediff that are not haunted"). Its
@@ -1169,9 +1231,9 @@ H3 (personal license only, see the licensing note above), `mesh_stage`, and the 
 floors (CRT **visualizer**, Ken-Burns, flat still). Audio-driven engines are offered only where
 audio exists; engines load one at a time with explicit VRAM reclaim between stages, and
 renders are request-hash deterministic. The old VRAM tier system is gone — profiles plus
-the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (The per-machine JSONs
-were removed, and `workflows/variants/` is generated-only and currently empty.
-There is exactly ONE graph -- see "Other setups" for the per-machine dropdown
+the `OTR_VideoDirector` dropdowns are the sizing mechanism now. (There is exactly one
+AUTHORED graph, the canonical; `workflows/variants/` holds 94 generated from it, one
+per profile -- see "Other setups" for how to load one and for the per-machine dropdown
 settings.)
 
 ### The video model reference — read these two before adding or changing an engine
@@ -1492,8 +1554,8 @@ project's generations. Born of the machine, still raising hell on the airwaves. 
 
 The current line is **v2.0-alpha** (Open Video Model Platform; per-role video AND image
 engines; six independent story source banks; one canonical workflow whose dropdowns you set
-per machine -- the per-platform variants were removed and will be regenerated from the
-canonical once it is final; frozen 48 kHz audio master, byte-identical in the archival copy).
+per machine, plus 94 per-profile graphs generated from it in `workflows/variants/`;
+frozen 48 kHz audio master, byte-identical in the archival copy).
 Full per-version history is in the git log and the GitHub Releases page.
 
 ## License & Credits

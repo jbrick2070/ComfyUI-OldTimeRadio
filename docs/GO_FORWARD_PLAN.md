@@ -40,15 +40,160 @@ see [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
 Every row here has more than one defensible answer, so it gets its round, its
 measurement or its ruling BEFORE code. An arc costs a wait, not a budget.
 
-*Empty as of 2026-09-12 (batch 2, `docs/2026-09-12-arc-batch-2/`): seven
-rows settled -- four cut or closed on the code, one settled by the bench,
-and three converted into named CODE rows below after a codex refutation.*
+### A1. What the canonical ships for writer + quant + ceiling on an 8 GB card
+
+The device half of system-independence landed 2026-09-12 (`8017a07e`): the
+canonical no longer names a vendor, and all four device widgets now read
+`default` / `cpu`. **The sizing half did not.** The canonical still carries
+`Qwen/Qwen3.5-4B` + `llm_quant_policy "none"` + `vram_ceiling_gb 10.0`, which is
+byte-for-byte the `otr_mac_mps` triple -- and 10.0 is unique to that one profile
+across all 118. On an 8 GB NVIDIA card `none` means bf16, so 8.68 GB is
+downloaded and then moved onto the card in one shot
+(`_otr_model_loader.py`, `if quant_config is None and max_memory is None:
+model = model.to(device)`), with no offload rescue. The gate says WARN and lets
+it through.
+
+**What a contrarian round settled, and it removed two options:**
+* The 8 GB stranger already HAS a shipped answer -- `workflows/variants/` holds
+  94 generated graphs including `otr_nvidia_8gb_haunted`, and they ship in the
+  registry bundle. ComfyUI's template browser globs one directory level, so it
+  cannot list them. The README said the folder was empty; that is corrected now,
+  and it may be the whole fix.
+* An `auto` value on the quant combo is the WORST option, not the obvious one.
+  A frozen `LLMRuntimePolicy` feeds `cache_key()`, so a resolving sentinel either
+  leaks into cache identity or needs a second resolution layer -- and the
+  loader's runtime bitsandbytes probe is deliberate (`01845aad`: "remove the
+  policy, test what actually works"). A sentinel puts the guess back one layer up.
+
+**What is still forked:** leave the canonical as a 16 GB-class graph and point
+8 GB users at the variant, or retune it to the smallest common denominator.
+Needs his call, because it trades a stranger's first run against the writer
+quality on the machine that renders the dailies.
+
+### A2. The `nv8` fit tag is computed on a halving the canonical's own setting invalidates
+
+`_otr_model_catalog.py` halves the download size in TWO places -- once in the
+gate's estimator and once in `fit_tags_for`, which mints the tag. The canonical's
+saved widget string literally reads
+`'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)'`: it advertises that it
+fits a 7.0 GiB NVIDIA budget, on an assumption of NF4 that its own
+`quant_policy "none"` rules out. The label is the only thing a stranger reads
+before pressing Queue.
+
+**Why this is an arc and not a fix.** `fit_tags_for` runs at INPUT_TYPES time,
+before any widget value exists, so it structurally CANNOT read the quant policy.
+Assume one policy, emit both, or drop the tag -- three defensible answers. And
+honest tags change the label, which no longer matches the saved
+`widgets_values`, so `tests/test_saved_workflow_model_values_resolve.py` goes red
+and 94 variants regenerate. Measured: un-halving the GATE alone flips ZERO
+profiles' verdict tier (`_FAIL_RATIO` 1.5 is wider than the 1.24 error), so that
+half is a truth fix with no safety effect. The tag is where the behaviour is.
+
+### A3. `MODEL_ASSET_INDEX.md` keys rows by filename, not by registered engine id
+
+Consequences measured 2026-09-12: `still_flat` / `still_motion` / `still_pan` /
+`still_word` have NO ROW AT ALL (50 profile selections between them) because they
+live in `cheap_families.py` and the generator globs `eng_*.py`. Three registered
+LTX 2.5 engines collapse into one row flagged "not declared in code -- verify",
+a false negative caused by an import style the scanner's regex misses, hiding 19
+selections of a GATED 22 GiB family. `bark` carries the same false flag because
+`suno` is not in a hardcoded publisher allowlist. The fork is what to render when
+one file implements six engines, which is why this is not a glob widening.
 
 ## 2. CODE -- the design is settled, build it
 
-*Empty as of 2026-09-12. Every row that was here is either shipped (its
-receipt is in [HANDOFF_LOG](HANDOFF_LOG.md)) or moved to section 3 because
-only a ruling is left.*
+### C1. Five shipped profiles cannot load their own configured writer
+
+Measured with the real gate on 2026-09-12: `8gb_lite`, `otr_8gb_wan`,
+`otr_8gb_ltx`, `otr_8gb_fastwan` and `otr_4060_12b_gguf_offload` all pair
+`creative_model: google/gemma-4-12b-it` with `vram_ceiling_gb: 6.8` and
+`quant_policy: none`. `check_vram_fit` returns **FAIL at 11.95 GB against 6.8,
+a 1.76x ratio**, and a FAIL verdict is what `request_slot` raises on.
+
+**The cause is a lane that no longer exists, not five bad sizing choices.**
+`GGUF_ROWS` in `nodes/_otr_gguf_backend.py` is **EMPTY** -- measured, and
+`gguf_row_for_repo` raises for every id -- so the 12B has no quantized route
+today and every one of these profiles prices as `provider: local`, i.e. the
+bf16 transformers lane. `otr_4060_12b_gguf_offload` is named for the exact
+mechanism that is gone. Same root cause explains a contradiction in the
+generated writer table, which still marks `google/gemma-4-12b-it` **proven** on
+8 GB NVIDIA at a 23.9 GiB download: that receipt was earned through the GGUF
+lane before it was emptied. So the choice is to restore a GGUF row for the 12B
+or to move these five profiles to a writer that fits unquantized -- and the
+receipt in the writer table needs whichever answer is picked recorded against it.
+
+### C2. `machine_classes.json` is missing the `ltx_8gb` receipt that `dropdown_matrix.json` spends
+
+`docs/dropdown_matrix.json` marks `ltx_8gb` **proven** on 8 GB NVIDIA;
+`config/machine_classes.json`'s `engine_evidence` carries no such row -- only an
+RTX A4500 20 GB and the Mac mini M4. `docs/4060_DRILL_LOG.md` around lines
+4579-4834 looks like the real 4060 receipt it was harvested from, so the fix is
+probably to add the row rather than to retract the verdict. Two hand-curated
+files feed two generated docs and nothing enforces agreement between them.
+
+### C3. Put the SD 1.5 checkpoint in the visual-asset manifest -- it is what the Mac ladder is waiting on
+
+**This is the single highest-leverage item for the three Mac graphs the operator
+described**, and the reason is one file. He asked for a procgen JSON, a stills
+JSON and an LTX 0.9.8 JSON, "all auto download and non gated". Measured
+2026-09-12, only the first is:
+
+| the Mac graph he wants | what it actually costs today |
+|---|---|
+| procgen (`viz_*`) | nothing. Zero weights, zero downloads. Already true. |
+| stills (`still_*`) | one hand-fetched 2 GB `sd15` checkpoint |
+| LTX 0.9.8 (`ltx_8gb`) | LTX's own 16.1 GiB self-fetches, but the lane is image-to-video and consumes a still, so it ALSO needs that same 2 GB by hand |
+
+So one file stands between him and two of the three. `sd15` is ungated and
+public (`Comfy-Org/stable-diffusion-v1-5-archive`); nothing about it needs to be
+manual.
+
+**Why it is a code row and not a one-line manifest entry.**
+`ensure_prompt_visual_assets` is SELECTION-DRIVEN -- it plans from the submitted
+prompt and intersects with `_COVERED`, so adding a row costs nobody who does not
+pick the engine, which is the property that makes this safe. But the function
+carries per-engine imports and passes them positionally into `native_requests`
+(`zimage=`, `ltx=`, `sa3=`), so a fourth engine touches `MANIFEST`, `_COVERED`,
+that import block and that signature. The one real design question is path
+resolution: `sd15._resolve_ckpt_name()` supports style-specific checkpoints and
+an env override, so the manifest must fetch the DEFAULT file without claiming to
+satisfy a pack checkpoint the user chose instead.
+
+`spandrel_esrgan`'s 67 MB upscale model is the same shape and the same fix, and
+it is the second of the two hand-fetches in the "Real video diffusion" row of
+the README's cheapest-setups table.
+
+### C4. `cpu_floor` has no local writer it is allowed to use
+
+Measured 2026-09-12. It is the ONLY profile whose `lane_allowlist` excludes
+`transformers` -- it permits `gguf`, `openrouter`, `comfy_credits`,
+`google_api`. Its `creative_model` is `unsloth/Llama-3.2-3B-Instruct`, a
+transformers row. And `GGUF_ROWS` is empty, so its one local lane offers nothing.
+A CPU-only user therefore has no local route at all: the two that remain are
+paid. Either restore a GGUF row, or add `transformers` to that allowlist and let
+the 3B run on CPU. Same empty-lane fact is what makes C1's five profiles fail, so
+the two rows probably share one answer.
+
+### C5. Small, named, and each takes minutes
+
+* `Comfy-Org/flux2-klein` 307-redirects to `Comfy-Org/vae-text-encorder-for-flux-klein-4b`.
+  The pinned SHA still resolves through the redirect, so this is cosmetic --
+  fix `docs/RUNPOD_INSTALL.md` and `scripts/otr_provision.py` next time either is open.
+* `elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF` is GATED (confirmed live) and flagged
+  as such in the provisioner's data, but no prose doc says so. RUNPOD_INSTALL's
+  "one terms click" heading undersells a second owner's accept-click.
+* The `--machine amd` selector still plans `flux2_klein` while both AMD profiles
+  ship `z_image_turbo` (`b1f372a9`). The selector and the profiles disagree about
+  the same hardware.
+* `tests/test_full_workflow_v2_audio_wiring.py:194` and
+  `tests/test_workflow_json_guardrails.py:768` still pin `cuda`; the canonical
+  now saves `default`.
+* `nodes/_otr_shared/device_options.py` has no tests. It is the module every
+  device widget now routes through.
+* Multi-GPU silent wrong device: CastLock stamps `cuda:1`, and
+  `_voice_device_from_ledger` hands back `cuda`.
+* `nodes/_otr_shared/device_options.py::vendor()` still has ZERO callers. Wire it
+  or write the row that says what it waits on -- A1 is that row today.
 
 ## 3. Blocked on the operator -- each unblocks with one word
 
@@ -59,6 +204,29 @@ So the rows below are what SURVIVED his answers. The twelve rows that closed are
 gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his ear, and nothing else
+
+* **The IndexTTS2 hang fix is WRITTEN AND HELD, because shipping it demotes
+  Lemmy.** Both protocol reads in `nodes/_otr_audio_engines/eng_indextts2.py`
+  are bare `proc.stdout.readline()` with no timeout, on the shipped default
+  character-voice engine. A stalled worker never returns, so the
+  `finally: self._teardown(adapter)` never runs and ComfyUI plus an orphaned
+  worker hold VRAM forever with nothing in the log -- indistinguishable from a
+  slow render. `eng_dia` and `eng_chatterbox` already route the identical read
+  through `_otr_sidecar.read_protocol_line`; this engine simply never imported
+  it, so the fix is to do exactly what its two siblings do.
+  **Why it is held.** That file is one of three in
+  `_otr_voice_route.RUNTIME_FINGERPRINT_SOURCES["indextts2"]`, hashed whole, so
+  ANY byte change moves the fingerprint. Measured 2026-09-12: the qualified
+  value is `d47779386ce91209` and the fix makes it `c78934682057fc65`, which
+  fails `test_the_shipped_lemmy_route_is_selected_again` and un-selects the
+  shipped Lemmy route. The demotion is graceful -- the row takes the ordinary
+  draw and the episode still publishes -- but the cameo he qualified by ear
+  goes away, and the test says plainly: *"re-audition and re-record, do not
+  hand-edit the fingerprint"*.
+  **What unblocks it: one word from him.** Either "ship it and I will
+  re-audition Lemmy", or "hold it". The trade is a certain loss of a cameo he
+  likes against protection from a rare hang. The patch is reconstructible in
+  minutes from the sibling engines; nothing else is waiting on it.
 
 * **The techno and house cues, re-rendered.** He judged `3_media_archive`
   (jazz) and `4_original` (salsa) RIGHT, and `1_scifi_news` (Detroit techno)

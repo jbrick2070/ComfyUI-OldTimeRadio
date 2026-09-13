@@ -239,12 +239,15 @@ tools/
 # whitespace.
 assets/
 #
-# workflows/variants/*.md -- 92 generated LAUNCH RECIPES, one per variant,
+# workflows/variants/*.md -- 94 generated LAUNCH RECIPES, one per variant,
 # written by scripts/build_variants.py. Every one of them is a headless command
 # built on runners under scripts/, which `scripts/*` above already stops
 # shipping, so on a registry install they document commands the installer
-# cannot run. THE .json VARIANTS THEMSELVES KEEP SHIPPING -- README's "Pick the
-# graph" table tells a user to drag `workflows/variants/otr_*.json` onto the
-# canvas, so this pattern is deliberately .md-only. Never widen it to
-# workflows/variants/.
+# cannot run. THE .json VARIANTS THEMSELVES KEEP SHIPPING, and they are the only
+# per-machine graph a registry user gets: ComfyUI's template browser globs one
+# directory level (`*/workflows/*.json`), so it lists the canonical and nothing
+# else. The README's "One graph in the menu" callout and its "Other setups"
+# bullet both tell the reader to drag `workflows/variants/otr_*.json` onto the
+# canvas, which only works because this pattern is deliberately .md-only.
+# Never widen it to workflows/variants/.
 workflows/variants/*.md

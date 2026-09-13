@@ -33,6 +33,9 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
+| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
+| `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
+| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_wan_i2v` | none | -- | key | key | key | key | key |
 | `cloud_wan_i2v_audio` | none | -- | key | key | key | key | key |
 | `google_omni_video` | none | -- | key | key | key | key | key |
@@ -43,14 +46,11 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
-| `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
-| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key | key | key |
-| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** | ? | not offered |
-| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
+| `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
+| `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
-| `wan22_high_video` | **auto** | 9.4 GiB | **no** | **proven** | not offered | ? | not offered |
+| `wan22_high_video` | manual | 9.4 GiB | **no** | **proven** | not offered | ? | not offered |
 | `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered | ? | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
@@ -60,8 +60,8 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
 | `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
 | `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `humo14_high_audio_in_portrait` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `humo14_high_audio_in_wide` | **auto** | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
 
@@ -69,7 +69,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `sd15` | **auto** | 2.0 GiB | fits | fits | **proven** | ? | too slow |
+| `sd15` | manual | 2.0 GiB | fits | fits | **proven** | ? | too slow |
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
@@ -115,7 +115,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `off` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
-| `spandrel_esrgan` | **auto** | 0.1 GiB | fits | **proven** | measured | ? | ? |
+| `spandrel_esrgan` | manual | 0.1 GiB | fits | **proven** | measured | ? | ? |
 
 **Writer (the LLM that writes the script)**
 
@@ -129,7 +129,14 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | **proven** | measured | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
 
-**How you get the weights.** **auto** -- fetched on first use, no account and no
+**How you get the weights.** Two things do the fetching for an **auto** row, and
+neither of them is a script you have to run: the engine's own library pulls it
+through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
+graph -- downloads it at queue time. A **manual** row may still have a helper in
+`scripts/`, but `scripts/` is not in the registry bundle, so from a normal
+install it is a step you take by hand and it is labelled as one.
+
+**auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
 it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.

@@ -45,15 +45,29 @@ def test_word_razzle_profile_skips_only_its_remote_video_download():
 
 
 def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
+    """AMD installs with NOTHING extra -- no manual tier, no third-party pack.
+
+    This assertion was stale from 2026-09-06 to 2026-09-12. Commit b1f372a9
+    moved both AMD profiles off `flux2_klein` (which needs the third-party
+    ComfyUI-GGUF pack and a hand-fetched 11 GB tier) and onto `z_image_turbo`,
+    which comes out of OTR's own fetch manifest -- that was the whole point of
+    the commit, "Make the AMD tiers installable with nothing extra". The test
+    kept asserting the pre-change plan, so it failed for six days while the
+    code was right. It now states the shipped truth: both plans are fully
+    automatic and both manual lists are EMPTY.
+
+    The two differ only in music: amd16 selects `stable_audio_3` (its own
+    fetch lane), amd8 selects `musicgen` (HF cache on first use, so no lane).
+    """
     provision = _provisioner()
 
     assert provision.profile_lanes("otr_amd16_rocm") == {
-        "automatic": ["stable_audio_3"],
-        "manual": ["flux2_klein"],
+        "automatic": ["z_image", "stable_audio_3"],
+        "manual": [],
     }
     assert provision.profile_lanes("otr_amd8_rocm") == {
-        "automatic": [],
-        "manual": ["flux2_klein"],
+        "automatic": ["z_image_int8"],
+        "manual": [],
     }
 
 

@@ -1683,7 +1683,18 @@ NO_LANE_REASON = {
     "google_lyria": "remote",
     "sonilo": "remote",
     # Image models fetched by their own loaders / documented manual tiers.
-    "sd15": "hf_cache",
+    # sd15 IS NOT "hf_cache", and calling it that printed the word "auto" into
+    # two shipped documents (2026-09-12). The hf_cache contract above is "the
+    # engine's own loader fetches it"; sd15's loader does the opposite --
+    # `nodes/_otr_image_engines/sd15.py` raises EngineUnusable(MISSING_MODEL)
+    # and hands the reader an `hf_hub_download` line to run plus a file to copy
+    # into `models/checkpoints/`, because a CheckpointLoaderSimple model lives
+    # in ComfyUI's model tree, not in the HF cache. `scripts/` can fetch it,
+    # but `scripts/` does not ship in the registry bundle, so for anyone who
+    # installed the pack the normal way it is a manual step. The README's own
+    # legend defines auto as "fetched on first use ... just pick it and run",
+    # which was false here.
+    "sd15": "manual_doc",
     "lumina_image": "manual_doc",
     "flux_gen1": "manual_doc",
     "ideogram4_local": "manual_doc",
@@ -1693,10 +1704,16 @@ NO_LANE_REASON = {
     "cloud_kling_avatar": "remote_unprovisioned",
     "cloud_seedance_2": "remote_unprovisioned",
     "cloud_vidu_q2_pro_fast_720p": "remote_unprovisioned",
-    # Upscale ships one model, pulled on first use. "off" does nothing at all,
-    # which is neither a download nor a service.
+    # Upscale ships one model. "off" does nothing at all, which is neither a
+    # download nor a service.
     "off": "builtin",
-    "spandrel_esrgan": "hf_cache",
+    # Same correction as sd15 above, same evidence: "pulled on first use" was
+    # the claim and the adapter refutes it. `eng_spandrel_esrgan.py` raises with
+    # a GitHub release URL to download "into models/upscale_models" and a
+    # pointer to `scripts/ensure_upscale_models.py`. A 67 MB file is small
+    # friction, but it is friction, and the matrix is where a stranger looks to
+    # find out whether a dropdown costs them anything before they pick it.
+    "spandrel_esrgan": "manual_doc",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
     "fastwan_8gb": "manual_doc",

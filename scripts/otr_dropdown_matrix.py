@@ -184,6 +184,62 @@ _NO_LANE_WORD = {"hf_cache": "auto", "sidecar": "sidecar",
                  "remote": "none", "manual_doc": "manual", "builtin": "nothing",
                  "remote_unprovisioned": "none*"}
 
+#: One-slot memo for :func:`self_fetching_lanes`.
+_SELF_FETCHING_CACHE: list = []
+
+
+def self_fetching_lanes() -> set:
+    """Fetcher lanes whose weights REALLY arrive on their own, derived.
+
+    HAVING A FETCHER LANE IS NOT THE SAME CLAIM AS "auto", and conflating them
+    printed the wrong word into two shipped documents (2026-09-12). The README's
+    own legend defines auto as "fetched on first use ... just pick it and run".
+    But `scripts/` is a development-tree tool that is NOT in the registry
+    bundle, and every local video adapter is fail-closed by design -- read
+    ``eng_ltx_8gb`` ("the offline invariant -- no runtime fetch") and
+    ``eng_ghost_signal`` ("Fail CLOSED ... and NEVER a download"). So a lane
+    that exists only in the fetcher script costs the reader a manual step, and
+    six engines were being advertised as costing none: the three AnimateDiff
+    lanes, both HuMo rows and ``wan_ti2v``.
+
+    WHAT ACTUALLY SELF-FETCHES is the visual-asset manifest, and the mechanism
+    is in the graph rather than in `scripts/`: ``OTR_WorkflowValidator`` -- a
+    node in the canonical workflow -- calls
+    ``_otr_visual_assets.ensure_prompt_visual_assets`` at queue time, which
+    downloads every manifest file it is missing. So a lane is genuinely "auto"
+    exactly when EVERY file it needs is in that manifest, and that is what this
+    computes. It is a join, not a list: put a file in the manifest and the
+    matrix says auto on the next regeneration, with nobody editing a table.
+
+    Today it resolves to ``ltx_8gb``, ``stable_audio_3`` and ``z_image`` -- the
+    three the operator can and does tell people to just pick.
+
+    Memoized because ``friction_for`` asks once per engine and ``_load`` re-executes
+    a module every call.
+    """
+    if _SELF_FETCHING_CACHE:
+        return _SELF_FETCHING_CACHE[0]
+    fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
+    assets = _load("nodes/_otr_visual_assets.py", "_odm_visual_assets")
+    # The manifest is keyed (comfy_dir, filename); the fetcher's specs carry a
+    # repo-relative path on several rows, so compare basenames.
+    manifest = {name for (_dir, name) in getattr(assets, "MANIFEST", {})}
+    self_fetching = set()
+    for lane, specs in getattr(fetcher, "LANES", {}).items():
+        names = []
+        for spec in specs:
+            raw = getattr(spec, "filename", None) or getattr(spec, "name", None)
+            if raw is None and isinstance(spec, (tuple, list)):
+                raw = next((x for x in spec if isinstance(x, str)
+                            and x.endswith((".safetensors", ".ckpt", ".pth",
+                                            ".gguf"))), None)
+            if raw:
+                names.append(os.path.basename(raw))
+        if names and all(n in manifest for n in names):
+            self_fetching.add(lane)
+    _SELF_FETCHING_CACHE.append(self_fetching)
+    return self_fetching
+
 
 def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
     """``(word, size_gb_or_None, lane_or_None)`` -- how you get the weights."""
@@ -204,7 +260,11 @@ def friction_for(engine: str, namespace: str, facts: dict) -> tuple:
         reason = provision.NO_LANE_REASON.get(engine)
         return (_NO_LANE_WORD.get(reason, "unrouted"), None, None)
     fact = facts.get(lane.lane, {})
-    if lane.manual:
+    if lane.manual or lane.lane not in self_fetching_lanes():
+        # A lane the render path will not fetch for you is a manual step, even
+        # when `scripts/otr_fetch_lane_weights.py` can do it -- see
+        # self_fetching_lanes(). The gate is the visual-asset manifest, not the
+        # existence of a lane.
         word = "GATED+manual" if fact.get("gated") else "manual"
     else:
         word = "GATED" if fact.get("gated") else "auto"
@@ -425,19 +485,31 @@ _FRICTION_CELL = {
     "none*": "none, **but see below**",
 }
 
+#: Every friction word that means "a hosted service, not a download". ``none*``
+#: is the SAME KIND of thing as ``none`` -- a cloud lane no shipping profile
+#: selects yet -- and testing only for ``none`` sent three cloud engines
+#: (`cloud_kling_avatar`, `cloud_seedance_2`, `cloud_vidu_q2_pro_fast_720p`)
+#: into the catch-all below, so they printed under the heading "local
+#: diffusion" while their own cells read "key". The asterisk still marks the
+#: gap; it no longer moves them to the wrong table.
+_HOSTED_WORDS = ("none", "none*")
+
 _GROUPS = (
     ("Video -- procedural, nothing to download",
      lambda r: r["namespace"] == "video" and r["friction"] == "nothing"),
     ("Video -- hosted, no weights but you supply the key",
-     lambda r: r["namespace"] == "video" and r["friction"] == "none"),
+     lambda r: r["namespace"] == "video" and r["friction"] in _HOSTED_WORDS),
     ("Video -- local diffusion",
-     lambda r: r["namespace"] == "video" and r["friction"] not in ("none", "nothing")),
-    ("Image -- local", lambda r: r["namespace"] == "image" and r["friction"] != "none"),
-    ("Image -- hosted", lambda r: r["namespace"] == "image" and r["friction"] == "none"),
+     lambda r: r["namespace"] == "video"
+     and r["friction"] not in _HOSTED_WORDS + ("nothing",)),
+    ("Image -- local",
+     lambda r: r["namespace"] == "image" and r["friction"] not in _HOSTED_WORDS),
+    ("Image -- hosted",
+     lambda r: r["namespace"] == "image" and r["friction"] in _HOSTED_WORDS),
     ("Voice and music -- local",
-     lambda r: r["namespace"] == "audio" and r["friction"] != "none"),
+     lambda r: r["namespace"] == "audio" and r["friction"] not in _HOSTED_WORDS),
     ("Voice and music -- hosted",
-     lambda r: r["namespace"] == "audio" and r["friction"] == "none"),
+     lambda r: r["namespace"] == "audio" and r["friction"] in _HOSTED_WORDS),
     ("Upscale", lambda r: r["namespace"] == "upscale"),
     ("Writer (the LLM that writes the script)",
      lambda r: r["namespace"] == "writer"),
@@ -468,7 +540,14 @@ def render_table(rows: list, machines=MACHINES) -> str:
 
 
 _LEGEND = """
-**How you get the weights.** **auto** -- fetched on first use, no account and no
+**How you get the weights.** Two things do the fetching for an **auto** row, and
+neither of them is a script you have to run: the engine's own library pulls it
+through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
+graph -- downloads it at queue time. A **manual** row may still have a helper in
+`scripts/`, but `scripts/` is not in the registry bundle, so from a normal
+install it is a step you take by hand and it is labelled as one.
+
+**auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
 it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
