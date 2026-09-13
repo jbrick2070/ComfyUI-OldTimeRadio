@@ -5496,3 +5496,17 @@ The known 23-frame closing-window tail-fill warning was reconciled back to the
 2,541-frame A/V budget. This is the second published clean-room episode and
 the first actual Plan 4 bank leg; the remaining four banks are not yet
 published.
+
+**CR-20260912-09 — Plan 4 `public_domain` one-act leg: PASS, published.**
+
+The same explicit active alpha.30 workflow and proven `machine:8gb` tuple
+completed with `act_count=1` in 32m15s. The public-domain bank produced a
+6-line, 73-word ledger, 8 persisted clips, 1,109 positioned frames at 25 fps,
+captions, and credits. The runner returned `status=success`; independent disk
+verification found the OBS MP4 at 53,246,484 bytes, 63.280 seconds, H.264/AAC,
+1920x1080 at 25 fps, SHA-256
+`7D3A291654D310F1E957844FF7F7C10185EBA75D5D25049023EFFC59B140CCBE`.
+The known 23-frame closing-window tail-fill warning was reconciled back to the
+1,109-frame A/V budget. This is the third published clean-room episode and
+the second actual Plan 4 bank leg; `media_archive`, `original`, and
+`shakespeare` remain to be published.
