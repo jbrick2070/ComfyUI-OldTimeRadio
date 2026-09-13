@@ -135,6 +135,7 @@ from . import _otr_writer_heartbeat as _OTRHB
 from . import _vram_log as _memory_log
 # S1 platform-portability: the explicit LLM runtime policy (stdlib-only).
 from ._otr_shared import llm_policy as _llm_policy
+from ._otr_shared import device_options as _OTR_DEVICE_OPTIONS
 
 # Stage 2C (multi-modal story schema, 2026-07-05): the story-routing layer
 # supplies the source_bank dropdown (list_bank_ids at INPUT_TYPES) and the
@@ -522,7 +523,15 @@ def _preflight_llm_selection(
     from . import _otr_gguf_backend as _gguf
 
     policy = _llm_policy.LLMRuntimePolicy(
-        device=str(llm_device),
+        # RESOLVED BEFORE THE POLICY IS BUILT, and the order matters
+        # (2026-09-12). The widget may now say "default" or "gpu:N" -- ComfyUI's
+        # own vocabulary -- and `llm_policy._DEVICES` deliberately refuses
+        # anything but a concrete device. That refusal is CORRECT and is left
+        # alone: a frozen policy carries into `cache_key()`, so admitting
+        # "default" there would let two physically different devices collide
+        # under one key and silently reuse a resident model across them.
+        # Resolving here keeps the policy honest and the ledger truthful.
+        device=_OTR_DEVICE_OPTIONS.resolve_device(llm_device, fallback="cuda"),
         attn_impl=str(llm_attn_impl),
         quant_policy=str(llm_quant_policy),
         vram_ceiling_gb=float(llm_vram_ceiling_gb),
@@ -2775,12 +2784,17 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # a 28-slot vector resolves byte-identically. They feed
                 # _resolve_inputs' LLMRuntimePolicy 1:1 (S1) and are
                 # profile-managed via widget_mapping llm.* keys.
+                # Core's host-detected vocabulary plus the legacy names, so a
+                # saved graph never names a machine it was not saved on and
+                # every existing graph still loads. See
+                # nodes/_otr_shared/device_options.py.
                 "llm_device": (
-                    ["cuda", "cpu", "mps"],
-                    {"default": "cuda",
-                     "tooltip": "EXPLICIT LLM device (platform profile "
-                                "value). No auto-detect; an unavailable "
-                                "device fails loud at load."},
+                    _OTR_DEVICE_OPTIONS.device_options(),
+                    {"default": _OTR_DEVICE_OPTIONS.DEFAULT_DEVICE_OPTION,
+                     "tooltip": "LLM device. 'default' asks ComfyUI what this "
+                                "machine has and RECORDS what it chose; an "
+                                "explicit device is never second-guessed and "
+                                "still fails loud if it is not there."},
                 ),
                 "llm_attn_impl": (
                     ["sdpa", "flash_attention_2", "eager"],

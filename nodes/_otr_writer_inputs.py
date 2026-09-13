@@ -32,6 +32,7 @@ from typing import Any
 
 # The same lazy, stdlib-only sibling modules the writer imports, in the same
 # spelling. None of them import back into the writer or into this module.
+from ._otr_shared import device_options as _OTR_DEVICE_OPTIONS
 from . import _otr_model_catalog as _otr_model_catalog
 from . import _otr_source_payload as _otr_source_payload
 from . import _otr_source_snapshot as _otr_source_snapshot
@@ -638,7 +639,12 @@ def _resolve_inputs(
         # construction (LLMPolicyError on a bad enum -- fail loud here,
         # before any model work).
         "llm_policy": _llm_policy.LLMRuntimePolicy(
-            device=str(llm_device),
+            # Resolved here for the same reason as the preflight build in
+            # OTR_LedgerScriptWriter: the widget may say "default" or "gpu:N"
+            # and a FROZEN policy must only ever hold a concrete device, since
+            # it carries into cache_key(). These two constructions are meant to
+            # be byte-identical, so they resolve identically.
+            device=_OTR_DEVICE_OPTIONS.resolve_device(llm_device, fallback="cuda"),
             attn_impl=str(llm_attn_impl),
             quant_policy=str(llm_quant_policy),
             vram_ceiling_gb=float(llm_vram_ceiling_gb),

@@ -64,6 +64,13 @@ _DEVICE_BACKENDS = ("cuda", "cpu", "mps")  # ROCm presents as "cuda"
 _STATUSES = ("shipping", "draft")
 _GPU_VENDORS = ("nvidia", "amd", "apple", "none")
 _DTYPE_POLICIES = ("fp8_ok", "no_fp8", "no_fp8_no_fp4")
+#: A PROFILE names a MACHINE, so it keeps the concrete vocabulary (2026-09-12).
+#: "default" is deliberately NOT legal here and that is the whole point of a
+#: profile: `otr_mac_mps` exists precisely to say mps, and `otr_amd16_rocm` to
+#: say cuda-on-AMD. Resolution belongs to the CANONICAL graph, which must run
+#: anywhere; a profile is the opposite -- an explicit answer for one class of
+#: box. Widening this would let a profile be vague about the only thing it
+#: exists to pin down.
 _DEVICE_POLICIES = ("cuda", "cpu", "mps")
 
 

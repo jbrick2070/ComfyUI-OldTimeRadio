@@ -565,7 +565,7 @@
         "(select Google API model)",
         "(select Google API model)",
         "",
-        "mps",
+        "default",
         "sdpa",
         "none",
         10.0,
@@ -1349,7 +1349,7 @@
         true,
         "kokoro",
         "kokoro",
-        "mps"
+        "default"
       ],
       "color": "#2B3C5A",
       "bgcolor": "#1C273C"
@@ -2205,7 +2205,7 @@
         "request_hash",
         42,
         "{}",
-        "mps",
+        "default",
         "no_fp8_no_fp4",
         0
       ],

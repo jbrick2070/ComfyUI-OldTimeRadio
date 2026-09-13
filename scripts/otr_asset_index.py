@@ -134,18 +134,50 @@ def _scan(path: str) -> dict:
     }
 
 
+#: Modules under an engine directory that are NOT engines.
+_NOT_AN_ENGINE = frozenset({"__init__.py", "registry.py", "schemas.py"})
+
+#: THE IMAGE ENGINES DO NOT USE THE `eng_` PREFIX, and that is why this
+#: generator silently had no image section at all until 2026-09-12. The video
+#: and audio directories name their adapters `eng_<name>.py`; the image
+#: directory names most of them `<name>.py` -- `flux2_klein.py`, `sd15.py`,
+#: `z_image_turbo.py` -- with only the two cloud adapters carrying the prefix.
+#: So a glob written for the other two directories matched almost nothing here
+#: and the doc whose own header says "read this if you are setting up OTR on a
+#: new machine" never mentioned an image model.
+#:
+#: That gap had teeth: all 94 shipped workflows bake an image engine into
+#: OTR_VideoDirector, and roughly a third of them pick an engine whose weights
+#: are a MANUAL download with no row anywhere central.
+_ENGINE_DIRS = (
+    ("video", "nodes/_otr_video_engines", "eng_*.py"),
+    ("audio", "nodes/_otr_audio_engines", "eng_*.py"),
+    ("image", "nodes/_otr_image_engines", "*.py"),
+)
+
+
+def _engine_paths(subdir: str, pattern: str) -> list:
+    """Every adapter module in one engine directory, registry files excluded."""
+    hits = sorted(glob.glob(os.path.join(_REPO, subdir, pattern)))
+    return [p for p in hits if os.path.basename(p) not in _NOT_AN_ENGINE]
+
+
+def _engine_name(path: str) -> str:
+    """The engine id as a reader sees it in the dropdown."""
+    base = os.path.basename(path)[:-len(".py")]
+    return base[len("eng_"):] if base.startswith("eng_") else base
+
+
 def collect_engines() -> list:
     global _SHARED
     every = []
-    for pattern in ("nodes/_otr_video_engines/eng_*.py",
-                    "nodes/_otr_audio_engines/eng_*.py"):
-        every += sorted(glob.glob(os.path.join(_REPO, pattern)))
+    for _kind, subdir, pattern in _ENGINE_DIRS:
+        every += _engine_paths(subdir, pattern)
     _SHARED = _shared_helpers(every)
     out = []
-    for kind, pattern in (("video", "nodes/_otr_video_engines/eng_*.py"),
-                          ("audio", "nodes/_otr_audio_engines/eng_*.py")):
-        for path in sorted(glob.glob(os.path.join(_REPO, pattern))):
-            name = os.path.basename(path)[len("eng_"):-len(".py")]
+    for kind, subdir, pattern in _ENGINE_DIRS:
+        for path in _engine_paths(subdir, pattern):
+            name = _engine_name(path)
             row = _scan(path)
             row.update(kind=kind, engine=name,
                        module=os.path.relpath(path, _REPO).replace("\\", "/"))
@@ -240,7 +272,13 @@ def render() -> str:
       "```\npython scripts/otr_fetch_lane_weights.py minimax_h3\n```\n")
     A("Anything not listed there is a manual install -- see its row below.\n")
 
-    for kind, title in (("video", "Video engines"), ("audio", "Audio and voice engines")):
+    # IMAGE IS LISTED LAST AND IS NOT OPTIONAL (2026-09-12). Every shipped
+    # workflow names an image engine on OTR_VideoDirector, so a reader who
+    # stops after the video and audio tables has not finished setting up.
+    for kind, title in (("video", "Video engines"),
+                        ("audio", "Audio and voice engines"),
+                        ("image", "Image engines (every shipped workflow "
+                                  "picks one)")):
         A("## %s\n" % title)
         A("| engine | needs | how | used by profiles |")
         A("|---|---|---|---|")

@@ -90,6 +90,21 @@ Anything not listed there is a manual install -- see its row below.
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
 | `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 96 profile(s) |
 
+## Image engines (every shipped workflow picks one)
+
+| engine | needs | how | used by profiles |
+|---|---|---|---|
+| `cloud_image` | nothing on disk | - | - |
+| `google_image` | nothing on disk | - | - |
+| `flux2_klein` | 3 weight file(s) | manual download | - |
+| `flux_gen1` | 1 weight file(s) | manual download | - |
+| `hidream_i1` | **not declared in code -- verify** | - | - |
+| `ideogram4_local` | 9 weight file(s) | manual download | - |
+| `lumina_image` | 3 weight file(s) | manual download | - |
+| `sd15` | 1 weight file(s); `Comfy-Org/stable-diffusion-v1-5-archive` | manual download | - |
+| `sd35_large` | **not declared in code -- verify** | - | - |
+| `z_image_turbo` | 3 weight file(s) | manual download | - |
+
 ## Engines that are a separate INSTALL, not a download
 
 These shell out to their own Python interpreter **on purpose**: their dependencies conflict with ComfyUI's, so they run as isolated subprocess workers. That is why they cannot simply be bundled into this pack -- vendoring them back into one process reintroduces the exact dependency clash the isolation exists to prevent, and their weights are far larger than a node pack should ship.
@@ -246,6 +261,45 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `stable_audio_3_small_music.safetensors`
 - `stable_audio_3_small_music_base.safetensors`
 - `t5gemma_b_b_ul2.safetensors`
+
+**`flux2_klein`** -- `nodes/_otr_image_engines/flux2_klein.py`
+
+- `flux-2-klein-4b-Q4_K_M.gguf`
+- `flux2-vae.safetensors`
+- `qwen_3_4b.safetensors`
+
+**`flux_gen1`** -- `nodes/_otr_image_engines/flux_gen1.py`
+
+- `flux1-dev-fp8.safetensors`
+
+**`ideogram4_local`** -- `nodes/_otr_image_engines/ideogram4_local.py`
+
+- `flux2-vae.safetensors`
+- `ideogram4_fp8_scaled.safetensors`
+- `ideogram4_int8_convrot.safetensors`
+- `ideogram4_nvfp4_mixed.safetensors`
+- `ideogram4_unconditional_fp8_scaled.safetensors`
+- `ideogram4_unconditional_int8_convrot.safetensors`
+- `ideogram4_unconditional_nvfp4_mixed.safetensors`
+- `qwen3vl_8b_fp8_scaled.safetensors`
+- `qwen3vl_8b_nvfp4.safetensors`
+
+**`lumina_image`** -- `nodes/_otr_image_engines/lumina_image.py`
+
+- `gemma_2_2b_fp16.safetensors`
+- `lumina2_ae.safetensors`
+- `lumina_2_model_bf16.safetensors`
+
+**`sd15`** -- `nodes/_otr_image_engines/sd15.py`
+
+- Hugging Face: `Comfy-Org/stable-diffusion-v1-5-archive`
+- `v1-5-pruned-emaonly-fp16.safetensors`
+
+**`z_image_turbo`** -- `nodes/_otr_image_engines/z_image_turbo.py`
+
+- `ae.safetensors`
+- `qwen_3_4b.safetensors`
+- `z_image_turbo_bf16.safetensors`
 
 ## If you only want one working episode
 

@@ -32,6 +32,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from . import _otr_voice_route as _ROUTE
+from ._otr_shared import device_options as _DEVOPTS
 
 try:
     from ._otr_shared import env as otr_env
@@ -307,11 +308,15 @@ class CastLock:
                 # (append-only; widget slot 5). Stamped as meta.voice_device
                 # (S4) so every voice adapter + theme music reads ONE truth;
                 # the per-adapter waterfalls are gone.
-                "voice_device": (["cuda", "cpu", "mps"], {
-                    "default": "cuda",
-                    "tooltip": "EXPLICIT device for local voice/music "
-                               "engines (platform profile value). No "
-                               "auto-detect; unavailable devices fail loud.",
+                # Core's host-detected vocabulary plus the legacy names. See
+                # nodes/_otr_shared/device_options.py for why both halves exist.
+                "voice_device": (_DEVOPTS.device_options(), {
+                    "default": _DEVOPTS.DEFAULT_DEVICE_OPTION,
+                    "tooltip": "Device for local voice and music engines. "
+                               "'default' asks ComfyUI what this machine has "
+                               "and RECORDS what it chose; an explicit device "
+                               "is never second-guessed and still fails loud "
+                               "if it is not there.",
                 }),
             },
         }
@@ -1597,11 +1602,24 @@ class CastLock:
             meta = {}
             led["meta"] = meta
 
-        _dev = str(voice_device or "cuda").strip().lower()
-        if _dev not in ("cuda", "cpu", "mps"):
+        # RESOLVE FIRST, THEN STAMP THE CONCRETE DEVICE (2026-09-12). The widget
+        # may now say "default" or "gpu:N" -- ComfyUI's own vocabulary -- and
+        # neither is a device a loader can open. `resolve_device` turns those
+        # into the real name and passes an explicit choice through untouched, so
+        # what lands in the ledger is always what actually ran. That keeps every
+        # receipt interpretable and replay faithful; a ledger holding the word
+        # "default" would mean nothing six months from now.
+        #
+        # The refusal below is KEPT, deliberately. The 2026-07-09 portability
+        # ruling is that an unavailable device fails loud rather than silently
+        # downgrading, and that still holds: only "default" is ever resolved for
+        # you, and a junk value is still an error rather than a quiet fallback.
+        _raw = str(voice_device or _DEVOPTS.DEFAULT_DEVICE_OPTION).strip().lower()
+        if _raw not in _DEVOPTS.device_options():
             raise ValueError(
                 f"OTR_CastLock: voice_device {voice_device!r} is not one of "
-                "cuda/cpu/mps -- NO silent default.")
+                f"{'/'.join(_DEVOPTS.device_options())} -- NO silent default.")
+        _dev = _DEVOPTS.resolve_device(_raw, fallback="cpu")
         meta["voice_device"] = _dev
 
         requested = str(char_voice_engine or "auto").strip() or "auto"

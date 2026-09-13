@@ -28,6 +28,20 @@ from ._otr_video_engines import registry as _vreg
 from ._otr_image_engines import registry as _ireg
 from ._otr_shared import role_compat as _rc
 from ._otr_shared import role_slots as _role_slots
+from ._otr_shared import device_options as _devopts
+
+
+def _resolve_device_policy(device_policy) -> str:
+    """The v2 policy's device, as a CONCRETE name. Never "default", never blank.
+
+    Total on purpose: this sits on the render path and a resolver that can raise
+    would turn a portability convenience into a dead episode.
+    """
+    try:
+        return _devopts.resolve_device(device_policy or _devopts.DEFAULT_DEVICE_OPTION,
+                                       fallback="cuda")
+    except Exception:  # noqa: BLE001 -- never fail a render on device naming
+        return str(device_policy or "cuda")
 
 
 def _engine_for_role(resolved_video, effective_by_role, role):
@@ -314,10 +328,15 @@ class OTRVideoDirector:
                 # policy widgets (append-only; widget slots 12-13). Defaults
                 # = nv50 baseline; emitted in the v2 policy and enforced at
                 # the adapter boundary (S4).
-                "device_policy": (["cuda", "cpu", "mps"], {
-                    "default": "cuda",
-                    "tooltip": "EXPLICIT local video render device (platform "
-                               "profile value). No auto-detect.",
+                # Core's own host-detected vocabulary, plus the legacy names so
+                # every saved graph stays loadable. See
+                # nodes/_otr_shared/device_options.py for why both halves exist.
+                "device_policy": (_devopts.device_options(), {
+                    "default": _devopts.DEFAULT_DEVICE_OPTION,
+                    "tooltip": "Local video render device. 'default' asks "
+                               "ComfyUI what this machine has and RECORDS what "
+                               "it chose; anything else is explicit and is "
+                               "never second-guessed.",
                 }),
                 "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {
                     "default": "fp8_ok",
@@ -494,7 +513,23 @@ class OTRVideoDirector:
             # (ImageDirector, ShotLock, dispatcher, render_driver)
             # asserts policy_version == 2.
             "policy_version": 2,
-            "device_policy": str(device_policy or "cuda"),
+            # RESOLVED, NOT PASSED THROUGH, and this line is why (2026-09-12).
+            # It used to be a bare `str(device_policy or "cuda")` with NO
+            # validation, and it forwards through FIVE hops --
+            # otr_image_director -> otr_image_gen_dispatcher -> otr_shot_lock ->
+            # render_driver -- straight into torch as a literal device string.
+            # The writer and CastLock both REFUSE an unknown device loudly; this
+            # one alone accepted anything and rendered with it. Two paths that
+            # shout and one that does not is the worst shape a validation gap
+            # can take: a smoke test clearing the other two looks like it proved
+            # this one.
+            #
+            # `resolve_device` returns a CONCRETE device name, never the word
+            # "default", so the v2 policy every downstream consumer asserts on
+            # still carries a real device and the ledger records what actually
+            # ran. An explicitly chosen device is passed through untouched --
+            # only "default" is ever resolved for you.
+            "device_policy": _resolve_device_policy(device_policy),
             "dtype_policy": str(dtype_policy or "fp8_ok"),
             # WAN 8GB launch contract (2026-07-24): the per-tier render-length
             # ceiling rides the SAME v2 policy channel as device/dtype, so a
