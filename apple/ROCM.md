@@ -46,7 +46,7 @@ an issue with the probe output pasted in is the whole ask.
 | **OS** | **Windows first** -- the pack is Windows-native and AMD ships a ROCm build of PyTorch for Radeon on Windows (ROCm 7.2.x, one installer for both OSes) -- or Linux. Neither has a receipt here |
 | **GPU** | One AMD card: RDNA3 (7900 XT / XTX, W7900), RDNA4 (RX 9070 / 9070 XT, official in ROCm 7.2), or MI-series. RDNA2 may work; nobody knows |
 | **VRAM** | 16 GB for the full profile, 8 GB for the small one |
-| **ROCm** | 7.2.x (Windows or Linux); 6.x still fine on Linux |
+| **ROCm** | 7.2.x (Windows or Linux); 6.x still fine on Linux. The pip lines below show the 6.x wheel index -- match it to what you install |
 | **Disk** | About 31 GB of weights, so 50 GB free with working room |
 | **FFmpeg** | **And ffprobe -- both binaries, 6.1 or newer.** The one dependency that fails LATE; see the step below |
 | **Time** | An hour, most of it downloads |
@@ -78,6 +78,12 @@ so take a static build there). Check with `ffmpeg -version; ffprobe -version`.
 `scripts/` is not in the registry package, so the probe and the runners below
 exist only if you cloned the repository.
 
+**Match the wheel index to YOUR ROCm.** The line below is the 6.x index,
+which is the one we can name with confidence; on 7.2 take the matching
+`--index-url` from [pytorch.org](https://pytorch.org/get-started/locally/)
+instead. Nobody here has run either, so the URL is yours to confirm, not ours
+to promise.
+
 ```bash
 pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio
 git clone https://github.com/comfyanonymous/ComfyUI && cd ComfyUI
@@ -108,6 +114,12 @@ have saved yourself the evening and taught us more than a failed render would.
 Windows, install AMD's PyTorch for Radeon per the
 [ROCm on Radeon guide](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/index.html)
 and skip the pip line; on Linux:
+
+**Match the wheel index to YOUR ROCm.** The line below is the 6.x index,
+which is the one we can name with confidence; on 7.2 take the matching
+`--index-url` from [pytorch.org](https://pytorch.org/get-started/locally/)
+instead. Nobody here has run either, so the URL is yours to confirm, not ours
+to promise.
 
 ```bash
 pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio
