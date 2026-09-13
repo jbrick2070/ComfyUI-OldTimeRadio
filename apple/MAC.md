@@ -130,6 +130,80 @@ Logs: `otr/legs/shipping_set_20260913_051313/otr_mac16_animatediff.log` and
 `otr/legs/mac_comfyui_20260913.log` in the checkout above. The complete
 chained traceback is included for the 5080 git handoff.
 
+## otr_mac16_animatediff single-leg re-test, 2026-09-13 (afternoon)
+
+Handoff from a Codex session that ran out of credits mid three-act rung. That
+rung (`shipping_set_20260913_111821`) finished `otr_mac16_low` (SUCCESS, 30
+min) and `otr_mac16_still` (SUCCESS, 54 min), then `otr_mac16_video` got stuck:
+ComfyUI's server process had exited (no crash log found, nothing listening on
+`:8188`) while `scripts/otr_canonical_api_run.py` kept polling and logging
+`status=pending` every 5s regardless, because it does not distinguish a
+connection failure from a still-pending prompt. That worker and its harness
+shell were killed manually; no source was touched.
+
+`git pull --rebase origin v2.0-alpha` then fast-forwarded `d1a81d16` ->
+`bda17f48487576146d6cf1fe6515203ca37e494233` (30 files). ComfyUI was fully
+restarted (old process confirmed gone, port confirmed free, then relaunched)
+so the new modules were actually loaded before the next leg, per the
+handoff's explicit warning that a plain `git pull` does not reach a server
+that already imported the old code at boot.
+
+One leg, one act, ran clean against the fresh server:
+
+```
+OTR_ACT_COUNT=1 OTR_LEG_TIMEOUT=9000 scripts/otr_shipping_set_legs.sh \
+  http://127.0.0.1:8188 /Users/rentamac/ComfyUI-Shared/output/otr/obs \
+  .../.venv/bin/python otr_mac16_animatediff
+```
+
+| Graph | RESULT | Minutes | OBS filename |
+| --- | --- | ---: | --- |
+| otr_mac16_animatediff | FAIL | 13 | None — no pass |
+
+**This did not retest the MPS chunked-decode fix.** The leg never reached VAE
+decode: it failed at `assert_usable` for shot `shot_music_opening_001`,
+engine `animatediff15_lightning_video`, `FailureKind.DEPENDENCY_MISSING` --
+`checkpoint=v1-5-pruned-emaonly-fp16.safetensors` (folder_paths category
+`checkpoints`) and `decoder=vae-ft-mse-840000-ema-pruned.safetensors`
+(folder_paths category `vae`) not found, no fallback, nothing downloaded at
+render time. The `[ghost-signal] decoded N frame(s) in M chunk(s)` line the
+handoff asked us to watch for is **absent** -- the engine never got past its
+own usability check to attempt a decode.
+
+Checked by hand (report only, no fix applied): the checkpoint file exists on
+disk, but in the HuggingFace hub cache
+(`models/huggingface/hub/models--Comfy-Org--stable-diffusion-v1-5-archive/snapshots/.../v1-5-pruned-emaonly-fp16.safetensors`),
+not under a `folder_paths` `checkpoints` directory the loader will see. No
+`vae-ft-mse-840000-ema-pruned.safetensors` was found anywhere under
+`models/` in this search. The 2026-09-13 05:13 run of this same graph noted
+"the Lightning fetcher verified the checkpoint, motion module, and VAE before
+boot" and got past this point to the MPS OOM this fix targets -- so the
+model-path resolution for this engine now fails where it previously passed,
+on the same machine, same day. Peak MPS allocation: not applicable this run
+(no decode attempted); ComfyUI stayed alive after the failure, queue empty.
+
+<details>
+<summary>otr_mac16_animatediff traceback (2026-09-13 afternoon, missing-model failure)</summary>
+
+```text
+[ERROR] [OTR video] render FAILED (no fallback) shot shot_music_opening_001 engine animatediff15_lightning_video: EngineUnusable: video engine 'animatediff15_lightning_video' is not usable for role 'text_to_video': missing_model -- animatediff15_lightning_video artifact(s) not found: checkpoint=v1-5-pruned-emaonly-fp16.safetensors (folder_paths category 'checkpoints'), decoder=vae-ft-mse-840000-ema-pruned.safetensors (folder_paths category 'vae') -- drop them in the matching folder or register it in extra_model_paths.yaml. There is no fallback list and nothing is downloaded at render time.
+Traceback (most recent call last):
+  File ".../nodes/_otr_video_engines/render_driver.py", line 4726, in render_shot
+    clip = _render_one(eng, request, force_oom=force, host_caps=host_caps, profile=profile, segment=segment)
+  File ".../nodes/_otr_video_engines/render_driver.py", line 4461, in _render_one
+    eng.assert_usable(host_caps=_caps, profile=_prof, request_template=request)
+  File ".../nodes/_otr_video_engines/eng_ghost_signal_lightning.py", line 352, in assert_usable
+    super().assert_usable(host_caps, profile, request_template)
+  File ".../nodes/_otr_video_engines/eng_ghost_signal.py", line 1017, in assert_usable
+    raise EngineUnusable(...)
+comfyui-old-time-radio.nodes._otr_shared.engine_registry_base.EngineUnusable: video engine 'animatediff15_lightning_video' is not usable for role 'text_to_video': missing_model -- checkpoint=v1-5-pruned-emaonly-fp16.safetensors (folder_paths category 'checkpoints'), decoder=vae-ft-mse-840000-ema-pruned.safetensors (folder_paths category 'vae')
+```
+
+</details>
+
+Logs: `otr/legs/shipping_set_20260913_131946/otr_mac16_animatediff.log` in the
+checkout above. No source fixes or memory-limit changes were applied.
+
 <details>
 <summary>otr_mac16_animatediff traceback</summary>
 
