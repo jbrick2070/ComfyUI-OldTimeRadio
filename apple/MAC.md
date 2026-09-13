@@ -16,7 +16,8 @@ Each is the canonical with Mac-appropriate dropdowns already saved. The
 canonical itself also runs — it names no vendor and resolves your device at run
 time — but these pick the lanes that have receipts here.
 
-(`otr_mac_mps` is the PROFILE those are cut from, not a file you open.)
+(Each graph is cut from the profile of the same name in `config/profiles/`.
+`otr_mac_mps` is a separate lab profile, not the parent of these four.)
 
 What runs on a Mac and what does not is the **Mac 16 GB** column in
 [MACHINES.md](MACHINES.md). That table is generated from the same data the code
@@ -51,8 +52,9 @@ Two of the four Mac graphs mint stills and ship **SD 1.5** for it —
 `otr_mac16_still` and `otr_mac16_video` — one 2 GB checkpoint, ungated, no
 account, fetched on first use. `otr_mac16_low`, the one to start with, draws its
 own frames and never fetches an image model at all. `otr_mac16_animatediff`
-renders from the prompt alone; its SD 1.5 checkpoint comes with
-ComfyUI-AnimateDiff-Evolved rather than from us.
+renders from the prompt alone, and its SD 1.5 checkpoint is a MANUAL fetch --
+a node pack supplies code, not 2 GB of weights. [MACHINES.md](MACHINES.md)
+section 3 names the files that lane needs and where each goes.
 
 Z-Image-Turbo is what the NVIDIA graphs use and is a ~19 GB download; leaving it
 selected on a Mac with a still-consuming video lane starts that download. If you

@@ -19,7 +19,7 @@ needed to try is already in the repo and nothing is waiting on us:
 
 * **A graph is built and shipped** -- `workflows/variants/otr_amd_still.json`,
   generated from `config/profiles/otr_amd_still.json` the same way as every
-  working graph and marked experimental because it has no receipts. It is the
+  working graph and marked `draft` because it has no receipts. It is the
   still-image tier: Qwen3.5-4B writer (unquantised), `still_motion` over
   Z-Image Turbo stills, Kokoro voices, MusicGen. Two older lab profiles,
   `otr_amd16_rocm` and `otr_amd8_rocm`, still load with `--profile` for a 16 GB
@@ -48,6 +48,7 @@ an issue with the probe output pasted in is the whole ask.
 | **VRAM** | 16 GB for the full profile, 8 GB for the small one |
 | **ROCm** | 7.2.x (Windows or Linux); 6.x still fine on Linux |
 | **Disk** | About 31 GB of weights, so 50 GB free with working room |
+| **FFmpeg** | **And ffprobe -- both binaries, 6.1 or newer.** The one dependency that fails LATE; see the step below |
 | **Time** | An hour, most of it downloads |
 
 A rented box works fine. This is a couple of dollars of cloud GPU, not a
@@ -63,6 +64,19 @@ anything. Install a ROCm torch -- on Windows, AMD's PyTorch for Radeon from the
 [ROCm on Radeon guide](https://rocm.docs.amd.com/projects/radeon-ryzen/en/latest/index.html)
 instead of the pip line below; on Linux, the pip line -- clone this pack, and
 run one file:
+
+**Put FFmpeg and ffprobe on PATH first -- both binaries.** This is the one
+dependency that fails at the END: the final mux copies the master audio into the
+MP4 as PCM, which builds older than 6.1 cannot write, so the episode renders in
+full and then dies with `Could not find tag for codec pcm_s16le`. The pack
+refuses in about a second at the start of a run instead -- but only if both
+binaries are reachable. `winget install Gyan.FFmpeg` on Windows;
+`sudo apt install ffmpeg` on Ubuntu 24.04+ (22.04's apt build is 4.4 and FAILS,
+so take a static build there). Check with `ffmpeg -version; ffprobe -version`.
+
+**And every step here wants the GitHub clone, not a Manager install** --
+`scripts/` is not in the registry package, so the probe and the runners below
+exist only if you cloned the repository.
 
 ```bash
 pip install --index-url https://download.pytorch.org/whl/rocm6.2 torch torchvision torchaudio

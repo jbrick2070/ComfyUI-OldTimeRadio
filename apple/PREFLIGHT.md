@@ -107,9 +107,10 @@ Two things worth knowing before you add one:
 
 ## Cloud partner rows
 
-**This section needs the git clone.** `tests/` and `scripts/` are stripped
-from the registry bundle, so the test and the command below exist only if
-you cloned the repository. Everything earlier on this page works either way.
+**This section needs the git clone**, and so does every "Enforced by
+`tests/...`" line above it: `tests/` and `scripts/` are both stripped from the
+registry bundle. The CHECKLIST reads fine either way -- it is RUNNING the named
+tests and commands that wants the clone.
 
 **The contract lives only in a test**, `tests/test_cloud_engine_is_a_three_part_rule.py`:
 a `cloud_` id prefix, a `provider_side` attribute, and a `cloud_` node key. Read

@@ -105,8 +105,11 @@ fails. Take a static build. The floor is 6.1, where FFmpeg's MP4 muxer gained
 PCM; measured across three machines, 4.4.2 fails while 7.0.2, 8.0.1 and 9.0 pass.
 
 ```
-ffmpeg -version && ffprobe -version
+ffmpeg -version; ffprobe -version
 ```
+
+Use `;` rather than `&&`: on Windows PowerShell -- the platform this pack is
+native to -- `&&` is a parser error.
 
 Nothing in the pack parses that version number -- it muxes a fifth of a second
 of real silence at the start of a run and refuses, in about a second, if the
@@ -120,7 +123,8 @@ On Linux also install one monospace font for the burned captions
 A reload is not enough; the process must restart. Then verify:
 
 ```
-grep -i "OldTimeRadio" <comfyui console log>
+grep -i "OldTimeRadio" <comfyui console log>              # macOS / Linux
+Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShell
 ```
 
 **What each outcome means -- do not guess between them:**
@@ -158,9 +162,12 @@ The finish line is a finished `.mp4` in:
 <ComfyUI output folder>/otr/obs/
 ```
 
-Not the console, not a green node, not the absence of errors. **If nothing is in
-`otr/obs/`, the run did not finish**, however clean the log looked. Read the
-server log for `obs_publish OK ->` and it names the real destination.
+Not the console, not a green node, not the absence of errors. Read the
+`obs_publish` line before concluding anything: `obs_publish OK -> <path>` names
+the real destination, and `obs_publish BLOCKED -- ...` means the run SUCCEEDED
+with the episode in `otr/episodes/<episode>/` and only the published copy
+withheld. **No `obs_publish` line at all means the run did not finish**, however
+clean the log looked.
 
 Report the absolute path you verified and the filename you found.
 

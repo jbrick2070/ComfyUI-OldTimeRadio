@@ -127,6 +127,7 @@ wheel supplies only one of them.
 
 **Captions are blank boxes on Linux.** Install a monospace TTF.
 
-**It finished but nothing is in `otr/obs/`.** Read the console from the end
-backwards for the first error. A run that ends without publishing did not
-succeed.
+**It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line
+first -- see above. `BLOCKED` means it succeeded and withheld only the published
+copy. No `obs_publish` line at all is a real failure: read the console from the
+end backwards for the first error.
