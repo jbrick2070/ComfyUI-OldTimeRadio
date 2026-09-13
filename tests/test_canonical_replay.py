@@ -475,11 +475,38 @@ def test_replay_from_is_whitelisted_in_both_copies_and_the_canonical_carries_the
     assert "replay_from" in api.CREATIVE_WHITELIST and "replay_from" in WA.CREATIVE_WHITELIST
     wf = json.loads((_REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
     by = {n["id"]: n for n in wf["nodes"]}
-    assert by[1]["inputs"][-1]["name"] == "replay_from" and by[1]["widgets_values"][-1] == ""
-    assert by[7]["inputs"][10]["name"] == "replay_descriptor"
-    link = next(l for l in wf["links"] if l[0] == 289)
-    assert link[1:5] == [62, 6, 7, 10] and 289 in by[62]["outputs"][6]["links"]
-    assert wf["last_link_id"] == 289
+
+    # BY IDENTITY, NEVER BY POSITION. The first cut of this test asserted
+    # `inputs[-1]`, `inputs[10]`, link id 289 and `last_link_id == 289`; every
+    # one of those broke when the canonical legitimately grew `story_author`
+    # and two more links, and none of them was the thing worth guarding. What
+    # matters is that the writer still carries `replay_from`, that it ships
+    # EMPTY (a canonical with a replay path pinned would replay one episode
+    # forever), and that the descriptor really is wired from node 62.
+    from tests.test_workflow_json_guardrails import (
+        _live_widget_order, _resolve_ncm,
+    )
+
+    writer_inputs = {i["name"]: i for i in by[1]["inputs"]}
+    assert "replay_from" in writer_inputs
+    assert "widget" in writer_inputs["replay_from"], (
+        "replay_from must stay a widget, not become a link socket")
+    ncm = _resolve_ncm()
+    if ncm:
+        order = _live_widget_order(
+            ncm["OTR_LedgerScriptWriter"].INPUT_TYPES() or {})
+        assert by[1]["widgets_values"][order.index("replay_from")] == "", (
+            "the shipped canonical must not pin a replay source")
+
+    descriptor_slot = next(
+        i for i, spec in enumerate(by[7]["inputs"])
+        if spec["name"] == "replay_descriptor")
+    link_id = by[7]["inputs"][descriptor_slot]["link"]
+    link = next(l for l in wf["links"] if l[0] == link_id)
+    assert link[1] == 62 and link[3] == 7 and link[4] == descriptor_slot
+    assert link_id in by[62]["outputs"][link[2]]["links"]
+    assert wf["last_link_id"] >= max(l[0] for l in wf["links"]), (
+        "last_link_id must cover every link the graph carries")
 
 
 def test_the_verifier_recomputes_the_receipt_sha():

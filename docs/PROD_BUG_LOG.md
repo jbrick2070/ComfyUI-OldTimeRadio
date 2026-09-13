@@ -14975,3 +14975,65 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   format later.
 - confidence: HIGH (two live failures, the exact ffmpeg error, the version
   pair measured with the probe command itself).
+
+## PBUG-20260913-04 -- AnimateDiff decodes the whole clip in one batch, and Apple silicon cannot serve it
+- surfaced: LIVE leg, 2026-09-13 -- 16 GB M4 Mac, Python 3.13.12, torch
+  2.12.1, MPS, ComfyUI 0.35.1, OTR at 8fd43146. `otr_mac16_animatediff`,
+  run `shipping_set_20260913_051313`, node 92 (`OTR_VideoRenderBatch`),
+  shot `shot_music_opening_001`, engine `animatediff15_lightning_video`.
+  All eight sampling steps completed in 5:11 with 88 latents and a
+  16-frame context; the VAE decode then failed: `MPS backend out of memory
+  (MPS allocated: 14.29 GiB, other allocations: 3.65 GiB, max allowed:
+  20.13 GiB). Tried to allocate 2.67 GiB`. RESULT FAIL at 23 minutes, no
+  OBS mp4. Recorded by the Mac window in `apple/MAC.md` with the full
+  chained traceback; the other three mac16 graphs passed the same night.
+- symptom: the whole clip samples, then nothing is published -- the leg
+  dies at the cheapest stage after paying for the most expensive one.
+- root cause: `eng_ghost_signal` stage 4 handed every latent in the clip to
+  one `VAEDecode` call. ComfyUI sizes its own decode batch as
+  `int(get_free_memory(device) / memory_used_decode(...))`, and on Apple
+  silicon `get_free_memory` reports system memory rather than the MPS
+  allocator's working-set watermark, so the batch it chose was far larger
+  than the allocator would serve. Its tiled retry never ran either:
+  `model_management.is_oom()` matches `torch.cuda.OutOfMemoryError` and
+  `torch.AcceleratorError`, and an MPS exhaustion arrives as a plain
+  `RuntimeError` (`comfy/sd.py` decode, `comfy/model_management.py` 380-395).
+  So no layer of the stack bounded the batch and no layer caught the miss.
+- fix: **FIXED, live proof owed (the Mac re-runs this leg).**
+  `ghost_decode_chunk_frames()` returns 8 on MPS and 0 -- meaning one call
+  with the whole batch, exactly as before -- everywhere else, including on
+  a host whose device cannot be read. `_decode_latents` runs the same
+  one-node decode graph once per chunk and concatenates in order. This is
+  NOT a recipe change: the SD1.5 VAE decodes each frame independently, so
+  the pixels are identical and only the peak moves; the regression test
+  compares a chunked decode against an unchunked one frame for frame.
+  CUDA is provably untouched -- the chunk size is 0 there, which is one
+  call, and `tests/test_mps_decode_and_oom_classification.py` pins that.
+- bible-worthy: yes -- "a backend's free-memory number is a claim about the
+  machine, not a promise from the allocator", and its corollary, that a
+  vendor's OOM fallback may be keyed to one vendor's exception type.
+- confidence: HIGH (the traceback names the stage, the allocator numbers
+  and the frame count; the ComfyUI source for both misses was read).
+
+## PBUG-20260913-05 -- an exhausted allocator was reported as an invalid graph
+- surfaced: the same leg as PBUG-20260913-04. The Mac window recorded
+  `FailureKind.INVALID_DAG` for what the chained traceback shows to be an
+  MPS allocation failure.
+- symptom: the label sends the next reader hunting a wiring fault that does
+  not exist. It cost real minutes on 2026-09-13 before the traceback was
+  read to the bottom.
+- root cause: `render_driver.classify_failure` read only the OUTERMOST
+  exception type. The node executor wraps whatever a node raises in a
+  `GraphExecutionError`, which the table maps to `INVALID_DAG`, so every
+  wrapped OOM was mislabelled. `OomSignal` was matched, but that is the
+  soak's own stand-in, not anything a real render raises.
+- fix: **FIXED.** `out_of_memory_in_chain(exc)` walks `__cause__` and
+  `__context__` (cycle-safe) and recognises a type named `OutOfMemoryError`
+  or `OomSignal`, or a message containing "out of memory" -- the message is
+  necessary because CUDA raises a real type and Apple silicon raises a bare
+  `RuntimeError` whose text is the only signal there is. `classify_failure`
+  consults it before its type table. Both kinds are already HARD in
+  `retry_taxonomy`, so this changes the LABEL and no control flow.
+- bible-worthy: yes -- classify an exception by its chain, never by the
+  wrapper the executor put on it.
+- confidence: HIGH (live traceback, both source sites read).

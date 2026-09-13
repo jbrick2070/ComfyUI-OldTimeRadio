@@ -387,9 +387,39 @@ class SoakError(AssertionError):
 # --------------------------------------------------------------------------- #
 # Pure helpers (CPU-tested)
 # --------------------------------------------------------------------------- #
+def out_of_memory_in_chain(exc):
+    """True when this exception, or anything it was raised from, is a device
+    out-of-memory.
+
+    THE REASON THIS WALKS THE CHAIN. The node executor wraps whatever a node
+    raises in a ``GraphExecutionError``, and the classifier reads only the
+    outermost type, so an exhausted allocator was being reported as an invalid
+    graph -- the Mac's AnimateDiff leg on 2026-09-13 said INVALID_DAG for an
+    MPS refusal of 2.67 GiB, which reads as a wiring fault and is not one.
+
+    THE REASON IT ALSO READS THE MESSAGE. CUDA raises
+    ``torch.cuda.OutOfMemoryError``, a real type worth matching, but Apple
+    silicon raises a plain ``RuntimeError`` whose text is the only signal
+    there is; matching the type alone would keep mis-reading every Mac.
+    """
+    seen, current = set(), exc
+    while current is not None and id(current) not in seen:
+        seen.add(id(current))
+        if type(current).__name__ in ("OutOfMemoryError", "OomSignal"):
+            return True
+        if "out of memory" in str(current).lower():
+            return True
+        current = (getattr(current, "__cause__", None)
+                   or getattr(current, "__context__", None))
+    return False
+
+
 def classify_failure(exc):
     """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
     if isinstance(exc, OomSignal):
+        return _rt.FailureKind.OOM
+    # BEFORE the type table: an OOM wearing a GraphExecutionError is an OOM.
+    if out_of_memory_in_chain(exc):
         return _rt.FailureKind.OOM
     name = type(exc).__name__
     if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",

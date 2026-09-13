@@ -308,6 +308,57 @@ GHOST_NODE_CANDIDATES = {
     "decode": ("VAEDecode",),
 }
 
+#: Frames per VAE decode CALL on Apple silicon. Zero everywhere else, which
+#: means one call with the whole batch -- exactly what this lane did before.
+#:
+#: WHY A NUMBER AT ALL. ComfyUI sizes its own decode batch as
+#: `int(get_free_memory(device) / memory_used_decode(...))`. On Apple silicon
+#: `get_free_memory` reports system memory, not the MPS allocator's working-set
+#: watermark, so the batch it picks is far larger than the allocator will
+#: serve; and its tiled retry never runs, because `model_management.is_oom()`
+#: recognises `torch.cuda.OutOfMemoryError` and `torch.AcceleratorError` while
+#: an MPS exhaustion arrives as a plain `RuntimeError`. Measured on a 16 GB M4
+#: on 2026-09-13: 88 latents at 512x288 asked for 2.67 GiB against a 20.13 GiB
+#: ceiling with 14.29 GiB already held, and the whole leg died AFTER all eight
+#: sampling steps had completed (PBUG-20260913-04).
+#:
+#: WHY FOUR, and what that number does and does not promise. ComfyUI's own
+#: estimator (`comfy/sd.py`, `memory_used_decode`) puts this clip at
+#: 1.196 GiB per frame at 512x288: about 4.79 GiB for four frames against
+#: roughly 37 GiB for the ~31-frame batch it chose from an over-reported free
+#: figure. Four is a deliberate small multiple of the per-frame estimate, not
+#: a proof of headroom -- the traceback records the allocator's state mid-
+#: decode and so pins neither the resident floor before decode nor this
+#: chunk's true peak. The proof owed is the Mac re-running the leg. The extra
+#: calls cost nothing worth counting: the decode is a small fraction of a leg,
+#: and the measured alternative on this hardware is losing the leg at 23
+#: minutes.
+GHOST_MPS_DECODE_CHUNK_FRAMES = 4
+
+
+def ghost_decode_chunk_frames(device_type=None):
+    """Frames per decode call on this host: the chunk on MPS, 0 elsewhere.
+
+    Zero means one call with the whole batch -- the pre-existing behaviour,
+    and the answer for every non-Apple box, including one whose device cannot
+    be read at all. A host we cannot identify is never given a changed path.
+
+    ASKS FOR THE VAE'S DEVICE, NOT THE SAMPLER'S. They differ: `--cpu-vae`
+    decodes on CPU while sampling stays on MPS, and chunking a CPU decode
+    would be work done for a ceiling that is not there. `vae_device()` is the
+    same function `comfy.sd.VAE` uses to choose where it decodes.
+    """
+    dev = device_type
+    if dev is None:
+        try:
+            import comfy.model_management as _mm
+            picker = getattr(_mm, "vae_device", None) or _mm.get_torch_device
+            dev = getattr(picker(), "type", "")
+        except Exception:  # noqa: BLE001 -- off the ComfyUI box
+            return 0
+    return GHOST_MPS_DECODE_CHUNK_FRAMES if str(dev) == "mps" else 0
+
+
 #: The ADE optional sockets this lane deliberately leaves UNCONNECTED. Pinned as
 #: a set so a test can prove the runtime input dictionary contains none of them
 #: -- omission is the contract, and an invented ``None`` would not be omission.
@@ -1386,11 +1437,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 "inputs": {"samples": _wb.Wire("sampled_latent", 0),
                            "vae": _wb.Wire("vae", 0)}},
         }
-        images = _wb.run_graph(
-            decode_graph,
-            external_results={"sampled_latent": sampled_latent,
-                              "vae": owners["vae"]},
-            terminal=NODE_DECODE)[0]
+        images = self._decode_latents(decode_graph, sampled_latent,
+                                      owners["vae"])
 
         frames = _wb.images_to_uint8(images)
         decoded = int(frames.shape[0])
@@ -1463,6 +1511,50 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                     "it was not meant, %s was not read.",
                     self.name, "animatediff15_v3", "OTR_GHOST_HAUNTED_LORA_STRENGTH")
         return raw
+
+    def _decode_latents(self, decode_graph, sampled_latent, vae):
+        """Run the one-node decode graph, in chunks where the host needs them.
+
+        One call with the whole batch wherever the VAE does not decode on MPS
+        -- byte-identical to what this lane always did, because it is the same
+        call. On MPS, `GHOST_MPS_DECODE_CHUNK_FRAMES` frames at a time,
+        concatenated in order.
+
+        WHAT MAKES THE CHUNKED PATH EQUIVALENT is that nothing at this stage
+        couples one frame to another: the SD1.5 decoder is a 2D autoencoder
+        applied per frame, and AnimateDiff-Evolved restores its GroupNorm
+        injection before the decode runs, so no motion patch survives into it.
+        ComfyUI itself already slices this batch by a memory estimate for the
+        same reason. The regression test pins the order and the coverage of
+        the pieces -- it stands in for the decoder and so cannot, and does
+        not, speak for the decoder's arithmetic.
+
+        See :func:`ghost_decode_chunk_frames` for why Apple silicon needs it.
+        """
+        from . import wrapper_bridge as _wb
+
+        def _run(latent_tuple):
+            return _wb.run_graph(
+                decode_graph,
+                external_results={"sampled_latent": latent_tuple, "vae": vae},
+                terminal=NODE_DECODE)[0]
+
+        chunk = ghost_decode_chunk_frames()
+        latent = sampled_latent[0] if sampled_latent else None
+        samples = latent.get("samples") if isinstance(latent, dict) else None
+        total = int(getattr(samples, "shape", [0])[0]) if samples is not None else 0
+        if chunk <= 0 or total <= chunk:
+            return _run(sampled_latent)
+
+        import torch
+        pieces = []
+        for start in range(0, total, chunk):
+            part = dict(latent)
+            part["samples"] = samples[start:start + chunk]
+            pieces.append(_run((part,)))
+        _LOG.info("[ghost-signal] decoded %d frame(s) in %d chunk(s) of %d "
+                  "-- Apple silicon decode ceiling", total, len(pieces), chunk)
+        return torch.cat(pieces, dim=0)
 
     def _release_sampling_patchers_before_decode(self, owners):
         """Detach and identity-remove the sampling patchers, outermost first.
