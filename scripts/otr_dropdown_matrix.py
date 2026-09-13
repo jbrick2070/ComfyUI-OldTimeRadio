@@ -65,19 +65,25 @@ _END = "<!-- END GENERATED: dropdown-matrix -->"
 MACHINES = (
     # `profile` is what the COLUMN is computed against, so every cell stays
     # reproducible with `--profile 8gb_lite`. `graph_profile` is what a PERSON
-    # should open, which is a different question: 8gb_lite is a draft lab
-    # preset, while otr_nvidia_8gb_haunted is shipping and has the published
-    # 8 GB episodes.
+    # should open, which is a different question: the lab presets are
+    # drafts, while the shipping set (build_variants.SHIPPING_SET,
+    # 2026-09-13) has one graph per machine and tier. Each machine opens
+    # its video tier -- the best auto-downloading video engine for it --
+    # except AMD (experimental, stills only) and CPU (procedural lanes).
     {"key": "nv8", "label": "8 GB NVIDIA", "profile": "8gb_lite",
-     "graph_profile": "otr_nvidia_8gb_haunted",
+     "graph_profile": "otr_8gb_video",
      "blurb": "RTX 4060 / 3070 / 2080 class"},
     {"key": "nv16", "label": "16 GB+ NVIDIA", "profile": "16gb_full",
+     "graph_profile": "otr_16gb_video",
      "blurb": "RTX 5080 / 4080 / 3090 class"},
     {"key": "mac16", "label": "Mac 16 GB", "profile": "otr_mac_mps",
+     "graph_profile": "otr_mac16_video",
      "blurb": "Apple Silicon, unified memory"},
     {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd16_rocm",
+     "graph_profile": "otr_amd_still",
      "blurb": "Linux only -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
     {"key": "cpu", "label": "CPU only", "profile": "cpu_floor",
+     "graph_profile": "otr_cpu_low",
      "blurb": "no GPU at all"},
 )
 
@@ -892,14 +898,24 @@ def recommended_graph(profile_id: str) -> tuple:
     full = os.path.join(_REPO, graph)
     if not os.path.exists(full):
         return ("workflows/otr_canonical.json", "no per-machine graph is generated")
-    if status != "shipping":
-        return ("workflows/otr_canonical.json",
-                "the per-machine graph is still a draft")
     blocked = sorted(graph_engine_values(full) & stripped_engines())
     if blocked:
         return ("workflows/otr_canonical.json",
                 "the per-machine graph selects %s, which is not in an installed "
                 "copy" % ", ".join("`%s`" % b for b in blocked))
+    if status != "shipping":
+        # A graph in the shipping set (2026-09-13) is the answer even while
+        # its profile is still `draft`: draft there means "not yet proven on
+        # this hardware", not "lab preset", and the reader is told which.
+        # A draft OUTSIDE the set is a lab preset and stays behind the canonical.
+        try:
+            from build_variants import SHIPPING_SET
+        except ImportError:
+            SHIPPING_SET = ()
+        if profile_id in SHIPPING_SET:
+            return (graph, "in the shipping set, not yet proven on this hardware")
+        return ("workflows/otr_canonical.json",
+                "the per-machine graph is still a draft")
     return (graph, "")
 
 

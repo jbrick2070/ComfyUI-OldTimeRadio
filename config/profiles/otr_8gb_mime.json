@@ -1,6 +1,6 @@
 {
   "id": "otr_8gb_mime",
-  "display_name": "8 GB NVIDIA -- the same render as foley with the generated audio dropped. Lane ltx25_mime, sd15 stills, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+  "display_name": "8 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime, sd15 stills, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",

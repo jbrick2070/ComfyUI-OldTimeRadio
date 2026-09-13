@@ -225,18 +225,24 @@ def test_the_wan_8gb_variant_still_carries_a_REAL_frame_ceiling():
     a ceiling REACHES the variant at all, so it asserts against the profile
     rather than against a literal that will move again.
     """
+    # otr_8gb_wan left the shipping set on 2026-09-13 (WAN is `no` on an
+    # 8 GB card in docs/dropdown_matrix.json), so its graph is no longer
+    # written to workflows/variants/. The ceiling wiring it guards is the
+    # same code path every shipped graph takes, so derive the graph in
+    # memory -- build_variant is pure -- and assert on that.
+    import sys
+    sys.path.insert(0, str(REPO_ROOT / "scripts"))
+    import build_variants as bv
     from nodes._otr_shared import capability_profiles as _cp
     expected = _cp.load_profile("otr_8gb_wan")["video"]["max_render_frames"]
     assert expected and expected > 17, (
         "the 8GB WAN ceiling must be a real, planner-legal value")
-    wf = VARIANTS_DIR / "otr_8gb_wan.json"
-    with open(wf, "r", encoding="utf-8") as fh:
-        data = json.load(fh)
+    data, _variant_rel, _recipe = bv.build_variant("otr_8gb_wan")
     node = next(n for n in data["nodes"]
                 if str(n.get("type") or "") == "OTR_VideoDirector")
     names = [i.get("name") for i in _widget_inputs(node)]
     idx = names.index("max_render_frames")
     assert node["widgets_values"][idx] == expected, (
-        "otr_8gb_wan.json should pin max_render_frames=%r to match "
+        "the otr_8gb_wan graph should pin max_render_frames=%r to match "
         "config/profiles/otr_8gb_wan.json; got %r"
         % (expected, node["widgets_values"][idx]))

@@ -1,6 +1,6 @@
 {
   "id": "otr_16gb_mime",
-  "display_name": "16 GB NVIDIA -- the same render as foley with the generated audio dropped. Lane ltx25_mime, z_image_turbo stills, Kokoro voices, MusicGen. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+  "display_name": "16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime, z_image_turbo stills, Kokoro voices, MusicGen. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",

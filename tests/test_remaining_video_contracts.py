@@ -25,21 +25,19 @@ def test_otr_8gb_wan_profile_pins_low_vram_contract():
         "OTR_WAN_TI2V_MAX_FRAMES": "81",
     }
 
-    variant = json.loads(
-        (REPO / "workflows" / "variants" / "otr_8gb_wan.json").read_text(
-            encoding="utf-8"))
-    validator = next(
-        node for node in variant["nodes"]
-        if node.get("type") == "OTR_WorkflowValidator")
+    # The graph is derived, not read: otr_8gb_wan left the shipping set on
+    # 2026-09-13, so workflows/variants/ no longer carries it. The launch
+    # env is asserted on the profile above, which is where the generated
+    # launch recipe reads it from; the hand-kept `.env.json` twin this once
+    # compared against was never tracked.
+    import sys
+    sys.path.insert(0, str(REPO / "scripts"))
+    import build_variants as bv
+    variant, _rel, _recipe = bv.build_variant("otr_8gb_wan")
     render_batch = next(
         node for node in variant["nodes"]
         if node.get("type") == "OTR_VideoRenderBatch")
-    env_recipe = json.loads(
-        (REPO / "workflows" / "variants" / "otr_8gb_wan.env.json").read_text(
-            encoding="utf-8"))
     assert render_batch["widgets_values"][3] == 17    # frame_budget
-    assert validator["widgets_values"][4] == env_recipe["master_hash"]
-    assert env_recipe["env"]["OTR_WAN_TI2V_MAX_FRAMES"] == "81"
 
 
 # ---------------------------------------------------------------------------
@@ -128,9 +126,18 @@ def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned():
     the planner.
     """
     def _director_ceiling(stem):
-        graph = json.loads(
-            (REPO / "workflows" / "variants" / f"{stem}.json").read_text(
-                encoding="utf-8"))
+        path = REPO / "workflows" / "variants" / f"{stem}.json"
+        if path.is_file():
+            graph = json.loads(path.read_text(encoding="utf-8"))
+        else:
+            # otr_8gb_wan left the shipping set on 2026-09-13 (WAN is `no`
+            # on an 8 GB card in docs/dropdown_matrix.json), so its graph is
+            # derived here rather than read: build_variant is pure, and the
+            # profile id is the stem for every otr_* profile.
+            import sys
+            sys.path.insert(0, str(REPO / "scripts"))
+            import build_variants as bv
+            graph, _rel, _recipe = bv.build_variant(stem)
         return _node_of(graph, "OTR_VideoDirector")["widgets_values"][14]
 
     assert _director_ceiling("otr_8gb_wan") == 81

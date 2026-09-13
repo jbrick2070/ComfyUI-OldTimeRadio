@@ -4,7 +4,7 @@
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
-  "gpu_vendor": "amd",
+  "gpu_vendor": "nvidia",
   "toolchains": [],
   "allow_sidecars": false,
   "role_overrides": {
@@ -59,10 +59,10 @@
   },
   "video": {
     "device_policy": "cuda",
-    "dtype_policy": "no_fp8"
+    "dtype_policy": "fp8_ok"
   },
   "image": {
-    "dtype_policy": "no_fp8"
+    "dtype_policy": "fp8_ok"
   },
   "audio": {
     "voice_device": "cuda"

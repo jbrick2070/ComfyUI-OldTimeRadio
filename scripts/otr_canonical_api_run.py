@@ -3,13 +3,14 @@
 This is the small, boring headless entrypoint agents should use when the
 operator asks for an API render/smoke:
 
-* Always load workflows/otr_canonical.json from this repo.
+* Load workflows/otr_canonical.json from this repo, or one of its generated
+  variants under workflows/variants/ via --workflow (a saved-dropdown
+  projection of the same graph, never an ad-hoc one).
 * Apply engine/dropdown capability profiles through the single profile applier.
 * Patch only creative/story widgets directly, through otr_api.patch_creative.
-* Convert with scripts/otr_api.py and fail loud on schema/widget drift.
-
-It deliberately has no --workflow argument. If a run needs a different graph,
-that is a workflow change, not a headless smoke.
+* Convert with scripts/otr_api.py and fail loud on schema/widget drift -- the
+  conversion reads the SERVER's /object_info, so a server carrying an older
+  pack than the graph refuses at the widget-count check rather than drifting.
 """
 from __future__ import annotations
 

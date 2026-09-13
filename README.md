@@ -409,27 +409,86 @@ Two things to know before you change a dropdown:
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **94 generated per-machine graphs in
-`workflows/variants/`**, one per profile. Browse Templates lists only the
-canonical -- its scanner looks one directory deep -- so these are files you
-**drag onto the canvas** or open with Workflow → Open. Never hand-edit one; they
-are regenerated from the canonical.
+skip the dropdowns, the pack also ships **18 generated graphs in
+`workflows/variants/`** -- one per machine class and episode kind, named
+`otr_<machine>_<tier>.json`. Browse Templates lists only the canonical -- its
+scanner looks one directory deep -- so these are files you **drag onto the
+canvas** or open with Workflow → Open. Never hand-edit one; each is the canonical
+with its dropdowns set, regenerated from it, and checked against it.
 
-| Your machine | Open | Also install |
-|---|---|---|
-| Anything, to start | `otr_canonical` from Browse Templates | nothing |
-| 8 GB NVIDIA (RTX 4060 / 3070 / 2080 class) | `workflows/variants/otr_nvidia_8gb_haunted.json` | ComfyUI-AnimateDiff-Evolved, ComfyUI-GGUF, and three AnimateDiff weights placed by hand |
-| 16 GB+ NVIDIA (RTX 5080 / 4080 / 3090 class) | `otr_canonical` | nothing |
-| Apple Silicon, 16 GB | `workflows/variants/otr_mac_mps.json` | nothing |
-| AMD on Linux, or CPU only | `otr_canonical` -- the per-machine graphs are drafts | nothing |
+The tiers are named by what the episode is made of. **low** runs the procedural
+visualiser lanes and needs no video or image weights at all. **still** generates
+one image per beat and animates it (`still_motion`). **video** is real video
+diffusion. **foley** is video that generates its own sound, mixed under the
+voices; **mime** is the same render as a silent performance -- the video's
+own sound carries its beats and the voices and music are muted there.
+**animatediff** is SD 1.5 motion driven by the text prompt alone; it mints
+no still. Kokoro voices, MusicGen music,
+three acts and three characters on every graph; the upscaler is off.
 
-The 8 GB row is the one with a real history: a physical RTX 4060 with 8 GB
-has published 7 documented full OTR episodes through it, across all five rolling
-source banks. Its writer is `google/gemma-4-E2B-it`, because the canonical's Qwen
-at `llm_quant_policy` → `none` wants roughly 8.7 GB and an 8 GB card has about 7
-to give; if you set the canonical up by hand for such a card, change the writer,
-not just the video roles. Its music is MusicGen, which is noncommercial -- switch
-the music dropdown to `stable_audio_3` if that matters to you.
+<!-- BEGIN GENERATED: tier-matrix -->
+### 8 GB NVIDIA
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | 3 | 3 | draft |
+| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | draft |
+| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx_8gb | sd15 | auto | nothing | 3 | 3 | draft |
+| **foley** | `otr_8gb_foley` | Qwen3.5-4B | bnb_nf4 | ltx25_foley_plus | sd15 | manual | ComfyUI-GGUF | 3 | 3 | draft |
+| **mime** | `otr_8gb_mime` | Qwen3.5-4B | bnb_nf4 | ltx25_mime | sd15 | manual | ComfyUI-GGUF | 3 | 3 | draft |
+| **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
+
+### 16 GB NVIDIA
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | draft |
+| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
+| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
+| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_mime | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
+| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | draft |
+
+### Apple Silicon, 16 GB
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_mac16_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
+| **still** | `otr_mac16_still` | Qwen3.5-4B | none | still_motion | sd15 | none | nothing | 3 | 3 | shipping |
+| **video** | `otr_mac16_video` | Qwen3.5-4B | none | ltx098_low_video | sd15 | auto | nothing | 3 | 3 | shipping |
+| foley | _not built_ | | | | | | | | | |
+| mime | _not built_ | | | | | | | | | |
+| **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
+
+### AMD ROCm (experimental -- no receipts)
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| low | _not built_ | | | | | | | | | |
+| **still** | `otr_amd_still` | Qwen3.5-4B | none | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | draft |
+| video | _not built_ | | | | | | | | | |
+| foley | _not built_ | | | | | | | | | |
+| mime | _not built_ | | | | | | | | | |
+| animatediff | _not built_ | | | | | | | | | |
+
+### CPU only
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | draft |
+| still | _not built_ | | | | | | | | | |
+| video | _not built_ | | | | | | | | | |
+| foley | _not built_ | | | | | | | | | |
+| mime | _not built_ | | | | | | | | | |
+| animatediff | _not built_ | | | | | | | | | |
+<!-- END GENERATED: tier-matrix -->
+
+Weights marked **auto** download themselves the first time you queue; **manual**
+means the launch recipe beside the graph (`<graph>.launch.md`) lists what to
+fetch and where; **none** means those lanes need no video weights. A `draft`
+status is a graph cut from the same canonical that has not yet been proven on
+that hardware; the AMD graph has no receipts at all. What each machine class
+runs, engine by engine, is in [apple/MACHINES.md](apple/MACHINES.md).
 
 **On a Mac, read [apple/MAC.md](apple/MAC.md) before picking anything heavier
 than the defaults.** An out-of-memory on unified memory can reboot the machine,
@@ -479,7 +538,7 @@ node packs, not Python packages, so `pip` cannot supply them. Install them into
 
 | If you select | Install |
 |---|---|
-| `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `animatediff15_lightning_video` -- including the whole `otr_nvidia_8gb_haunted` graph | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) |
+| `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `animatediff15_lightning_video` -- including the three `otr_*_animatediff` graphs | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) |
 | `flux2_klein`, `ltx23_*`, `ltx25_*`, `wan22_*` | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md) |
 
 If you pick one of these lanes without its pack, the render stops with an error

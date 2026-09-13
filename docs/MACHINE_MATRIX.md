@@ -109,11 +109,11 @@ Video engines they select: `animatediff15_v3_haunted_video`, `fastwan_8gb`, `ltx
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_mac_animatediff` | animatediff15_lightning_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
-| `otr_mac_low` | viz_camera | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac16_animatediff` | animatediff15_lightning_video | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac16_low` | viz_camera | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
+| `otr_mac16_still` | still_motion | - | musicgen | sd15 | `shipping` | missing exact owner |
+| `otr_mac16_video` | ltx098_low_video | - | musicgen | sd15 | `shipping` | missing exact owner |
 | `otr_mac_mps` | viz_camera | - | musicgen | sd15 | `shipping` | complete; Python <=3.13 |
-| `otr_mac_still` | still_motion | - | musicgen | sd15 | `shipping` | missing exact owner |
-| `otr_mac_video` | ltx098_low_video | - | musicgen | sd15 | `shipping` | missing exact owner |
 
 <details><summary>3 draft profile(s) here -- not vouched for</summary>
 

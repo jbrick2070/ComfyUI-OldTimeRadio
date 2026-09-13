@@ -11,11 +11,11 @@ Every row below is a real saved graph in this repository. Drag it onto the Comfy
 | Your machine | Open this | Also install |
 |---|---|---|
 | Anything, to start | `workflows/otr_canonical.json` (Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; comfyui-old-time-radio) | nothing |
-| 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
-| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
-| Mac 16 GB -- Apple Silicon, unified memory | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
-| AMD ROCm -- Linux only -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
-| CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
+| 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_8gb_video.json` &mdash; in the shipping set, not yet proven on this hardware | nothing |
+| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` | ComfyUI-GGUF |
+| Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` | nothing |
+| AMD ROCm -- Linux only -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` &mdash; in the shipping set, not yet proven on this hardware | nothing |
+| CPU only -- no GPU at all | `workflows/variants/otr_cpu_low.json` &mdash; in the shipping set, not yet proven on this hardware | nothing |
 
 Every machine needs **ffmpeg and ffprobe** on PATH, and Linux needs one monospace TTF installed for burned captions.
 

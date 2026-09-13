@@ -384,6 +384,30 @@ stall for me, keep going and do a bunch of testing, we can fix when i get back."
 So the rows below are what SURVIVED his answers. The twelve rows that closed are
 gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
+### Waiting on his eyeball -- registry and workflow (2026-09-13 night)
+
+* **The pod cannot test the shipping graphs until a registry version that
+  carries them is Active.** `runpod create` + `install_custom_node
+  id=comfyui-old-time-radio` installs fine, but the registry's Active version
+  is alpha.30 (09-11) and alpha.31 is still Pending; the HEAD graphs carry
+  `OTR_StableAudioTheme.music_style` (09-12), so every pod leg refused at the
+  runner's widget-count guard. Unblocks with either: wait for alpha.31 to go
+  Active (alpha.31 has the widget), or bump `pyproject.toml` to alpha.32 (his
+  registry push). Git-URL installs do not reach a remote pod through the MCP,
+  and the template exposes no shell. Memory: pod-pack-version-must-match-the-graphs.
+* **Fable's answer to "an auto-update agent for version control" is a
+  fork-point audit in `scripts/build_variants.py --check` plus a tracked
+  `.githooks/pre-push`, not an agent.** Refuse a shipping profile whose
+  effective voice pair fails `resolve_casting_plan()`, refuse a pin that equals
+  the canonical (624 such pins across the 18 today -- each rots the day the
+  canonical moves), print each profile's real diff, and run that check with
+  the three sibling `--check`s (dropdown matrix, machine matrix, tier matrix)
+  from the hook: seven seconds measured, no CI. Three of tonight's eight
+  defects would have been refused before push. Needs his word because a
+  hook changes how both windows push (`git config core.hooksPath .githooks`
+  per clone). Full write-up: the session scratchpad `fable_vc.md`; ~80 lines
+  in build_variants.py, ~10 in otr_asset_index.py, one 25-line hook.
+
 ### Waiting on his ear, and nothing else
 
 * **The IndexTTS2 hang fix is WRITTEN AND HELD, because shipping it demotes
@@ -624,6 +648,34 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   haystack. That is the reason to curate before promoting, not after.
 
 ### Still genuinely open, and not his call
+
+* **Eleven shipped graphs store a bare engine id where the canvas combo
+  holds the suffixed label** (`viz_camera` vs `viz_camera (16:9) (audio-reactive,
+  no scene image)`). Headless queueing is unaffected -- `OTR_VideoDirector`
+  declares `VALIDATE_INPUTS(**kwargs)`, so ComfyUI skips the list check and the
+  resolver strips suffixes -- and the 09-13 legs rendered through it; on the
+  canvas the dropdown shows a value that is not in its own list. The widening
+  that fixes it is already written up and deliberately NOT done in
+  `nodes/_otr_workflow_apply.py::_director_option_value` (it relabels values
+  five tests expect bare); the fix is to separate the application contract
+  from the display label, then widen. Found by cursor's final QA, 2026-09-13.
+* **`otr_cpu_low` still carries `z_image_turbo` on its image roles** -- the
+  canonical's pick, dormant because the visualiser lanes never consume a
+  still, but a CPU user who flips one video role to a still-consuming lane
+  queues a CUDA image engine. There is no `none` image engine to pin; either
+  add one or document the flip. Cursor, 2026-09-13.
+* **`status` is inconsistent across the 18 shipping profiles** (8 GB graphs
+  are `draft` except `otr_8gb_animatediff`, which inherited `shipping` from
+  the haunted profile it was copied from). `apple/MACHINES.md` names a
+  shipping-set graph either way and says "not yet proven on this hardware"
+  for a draft; promote each profile when its machine has published an
+  episode through it (5080 legs 2026-09-13, then the 4060 and the Mac).
+* **`v3_sd15_mm.ckpt` is not at the models root on the 5080** -- only under
+  `custom_nodes/ComfyUI-AnimateDiff-Evolved/models/`, which the pack registers
+  as an `animatediff_models` path. The 09-13 AnimateDiff legs on the 5080
+  settle whether that is enough; if they fail, `python
+  scripts/otr_fetch_lane_weights.py haunted` places it. Cursor, 2026-09-13.
+
 
 * **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
   not assumed.** The edition carries NO chapter divisions of any kind -- its

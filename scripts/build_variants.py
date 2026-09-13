@@ -156,12 +156,19 @@ def _variant_stem(profile_id: str) -> str:
 
 
 def _profile_id_from_stem(stem: str) -> str:
-    """Inverse of _variant_stem against the COMMITTED profile ids."""
-    committed = set(_committed_profile_ids())
-    if stem in committed:
+    """Inverse of _variant_stem against the profile FILES on disk.
+
+    Resolved against every profile in config/profiles/, not the shipping
+    allow-list: `--check` may be pointed at a directory holding a lab
+    profile's graph (the drift test writes cpu_floor's), and a stem that
+    cannot find its profile must still name the file it came from.
+    """
+    profile_dir = Path(PROFILE_DIR)
+    if (profile_dir / f"{stem}.json").is_file():
         return stem
-    if stem.startswith("otr_") and stem[len("otr_"):] in committed:
-        return stem[len("otr_"):]
+    bare = stem[len("otr_"):] if stem.startswith("otr_") else stem
+    if bare != stem and (profile_dir / f"{bare}.json").is_file():
+        return bare
     return stem
 
 
