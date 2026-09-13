@@ -176,13 +176,23 @@ Both repos are public and ungated -- no token, no licence click.
 (the 8 GB default lane), into your ComfyUI `models/` tree:
 
 ```bash
+python -c "from huggingface_hub import hf_hub_download as d; print(d('Comfy-Org/stable-diffusion-v1-5-archive','v1-5-pruned-emaonly-fp16.safetensors'))"
 python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_mm.ckpt'))"
 python -c "from huggingface_hub import hf_hub_download as d; print(d('guoyww/animatediff','v3_sd15_adapter.ckpt'))"
 ```
 
-Copy `v3_sd15_mm.ckpt` into `models/animatediff_models/` and
-`v3_sd15_adapter.ckpt` into `models/loras/`. The SD 1.5 checkpoint these sample
-against is fetched for you at queue time and needs no action.
+Copy `v1-5-pruned-emaonly-fp16.safetensors` into `models/checkpoints/`,
+`v3_sd15_mm.ckpt` into `models/animatediff_models/`, and `v3_sd15_adapter.ckpt`
+into `models/loras/`.
+
+> **All three, including the SD 1.5 checkpoint, and here is why that is not
+> obvious.** SD 1.5 auto-downloads for the `sd15` IMAGE engine, so an earlier
+> version of this paragraph said it needed no action here. That was wrong. The
+> AnimateDiff lanes declare `accepts_still = False` -- they mint no still, so
+> the graph correctly skips fetching the image engine's weights as "provably
+> unused". But the motion module animates that checkpoint, so the lane needs
+> the file for ITSELF, and nothing on this path pulls it. It is the first of
+> the three files the clean-room 4060 stopped on.
 
 **For `animatediff15_lightning_video`** (the Apple Silicon lane) you need the
 Lightning module and the ft-mse VAE instead:
@@ -199,6 +209,31 @@ addendum that exposes it.
 
 **The motion module publishes no licence grant** (`commercial_clean = False` in
 the adapter), so treat the haunted lane as personal use.
+
+#### Three lanes whose weights we cannot tell you where to find
+
+**Said plainly because the alternative is you discovering it mid-render.** These
+dropdown rows declare weight files, nothing fetches them, and no document in
+this repo names a source for them. An audit on 2026-09-12 grepped the whole
+tree, archival design notes included, and found no repository attribution at
+all.
+
+| dropdown row | files with no stated source |
+|---|---|
+| `ltx23_high_video` (`ltx_video`) | 7 files -- the 22B unet, its GGUF, the video VAE, a Gemma text encoder, two distilled LoRAs and a spatial upscaler |
+| `ltx23_low_audio_in` (`ltx_audio_in`) | the same 7, plus an audio VAE |
+| `mesh_stage` | a Hunyuan3D checkpoint, and the portable Blender binary it shells out to |
+
+`wan22_high_fast` (`fastwan_8gb`) is a milder case of the same thing: its base
+weights come down with `wan22_high_video`, but the rank-128 LoRA that makes it
+"fast" is named only in two internal dated design notes, and the provisioner has
+no route for it either.
+
+**What this means for you.** Pick one of these and the render will stop when it
+looks for the file. If you know where these weights live, an issue naming the
+repository is the single most useful thing you could send us. Everything else
+about these lanes is documented -- the node packs, the pinned commits, the
+destination folders -- and only the source line is missing.
 
 > **Python 3.13 and the Kokoro voice (ComfyUI Desktop and the portable build both
 > ship Python 3.13).** The torch `kokoro` package cannot be pip-installed on 3.13
