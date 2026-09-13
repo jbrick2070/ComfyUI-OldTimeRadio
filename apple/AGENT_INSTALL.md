@@ -37,7 +37,7 @@ itself runs on** -- not `python3` on PATH, not a conda env you activated.
 
 | Install kind | Where ComfyUI lives | The Python to use |
 |---|---|---|
-| ComfyUI Desktop (Win/Mac) | `%APPDATA%\ComfyUI` / `~/Library/Application Support/ComfyUI`, models elsewhere | the bundled venv under the install dir |
+| ComfyUI Desktop (Win/Mac) | `%APPDATA%\ComfyUI`, or on a Mac `~/Library/Application Support/ComfyUI` **or** `~/Library/Application Support/Comfy Desktop` -- check both; models live elsewhere again | the bundled venv under the install dir |
 | Portable (Windows) | the unzipped folder | `python_embeded\python.exe` |
 | git clone | wherever they cloned it | that tree's `.venv` or the env they launch with |
 
@@ -54,7 +54,8 @@ instead.**
 
 The Python version decides the voice backend, and this is not a preference:
 
-* **3.12** -> the torch `kokoro` package.
+* **3.10, 3.11, 3.12** -> the torch `kokoro` package
+  (`requirements.txt` pins it to `python_version < "3.13"`).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
   CPU, about six times faster than realtime. Same voices.
 * **3.14** -> **no kokoro backend is packaged yet.** The pack still installs;
@@ -107,9 +108,9 @@ PCM; measured across three machines, 4.4.2 fails while 7.0.2, 8.0.1 and 9.0 pass
 ffmpeg -version && ffprobe -version
 ```
 
-Nothing in the pack parses that version number -- it runs a real one-second mux
-probe at the start of a run and refuses in about a second if the build cannot do
-it. Your job is only to make both binaries reachable.
+Nothing in the pack parses that version number -- it muxes a fifth of a second
+of real silence at the start of a run and refuses, in about a second, if the
+build cannot write it. Your job is only to make both binaries reachable.
 
 On Linux also install one monospace font for the burned captions
 (`fonts-dejavu-core` is enough).
@@ -128,9 +129,10 @@ grep -i "OldTimeRadio" <comfyui console log>
   installed. Move on.
 * `[OldTimeRadio] Skipped '<name>': <reason>` for a FEW nodes -> one dependency
   is missing. That is by design: `__init__.py` loads each node in its own
-  try/except so a partial install still works. Install the named dependency
-  with the ComfyUI Python. **32 of 34 nodes still register with every
-  requirement blocked**, so a handful of skips is not a broken pack.
+  try/except, so a partial install still works and the skip names its own
+  cause. Install the named dependency with the ComfyUI Python. A clean install
+  prints `[OldTimeRadio] OK - All 25 nodes loaded successfully`; a few skips
+  below that number is a missing library, not a broken pack.
 * **Zero nodes and no `[OldTimeRadio]` lines at all** -> the pack is not being
   loaded. It is in the wrong directory, ComfyUI is not scanning it, or
   `prestartup_script.py` died. **Do not chase missing libraries for this
@@ -142,8 +144,8 @@ grep -i "OldTimeRadio" <comfyui console log>
 is exactly one entry, `otr_canonical`. Open it and press **Queue**. Change
 nothing: every dropdown already holds a working value.
 
-Set `act_count` to `1` on **OTR_LedgerScriptWriter** for the first run if you
-want the shortest proof.
+`act_count` on **OTR_LedgerScriptWriter** already ships at `1` in
+`otr_canonical`, which is the shortest proof. Leave it alone.
 
 The first run downloads about 12 GB -- the writer, the music model and its text
 encoder, and the Kokoro voices. Later runs skip it.

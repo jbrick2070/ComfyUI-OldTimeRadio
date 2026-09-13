@@ -1,6 +1,6 @@
 {
   "id": "otr_8gb_animatediff",
-  "display_name": "8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, flux2_klein stills, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+  "display_name": "8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",

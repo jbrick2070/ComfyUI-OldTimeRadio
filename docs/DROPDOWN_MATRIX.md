@@ -16,7 +16,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 ## Every dropdown
 
-**Video -- procedural, nothing to download**
+**Video -- procedural, no video weights**
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
@@ -139,7 +139,8 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
+it yourself; `apple/MACHINES.md` section 3 names every file, the repository
+it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

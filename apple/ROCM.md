@@ -1,7 +1,7 @@
 # AMD / ROCm
 
-**AMD is not part of v2.0. We cut our losses on it, and this page is the map we
-made before we stopped.**
+**AMD ships EXPERIMENTAL in v2.0: one graph, no receipts. This page is the map,
+and the first episode off a Radeon is what makes it v2.1.**
 
 This pack writes a full old-time-radio episode -- script, cast, voices, music,
 pictures, video, credits -- locally, offline, on one GPU. It has run on NVIDIA

@@ -16,13 +16,14 @@
 That is how every episode opens. What follows is a radio drama nobody has heard
 before: a script written on your own machine from tonight's news, a public-domain
 story, a scene of Shakespeare, or nothing at all; a cast of neural voices and an
-announcer; a theme in the bank's own idiom; pictures to watch while you listen;
+announcer; a theme composed in the musical style of wherever the story came
+from; pictures to watch while you listen;
 burned captions and a credit roll. One workflow, one press of **Queue**, and a
 finished `.mp4` lands in your output folder.
 
 It runs entirely locally -- no account, no API key, no cloud service -- on NVIDIA
-cards and on Apple Silicon. Paid lanes exist for people who want them, and every
-one of them stays off until you turn it on.
+cards and on Apple Silicon. Paid options exist for people who want them, and
+every one of them stays off until you turn it on.
 
 ---
 
@@ -30,8 +31,8 @@ one of them stays off until you turn it on.
 
 **New to ComfyUI? This is a five-minute read and then a button.** You need a
 working ComfyUI (Desktop, portable or a git install -- any of them), about
-**25 GB of free disk** for the models the first run fetches, and one of the
-machines in the table below. You do not need an account, an API key, a paid
+**25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
+episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
 service, or a single one of the sixteen saved graphs further down this page:
 those are per-machine presets you can grow into. Installing the pack and
 pressing **Queue** is the whole path.
@@ -39,6 +40,7 @@ pressing **Queue** is the whole path.
 | Your machine | What to expect on a first short episode |
 |---|---|
 | NVIDIA, 16 GB or more | Minutes. Everything on this page is available to you. |
+| NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
 | No GPU at all | About half an hour, and it works. Start ComfyUI with `--cpu`. |
@@ -52,24 +54,23 @@ git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 ```
 
-Either branch is current: `v2.0-alpha` is the default and where the work
-lands, and `main` is kept on the same commit automatically. (It was not always
--- `main` sat 5,029 commits behind until 2026-09-13, so an older clone of it is
-a v1.7 tree and should be re-cloned rather than pulled.) Use ComfyUI's own
-Python for the `pip install`, not a system one.
+**Run that `pip install` with ComfyUI's own Python, not a system one** -- this
+is the most common way an install fails, and it fails much later, as nodes that
+quietly refuse to load. Python 3.10 through 3.13 are fine; 3.14 has no Kokoro
+voice build yet. Either branch is current: `v2.0-alpha` is the default and
+`main` now tracks it, so an older clone of `main` is a v1.7 tree and wants
+re-cloning rather than pulling.
 
-**2. Put `ffmpeg` and `ffprobe` on your PATH, and make it a current one.**
-Both binaries. Every episode is mixed, captioned and muxed through them, and
-the final mux copies the master audio into the MP4 losslessly, which older
-builds cannot write. `winget install Gyan.FFmpeg` and `brew install ffmpeg`
-give you a current pair and nothing more to think about. On Debian/Ubuntu run
-`ffmpeg -version` first: Ubuntu 22.04's apt build is 4.4, which fails, so take
-a static build instead. The floor is 6.1, where FFmpeg's MP4 muxer gained PCM;
-measured across three machines, 4.4.2 fails while 7.0.2, 8.0.1 and 9.0 pass. You do not have to work this out -- nothing reads the version number.
-The pack muxes a fifth of a second of silence at the start of a run and refuses
-in about a second if your build cannot do it, instead of at the end of a
-render. On Linux also install one monospace font (`fonts-dejavu-core` is
-enough) for the captions.
+**2. Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
+build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
+On Debian or Ubuntu take a static build -- 22.04's apt ffmpeg is too old to
+write the MP4 this pack makes -- and install one monospace font
+(`fonts-dejavu-core` is enough) for the captions. You do not have to check
+versions yourself: the pack pushes a fifth of a second of silence through your
+build at the start of every run and refuses in about a second if it cannot do
+the job, rather than at the end of a render.
+[apple/INSTALL.md](apple/INSTALL.md) has the version floor and what was
+measured where.
 
 **3. Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
 **OldTimeRadio** category in the node menu.
@@ -87,7 +88,8 @@ Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
 on CPU it is a long wait, and that is the model working, not a hang.
 
 That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
-finish**, however green the console looked.
+finish**, however green the console looked -- go to
+[When something goes wrong](#when-something-goes-wrong).
 
 The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
@@ -106,7 +108,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 |---|---|
 | `episode_title` | Blank, and the show titles itself. Anything you type becomes the title card. |
 | `num_characters` | Speaking parts. Ships at 2. |
-| `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. |
+| `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. Episodes published here run about one to four minutes; this is the main lever on that. |
 | `custom_premise` | A sentence or two of your own. Blank means the source decides. |
 | `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks -- one of nine. Ships on *roll*. |
@@ -126,7 +128,8 @@ something, and it is the one bank the roll never lands on.
 
 ## The guides that ship with it
 
-Everything under `apple/` is in the pack, whichever way you installed it.
+Everything under `apple/` is in the pack, whichever way you installed it. (The
+folder name is historical; the guides cover every platform.)
 
 | Everyone | |
 |---|---|
@@ -204,7 +207,7 @@ engines, chosen per role from dropdowns. Whatever you pick is honoured exactly: 
 missing or out-of-memory engine **stops the render with a named error** rather
 than swapping in something you did not choose. There is no silent fallback.
 
-What the canonical ships, and why:
+What `otr_canonical` ships, and why:
 
 - **Video:** three procedural, audio-reactive lanes -- `viz_mxc_cpu`, `viz_green`,
   `viz_camera` -- one per role. They draw their own frames, download nothing, and
@@ -257,7 +260,35 @@ and CPU-only columns, and a legend for every word in it, is
 
 <!-- BEGIN GENERATED: dropdown-matrix -->
 
-**Video -- procedural, nothing to download**
+**Reading these tables.** The canonical ships `viz_mxc_cpu` / `viz_green` /
+`viz_camera` for video, `z_image_turbo` for images (dormant -- those three video
+lanes consume no still), `kokoro` on both voice slots, `stable_audio_3` for
+music and `Qwen/Qwen3.5-4B` as the writer. Every one of them is **auto** or
+**nothing**: a default run downloads no manual file.
+
+*How you get it.* **auto** -- fetched on first use, no account.
+**GATED** -- fetches itself once you have accepted the licence on the model page
+and set `HF_TOKEN`. **manual** -- you place the file yourself;
+[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
+it comes from and the folder it goes in. **none** -- a hosted service, no
+weights. **own installer** -- its own install script rather than the model
+provisioner; **(Windows)** marks the three whose installer is PowerShell with no
+shell twin yet. **nothing** -- pure code. Sizes are GiB, from the real artifact
+bytes in the fetch manifests.
+
+*What a machine cell says.* **proven** -- a published episode used it on that
+machine. measured -- it ran there in a lab test, but no episode has used it.
+fits -- nothing blocks it and the arithmetic says it fits; nobody has run it.
+**tight** -- fits with little to spare. **OOM** -- expect to exhaust memory.
+**no** -- it will not fit. key -- hosted, so it runs anywhere you have the API
+key. not offered -- absent from that machine's dropdown because nobody has
+proven it there, which is a statement about receipts and **not about your
+hardware**.
+
+**On a Mac, OOM means a hard machine reboot, not a failed render** -- unified
+memory has no separate pool to exhaust. Read the Mac column before you pick.
+
+**Video -- procedural, no video weights**
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
 |---|---|---|---|---|---|
@@ -369,63 +400,6 @@ and CPU-only columns, and a legend for every word in it, is
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** |
-**How you get the weights.** Two things do the fetching for an **auto** row, and
-neither of them is a script you have to run: the engine's own library pulls it
-through the Hugging Face cache, or `OTR_WorkflowValidator` -- a node inside the
-graph -- downloads it at queue time. A **manual** row may still have a helper in
-`scripts/`, but `scripts/` is not in the registry bundle, so from a normal
-install it is a step you take by hand and it is labelled as one.
-
-**auto** -- fetched on first use, no account and no
-token; just pick it and run. **GATED** -- fetches itself, but only after you
-accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
-**none** -- no weights at all. *no lane* -- the engine is registered but no
-provisioning lane is declared for it, so nothing will fetch it for you.
-
-**own installer** -- installs through its own script rather than the model
-provisioner; **(Windows)** marks the three whose installer is PowerShell with no
-`.sh` twin, so on Linux and macOS there is no install path today. That is
-packaging, not hardware -- writing the shell installer is what clears it. **nothing** -- pure code; there is nothing to obtain.
-
-Sizes are GiB, summed from the real artifact bytes in the fetch manifests where
-a lane carries them, otherwise the figure the fetcher's own pick list states.
-
-**What a machine cell means, and read this before you read one.** Each cell
-answers TWO questions in order.
-
-* **not offered** -- OTR will not put this engine in your dropdown on that
-  machine, because its declaration does not list that backend. This is a
-  statement about the code, **not about your hardware**: several of these have
-  run on that hardware, and the declaration is a record of what has been
-  PROVEN, not of what is possible. Making one available is a code change plus a
-  receipt, not a purchase.
-* **too slow** -- offered on a CPU-only box in principle, kept off it because it
-  is not practical there.
-* Otherwise the engine IS offered, and the word is the memory verdict:
-  **proven** (a PUBLISHED EPISODE used it), measured (it ran on that hardware
-  in a lab test and worked, but no episode has ever used it), fits (nothing
-  blocks it and the arithmetic says it fits -- nobody has run it at all),
-  **OOM** (expect to exhaust memory), **?** (offered, nobody has measured it).
-
-**The proven/measured split IS the test plan.** "measured" is precisely the list
-of engines to close next, and the distinction was earned: a first pass called
-both states "proven", which put engines in the same column as ones that had
-carried a whole episode. Note also that an episode's FILENAME records only its
-dominant video lane, so counting receipts from filenames under-reports -- one
-published episode here ran viz_camera, viz_mxc_cpu and viz_green together.
-
-**The AMD column is the weakest one here, and it is weak by construction.** The
-ROCm profiles declare `device_backend: "cuda"`, because that is how ROCm
-presents itself to torch -- so every CUDA lane reads as offered there, and the
-column is really answering "is this vendor-locked or sidecar-locked?" rather
-than "has this been run on AMD?". Nothing in this repo has an AMD receipt. Treat
-an AMD cell as the absence of a hard blocker, nothing more.
-
-**On a Mac, OOM is a HARD MACHINE REBOOT, not a failed render** -- unified
-memory has no separate pool to exhaust. That is why the Mac column is worth
-reading before you pick, and why an unmeasured **?** there deserves more caution
-than the same mark on a discrete card.
 <!-- END GENERATED: dropdown-matrix -->
 
 Two things to know before you change a dropdown:
@@ -448,8 +422,8 @@ Two things to know before you change a dropdown:
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **18 generated graphs in
-`workflows/variants/`** -- one per machine class and episode kind, named
+skip the dropdowns, the pack also ships **sixteen generated graphs in
+`custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/`** -- one per machine class and episode kind, named
 `otr_<machine>_<tier>.json`. Browse Templates lists only the canonical -- its
 scanner looks one directory deep -- so these are files you **drag onto the
 canvas** or open with Workflow → Open. Never hand-edit one; each is the canonical
@@ -462,8 +436,13 @@ diffusion. **foley** is video that generates its own sound, mixed under the
 voices; **mime** is the same render as a silent performance -- the video's
 own sound carries its beats and the voices and music are muted there.
 **animatediff** is SD 1.5 motion driven by the text prompt alone; it mints
-no still. Kokoro voices, MusicGen music,
-three acts and three characters on every graph; the upscaler is off.
+no still. Kokoro voices, three acts and three characters on every graph; the
+upscaler is off.
+
+Every pre-set graph scores with **MusicGen**, not the canonical's Stable Audio
+3. MusicGen is noncommercial (see [Licence](#licence-and-credits)), so if that
+matters to you, change the music dropdown on **OTR_StableAudioTheme** after
+opening the graph.
 
 <!-- BEGIN GENERATED: tier-matrix -->
 ### 8 GB NVIDIA
@@ -536,43 +515,16 @@ mark left, on the AMD graph, and it means what it says: cut from the same source
 as the rest, with no receipts. What each machine class runs, engine by engine,
 is in [apple/MACHINES.md](apple/MACHINES.md).
 
-**On a Mac, read [apple/MAC.md](apple/MAC.md) before picking anything heavier
-than the defaults.** An out-of-memory on unified memory can reboot the machine,
-not the render, which is why the Mac column is conservative.
-
-The rows below are generated from the machine classes the pack ships, and say
-what each class runs for writer, video, voice, music and image.
-
-<!-- BEGIN GENERATED: machine-matrix -->
-
-## What works on what machine
-
-**Read the `extra install` column before you pick a row.** A lane that needs a third-party ComfyUI node pack cannot say so in `requirements.txt` or `pyproject.toml`, because a node pack is not a pip distribution -- so the requirement is invisible until the render fails with a missing class. That has already cost one divergence between the PROVEN path and the DOCUMENTED path (PBUG-20260829-09), when the box that proved the lane had git-cloned the pack by hand. `gated` means the weights need a Hugging Face licence acceptance before they download.
-
-| your machine | writer | video | voice | music | image | extra install | status |
-|---|---|---|---|---|---|---|---|
-| **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; image lane (Klein) proven 2026-09-02 on a Python 3.13 clean room |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | ComfyUI-GGUF | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
-| **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | flux2_klein | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
-| **AMD / ROCm (Windows or Linux)** | Qwen3.5-4B | still_motion | kokoro | musicgen | z_image_turbo | none | `draft`, unproven |
-
-**Use the machine key, not an experimental profile name.** Run these with the exact Python executable that launches ComfyUI (shown as `<ComfyUI Python>`). Preview the install plan first, then run the same command without `--list` to install it.
-
-* **8 GB NVIDIA (RTX 4060, 3070, 2080)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 8gb --list`
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 16gb --list`
-* **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** -> `<ComfyUI Python> scripts/otr_provision.py --machine 12gb --list`
-* **AMD / ROCm (Windows or Linux)** -> `<ComfyUI Python> scripts/otr_provision.py --machine amd --list`
-
-Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
-
-Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is the `otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and unused, published a three-act episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x realtime on the CPU. One system, one episode: a receipt, not a tier.
-
-<!-- END GENERATED: machine-matrix -->
-
-The `scripts/otr_provision.py` commands that table prints need the **git clone**:
-`scripts/` is not in a Manager install. The saved graphs in `workflows/variants/`
-need nothing but a drag, and the weights a graph selects download at queue time
-whenever the pack can fetch them itself.
+There is a second way to read the same hardware question, and it is worth
+knowing which you are reading. The tables above say what each **saved graph**
+selects. [apple/MACHINES.md](apple/MACHINES.md) also carries the **machine
+classes** -- what `scripts/otr_provision.py --machine <key>` would install for a
+class of card, which is a provisioning plan rather than a file on disk, and so
+names different engines for the same hardware. Both ship with the pack.
+`scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
+Manager install. The saved graphs in `workflows/variants/` need nothing but a
+drag, and the weights a graph selects download at queue time whenever the pack
+can fetch them itself.
 
 ---
 

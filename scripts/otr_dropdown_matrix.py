@@ -525,7 +525,7 @@ _FRICTION_CELL = {
 _HOSTED_WORDS = ("none", "none*")
 
 _GROUPS = (
-    ("Video -- procedural, nothing to download",
+    ("Video -- procedural, no video weights",
      lambda r: r["namespace"] == "video" and r["friction"] == "nothing"),
     ("Video -- hosted, no weights but you supply the key",
      lambda r: r["namespace"] == "video" and r["friction"] in _HOSTED_WORDS),
@@ -569,6 +569,36 @@ def render_table(rows: list, machines=MACHINES) -> str:
     return "".join(out)
 
 
+_README_LEGEND = """
+**Reading these tables.** The canonical ships `viz_mxc_cpu` / `viz_green` /
+`viz_camera` for video, `z_image_turbo` for images (dormant -- those three video
+lanes consume no still), `kokoro` on both voice slots, `stable_audio_3` for
+music and `Qwen/Qwen3.5-4B` as the writer. Every one of them is **auto** or
+**nothing**: a default run downloads no manual file.
+
+*How you get it.* **auto** -- fetched on first use, no account.
+**GATED** -- fetches itself once you have accepted the licence on the model page
+and set `HF_TOKEN`. **manual** -- you place the file yourself;
+[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
+it comes from and the folder it goes in. **none** -- a hosted service, no
+weights. **own installer** -- its own install script rather than the model
+provisioner; **(Windows)** marks the three whose installer is PowerShell with no
+shell twin yet. **nothing** -- pure code. Sizes are GiB, from the real artifact
+bytes in the fetch manifests.
+
+*What a machine cell says.* **proven** -- a published episode used it on that
+machine. measured -- it ran there in a lab test, but no episode has used it.
+fits -- nothing blocks it and the arithmetic says it fits; nobody has run it.
+**tight** -- fits with little to spare. **OOM** -- expect to exhaust memory.
+**no** -- it will not fit. key -- hosted, so it runs anywhere you have the API
+key. not offered -- absent from that machine's dropdown because nobody has
+proven it there, which is a statement about receipts and **not about your
+hardware**.
+
+**On a Mac, OOM means a hard machine reboot, not a failed render** -- unified
+memory has no separate pool to exhaust. Read the Mac column before you pick.
+"""
+
 _LEGEND = """
 **How you get the weights.** Two things do the fetching for an **auto** row, and
 neither of them is a script you have to run: the engine's own library pulls it
@@ -580,7 +610,8 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; `docs/MODEL_ASSET_INDEX.md` names the files and where they go.
+it yourself; `apple/MACHINES.md` section 3 names every file, the repository
+it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 
@@ -1057,7 +1088,8 @@ def render_apple(rows: list) -> str:
     # that pointer finds nothing -- and section 3 above answers the question
     # better anyway, with a repository and a destination folder per file.
     legend = _LEGEND.strip().replace(
-        "`docs/MODEL_ASSET_INDEX.md` names the files and where they go.",
+        "`apple/MACHINES.md` section 3 names every file, the repository\n"
+        "it comes from and the folder it goes in.",
         "section 3 above names every file, the repository it comes from and "
         "the folder it goes in.")
     L.append(legend + "\n\n")
@@ -1102,10 +1134,19 @@ def _profile_engines(profile_id: str) -> set:
 
 
 def render_readme_block(rows: list) -> str:
-    """The README injection -- the three machines a stranger is likely on."""
+    """The README injection -- the three machines a stranger is likely on.
+
+    The legend goes ABOVE the tables and is the SHORT one. The long `_LEGEND`
+    is written for the full five-machine rendering: against the README's own
+    cells it defines three marks that never appear here (`**?**`, `too slow`,
+    `*no lane*`), leaves the three most common ones undefined (`key` alone
+    appears 57 times), and spends two paragraphs on an AMD column this
+    rendering does not have. It stays in the docs that do render those.
+    """
     machines = [m for m in MACHINES if m["key"] in ("nv8", "nv16", "mac16")]
-    return ("%s\n\n%s\n%s\n%s\n" % (
-        _BEGIN, render_table(rows, machines).strip(), _LEGEND.strip(), _END))
+    return ("%s\n\n%s\n\n%s\n%s\n" % (
+        _BEGIN, _README_LEGEND.strip(), render_table(rows, machines).strip(),
+        _END))
 
 
 def inject_readme(block: str, write: bool) -> bool:

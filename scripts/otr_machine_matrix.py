@@ -458,11 +458,13 @@ def render() -> str:
       "2026-09-08, including local `sd15` stills and local `ltx_8gb` video "
       "diffusion. It is not promoted to a machine key: a machine key implies a "
       "measured VRAM tier, and one 16 GB Mac is one data point, not a tier. "
-      "Read `docs/MAC_PORTABILITY_GUIDE.md` before starting. CPU-only is the "
+      "Read `apple/MAC.md` before starting -- it ships with the pack, unlike "
+      "`docs/`. CPU-only is the "
       "`otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` "
-      "on an x86 laptop, the GPU present and unused, published a three-act "
+      "on an x86 laptop, the GPU present and unused, published a one-act "
       "episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x "
-      "realtime on the CPU. One system, one episode: a receipt, not a tier.\n")
+      "realtime on the CPU. One system, one episode, one act: a receipt, "
+      "not a tier.\n")
     A("")
 
     A("## How to read the confidence column\n")
@@ -607,13 +609,28 @@ _END = "<!-- END GENERATED: machine-matrix -->"
 
 
 def headline_block() -> str:
-    """Just the class table -- what gets injected into README.
+    """Just the class table. No longer injected into README -- see below.
 
-    README is the universal front door and already answers "what do I run on my
-    machine". Two hand-eyed surfaces answering one question is how it came to
-    claim an 8 GB card had "rendered nothing" while six documented episodes had published
-    from one. So the answer is generated ONCE and injected, rather than told
-    twice.
+    It WAS injected, for a good reason worth keeping written down: README is the
+    universal front door, and two hand-eyed surfaces answering "what do I run on
+    my machine" is how the page came to claim an 8 GB card had "rendered
+    nothing" while six documented episodes had published from one. Generating
+    the answer once and injecting it fixed that.
+
+    What changed on 2026-09-13 is that README gained a TIER matrix -- one row per
+    shipping graph -- and the two tables then answered the hardware question
+    differently, because they are answers to different questions. A machine-class
+    row is the PROVISIONER TUPLE (`otr_provision.py --machine 16gb` installs
+    wan22_high_video and gemma-4-12b); a tier row is what the saved graph on disk
+    actually selects (ltx25_high_video, and the same writer under a different
+    label). Side by side and unlabelled, that reads as a contradiction, and two
+    independent reviewers read it as one.
+
+    So README now carries NO copy of this table and links to `apple/MACHINES.md`
+    instead. The original hazard does not return: the fix for a stale duplicate
+    is still "generate it once", and the place it is generated to now ships with
+    the pack. Do not re-inject this without also resolving it against the tier
+    matrix.
     """
     full = render()
     start = full.index("## What works on what machine")
@@ -622,20 +639,21 @@ def headline_block() -> str:
 
 
 def inject_readme(check_only: bool = False) -> bool:
-    """Put the class table into README between markers. True if in sync."""
+    """REMOVE the class table from README. True if README already has none.
+
+    The name is kept because `--check` and `main` both call it and the job is
+    still "make README agree with this generator" -- the agreement is now that
+    README carries no copy. See headline_block for why. A leftover block from an
+    older checkout is stripped, markers and all; there is no re-injection path,
+    so running this generator can no longer put the table back.
+    """
     path = os.path.join(_REPO, "README.md")
     s = io.open(path, encoding="utf-8").read()
-    block = _BEGIN + "\n\n" + headline_block() + "\n" + _END
-    if _BEGIN in s and _END in s:
-        head, rest = s.split(_BEGIN, 1)
-        _stale, tail = rest.split(_END, 1)
-        out = head + block + tail
-    else:
-        hook = "## Which video models fit your card"
-        if hook not in s:
-            print("  README hook not found; nothing injected")
-            return True
-        out = s.replace(hook, block + "\n\n" + hook, 1)
+    if _BEGIN not in s or _END not in s:
+        return True
+    head, rest = s.split(_BEGIN, 1)
+    _stale, tail = rest.split(_END, 1)
+    out = (head.rstrip("\n") + "\n" + tail.lstrip("\n"))
     if out == s:
         return True
     if check_only:
@@ -761,13 +779,15 @@ def main(argv=None) -> int:
         if not doc_ok:
             print("  STALE: docs/MACHINE_MATRIX.md differs from the profiles")
         if not readme_ok:
-            print("  STALE: README's machine-matrix block differs")
+            print("  STALE: README still carries a machine-matrix block; "
+                  "this generator no longer puts one there")
         print("  run: python scripts/otr_machine_matrix.py")
         return 1
 
     io.open(dest, "w", encoding="utf-8", newline="\n").write(text)
-    inject_readme()
-    print("wrote %s (%d bytes) and injected the README block" % (dest, len(text)))
+    stripped = not inject_readme()
+    print("wrote %s (%d bytes)%s" % (dest, len(text),
+          "; removed the stale README block" if stripped else ""))
     return 0
 
 

@@ -409,7 +409,7 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   fork-point audit in `scripts/build_variants.py --check` plus a tracked
   `.githooks/pre-push`, not an agent.** Refuse a shipping profile whose
   effective voice pair fails `resolve_casting_plan()`, refuse a pin that equals
-  the canonical (624 such pins across the 18 today -- each rots the day the
+  the canonical (hundreds of such pins across the 16 today -- each rots the day the
   canonical moves), print each profile's real diff, and run that check with
   the three sibling `--check`s (dropdown matrix, machine matrix, tier matrix)
   from the hook: seven seconds measured, no CI. Three of tonight's eight
@@ -699,11 +699,15 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   still, but a CPU user who flips one video role to a still-consuming lane
   queues a CUDA image engine. There is no `none` image engine to pin; either
   add one or document the flip. Cursor, 2026-09-13.
-* **`status` is inconsistent across the 18 shipping profiles** (8 GB graphs
-  are `draft` except `otr_8gb_animatediff`, which inherited `shipping` from
-  the haunted profile it was copied from). `apple/MACHINES.md` names a
-  shipping-set graph either way and says "not yet proven on this hardware"
-  for a draft; promote each profile when its machine has published an
+* **DONE 2026-09-13: `status` now matches the receipts.** Fifteen of the
+  sixteen shipping profiles are `shipping`, each against a named published
+  episode; `otr_amd_still` stays `draft` because no Radeon has run it.
+  `apple/MACHINES.md` reads `status` directly, so its "not yet proven on this
+  hardware" note now appears against the AMD row alone. The original row, for
+  the record: status was inconsistent across the shipping profiles (8 GB
+  graphs `draft` except `otr_8gb_animatediff`, which inherited `shipping`
+  from the haunted profile it was copied from); promote each profile when
+  its machine has published an
   episode through it (5080 legs 2026-09-13, then the 4060 and the Mac).
 * **`v3_sd15_mm.ckpt` is not at the models root on the 5080** -- only under
   `custom_nodes/ComfyUI-AnimateDiff-Evolved/models/`, which the pack registers
