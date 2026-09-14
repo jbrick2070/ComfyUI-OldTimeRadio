@@ -19,9 +19,11 @@
 <p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">▶ Hear a complete episode first — ninety seconds</a></strong></p>
 <p align="center"><em><strong>The Shivering Gauge</strong>: a film archivist and his apprentice racing
 vinegar syndrome through one night in the lab. Written, cast, performed, scored,
-drawn and cut on one machine, from a Library of Congress feed. The sound effects
-are not a library — the video model generates its own audio, mixed under the
-voices.</em></p>
+drawn and cut on one machine, from a Library of Congress feed. Its sound effects
+are not a library: this episode ran the foley lane (<code>otr_16gb_foley</code>),
+where the video model generates the scene's own audio and the workflow mixes it
+under the voices. The default graph draws its pictures from the audio instead;
+the foley lane is a 16 GB pick, not the starting point.</em></p>
 
 That is how every episode opens. What follows is a radio drama nobody has heard
 before: a script written on your own machine from tonight's news, a public-domain
