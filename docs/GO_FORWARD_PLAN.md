@@ -386,40 +386,15 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his eyeball -- registry and workflow (2026-09-13 night)
 
-* **2.0.0 IS ACTIVE. 2.1.0 AND 2.1.1 ARE BOTH PENDING (2026-09-13 night).**
-  2.0.0 cleared the scanner roughly a day after publish, which unblocked
-  everything that had been queued behind the "never stack on a Pending
-  version" rule. Two releases went out the same evening on his direct
-  instruction:
-  * **2.1.0** -- Stable Audio 3 became the music default on fifteen of the
-    sixteen shipped graphs (otr_cpu_low stays on MusicGen: sa3 declares
-    cuda+mps only), My Story joined the source-bank roll as an equal peer,
-    and the registry listing text was replaced -- the old description claimed
-    "No cloud services required", which stopped being true when two banks
-    began fetching live RSS. A false claim on the listing page itself.
-  * **2.1.1** -- took the retired branch name off every surface a user can
-    see: the credit roll burned into every episode read "Made with OTR
-    v2.0-alpha", and ~20 GitHub URLs inside ERROR MESSAGES pointed at that
-    branch, which is where a 404 lands on someone already stuck.
-  **NOTHING TO DO BUT READ THE REGISTRY, and read the WHOLE list** -- the API
-  sorts by version string, so a bare release sorts BELOW every `-alpha.N` row.
-  There is no telemetry; the enum is the only signal.
-  **ONE THING IS GATED ON 2.1.1 GOING ACTIVE, and it is easy to get wrong:**
-  do NOT delete the `v2.0-alpha` branch until then. A published version's
-  metadata is frozen with the Icon URL it shipped, so 2.0.0 and 2.1.0 both
-  still resolve their registry card art through `/v2.0-alpha/`. The listing
-  renders whichever version is CURRENT. Delete the branch while an older row
-  is current and the card art breaks on the live page. Wait for Active,
-  confirm the card, then delete.
-  **The pod half of this row is CLOSED (2026-09-13).** It was written when the
-  only route to a pod was `install_custom_node` through the MCP, which serves
-  the registry version. A pod created from the PyTorch template with an SSH
-  key exposes a real shell, so it runs a git checkout at HEAD like any other
-  box, and `otr_16gb_low` published from one at 18:14Z. Two things that route
-  costs, both now handled in `scripts/otr_pod_provision.sh`: the template's
-  ffmpeg is 4.4 and cannot write the master into an MP4 (PBUG-20260913-03),
-  and the network volume is shared and sits near its quota, so a long ladder
-  can hit "Disk quota exceeded" mid-episode.
+* **WATCH FOR 2.1.1 TO GO ACTIVE, then delete the `v2.0-alpha` branch.**
+  State: 2.0.0 Active, 2.1.0 and 2.1.1 Pending. Read the WHOLE version list --
+  the API sorts by string, so a release sorts below every `-alpha.N` row, and
+  the status enum is the only signal there is.
+  **Do not delete the branch before 2.1.1 is Active.** 2.0.0 and 2.1.0 have
+  `/v2.0-alpha/` frozen into their registry card Icon URL, and the listing
+  renders whichever version is current -- deleting early breaks the card art
+  on the live page.
+
 * **Fable's answer to "an auto-update agent for version control" is a
   fork-point audit in `scripts/build_variants.py --check` plus a tracked
   `.githooks/pre-push`, not an agent.** Refuse a shipping profile whose
@@ -674,120 +649,27 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
-* **THE WIDGET RENAME/REORDER TIER IS HANDED OFF, NOT DONE
-  (`docs/HANDOFF_WIDGET_RENAME_REORDER.md`, 2026-09-13).** An external UI
-  audit read the whole widget surface. The string-and-default half LANDED
-  (commit 2f11fe88): five receipt-only controls stopped pretending to be
-  switches, tooltips naming retired nodes are fixed -- two of them falsified
-  by that same evening's own node removals -- the four-widget cross-node voice
-  trap is named on all four tooltips, and eleven fresh-node defaults now match
-  the shipped graph (worst: both voice nodes defaulted to `indextts2`, which
-  is noncommercial and absent from an ordinary install, because `engines[0]`
-  is registry order).
-  What is LEFT is positional surgery, and the handoff measures why it was not
-  rushed: a rename breaks **2,074** saved `inputs[].widget.name` references
-  across the 17 shipped graphs, **47** `widget_mapping.json` targets, the node
-  function's keyword parameter and all its callers -- and every workflow a
-  USER has already saved, which cannot be migrated and fails in a way they
-  cannot diagnose. The handoff's first deliverable is a GO/NO-GO on the
-  renames, not an edit, with the instruction to find out why this pack
-  deliberately removed `_RENAME_ALIASES` in the 2026-05-12 clean break
-  (`__init__.py:402`) before anyone proposes bringing it back. If there is no
-  safe path it recommends the REORDER alone, which changes no names.
+* **WIDGET RENAME/REORDER TIER -- run `docs/HANDOFF_WIDGET_RENAME_REORDER.md`
+  in its own window.** Its first deliverable is a GO/NO-GO on the RENAMES, not
+  an edit. The blocker to decide: a rename breaks every workflow a USER has
+  already saved, which cannot be migrated. Measured costs are in the handoff
+  (2,074 saved widget-name refs, 47 mapping targets). If no safe path exists,
+  do the REORDER only -- it changes no names.
 
-* **TWO FRESH-NODE DEFAULTS ARE HIS CALL, deliberately left disagreeing with
-  the canonical (2026-09-13).** `llm_quant_policy` (fresh `bnb_nf4`, canonical
-  `none`) and `llm_vram_ceiling_gb` (fresh `14.5`, canonical `10.0`). The
-  audit's rule -- make a dropped node match the graph -- is right everywhere
-  else and stops being safe here: matching would make a fresh node load the
-  writer UNQUANTISED at a HIGHER ceiling, which is correct for the canonical's
-  4B writer and can OOM a small card that the nf4 default would have carried.
-  `act_count` (fresh 3, canonical 1) is left for the same reason: the
-  canonical ships one act because every proving leg ran one on purpose, and
-  three is the friendlier first episode. Taste, not a defect.
+* **DECIDE: should `llm_quant_policy` and `llm_vram_ceiling_gb` fresh defaults
+  match the canonical?** Today they deliberately do not (fresh `bnb_nf4` /
+  `14.5`; canonical `none` / `10.0`). Matching would make a dropped node load
+  the writer unquantised at a higher ceiling and could OOM an 8 GB card. His
+  call. Same question, same answer needed, for `act_count` (fresh 3,
+  canonical 1).
 
-* **`stable_audio_3` DECLARES cuda+mps, and a canonical CPU leg ran it anyway
-  (2026-09-13).** The declaration in `nodes/_otr_audio_engines/registry.py`
-  lists no `cpu`, and `tests/test_capability_profiles.py::test_v2_stable_audio_3_lists_mps_but_not_cpu`
-  pins that -- with a docstring giving a TIER PREFERENCE as its reason ("the
-  cpu floor keeps musicgen"), not a capability claim. Measured against it:
-  the canonical, on a `--cpu` server, loaded
-  `stable_audio_3_small_music_base.safetensors`, sampled 100 steps twice at
-  ~1.05 s/it (~3.5 min of a 34.5-minute episode) and published
-  `the_trembling_silver_signet` to obs. So the declaration is arguably stale.
-  Changing it means editing a deliberately-pinned test, and it would let
-  `otr_cpu_low` move to sa3 like the other fifteen. Left alone because a
-  preference expressed as a refusal is exactly the kind of thing that should
-  not be flipped at the tail of a long night.
-
-* **The publish action will soon refuse `exec()` in the checkout.** Its
-  pre-scan on the 2.0.0 publish printed, against
-  `tests/test_visual_asset_validator_stdlib.py:92`, "We will soon disable
-  exec and eval ... this will be an error soon." The upload succeeded because
-  today it is a warning, and `tests/` is not in the zip -- but the pre-scan
-  runs on the CHECKOUT, not the zip, so `.comfyignore` may not save the next
-  publish. Two exits, either is fine: rewrite that seam test to build its
-  isolated class without `exec` (it compiles methods lifted from the AST; a
-  `types.FunctionType` build or a plain import with the stubs patched in
-  would do), or find the action's own ignore mechanism. Do it BEFORE 2.1, not
-  on the day 2.1 is due.
-
-* **The news lane never rerolls a decode-liveness halt (PBUG-20260913-06).**
-  `GenerationDegeneracyError` is raised with its own log line saying
-  "Rerollable", `_otr_slot_drama_contract.py` catches it and falls back, but
-  `run_scifi_news_pro_episode` calls `_pass_script(...)` exactly once with no
-  handler, and `_run_markup_ladder` re-raises it on purpose assuming a layer
-  above retries. Nothing above does. Seen once, live, on `otr_cpu_low` (the
-  second roll passed). **Held at one strike on purpose:** the fix is a design
-  question, not a patch -- the surrounding code enforces exactly one call per
-  rung (`box["calls"] == len(p3_attempts)`, `NewsProScriptError` on drift), so
-  a retry has to consume a rung honestly, the way the `prompt_no_room` path
-  already does. Do it on the second live occurrence, with one contrarian and
-  the news-lane + generation-budget suites, and a leg that forces a halt.
-
-* **Eleven shipped graphs store a bare engine id where the canvas combo
-  holds the suffixed label** (`viz_camera` vs `viz_camera (16:9) (audio-reactive,
-  no scene image)`). Headless queueing is unaffected -- `OTR_VideoDirector`
-  declares `VALIDATE_INPUTS(**kwargs)`, so ComfyUI skips the list check and the
-  resolver strips suffixes -- and the 09-13 legs rendered through it; on the
-  canvas the dropdown shows a value that is not in its own list. The widening
-  that fixes it is already written up and deliberately NOT done in
-  `nodes/_otr_workflow_apply.py::_director_option_value` (it relabels values
-  five tests expect bare); the fix is to separate the application contract
-  from the display label, then widen. Found by cursor's final QA, 2026-09-13.
-* **`otr_cpu_low` still carries `z_image_turbo` on its image roles** -- the
-  canonical's pick, dormant because the visualiser lanes never consume a
-  still, but a CPU user who flips one video role to a still-consuming lane
-  queues a CUDA image engine. There is no `none` image engine to pin; either
-  add one or document the flip. Cursor, 2026-09-13.
-* **DONE 2026-09-13: `status` now matches the receipts.** Fifteen of the
-  sixteen shipping profiles are `shipping`, each against a named published
-  episode; `otr_amd_still` stays `draft` because no Radeon has run it.
-  `apple/MACHINES.md` reads `status` directly, so its "not yet proven on this
-  hardware" note now appears against the AMD row alone. The original row, for
-  the record: status was inconsistent across the shipping profiles (8 GB
-  graphs `draft` except `otr_8gb_animatediff`, which inherited `shipping`
-  from the haunted profile it was copied from); promote each profile when
-  its machine has published an
-  episode through it (5080 legs 2026-09-13, then the 4060 and the Mac).
-* **`v3_sd15_mm.ckpt` is not at the models root on the 5080** -- only under
-  `custom_nodes/ComfyUI-AnimateDiff-Evolved/models/`, which the pack registers
-  as an `animatediff_models` path. The 09-13 AnimateDiff legs on the 5080
-  settle whether that is enough; if they fail, `python
-  scripts/otr_fetch_lane_weights.py haunted` places it. Cursor, 2026-09-13.
-
-
-* **`purple_cloud` cannot be vendored from pg11229 and that is now measured,
-  not assumed.** The edition carries NO chapter divisions of any kind -- its
-  only all-caps headings are the title, "INTRODUCTION" and "THE END.", and the
-  body is broken solely by rows of asterisks. So `("chapters", 10, 11)` is
-  unsatisfiable and no chapter pair would resolve. It wants either a different
-  Gutenberg edition or a new chunk kind that slices on an explicit prose
-  landmark. It is left REFUSING on purpose: the near-miss on `ghost_ship` the
-  same day (a wrong anchor produced a clean 9,134-word "OK" line that had
-  silently swallowed an entirely different story) is the argument against
-  anchoring by feel. `ghost_ship` and `beleaguered_city` ARE vendored; the
-  manifest went 65 -> 67 and lost nothing.
+* **DECIDE: is `stable_audio_3`'s cuda+mps declaration stale?** A canonical
+  `--cpu` leg ran it and published (`the_trembling_silver_signet`; the leg log
+  names the checkpoint). If the declaration gains `cpu`, `otr_cpu_low` can move
+  to sa3 like the other fifteen. Cost: editing
+  `tests/test_capability_profiles.py::test_v2_stable_audio_3_lists_mps_but_not_cpu`,
+  whose docstring gives a tier PREFERENCE as its reason, not a capability
+  claim.
 
 ### Held deliberately, revisit when the thing they wait on lands
 
@@ -816,14 +698,11 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   it fires when 2.0.0 (published 2026-09-13 22:13Z, Pending) goes Active --
   a registry state change nobody is watching.** He posts the ping; a window
   drafts it.
-  **THE TRIGGER HAS FIRED: 2.0.0 WENT ACTIVE on 2026-09-13 night.** This is
-  owed NOW. One caveat worth putting in the ping rather than letting him
-  discover it: `otr_amd_still` moved to Stable Audio 3 in 2.1.0 on
-  DECLARATION compatibility (the profile declares `device_backend: cuda`,
-  which is how this repo's vocabulary carries ROCm), NOT on an AMD receipt.
-  No AMD receipt exists for EITHER music engine. If he would rather send him
-  a version whose AMD graph is on the more broadly-measured MusicGen, that is
-  2.0.0 and it is Active today.
+  **TRIGGER FIRED -- 2.0.0 is Active, so this is owed NOW.** Put one line in
+  the ping: `otr_amd_still` moved to Stable Audio 3 in 2.1.0 on declaration
+  compatibility, not on an AMD receipt (none exists for either music
+  engine). If he would rather send a version whose AMD graph is on the
+  more broadly measured MusicGen, that is 2.0.0.
 * **`otr_8gb_foley` is RETIRED (operator ruling, 2026-09-13).** He ruled on
   time, not on failure: *"4 hours for 1 act seems too long"*, then *"maybe we
   dump foley on the 8gb lane."* The measurement behind it, from the 4060's own
