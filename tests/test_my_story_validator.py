@@ -117,6 +117,45 @@ def test_a_blank_my_story_submission_writes_the_standing_premise(gate, blank):
     assert saved["fields"]["idea"] == SI.DEFAULT_IDEA
 
 
+def test_the_writers_own_preroll_check_floors_too_not_just_the_validator():
+    """THE GAP A QA PASS FOUND ON 2026-09-13, and the reason it existed.
+
+    The writer checks admission TWICE: once as the first statement of run(),
+    BEFORE the bank roll, and once after the bank row is bound. The floor was
+    applied only at the second site. A MANUAL `my_story` pick is a plain combo
+    value, not the roll sentinel, so the first check saw it, saw every creative
+    field blank, and raised -- after the VALIDATOR had already admitted the
+    same submission by flooring it. The gate passed a request the writer then
+    refused, three lines above a comment claiming the two agree "by
+    construction".
+
+    Nothing caught it because every my_story test either went through the
+    validator (which floored) or supplied a premise. This asserts the writer's
+    OWN pre-roll policy path, with no premise, admits.
+    """
+    from nodes import _otr_story_routing as RT
+
+    raw = SI.capture_raw(idea="", characters="", plot="", setting="",
+                         author="")
+    row = RT.find_bank("my_story")
+    policy = SI.StoryInputPolicy(
+        mode=RT.story_input_mode(row),
+        bank_id=getattr(row, "source_bank_id", "") or "my_story",
+    )
+    floored = SI.with_default_idea(raw, policy)
+    SI.check_selection(floored, policy)          # must not raise
+    assert floored.idea == SI.DEFAULT_IDEA
+
+    # ...and the roll sentinel is still NOT a user-fields bank here, so the
+    # floor must leave it exactly alone (same object, not merely equal).
+    sentinel_row = RT.find_bank("roll (any eligible bank)")
+    sentinel_policy = SI.StoryInputPolicy(
+        mode=RT.story_input_mode(sentinel_row),
+        bank_id="roll (any eligible bank)",
+    )
+    assert SI.with_default_idea(raw, sentinel_policy) is raw
+
+
 def test_a_typed_my_story_submission_is_never_overwritten_by_the_floor(gate):
     """The floor is a floor, not a default: one typed word beats it."""
     run, downloads = gate

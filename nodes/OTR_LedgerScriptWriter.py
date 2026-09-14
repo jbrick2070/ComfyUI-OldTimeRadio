@@ -3103,13 +3103,25 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # row, so `get_bank` would raise on the default graph. None reads as
         # the legacy route, which is what every non-My-Story run is.
         _story_row_early = _otr_story_routing.find_bank(source_bank)
+        _policy_early = _otr_story_input.StoryInputPolicy(
+            mode=_otr_story_routing.story_input_mode(_story_row_early),
+            bank_id=getattr(_story_row_early, "source_bank_id", "")
+            or str(source_bank or ""),
+        )
+        # THE FLOOR BELONGS HERE TOO, not only at the post-roll site below.
+        # This check runs BEFORE the roll, so it sees the LITERAL widget value
+        # -- and a manual `my_story` pick is a plain combo choice, not the roll
+        # sentinel. Without the floor, a blank manual My Story submission was
+        # ADMITTED by the validator (which floors it) and then refused here by
+        # the writer's own first statement, three lines before the comment that
+        # claims the two checks agree "by construction". They did not.
+        # Applying it here makes that comment true and makes the two sites
+        # build the same fields, which is what keeps their digests equal.
+        _story_raw = _otr_story_input.with_default_idea(
+            _story_raw, _policy_early)
         _otr_story_input.check_selection(
             _story_raw,
-            _otr_story_input.StoryInputPolicy(
-                mode=_otr_story_routing.story_input_mode(_story_row_early),
-                bank_id=getattr(_story_row_early, "source_bank_id", "")
-                or str(source_bank or ""),
-            ),
+            _policy_early,
             source_ref=source_ref,
             replay_from=replay_from,
             snapshot_manifest_configured=(
