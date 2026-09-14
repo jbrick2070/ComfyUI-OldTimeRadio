@@ -140,10 +140,52 @@ widgets, the six inert `OTR_VideoRenderBatch` diagnostic widgets).
 
 ---
 
+## TASK ZERO: clear the 14 suite deltas BEFORE any widget work
+
+Added 2026-09-13 night. The full-suite diff against `283abaa6` ended the
+session at 63 failures vs 53 -- 14 tests fail that passed at session start,
+4 that failed then now pass. **They were never individually cleared.**
+
+This comes FIRST, and the reason is not tidiness: every gate in this document
+is a test. Positional widget surgery is verified by running the suite and
+comparing failure SETS. If fourteen of those failures are unexplained going
+in, you cannot tell your own off-by-one from the noise you inherited -- which
+is precisely how the 63-workflow corruption went unnoticed the first time.
+
+The list, with what is already known about two of them:
+
+| test | status |
+|---|---|
+| `test_legacy_audit_clean::test_no_unclassified_legacy_references` | **known.** Trips on the node TITLES from the canvas relayout -- its audit flags "Director" surfaces and the titles now read "Video Director / Settings". Real, cosmetic. Decide: retitle, or widen the audit's allowlist. |
+| `test_canonical_headless_api::test_visual_style_override_does_not_patch_story_fields` | **known: NOT a regression.** Passes in isolation -- order-dependent. Confirm and move on. |
+| `test_scope_render_profile` (x4) | expected to follow the node 93/94 removal (`8171e994`). **Confirm, do not assume.** |
+| `test_freeze_cascade_title_rename` | unexamined |
+| `test_gguf_version_pin_is_documented` (x2) | unexamined |
+| `test_google_video_sfx_workflow` | unexamined |
+| `test_model_asset_index_drift` | unexamined |
+| `test_source_bank_widget_2c::TestAddYourOwnSignpost` | unexamined -- note it failed all night in targeted runs too |
+| `test_text_metric_ownership` | unexamined |
+| `test_workflow_director_freedom` | unexamined |
+
+**RUN EACH ONE ALONE FIRST.** Two of the fourteen already behave differently
+in isolation, so the batch result is not the evidence for any individual row.
+
+For each: it is either (a) a real defect from that session -- fix the code;
+(b) an intentional behaviour change -- re-pin the test WITH the reason written
+into it, never silently; or (c) an isolation/order artifact -- prove it and
+record it. All three outcomes are acceptable. Leaving one unclassified is not.
+
+Four tests also went from failing to PASSING. Confirm they pass for a real
+reason and not because something stopped being checked.
+
+---
+
 ## PASTE THIS INTO THE NEW WINDOW
 
 ```
-Pick up the widget rename/reorder tier on ComfyUI-OldTimeRadio. Read
+Pick up the widget audit's remaining tiers on ComfyUI-OldTimeRadio, starting
+with TASK ZERO (clear the 14 suite deltas) -- you cannot verify positional
+widget surgery against a suite you do not trust. Read
 docs/HANDOFF_WIDGET_RENAME_REORDER.md first — it has the measured blast radius
 and the gates. Then read CLAUDE.md sections 0 and 0B before touching anything.
 
