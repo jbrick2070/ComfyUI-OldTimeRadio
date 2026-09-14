@@ -100,9 +100,12 @@ class CompletenessTests(unittest.TestCase):
     #: (`ltx098_low_video`) while the ledger records engine ids (`ltx_8gb`), and
     #: it is the engine id that reaches the filename. It is covered by
     #: `test_every_video_engine_id_has_a_code` against the engine registry.
+    #: source_bank is DELIBERATELY ABSENT for the reason tts, video_lane and
+    #: image_gen each left in turn: this dict is only read when a ComfyUI is
+    #: listening on :8188, so in the suite it never runs. It is covered by
+    #: `test_every_bank_id_has_a_code` against the bank registry.
     LIVE = {
         "llm": ("OTR_LedgerScriptWriter", "creative_writing_model"),
-        "source_bank": ("OTR_LedgerScriptWriter", "source_bank"),
         "visual_style": ("OTR_LedgerScriptWriter", "visual_style"),
         "image_gen": ("OTR_VideoDirector", "announcer_image_model"),
         "music_gen": ("OTR_StableAudioTheme", "engine"),
@@ -127,6 +130,38 @@ class CompletenessTests(unittest.TestCase):
             engines.update(profiles._LEGACY_FIRST_ENGINES.get(role) or ())
         missing = [e for e in sorted(engines) if SC.code_for("tts", e) == "unk"]
         self.assertFalse(missing, "voice engines with no code: %s" % missing)
+
+    def test_every_bank_id_has_a_code(self):
+        """The bank dimension is keyed on the REGISTRY, and this is the FOURTH
+        dimension to move here for the same reason.
+
+        `source_bank` was covered only by the live-dropdown check below, which
+        skips whenever no ComfyUI is listening on :8188 -- so in the suite it
+        never ran, and `my_story` reached the published filename as `unk` for a
+        week after the bank shipped. Five episodes on 2026-09-11 are named
+        `__unk__` because of it. The pattern is now unmistakable: a dimension
+        whose only guard needs a live server has no guard.
+
+        The authority is `list_bank_ids()` -- the same call that BUILDS the
+        dropdown -- plus the roll sentinel, which reaches a filename whenever a
+        run is still resolving.
+        """
+        try:
+            from nodes import _otr_rolls as rolls
+            from nodes import _otr_story_routing as routing
+        except Exception as exc:  # pragma: no cover
+            self.skipTest("bank registry unavailable: %s" % exc)
+        bank_ids = sorted(routing.list_bank_ids())
+        self.assertTrue(
+            bank_ids,
+            "the bank registry is empty, so this check would pass vacuously")
+        missing = [bank_id for bank_id in [rolls.BANK_SENTINEL] + bank_ids
+                   if SC.code_for("source_bank", bank_id) == "unk"]
+        self.assertFalse(
+            missing,
+            "these bank ids reach the published filename with no code, so "
+            "their episodes would all be named 'unk':\n  "
+            + "\n  ".join(missing))
 
     def test_every_video_engine_id_has_a_code(self):
         """The video dimension carries two vocabularies and only one of them

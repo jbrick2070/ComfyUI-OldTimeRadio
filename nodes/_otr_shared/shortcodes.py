@@ -62,6 +62,17 @@ LLM = {
     "google/gemma-2-2b-it": "g22b",
 }
 
+#: KEYED ON BANK IDS, which is also what the dropdown offers -- the one
+#: dimension where the two vocabularies agree. The authority is
+#: ``_otr_story_routing.list_bank_ids()`` plus ``_otr_rolls.BANK_SENTINEL``,
+#: and ``test_every_bank_id_has_a_code`` reads it in-process.
+#:
+#: ``my_story`` was absent from 2026-09-07 until 2026-09-14, so five pinned My
+#: Story episodes published on 09-11 carry ``__unk__`` in the bank slot --
+#: ``dinner_memories``, ``dinner_recollections``,
+#: ``dinner_table_remembrances``, ``the_bay_area_table`` and ``the_la_table``.
+#: They are not renamed: the published name is a record of what ran, and
+#: rewriting it would break the evidence-by-hash rule. New runs read ``myst``.
 SOURCE_BANK = {
     "roll (any eligible bank)": "roll",
     "media_archive": "marc",
