@@ -70,7 +70,15 @@ def test_script_seam_owns_complete_plain_text_grammar(stages):
     prompt = stages["scifi_news_pro_script_system"]
     for marker in (
         "TITLE: <episode title>",
-        "MUSIC: <mood and instruments>",
+        # The MUSIC placeholder stopped asking for instruments on 2026-09-13.
+        # The instruments and the tempo come from the show's own palette
+        # (`_otr_music_palette`), so a cue that named its own fought them -- the
+        # lesson this lane's own format example already carried ("MUSIC: the
+        # theme, up and under", with a comment recording that naming
+        # instruments over a TR-909 palette made the engine resolve toward the
+        # strings). What the seam asks for is the FEELING; this test still pins
+        # that the grammar teaches a MUSIC line at all, which is its job.
+        "MUSIC: <the feeling of the moment, a few words, no instruments>",
         "SCENE <n>: <concrete setting>",
         "ANNOUNCER: <spoken words>",
         "<CAST NAME>: <spoken words>",
