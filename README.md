@@ -391,10 +391,12 @@ graph in a night, which means overriding the act count; the preset itself is
 unchanged and is what you get when you open it. Both facts are true and neither
 implies the other.
 
-Every pre-set graph scores with **MusicGen**, not the canonical's Stable Audio
-3. MusicGen is noncommercial (see [Licence](#licence-and-credits)), so if that
-matters to you, change the music dropdown on **OTR_StableAudioTheme** after
-opening the graph.
+Every pre-set graph scores with **Stable Audio 3**, the same engine the
+canonical opens on -- ungated, and commercially clean. The one exception is
+the CPU preset, which scores with **MusicGen**, because Stable Audio 3 declares
+CUDA and Metal only. MusicGen is noncommercial (see
+[Licence](#licence-and-credits)), so on that preset alone, change the music
+dropdown on **OTR_StableAudioTheme** if that matters to you.
 
 <!-- BEGIN GENERATED: tier-matrix -->
 ### 8 GB NVIDIA

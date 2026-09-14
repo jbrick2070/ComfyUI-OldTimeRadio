@@ -21,7 +21,7 @@ needed to try is already in the repo and nothing is waiting on us:
   generated from `config/profiles/otr_amd_still.json` the same way as every
   working graph and marked `draft` because it has no receipts. It is the
   still-image tier: Qwen3.5-4B writer (unquantised), `still_motion` over
-  Z-Image Turbo stills, Kokoro voices, MusicGen. Two older lab profiles,
+  Z-Image Turbo stills, Kokoro voices, Stable Audio 3. Two older lab profiles,
   `otr_amd16_rocm` and `otr_amd8_rocm`, still load with `--profile` for a 16 GB
   or 8 GB variant of the same idea. Every engine any of them selects is plain
   PyTorch: no sageattention, no flash-attn, no bitsandbytes, no fp8, no
@@ -164,10 +164,12 @@ python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py stable_audio_3
 ```
 
-The shipped graph needs none of this by hand: Z-Image Turbo and MusicGen fetch
-themselves at the first queue, so the `z_image` line only saves you the wait.
-The `stable_audio_3` line is for the 16 GB lab profile alone; the shipped graph
-and the 8 GB profile are on MusicGen.
+The shipped graph needs none of this by hand: Z-Image Turbo and Stable Audio 3
+fetch themselves at the first queue (the music weights are ungated -- no
+account, no licence click, no token), so both lines above only save you the
+wait. Stable Audio 3 is what the AMD graph and every other shipped graph score
+with; only the CPU preset is on MusicGen, because Stable Audio 3 declares CUDA
+and Metal only.
 
 **4. Start ComfyUI.**
 
