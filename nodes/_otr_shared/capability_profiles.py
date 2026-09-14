@@ -18,7 +18,13 @@ S1 -- DERIVED ENABLE-SET, never hand-listed:
     (``nodes/_otr_video_engines/registry.py`` etc., ``CAPABILITIES`` dict --
     NOT in adapter modules);
   * ``availability(profile, declarations)`` -> the shared availability object
-    with one reason code per engine (reused by validator / wizard / logs);
+    with one reason code per engine. ITS ONLY PRODUCTION CONSUMER IS EMIT-TIME:
+    ``cross_validate_profile`` in ``scripts/build_variants.py``, plus the
+    dropdown-matrix generator. The workflow validator does NOT use it -- it
+    imports ``load_profile`` and ``ProfileError`` and nothing else -- and the
+    "wizard" named in older comments here and in the video registry was never
+    built: grep the repo and the word survives only in comments describing what
+    it would have asked for;
   * ``enabled_engines`` = engines whose declarations fit the profile;
   * ``cross_validate_profile`` -- every profile override must be in the
     enable-set of its namespace (per-engine fit ONLY; NO static co-residency

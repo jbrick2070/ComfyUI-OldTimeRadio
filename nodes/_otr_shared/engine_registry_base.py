@@ -2,7 +2,9 @@
 
 The SHIPPED audio registry (``nodes/_otr_audio_engines/registry.py``) proved a
 fail-closed, model-agnostic "pluggable adapter" pattern: adapters self-register,
-nodes build their dropdown from ``engines_for_role(role)``, and ``assert_usable``
+nodes build their dropdown from the FULL registry (``all_engine_names()``, or a
+legacy-first list for voices) rather than from ``engines_for_role(role)`` --
+hiding an engine is not how this pack refuses one. ``assert_usable``
 either returns the validated engine name or raises :class:`EngineUnusable` with
 a classified reason -- it NEVER silently swaps one engine for another.
 

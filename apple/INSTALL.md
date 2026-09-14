@@ -132,6 +132,14 @@ or for a crash during ComfyUI's startup, before any node loaded.
 
 ## 6. Weights: what you do not have to do
 
+**One thing the pack deletes, so you are not surprised by it.** On every
+ComfyUI start, and again after each publish, it sweeps
+`<output>/otr/episodes/_shared/tmp` and removes anything older than 24 hours.
+That tier is scratch space the render writes through; nothing you are meant to
+keep lives there, and the sweep touches no other folder, skips anything locked,
+logs every deletion and never fails a render. Set `OTR_TMP_SWEEP_MAX_AGE_S` to
+change the age, and do not park files under that path.
+
 **Nothing by hand.** There is no setup script to run and no model to place
 yourself. Almost everything arrives the first time you queue: the one exception
 is the Kokoro voice set, which the pack fetches at STARTUP so the default voice

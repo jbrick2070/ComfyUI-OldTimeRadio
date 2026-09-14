@@ -91,7 +91,10 @@ wheel that comes down with the requirements typically does not.
 measured where.
 
 **3. Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
-**OldTimeRadio** category in the node menu.
+**OldTimeRadio** category in the node menu. The first restart after installing
+fetches the Kokoro voices (a few hundred MB, and on Python 3.13 the ONNX model
+with them) so the default voice is ready before you ever queue -- if the console
+pauses on `[OldTimeRadio]` lines, that is what it is doing.
 
 **4. Load the show.** **Workflow → Browse Templates → EXTENSIONS →
 comfyui-old-time-radio**. There is exactly one entry, **`otr_canonical`**. Open
@@ -510,7 +513,10 @@ value saved into a graph travels with it -- into every workflow you share, every
 queue entry, and the metadata of every image you generate. A token in the login
 file, or in `HF_TOKEN` in the environment that launches ComfyUI, is the whole
 setup. ComfyUI Desktop on Windows does not inherit user-scope environment
-variables, which is one more reason to prefer the login file.
+variables -- the pack bridges that itself there, reading `HF_TOKEN` out of your
+user registry at load and exporting it into the process, so a token you set that
+way does work. The login file is still the habit to build: it is the one that
+works on every platform.
 
 The weights that do **not** fetch themselves -- every hand-fetched file, its
 repository, its size, and the folder under `models/` it goes in -- are listed in

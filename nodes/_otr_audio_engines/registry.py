@@ -2,8 +2,13 @@
 
 Each audio *role* -- character voice, announcer voice, music, sfx -- picks its
 engine from this shared registry instead of being hardcoded to one model.
-Adapters self-register on import; nodes build their ComfyUI engine dropdown
-from ``engines_for_role(role)``. The engine that is the byte-identical default
+Adapters self-register on import. NODES DO NOT BUILD THEIR DROPDOWN FROM
+``engines_for_role``: the voice nodes use ``legacy_first_engines`` through
+``build_engine_combo`` (``_otr_voice_node_common.py``) and the video and image
+directors read ``all_engine_names()`` outright. That is deliberate -- the
+registry IS the menu, and an engine that cannot run fails closed at execute with
+a named error rather than being hidden from you. ``engines_for_role`` stays the
+role filter used by tooling and tests. The engine that is the byte-identical default
 for a role sorts first, so the default workflow keeps choosing it and stays
 byte-identical.
 
