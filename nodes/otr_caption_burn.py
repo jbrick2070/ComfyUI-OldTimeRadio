@@ -522,7 +522,7 @@ class OTRCaptionBurn:
         os.makedirs(out_dir, exist_ok=True)
         return os.path.join(out_dir, f"{stem}_captioned.mp4")
 
-    def burn(self, video_path, burn_captions=False, caption_style=_DEFAULT_CAPTION_STYLE,
+    def burn(self, video_path, burn_captions=True, caption_style=_DEFAULT_CAPTION_STYLE,
              fps=25, ffmpeg="ffmpeg", ledger_path="", output_path="", gate_in="",
              title_card_plan_json=""):
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not

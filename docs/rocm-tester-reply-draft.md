@@ -40,7 +40,7 @@ There is one graph I need run and it is the small one. Here is the whole ask:
 **1. Install from git, not from Manager, for this one.** ComfyUI with a ROCm
 build of PyTorch (AMD's own instructions for your OS), then
 `git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio` into
-`custom_nodes/`. Either branch is fine -- `main` and `v2.0-alpha` are the same
+`custom_nodes/`. Either branch is fine -- `main` and `main` are the same
 commit. Manager pulls the registry copy, and the graph below was added to the
 repo today, so no published version carries it yet. I will ping you when one
 does, because the one-click install is its own thing worth testing and I would
@@ -169,7 +169,7 @@ There is one graph I need run and it is the small one. Here is the whole ask:
 **1. Install from git, not from Manager, for this one.** ComfyUI with a ROCm
 build of PyTorch (AMD's own instructions for your OS), then clone the repo --
 it is jbrick2070/ComfyUI-OldTimeRadio on GitHub -- into `custom_nodes/`.
-Either branch is fine, `main` and `v2.0-alpha` are the same commit. Manager
+Either branch is fine, `main` and `main` are the same commit. Manager
 pulls the registry copy, and the graph below was added to the repo today, so
 no published version carries it yet. I will ping you when one does, because
 the one-click install is its own thing worth testing and I would rather learn

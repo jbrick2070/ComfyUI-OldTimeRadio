@@ -31,7 +31,7 @@ sleep 2
 curl -s -X POST http://127.0.0.1:8188/interrupt >/dev/null 2>&1
 q=$(curl -s http://127.0.0.1:8188/queue | "$PY" -c 'import sys,json; d=json.load(sys.stdin); print(len(d["queue_running"]), len(d["queue_pending"]))' 2>/dev/null)
 echo "queue after interrupt: $q"
-cd "$OTR" && git fetch -q origin v2.0-alpha && git checkout -q v2.0-alpha 2>/dev/null; git reset -q --hard origin/v2.0-alpha && echo "OTR now at $(git log -1 --format='%h %s' | cut -c1-90)"
+cd "$OTR" && git fetch -q origin main && git checkout -q main 2>/dev/null; git reset -q --hard origin/main && echo "OTR now at $(git log -1 --format='%h %s' | cut -c1-90)"
 # Restart ComfyUI so the new module code loads.
 for pid in $(pgrep -f "main.py --listen 127.0.0.1 --port 8188"); do kill "$pid" 2>/dev/null; done
 sleep 5

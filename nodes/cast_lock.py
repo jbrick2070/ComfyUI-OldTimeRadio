@@ -336,6 +336,15 @@ class CastLock:
         return True
 
     # ------------------------------------------------------------------ #
+    # THE SIGNATURE DELIBERATELY DISAGREES WITH INPUT_TYPES, and the reason is
+    # recorded rather than silently tolerated (2026-09-13). INPUT_TYPES now
+    # defaults voice_bank=kokoro_builtin / auto_registry / reuse=True to match
+    # the shipped graph, which is what a node dropped on a canvas gets. These
+    # KEYWORD defaults serve DIRECT Python callers, and twelve tests encode
+    # real casting behaviour against them -- aligning them changes what those
+    # calls actually cast, which is a casting decision and not a defaults
+    # tidy-up. A saved graph is unaffected either way: every shipped graph
+    # passes all three explicitly. Open row in GO_FORWARD.
     def lock(self, script_json, voice_bank="default",
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
              allow_voice_reuse=False, char_voice_engine="auto",

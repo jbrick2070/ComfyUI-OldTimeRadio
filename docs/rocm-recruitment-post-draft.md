@@ -38,7 +38,7 @@ an AMD graph nobody has ever been able to test.
 > column in the machine table is yours.
 >
 > Repo: https://github.com/jbrick2070/ComfyUI-OldTimeRadio (branch
-> `v2.0-alpha`)
+> `main`)
 
 ---
 
@@ -94,7 +94,7 @@ local AI radio-drama pipeline on AMD
 > on AMD hardware, and I will say so in the repo.
 >
 > Repo: https://github.com/jbrick2070/ComfyUI-OldTimeRadio (branch
-> `v2.0-alpha`). Happy to answer anything here.
+> `main`). Happy to answer anything here.
 
 ---
 

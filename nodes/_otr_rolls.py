@@ -188,11 +188,15 @@ def eligible_bank_ids() -> "tuple[str, ...]":
     output is used is the end user's call, not a gate inside the writer.)
 
     `defaults.auto_select` (2026-09-10) answers a question runnable cannot:
-    may an UNATTENDED run land here? A bank whose story is the person's own
-    typed fields is perfectly runnable and completely unrollable -- a blank
-    automatic run has nothing to write. Absent means true, so every bank that
+    may an UNATTENDED run land here? Absent means true, so every bank that
     predates the field keeps its place in the pool; only a bank that declares
     itself manual-only leaves it.
+
+    my_story was the reason this field exists and is NO LONGER excluded by it
+    (operator, 2026-09-13). The old reasoning -- a bank whose story is the
+    person's own typed fields has nothing to write on a blank automatic run --
+    was answered by giving it something: `_otr_story_input.DEFAULT_IDEA` is
+    the floor a blank My Story run writes. Do not "fix" this back.
 
     The retired third filter -- "the lane's declared request compatibility" --
     went 2026-08-14 with the word authority. It existed solely so a lane could

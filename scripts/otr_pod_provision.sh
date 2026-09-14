@@ -66,17 +66,17 @@ echo "  comfy python: $COMFY_PY"
 # fail a typo/incompatible Python selection while the pod is still cheap.
 OTR_ROOT="$CUSTOM_NODES/ComfyUI-OldTimeRadio"
 if [ -d "$OTR_ROOT/.git" ]; then
-  git -C "$OTR_ROOT" fetch -q origin v2.0-alpha \
-    || fail "could not fetch OTR v2.0-alpha"
-  git -C "$OTR_ROOT" checkout -q v2.0-alpha \
-    || fail "could not select OTR v2.0-alpha (check local changes)"
-  git -C "$OTR_ROOT" pull -q --ff-only origin v2.0-alpha \
-    || fail "could not fast-forward OTR v2.0-alpha"
+  git -C "$OTR_ROOT" fetch -q origin main \
+    || fail "could not fetch OTR main"
+  git -C "$OTR_ROOT" checkout -q main \
+    || fail "could not select OTR main (check local changes)"
+  git -C "$OTR_ROOT" pull -q --ff-only origin main \
+    || fail "could not fast-forward OTR main"
 elif [ -e "$OTR_ROOT" ]; then
   fail "$OTR_ROOT exists but is not a git checkout; move it aside explicitly"
 else
-  git clone -q -b v2.0-alpha "$OTR_REPO_URL" "$OTR_ROOT" \
-    || fail "could not clone OTR v2.0-alpha"
+  git clone -q -b main "$OTR_REPO_URL" "$OTR_ROOT" \
+    || fail "could not clone OTR main"
 fi
 cd "$OTR_ROOT" || fail "cannot enter OTR checkout"
 

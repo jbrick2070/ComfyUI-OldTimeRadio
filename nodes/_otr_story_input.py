@@ -319,7 +319,9 @@ def check_selection(
         raise StoryInputError(
             "my_story: replay_from is set, which re-renders a frozen episode "
             "and would ignore everything you typed. Clear replay_from to "
-            "generate from your story input."
+            "generate from your story input -- or leave replay_from set "
+            "and switch Source off my_story, since a replay reuses the frozen "
+            "bundle and ignores the source bank entirely."
         )
     if snapshot_manifest_configured:
         raise StoryInputError(
