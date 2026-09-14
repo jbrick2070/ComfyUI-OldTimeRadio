@@ -109,6 +109,26 @@ selections of a GATED 22 GiB family. `bark` carries the same false flag because
 `suno` is not in a hardcoded publisher allowlist. The fork is what to render when
 one file implements six engines, which is why this is not a glob widening.
 
+### A4. The writer's 36-widget order is unsettled, and it is the only thing blocking the reorder
+
+Everything else in the widget tier is decided (see C7). This is not: there is no
+explicit ordering of the writer's 36 remaining widgets, only a 13-widget leading
+block and broad groups. The 23 unplaced ones are listed in
+[HANDOFF_WIDGET_TIER_EXECUTE.md](HANDOFF_WIDGET_TIER_EXECUTE.md).
+
+The settled leading block:
+
+```
+episode_title, source_bank, custom_premise, num_characters, act_count,
+include_act_breaks, visual_style, creativity, lemmy_cameo,
+story_characters, story_plot, story_setting, story_author
+```
+
+Propose ONE ordering naming every remaining widget exactly once, get the
+operator's yes, and make that list an executable test before touching
+`INPUT_TYPES`. Coding stops here until it exists -- inferring an order
+mid-surgery is how a positional change becomes a silent one.
+
 ## 2. CODE -- the design is settled, build it
 
 ### C1. Five shipped profiles cannot load their own configured writer
@@ -195,6 +215,43 @@ repair.
 SHIPPING set gets the rule, and a soak or rotation recipe whose entire purpose
 is to exercise `wan_ti2v` or `ltx25` keeps it, because changing those deletes
 the test.
+
+### C7. The widget tier -- verified plan, nothing built
+
+An external UI audit asked for removals, renames, a reorder and two
+ownership consolidations. It has been independently QA'd (Cursor, with its own
+contrarian) and the answer is **do not ship it as one change**. The plan of
+record is [2026-09-13-widget-cleanup-QA-VERDICT.md](2026-09-13-widget-cleanup-QA-VERDICT.md);
+where it and the original brief disagree, the verdict wins.
+
+Approved, in order: the two missing guards, then UI labels via `display_name`,
+then `perfect_run_spacesaver`, then all FIVE deprecated `ffmpeg` widgets, then
+`OTR_VideoDirector`'s two inert seed widgets, then the title consolidation as
+separate tested work, then the reorder once A4 lands.
+
+Two no-goes on evidence, not caution. **Voice-engine consolidation** fails on
+five blockers, the sharpest being that `char_voice_engine` is legitimately
+stamped literal `"auto"` when CastLock resolves nothing and the render node still
+needs a concrete engine. **`custom_source_bank`** cannot be fixed as proposed at
+all -- the dropdown is fed scalar ids by `list_bank_ids()`, so `banks.json`'s
+`label` is not a per-option display label and editing it changes nothing a user
+sees.
+
+**Renames are answered without renaming.** Frontend 1.51.10 separates the UI
+label from the stable internal key and `node_info` forwards the option, so
+`display_name` buys the wording with none of the blast radius.
+
+**The trap that inverts the obvious:** `migrateWidgetsValues` fires at exactly
+ONE removal, so dropping a single trailing widget corrupts `replay_from` and the
+three My Story fields while dropping the last two corrupts nothing. "Trailing is
+free" is false.
+
+`scripts/otr_widget_surgery.py` is the procedure as a module -- both entry points
+return `(touched, repairs)`, repair the link table themselves, and refuse a short
+or absent `widgets_values`; 14 tests against the real canonical. The execution
+brief is [HANDOFF_WIDGET_TIER_EXECUTE.md](HANDOFF_WIDGET_TIER_EXECUTE.md), and
+[2026-09-14-CODEX-WIDGET-DRIFT-HARDENING.md](2026-09-14-CODEX-WIDGET-DRIFT-HARDENING.md)
+is the brief for attacking the drift model before any of it is executed.
 
 ### C0. Kokoro is the default voice in every shipped JSON (operator ruling, 2026-09-12)
 
