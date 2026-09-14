@@ -330,9 +330,9 @@ class AudioEnhance:
                 }),
                 "spatial_width": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 1.0, "step": 0.05,
-                    "tooltip": "Mid-side stereo width ADDED to the signal: "
-                               "0=none (default; the supplied image is kept), "
-                               "0.3=natural, 1.0=extreme"
+                    "tooltip": "How much stereo width to add. 0 leaves the stereo "
+                               "image exactly as it arrived, 0.3 is natural, 1.0 is "
+                               "extreme."
                 }),
                 "haas_delay_ms": ("FLOAT", {
                     "default": 0.0, "min": 0.0, "max": 2.0, "step": 0.1,

@@ -441,7 +441,7 @@ class OTRVideoRenderBatch:
     def INPUT_TYPES(cls):
         return {
             "required": {
-                "mode": (["soak", "single", "episode"], {"default": "soak", "tooltip": (
+                "mode": (["soak", "single", "episode"], {"default": "episode", "tooltip": (
                     "Run mode. 'episode' is the production path (renders one REAL "
                     "per-beat clip per shot from patched_ledger_json). 'soak' and "
                     "'single' are diagnostic harness modes -- some widgets below are "

@@ -76,7 +76,12 @@ def test_caption_burn_env_does_not_enable(monkeypatch, tmp_path):
 def test_caption_burn_widgets_default_off():
     it = OTRCaptionBurn.INPUT_TYPES()
     assert "video_path" in it["required"]
-    assert it["optional"]["burn_captions"][1]["default"] is False   # clean master default
+    # Was False ("clean master default") until 2026-09-13. The shipped graph
+    # burns captions, so a fresh node that did not was a silent disagreement
+    # with the only graph anyone runs. Safe to flip: a host whose ffmpeg lacks
+    # the ass filter or libx264 still finishes the episode, without captions
+    # and saying so, rather than failing.
+    assert it["optional"]["burn_captions"][1]["default"] is True
     assert "caption_style" in it["optional"]
     assert OTRCaptionBurn.OUTPUT_NODE is False
 

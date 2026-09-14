@@ -1670,7 +1670,8 @@ class OTRCreditsRoll:
         return {"required": {
             "video_path": ("STRING", {
                 "forceInput": True,
-                "tooltip": "Node 93 output (captions/bars already burned)."}),
+                "tooltip": "The finished video, with captions already burned in. "
+                           "Comes from Caption Burn."}),
             "clip_manifest_json": ("STRING", {
                 "forceInput": True,
                 "tooltip": "Node 92 slot 1 (third fan-out consumer)."}),

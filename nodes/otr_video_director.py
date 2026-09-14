@@ -273,17 +273,23 @@ class OTRVideoDirector:
                     ),
                 }),
                 "announcer_image_model": (image, {
-                    "tooltip": "Image source for the announcer (feeds its video).",
+                    "tooltip": "The still the announcer's video is built from. "
+                               "Nothing downloads while this role's video lane "
+                               "is procedural; z_image_turbo is about 19 GB the "
+                               "first time a lane actually needs it.",
                 }),
                 "music_image_model": (image, {
-                    "tooltip": "Image source for music beats.",
+                    "tooltip": "The still music beats are built from. Nothing "
+                               "downloads while this role's video lane is "
+                               "procedural; z_image_turbo is about 19 GB the "
+                               "first time a lane actually needs it.",
                 }),
                 "character_image_model": (image, {
-                    "tooltip": "Image engine that mints the still for "
-                               "character beats (the portrait-bearing shots). "
-                               "Profile/platform-owned: variants pin it per "
-                               "hardware tier; the runtime engine registry "
-                               "resolves the final engine.",
+                    "tooltip": "The still character beats are built from -- the "
+                               "shots that carry a face. Nothing downloads while "
+                               "this role's video lane is procedural; "
+                               "z_image_turbo is about 19 GB the first time a "
+                               "lane actually needs it.",
                 }),
                 "fps": ("INT", {
                     "default": 25, "min": 1, "max": 60,
@@ -306,11 +312,15 @@ class OTRVideoDirector:
                 }),
                 "seed_mode": (list(SEED_MODES), {
                     "default": SEED_MODES[0],
-                    "tooltip": "request_hash (deterministic) | fixed.",
+                    "tooltip": "Recorded on the receipt. The video seed is "
+                               "derived per shot from its request hash, so "
+                               "changing this does not change the picture.",
                 }),
                 "request_seed": ("INT", {
                     "default": 0, "min": 0, "max": 0xFFFFFFFF,
-                    "tooltip": "Base seed (NOT named 'seed' on purpose, V-7).",
+                    "tooltip": "Recorded on the receipt, not used to seed video. "
+                               "Each shot seeds itself from its own request "
+                               "hash.",
                 }),
             },
             "optional": {
@@ -338,16 +348,15 @@ class OTRVideoDirector:
                 # nodes/_otr_shared/device_options.py for why both halves exist.
                 "device_policy": (_devopts.device_options(), {
                     "default": _devopts.DEFAULT_DEVICE_OPTION,
-                    "tooltip": "Local video render device. 'default' asks "
-                               "ComfyUI what this machine has and RECORDS what "
-                               "it chose; anything else is explicit and is "
-                               "never second-guessed.",
+                    "tooltip": "Recorded on the episode receipt only. It does "
+                               "not choose the device -- each engine resolves "
+                               "that itself at render time.",
                 }),
                 "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {
                     "default": "fp8_ok",
-                    "tooltip": "Dtype lanes allowed for local video engines "
-                               "(fp8/fp4 artifacts are OFF on ROCm/MPS "
-                               "tiers).",
+                    "tooltip": "Recorded on the episode receipt only. No video "
+                               "engine currently reads it to choose a "
+                               "precision.",
                 }),
                 # WAN 8GB launch contract (2026-07-24): the low-VRAM tier's
                 # render-length ceiling, appended LAST (widget slot 14) so no

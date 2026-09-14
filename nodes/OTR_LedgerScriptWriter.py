@@ -2316,13 +2316,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "perfect_run_spacesaver": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
-                        "DEPRECATED 2026-08-08 -- NO-OP sentinel. "
-                        "Widget preserved to keep positional layout "
-                        "stable (BUG-LOCAL-097). Formerly triggered "
-                        "OTR_RTXUpscale's per-episode intermediate "
-                        "cleanup, which was retired with the RTX-VSR "
-                        "node (queue item 8; nodes/rtx_upscale.py "
-                        "removed). Setting this True has no effect."
+                        "Does nothing. It is kept only so the widgets "
+                        "below it do not shift position in saved graphs. "
+                        "Leave it alone."
                     ),
                 }),
                 # Phase 4 v4 (2026-05-11): sampling knobs appended at
@@ -2706,27 +2702,17 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     {
                         "default": "sci_fi_radio",
                         "tooltip": (
-                            "VISUAL STYLE (multi-modal story schema). "
-                            "Rewrites ONLY the downstream still/video prompt "
-                            "style language (tails); story content is "
-                            "untouched. sci_fi_radio = the production look "
-                            "(default, byte-identical). anime / cartoon / "
-                            "paper_origami / archival_documentary / "
-                            "recur_frac / shakespeare_stage_realism / "
-                            "storybook_engraving / video_art are live "
-                            "immediately. "
-                            "Unknown id fails LOUD before any "
-                            "story work. "
-                            "ROLL: pick 'roll (any style)' to let the run "
-                            "choose the look for you, uniformly, from every "
-                            "registered style (they are all fully live, so "
-                            "there is nothing to exclude). This is a SEPARATE "
-                            "randomizer from the source_bank roll -- either, "
-                            "both, or neither. The choice is recorded at "
-                            "meta.style_roll; set OTR_VISUAL_STYLE_SEED to "
-                            "replay a past roll (that is its own seed -- "
-                            "OTR_STYLE_SEED is the narrative arc-shape seed "
-                            "and is unrelated)."
+                            "NO VISIBLE EFFECT ON THE SHIPPED GRAPH. It "
+                            "styles the still and video prompts, and the "
+                            "canonical's three video lanes are procedural -- "
+                            "they draw from the audio and read no still, so "
+                            "this changes the filename and the receipt and "
+                            "nothing you can see. Switch a video lane to a "
+                            "still or diffusion engine first, then it is one "
+                            "of the strongest controls here. "
+                            "Story content is never touched either way. "
+                            "'roll (any style)' picks one for you, recorded "
+                            "at meta.style_roll."
                         ),
                     },
                 ),

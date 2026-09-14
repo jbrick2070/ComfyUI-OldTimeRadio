@@ -1899,8 +1899,13 @@ class SignalLostVideoRenderer:
             },
             "optional": {
                 "fps": ("INT", {
-                    "default": 24, "min": 12, "max": 60, "step": 1,
-                    "tooltip": "Frames per second (24 = cinematic)"
+                    # 24 was the lone odd one out: the shipped graph, Caption
+                    # Burn and the Mux all declare 25, and these rates have to
+                    # agree or the captions drift against the picture.
+                    "default": 25, "min": 12, "max": 60, "step": 1,
+                    "tooltip": "Frames per second. Keep it equal to the rate on "
+                               "Caption Burn and Mux and Publish -- they are "
+                               "timing declarations, not converters."
                 }),
                 # 2026-05-03 EVENING (BUG-LOCAL-030 Phase B, Jeffrey
                 # final spec): default RAISED from 832x480 to 1920x1080
@@ -1936,7 +1941,10 @@ class SignalLostVideoRenderer:
                 # v1 floor visual for every existing saved workflow.
                 "draw_scopes": ("BOOLEAN", {
                     "default": True,
-                    "tooltip": "Draw the floor's in-frame scopes (centre ring, orbit particles, waveform, freq bars). Default ON (v1). Set OFF for the v2 scene-aware-scopes pipeline, where OTR_SceneAwareScopes draws the scopes in the real per-beat gutters downstream."
+                    "tooltip": "Draw the scopes over the picture -- centre ring, "
+                               "orbiting particles, waveform and frequency bars. "
+                               "Turn it off for a clean frame with nothing "
+                               "overlaid."
                 }),
             },
         }

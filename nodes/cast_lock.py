@@ -259,43 +259,51 @@ class CastLock:
             },
             "optional": {
                 "voice_bank": (list(_VOICE_BANKS), {
-                    "default": _VOICE_BANKS[0],
+                    # Was _VOICE_BANKS[0] ("default"), which casts from the
+                    # chatterbox / indextts2 reference banks -- neither of which
+                    # an ordinary install has. The shipped graph uses
+                    # kokoro_builtin, so a dropped node now agrees with it.
+                    "default": "kokoro_builtin",
                     "tooltip": (
-                        "Voice reference bank scope used by auto_registry. "
-                        "'default' casts from the chatterbox / indextts2 "
-                        "reference banks; bark_legacy / kokoro_builtin keep the "
-                        "preset-based engines."
+                        "Which pool the voices are cast from. kokoro_builtin "
+                        "needs nothing extra installed; the other banks expect "
+                        "their own engine to be present."
                     ),
                 }),
                 "cast_voice_policy": (list(_CAST_POLICIES), {
-                    "default": _CAST_POLICIES[0],
+                    # Matches the shipped graph.
+                    "default": "auto_registry",
                     "tooltip": (
-                        "preserve_ledger: keep the writer's voice assignments "
-                        "(byte-safe default). auto_registry: assign voice "
-                        "references from the bank with the deterministic caster."
+                        "Who picks the voices. auto_registry casts them from "
+                        "the bank, the same way every time; preserve_ledger "
+                        "keeps whatever the writer already assigned."
                     ),
                 }),
                 "allow_voice_reuse": ("BOOLEAN", {
-                    "default": False,
+                    # Matches the shipped graph. Off means a cast larger than
+                    # the bank stops the render rather than doubling a voice.
+                    "default": True,
                     "tooltip": (
-                        "When the bank runs out of unique references, allow "
-                        "reusing one already assigned (the gender floor still "
-                        "holds). Off -> casting fails closed instead."
+                        "Let two characters share a voice when the bank runs "
+                        "out of distinct ones. Off stops the render instead."
                     ),
                 }),
                 "char_voice_engine": (list(_CHAR_VOICE_ENGINES), {
                     "default": "auto",
                     "tooltip": (
-                        "Character TTS engine CastLock stamps into the durable "
-                        "cast. auto resolves from voice_bank; explicit cloud "
-                        "picks fail loud if the bank is incompatible."
+                        "Which engine speaks the characters. Leave it on auto "
+                        "and it follows voice_bank. If you set it explicitly, "
+                        "set `engine` on Character Voices to match -- naming "
+                        "two different engines stops the render."
                     ),
                 }),
                 "announcer_voice_engine": (list(_ANNOUNCER_VOICE_ENGINES), {
                     "default": "auto",
                     "tooltip": (
-                        "Announcer TTS engine CastLock stamps into the durable "
-                        "cast. auto keeps the shipped Kokoro announcer."
+                        "Which engine reads the announcer. auto keeps the "
+                        "shipped Kokoro voice. If you set it explicitly, set "
+                        "`engine` on Announcer Voice to match -- naming two "
+                        "different engines stops the render."
                     ),
                 }),
                 "gate_in": ("STRING", {

@@ -1525,14 +1525,16 @@ class OTRSilentComposite:
             },
             "optional": {
                 "canvas_w": ("INT", {
-                    "default": 1472, "min": 16, "max": 7680,
+                    # Matches the shipped graph (1920x1080). The old 1472x832
+                    # default was a tier value that only some variants pin.
+                    "default": 1920, "min": 16, "max": 7680,
                     "tooltip": "Silent-composite canvas width (px). "
                                "Profile/platform-owned: variants pin it per "
                                "hardware tier; both dimensions must be even "
                                "(yuv420p) or the encode refuses by name.",
                 }),
                 "canvas_h": ("INT", {
-                    "default": 832, "min": 16, "max": 4320,
+                    "default": 1080, "min": 16, "max": 4320,
                     "tooltip": "Silent-composite canvas height (px). "
                                "Profile/platform-owned, even values only -- "
                                "see canvas_w.",

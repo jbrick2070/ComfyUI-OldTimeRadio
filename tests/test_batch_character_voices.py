@@ -109,7 +109,13 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
         "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
         "google_tts",
     ]
-    assert it["required"]["engine"][1]["default"] == "indextts2"
+    # THE ORDER ABOVE IS UNCHANGED -- index 0 is still indextts2, so anything
+    # depending on registry order is untouched. What changed on 2026-09-13 is
+    # the DEFAULT, which used to be engines[0] and therefore indextts2: a
+    # noncommercial engine an ordinary install does not even have. Kokoro is
+    # the documented one-click default on every platform and is what the
+    # shipped graph uses, so a dropped node now agrees with the graph.
+    assert it["required"]["engine"][1]["default"] == "kokoro"
     # Order is stable across opt-in flags.
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     monkeypatch.setenv("OTR_ENABLE_INDEXTTS2", "1")
@@ -138,7 +144,7 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
     # tests/test_tts_voice_preflight_matrix.py holds the two equal directly.
     assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro",
                        "elevenlabs", "google_tts"]  # hardcoded fallback
-    assert engines[0] == "indextts2", "index 0 is the byte-identical default"
+    assert engines[0] == "indextts2", "index 0 is the byte-identical ENGINE"
     assert engines, "engine combo must never be empty (C-5)"
 
 

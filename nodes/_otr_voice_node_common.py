@@ -376,11 +376,16 @@ def voice_input_types(role, fallback) -> dict:
                 ),
             }),
             "engine": (engines, {
-                "default": engines[0],
+                # NOT engines[0]: that is registry order, and it resolved to
+                # indextts2 -- noncommercial, and absent from an ordinary
+                # install. Kokoro is the documented one-click default on every
+                # platform and is what the shipped graph uses, so a dropped
+                # node now agrees with it. Falls back if a build lacks kokoro.
+                "default": "kokoro" if "kokoro" in engines else engines[0],
                 "tooltip": (
-                    "Voice engine for this role. The legacy engine is the "
-                    "byte-identical default; opt-in engines are flag-gated "
-                    "until the GPU dependency pilot promotes them. Unusable "
+                    "Which engine voices this role. It must agree with the "
+                    "matching engine on Cast Lock -- naming two different "
+                    "engines stops the render. Unusable "
                     "selections fail closed with a named error at queue time."
                 ),
             }),

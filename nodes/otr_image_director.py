@@ -206,8 +206,10 @@ class OTRImageDirector:
                                "comparisons.",
                 }),
                 "request_seed": ("INT", {
-                    "default": 0, "min": 0, "max": 0xFFFFFFFF,
-                    "tooltip": "Base seed (NOT named 'seed' on purpose, V-7).",
+                    "default": 42, "min": 0, "max": 0xFFFFFFFF,
+                    "tooltip": "Base seed for the stills. Each shot derives its "
+                               "own seed from this and its request, so the same "
+                               "number reproduces the same pictures.",
                 }),
                 # REQUIRED + forceInput (3D plan section 3): ComfyUI only
                 # enforces a WIRED connection for required inputs, and
@@ -244,9 +246,9 @@ class OTRImageDirector:
                 # adapter boundary (S4).
                 "dtype_policy": (["fp8_ok", "no_fp8", "no_fp8_no_fp4"], {
                     "default": "fp8_ok",
-                    "tooltip": "Dtype lanes allowed for local image engines "
-                               "(fp8/fp4 artifacts are OFF on ROCm/MPS "
-                               "tiers).",
+                    "tooltip": "Recorded on the episode receipt only. No image "
+                               "engine currently reads it to choose a "
+                               "precision.",
                 }),
             },
         }

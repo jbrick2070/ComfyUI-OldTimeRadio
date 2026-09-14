@@ -861,22 +861,20 @@ class SceneSequencer:
                 "script_json": ("STRING", {
                     "multiline": True,
                     "default": "[]",
-                    "tooltip": "Parsed script JSON from LLMScriptWriter"
+                    "tooltip": "The script, as JSON, from the Story Writer."
                 }),
             },
             "optional": {
                 "tts_audio_clips": ("AUDIO", {
-                    "tooltip": "Pre-rendered TTS audio clips (from Bark/Parler batch). "
-                               "If provided, dialogue lines use these clips instead of "
-                               "placeholder silence. Clips are matched to dialogue lines "
-                               "in order. ANNOUNCER lines are NOT expected here - they "
-                               "flow through announcer_audio_clips on a separate bus."
+                    "tooltip": "Character dialogue, already voiced, matched to the "
+                               "script in order. Without it those lines come out as "
+                               "silence. Announcer lines do not belong here -- they "
+                               "arrive on announcer_audio_clips."
                 }),
                 "announcer_audio_clips": ("AUDIO", {
-                    "tooltip": "Pre-rendered ANNOUNCER audio clips from KokoroAnnouncer. "
-                               "Consumed in script order for dialogue lines whose "
-                               "character_name is ANNOUNCER. Keeps the Voice of God "
-                               "bookends separated from the Bark character pool."
+                    "tooltip": "Announcer lines, already voiced, used in script order. "
+                               "They ride their own bus so the bookends stay separate "
+                               "from the cast."
                 }),
                 "start_line": ("INT", {
                     "default": 0, "min": 0, "max": 9999,

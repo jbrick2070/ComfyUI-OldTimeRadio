@@ -446,8 +446,11 @@ class OTRCaptionBurn:
             },
             "optional": {
                 "burn_captions": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": "Burn SDH open captions into the video. Default OFF (clean master); enabled by the capability profile. Node 86 is the single caption owner.",
+                    "default": True,
+                    "tooltip": "Burn open captions into the video. On by default, "
+                               "matching the shipped graph. Needs an ffmpeg with the "
+                               "ass filter and libx264 -- without them the episode "
+                               "still finishes, just without captions.",
                 }),
                 "caption_style": (_CAPTION_STYLE_CHOICES, {
                     "default": _DEFAULT_CAPTION_STYLE,
