@@ -5615,3 +5615,54 @@ directory from the server log's pinned line, never from the launch flags.
 With this leg all four 8 GB graphs in the v2.0.0 shipping set have a receipt on
 this card -- low, still and video from `shipping_set_20260913_045924`, and
 animatediff here -- and all four profiles moved from `draft` to `shipping`.
+
+### September 14, 2026 - AnimateDiff overnight artifact audit
+
+This is a read-only verification of completed September 13-14 runs on the
+physical RTX 4060, not a new render. All three harness summaries below say
+`DONE` and `act_count=1`; their evidence is under `otr/legs/<run>/` in
+`SUMMARY.txt` and `otr_8gb_animatediff.log`. Times are PDT.
+
+| Run | Graph / acts | RESULT | Minutes | OBS filename | Verified bytes |
+|---|---|---|---:|---|---:|
+| `shipping_set_20260913_125648` | `otr_8gb_animatediff` / 1 | NO-RESULT-LINE, rc=-1; server unavailable at harness cleanup | 54.1 | None verified | - |
+| `shipping_set_20260913_235601` | `otr_8gb_animatediff` / 1 | NO-RESULT-LINE, rc=1; connection refused before queueing | 0.1 | None | - |
+| `shipping_set_20260913_235900` | `otr_8gb_animatediff` / 1 | SUCCESS / PASS, rc=0 | 55.5 | `the_blinking_red_20260914_000804_silent__shst__adhv__none__koko__marc__q354b__sa3_final.mp4` | 140,030,494 |
+
+The successful run's prompt was `d9ba4475-859b-4882-af3d-c811527f847a`.
+Its actual publication is in `D:\output\otr\obs`, written September 14 at
+00:54:32 PDT; the harness finished at 00:54:33. Its `obs=0` again came from
+the launcher's incorrect `-ObsDir`, not absence of a publication. Future
+monitoring must use the actual pinned directory, `D:\output\otr\obs`.
+
+Independent ffprobe inspection succeeds: H.264 1920x1080 at 25 fps and
+stereo AAC at 48 kHz. The episode ledger confirms one act, six voiced rows,
+and 209 voiced words; every speech row has a positive positioned duration
+and is not skipped. The final audio lasts 90.582 seconds, matching the
+master; the 112.48-second video includes approximately 21.88 seconds of
+video-only credits. The `_silent` suffix is residual pipeline naming, not
+evidence of missing dialogue. This is container/ledger verification, not a
+listening review. The recorded frame checks passed for all eight beats.
+
+The earlier 46.1-minute PASS already recorded above corresponds to
+`shipping_set_20260913_135400`, also **one act**. Its `original` bank proves
+AnimateDiff publication on that bank; it does not independently exercise
+the `scifi_news_pro` Toad coverage failure. Neither that run nor the new
+`media_archive` publication establishes that news-specific fix by itself.
+
+The requested two- and three-act trials still have no verified result.
+The old retry group was superseded for the upstream fix, and the prepared
+replacement group's launch was previously rejected by automatic approval
+review with only `blocked by policy`; its marker and state remain absent.
+No replacement render or server reset was attempted during this audit.
+At 09:29 PDT Comfy was already running sage-free on loopback 8188 under
+listener PID 24548, with an empty queue. Its current redirected server log
+`otr/legs/4060_server_relaunch2.log` is empty, so it cannot supply a server
+traceback for the overnight runs. The 23:56 runner traceback is a
+`requests.exceptions.ConnectionError` on `/object_info` with WinError 10061.
+
+The original six-leg report remains published as `dca1612`, and the earlier
+AnimateDiff pass as `2722306`. This addendum preserves those receipts.
+Publication now targets promoted `main`; `v2.0-alpha` is retired. A fresh
+Claude CLI ListAgents/SendMessage attempt could not reach the old 5080
+session, so this pushed file is the durable handoff.
