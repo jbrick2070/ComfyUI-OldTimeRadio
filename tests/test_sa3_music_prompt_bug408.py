@@ -8,8 +8,9 @@ opening at the head, a closing at the tail, an interstitial in the middle.
 The OTHER half of the 408 fix -- an SA3-only era/genre anchor prepended to
 the prompt, with "analog tape warmth" in every branch -- was retired on
 2026-09-11: the operator withdrew the radio-hiss texture ("make them more
-musical") and the instruments now come from the story palette through the
-shared composer (`_otr_music_prompt.compose_engine_prompt`), for EVERY engine.
+musical") and the genre now comes from the story palette through the shared
+composer (`_otr_music_prompt.compose_brief_engine_prompt`), which since
+2026-09-13 is the ONE form every engine hears.
 `tests/test_music_prompts_are_musical.py` pins that the engine no longer
 prepends anything.
 """

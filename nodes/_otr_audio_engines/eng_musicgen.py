@@ -35,26 +35,20 @@ class MusicGenEngine:
     supports_external_generator = False  # MusicGen.generate binds no external Generator
     model_id = _MUSICGEN_MODEL_ID
     guidance_scale = 3.0                 # == music_musicgen_v1 profile default (pinned)
-    #: ASK FOR THE SHORT PROMPT. Measured 2026-09-12 with this model's own T5
-    #: tokenizer: the pack's full cue prompt runs 72-88 tokens, and Meta's own
-    #: MusicGen examples are 12-14 ("80s pop track with bassy drums and synth").
-    #: Our cues are 8 and 12 seconds long, so most of that text describes
-    #: structure the clip cannot contain and only dilutes the conditioning that
-    #: decides whether it sounds like the genre at all.
+    #: THE SHORT PROMPT IS NOW EVERY ENGINE'S PROMPT, so this engine no longer
+    #: asks for one. It carried `wants_brief_prompt = True` until 2026-09-13,
+    #: and the measurement behind that flag is what eventually retired it:
+    #: taken with this model's own T5 tokenizer, the pack's full cue prompt ran
+    #: 72-88 tokens against Meta's own 12-14 examples ("80s pop track with
+    #: bassy drums and synth"), on cues 8 and 12 seconds long.
     #:
-    #: THE FLAG LIVES HERE, ON THE ENGINE, because prompt length is a fact
-    #: about the model rather than about the story. `stable_audio_theme` reads
-    #: it and asks `_otr_music_prompt.compose_brief_engine_prompt` instead; the
-    #: short form is COMPOSED from the palette, never trimmed from the long
-    #: one, because trimming cuts the middle and the genre/BPM clause sits
-    #: there.
-    #:
-    #: This used to add "Stable Audio 3 takes the long form happily and keeps
-    #: it". It does not, as of 2026-09-13: SA3 sets the same flag, on the
-    #: operator's ear -- "they need to be the same musicgen prompts". The long
-    #: form never read `palette.idiom`, so the shipped engine was the only one
-    #: that never heard the genre or the tempo.
-    wants_brief_prompt = True
+    #: What the long form actually differed in turned out to be the IDIOM it
+    #: omitted rather than the length it added -- it was built from
+    #: `palette.instruments` and never read `palette.idiom`, so the engines
+    #: taking it never heard the genre name or the tempo. The operator's call:
+    #: "everyone gets brief". `_otr_music_prompt.compose_brief_engine_prompt`
+    #: is the only engine form now, and `stable_audio_theme` calls it
+    #: unconditionally.
 
     def __init__(self):
         self._model = None

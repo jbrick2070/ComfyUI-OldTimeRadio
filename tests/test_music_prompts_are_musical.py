@@ -5,9 +5,14 @@ we asked. So I am asking to go over ALL musical prompts and make them more
 musical ... ideally it is relevant to the story").
 
 Two products from one composer (`_otr_music_prompt`): the ROW text the ledger
-stores and hashes, and the ENGINE prompt every adapter hears -- the story
-palette's instruments and a clean production anchor in front of the row text,
-plus the one negative prompt. No engine prepends its own texture any more.
+stores and hashes, and the ENGINE prompt every adapter hears -- the palette's
+IDIOM (genre and BPM), one mood word, one setting phrase, plus the one negative
+prompt. No engine prepends its own texture any more.
+
+Since 2026-09-13 there is only ONE engine form. The long instruments-and-anchor
+form was ripped because it never read the idiom, so every engine taking it --
+Stable Audio 3 among them, which is what the shipped graphs run -- never heard
+the genre name or the tempo.
 """
 from __future__ import annotations
 
@@ -50,17 +55,20 @@ def _instrument_count(text):
 @pytest.mark.parametrize("bank,year,cue", list(itertools.product(_BANKS, _YEARS, MP.CUE_DURATIONS)))
 def test_every_bank_period_and_cue_composes_music_not_texture(bank, year, cue):
     row, duration = MP.compose_music_prompt(_meta(bank, year), cue)
-    engine = MP.compose_engine_prompt(_meta(bank, year), row)
+    engine = MP.compose_brief_engine_prompt(_meta(bank, year))
     for text in (row, engine.text):
         low = text.lower()
         assert not [w for w in _NOISE_WORDS if w in low], text
-    assert _instrument_count(engine.text) >= 2, engine.text
     assert row.endswith("instrumental only, no dialogue, no vocals")
-    assert engine.text.endswith("instrumental only, no dialogue, no vocals")
-    assert engine.text.startswith(P.story_palette(_meta(bank, year)).instruments)
-    assert MP.PRODUCTION_ANCHOR in engine.text
+    # The ROW keeps the long instrumental tail it has always had; the ENGINE
+    # form ends on the shorter instruction, because it is a different product.
+    assert engine.text.endswith("instrumental, no vocals")
+    # It LEADS with the palette's idiom -- genre and tempo -- which is the
+    # whole reason the long form was ripped on 2026-09-13: that form was built
+    # from `palette.instruments` and never read the idiom at all, so every
+    # engine taking it never heard the genre name or the BPM.
+    assert P.story_palette(_meta(bank, year)).idiom in engine.text
     assert duration == MP.CUE_DURATIONS[cue]
-    assert len(engine.text) <= MP.ENGINE_PROMPT_MAX_CHARS
 
 
 def test_the_row_text_reads_as_a_musical_instruction_about_this_story():
@@ -78,15 +86,6 @@ def test_the_row_text_reads_as_a_musical_instruction_about_this_story():
     assert "dancing woodwind" not in row
 
 
-def test_the_engine_prompt_leads_with_the_ensemble_and_a_clean_recording():
-    meta = _meta("shakespeare", "c. 1595")
-    row, _ = MP.compose_music_prompt(meta, "closing")
-    engine = MP.compose_engine_prompt(meta, row)
-    assert engine.text.startswith("viol consort, recorders, soft bowed strings, gentle lute, "
-                                  "clearly recorded, clean balanced studio mix, natural room. ")
-    assert engine.text.endswith(row)
-    assert engine.palette_key == "early_consort"
-    assert engine.negative == MP.NEGATIVE_PROMPT_DEFAULT
 
 
 def test_the_negative_prompt_names_the_withdrawn_texture_and_speech():
@@ -121,41 +120,22 @@ def test_the_positive_prompt_never_asks_for_the_thing_the_negative_forbids():
 
 def test_an_authored_prompt_survives_verbatim_inside_the_engine_prompt():
     authored = "slow open on a lonely trumpet over a city at night"
-    engine = MP.compose_engine_prompt(_meta("my_story", None), authored)
-    assert engine.text.endswith(". " + authored)
-    assert engine.text.startswith(P.HOUSE_PALETTE.instruments)
+    engine = MP.compose_brief_engine_prompt(_meta("my_story", None), authored)
+    # His words are carried whole, and the genre still leads them because that
+    # is what his ear judged.
+    assert authored in engine.text
+    assert engine.text.startswith(P.HOUSE_PALETTE.idiom)
 
 
-def test_the_engine_prompt_is_capped_below_the_smallest_engine_budget_without_raising():
-    long_row = ", ".join("a long clause number %d" % i for i in range(120))
-    assert len(long_row) > MP.ENGINE_PROMPT_MAX_CHARS
-    engine = MP.compose_engine_prompt(_meta("my_story", None), long_row)
-    assert len(engine.text) <= MP.ENGINE_PROMPT_MAX_CHARS
-    assert engine.text.startswith(P.HOUSE_PALETTE.instruments)
-    assert engine.text.endswith("clause number %d" % (
-        int(engine.text.rsplit("number ", 1)[-1])))  # cut at a clause boundary
-    assert not engine.text.endswith(",")
 
 
-def test_an_overflowing_composed_row_keeps_its_instrumental_tail():
-    meta = _meta("my_story", None,
-                 moods=tuple("mood word number %d" % i for i in range(3)),
-                 setting=tuple("a setting phrase that runs long %d" % i for i in range(2)))
-    row, _ = MP.compose_music_prompt(meta, "opening")
-    long_row = row.replace("evokes", "evokes " + ", ".join(
-        "an extra scenic clause %d" % i for i in range(60)) + ",")
-    assert len(long_row) > MP.ENGINE_PROMPT_MAX_CHARS
-    assert long_row.endswith("instrumental only, no dialogue, no vocals")
-    engine = MP.compose_engine_prompt(meta, long_row)
-    assert len(engine.text) <= MP.ENGINE_PROMPT_MAX_CHARS
-    assert engine.text.endswith("instrumental only, no dialogue, no vocals")
-    assert engine.text.startswith(P.HOUSE_PALETTE.instruments)
 
 
 def test_junk_meta_still_composes_both_products():
     for junk in (None, {}, [], "x", {"source_meta": "c. 1595", "music_mood_terms": 3}):
         row, _ = MP.compose_music_prompt(junk if isinstance(junk, dict) else {}, "opening")
-        engine = MP.compose_engine_prompt(junk, row)
+        engine = MP.compose_brief_engine_prompt(
+            junk if isinstance(junk, dict) else {})
         assert engine.text and engine.negative and engine.palette_key
 
 
@@ -421,7 +401,7 @@ def test_a_rhythmic_bank_is_never_forbidden_its_own_genre():
     for bank in ("scifi_news_pro", "media_archive", "original", "public_domain"):
         meta = _meta(bank, None)
         row, _ = MP.compose_music_prompt(meta, "opening")
-        engine = MP.compose_engine_prompt(meta, row)
+        engine = MP.compose_brief_engine_prompt(meta)
         assert P.story_palette(meta).rhythmic is True, bank
         low = engine.negative.lower()
         for word in forbidden_of_a_groove:
@@ -433,7 +413,7 @@ def test_a_rhythmic_bank_is_never_forbidden_its_own_genre():
     # and a sustained bank keeps the full anti-loop negative
     meta = _meta("shakespeare", "c. 1595")
     row, _ = MP.compose_music_prompt(meta, "opening")
-    assert MP.compose_engine_prompt(meta, row).negative == MP.NEGATIVE_PROMPT_DEFAULT
+    assert MP.compose_brief_engine_prompt(meta).negative == MP.NEGATIVE_PROMPT_DEFAULT
 
 
 def test_a_rhythmic_bank_is_not_also_told_to_play_slow_and_sustained():
@@ -481,7 +461,7 @@ def test_a_rhythmic_bank_is_not_given_a_sustained_ARC_either():
         meta = _meta(bank, None, moods=())
         for cue in MP.CUE_DURATIONS:
             row, _ = MP.compose_music_prompt(meta, cue)
-            engine = MP.compose_engine_prompt(meta, row)
+            engine = MP.compose_brief_engine_prompt(meta)
             low = engine.text.lower()
             for word in sustained_arc:
                 assert word not in low, (bank, cue, word, engine.text)

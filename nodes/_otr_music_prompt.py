@@ -20,15 +20,24 @@ prompts and make them more musical ... ideally it is relevant to the story"):
   The brief's mood words, the musical DEVICES they call for, the story's
   period idiom, the setting it evokes, the cue's arc, and the instrumental-only
   tail. Story-relevant, and it reads as a musical instruction.
-* ``compose_engine_prompt(meta, row_text) -> EnginePrompt`` -- what the ENGINE
-  hears: the story palette's instruments first (`_otr_music_palette`), a
-  clean-studio production anchor, then the row text -- or an AUTHORED row's
-  text verbatim on the my_story / scifi_news_pro lanes -- capped at the
-  smallest engine budget (Sonilo refuses above 1000 characters) by trimming
-  the row text at a clause boundary, never raising. Plus the one negative
-  prompt for every engine that takes one. The per-engine "analog tape warmth
-  / vintage / radio" anchors that used to be prepended were the withdrawn ask
-  and appear nowhere.
+* ``compose_brief_engine_prompt(meta, authored_text) -> EnginePrompt`` -- what
+  the ENGINE hears, and EVERY music engine hears this same form (operator,
+  2026-09-13: "everyone gets brief"). The palette's IDIOM leads -- genre and
+  BPM, which is what his ear judged -- with one mood word as an adjective on
+  it, one setting phrase, then the instrumental instruction. An AUTHORED row
+  on the my_story / scifi_news_pro lanes is his own words and follows the
+  genre verbatim. Plus the one negative prompt for every engine that takes
+  one. The per-engine "analog tape warmth / vintage / radio" anchors that used
+  to be prepended were the withdrawn ask and appear nowhere.
+
+  A LONG FORM used to sit beside this one, built from the palette's
+  INSTRUMENTS plus a production anchor and capped at 1000 characters. It was
+  ripped on 2026-09-13 because it never read the idiom, so every engine taking
+  it -- Stable Audio 3 among them, which is what the shipped graphs run --
+  never heard the genre name or the tempo. Its character cap went with it and
+  is not missed: Sonilo owns its own 1000-character limit and raises on it
+  (`eng_cloud_sonilo.generate_clip`), which is the fail-closed shape this pack
+  prefers over a silent trim.
 
 Mood resolution cascade (preserved from the audited musicgen path so a given
 brief yields the same music): v2 `music_mood_terms` (top 3) -> v1
@@ -105,9 +114,6 @@ _CUE_CHARACTER_RHYTHMIC: dict[str, str] = {
                     "instrumental transition",
 }
 
-#: What every engine hears after the instruments: a clean recording, not a
-#: degraded one. This is the ONLY production language in any music prompt.
-PRODUCTION_ANCHOR = "clearly recorded, clean balanced studio mix, natural room"
 
 #: The one negative prompt, for the engines that take one. It names the
 #: withdrawn texture explicitly so the model steers away from it.
@@ -125,10 +131,6 @@ NEGATIVE_PROMPT_DEFAULT = (
     # moved from 0.25 s to 2.2-4.2 s (`scripts/otr_music_ab.py`).
     "loop, looping, repetitive, ostinato, sequencer, arpeggiator, drum "
     "machine, metronome, click track, drum loop, beat")
-
-#: The smallest engine budget in the pack (`eng_cloud_sonilo` refuses a
-#: longer prompt with a ValueError, and a render must never die on length).
-ENGINE_PROMPT_MAX_CHARS = 1000
 
 
 @dataclass(frozen=True)
@@ -344,16 +346,6 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     return prompt, CUE_DURATIONS[cue_id]
 
 
-def _trim_at_clause(text: str, budget: int) -> str:
-    """``text`` cut to at most ``budget`` characters at a clause boundary when
-    one sits in the second half of the cut, else at the budget."""
-    cut = text[:max(0, budget)]
-    at = max(cut.rfind(", "), cut.rfind("; "), cut.rfind(". "))
-    if at > budget // 2:
-        cut = cut[:at]
-    return cut.rstrip(" ,;.")
-
-
 def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePrompt:
     """The SHORT form, for engines trained on short descriptions.
 
@@ -386,11 +378,17 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePr
          music still answers to this story rather than to its bank;
       3. the instrumental instruction.
 
-    COMPOSED, NEVER TRIMMED. ``compose_engine_prompt`` trims a long row from
-    the MIDDLE at a clause boundary -- which on these palettes cuts the genre
-    and BPM clause, because it sits after the instruments. Shortening by
-    trimming would silently reinstate the exact defect he heard in the techno
-    and house cues. Measured output: 15-28 tokens.
+    COMPOSED, NEVER TRIMMED, and that is why the long form could not simply be
+    shortened. It trimmed a long row from the MIDDLE at a clause boundary --
+    which on these palettes cuts the genre and BPM clause, because it sat
+    after the instruments. Trimming to length would have silently reinstated
+    the exact defect he heard in the techno and house cues. Measured output:
+    15-28 tokens.
+
+    THIS IS NOW THE ONLY ENGINE FORM (2026-09-13). Every music engine receives
+    it -- the fork that let an engine ask for a longer one is gone, because
+    what the long form actually differed in was the IDIOM it omitted, not the
+    length it added.
     """
     palette = story_palette(meta)
     # AN AUTHORED ROW IS THE OPERATOR'S OWN WORDS AND OUTRANKS EVERY DERIVED
@@ -441,25 +439,3 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePr
                         palette_key=palette.key)
 
 
-def compose_engine_prompt(meta: dict, row_text: str) -> EnginePrompt:
-    """What the engine hears for one cue: the story palette's instruments, the
-    production anchor, then ``row_text`` -- the composed row text on the
-    legacy lane, or an AUTHORED row's ``generation_prompt`` verbatim on the
-    my_story / scifi_news_pro lanes (the palette and anchor only ever go in
-    FRONT of it). Capped at ``ENGINE_PROMPT_MAX_CHARS`` by trimming the row
-    text at a clause boundary; never raises."""
-    palette = story_palette(meta)
-    head = f"{palette.instruments}, {PRODUCTION_ANCHOR}. "
-    body = str(row_text or "").strip()
-    budget = ENGINE_PROMPT_MAX_CHARS - len(head)
-    if len(body) > budget:
-        if body.endswith(_PROMPT_TAIL):
-            # A composed row overflowing keeps its instrumental-only tail:
-            # the clauses that go are in the middle, never the instruction.
-            body = (_trim_at_clause(body[:-len(_PROMPT_TAIL)],
-                                    budget - len(_PROMPT_TAIL)) + _PROMPT_TAIL)
-        else:
-            body = _trim_at_clause(body, budget)
-    return EnginePrompt(text=(head + body).strip(),
-                        negative=negative_for(palette),
-                        palette_key=palette.key)

@@ -73,8 +73,16 @@ def test_every_cue_row_carries_what_the_engine_heard_and_did(monkeypatch):
         # no production anchor. Checking only that the idiom appears somewhere
         # would pass on the long prompt too, which is what this replaced (codex
         # contrarian, 2026-09-12).
+        #
+        # The anchor phrase is spelled out here rather than imported. It used
+        # to read `MP.PRODUCTION_ANCHOR`, but that constant was ripped with the
+        # long form on 2026-09-13 and keeping a production constant alive only
+        # so a test can name it is the orphan this repo keeps re-learning. The
+        # literal still fails if anyone reintroduces the anchor, which is the
+        # whole job of the line.
         assert P.EARLY_CONSORT.instruments not in receipt["engine_prompt"]
-        assert MP.PRODUCTION_ANCHOR not in receipt["engine_prompt"]
+        assert ("clearly recorded, clean balanced studio mix, natural room"
+                not in receipt["engine_prompt"])
         assert receipt["negative_prompt"] == heard["negative_prompt"]
         assert "hiss" in receipt["negative_prompt"]
         assert receipt["palette_key"] == "early_consort"

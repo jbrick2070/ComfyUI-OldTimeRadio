@@ -31,7 +31,7 @@ from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
 import math
 
 from ._otr_music_prompt import (compose_brief_engine_prompt,
-                                compose_engine_prompt, compose_music_prompt)
+                                compose_music_prompt)
 
 #: Where a music cue's peak is allowed to sit. The same -1 dBFS the
 #: delivery master uses, and the level `eng_musicgen` has always
@@ -325,21 +325,27 @@ class StableAudioTheme:
             duration_s = spec["requested_duration_s"]
             engine_seed = _seed_to_int64(music_seed_base, spec["seed_key"])  # G1
             # The ROW text stays the cue's identity (ledger generation_prompt,
-            # cue_spec_sha256). The ENGINE hears the story palette and a clean
-            # production anchor in front of it, plus the negative prompt --
-            # one composer for every engine (2026-09-11: "make it musical").
-            # ASK THE ADAPTER HOW MUCH TEXT IT WANTS (2026-09-12). One
-            # composer still serves every engine -- what changed is that the
-            # engine now says which FORM it was trained for. MusicGen sets
-            # `wants_brief_prompt` because its own examples are 12-14 tokens
-            # and ours ran 72-88 for an 8-second bed; Stable Audio 3 says
-            # nothing and keeps the full form. The default is False, so an
-            # engine that never heard of this flag is byte-identical.
-            if getattr(adapter, "wants_brief_prompt", False):
-                engine_prompt = compose_brief_engine_prompt(
-                    meta, prompt if spec.get("authored") else "")
-            else:
-                engine_prompt = compose_engine_prompt(meta, prompt)
+            # cue_spec_sha256). The ENGINE hears the short form, and EVERY
+            # engine hears the same one (operator, 2026-09-13: "everyone gets
+            # brief" / "I want the same prompts, the same story meta brief
+            # etc for each").
+            #
+            # There used to be a `wants_brief_prompt` fork here, and the two
+            # forms had drifted in what they SAY rather than only in length:
+            # the long form was built from `palette.instruments` and never
+            # read `palette.idiom`, so the engines taking it never heard the
+            # genre name or the tempo. Stable Audio 3, which 16 of the 17
+            # shipped graphs actually run, was one of them -- it got "Roland
+            # TR-909 drum machine, deep analog sub bass, ..." with no "Detroit
+            # techno at 128 BPM" anywhere in it, while MusicGen (not the
+            # shipped default) was the only engine receiving the two strongest
+            # genre signals. That inverted the palette file's own 2026-09-12
+            # measurement, which found a named BPM is answered accurately.
+            #
+            # An AUTHORED row is still the operator's own words and is carried
+            # verbatim; only the derived form is composed.
+            engine_prompt = compose_brief_engine_prompt(
+                meta, prompt if spec.get("authored") else "")
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
             with deterministic_inference(engine_seed, warn_only=True):
