@@ -22,10 +22,23 @@ Already done, do not redo:
   of 17. Now `rglob`, collects 17, passes 17.
 * **`test_text_metric_ownership` is cleared** (`5184e33b`). The QA report lists
   it as a red blocker on step 1; that report was written before the fix.
-* **`scripts/otr_widget_surgery.py` exists and is proven.** Identity-based
-  `dst_slot` repair, descriptor-vs-value index handling, a reorder that needs
-  zero link repairs, and a `verify()` that re-asserts the backstop property.
-  Use it. Do not re-derive the procedure by hand.
+* **`scripts/otr_widget_surgery.py` exists, and its contract changed on
+  2026-09-13 after a QA pass found a blocker in it.** Identity-based `dst_slot`
+  repair, descriptor-vs-value index handling, and a `verify()` that re-asserts
+  the backstop property. Use it; do not re-derive the procedure by hand.
+
+  **`reorder_widgets` now returns `(touched, repairs)` and repairs the link
+  table ITSELF.** An earlier version said a reorder "needs zero link repairs",
+  which was true of the canonical and false in general: a WIDGET descriptor can
+  carry a live link, and three do today -- `OTR_SceneSequencer.script_json`
+  (link 277), `OTR_SignalLostVideo.script_json` (16) and `news_used` (110).
+  Moving one left its row pointing at the slot it vacated. The tool no longer
+  trusts the caller to remember part 3, and it REFUSES a node whose
+  `widgets_values` is shorter than its descriptor count rather than backfilling
+  `None`.
+
+  `tests/test_widget_surgery_tool.py` proves both against the real canonical.
+  Run it before you trust a change you make to the tool.
 
 ## The one blocker, and it is not code
 
@@ -154,10 +167,13 @@ already has a ledger source: canonical link 289 carries the full v2_ledger_json
 into replay_descriptor). Leave voice ownership and custom_source_bank alone --
 both are no-goes on evidence, reasons in the verdict.
 
-USE scripts/otr_widget_surgery.py. It is proven: identity-based dst_slot repair
-(idempotent -- a second pass returns empty), correct descriptor-vs-value index
-handling, a reorder that needs zero link repairs, and a verify(). Do not
-re-derive the three-part removal by hand.
+USE scripts/otr_widget_surgery.py, and note its contract changed on 2026-09-13:
+reorder_widgets returns (touched, repairs) and repairs the link table itself,
+because a WIDGET descriptor can carry a live link and three do today. It also
+refuses a short widgets_values rather than backfilling None. Identity-based
+dst_slot repair is idempotent -- a second pass returns empty. Run
+tests/test_widget_surgery_tool.py before trusting any change you make to it. Do
+not re-derive the three-part removal by hand.
 
 THE TRAP THAT INVERTS THE OBVIOUS: migrateWidgetsValues fires when EXACTLY ONE
 widget is removed ((37-k)+1 against 37 saved values), so removing a single
