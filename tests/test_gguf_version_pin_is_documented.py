@@ -1,15 +1,27 @@
-"""The GGUF lane's version pin must survive, in the two places users meet it.
+"""The GGUF lane's version pin, kept where it can still be reached.
 
 PBUG-20260829-12. llama-cpp-python 0.3.35 dies with STATUS_ILLEGAL_INSTRUCTION
 inside llama_init_from_model, reproduced at n_gpu_layers=0 -- so the fault is
 in the CPU backend and no GPU avoids it. 0.3.33 loads and generates, and the
 two builds were confirmed byte-identical across two machines by SHA-256.
 
-An unpinned `pip install llama-cpp-python` resolves to the broken one, so a
-fresh install of the GGUF lane is broken by default. The dependency is
-deliberately NOT in requirements.txt -- it is an opt-in lane and the CUDA wheel
-is ~945 MB -- which makes the error message and the README the only two places
-the pin can live.
+THE LANE NO LONGER SHIPS A WRITER ROW (operator directive 2026-09-06, recorded
+at nodes/_otr_gguf_backend.py: `GGUF_ROWS = ()`). `_gguf_native_virtual_rows()`
+returns nothing and no *-GGUF model reaches the writer dropdown. The reason is
+the AUTO-DOWNLOAD: a GGUF row pulls multi-GB weights on its own initiative,
+which is the pack reaching for the network and the disk without the user having
+chosen it.
+
+So the two README assertions that used to live here are GONE. bd106b06
+deleted that README section on purpose, and re-adding it would document an
+install path to a lane the pack does not offer -- worse than silent, because it
+reads as a supported route. Do not restore them, and do not revive the lane as
+an installer-ergonomics fix; what would have to change first is that the user
+CHOOSES the weights.
+
+What remains is the pair that still guards something real: the error message a
+reader of the code meets, and the promise that a ~945 MB wheel never quietly
+becomes a hard dependency.
 """
 from __future__ import annotations
 
@@ -32,13 +44,6 @@ def test_the_import_error_names_the_working_version():
         "resolves to it" % BAD)
 
 
-def test_the_readme_documents_the_pin():
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "llama-cpp-python==%s" % GOOD in readme, (
-        "README lost the pinned install command")
-    assert BAD in readme, "README does not warn against the broken version"
-
-
 def test_the_pin_is_not_silently_added_to_requirements():
     """It is opt-in on purpose: a ~945 MB CUDA wheel for a lane most users
     never select. If this ever changes it should be a deliberate decision,
@@ -48,12 +53,3 @@ def test_the_pin_is_not_silently_added_to_requirements():
         "llama-cpp-python appeared in requirements.txt -- that forces a very "
         "large optional wheel on every installer; if intended, delete this "
         "test in the same commit and say why")
-
-
-def test_the_bare_import_trap_is_documented():
-    """A bare `import llama_cpp` fails on a WORKING install, because OTR
-    preloads CUDA DLLs first. Both boxes lost time to this."""
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    assert "_import_llama_cpp" in readme, (
-        "README does not tell users to test through OTR's own import path, so "
-        "they will diagnose a working install as broken")
