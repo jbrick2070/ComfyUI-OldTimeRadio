@@ -56,7 +56,7 @@ pressing **Queue** is the whole path.
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
-| No GPU at all | About half an hour, and it works. Start ComfyUI with `--cpu`. |
+| No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | Experimental. No hardware has run it; [apple/ROCM.md](apple/ROCM.md) has the graph and the open questions. |
 
 **1. Install the pack.** In ComfyUI Manager, search for **Old Time Radio** (registry

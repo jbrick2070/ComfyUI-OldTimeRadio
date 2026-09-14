@@ -459,12 +459,16 @@ def render() -> str:
       "diffusion. It is not promoted to a machine key: a machine key implies a "
       "measured VRAM tier, and one 16 GB Mac is one data point, not a tier. "
       "Read `apple/MAC.md` before starting -- it ships with the pack, unlike "
-      "`docs/`. CPU-only is the "
-      "`otr_cpu_low` graph, PROVEN 2026-09-13: ComfyUI launched with `--cpu` "
-      "on an x86 laptop, the GPU present and unused, published a one-act "
-      "episode to `otr/obs/` in 34.5 minutes -- Kokoro voices ran at 0.12x "
-      "realtime on the CPU. One system, one episode, one act: a receipt, "
-      "not a tier.\n")
+      "`docs/`. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: "
+      "ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and "
+      "unused, ran `otr_canonical` with no profile and no overrides -- "
+      "exactly what the quickstart tells a stranger to open -- and published "
+      "a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is "
+      "nearly all of that: Qwen3.5-4B generates at about 3 tokens a second "
+      "on a CPU, while Kokoro runs at 0.12x realtime and the procedural "
+      "video lanes draw their own frames. The `otr_cpu_low` graph published "
+      "separately the same day in 34.5 minutes. One system, two episodes: a "
+      "receipt, not a tier.\n")
     A("")
 
     A("## How to read the confidence column\n")
