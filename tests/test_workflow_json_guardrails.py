@@ -526,6 +526,35 @@ class TestWriterB2aSurface:
         assert len(writers) == 1
         return writers[0]
 
+    def _writer_slot(self):
+        """`name -> widgets_values index`, read off the node's own descriptors.
+
+        THIS REPLACED A WALL OF ~20 HARDCODED INDEXES (2026-09-13). Those
+        literals had already been renumbered by hand four times -- the `seed`
+        removal, the style-engine consolidation, the `target_words` removal,
+        the `refine_target_grade` removal -- and each renumber was arithmetic
+        on a saved layout, which is precisely the move CLAUDE.md section 0
+        forbids for the link table and for the same reason: it is silently
+        wrong when the assumed starting point is stale.
+
+        Resolving by NAME makes the test say what it means ("the shipped
+        act_count is 1"), survive any future reorder untouched, and fail
+        loudly with the widget's own name if the widget itself disappears.
+        """
+        node = self._writer()
+        names = [i["widget"]["name"] for i in (node.get("inputs") or [])
+                 if isinstance(i.get("widget"), dict)]
+        index = {name: i for i, name in enumerate(names)}
+
+        def slot(name):
+            assert name in index, (
+                f"the writer has no widget named {name!r} -- this assertion "
+                f"is pinning a control that no longer exists. Widgets: {names!r}"
+            )
+            return index[name]
+
+        return slot
+
     def test_writer_output_slot_indexes_stable(self):
         """Every existing link's source slot still resolves to its
         original output name post-B2a. The two new outputs append at
@@ -582,6 +611,7 @@ class TestWriterB2aSurface:
         """
         writer = self._writer()
         wv = writer.get("widgets_values", [])
+        slot = self._writer_slot()
         # Current writer widgets_values layout:
         #   0  episode_title              ""
         #   1  num_characters             2
@@ -653,35 +683,42 @@ class TestWriterB2aSurface:
         # BUG-LOCAL-097), taking the vector 33 -> 37. All four default to ""
         # and are read only by the my_story bank, so a saved 33-slot workflow
         # resolves them empty and behaves exactly as it did. gate_in remains a
-        # socket-only forceInput at INPUT slot 32 and still consumes no
-        # widgets_values slot; link 279 is unchanged.
-        assert len(wv) == 37, (
-            f"writer widgets_values length drift: {len(wv)} (expected 37: "
+        # socket-only forceInput and still consumes no widgets_values slot.
+        #
+        # 2026-09-13: `perfect_run_spacesaver` was REMOVED from slot 8, taking
+        # the vector 37 -> 36 and pulling every later widget down one. This is
+        # the first removal here that was not a value-shift accident waiting to
+        # happen: the descriptor, the saved value AND the link table were moved
+        # together by scripts/otr_widget_surgery.py, so `gate_in` went from
+        # input slot 32 to 31 and link 279 followed it by identity.
+        assert len(wv) == 36, (
+            f"writer widgets_values length drift: {len(wv)} (expected 36: "
             f"32 after the 2026-08-14 target_words removal and the 2026-08-28 "
             f"refine_target_grade removal, plus the trailing replay_from "
             f"widget appended 2026-09-02 for the canonical replay, plus the "
-            f"four My Story fields appended 2026-09-10)"
+            f"four My Story fields appended 2026-09-10, minus "
+            f"perfect_run_spacesaver removed 2026-09-13)"
         )
         # 2026-09-06 operator directive: the shipped template starts with
         # ONE ACT for first-run portability. The generic node/legacy-input
         # fallback remains separate; all other saved choices stay unchanged.
-        assert wv[6] == "1", (
-            f"act_count (slot 6) must ship '1'; got {wv[6]!r}"
+        assert wv[slot('act_count')] == "1", (
+            f"act_count must ship '1'; got {wv[slot('act_count')]!r}"
         )
         # Slot 13: use_exchange -- the live grouped-exchange dialogue path
         # (ON in the shipped bake).
-        assert wv[13] is True, (
-            f"use_exchange (slot 13) must be ON in the shipped bake; "
-            f"got {wv[13]!r}"
+        assert wv[slot('use_exchange')] is True, (
+            f"use_exchange must be ON in the shipped bake; "
+            f"got {wv[slot('use_exchange')]!r}"
         )
         # Slot 14: enable_production_stage3_validators (ON in the shipped
         # bake).
-        assert wv[14] is True, (
-            f"enable_production_stage3_validators (slot 14); got {wv[14]!r}"
+        assert wv[slot('enable_production_stage3_validators')] is True, (
+            f"enable_production_stage3_validators; got {wv[slot('enable_production_stage3_validators')]!r}"
         )
         # Slot 15: news_briefs_required (ON in the shipped bake).
-        assert wv[15] is True, (
-            f"news_briefs_required (slot 15); got {wv[15]!r}"
+        assert wv[slot('news_briefs_required')] is True, (
+            f"news_briefs_required; got {wv[slot('news_briefs_required')]!r}"
         )
         # Slots 16/17: the S2 OpenRouter slot-slug pickers, appended at the
         # END. PRODUCTION RESTORE 2026-06-10: the shipped bake previously
@@ -690,24 +727,24 @@ class TestWriterB2aSurface:
         # (value_not_in_list) -- the saved file would not queue AS-IS. The
         # bake now ships the DISABLED SENTINELS; an operator who enables a
         # lane picks a slug in the UI and the preservation rule keeps it.
-        assert wv[16] == "(enable OpenRouter)", (
-            f"openrouter_slot_a_model (slot 16) must ship the disabled "
+        assert wv[slot('openrouter_slot_a_model')] == "(enable OpenRouter)", (
+            f"openrouter_slot_a_model must ship the disabled "
             f"sentinel (the saved file must queue with lanes off); got "
-            f"{wv[16]!r}"
+            f"{wv[slot('openrouter_slot_a_model')]!r}"
         )
-        assert wv[17] == "(enable OpenRouter)", (
-            f"openrouter_slot_b_model (slot 17) must ship the disabled "
-            f"sentinel; got {wv[17]!r}"
+        assert wv[slot('openrouter_slot_b_model')] == "(enable OpenRouter)", (
+            f"openrouter_slot_b_model must ship the disabled "
+            f"sentinel; got {wv[slot('openrouter_slot_b_model')]!r}"
         )
         # Slots 18/19: the Comfy Credits slot-slug pickers -- same sentinel
         # rule as 16/17.
-        assert wv[18] == "(enable Comfy Credits)", (
-            f"comfy_slot_a_model (slot 18) must ship the disabled sentinel; "
-            f"got {wv[18]!r}"
+        assert wv[slot('comfy_slot_a_model')] == "(enable Comfy Credits)", (
+            f"comfy_slot_a_model must ship the disabled sentinel; "
+            f"got {wv[slot('comfy_slot_a_model')]!r}"
         )
-        assert wv[19] == "(enable Comfy Credits)", (
-            f"comfy_slot_b_model (slot 19) must ship the disabled sentinel; "
-            f"got {wv[19]!r}"
+        assert wv[slot('comfy_slot_b_model')] == "(enable Comfy Credits)", (
+            f"comfy_slot_b_model must ship the disabled sentinel; "
+            f"got {wv[slot('comfy_slot_b_model')]!r}"
         )
         # Slot 20 WAS refine_target_grade until 2026-08-28, when it was
         # removed as an inert widget (the revision loop it advertised had been
@@ -716,9 +753,9 @@ class TestWriterB2aSurface:
         # it; the slots below are renumbered accordingly.
         # Slot 20: story_scaffold (scaffold toggle, 2026-06-24) -- ships "auto"
         # (follow OTR_ENABLE_STYLE_GRAMMAR / its default).
-        assert wv[20] == "auto", (
-            f"story_scaffold (slot 20) must ship 'auto' (follow the env/default "
-            f"scaffold setting in the shipped bake); got {wv[20]!r}"
+        assert wv[slot('story_scaffold')] == "auto", (
+            f"story_scaffold must ship 'auto' (follow the env/default "
+            f"scaffold setting in the shipped bake); got {wv[slot('story_scaffold')]!r}"
         )
         # Slot 21: source_bank (Stage 2C multi-modal story schema, 2026-07-05)
         # -- APPENDED at the END; ships the production story-bank surface AND
@@ -735,70 +772,87 @@ class TestWriterB2aSurface:
         # typo shipping a value that resolves to nothing.
         from nodes import _otr_story_routing as _routing
         from nodes import _otr_rolls as _rolls
-        assert wv[21] == _rolls.BANK_SENTINEL or wv[21] in _routing.list_bank_ids(), (
-            f"source_bank (slot 21) must ship the roll sentinel "
+        assert wv[slot('source_bank')] == _rolls.BANK_SENTINEL or wv[slot('source_bank')] in _routing.list_bank_ids(), (
+            f"source_bank must ship the roll sentinel "
             f"{_rolls.BANK_SENTINEL!r} or a registered bank id "
-            f"{_routing.list_bank_ids()!r}; got {wv[21]!r}"
+            f"{_routing.list_bank_ids()!r}; got {wv[slot('source_bank')]!r}"
         )
         # Slot 22: visual_style (Stage 3C multi-modal story schema,
         # 2026-07-06) -- APPENDED at the END; ships the production look AND
         # must be a REGISTERED style id (live registry cross-check).
         # 2026-08-15 (operator): the roll sentinel ships here too -- same
         # reasoning as slot 22 above. Sentinel OR an eligible style id.
-        assert wv[22] == _rolls.STYLE_SENTINEL or wv[22] in _rolls.eligible_style_ids(), (
-            f"visual_style (slot 22) must ship the roll sentinel "
+        assert wv[slot('visual_style')] == _rolls.STYLE_SENTINEL or wv[slot('visual_style')] in _rolls.eligible_style_ids(), (
+            f"visual_style must ship the roll sentinel "
             f"{_rolls.STYLE_SENTINEL!r} or an eligible style id "
-            f"{_rolls.eligible_style_ids()!r}; got {wv[22]!r}"
+            f"{_rolls.eligible_style_ids()!r}; got {wv[slot('visual_style')]!r}"
         )
-        assert wv[23] == "(select Google API model)", (
-            f"google_api_slot_a_model (slot 23) must ship the unselected "
-            f"sentinel; got {wv[23]!r}"
+        assert wv[slot('google_api_slot_a_model')] == "(select Google API model)", (
+            f"google_api_slot_a_model must ship the unselected "
+            f"sentinel; got {wv[slot('google_api_slot_a_model')]!r}"
         )
-        assert wv[24] == "(select Google API model)", (
-            f"google_api_slot_b_model (slot 24) must ship the unselected "
-            f"sentinel; got {wv[24]!r}"
+        assert wv[slot('google_api_slot_b_model')] == "(select Google API model)", (
+            f"google_api_slot_b_model must ship the unselected "
+            f"sentinel; got {wv[slot('google_api_slot_b_model')]!r}"
         )
-        assert wv[25] == "", (
-            f"source_ref (slot 25) must ship blank/inert; got {wv[25]!r}"
+        assert wv[slot('source_ref')] == "", (
+            f"source_ref must ship blank/inert; got {wv[slot('source_ref')]!r}"
         )
-        # Slots 27-32: S5 platform-portability (2026-07-10) LLM
-        # runtime-policy tail, APPENDED after source_ref. Defaults equal
-        # the nv50 16 GB baseline so an old 28-slot workflow resolves
-        # byte-identically.
-        assert wv[26] == "cuda", (
-            f"llm_device (slot 26) must ship 'cuda' (nv50 baseline); "
-            f"got {wv[26]!r}"
+        # The S5 platform-portability (2026-07-10) LLM runtime-policy tail.
+        #
+        # THESE PINS WERE STALE AND RED BEFORE THIS COMMIT. They asserted the
+        # nv50 16 GB baseline -- 'cuda', 'bnb_nf4', 14.5 -- which is what the
+        # 16 GB VARIANTS carry. The CANONICAL went device-agnostic when the
+        # product shape became "one canonical JSON that resolves your device at
+        # run time, with the per-machine picks living in the variants", and the
+        # startup banner says exactly that. Pinning a machine's choices on the
+        # portable file asserted the opposite of what the pack ships, so the
+        # test was failing for a correct tree.
+        #
+        # Measured 2026-09-13: canonical 'default' / 'sdpa' / 'none' / 10.0;
+        # every otr_16gb_* variant 'cuda' / 'sdpa' / 'bnb_nf4' / 14.5.
+        assert wv[slot('llm_device')] == "default", (
+            f"llm_device must ship 'default' on the CANONICAL -- the portable "
+            f"graph resolves the device at run time; 'cuda' belongs to the "
+            f"nv variants. Got {wv[slot('llm_device')]!r}"
         )
-        assert wv[27] == "sdpa", (
-            f"llm_attn_impl (slot 27) must ship 'sdpa'; got {wv[27]!r}"
+        assert wv[slot('llm_attn_impl')] == "sdpa", (
+            f"llm_attn_impl must ship 'sdpa'; got {wv[slot('llm_attn_impl')]!r}"
         )
-        assert wv[28] == "bnb_nf4", (
-            f"llm_quant_policy (slot 28) must ship 'bnb_nf4'; got {wv[28]!r}"
+        assert wv[slot('llm_quant_policy')] == "none", (
+            f"llm_quant_policy must ship 'none' on the CANONICAL -- bnb_nf4 is "
+            f"a CUDA-only quantiser and would refuse on Mac/CPU/AMD; "
+            f"got {wv[slot('llm_quant_policy')]!r}"
         )
-        assert wv[29] == 14.5, (
-            f"llm_vram_ceiling_gb (slot 29) must ship 14.5; got {wv[29]!r}"
+        assert wv[slot('llm_vram_ceiling_gb')] == 10.0, (
+            f"llm_vram_ceiling_gb must ship 10.0 on the CANONICAL -- a ceiling "
+            f"an 8 GB card can also live under; 14.5 is the 16 GB variants' "
+            f"number. Got {wv[slot('llm_vram_ceiling_gb')]!r}"
         )
-        assert wv[30] == 4096, (
-            f"gguf_n_ctx (slot 30) must ship 4096; got {wv[30]!r}"
+        assert wv[slot('gguf_n_ctx')] == 4096, (
+            f"gguf_n_ctx must ship 4096; got {wv[slot('gguf_n_ctx')]!r}"
         )
-        assert wv[31] == "Q8_0", (
-            f"gguf_quant (slot 31) must ship 'Q8_0'; got {wv[31]!r}"
+        assert wv[slot('gguf_quant')] == "Q8_0", (
+            f"gguf_quant must ship 'Q8_0'; got {wv[slot('gguf_quant')]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
-        assert isinstance(wv[2], str) and wv[2], (
+        assert isinstance(wv[slot('creative_writing_model')], str) and wv[slot('creative_writing_model')], (
             f"creative_writing_model widget value not a non-empty "
-            f"string: {wv[2]!r}"
+            f"string: {wv[slot('creative_writing_model')]!r}"
         )
-        assert isinstance(wv[3], str) and wv[3], (
+        assert isinstance(wv[slot('technical_model')], str) and wv[slot('technical_model')], (
             f"technical_model widget value not a non-empty string: "
-            f"{wv[3]!r}"
+            f"{wv[slot('technical_model')]!r}"
         )
-        assert wv[7] == "balanced", (
-            f"creativity widget drifted: {wv[7]!r}"
+        assert wv[slot('creativity')] == "balanced", (
+            f"creativity widget drifted: {wv[slot('creativity')]!r}"
         )
-        assert wv[8] is False, (
-            f"perfect_run_spacesaver widget drifted from slot 8: {wv[8]!r}"
-        )
+        # `perfect_run_spacesaver` was pinned here until 2026-09-13, when the
+        # widget was removed outright -- inert since 2026-08-08, and held in
+        # place only so the widgets after it would not move. Its absence is
+        # guarded by tests/test_perfect_run_spacesaver_is_gone.py, which is
+        # where a re-add gets caught; pinning its VALUE here would only
+        # re-assert that it exists.
 
     def test_writer_broadcasts_normalized_model_ids(self):
         """AST-walk OTR_LedgerScriptWriter source. Both new outputs

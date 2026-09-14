@@ -195,6 +195,12 @@ def _writer_schemas_s5() -> dict:
     # its paired synthetic double stay exactly as they were, because they
     # test the by-name patch mechanism against a fixed shape, not the live one.
     required.pop("target_words", None)
+    # 2026-09-13: `perfect_run_spacesaver` was deleted from the live node --
+    # inert since 2026-08-08, and held in place only to stop later widgets
+    # moving. Same reasoning as `target_words` above: ONLY this helper drops
+    # it, because the frozen synthetic double below is testing the by-name
+    # patch mechanism against a fixed shape, not against the live writer.
+    required.pop("perfect_run_spacesaver", None)
     required["llm_device"] = (
         ["cuda", "cpu", "mps"], {"default": "cuda"},
     )
@@ -534,7 +540,10 @@ def test_round_trip_canonical_node1_inputs_correct():
     # gone). gate_in is a forceInput socket and does not occupy a slot.
     # 33 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
     # appended as the trailing widget, after gate_in, so no earlier slot moved.
-    assert len(dump) == 37, f"node 1 widgets_values length drift: {len(dump)}"
+    # 36 since 2026-09-13: `perfect_run_spacesaver` was removed from slot 8
+    # with the full three-part migration (descriptor, saved value, and link
+    # 279's dst_slot, which moved 32 -> 31 with the gate_in socket).
+    assert len(dump) == 36, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

@@ -3,14 +3,18 @@
 This chunk only adds the inert, append-only source-reference surface. Bank
 fetchers consume it in later chunks; until then blank is byte-stable and
 nonblank is just preserved for downstream fail-loud consumers.
+
+Every position in this file is resolved BY NAME through
+``tests/fixtures/writer_slots``. Nothing here pins an absolute widget index,
+because the writer's layout has shifted under this file three times and each
+shift was silent: the saved values around `source_ref` are mostly ``""``, so
+an assertion that slid onto its neighbour kept passing and stopped checking.
 """
 from __future__ import annotations
 
 import inspect
 import sys
 from pathlib import Path
-
-import pytest
 
 _REPO = Path(__file__).resolve().parent.parent
 _SCRIPTS = _REPO / "scripts"
@@ -21,65 +25,73 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     _resolve_inputs,
 )
+from tests.fixtures.writer_slots import (  # noqa: E402
+    assert_relative_order,
+    value,
+)
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
 
 def test_source_ref_slot_pinned_with_llm_policy_tail():
-    """S5 platform-portability (2026-07-10): source_ref is NO LONGER the
-    final append-only widget -- OLD pin: order[26] == "source_ref" AND
-    len(order) == 28 (the tail). NEW pin (post S5): source_ref stays fixed
-    at order[26], the six explicit LLM runtime-policy widgets
-    (llm_device .. gguf_quant) were appended after it, and the gate_in
-    forceInput socket became the final declared entry. Renamed from
-    test_source_ref_is_final_append_only_widget since that name would now
-    lie -- source_ref is pinned mid-vector, not the tail.
+    """`source_ref` keeps its declared neighbourhood, and it is not the tail.
 
-    2026-08-14: the `target_words` widget (formerly slot 1) was deleted,
-    shifting every slot from num_characters onward down by 1 -- source_ref
-    moved from order[26] to order[25], and the tail (llm_device ..
-    gguf_quant .. gate_in) shifted down by 1 with it.
+    It was once the final append-only widget, which is what this test was
+    originally named for. It is not any more: everything appended since landed
+    AFTER it -- the six explicit LLM runtime-policy widgets
+    (llm_device .. gguf_quant) in the S5 platform-portability pass
+    (2026-07-10), the gate_in forceInput socket, replay_from (canonical
+    replay, 2026-09-02), and the four My Story creative fields (2026-09-10).
+    So what has actually held constant is the ORDER of that run, not
+    `source_ref`'s position in it.
+
+    The position has moved three times, every time because a widget AHEAD of
+    `source_ref` was deleted: target_words (2026-08-14), refine_target_grade
+    (2026-08-28) and perfect_run_spacesaver (2026-09-13). That is exactly the
+    class of change an absolute index cannot survive and a relative-order
+    claim does not care about, so this test makes the relative claim.
     """
     spec = OTR_LedgerScriptWriter.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
 
-    assert order[21] == "source_bank"
-    assert order[22] == "visual_style"
-    assert order[23] == "google_api_slot_a_model"
-    assert order[24] == "google_api_slot_b_model"
-    assert order[25] == "source_ref"
-    assert order[26] == "llm_device"
-    assert order[27] == "llm_attn_impl"
-    assert order[28] == "llm_quant_policy"
-    assert order[29] == "llm_vram_ceiling_gb"
-    assert order[30] == "gguf_n_ctx"
-    assert order[31] == "gguf_quant"
-    assert order[32] == "gate_in"
-    # 33 since 2026-08-28: refine_target_grade (slot 20) was removed as an
-    # inert widget and every pin below it shifted down one.
-    # 34 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
-    # was appended as the trailing widget AFTER the gate_in socket, so no
-    # earlier pin moved and the saved vector grew 33 -> 34 at its end.
-    assert order[33] == "replay_from"
-    # 38 since 2026-09-10: the four My Story creative fields were appended
-    # after replay_from, so again no earlier pin moved. gate_in stays the
-    # only declared entry that consumes no widgets_values slot, which is why
-    # 38 declared inputs carry a 37-wide saved vector.
-    assert order[34] == "story_characters"
-    assert order[35] == "story_plot"
-    assert order[36] == "story_setting"
-    assert order[37] == "story_author"
-    assert len(order) == 38
+    assert_relative_order(order, [
+        "source_bank",
+        "visual_style",
+        "google_api_slot_a_model",
+        "google_api_slot_b_model",
+        "source_ref",
+        "llm_device",
+        "llm_attn_impl",
+        "llm_quant_policy",
+        "llm_vram_ceiling_gb",
+        "gguf_n_ctx",
+        "gguf_quant",
+        "gate_in",
+        "replay_from",
+        "story_characters",
+        "story_plot",
+        "story_setting",
+        "story_author",
+    ])
+    # The My Story fields were the last thing appended, so story_author closes
+    # the declared vector. Appending anything after them has to come past this
+    # line, which is the point of asserting the tail rather than an index.
+    assert order[-1] == "story_author"
+    # A COUNT, not a position -- this one is a literal on purpose. 37 declared
+    # inputs carry a 36-wide saved vector because gate_in is a forceInput
+    # socket and consumes no widgets_values slot (asserted just below).
+    assert len(order) == 37
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
     assert meta["default"] == ""
 
-    # gate_in is declared (order[32]) but is a forceInput socket -- it
-    # consumes NO widgets_values slot (verified against the live 33-wide
-    # vector in test_patch_widget_by_name_lands_source_ref_slot_25 and
-    # tests/test_otr_api_companions.py::test_round_trip_canonical_node1_
-    # inputs_correct).
+    # gate_in is declared in the order above but is a forceInput socket, so it
+    # takes no saved value. That is the whole reason the declared order runs
+    # one longer than widgets_values -- verified against the live canonical
+    # node in test_patch_widget_by_name_lands_on_source_ref below, and in
+    # tests/test_otr_api_companions.py::
+    # test_round_trip_canonical_node1_inputs_correct.
     gate_type, gate_meta = spec["optional"]["gate_in"]
     assert gate_type == "STRING"
     assert gate_meta["forceInput"] is True
@@ -99,7 +111,6 @@ def test_source_ref_is_real_run_parameter_and_resolved_value():
     assert resolved2["source_ref"] == "https://example.invalid/source.txt"
 
 
-
 def test_source_ref_on_both_headless_whitelists():
     from nodes._otr_workflow_apply import CREATIVE_WHITELIST as pkg_wl
     import otr_api
@@ -108,7 +119,7 @@ def test_source_ref_on_both_headless_whitelists():
     assert "source_ref" in otr_api.CREATIVE_WHITELIST
 
 
-def test_patch_widget_by_name_lands_source_ref_slot_25():
+def test_patch_widget_by_name_lands_on_source_ref():
     import otr_api
 
     spec = OTR_LedgerScriptWriter.INPUT_TYPES()
@@ -130,23 +141,24 @@ def test_patch_widget_by_name_lands_source_ref_slot_25():
     )
     node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
 
-    # S5 platform-portability (2026-07-10): OLD pin 28 -> pin 34 (the six
-    # llm_device..gguf_quant widgets appended at 28-33; source_ref at 27).
-    # 2026-08-14: target_words removal shifted everything from
-    # num_characters onward down by 1 -- source_ref now sits at 26 and the
-    # vector tops out at 33. schemas comes from the LIVE INPUT_TYPES()
-    # above, so this already reflects the new vector -- only the pin
-    # needed updating.
-    assert len(node1["widgets_values"]) == 37  # 37 since 2026-09-10: four trailing My Story fields (story_characters/plot/setting/author)
-    # 2026-08-15 (operator): canonical ships the roll sentinels on both slots so
-    # an unattended run varies bank and style. These two lines are NEIGHBOUR
-    # checks -- they exist to prove the source_ref patch landed at 26 without
-    # disturbing anything around it, so they track canonical's saved values.
-    assert node1["widgets_values"][21] == "roll (any eligible bank)"
-    assert node1["widgets_values"][22] == "roll (any style)"
-    assert node1["widgets_values"][23] == "(select Google API model)"
-    assert node1["widgets_values"][24] == "(select Google API model)"
-    assert node1["widgets_values"][25] == "https://example.invalid/source.txt"
+    # A COUNT, not a position: the writer's saved vector has been 36 wide
+    # since 2026-09-13, when the inert perfect_run_spacesaver widget was
+    # removed. Patching must not change the width -- a patch that grew or
+    # shrank the vector would be corrupting every later widget in the graph.
+    assert len(node1["widgets_values"]) == 36
+
+    # Neighbour checks. They exist to prove the patch landed on source_ref
+    # ALONE and left the widgets on either side of it holding canonical's own
+    # saved values, so they track canonical rather than stating a preference.
+    # 2026-08-15 (operator): canonical ships the roll sentinels on bank and
+    # style so an unattended run varies both.
+    assert value(node1, "source_bank") == "roll (any eligible bank)"
+    assert value(node1, "visual_style") == "roll (any style)"
+    assert (value(node1, "google_api_slot_a_model")
+            == "(select Google API model)")
+    assert (value(node1, "google_api_slot_b_model")
+            == "(select Google API model)")
+    assert value(node1, "source_ref") == "https://example.invalid/source.txt"
 
 
 def test_patch_creative_allows_source_ref():
@@ -170,4 +182,4 @@ def test_patch_creative_allows_source_ref():
         schemas,
     )
     node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-    assert node1["widgets_values"][25] == "pd://sherlock/case-001"
+    assert value(node1, "source_ref") == "pd://sherlock/case-001"

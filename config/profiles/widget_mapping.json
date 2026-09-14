@@ -479,7 +479,6 @@
       "include_act_breaks",
       "act_count",
       "creativity",
-      "perfect_run_spacesaver",
       "min_p",
       "repetition_penalty",
       "max_new_tokens_cap",

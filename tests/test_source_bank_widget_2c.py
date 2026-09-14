@@ -5,7 +5,8 @@ widget on OTR_LedgerScriptWriter (kibitz-converged plan,
 kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 
 Pins:
-  1. Widget surface: source_bank is pinned at slot 21 (was 22 until the 2026-08-28 removal of the inert refine_target_grade at slot 20); choices come
+  1. Widget surface: source_bank sits immediately before visual_style, the two
+     Google API selectors and source_ref, in that order; choices come
      LIVE from the routing registry (exact list, registry order, including
      non-runnable custom banks -- the honest-error contract); default scifi_news_pro.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
@@ -19,10 +20,12 @@ Pins:
      every recursive compose_line self-call forwards it (AST pin).
   5. _resolve_inputs carries source_bank as the one authoritative value.
   6. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
-     patch_widget_by_name lands it at slot 21 of the canonical workflow
-     (shifted -1 by the 2026-08-14 removal of the `target_words` widget,
-     on top of the -2 shift from the 2026-07-05 style-engine consolidation,
-     which deleted the style / style_custom widgets).
+     patch_widget_by_name lands it on the canonical workflow's own
+     source_bank widget -- resolved by NAME from the node's descriptors
+     (tests/fixtures/writer_slots.py), never by a hardcoded index. Four
+     migrations have shifted these positions; each one left a stale numbered
+     comment behind, and a drifted index mostly lands on a neighbouring ""
+     or False and keeps passing while checking nothing.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
 from nodes._otr_creative_prompt_router import (  # noqa: E402
     resolve_creative_system_prompt,
 )
+from tests.fixtures.writer_slots import assert_relative_order, value  # noqa: E402
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 _PUBLIC_DOMAIN_BANK = "public_domain"
@@ -58,18 +62,22 @@ _NON_RUNNABLE_BANK = "custom_source_bank"
 # ---------------------------------------------------------------------------
 class TestWidgetSurface:
     def test_source_bank_positional_pin(self):
+        # The claim is about the GROUP, not about where the group starts.
         # Stage 3C (2026-07-06) appended visual_style after source_bank;
-        # Google API (2026-07-08) appended its slot pair after visual_style;
-        # Source Banks v2 appended source_ref after those. 2026-08-14: the
-        # `target_words` widget (formerly slot 1) was deleted, shifting
-        # every slot from num_characters onward down by 1.
+        # Google API (2026-07-08) appended its selector pair after
+        # visual_style; Source Banks v2 appended source_ref after those. That
+        # run of five must stay together in that order -- which is what the
+        # old absolute indexes were really asserting, and what survives the
+        # next add or removal earlier in the node.
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[21] == "source_bank"
-        assert order[22] == "visual_style"
-        assert order[23] == "google_api_slot_a_model"
-        assert order[24] == "google_api_slot_b_model"
-        assert order[25] == "source_ref"
+        assert_relative_order(order, [
+            "source_bank",
+            "visual_style",
+            "google_api_slot_a_model",
+            "google_api_slot_b_model",
+            "source_ref",
+        ])
 
     def test_choices_are_the_roll_sentinel_then_the_registry_in_order(self):
         """2026-07-31: the randomizer command is PREPENDED as choice 0.
@@ -253,7 +261,7 @@ class TestHeadlessSurface:
         assert "source_bank" in pkg_wl
         assert "source_bank" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_21(self):
+    def test_patch_widget_by_name_lands_on_source_bank(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -268,24 +276,26 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "source_bank", "scifi_news_pro", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # The Google API selectors and source_ref were appended after
-        # visual_style; source_bank sits at slot 21 (was 22 until the
-        # 2026-08-28 refine_target_grade removal, and 25 before the
-        # style-engine consolidation, then 23 before the 2026-08-14
-        # target_words removal). S5 platform-portability appended the six
-        # llm runtime-policy widgets at 27-32 (vector = 33).
-        assert len(node1["widgets_values"]) == 37  # 37 since 2026-09-10: four trailing My Story fields (story_characters/plot/setting/author)
-        assert node1["widgets_values"][21] == "scifi_news_pro"
-        assert node1["widgets_values"][23] == "(select Google API model)"
-        assert node1["widgets_values"][24] == "(select Google API model)"
-        assert node1["widgets_values"][25] == ""
+        # The patch must land on source_bank itself and leave its neighbours
+        # -- the two Google API selectors, source_ref, and the llm
+        # runtime-policy block -- exactly as the canonical saved them. Each
+        # value is resolved from the node's own widget descriptors, so this
+        # still reads the widget it names after the next migration moves it.
+        assert len(node1["widgets_values"]) == 36
+        assert value(node1, "source_bank") == "scifi_news_pro"
+        assert value(node1, "google_api_slot_a_model") == (
+            "(select Google API model)")
+        assert value(node1, "google_api_slot_b_model") == (
+            "(select Google API model)")
+        assert value(node1, "source_ref") == ""
         # NOT "cuda": the canonical is retargeted to whichever machine is
-        # under test (operator ruling 2026-09-07), so pin the SLOT, not the pick.
+        # under test (operator ruling 2026-09-07), so pin the WIDGET, not the
+        # pick.
         _llm_device_options = spec["optional"]["llm_device"][0]
-        assert node1["widgets_values"][26] in _llm_device_options, (
-            "slot 26 is llm_device; %r is not one of %r"
-            % (node1["widgets_values"][26], _llm_device_options))
-        assert node1["widgets_values"][31] == "Q8_0"
+        assert value(node1, "llm_device") in _llm_device_options, (
+            "llm_device holds %r, which is not one of %r"
+            % (value(node1, "llm_device"), _llm_device_options))
+        assert value(node1, "gguf_quant") == "Q8_0"
 
 
 # ---------------------------------------------------------------------------
@@ -394,15 +404,14 @@ class TestClientBankReachesTheWidget:
         workflow = json.loads(
             _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 37  # 37 since 2026-09-10: four trailing My Story fields (story_characters/plot/setting/author)
+        assert len(node1["widgets_values"]) == 36
         # 2026-08-15 (operator): canonical ships the roll sentinel here. The
         # point of this assertion is that admitting a client bank does not
-        # disturb slot 22, whatever legal value it holds.
-        assert node1["widgets_values"][21] == "roll (any eligible bank)"
+        # disturb the source_bank widget, whatever legal value it holds.
+        assert value(node1, "source_bank") == "roll (any eligible bank)"
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[21] == "source_bank"
-        assert order[22] == "visual_style"
+        assert_relative_order(order, ["source_bank", "visual_style"])
 
 
 # ---------------------------------------------------------------------------

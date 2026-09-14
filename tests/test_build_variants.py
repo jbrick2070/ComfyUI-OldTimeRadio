@@ -21,6 +21,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import build_variants as bv  # noqa: E402
 from nodes import _otr_workflow_apply as wa  # noqa: E402
+from tests.fixtures.writer_slots import value  # noqa: E402
 
 
 @pytest.fixture(scope="module")
@@ -90,22 +91,22 @@ def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
     assert rel == "workflows/variants/otr_cpu_floor.json"
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
-    wv = vnode["widgets_values"]
-    assert wv[0] == rel
-    assert wv[3] == "cpu_floor"
-    assert wv[5] == bv.GENERATED_BY
-    assert wv[4] == wa.semantic_master_hash(variant, mapping=mapping,
-                                            schemas=schemas)
-    # Profile-managed values landed: castlock voice_device (slot 5) = cpu,
-    # writer llm_device (slot 26) = cpu, gguf_quant (slot 31) = Q4_K_M.
-    # (2026-08-14: target_words removal shifted these from 28/33 to 27/32.
-    #  2026-08-28: refine_target_grade removal shifted them again to 26/31 --
-    #  it sat at slot 20, above both, so everything below moved down one.)
-    n80 = next(n for n in variant["nodes"] if n["id"] == 80)
-    assert n80["widgets_values"][5] == "cpu"
-    n1 = next(n for n in variant["nodes"] if n["id"] == 1)
-    assert n1["widgets_values"][26] == "cpu"
-    assert n1["widgets_values"][31] == "Q4_K_M"
+    assert value(vnode, "workflow_json_path") == rel
+    assert value(vnode, "profile_id") == "cpu_floor"
+    assert value(vnode, "generated_by") == bv.GENERATED_BY
+    assert value(vnode, "master_hash") == wa.semantic_master_hash(
+        variant, mapping=mapping, schemas=schemas)
+    # The profile's managed values reached the nodes that own them: the cast
+    # lock renders its voices on the CPU, and the writer runs its model on the
+    # CPU at the quantisation the floor profile asks for. Each widget is found
+    # by its own name, so adding or removing an unrelated control above it
+    # leaves these three assertions alone -- which is the whole reason no
+    # position is written down here.
+    castlock = next(n for n in variant["nodes"] if n["id"] == 80)
+    assert value(castlock, "voice_device") == "cpu"
+    writer = next(n for n in variant["nodes"] if n["id"] == 1)
+    assert value(writer, "llm_device") == "cpu"
+    assert value(writer, "gguf_quant") == "Q4_K_M"
     # Recipe carries args + env pointers + key names, never key values.
     assert "--cpu" in recipe
     assert "OTR_COMFYUI_MODELS_ROOT" in recipe
@@ -163,7 +164,7 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
         "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
-    stamped_hash = vnode["widgets_values"][4]
+    stamped_hash = value(vnode, "master_hash")
 
     good = tmp_path / "otr_cpu_floor.json"
     good.write_text(bv._dump(variant), encoding="utf-8")
@@ -203,7 +204,7 @@ def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
 
     with pytest.raises(ValueError, match="needs --cpu ON"):
         WorkflowValidator()._assert_stamp(
-            str(path), "cpu_floor", vnode["widgets_values"][4],
+            str(path), "cpu_floor", value(vnode, "master_hash"),
             bv.GENERATED_BY,
         )
 

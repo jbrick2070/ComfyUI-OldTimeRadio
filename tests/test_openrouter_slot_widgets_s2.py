@@ -23,18 +23,39 @@ from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 
 
-# The frozen widget order for indices [0..15] -- must never shift.
-# style / style_custom retired 2026-07-05 (style-engine consolidation);
-# target_words retired 2026-08-14 (episode length is an observation now,
-# never a word-count instruction).
-_EXPECTED_0_15 = [
+# THE WRITER'S DECLARED INPUT ORDER -- the single source of truth for it.
+#
+# `widgets_values` binds by POSITION (BUG-LOCAL-097), so this list is a
+# contract with every saved graph in existence, not a style preference.
+# Changing it means migrating all 17 shipped graphs in the same commit with
+# scripts/otr_widget_surgery.py.
+#
+# `gate_in` is in this list because it is a declared INPUT, but it is a
+# forceInput SOCKET: it consumes no widgets_values slot, which is why the
+# saved widget vector is 36 while this list is 37 long.
+#
+# Departures, so a reader knows why the numbering here will not match older
+# comments elsewhere in the repo:
+#   style / style_custom  retired 2026-07-05 (style-engine consolidation)
+#   refine_target_grade   retired 2026-08-28 (inert revision-loop promise)
+#   target_words          retired 2026-08-14 (length is an observation now)
+#   perfect_run_spacesaver retired 2026-09-13 (inert since 2026-08-08)
+_EXPECTED_INPUT_ORDER = [
     "episode_title", "num_characters",
     "creative_writing_model", "technical_model", "custom_premise",
-    "include_act_breaks", "act_count",
-    "creativity", "perfect_run_spacesaver", "min_p",
-    "repetition_penalty", "max_new_tokens_cap", "lemmy_cameo",
-    "use_exchange", "enable_production_stage3_validators",
+    "include_act_breaks", "act_count", "creativity",
+    "min_p", "repetition_penalty", "max_new_tokens_cap",
+    "lemmy_cameo", "use_exchange", "enable_production_stage3_validators",
     "news_briefs_required",
+    "openrouter_slot_a_model", "openrouter_slot_b_model",
+    "comfy_slot_a_model", "comfy_slot_b_model",
+    "story_scaffold", "source_bank", "visual_style",
+    "google_api_slot_a_model", "google_api_slot_b_model", "source_ref",
+    "llm_device", "llm_attn_impl", "llm_quant_policy",
+    "llm_vram_ceiling_gb", "gguf_n_ctx", "gguf_quant",
+    "gate_in",                      # SOCKET -- no widgets_values slot
+    "replay_from",
+    "story_characters", "story_plot", "story_setting", "story_author",
 ]
 
 
@@ -56,48 +77,43 @@ def remote_on(monkeypatch):
 
 
 def test_widget_order_appends_slots_at_end():
-    """The widget KEYS are env-independent: [0..15] frozen, OpenRouter slots
-    at 16/17, Comfy Credits slots at 18/19 (2026-06-01), and the Google
-    API slots appended at 24/25 (2026-07-08), then source_ref at 26
-    (Source Banks v2, 2026-07-08). Indices shifted -2 by the 2026-07-05
-    style-engine consolidation (style / style_custom widgets deleted),
-    then a further -1 by the 2026-08-14 target_words removal."""
+    """THE WRITER'S DECLARED INPUT ORDER, stated once, in full.
+
+    This used to be twenty-odd assertions against hardcoded indexes
+    (`order[16] == "openrouter_slot_a_model"`, and so on). Those literals had
+    been renumbered by hand four separate times -- the style-engine
+    consolidation took two slots out at 8/9, `refine_target_grade` took one out
+    at 20, `target_words` took one out at 1, and `perfect_run_spacesaver` took
+    one out at 8 on 2026-09-13 -- and every renumber was arithmetic performed
+    on a layout someone had to reconstruct from comments. Three of those four
+    comment blocks were stale by the time the fourth arrived.
+
+    A single list says the same thing, reads as the thing it is pinning, and
+    produces a diff a human can check at a glance. It is also the ONE place the
+    approved writer reorder has to change: pin the order here first, watch this
+    test go red, then move `INPUT_TYPES` to match it.
+
+    `gate_in` appears in this list because it is a declared INPUT, but it is a
+    forceInput SOCKET and consumes no `widgets_values` slot -- which is why the
+    saved widget vector is 36 while this list is 37.
+    """
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[:16] == _EXPECTED_0_15, f"index drift in [0..15]: {order[:16]}"
-    assert order[16] == "openrouter_slot_a_model"
-    assert order[17] == "openrouter_slot_b_model"
-    assert order[18] == "comfy_slot_a_model"
-    assert order[19] == "comfy_slot_b_model"
-    # slot 20 was refine_target_grade until 2026-08-28. It was an inert
-    # widget promising a revision loop deleted a month earlier, so it was
-    # removed WITH its migration and every later slot moved down by one.
-    assert order[20] == "story_scaffold"          # scaffold toggle (2026-06-24)
-    assert order[21] == "source_bank"             # Stage 2C (2026-07-05)
-    assert order[22] == "visual_style"            # Stage 3C (2026-07-06)
-    assert order[23] == "google_api_slot_a_model" # Google API (2026-07-08)
-    assert order[24] == "google_api_slot_b_model" # Google API (2026-07-08)
-    assert order[25] == "source_ref"              # Source Banks v2 (2026-07-08)
-    # S5 platform-portability (2026-07-10): the six explicit LLM
-    # runtime-policy widgets, appended at 27-32 (append-only).
-    assert order[26] == "llm_device"
-    assert order[27] == "llm_attn_impl"
-    assert order[28] == "llm_quant_policy"
-    assert order[29] == "llm_vram_ceiling_gb"
-    assert order[30] == "gguf_n_ctx"
-    assert order[31] == "gguf_quant"
-    # gate_in (S5 validation-order fix) is a forceInput SOCKET -- present
-    # in the INPUT_TYPES key order but consumes NO widgets_values slot
-    # (the serialized widget vector stays one shorter than this order).
-    assert order[32] == "gate_in"
-    # 33 since 2026-08-28: refine_target_grade (was slot 20) was removed
-    # as an inert widget, with all 62 saved graphs re-indexed.
-    # 34 since 2026-09-02: replay_from (CANONICAL REPLAY, campaign item 0)
-    # appended as the trailing widget after the gate_in socket -- the
-    # append-only rule this test exists to enforce.
-    assert order[33] == "replay_from"
-    assert order[34:] == ["story_characters", "story_plot", "story_setting", "story_author"]
-    assert len(order) == 38
+    assert order == _EXPECTED_INPUT_ORDER, (
+        "the writer's declared input order drifted.\n"
+        "  declared: %r\n  expected: %r\n"
+        "If this change is intended, update _EXPECTED_INPUT_ORDER in the same "
+        "commit AND migrate all 17 shipped graphs with "
+        "scripts/otr_widget_surgery.py -- the saved values bind by POSITION, "
+        "so a reorder that touches only the class silently re-attaches every "
+        "value after the moved index." % (order, _EXPECTED_INPUT_ORDER))
+
+    # The socket, called out separately because it is the one entry here that
+    # is NOT a widget and does NOT consume a saved value slot.
+    widgets = [n for n in order if n != "gate_in"]
+    assert len(widgets) == 36, (
+        "the writer should declare 36 widgets plus the gate_in socket; got %d"
+        % len(widgets))
 
 
 # --- conditional creative default; technical never flips --------------------

@@ -1,24 +1,31 @@
 """tests/test_visual_style_widget_3c.py
 
 Multi-modal story schema STAGE 3 CHUNK 3C -- the `visual_style` selector
-widget on OTR_LedgerScriptWriter (workflow slot 22; the 2C playbook applied
-per STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
+widget on OTR_LedgerScriptWriter (the 2C playbook applied per
+STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
+
+Positions are resolved BY NAME through tests/fixtures/writer_slots.py. This
+file used to pin them as bare integers, and every widget added to or removed
+from the writer silently slid those integers onto a neighbour -- the saved
+values around here are mostly "" and a repeated placeholder string, so a
+drifted assertion kept passing while checking nothing. See that module's
+docstring for the full account.
 
 Pins:
-  1. Widget surface: visual_style stays pinned at slot 22; choices ==
-     list_style_ids() exactly (registry order, all styles live); default
-     sci_fi_radio.
+  1. Widget surface: visual_style sits with its neighbours in the declared
+     order -- immediately before the two Google API slots and source_ref;
+     choices == the roll sentinel followed by eligible_style_ids() exactly
+     (registry order, all styles live); default sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
      INPUT_TYPES (deliberate convention exception -- no baked-in list).
   3. Gate order: an unknown visual_style raises UnknownVisualStyleError
      with ZERO side effects, and the bank gate fires BEFORE the style gate
      (non-runnable custom bank wins even when both are bad).
   4. _resolve_inputs carries visual_style as the authoritative value.
-  5. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name lands
-     slot 22 (shifted -1 by the 2026-08-14 removal of the `target_words`
-     widget, on top of the -2 shift from the 2026-07-05 style-engine
-     consolidation, which deleted the style / style_custom widgets).
-     Later widgets append after it.
+  5. Headless: on both CREATIVE_WHITELISTs; patch_widget_by_name writes the
+     visual_style widget in the canonical graph and leaves its neighbours --
+     source_bank before it, the Google API slots and source_ref after it --
+     carrying their own saved values.
 """
 from __future__ import annotations
 
@@ -39,6 +46,10 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     _resolve_inputs,
 )
+from tests.fixtures.writer_slots import (  # noqa: E402
+    assert_relative_order,
+    value,
+)
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
@@ -51,13 +62,23 @@ def _fresh_registry():
 
 
 class TestWidgetSurface:
-    def test_visual_style_positional_pin(self):
+    def test_visual_style_neighbour_pin(self):
+        """visual_style leads the Google API slots, which lead source_ref.
+
+        What the four absolute indexes here used to say was a claim about
+        this GROUP, not about where the group starts: the declared order runs
+        visual_style, both Google API slots, then source_ref, contiguously.
+        That survives an unrelated widget being added or removed earlier in
+        the node, which an absolute index does not.
+        """
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[22] == "visual_style"
-        assert order[23] == "google_api_slot_a_model"
-        assert order[24] == "google_api_slot_b_model"
-        assert order[25] == "source_ref"
+        assert_relative_order(order, [
+            "visual_style",
+            "google_api_slot_a_model",
+            "google_api_slot_b_model",
+            "source_ref",
+        ])
 
     def test_choices_are_the_roll_sentinel_then_the_registry(self):
         """2026-07-31: this dropdown owns the SECOND randomizer's command,
@@ -147,7 +168,7 @@ class TestHeadlessSurface:
         assert "visual_style" in pkg_wl
         assert "visual_style" in otr_api.CREATIVE_WHITELIST
 
-    def test_patch_widget_by_name_lands_slot_22(self):
+    def test_patch_widget_by_name_lands_on_visual_style(self):
         import otr_api
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         schemas = {
@@ -162,19 +183,16 @@ class TestHeadlessSurface:
         otr_api.patch_widget_by_name(
             workflow, 1, "visual_style", "anime", schemas)
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        # S5 platform-portability (2026-07-10): OLD pin 28 -> pin 34
-        # (llm_device..gguf_quant appended at 28-33; visual_style at 24).
-        # 2026-08-14: target_words removal shifted everything from
-        # num_characters onward down by 1 -- visual_style now sits at 22 (23 until the 2026-08-28 refine_target_grade removal shifted it)
-        # and the vector tops out at 33. schemas comes from the LIVE
-        # INPUT_TYPES() above, so this already reflects the new vector --
-        # only the pin needed updating.
-        assert len(node1["widgets_values"]) == 37  # 37 since 2026-09-10: four trailing My Story fields (story_characters/plot/setting/author)
-        assert node1["widgets_values"][22] == "anime"
-        # 2026-08-15 (operator): canonical ships the bank roll sentinel. This is
-        # the NEIGHBOUR check proving the visual_style patch landed at 23 and
-        # left 22 alone, so it tracks canonical's saved value.
-        assert node1["widgets_values"][21] == "roll (any eligible bank)"
-        assert node1["widgets_values"][23] == "(select Google API model)"
-        assert node1["widgets_values"][24] == "(select Google API model)"
-        assert node1["widgets_values"][25] == ""
+        # The count is the one number that belongs here: it is a measured
+        # total, not a position, so it is allowed to be a literal. schemas
+        # comes from the LIVE INPUT_TYPES() above, so the patch is resolved
+        # against the real widget vector rather than a remembered one.
+        assert len(node1["widgets_values"]) == 36
+        assert value(node1, "visual_style") == "anime"
+        # The NEIGHBOUR checks: the patch wrote visual_style and nothing else,
+        # so each of these still carries canonical's own saved value. The bank
+        # roll sentinel is what canonical ships (2026-08-15, operator).
+        assert value(node1, "source_bank") == "roll (any eligible bank)"
+        assert value(node1, "google_api_slot_a_model") == "(select Google API model)"
+        assert value(node1, "google_api_slot_b_model") == "(select Google API model)"
+        assert value(node1, "source_ref") == ""

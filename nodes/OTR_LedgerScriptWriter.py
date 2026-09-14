@@ -51,7 +51,7 @@ Pipeline (unchanged from v2.0 LPL):
        guardrails. canon.title is updated and episode_canon.json is
        written here (deferred from step 5 specifically for this).
     9. Stamp meta block (gen_params_initial, episode_title, title_source,
-       perfect_run_spacesaver, creativity, optimization_profile).
+       creativity, optimization_profile).
    10. Save ledger.
 
 Output contract:
@@ -79,12 +79,6 @@ Widget surface (current as of 2026-05-23):
         act_count         combo   ('1'-'6' -- THE one length-shaped knob;
                                    always honoured, never derived)
         creativity        combo   (maps to temperature + top_p preset)
-        perfect_run_spacesaver BOOLEAN (DEPRECATED 2026-08-08 -- no-op
-                                        sentinel; kept to preserve widget
-                                        positional layout per BUG-LOCAL-097.
-                                        Formerly triggered RTXUpscale's
-                                        per-episode cleanup, which was
-                                        retired with the RTX-VSR node.)
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
         repetition_penalty FLOAT  (anti-loop penalty; 1.0 disables)
         max_new_tokens_cap INT    (per-line composer token ceiling)
@@ -2313,14 +2307,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "so 'maximum chaos' caps at 0.95.)"
                     ),
                 }),
-                "perfect_run_spacesaver": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "Does nothing. It is kept only so the widgets "
-                        "below it do not shift position in saved graphs. "
-                        "Leave it alone."
-                    ),
-                }),
+                # `perfect_run_spacesaver` stood here until 2026-09-13. It was
+                # a no-op from 2026-08-08 (its consumer,
+                # `_spacesaver_cleanup_if_flagged`, went with the retired
+                # RTX-VSR node) and was kept only so the widgets below it
+                # would not shift position. Operator ruling 2026-08-28 --
+                # *"that's being lazy not to remove an inert widget"* -- and
+                # the shift is now WORK rather than a veto: the three-part
+                # removal in CLAUDE.md section 0, executed by
+                # scripts/otr_widget_surgery.py across all 17 shipped graphs.
                 # Phase 4 v4 (2026-05-11): sampling knobs appended at
                 # the END of optional so existing saved workflows keep
                 # binding positionally to the old widgets; ComfyUI
@@ -2990,7 +2985,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         act_count=0,
         creativity="balanced",
         optimization_profile="Standard",
-        perfect_run_spacesaver=False,
         # Phase 4 v4 (2026-05-11) sampling knobs appended at end.
         # Tier 2 fix #17 (2026-05-11): min_p / repetition_penalty
         # defaults flipped from 0.0 / 1.0 (disabled) to 0.05 / 1.03
@@ -3359,7 +3353,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             act_count=act_count,
             creativity=creativity,
             optimization_profile=optimization_profile,
-            perfect_run_spacesaver=perfect_run_spacesaver,
             # Phase 4 v4 (2026-05-11) sampling knobs.
             min_p=min_p,
             repetition_penalty=repetition_penalty,
@@ -3414,7 +3407,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             "[OTR_LedgerScriptWriter] start: creative_model=%r, "
             "technical_model=%r, act_count=%d, num_characters=%d, "
             "creativity=%r (temp=%.2f top_p=%.2f), seed_source=%s, "
-            "episode_title=%r, perfect_run_spacesaver=%s",
+            "episode_title=%r",
             resolved["creative_writing_model"],
             resolved["technical_model"],
             resolved["act_count"],
@@ -3422,7 +3415,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             resolved["creativity"],
             resolved["temperature"], resolved["top_p"],
             resolved["seed_source"], resolved["episode_title"],
-            resolved["perfect_run_spacesaver"],
         )
 
         # --- B. Late imports (no GPU / no model loads at module import) ---

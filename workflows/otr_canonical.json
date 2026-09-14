@@ -200,16 +200,6 @@
           "link": null
         },
         {
-          "localized_name": "perfect_run_spacesaver",
-          "name": "perfect_run_spacesaver",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "perfect_run_spacesaver"
-          },
-          "link": null
-        },
-        {
           "localized_name": "min_p",
           "name": "min_p",
           "shape": 7,
@@ -550,7 +540,6 @@
         true,
         "1",
         "balanced",
-        false,
         0.05,
         1.03,
         200,
@@ -3159,7 +3148,7 @@
       63,
       0,
       1,
-      32,
+      31,
       "STRING"
     ],
     [

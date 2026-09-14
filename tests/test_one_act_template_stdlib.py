@@ -1,35 +1,49 @@
 """One-act shipped-template contract; no runtime, GPU or network imports."""
-import importlib.util
 import json
 from pathlib import Path
 import unittest
 
+from tests.fixtures.writer_slots import value, widget_names
+
 
 REPO = Path(__file__).resolve().parents[1]
+
+#: The writer's saved control count, measured against the canonical graph on
+#: 2026-09-13 after ``perfect_run_spacesaver`` was removed. This is a COUNT, not
+#: a position -- it is the one number in this module that is allowed to be a
+#: literal, and it changes only when a control is genuinely added or dropped.
+#: Every VALUE below is found by widget NAME, so nothing here needs renumbering
+#: when the writer's controls are reordered.
+WRITER_WIDGET_COUNT = 36
 
 
 def load_graph(path):
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def writer_widgets(graph):
+def the_writer(graph):
+    """The graph's single script writer, checked fit to be read by name.
+
+    Names must be unique or reading a value by name silently takes the first of
+    them. The descriptor/value alignment is the shared helper's own precondition
+    -- ``value()`` refuses a node whose counts disagree -- so it is not repeated
+    here.
+    """
     writers = [node for node in graph["nodes"]
                if node["type"] == "OTR_LedgerScriptWriter"]
     if len(writers) != 1:
         raise AssertionError("Expected exactly one script writer")
     node = writers[0]
-    names = [item["widget"]["name"] for item in node["inputs"]
-             if item.get("widget")]
-    values = node["widgets_values"]
-    if len(names) != len(values) or len(set(names)) != len(names):
-        raise AssertionError("Writer descriptor/value alignment changed")
-    return dict(zip(names, values))
+    names = widget_names(node)
+    if len(set(names)) != len(names):
+        raise AssertionError("Writer widget names are not unique")
+    return node
 
 
 class OneActTemplateTests(unittest.TestCase):
     def test_canonical_starts_with_one_act_and_same_writers(self):
-        values = writer_widgets(load_graph(REPO / "workflows/otr_canonical.json"))
-        self.assertEqual(values["act_count"], "1")
+        writer = the_writer(load_graph(REPO / "workflows/otr_canonical.json"))
+        self.assertEqual(value(writer, "act_count"), "1")
         # WHICH model is authoritative in test_shipped_template_writer_default,
         # which ties it to DEFAULT_LLM. This module is deliberately stdlib-only
         # (see the docstring) so it must not import the catalog to learn the
@@ -38,8 +52,8 @@ class OneActTemplateTests(unittest.TestCase):
         # pinned the drift in place rather than catching it (PBUG-20260906-09).
         # What belongs HERE is the structural half: both writer slots agree,
         # and the value is a real COMBO label carrying its size suffix.
-        creative = values["creative_writing_model"]
-        self.assertEqual(values["technical_model"], creative,
+        creative = value(writer, "creative_writing_model")
+        self.assertEqual(value(writer, "technical_model"), creative,
                          "both writer slots must select the same model")
         # The badge is `(<download> GB[, <tags>])` since 2026-09-09 -- the size
         # is the DOWNLOAD, and machine-fit tags may follow it (`mac16`,
@@ -50,4 +64,5 @@ class OneActTemplateTests(unittest.TestCase):
         self.assertRegex(creative, r"^\S+/\S+ \(\d+(\.\d+)? GB(, [\w\- ]+)?\)$",
                          "the size suffix is part of the COMBO value; a bare "
                          "repo id matches no choice and can resolve to index 0")
-        self.assertEqual(len(values), 37)
+        self.assertEqual(len(widget_names(writer)), WRITER_WIDGET_COUNT)
+        self.assertEqual(len(writer["widgets_values"]), WRITER_WIDGET_COUNT)

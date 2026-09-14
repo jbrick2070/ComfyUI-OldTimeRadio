@@ -20,6 +20,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import OTR_LedgerScriptWriter as W  # noqa: E402
+from tests.fixtures.writer_slots import assert_relative_order  # noqa: E402
 
 _ENV = "OTR_ENABLE_STYLE_GRAMMAR"
 
@@ -48,19 +49,30 @@ class TestWidgetSurface:
         assert choices == ["auto", "on", "off"]
         assert meta["default"] == "auto"
 
-    def test_story_scaffold_positional_pin(self):
-        # Later source_bank, visual_style, Google API, and source_ref widgets
-        # append after this toggle; the scaffold slot itself stays fixed at
-        # 21 (was 22 before the 2026-08-14 `target_words` widget removal
-        # shifted every slot from num_characters onward down by 1).
+    def test_story_scaffold_leads_the_widgets_appended_after_it(self):
+        """The toggle, and everything that has been appended behind it since,
+        still sit together in that sequence.
+
+        This was six assertions against absolute indexes, renumbered by hand
+        every time a widget ahead of the group was removed -- most recently
+        `perfect_run_spacesaver` on 2026-09-13. The claim they were making was
+        never about the absolute position: it was that each later widget
+        APPENDED after this toggle rather than being inserted among them, which
+        is what keeps every saved graph's positional values bound to the right
+        controls. Stated as a relative order it survives the next removal
+        ahead of the group untouched. The absolute order is pinned once, in
+        tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER.
+        """
         spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert order[20] == "story_scaffold"
-        assert order[21] == "source_bank"
-        assert order[22] == "visual_style"
-        assert order[23] == "google_api_slot_a_model"
-        assert order[24] == "google_api_slot_b_model"
-        assert order[25] == "source_ref"
+        assert_relative_order(order, [
+            "story_scaffold",
+            "source_bank",
+            "visual_style",
+            "google_api_slot_a_model",
+            "google_api_slot_b_model",
+            "source_ref",
+        ])
 
 
 class TestApplyScaffoldEnv:

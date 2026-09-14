@@ -78,7 +78,9 @@ def _make_resolved(**overrides) -> dict:
         "seed_source": "rss",
         "source_ref": "",
         "news_seed": "Test science wire item.",
-        "perfect_run_spacesaver": False,
+        # `perfect_run_spacesaver` was a key here until 2026-09-13. The widget
+        # and its whole plumbing chain went that day, so a fixture still
+        # supplying it would be describing an input the writer no longer has.
         "llm_policy": _StubPolicy(),
     }
     resolved.update(overrides)

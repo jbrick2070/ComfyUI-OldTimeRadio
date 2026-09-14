@@ -1,12 +1,15 @@
 """Comfy Credits lane -- the sibling of the OpenRouter four-dropdown router.
 
-Pins the 2026-06-01 contract (indices shifted -2 by the 2026-07-05
-style-engine consolidation, which deleted the style/style_custom
-widgets that used to sit earlier in the optional block, then a further
--1 by the 2026-08-14 removal of the `target_words` widget):
-  * comfy_slot_a_model / comfy_slot_b_model are APPENDED at indices 18/19
-    of the writer's combined required+optional order (the OpenRouter
-    pair stays at 16/17).
+Pins the 2026-06-01 contract:
+  * comfy_slot_a_model / comfy_slot_b_model are APPENDED immediately after
+    the OpenRouter pair in the writer's combined required+optional order,
+    never inserted among the widgets that precede them. The position is
+    asserted by NAME -- the absolute offset has moved four times now
+    (style/style_custom 2026-07-05, target_words 2026-08-14,
+    refine_target_grade 2026-08-28, perfect_run_spacesaver 2026-09-13) and
+    every numbered comment written about it went stale within weeks. The
+    writer's declared order is stated ONCE, in
+    tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER.
   * The lane is opt-in / default-off via OTR_ENABLE_COMFY_CREDITS=1 -- when
     disabled the virtual rows + slug catalog never reach the dropdowns, so
     the offline baseline is untouched (mirrors the OpenRouter gate).
@@ -24,6 +27,7 @@ from nodes import _otr_comfy_backend as occ
 from nodes import _otr_model_catalog as cat
 from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
+from tests.fixtures.writer_slots import assert_relative_order
 
 
 @pytest.fixture(autouse=True)
@@ -257,8 +261,13 @@ def test_request_slot_routes_comfy_handle_to_backend(comfy_on):
 def test_writer_appends_comfy_slots_after_openrouter():
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    assert order[18] == "comfy_slot_a_model"
-    assert order[19] == "comfy_slot_b_model"
+    # The lane's whole contract is that it was APPENDED behind the OpenRouter
+    # pair rather than inserted among the older widgets -- so assert the group,
+    # which is what an absolute offset was standing in for.
+    assert_relative_order(order, [
+        "openrouter_slot_a_model", "openrouter_slot_b_model",
+        "comfy_slot_a_model", "comfy_slot_b_model",
+    ])
     # The hidden auth input is declared but is NOT a widget (absent from order).
     assert "api_key_comfy_org" in spec.get("hidden", {})
     assert "api_key_comfy_org" not in order

@@ -138,7 +138,6 @@ def _resolve_inputs(
     act_count: str = "auto",
     creativity: str = "balanced",
     optimization_profile: str = "Standard",
-    perfect_run_spacesaver: bool = False,
     # Phase 4 v4 (2026-05-11) sampling knobs. Tier 2 fix #17
     # defaults flipped to 0.05 / 1.03 (validated improvement over
     # disabled baseline on the small-LLM class).
@@ -661,7 +660,6 @@ def _resolve_inputs(
         "temperature":          float(temperature),
         "top_p":                float(top_p),
         "optimization_profile": str(optimization_profile),
-        "perfect_run_spacesaver": bool(perfect_run_spacesaver),
         # Phase 4 v4 (2026-05-11) sampling knobs. Clamped to widget
         # ranges so a hand-edited workflow JSON can't slip through
         # out-of-band values.

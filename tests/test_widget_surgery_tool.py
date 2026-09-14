@@ -100,10 +100,19 @@ def test_every_value_travels_with_its_own_widget():
         assert val == "MARK::%s" % nm, (nm, val)
 
 
+# A mid-list writer widget that sits BEFORE the gate_in socket, so removing it
+# moves a live link and exercises part 3 of the removal. This was
+# `perfect_run_spacesaver` (descriptor 8, gate_in at 32) until 2026-09-13, when
+# that widget was removed for real -- `min_p` inherited descriptor 8 and
+# gate_in moved to 31. The fixture is a POSITION, not a particular widget; what
+# it has to be is mid-list and ahead of the socket.
+_MIDLIST_VICTIM = "min_p"
+
+
 def test_removing_a_widget_repairs_the_link_that_follows_it():
-    """perfect_run_spacesaver sits at descriptor 8; gate_in is 32 and carries
-    link 279. Removing the first moves the second, and the repair is by
-    IDENTITY -- match inputs[i].link to the row's id -- never by arithmetic."""
+    """min_p sits at descriptor 8; gate_in is 31 and carries link 279.
+    Removing the first moves the second, and the repair is by IDENTITY --
+    match inputs[i].link to the row's id -- never by arithmetic."""
     ws = _tool()
     wf = _canonical()
 
@@ -112,9 +121,11 @@ def test_removing_a_widget_repairs_the_link_that_follows_it():
     # part 3 itself; binding the pair to one name made `assert touched` always
     # true, because a 2-tuple is truthy even when the widget was never found.
     touched, repairs = ws.remove_widget(
-        wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
-    assert touched, "perfect_run_spacesaver is not on the writer any more"
-    assert touched[0]["dropped_value"] is False, touched
+        wf, "OTR_LedgerScriptWriter", _MIDLIST_VICTIM)
+    assert touched, "%s is not on the writer any more" % _MIDLIST_VICTIM
+    assert touched[0]["input_pos"] == 8, (
+        "the fixture assumes a MID-LIST widget ahead of the gate_in socket; "
+        "%s is at descriptor %d" % (_MIDLIST_VICTIM, touched[0]["input_pos"]))
 
     assert ws.verify(wf, "after-removal") == []
     assert ws.repair_dst_slots(wf) == [], "the repair is not idempotent"
@@ -178,7 +189,7 @@ def test_removing_from_a_short_widgets_values_is_refused():
     node["widgets_values"] = node["widgets_values"][:-1]
 
     with pytest.raises(ValueError, match="saved values"):
-        ws.remove_widget(wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
+        ws.remove_widget(wf, "OTR_LedgerScriptWriter", _MIDLIST_VICTIM)
 
 
 def test_removing_from_a_node_with_no_widgets_values_is_refused():
@@ -192,7 +203,7 @@ def test_removing_from_a_node_with_no_widgets_values_is_refused():
     node.pop("widgets_values", None)
 
     with pytest.raises(ValueError, match="no widgets_values"):
-        ws.remove_widget(wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
+        ws.remove_widget(wf, "OTR_LedgerScriptWriter", _MIDLIST_VICTIM)
 
 
 def test_a_repair_reports_a_stale_node_as_well_as_a_stale_slot():

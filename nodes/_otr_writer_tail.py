@@ -896,7 +896,7 @@ class WriterTailMixin:
         # --- K. Stamp meta block --------------------------------------
         # Stamps the run parameters into meta.gen_params_initial for
         # forensic / soak inspection. Also stamps episode_title
-        # (forward-compat title chain slot) and perfect_run_spacesaver.
+        # (forward-compat title chain slot).
         meta = led.data.setdefault("meta", {})
         meta["gen_params_initial"] = {
             "act_count":            resolved["act_count"],
@@ -1070,8 +1070,11 @@ class WriterTailMixin:
         # title, so there is no post-hoc substitution to record. The
         # former J.6 verbatim-substitution block and its title-swap
         # helper were both removed in this sprint.
-        if resolved["perfect_run_spacesaver"]:
-            meta["perfect_run_spacesaver"] = True
+        # `meta.perfect_run_spacesaver` was stamped here until 2026-09-13,
+        # when the widget that fed it was removed. It had been a no-op since
+        # 2026-08-08 and the flag was only ever written when the box was
+        # ticked, which the shipped graphs never did -- so no ledger this
+        # pack has produced carries the key, and nothing reads it.
 
         # K.5 -- voice-path-cleanbreak Sprint 2 + Sprint 6 (2026-05-12).
         # Stamp the visual_plan + style fields that OTR_VideoPlan and
