@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.0.0"
-description = "Fully local old-time radio drama generator for ComfyUI — writes episode scripts, performs them with multi-voice neural TTS, masters 48kHz audio, and renders companion video. No cloud services required."
+version = "2.1.0"
+description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. Optional sound-generating video lanes create the scene's effects instead of using a stock library."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
@@ -110,13 +110,15 @@ dependencies = [
 authors = [
     {name = "Jeffrey Brick", email = "jbrick2070@gmail.com"},
 ]
-keywords = ["comfyui", "tts", "radio", "bark", "gemma", "audio", "sci-fi", "spatial"]
+keywords = ["comfyui", "comfyui-nodes", "comfyui-custom-node", "text-to-speech", "tts", "radio-drama", "audio-drama", "old-time-radio", "story-generation", "music-generation", "video-generation", "local-ai"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
-    "Topic :: Multimedia :: Sound/Audio :: Speech",
     "Topic :: Artistic Software",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Multimedia :: Video",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 [project.urls]

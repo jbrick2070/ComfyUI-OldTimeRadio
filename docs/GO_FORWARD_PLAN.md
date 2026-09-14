@@ -659,25 +659,6 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
-* **OWED AT THE NEXT VERSION BUMP, AND NOT ONE COMMIT SOONER: the registry
-  listing text.** An announcement-surface review (2026-09-13 evening) rewrote
-  `pyproject.toml`'s `description`, `keywords` and `classifiers`. The current
-  description still says "No cloud services required", which the README stopped
-  saying today because two story banks fetch live RSS. It is NOT applied because
-  editing `pyproject.toml` auto-fires a registry publish (7A) and 2.0.0 is still
-  Pending; it lands with the first real bump (2.1, or a 2.0.1 if a shipping gap
-  forces one). The staged text, ready to paste:
-
-  ```toml
-  description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. Optional sound-generating video lanes create the scene's effects instead of using a stock library."
-  keywords = ["comfyui", "comfyui-nodes", "comfyui-custom-node", "text-to-speech", "tts", "radio-drama", "audio-drama", "old-time-radio", "story-generation", "music-generation", "video-generation", "local-ai"]
-  classifiers = ["Development Status :: 4 - Beta", "Programming Language :: Python :: 3", "License :: OSI Approved :: MIT License", "Topic :: Artistic Software", "Topic :: Multimedia :: Sound/Audio :: Speech", "Topic :: Multimedia :: Video", "Topic :: Scientific/Engineering :: Artificial Intelligence"]
-  ```
-
-  Measured while reviewing: the live registry `tags` are empty, and changing
-  `keywords` alone has not populated them in any published version -- so do not
-  expect that field to fix the listing's tags; that is a registry-side question.
-
 * **The publish action will soon refuse `exec()` in the checkout.** Its
   pre-scan on the 2.0.0 publish printed, against
   `tests/test_visual_asset_validator_stdlib.py:92`, "We will soon disable
