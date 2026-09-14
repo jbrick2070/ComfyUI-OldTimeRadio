@@ -102,9 +102,9 @@
         "",
         ""
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#2B3C5A",
-      "title": "0 - Workflow Validator"
+      "color": "#1B2940",
+      "bgcolor": "#3B3D42",
+      "title": "Preflight - Workflow Validator"
     },
     {
       "id": 1,
@@ -580,8 +580,8 @@
         "",
         ""
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#2B3C5A"
+      "color": "#1B2940",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 3,
@@ -691,8 +691,8 @@
         "",
         0
       ],
-      "color": "#4A2B4D",
-      "bgcolor": "#4A2B4D"
+      "color": "#3C1C37",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 4,
@@ -799,8 +799,8 @@
         0.0,
         "off"
       ],
-      "color": "#4A2B4D",
-      "bgcolor": "#4A2B4D"
+      "color": "#3C1C37",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 7,
@@ -955,14 +955,14 @@
         8,
         500
       ],
-      "color": "#4A2B4D",
-      "bgcolor": "#4A2B4D"
+      "color": "#3C1C37",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 12,
       "type": "OTR_SignalLostVideo",
       "pos": [
-        2980,
+        2960,
         80
       ],
       "size": [
@@ -1072,8 +1072,8 @@
         "",
         false
       ],
-      "color": "#5B3A29",
-      "bgcolor": "#5B3A29"
+      "color": "#382712",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 62,
@@ -1215,8 +1215,8 @@
         true,
         true
       ],
-      "color": "#2B3C5A",
-      "bgcolor": "#2B3C5A"
+      "color": "#1B2940",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 80,
@@ -1354,8 +1354,8 @@
         "kokoro",
         "default"
       ],
-      "color": "#234035",
-      "bgcolor": "#234035"
+      "color": "#173220",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 81,
@@ -1436,8 +1436,8 @@
       "widgets_values": [
         "kokoro"
       ],
-      "color": "#234035",
-      "bgcolor": "#234035"
+      "color": "#173220",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 82,
@@ -1518,8 +1518,8 @@
       "widgets_values": [
         "kokoro"
       ],
-      "color": "#234035",
-      "bgcolor": "#234035"
+      "color": "#173220",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 83,
@@ -1617,14 +1617,14 @@
         "stable_audio_3",
         ""
       ],
-      "color": "#234035",
-      "bgcolor": "#234035"
+      "color": "#173220",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 84,
       "type": "OTR_SilentComposite",
       "pos": [
-        3500,
+        3440,
         80
       ],
       "size": [
@@ -1757,14 +1757,14 @@
         "off",
         "cpu"
       ],
-      "color": "#5B3A29",
-      "bgcolor": "#5B3A29"
+      "color": "#382712",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 85,
       "type": "OTR_MasterAudioMux",
       "pos": [
-        5140,
+        5000,
         80
       ],
       "size": [
@@ -1883,14 +1883,14 @@
         "ffmpeg",
         ""
       ],
-      "color": "#4A2B4D",
-      "bgcolor": "#4A2B4D"
+      "color": "#3C1C37",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 86,
       "type": "OTR_CaptionBurn",
       "pos": [
-        4560,
+        4400,
         80
       ],
       "size": [
@@ -2012,8 +2012,8 @@
         "",
         ""
       ],
-      "color": "#5B3A29",
-      "bgcolor": "#5B3A29"
+      "color": "#382712",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 87,
@@ -2191,7 +2191,7 @@
           ]
         }
       ],
-      "title": "Video Director",
+      "title": "Video Director / Settings",
       "properties": {
         "Node name for S&R": "OTR_VideoDirector"
       },
@@ -2212,8 +2212,8 @@
         "no_fp8_no_fp4",
         0
       ],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 88,
@@ -2330,7 +2330,7 @@
           ]
         }
       ],
-      "title": "Image Director",
+      "title": "Image Director / Settings",
       "properties": {
         "Node name for S&R": "OTR_ImageDirector"
       },
@@ -2344,15 +2344,15 @@
         "{}",
         "fp8_ok"
       ],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 89,
       "type": "OTR_MetaBriefImagePromptGen",
       "pos": [
         1520,
-        1400
+        1700
       ],
       "size": [
         379.96875,
@@ -2406,15 +2406,15 @@
         "Node name for S&R": "OTR_MetaBriefImagePromptGen"
       },
       "widgets_values": [],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 90,
       "type": "OTR_ShotLock",
       "pos": [
         1520,
-        1700
+        1400
       ],
       "size": [
         379.96875,
@@ -2497,8 +2497,8 @@
         "Node name for S&R": "OTR_ShotLock"
       },
       "widgets_values": [],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 91,
@@ -2580,8 +2580,8 @@
         "Node name for S&R": "OTR_ImageGenDispatcher"
       },
       "widgets_values": [],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 92,
@@ -2721,14 +2721,14 @@
         "",
         ""
       ],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A"
+      "color": "#102F35",
+      "bgcolor": "#3B3D42"
     },
     {
       "id": 93,
       "type": "OTR_PostUpscaleProcgenBlend",
       "pos": [
-        3980,
+        3920,
         80
       ],
       "size": [
@@ -2880,15 +2880,15 @@
         "",
         "bottom"
       ],
-      "color": "#5B3A29",
-      "bgcolor": "#5B3A29",
+      "color": "#382712",
+      "bgcolor": "#3B3D42",
       "title": "11 - CRT Overlay"
     },
     {
       "id": 94,
       "type": "OTR_SceneAwareScopes",
       "pos": [
-        2980,
+        2960,
         1400
       ],
       "size": [
@@ -2977,16 +2977,16 @@
         "ffmpeg",
         "off"
       ],
-      "color": "#3A3A5A",
-      "bgcolor": "#3A3A5A",
+      "color": "#102F35",
+      "bgcolor": "#3B3D42",
       "title": "9e - Scope Overlays"
     },
     {
       "id": 95,
       "type": "OTR_CreditsRoll",
       "pos": [
-        4560,
-        660
+        4400,
+        460
       ],
       "size": [
         370,
@@ -3040,8 +3040,8 @@
         "Node name for S&R": "OTR_CreditsRoll"
       },
       "widgets_values": [],
-      "color": "#5B3A29",
-      "bgcolor": "#5B3A29",
+      "color": "#382712",
+      "bgcolor": "#3B3D42",
       "title": "13 - Credits Roll"
     }
   ],
@@ -3554,53 +3554,53 @@
   "groups": [
     {
       "id": 1,
-      "title": "THE SCRIPT",
+      "title": "SCRIPT / START HERE",
       "bounding": [
         50,
         10,
         939.96875,
         1191.4375
       ],
-      "color": "#3f5159",
+      "color": "#6F86AA",
       "font_size": 24,
       "flags": {}
     },
     {
       "id": 2,
-      "title": "THE CAST AND THE MUSIC",
+      "title": "CAST + MUSIC",
       "bounding": [
         1010,
         10,
         459.96875,
         1271.640625
       ],
-      "color": "#3f5f4a",
+      "color": "#77987E",
       "font_size": 24,
       "flags": {}
     },
     {
       "id": 3,
-      "title": "THE AUDIO MASTER",
+      "title": "AUDIO MASTER",
       "bounding": [
         1490,
         10,
         1439.96875,
         483.59375
       ],
-      "color": "#5f3f5f",
+      "color": "#A17B9A",
       "font_size": 24,
       "flags": {}
     },
     {
       "id": 4,
-      "title": "THE CUT",
+      "title": "VIDEO FINISH",
       "bounding": [
-        2950,
+        2930,
         10,
-        2145.640625,
-        810
+        2005.640625,
+        619.453125
       ],
-      "color": "#6b4a34",
+      "color": "#AD916B",
       "font_size": 24,
       "flags": {}
     },
@@ -3608,25 +3608,25 @@
       "id": 5,
       "title": "PUBLISH",
       "bounding": [
-        5110,
+        4970,
         10,
         459.96875,
         347.140625
       ],
-      "color": "#4a5f6b",
+      "color": "#A17B9A",
       "font_size": 24,
       "flags": {}
     },
     {
       "id": 6,
-      "title": "THE PICTURE",
+      "title": "PICTURE / SETTINGS + SHOTS",
       "bounding": [
         530,
         1330,
-        2819.96875,
+        2799.96875,
         719.515625
       ],
-      "color": "#444466",
+      "color": "#6A9CA6",
       "font_size": 24,
       "flags": {}
     }
@@ -3634,10 +3634,10 @@
   "config": {},
   "extra": {
     "ds": {
-      "scale": 0.6363636363636366,
+      "scale": 0.2825,
       "offset": [
-        -101.2635191751642,
-        74.11313678632712
+        91.5929,
+        131.5929
       ]
     },
     "info": {
