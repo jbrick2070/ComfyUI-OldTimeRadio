@@ -108,9 +108,13 @@ def test_removing_a_widget_repairs_the_link_that_follows_it():
     wf = _canonical()
 
     before = {r[0]: list(r) for r in wf["links"]}
-    touched = ws.remove_widget(wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
+    # UNPACK BOTH. remove_widget returns (touched, repairs) since it took on
+    # part 3 itself; binding the pair to one name made `assert touched` always
+    # true, because a 2-tuple is truthy even when the widget was never found.
+    touched, repairs = ws.remove_widget(
+        wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
     assert touched, "perfect_run_spacesaver is not on the writer any more"
-    repairs = ws.repair_dst_slots(wf)
+    assert touched[0]["dropped_value"] is False, touched
 
     assert ws.verify(wf, "after-removal") == []
     assert ws.repair_dst_slots(wf) == [], "the repair is not idempotent"
@@ -142,3 +146,20 @@ def test_a_partial_order_is_refused():
         next(n for n in wf["nodes"] if n.get("type") == "OTR_SceneSequencer"))
     with pytest.raises(ValueError, match="permutation"):
         ws.reorder_widgets(wf, "OTR_SceneSequencer", names[:-1])
+
+
+def test_removing_a_widget_that_is_not_there_reports_nothing():
+    """Guards the shape of the return, not just its truthiness.
+
+    `remove_widget` returns (touched, repairs) since it took on part 3, and a
+    caller that binds the pair to a single name gets a 2-tuple that is truthy
+    even when the widget was never found -- which silently turned the
+    "is it still on the writer?" assertion above into a no-op.
+    """
+    ws = _tool()
+    wf = _canonical()
+    touched, repairs = ws.remove_widget(wf, "OTR_LedgerScriptWriter",
+                                        "a_widget_that_never_existed")
+    assert touched == [], touched
+    assert repairs == [], repairs
+    assert ws.verify(wf, "unchanged") == []
