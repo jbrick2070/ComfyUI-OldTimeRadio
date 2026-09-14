@@ -50,10 +50,18 @@ def repair_dst_slots(wf):
             row = links_by_id.get(lid)
             if row is None or len(row) < 5:
                 continue
-            if row[3] != node["id"]:
+            # REPORT EVERY MUTATION, not only the slot. An earlier cut fixed a
+            # stale dst_node in place and returned it in nothing, so a caller
+            # reading `repairs == []` as "the graph was already consistent" was
+            # wrong -- and reorder_widgets' docstring promises the return value
+            # shows what the repair did.
+            if row[3] != node["id"] or row[4] != idx:
+                repairs.append({
+                    "link": lid,
+                    "from": (row[3], row[4]),
+                    "to": (node["id"], idx),
+                })
                 row[3] = node["id"]
-            if row[4] != idx:
-                repairs.append((lid, row[4], idx))
                 row[4] = idx
     return repairs
 
@@ -61,7 +69,8 @@ def repair_dst_slots(wf):
 def remove_widget(wf, node_type, widget_name):
     """Drop one widget from every node of `node_type` in this graph.
 
-    Does parts 1 and 2; the caller runs repair_dst_slots for part 3."""
+    Does all THREE parts: the value, the descriptor, and the link table.
+    Returns (touched, repairs)."""
     touched = []
     for node in wf.get("nodes", []):
         if node.get("type") != node_type:
@@ -73,7 +82,17 @@ def remove_widget(wf, node_type, widget_name):
         value_pos = names.index(widget_name)
         input_pos = desc_idx[value_pos]
 
+        # THE SAME REFUSAL reorder_widgets earned, for the same reason. An
+        # earlier cut skipped the pop when widgets_values was already short and
+        # then removed the descriptor anyway, widening a pre-existing mismatch
+        # by one with no error -- turning a graph that is merely inconsistent
+        # into one that is confidently wrong.
         wv = node.get("widgets_values")
+        if isinstance(wv, list) and len(wv) != len(names):
+            raise ValueError(
+                "node %s: %d widget descriptors but %d saved values. Fix the "
+                "graph before removing from it; the removal cannot know which "
+                "value belongs to which widget." % (node["id"], len(names), len(wv)))
         dropped = None
         if isinstance(wv, list) and value_pos < len(wv):
             dropped = wv.pop(value_pos)
@@ -84,7 +103,13 @@ def remove_widget(wf, node_type, widget_name):
             "widgets_values_len": len(node.get("widgets_values") or []),
             "inputs_len": len(node.get("inputs") or []),
         })
-    return touched
+    # Part 3, run here rather than left to the caller -- the same guarantee
+    # reorder_widgets gives. The asymmetry between the two was an oversight,
+    # not a design: remove_widget's docstring used to say "the caller runs
+    # repair_dst_slots for part 3", which is one forgotten line away from a
+    # link pointing at the wrong descriptor.
+    repairs = repair_dst_slots(wf)
+    return touched, repairs
 
 
 def reorder_widgets(wf, node_type, new_name_order):

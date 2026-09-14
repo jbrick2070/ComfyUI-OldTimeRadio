@@ -81,7 +81,25 @@ class _DirectTextWriteVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        # The attribute has to be set HERE too. Without it the shape check read
+        # a missing value on this path, so an annotated `ui["text"]` could
+        # never take the exemption -- the check was dead on one of its two
+        # branches and nobody would have noticed until someone annotated one.
+        setattr(node.target, "_otr_assigned_value", node.value)
         if not self._is_self_test() and self._is_text_target(node.target):
+            self.direct_writes.append(node.lineno)
+        self.generic_visit(node)
+
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
+        """`row["text"] += ...` was invisible to this visitor entirely.
+
+        An augmented assignment mutates the text without touching char_count or
+        word_count, which is precisely the drift this file exists to prevent,
+        and it walked past every branch. It is caught on ANY object -- there is
+        no ui exemption here, because ComfyUI's preview list is built, not
+        appended to, so a `+=` on a "text" key is a ledger write or a mistake.
+        """
+        if not self._is_self_test() and isinstance(node.target, ast.Subscript)                 and isinstance(node.target.slice, ast.Constant)                 and node.target.slice.value == "text":
             self.direct_writes.append(node.lineno)
         self.generic_visit(node)
 
