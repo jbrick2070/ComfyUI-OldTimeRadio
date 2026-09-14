@@ -649,6 +649,22 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
+* **ONE HEADLESS LEG WOULD ADMIT A BIBLE RULE THAT IS OTHERWISE HELD.** The
+  `custom_premise` source-override hijack (shipped in 2.1.0/2.1.1, fixed in
+  2.1.2) is genuinely UNCOVERED as a Bible class -- "a field validation treats
+  as optional may be another consumer's override switch; grep every READER,
+  not just the validators". It is NOT admissible on the evidence that exists:
+  a reviewer ran `_resolve_inputs` headlessly against the real shipped value,
+  which this repo's own log has twice ruled is review evidence, not a live
+  incident. Nothing was actually mis-rendered -- every episode in the affected
+  window ran `my_story`, the one correct bank.
+  **The cheap close:** one headless leg on `media_archive`, `public_domain`,
+  `shakespeare` or `scifi_news_pro` against a worktree in the pre-fix range
+  (`5e60a012`..`bf584e9b`) produces the server-log/ledger evidence
+  PBUG-20260819-01 used, and it becomes admissible the same day. The drafted
+  Bible entry (`04.15`) and index row are in that session's transcript, ready
+  to paste. Bible is 352 entries at `af2557f7`, in sync.
+
 * **CLEAR 14 SUITE DELTAS FROM THE 2026-09-13 NIGHT SESSION.** A full-suite
   diff against `283abaa6` (that session's start) shows 63 failures vs 53 --
   14 tests fail now that passed then, 4 that failed then now pass. They were

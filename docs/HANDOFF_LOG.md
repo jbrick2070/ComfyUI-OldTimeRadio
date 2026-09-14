@@ -1,3 +1,76 @@
+## 2026-09-13 -- HEAD 910df1d5 +handoff (main) -- CODER (v2 promoted to main; three releases; a widget audit and the defect it hid)
+
+Did: **v2 PROMOTED.** `main` is the default and working branch, `v2.0-alpha`
+retired and frozen (NOT deleted -- 2.0.0 and 2.1.0 have `/v2.0-alpha/` frozen
+into their registry card Icon URL; deleting before 2.1.2 is Active breaks the
+card art on the live listing). `mirror_main.yml` deleted, publish action moved
+to main, CLAUDE.md 7 + 0B and the otr-handoff skill rewritten (the skill still
+told every resuming window the branch "must be v2.0-alpha").
+**THREE RELEASES.** 2.1.0 (Stable Audio 3 as music default on 15 of 16 graphs;
+My Story joins the roll; listing text replaced -- the old one claimed "No cloud
+services required", false since two banks fetch live RSS). 2.1.1 (the retired
+branch name off every user-visible surface: the credit roll burned into every
+episode, ~20 URLs inside ERROR messages, the registry Icon). 2.1.2 (the
+critical fix below). 2.0.0 and 2.1.0 Active; 2.1.1 and 2.1.2 Pending.
+**THE CRITICAL ONE, and it was mine.** A standing premise written into the
+canonical's `custom_premise` widget hijacked FOUR of six banks:
+`_otr_writer_inputs._resolve_inputs` takes an `elif custom:` branch that
+treats a non-empty premise as a SOURCE OVERRIDE and skips the RSS/archive/
+Folger fetch entirely. I had checked what REFUSES the field (admission) and
+never what CONSUMES it. Shipped in 2.1.0 and 2.1.1; fixed in 2.1.2 by clearing
+the widget -- the code floor `DEFAULT_IDEA` already covered the case the widget
+was added for. Nothing was actually mis-rendered: every episode in the affected
+window ran `my_story`, the one correct bank.
+**MY STORY rolls as an equal peer**, on a `DEFAULT_IDEA` floor applied at four
+admission sites; a parse-time guard refusing `user_fields_v1`+`auto_select`
+removed, with a note at its grave. The 4th site (the writer's PRE-roll check)
+was added only after QA found a manual blank pick was admitted by the validator
+and then refused by the writer.
+**WIDGET AUDIT, tier one:** ~15 tooltips (five receipt-only controls stopped
+posing as switches; two had been falsified by this session's own node 93/94
+removal), 11 fresh-node defaults aligned to the shipped graph (both voice nodes
+defaulted to `indextts2`; VideoRenderBatch.mode defaulted to diagnostic
+`soak`).
+**Canvas** relaid out and looked at on a live server for the first time -- three
+nodes render taller than their saved size because the frontend raises them to
+their widget minimum, which no JSON check can see.
+Suite: **63 failures vs 53** at session start (`283abaa6`). 14 deltas were NOT
+individually cleared -- recorded as an open row with the list; two were
+spot-checked (one is a node-title audit, one passes in isolation). Every
+TARGETED comparison during the session was identical to baseline; the full-suite
+one is the honest number. Bug Bible: checked twice, **nothing admissible**,
+stays 352 at `af2557f7`, in sync. A genuinely uncovered class (validation-vs-
+consumption) is HELD with a drafted entry -- one headless leg would admit it.
+Box: CPU server on 8001 stopped, VRAM at baseline, tree clean.
+
+Current step: GO_FORWARD trimmed to actions only (operator: "go forward should
+only have things we need to do, not history"). Its live rows: watch 2.1.2 to
+Active then delete `v2.0-alpha`; ping the AMD volunteer (trigger fired); clear
+the 14 suite deltas; run the widget rename/reorder handoff; three DECIDE rows.
+
+Next: `docs/HANDOFF_WIDGET_RENAME_REORDER.md`, starting at its TASK ZERO --
+clear the 14 suite deltas BEFORE any widget work, because every gate in that
+document is a test and you cannot tell your own off-by-one from inherited
+noise. Then the rename GO/NO-GO, which is a decision and not an edit: a rename
+breaks 2,074 saved widget-name references, 47 mapping targets, and every
+workflow a USER has already saved, which cannot be migrated.
+
+Models: Sonnet 6-dimension QA fan-out over the session diff with each finding
+handed to a separate refuter (found the pre-roll floor gap). Fable on the My
+Story premise. An external adversarial finishing review found the
+`custom_premise` hijack -- the single most valuable finding of the session, and
+one nothing internal caught. Two Sonnet agents on Bible admission, both ruling
+NOT admissible. The kibitz cursor lane produced 0 bytes and was killed, not
+reported as a review.
+
+Commits: f32dbb48, 7eade495, 76d5ce29, 958c7d1d, 59113dc6, f7d9eb6a, 90cc904e,
+5e60a012 (2.1.0), 4e8acae3, 33643963, bf584e9b (2.1.1), 2f11fe88, 359951e1,
+e27bf0f0, ad96c441, ff81dee1, ab07a52e, f20a53dd (2.1.2), 97cdb8c7, 0a570314,
+910df1d5. The handoff commit lands ON TOP of these -- the sha above is the last
+CODE head and is the second-to-last on the branch once this entry lands; the
+last is this handoff commit. See the kickoff line for the real head.
+
+
 ## 2026-09-12 (evening) -- HEAD b64ae5f4 +this (v2.0-alpha) -- CODER (the matrix said auto for eight engines that fetch nothing; the 4060 proved it the same hour)
 
 **THE RECEIPT THAT WAS MISSING NOW EXISTS.** After a clean section-4 reset
@@ -4263,6 +4336,7 @@ Commits: a1a85901, b632ad44, 24eeabcb, 39b9e76e, c02ce45d, f2d039e6, a88cede5,
 
 Append-only session log, newest at top. What each session actually did;
 GO_FORWARD_PLAN.md stays lean and forward-only.
+
 
 ## 2026-08-21 EVENING -- HEAD 8f7592b0 +handoff (v2.0-alpha) -- QUALITY-PROGRAMME WINDOW (lanes 4 and 5 closed NO WIN; operator eye exercised at last; still-canvas review opened)
 
