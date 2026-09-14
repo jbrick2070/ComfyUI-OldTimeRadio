@@ -1153,12 +1153,26 @@ def render_readme_block(rows: list) -> str:
 
 
 def inject_readme(block: str, write: bool) -> bool:
+    """REMOVE the dropdown block from README. True if README already has none.
+
+    It WAS injected, and the reasoning was sound: one generated answer beats two
+    hand-kept ones. What changed on 2026-09-13 is that three independent readers
+    said the same thing -- 143 lines of engine matrix sat between "press Queue"
+    and everything a newcomer needs next, while the identical data lives in
+    apple/MACHINES.md section 2 with MORE columns and the full legend, on a page
+    that ships. README now carries the canonical's own defaults and a link.
+
+    The name is kept because --check and main both call it and the job is still
+    "make README agree with this generator" -- the agreement is now that README
+    carries no copy. There is no re-injection path, so running this generator
+    cannot put the block back.
+    """
     text = io.open(_README, encoding="utf-8").read()
     if _BEGIN not in text or _END not in text:
-        raise SystemExit("README has no dropdown-matrix markers to inject into")
+        return True
     head = text[:text.index(_BEGIN)]
     tail = text[text.index(_END) + len(_END):]
-    fresh = head + block.rstrip("\n") + tail
+    fresh = (head.rstrip("\n") + "\n" + tail.lstrip("\n"))
     if fresh == text:
         return True
     if write:
@@ -1205,7 +1219,7 @@ def main(argv=None) -> int:
     os.makedirs(os.path.dirname(_APPLE), exist_ok=True)
     io.open(_APPLE, "w", encoding="utf-8").write(apple)
     inject_readme(block, write=True)
-    print("wrote %s (%d bytes) and %s (%d bytes), injected the README block; "
+    print("wrote %s (%d bytes) and %s (%d bytes), README carries no copy; "
           "%d engines" % (os.path.relpath(_DOC, _REPO), len(doc),
                           os.path.relpath(_APPLE, _REPO), len(apple), len(rows)))
     return 0

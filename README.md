@@ -303,156 +303,29 @@ writer dropdowns are on **OTR_LedgerScriptWriter**.
 
 You never need all the weights in this workflow. One graph ships; the dropdowns
 decide what it loads, and therefore what you have to download. The table below
-prices each choice and says whether it runs on the three machines most people
-have. It is generated from the code -- whether a machine is offered an engine
-comes from that engine's own declaration, and sizes come from the real fetch
-manifests -- so it is generated from the profiles the pack actually loads. The same table with AMD
-and CPU-only columns, and a legend for every word in it, is
-[apple/MACHINES.md](apple/MACHINES.md) section 2.
+decides what it loads, and therefore what you have to download.
 
-<!-- BEGIN GENERATED: dropdown-matrix -->
+**What the canonical selects, and what it costs.** Everything here is either
+already in the pack or fetches itself; a default run downloads no manual file.
 
-**Reading these tables.** The canonical ships `viz_mxc_cpu` / `viz_green` /
-`viz_camera` for video, `z_image_turbo` for images (dormant -- those three video
-lanes consume no still), `kokoro` on both voice slots, `stable_audio_3` for
-music and `Qwen/Qwen3.5-4B` as the writer. Every one of them is **auto** or
-**nothing**: a default run downloads no manual file.
+| role | the canonical ships | what it costs |
+|---|---|---|
+| video | `viz_mxc_cpu` / `viz_green` / `viz_camera` | nothing -- they draw their own frames |
+| images | `z_image_turbo`, dormant | nothing on a default run; those video lanes consume no still |
+| voices | `kokoro` on both slots | fetches once, about 0.3 GiB |
+| music | `stable_audio_3` | fetches once |
+| writer | `Qwen/Qwen3.5-4B` | fetches once, about 8.7 GiB |
 
-*How you get it.* **auto** -- fetched on first use, no account.
-**GATED** -- fetches itself once you have accepted the licence on the model page
-and set `HF_TOKEN`. **manual** -- you place the file yourself;
-[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
-it comes from and the folder it goes in. **none** -- a hosted service, no
-weights. **own installer** -- its own install script rather than the model
-provisioner; **(Windows)** marks the three whose installer is PowerShell with no
-shell twin yet. **nothing** -- pure code. Sizes are GiB, from the real artifact
-bytes in the fetch manifests.
+**The three kinds of video, because that is what the choice really is.**
+*Procedural* lanes draw frames from the audio and need no weights at all -- that
+is what ships. *Still* lanes mint one image per beat and animate it, so they
+wake the image model. *Diffusion* lanes generate real video, and are the
+expensive end in both download and render time.
 
-*What a machine cell says.* **proven** -- a published episode used it on that
-machine. measured -- it ran there in a lab test, but no episode has used it.
-fits -- nothing blocks it and the arithmetic says it fits; nobody has run it.
-**tight** -- fits with little to spare. **OOM** -- expect to exhaust memory.
-**no** -- it will not fit. key -- hosted, so it runs anywhere you have the API
-key. not offered -- absent from that machine's dropdown because nobody has
-proven it there, which is a statement about receipts and **not about your
-hardware**.
-
-**On a Mac, OOM means a hard machine reboot, not a failed render** -- unified
-memory has no separate pool to exhaust. Read the Mac column before you pick.
-
-**Video -- procedural, no video weights**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `still_flat` | nothing | -- | fits | **proven** | **proven** |
-| `still_motion` | nothing | -- | **proven** | **proven** | **proven** |
-| `still_pan` | nothing | -- | **proven** | **proven** | **proven** |
-| `still_word` | nothing | -- | fits | measured | **proven** |
-| `viz_camera` | nothing | -- | fits | **proven** | **proven** |
-| `viz_green` | nothing | -- | fits | **proven** | **proven** |
-| `viz_mxc_cpu` | nothing | -- | **proven** | **proven** | **proven** |
-| `viz_mxc_mandala` | nothing | -- | fits | **proven** | fits |
-
-**Video -- hosted, no weights but you supply the key**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key |
-| `cloud_seedance_2` | none, **but see below** | -- | key | key | key |
-| `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key |
-| `cloud_wan_i2v` | none | -- | key | key | key |
-| `cloud_wan_i2v_audio` | none | -- | key | key | key |
-| `google_omni_video` | none | -- | key | key | key |
-| `google_veo_video` | none | -- | key | key | key |
-| `word_razzle` | none | -- | key | key | key |
-
-**Video -- local diffusion**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** |
-| `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered |
-| `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered |
-| `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered |
-| `wan22_high_video` | manual | 9.4 GiB | **no** | **proven** | not offered |
-| `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered |
-| `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
-| `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered |
-| `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered |
-| `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered |
-| `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** |
-| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
-| `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered |
-| `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered |
-| `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered |
-| `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered |
-| `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered |
-
-**Image -- local**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered |
-| `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered |
-| `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered |
-| `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered |
-| `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered |
-
-**Image -- hosted**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `cloud_flux_pro` | none | -- | key | key | key |
-| `cloud_krea_2_turbo` | none | -- | key | key | key |
-| `cloud_luma_photon_flash` | none | -- | key | key | key |
-| `cloud_nano_banana_2` | none | -- | key | key | key |
-| `cloud_seedream_2` | none | -- | key | key | key |
-| `google_image` | none | -- | key | key | key |
-| `ideo` | none | -- | key | key | key |
-
-**Voice and music -- local**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** |
-| `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | measured |
-| `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered |
-| `stable_audio_3` | **auto** | 3.5 GiB | **proven** | **proven** | **proven** |
-| `bark` | **auto** | 4.2 GiB | **proven** | **proven** | **OOM** |
-| `stable_audio_music` | GATED | 4.5 GiB | fits | fits | not offered |
-| `dia` | own installer (Windows) | 6.0 GiB | not offered | fits | not offered |
-| `indextts2` | own installer (Windows) | 11.1 GiB | not offered | **proven** | not offered |
-
-**Voice and music -- hosted**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `elevenlabs` | none | -- | key | key | key |
-| `google_lyria` | none | -- | key | key | key |
-| `google_tts` | none | -- | key | key | key |
-| `sonilo` | none | -- | key | key | key |
-
-**Upscale**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `off` | nothing | -- | **proven** | **proven** | **proven** |
-| `spandrel_esrgan` | manual | 0.1 GiB | fits | **proven** | measured |
-
-**Writer (the LLM that writes the script)**
-
-| dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB |
-|---|---|---|---|---|---|
-| `google/gemma-2-2b-it` | GATED | 5.2 GiB | **proven** | fits | fits |
-| `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** |
-| `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits |
-| `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** |
-| `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** |
-| `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** |
-| `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** |
-<!-- END GENERATED: dropdown-matrix -->
+**Every engine, what it weighs, and whether it runs on your machine** is in
+[apple/MACHINES.md](apple/MACHINES.md): section 2 prices each choice across five
+machine classes, and section 3 names every hand-fetched file and the folder it
+goes in.
 
 Two things to know before you change a dropdown:
 
