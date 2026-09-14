@@ -649,6 +649,25 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
+* **CLEAR 14 SUITE DELTAS FROM THE 2026-09-13 NIGHT SESSION.** A full-suite
+  diff against `283abaa6` (that session's start) shows 63 failures vs 53 --
+  14 tests fail now that passed then, 4 that failed then now pass. They were
+  NOT individually cleared before the session ended; that is the work.
+  Two were spot-checked and are known:
+  * `test_legacy_audit_clean::test_no_unclassified_legacy_references` trips on
+    the node TITLES set during the canvas relayout ("Video Director /
+    Settings") -- its audit flags Director surfaces. Cosmetic, real.
+  * `test_canonical_headless_api::test_visual_style_override_does_not_patch_story_fields`
+    PASSES in isolation, so it is order-dependent, not a regression.
+  The four `test_scope_render_profile` rows are expected to follow the node
+  93/94 removal (`8171e994`) and want confirming, not assuming. The rest are
+  unexamined: `test_freeze_cascade_title_rename`,
+  `test_gguf_version_pin_is_documented` (x2), `test_google_video_sfx_workflow`,
+  `test_model_asset_index_drift`, `test_source_bank_widget_2c`,
+  `test_text_metric_ownership`, `test_workflow_director_freedom`.
+  Run each in ISOLATION first -- two of the fourteen are already known to
+  behave differently alone, so the batch number is not the evidence.
+
 * **WIDGET RENAME/REORDER TIER -- run `docs/HANDOFF_WIDGET_RENAME_REORDER.md`
   in its own window.** Its first deliverable is a GO/NO-GO on the RENAMES, not
   an edit. The blocker to decide: a rename breaks every workflow a USER has
