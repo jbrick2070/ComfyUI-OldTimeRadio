@@ -36,11 +36,30 @@ class _DirectTextWriteVisitor(ast.NodeVisitor):
 
     @staticmethod
     def _is_text_target(target: ast.expr) -> bool:
-        return (
+        """True for a LEDGER LINE's `text`, which must move with its counts.
+
+        `ui["text"]` is exempt, and it is a different `text` entirely rather
+        than a loophole. It is ComfyUI's node-preview contract -- a list of
+        strings the canvas draws under the node -- so it has no char_count or
+        word_count to keep in step and nothing downstream reads it as spoken
+        content. The rule this file enforces is about a ledger row whose
+        metrics would silently disagree with its words.
+
+        Kept as narrow as the evidence allows: exactly one `ui["text"]` write
+        exists in nodes/ (otr_master_audio_mux, naming where the episode was
+        published or why it was withheld), and no ledger write anywhere uses a
+        variable named `ui`. Matching on the OBJECT rather than skipping the
+        file means a real `row["text"]` added to that same module is still
+        caught.
+        """
+        if not (
             isinstance(target, ast.Subscript)
             and isinstance(target.slice, ast.Constant)
             and target.slice.value == "text"
-        )
+        ):
+            return False
+        return not (isinstance(target.value, ast.Name)
+                    and target.value.id == "ui")
 
     def visit_Assign(self, node: ast.Assign) -> None:
         if not self._is_self_test() and any(
