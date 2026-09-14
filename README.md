@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.downloads&label=registry%20installs&color=0a7bbb" alt="Registry installs"></a>
-  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.latest_version.version&label=registry&color=0a7bbb" alt="Registry version"></a>
+  <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjbrick2070%2FComfyUI-OldTimeRadio%2Fmain%2Fpyproject.toml&query=%24.project.version&label=version&color=0a7bbb" alt="Version"></a>
   <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/stargazers"><img src="https://img.shields.io/github/stars/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="GitHub stars"></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="License"></a>
 </p>
