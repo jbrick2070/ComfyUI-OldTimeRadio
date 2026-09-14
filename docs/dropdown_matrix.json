@@ -1,552 +1,555 @@
 {
- "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row. The `writers` block is the same shape as `engines` but keyed on HF repo id; writer machine-fit is DERIVED from _otr_model_catalog.fit_tags_for, so only receipts are curated here. NVIDIA verdicts were harvested from real receipts in docs/4060_DRILL_LOG.md, docs/ship-audit-2026-09-01/ and docs/MACHINE_MATRIX.md on 2026-09-09; AMD has ZERO receipts of any kind, which is why that column is all '?'.",
- "_nvidia_provenance": "The nv8 and nv16 verdicts came from a 46-agent audit of all 61 engines on 2026-09-09 (8 GB Ada / 16 GB Blackwell), each grounded in the registries and adapters, with 42 load-bearing verdicts adversarially re-checked and 7 overturned. Unlike the Mac column these are mostly REASONED, not run: 'proven' still means a receipt in docs/MACHINE_MATRIX.md and nothing else.",
- "engines": {
-  "animatediff15_lightning_video": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "note": "TWO published Mac episodes now: lightning_mac_proof_2 (2026-09-09, 23 beats, 02:32:34) and lightning_mac_proof_3 (2026-09-09, 8 clips, 01:17:46, RESULT SUCCESS). The second was rendered specifically to prove the scoped-refusal change to _beat_hold on a live episode -- it had unit tests and a measured ceiling behind it but no render, because the render that would have proven it rebooted the host (PBUG-20260909-02). Rendered clean with nothing else competing for RAM, it published and the machine survived.",
-   "size_gb": 3.1
+  "_README": "CURATED INPUT to scripts/otr_dropdown_matrix.py -- the ONLY hand-maintained half of the dropdown matrix. Everything else (which machines offer an engine, how its weights arrive, how big they are) is derived from the registries and the fetch manifests and must never be typed here. memory verdicts: proven (a PUBLISHED EPISODE used it) | measured (it ran on that hardware in a lab test, but no episode has used it) | fits (arithmetic only) | oom | no | unknown. The proven/measured split is not pedantry: it is the go-forward test plan, because 'measured' is exactly the list of things still to close. A 'proven' on a machine whose profile refuses the engine is a build failure, not a row. The `writers` block is the same shape as `engines` but keyed on HF repo id; writer machine-fit is DERIVED from _otr_model_catalog.fit_tags_for, so only receipts are curated here. NVIDIA verdicts were harvested from real receipts in docs/4060_DRILL_LOG.md, docs/ship-audit-2026-09-01/ and docs/MACHINE_MATRIX.md on 2026-09-09; AMD has ZERO receipts of any kind, which is why that column is all '?'.",
+  "_nvidia_provenance": "The nv8 and nv16 verdicts came from a 46-agent audit of all 61 engines on 2026-09-09 (8 GB Ada / 16 GB Blackwell), each grounded in the registries and adapters, with 42 load-bearing verdicts adversarially re-checked and 7 overturned. Unlike the Mac column these are mostly REASONED, not run: 'proven' still means a receipt in docs/MACHINE_MATRIX.md and nothing else.",
+  "engines": {
+    "animatediff15_lightning_video": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "note": "TWO published Mac episodes now: lightning_mac_proof_2 (2026-09-09, 23 beats, 02:32:34) and lightning_mac_proof_3 (2026-09-09, 8 clips, 01:17:46, RESULT SUCCESS). The second was rendered specifically to prove the scoped-refusal change to _beat_hold on a live episode -- it had unit tests and a measured ceiling behind it but no render, because the render that would have proven it rebooted the host (PBUG-20260909-02). Rendered clean with nothing else competing for RAM, it published and the machine survived.",
+      "size_gb": 3.1
+    },
+    "animatediff15_v3_haunted_video": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": 3.8
+    },
+    "animatediff15_v3_stillin_lab_video": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": 3.8
+    },
+    "bark": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "MEASURED END TO END ON THIS M4, 2026-09-09, and the verdict moved from 'measured' to OOM on the numbers. It produces good audio -- 11.5 s of speech, finite, spectral flatness 0.031 -- but: (1) 11.7x SLOWER THAN REALTIME (134.6 s for 11.5 s), so an episode's minutes of dialogue is hours in the voice stage alone; (2) generation drove the process to an 18.0 GB phys_footprint on a 16 GB machine, which is swap. The cause is not the weights: LIVE tensors never left 4.18 GB. The MPS caching allocator's RESERVED pool grew 5.10 -> 16.63 GB across the autoregressive loop and never gave it back -- after a full teardown, with ZERO live tensors, 10.85 GB stayed reserved and a second explicit torch.mps.empty_cache() returned none of it. kokoro is why all seven published episodes used kokoro.",
+      "size_gb": 4.2
+    },
+    "chatterbox": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": 3.0
+    },
+    "cloud_flux_pro": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_kling_avatar": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_krea_2_turbo": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_luma_photon_flash": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_nano_banana_2": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_seedance_2": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_seedream_2": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_vidu_q2_pro_fast_720p": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_wan_i2v": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_wan_i2v_audio": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "dia": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "oom"
+      },
+      "size_gb": 6.0
+    },
+    "elevenlabs": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "fastwan_8gb": {
+      "memory": {
+        "mac16": "no",
+        "nv16": "fits",
+        "nv8": "oom"
+      },
+      "size_gb": 10.0
+    },
+    "flux2_klein": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "Rendered a clean 1472x832 still on a 16 GB M4 (klein_run.log) but peaked at 22 GB and survived only on swap, at ~8 min a still, so mps is withheld from its declaration on purpose. sd15 is the practical Mac image engine.",
+      "size_gb": 11.0
+    },
+    "flux_gen1": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 13.0
+    },
+    "google_image": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "google_lyria": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "google_omni_video": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "google_tts": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "google_veo_video": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "humo": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 26.7
+    },
+    "humo_1.7B": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 12.6
+    },
+    "humo_1.7B_169": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 12.6
+    },
+    "humo_14B_169": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 26.7
+    },
+    "ideo": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "ideogram4_local": {
+      "memory": {
+        "mac16": "no",
+        "nv16": "proven",
+        "nv8": "no"
+      },
+      "size_gb": 17.3
+    },
+    "indextts2": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 11.1
+    },
+    "kokoro": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven",
+        "cpu": "proven"
+      },
+      "size_gb": 0.3,
+      "note": "CPU proven 2026-09-13 on the same otr_cpu_low leg -- Kokoro ran at 0.12x realtime on the CPU, which is about eight seconds of a 34.5 minute run."
+    },
+    "ltx25_foley_plus": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": 19.6
+    },
+    "ltx25_mime": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": 19.6
+    },
+    "ltx25_video": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": 19.6
+    },
+    "ltx_8gb": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": 9.1
+    },
+    "ltx_audio_in": {
+      "memory": {
+        "mac16": "no",
+        "nv16": "fits",
+        "nv8": "oom"
+      },
+      "size_gb": 15.2
+    },
+    "ltx_video": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "oom",
+        "nv8": "oom"
+      },
+      "size_gb": 14.8
+    },
+    "lumina_image": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 10.4
+    },
+    "mesh_stage": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": 4.6
+    },
+    "minimax_h3_audio_in": {
+      "memory": {
+        "mac16": "no",
+        "nv16": "fits",
+        "nv8": "oom"
+      },
+      "size_gb": 42.5
+    },
+    "minimax_h3_video": {
+      "memory": {
+        "mac16": "no",
+        "nv16": "proven",
+        "nv8": "oom"
+      },
+      "size_gb": 41.9
+    },
+    "musicgen": {
+      "memory": {
+        "mac16": "measured",
+        "nv16": "proven",
+        "nv8": "proven",
+        "cpu": "proven"
+      },
+      "note": "Re-measured end to end on this M4 2026-09-09 through the real adapter (generate_clip, guidance_scale 3.0): 5.1 s of audio in 10.3 s on mps -- 2.1x realtime, and 1.7x FASTER than cpu (17.3 s). Structured audio on both devices. Memory ratchets hard but recovers completely: live tensors stay at 2.20 GB while the MPS reserved pool grows to 15.88 GB (7.1x the weights), then returns to 0.05 GB on empty_cache -- unlike bark, which leaves 10.85 GB stranded. Still MEASURED not PROVEN: no published episode has used it, all seven used stable_audio_3, and its CC-BY-NC licence is why it is not a default candidate. NO QUALITY CLAIM IS MADE HERE: spectral flatness in this repo is a noise detector (~0.43 = noise), not a quality score, and readings vary with prompt and seed -- ours read below the noise floor on both devices and that is all it establishes. CPU proven 2026-09-13: otr_cpu_low published a one-act episode with ComfyUI in --cpu mode in 34.5 minutes, and that graph scores with musicgen.",
+      "size_gb": 2.2
+    },
+    "off": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": null
+    },
+    "sd15": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": 2.0
+    },
+    "sonilo": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "spandrel_esrgan": {
+      "memory": {
+        "mac16": "measured",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "note": "SUSTAINED-LOAD MEASURED on this M4 2026-09-09, which was the largest untested Mac gap: none of the seven published episodes ran the upscale stage at all (every one used upscale_engine=off) and the only Metal receipt covered 2 frames. Driven 96 frames at production canvas (512x288 -> 1024x576) through the engine's own load -> upscale_frames path: reserved memory DEAD FLAT at 1.13 GB from frame 24 to 96, footprint flat at 1.54 GB, chunk time flat at 4.17-4.19 s (no thermal drift), and 0.07 GB after empty_cache. 0.53 s/frame projects to ~24 min for a 2,736-frame episode. IT DOES NOT RATCHET, unlike bark and musicgen -- a fixed-shape convolutional forward has no growing state, so the Metal allocator behaviour that costs those two is absent here. Still not `proven`: no published episode has run it, so wall-clock inside a real OTR_SilentComposite pass is projected, not observed.",
+      "size_gb": 0.1
+    },
+    "stable_audio_3": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": 3.5
+    },
+    "stable_audio_music": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": 4.5
+    },
+    "still_flat": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "still_motion": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": null
+    },
+    "still_pan": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": null
+    },
+    "still_word": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "measured",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "viz_camera": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "viz_green": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "viz_mxc_cpu": {
+      "memory": {
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": null
+    },
+    "viz_mxc_mandala": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "proven",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "wan_ti2v": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "no"
+      },
+      "size_gb": 10.6
+    },
+    "word_razzle": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "z_image_turbo": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "size_gb": 19.3
+    }
   },
-  "animatediff15_v3_haunted_video": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 3.8
-  },
-  "animatediff15_v3_stillin_lab_video": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": 3.8
-  },
-  "bark": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "note": "MEASURED END TO END ON THIS M4, 2026-09-09, and the verdict moved from 'measured' to OOM on the numbers. It produces good audio -- 11.5 s of speech, finite, spectral flatness 0.031 -- but: (1) 11.7x SLOWER THAN REALTIME (134.6 s for 11.5 s), so an episode's minutes of dialogue is hours in the voice stage alone; (2) generation drove the process to an 18.0 GB phys_footprint on a 16 GB machine, which is swap. The cause is not the weights: LIVE tensors never left 4.18 GB. The MPS caching allocator's RESERVED pool grew 5.10 -> 16.63 GB across the autoregressive loop and never gave it back -- after a full teardown, with ZERO live tensors, 10.85 GB stayed reserved and a second explicit torch.mps.empty_cache() returned none of it. kokoro is why all seven published episodes used kokoro.",
-   "size_gb": 4.2
-  },
-  "chatterbox": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": 3.0
-  },
-  "cloud_flux_pro": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_kling_avatar": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_krea_2_turbo": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_luma_photon_flash": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_nano_banana_2": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_seedance_2": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_seedream_2": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_vidu_q2_pro_fast_720p": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_wan_i2v": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "cloud_wan_i2v_audio": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "dia": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "oom"
-   },
-   "size_gb": 6.0
-  },
-  "elevenlabs": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "fastwan_8gb": {
-   "memory": {
-    "mac16": "no",
-    "nv16": "fits",
-    "nv8": "oom"
-   },
-   "size_gb": 10.0
-  },
-  "flux2_klein": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "note": "Rendered a clean 1472x832 still on a 16 GB M4 (klein_run.log) but peaked at 22 GB and survived only on swap, at ~8 min a still, so mps is withheld from its declaration on purpose. sd15 is the practical Mac image engine.",
-   "size_gb": 11.0
-  },
-  "flux_gen1": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 13.0
-  },
-  "google_image": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "google_lyria": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "google_omni_video": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "google_tts": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "google_veo_video": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "humo": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 26.7
-  },
-  "humo_1.7B": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 12.6
-  },
-  "humo_1.7B_169": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 12.6
-  },
-  "humo_14B_169": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 26.7
-  },
-  "ideo": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "ideogram4_local": {
-   "memory": {
-    "mac16": "no",
-    "nv16": "proven",
-    "nv8": "no"
-   },
-   "size_gb": 17.3
-  },
-  "indextts2": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 11.1
-  },
-  "kokoro": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 0.3
-  },
-  "ltx25_foley_plus": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": 19.6
-  },
-  "ltx25_mime": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": 19.6
-  },
-  "ltx25_video": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 19.6
-  },
-  "ltx_8gb": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 9.1
-  },
-  "ltx_audio_in": {
-   "memory": {
-    "mac16": "no",
-    "nv16": "fits",
-    "nv8": "oom"
-   },
-   "size_gb": 15.2
-  },
-  "ltx_video": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "oom",
-    "nv8": "oom"
-   },
-   "size_gb": 14.8
-  },
-  "lumina_image": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 10.4
-  },
-  "mesh_stage": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": 4.6
-  },
-  "minimax_h3_audio_in": {
-   "memory": {
-    "mac16": "no",
-    "nv16": "fits",
-    "nv8": "oom"
-   },
-   "size_gb": 42.5
-  },
-  "minimax_h3_video": {
-   "memory": {
-    "mac16": "no",
-    "nv16": "proven",
-    "nv8": "oom"
-   },
-   "size_gb": 41.9
-  },
-  "musicgen": {
-   "memory": {
-    "mac16": "measured",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "note": "Re-measured end to end on this M4 2026-09-09 through the real adapter (generate_clip, guidance_scale 3.0): 5.1 s of audio in 10.3 s on mps -- 2.1x realtime, and 1.7x FASTER than cpu (17.3 s). Structured audio on both devices. Memory ratchets hard but recovers completely: live tensors stay at 2.20 GB while the MPS reserved pool grows to 15.88 GB (7.1x the weights), then returns to 0.05 GB on empty_cache -- unlike bark, which leaves 10.85 GB stranded. Still MEASURED not PROVEN: no published episode has used it, all seven used stable_audio_3, and its CC-BY-NC licence is why it is not a default candidate. NO QUALITY CLAIM IS MADE HERE: spectral flatness in this repo is a noise detector (~0.43 = noise), not a quality score, and readings vary with prompt and seed -- ours read below the noise floor on both devices and that is all it establishes.",
-   "size_gb": 2.2
-  },
-  "off": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": null
-  },
-  "sd15": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": 2.0
-  },
-  "sonilo": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "spandrel_esrgan": {
-   "memory": {
-    "mac16": "measured",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "note": "SUSTAINED-LOAD MEASURED on this M4 2026-09-09, which was the largest untested Mac gap: none of the seven published episodes ran the upscale stage at all (every one used upscale_engine=off) and the only Metal receipt covered 2 frames. Driven 96 frames at production canvas (512x288 -> 1024x576) through the engine's own load -> upscale_frames path: reserved memory DEAD FLAT at 1.13 GB from frame 24 to 96, footprint flat at 1.54 GB, chunk time flat at 4.17-4.19 s (no thermal drift), and 0.07 GB after empty_cache. 0.53 s/frame projects to ~24 min for a 2,736-frame episode. IT DOES NOT RATCHET, unlike bark and musicgen -- a fixed-shape convolutional forward has no growing state, so the Metal allocator behaviour that costs those two is absent here. Still not `proven`: no published episode has run it, so wall-clock inside a real OTR_SilentComposite pass is projected, not observed.",
-   "size_gb": 0.1
-  },
-  "stable_audio_3": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 3.5
-  },
-  "stable_audio_music": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": 4.5
-  },
-  "still_flat": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "still_motion": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": null
-  },
-  "still_pan": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": null
-  },
-  "still_word": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "measured",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "viz_camera": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "viz_green": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "viz_mxc_cpu": {
-   "memory": {
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": null
-  },
-  "viz_mxc_mandala": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "proven",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "wan_ti2v": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "no"
-   },
-   "size_gb": 10.6
-  },
-  "word_razzle": {
-   "memory": {
-    "mac16": "fits",
-    "nv16": "fits",
-    "nv8": "fits"
-   },
-   "size_gb": null
-  },
-  "z_image_turbo": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "size_gb": 19.3
+  "writers": {
+    "Qwen/Qwen3.5-4B": {
+      "memory": {
+        "amd": "unknown",
+        "cpu": "unknown",
+        "mac16": "proven",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
+    },
+    "anthropic/claude-sonnet-4.5": {
+      "memory": {
+        "nv16": "proven"
+      }
+    },
+    "google/gemma-2-2b-it": {
+      "memory": {
+        "nv8": "proven"
+      }
+    },
+    "google/gemma-4-12b-it": {
+      "memory": {
+        "nv16": "proven",
+        "nv8": "measured"
+      },
+      "note": "nv8 WAS 'proven' and is corrected to 'measured' on 2026-09-12. This file's own rule is that proven means a PUBLISHED EPISODE used it, and no episode has. The 4060 loads this row standalone -- 48/48 GPU layers, 7,751 MiB -- and then fails in the pipeline: 27 of 27 attempts at Step 15, and CR-20260912-06 now refuses it even earlier, at the fit gate, with 'estimated 11.9 GB peak resident vs 6.8 GB ceiling'. The drill log asks in as many words that it not be reported as qualified. nv16 goes the other way on a real receipt: the_cocks_trumpet_20260912_210724."
+    },
+    "google/gemma-4-E2B-it": {
+      "memory": {
+        "mac16": "oom",
+        "nv16": "proven",
+        "nv8": "proven"
+      },
+      "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it. Recorded because a download-size projection puts it 4 GB BELOW Qwen and briefly had this table recommending it to Mac users as the safer pick."
+    },
+    "google/gemma-4-E4B-it": {
+      "memory": {
+        "nv16": "proven",
+        "nv8": "measured"
+      }
+    },
+    "mistralai/Mistral-Nemo-Instruct-2407": {
+      "memory": {
+        "nv16": "proven"
+      }
+    },
+    "unsloth/gemma-4-12b-it-GGUF": {
+      "memory": {
+        "nv16": "proven"
+      }
+    }
   }
- },
- "writers": {
-  "Qwen/Qwen3.5-4B": {
-   "memory": {
-    "amd": "unknown",
-    "cpu": "unknown",
-    "mac16": "proven",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "note": "The shipped default, and the ONLY writer with a receipt on either machine. All SEVEN episodes published on the M4 used it (ledger creative_writing_model, filename q354b), and it carried a complete episode on a physical 8 GB RTX 4060 at 2.99 GiB resident / 14.47 tok/s under NF4. On Metal there is no NF4 -- bitsandbytes is excluded on darwin -- so the same row loads full bf16 at ~14 GB, which fits a 16 GB machine with no margin for anything else. It rebooted this host once, at the writer-to-video handover, with a test suite competing for RAM."
-  },
-  "anthropic/claude-sonnet-4.5": {
-   "memory": {
-    "nv16": "proven"
-   }
-  },
-  "google/gemma-2-2b-it": {
-   "memory": {
-    "nv8": "proven"
-   }
-  },
-  "google/gemma-4-12b-it": {
-   "memory": {
-    "nv16": "proven",
-    "nv8": "measured"
-   },
-   "note": "nv8 WAS 'proven' and is corrected to 'measured' on 2026-09-12. This file's own rule is that proven means a PUBLISHED EPISODE used it, and no episode has. The 4060 loads this row standalone -- 48/48 GPU layers, 7,751 MiB -- and then fails in the pipeline: 27 of 27 attempts at Step 15, and CR-20260912-06 now refuses it even earlier, at the fit gate, with 'estimated 11.9 GB peak resident vs 6.8 GB ceiling'. The drill log asks in as many words that it not be reported as qualified. nv16 goes the other way on a real receipt: the_cocks_trumpet_20260912_210724."
-  },
-  "google/gemma-4-E2B-it": {
-   "memory": {
-    "mac16": "oom",
-    "nv16": "proven",
-    "nv8": "proven"
-   },
-   "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it. Recorded because a download-size projection puts it 4 GB BELOW Qwen and briefly had this table recommending it to Mac users as the safer pick."
-  },
-  "google/gemma-4-E4B-it": {
-   "memory": {
-    "nv16": "proven",
-    "nv8": "measured"
-   }
-  },
-  "mistralai/Mistral-Nemo-Instruct-2407": {
-   "memory": {
-    "nv16": "proven"
-   }
-  },
-  "unsloth/gemma-4-12b-it-GGUF": {
-   "memory": {
-    "nv16": "proven"
-   }
-  }
- }
 }

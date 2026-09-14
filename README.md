@@ -345,9 +345,10 @@ Two things to know before you change a dropdown:
   you spend.
 - **The writer is the biggest single download** and, on a Mac, the biggest single
   memory user. `Qwen/Qwen3.5-4B` is the default because it is ungated,
-  Apache-2.0, and the smallest row that runs everywhere. The writer column in the
-  table says which others fit your machine, and the pack refuses before
-  downloading if you pick one that will not.
+  Apache-2.0, and the smallest row proven everywhere.
+  [apple/MACHINES.md](apple/MACHINES.md) section 2 says which other writers fit
+  your machine, and the pack refuses before downloading if you pick one that
+  will not.
 
 ---
 

@@ -626,12 +626,14 @@ a lane carries them, otherwise the figure the fetcher's own pick list states.
 **What a machine cell means, and read this before you read one.** Each cell
 answers TWO questions in order.
 
-* **not offered** -- OTR will not put this engine in your dropdown on that
-  machine, because its declaration does not list that backend. This is a
-  statement about the code, **not about your hardware**: several of these have
-  run on that hardware, and the declaration is a record of what has been
-  PROVEN, not of what is possible. Making one available is a code change plus a
-  receipt, not a purchase.
+* **not offered** -- this engine's declaration does not list that backend, so
+  nothing here claims it works there. It is a statement about RECEIPTS, **not
+  about your hardware and not about the menu**: several of these have run on
+  that hardware, and the dropdown is built from the whole registry, so the
+  engine IS still selectable on that machine. What protects you is not a hidden
+  filter -- it is that an engine which cannot run stops the render with a named
+  error instead of quietly substituting something else. Moving a cell out of
+  this state is a declaration change plus a receipt, not a purchase.
 * **too slow** -- offered on a CPU-only box in principle, kept off it because it
   is not practical there.
 * Otherwise the engine IS offered, and the word is the memory verdict:

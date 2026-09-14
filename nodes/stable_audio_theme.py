@@ -93,10 +93,15 @@ class StableAudioTheme:
                 "engine": (engines, {
                     "default": engines[0],
                     "tooltip": (
-                        "Theme-music engine. Legacy MusicGen is the "
-                        "byte-identical default; stable_audio_music is opt-in "
-                        "(flag + HF token) until the GPU pilot promotes it. "
-                        "Unusable selections fail closed with a named error."
+                        # PBUG-20260907-04 lived in THIS STRING: it kept
+                        # saying MusicGen was the default for six days after
+                        # the default became stable_audio_3, because the fix
+                        # changed the value and not the sentence describing it.
+                        "Theme-music engine. `stable_audio_3` is the shipped "
+                        "default and is ungated; `musicgen` is selectable and "
+                        "is noncommercial; `stable_audio_music` needs a "
+                        "Hugging Face licence acceptance. Unusable selections "
+                        "fail closed with a named error."
                     ),
                 }),
             },
