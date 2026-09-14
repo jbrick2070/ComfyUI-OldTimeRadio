@@ -632,6 +632,20 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   `2.0.0-alpha.N`, two minutes after the action logged "Upload successful". A window
   that prints the top three rows will conclude the publish silently failed; this one
   did, for ten minutes. Read the whole list and test for the exact string.
+- **VERSION SHAPE: `2.x.x` ON MAIN, AND YOU MOVE THE THIRD DIGIT ONLY
+  (operator directive 2026-09-13).** Operator: *"we are v2.x.x main now, using
+  the third x until I say we get a 2.2 bump."*
+  * The next release after `2.1.1` is **`2.1.2`**, then `2.1.3`, and so on. The
+    PATCH digit is the one a window is allowed to move on its own.
+  * **The MINOR digit is his to call.** Do not publish a `2.2.0` -- or any
+    minor bump -- because a change feels large enough to deserve one. Sizing a
+    release is his decision, not a judgement call made from inside the diff.
+    If the work genuinely seems to want a minor, say so and ask; do not take
+    it.
+  * The MAJOR digit is not in play at all while v2 is the line.
+  * This does NOT relax anything else in 7A: a new version string is still
+    required per publish, a Pending version still means do not stack for
+    tidiness, and an unexplained regression still blocks a publish outright.
 - **Every publish needs a NEW version string.** `(node_id, version)` is uniquely indexed
   server-side; re-publishing the same version is refused.
 - **`.comfyignore` decides what SHIPS** (gitignore syntax, layered on top of git tracking --
