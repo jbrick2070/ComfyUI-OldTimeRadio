@@ -250,10 +250,22 @@ def test_scifi_news_pro_music_rows_render_by_cue_id(monkeypatch):
     # old set-equality proved, without counting comma fields from either end --
     # an idiom may itself contain a comma ("Detroit techno at 128 BPM, hypnotic
     # machine funk"), so index arithmetic is a trap here.
+    # MATCHED AS A COMMA FIELD, not by adjacency to the tail (2026-09-13). This
+    # read ", %s, instrumental, no vocals" because the authored line used to sit
+    # directly in front of the tail. A per-cue arc clause now sits between them
+    # -- "slow open, a rising open, instrumental, no vocals" -- so that anchor
+    # no longer holds, and the fix is to pin what the test actually means rather
+    # than to widen it.
+    #
+    # Field EQUALITY, not substring: the interstitial arc on a sustained palette
+    # is "a short bridge", which contains the authored fragment "bridge". A
+    # substring test would count that as a second authored line and this
+    # assertion would fire on a correct prompt. The comma field is exact.
     AUTHORED = ("slow open", "bridge", "resolve")
     found = []
     for h in heard:
-        hits = [a for a in AUTHORED if ", %s, instrumental, no vocals" % a in h]
+        fields = [f.strip() for f in h.split(",")]
+        hits = [a for a in AUTHORED if a in fields]
         assert len(hits) == 1, "prompt carries %d authored lines: %s" % (len(hits), h)
         found.append(hits[0])
     assert sorted(found) == sorted(AUTHORED), found

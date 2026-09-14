@@ -565,14 +565,37 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
         # contrarian, 2026-09-12). Only whitespace is stripped now. The tail is
         # joined so it reads correctly whatever the line ends with, instead of
         # the text being changed to suit the join.
-        if authored.endswith((".", "!", "?")):
-            tail = " instrumental, no vocals"
-        elif authored.endswith(","):
-            tail = " instrumental, no vocals"
-        else:
-            tail = ", instrumental, no vocals"
+        # AN AUTHORED ROW GETS THE CUE CLAUSE TOO, and the reason is a claim
+        # that was asserted here rather than measured. This branch used to
+        # return without reading `cue_id` at all, excused by "an authored row
+        # is already per-cue". That is true of the WRITER's intent and false of
+        # its output often enough to matter: across the 920 ledgers on disk
+        # carrying two or more authored cues, 15 repeat the same
+        # generation_prompt text for different cues -- banks scifi_sonnet
+        # through scifi_news_pro, 2026-07-11 through 2026-09-13, so it is
+        # ongoing writer behaviour rather than one bad episode. On the worst of
+        # them the opening and the closing of a Detroit techno episode asked the
+        # engine for a byte-identical string.
+        #
+        # The clause goes AFTER his words, never in front of them and never
+        # inside them. His line still leads the prompt behind the genre; this
+        # only adds where in the story it sits, which he cannot have said
+        # himself because the writer wrote the same sentence twice.
+        #
+        # No story flavour here: an authored row already names its own scene,
+        # and a scene line from the ledger beside it would say the same thing
+        # twice.
+        # HIS TEXT IS NEVER TOUCHED -- the arc joins through the TAIL, which is
+        # the same seam that already existed. An earlier cut here ran
+        # `.rstrip(",.")` and turned an authored "Resolve." into "Resolve",
+        # mutating the operator's own words inside the branch whose entire job
+        # is to preserve them (codex contrarian, 2026-09-12). With no arc this
+        # composes byte-identically to what it did before.
+        arc = _brief_cue_arc(cue_id, palette)
+        joiner = " " if authored.endswith((".", "!", "?", ",")) else ", "
+        after = ", ".join(([arc] if arc else []) + ["instrumental, no vocals"])
         return EnginePrompt(
-            text="%s, %s%s" % (palette.idiom, authored, tail),
+            text="%s, %s%s%s" % (palette.idiom, authored, joiner, after),
             negative=negative_for(palette),
             palette_key=palette.key)
     moods = resolve_mood_terms(meta)

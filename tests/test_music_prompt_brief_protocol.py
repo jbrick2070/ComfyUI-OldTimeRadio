@@ -106,7 +106,14 @@ def test_the_three_cues_do_not_collapse_into_one_prompt():
     ENGINE axis (SA3 against MusicGen) and never along the CUE axis. Caught by
     a contrarian pass, not by the suite.
 
-    An AUTHORED row was never affected: it is per-cue already.
+    AND AN AUTHORED ROW IS NOT EXEMPT, whatever the first version of this
+    docstring claimed. It said "an AUTHORED row was never affected: it is
+    per-cue already" -- asserted, not measured, in the same commit that fixed
+    the derived branch by measuring everything else. Across the 920 ledgers on
+    disk carrying two or more authored cues, 15 repeat the same
+    generation_prompt for different cues, banks scifi_sonnet through
+    scifi_news_pro and dates 2026-07-11 through 2026-09-13. The writer meaning
+    to differentiate is not the writer differentiating.
     """
     import nodes._otr_music_prompt as MP
 
@@ -215,3 +222,60 @@ def test_the_flavour_is_optional_and_never_raises():
     meta = {"source_bank": "original"}
     assert MP.compose_brief_engine_prompt(meta, "", cue_id="opening",
                                           story_flavour="").text
+
+
+def test_an_authored_row_still_differs_by_cue():
+    """The writer sometimes hands two cues the SAME text, so the cue clause has
+    to reach the authored branch too.
+
+    The real case: a scifi_news_pro episode whose opening and closing both
+    carried "Detroit techno, 128 BPM, hypnotic machine funk, Roland TR-909."
+    verbatim. The authored branch returned before reading cue_id, so both cues
+    asked the engine for a byte-identical string.
+    """
+    import nodes._otr_music_prompt as MP
+
+    meta = {"source_bank": "scifi_news_pro"}
+    same = "Detroit techno, 128 BPM, hypnotic machine funk, Roland TR-909."
+    texts = {cue: MP.compose_brief_engine_prompt(meta, same, cue_id=cue).text
+             for cue in ("opening", "interstitial", "closing")}
+    assert len(set(texts.values())) == 3, texts
+
+
+def test_an_authored_row_is_never_edited():
+    """His words are his. The arc joins through the tail, never by rewriting
+    the line -- an earlier cut ran .rstrip(",.") and turned an authored
+    "Resolve." into "Resolve" inside the branch whose job is to preserve it."""
+    import nodes._otr_music_prompt as MP
+
+    meta = {"source_bank": "scifi_news_pro"}
+    for authored in ("Resolve.", "slow open,", "a bridge",
+                     "Stomp and Tiptoe argue!", "why?", "  padded  "):
+        for cue in ("opening", "closing", None, "bogus"):
+            text = MP.compose_brief_engine_prompt(
+                meta, authored, cue_id=cue).text
+            assert authored.strip() in text, (authored, cue, text)
+
+
+def test_the_theme_node_passes_the_cue_to_the_composer():
+    """WIRING, not the helper. Every other distinctness test calls the composer
+    directly, so none of them would notice if a refactor dropped `cue_id` from
+    the real call site -- this repo's most repeated defect is correct code
+    nothing reaches."""
+    import ast
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "nodes" / "stable_audio_theme.py").read_text(encoding="utf-8")
+    calls = [n for n in ast.walk(ast.parse(src))
+             if isinstance(n, ast.Call)
+             and getattr(n.func, "id", "") == "compose_brief_engine_prompt"]
+    assert calls, "the theme node no longer calls compose_brief_engine_prompt"
+    for call in calls:
+        kwargs = {k.arg for k in call.keywords}
+        assert "cue_id" in kwargs, (
+            "compose_brief_engine_prompt is called without cue_id -- the three "
+            "cues collapse to one identical prompt")
+        assert "story_flavour" in kwargs, (
+            "compose_brief_engine_prompt is called without story_flavour -- "
+            "the cue stops carrying the story's own scene")
