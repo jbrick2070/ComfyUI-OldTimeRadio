@@ -59,7 +59,6 @@ def _direct(monkeypatch, announcer="still_flat", music="still_flat",
         music_image_model="flux_gen1",
         character_image_model="flux_gen1",
         fps=25, canvas_w=832, canvas_h=480,
-        seed_mode="request_hash", request_seed=0,
         custom_models_json=custom_models_json,
     )
     return json.loads(raw)

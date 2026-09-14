@@ -1546,10 +1546,6 @@ class OTRSilentComposite:
                                "(the audio-derived budget), the manifest wins "
                                "and this value is ignored.",
                 }),
-                "ffmpeg": ("STRING", {
-                    "default": "ffmpeg",
-                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
-                }),
                 "output_path": ("STRING", {
                     "default": "",
                     "tooltip": "Silent composite path. Empty -> <output>/otr/episodes/<stem>_silent.mp4.",
@@ -1598,7 +1594,7 @@ class OTRSilentComposite:
 
     @classmethod
     def IS_CHANGED(cls, base_video_path="", canvas_w=1472, canvas_h=832, fps=25,
-                    ffmpeg="ffmpeg", output_path="", gate_in="",
+                    output_path="", gate_in="",
                     clip_manifest_json="{}",
                     upscale_engine="off", upscale_device="cpu", **kw):
         """Fingerprint ALL external inputs regardless of engine. ComfyUI relies
@@ -1751,17 +1747,21 @@ class OTRSilentComposite:
         return os.path.join(out_dir, f"{stem}_silent.mp4")
 
     def composite(self, base_video_path, canvas_w=1472, canvas_h=832, fps=25,
-                  ffmpeg="ffmpeg", output_path="", gate_in="",
+                  output_path="", gate_in="",
                   clip_manifest_json="{}",
                   upscale_engine="off", upscale_device="cpu"):
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
         # operator intent. Discarded HERE, at the node boundary, so no
         # helper underneath can be handed it.
-        try:
-            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
-        except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
-        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_SilentComposite")
+        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
+        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
+        # found to reach argv[0] over an unauthenticated /prompt request;
+        # the fix then was to discard it here, at the node boundary. The
+        # declaration is now gone, so ComfyUI never passes the field at
+        # all and there is nothing left to discard -- the channel is
+        # closed rather than sanitised. Everything below already saw ""
+        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names
         # on the first stat -- BEFORE any spawn -- so the refusal belongs

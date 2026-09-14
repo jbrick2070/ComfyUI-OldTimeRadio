@@ -771,11 +771,6 @@ class PostUpscaleProcgenBlend:
                         "instead of full strength."
                     ),
                 }),
-                "ffmpeg": ("STRING", {
-                    "default": "ffmpeg",
-                    "multiline": False,
-                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
-                }),
                 "bypass": ("BOOLEAN", {
                     "default": False,
                     "tooltip": (
@@ -897,7 +892,6 @@ class PostUpscaleProcgenBlend:
         procgen_mp4_path: str,
         blend_mode: str = _DEFAULT_BLEND_MODE,
         blend_opacity: float = _DEFAULT_BLEND_OPACITY,
-        ffmpeg: str = "ffmpeg",
         bypass: bool = False,
         out_suffix: str = "_procgen_blended",
         shadow_crush_threshold: int = _DEFAULT_SHADOW_CRUSH,
@@ -909,11 +903,15 @@ class PostUpscaleProcgenBlend:
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
         # operator intent. Discarded HERE, at the node boundary, so no
         # helper underneath can be handed it.
-        try:
-            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
-        except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
-        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_PostUpscaleProcgenBlend")
+        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
+        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
+        # found to reach argv[0] over an unauthenticated /prompt request;
+        # the fix then was to discard it here, at the node boundary. The
+        # declaration is now gone, so ComfyUI never passes the field at
+        # all and there is nothing left to discard -- the channel is
+        # closed rather than sanitised. Everything below already saw ""
+        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names
         # on the first stat -- BEFORE any spawn -- so the refusal belongs

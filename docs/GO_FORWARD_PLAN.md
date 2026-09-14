@@ -109,25 +109,134 @@ selections of a GATED 22 GiB family. `bark` carries the same false flag because
 `suno` is not in a hardcoded publisher allowlist. The fork is what to render when
 one file implements six engines, which is why this is not a glob widening.
 
-### A4. The writer's 36-widget order is unsettled, and it is the only thing blocking the reorder
+### A4. The writer's 36-widget order -- SETTLED 2026-09-14, ready to execute
 
-Everything else in the widget tier is decided (see C7). This is not: there is no
-explicit ordering of the writer's 36 remaining widgets, only a 13-widget leading
-block and broad groups. The 23 unplaced ones are listed in
-[HANDOFF_WIDGET_TIER_EXECUTE.md](HANDOFF_WIDGET_TIER_EXECUTE.md).
+Operator, when asked for his preference: *"ask fable and cursor to agree upon the
+most logical order for what we are doing, I don't have preference except think
+what Apple would think, what's clean and logical."* So this was decided by three
+independent readers, blind to each other, then converged by a fourth pass.
 
-The settled leading block:
+**The roster, stated honestly:** Claude Fable (subagent), GPT-5.6 Sol (via the
+Cursor CLI), and DeepSeek v4 Pro (via OpenRouter) each proposed an order
+independently. Sol was then given all three plus the corrections below and asked
+to converge. The driver made the final call on one row -- see the overrule.
+
+#### THE ORDER
 
 ```
-episode_title, source_bank, custom_premise, num_characters, act_count,
-include_act_breaks, visual_style, creativity, lemmy_cameo,
-story_characters, story_plot, story_setting, story_author
+ 1 source_bank          <- the ONLY `required` entry (see below)
+ 2 source_ref
+ 3 visual_style
+ 4 episode_title
+ 5 custom_premise
+ 6 story_characters
+ 7 story_plot
+ 8 story_setting
+ 9 story_author
+10 act_count
+11 include_act_breaks
+12 num_characters
+13 lemmy_cameo
+14 story_scaffold
+15 creativity
+16 min_p
+17 repetition_penalty
+18 max_new_tokens_cap
+19 creative_writing_model
+20 technical_model
+21 openrouter_slot_a_model
+22 openrouter_slot_b_model
+23 comfy_slot_a_model
+24 comfy_slot_b_model
+25 google_api_slot_a_model
+26 google_api_slot_b_model
+27 llm_device
+28 llm_attn_impl
+29 llm_quant_policy
+30 llm_vram_ceiling_gb
+31 gguf_n_ctx
+32 gguf_quant
+33 use_exchange
+34 enable_production_stage3_validators
+35 news_briefs_required
+36 replay_from
 ```
 
-Propose ONE ordering naming every remaining widget exactly once, get the
-operator's yes, and make that list an executable test before touching
-`INPUT_TYPES`. Coding stops here until it exists -- inferring an order
-mid-surgery is how a positional change becomes a silent one.
+`gate_in` is a forceInput SOCKET and consumes no `widgets_values` slot; it is not
+in this list and its descriptor index moves regardless, so the link-repair-by-
+identity step runs either way.
+
+#### THE STRUCTURAL FACT THAT SHAPES EXECUTION
+
+**`required` renders BEFORE `optional`, always.** Verified by Fable in the
+INSTALLED frontend
+(`.venv/Lib/site-packages/comfyui_frontend_package/static/assets/settingStore-*.js`):
+ComfyUI iterates `input.required` then `input.optional` into one ordered map.
+
+Today `required = {episode_title, num_characters}`. **So every proposal that
+opens with `source_bank` -- and all three did -- is unrenderable until the
+categories move.** Two of the three readers proposed that order without noticing.
+
+So the execution requires: `source_bank` INTO `required`; `episode_title` and
+`num_characters` OUT to `optional`. Free at the Python level -- every `run()`
+kwarg already carries a default -- but it is a deliberate decision, not a
+side effect. `source_bank` is the only genuine routing prerequisite;
+`episode_title` calls itself an optional override in its own tooltip, and a
+required-looking blank in row 1 tells a first-timer they must fill it.
+
+#### THE FOUR CONTESTED PLACEMENTS, and what won
+
+1. **`visual_style` at row 3**, with the source controls rather than beside
+   `creativity`. It is the second independent top-level roll, and it shapes the
+   PICTURE, not the writing -- sitting it next to `creativity` implies it changes
+   the script.
+2. **`episode_title` at row 4.** Once it is `optional` the blank-required-field
+   objection dissolves, and the title belongs with the episode's identity rather
+   than buried below the My Story block.
+3. **Sampling knobs directly after `creativity`** (rows 15-18), so generation
+   behaviour reads as one block that then leads into model selection.
+4. **Remote pickers directly under the model dropdowns** (rows 21-26). They are
+   passive bindings for handles those dropdowns select; separating them hides
+   the dependency. Their dead sentinels do not outweigh the causal link.
+
+#### THE ONE OVERRULE, by the driver
+
+The convergence pass moved `use_exchange`, `enable_production_stage3_validators`
+and `news_briefs_required` UP to rows 15-17 and did not justify it in any of its
+four rulings. Against that: Fable placed them last (its "lab equipment" tier),
+DeepSeek placed them at 27-29, and the converging reader's OWN earlier proposal
+placed them at 27-29. Three of four readings put them low and the move was
+unexplained, so they are restored to 33-35, above `replay_from`.
+
+#### FACTS CORRECTED ALONG THE WAY -- all re-verified against the files
+
+* `custom_premise` is shared by EVERY bank, not a My Story field
+  (`nodes/_otr_story_input.py:48-52`). The driver's own brief said otherwise and
+  misled all three readers.
+* `config/profiles/widget_mapping.json` manages **16** writer widgets, not 14 --
+  it also manages `act_count` and `num_characters`. Re-measured.
+* `source_ref` is NOT read by `media_archive`:
+  `nodes/_otr_media_archive_sources.py:294` does `del bank, technical_model,
+  source_ref` and its docstring says RSS feeds ignore it. Only `shakespeare` and
+  `public_domain` consume it.
+* `story_scaffold` is forced off by `media_archive` and `my_story` as well as by
+  `original`.
+* `lemmy_cameo` is refused outright on `shakespeare` and `public_domain`
+  (`nodes/_otr_casting.py:1178`) and consumes a `num_characters` slot.
+* The node has an OUTPUT socket literally named `technical_model`, so any label
+  for that widget keeps the word "technical" or it contradicts the socket beside
+  it.
+
+#### HOW TO EXECUTE IT
+
+The order is pinned in ONE place already:
+`tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER`. Change that
+list first, watch the test go red, then move `INPUT_TYPES` to match and migrate
+all 17 graphs with `scripts/otr_widget_surgery.py` -- never by hand. The two
+guards added 2026-09-13 (`test_widget_schema_order_matches_live_input_types`,
+`test_widget_migration_pairs_values_by_name`) exist precisely to catch a reorder
+that updates the class and not the graphs, or that lands a value on its
+neighbour.
 
 ## 2. CODE -- the design is settled, build it
 

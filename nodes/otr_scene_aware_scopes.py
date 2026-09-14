@@ -405,10 +405,6 @@ class SceneAwareScopes:
                     "tooltip": "Scopes output height (px, even values). "
                                "Profile/platform-owned -- see out_w.",
                 }),
-                "ffmpeg": ("STRING", {
-                    "default": "ffmpeg", "multiline": False,
-                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
-                }),
                 # APPEND-ONLY (BUG-LOCAL-097 positional rule -- keep LAST). 'off'
                 # is byte-identical to today (landscape clips show nothing); 'bottom'
                 # paints a green audio-reactive frequency strip along the bottom of
@@ -426,16 +422,20 @@ class SceneAwareScopes:
         return _time.time()
 
     def render_scopes(self, clip_manifest_json, audio=None,
-                      out_w=1920, out_h=1080, ffmpeg="ffmpeg",
+                      out_w=1920, out_h=1080,
                       landscape_bars="off"):
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
         # operator intent. Discarded HERE, at the node boundary, so no
         # helper underneath can be handed it.
-        try:
-            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
-        except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
-        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_SceneAwareScopes")
+        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
+        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
+        # found to reach argv[0] over an unauthenticated /prompt request;
+        # the fix then was to discard it here, at the node boundary. The
+        # declaration is now gone, so ComfyUI never passes the field at
+        # all and there is nothing left to discard -- the channel is
+        # closed rather than sanitised. Everything below already saw ""
+        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        ffmpeg = ""
         import json
         try:
             manifest = json.loads(clip_manifest_json) if clip_manifest_json else {}

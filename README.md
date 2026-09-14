@@ -187,7 +187,18 @@ folder name is historical; the guides cover every platform.)
 | [apple/INSTALL.md](apple/INSTALL.md) | Getting the nodes loading: ffmpeg, Python versions, what downloads itself. |
 | [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | The same install, written for an AI coding agent to run. Optional. |
 | [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
+| [apple/BANKS.md](apple/BANKS.md) | The six source banks. This is the control that decides what kind of episode you get. |
 | [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
+
+| Choosing what it uses | |
+|---|---|
+| [apple/WRITERS.md](apple/WRITERS.md) | The LLM that writes the script, and the two slots it fills. |
+| [apple/VOICES.md](apple/VOICES.md) | Who speaks, which engine says it, and which ones need a download. |
+| [apple/MUSIC.md](apple/MUSIC.md) | The theme and the cues between scenes. |
+| [apple/IMAGE_MODELS.md](apple/IMAGE_MODELS.md) | The still pictures each beat is built from. |
+| [apple/VIDEO_MODELS.md](apple/VIDEO_MODELS.md) | How a beat becomes moving picture, and what each lane costs. |
+| [apple/STYLES.md](apple/STYLES.md) | The look of an episode, and adding a style pack of your own. |
+| [apple/UPSCALERS.md](apple/UPSCALERS.md) | The optional upscale step, and why it ships off. |
 
 | If it applies to you | |
 |---|---|

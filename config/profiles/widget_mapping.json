@@ -328,10 +328,6 @@
       "registry": null,
       "targets": [
         [
-          "OTR_VideoDirector",
-          "request_seed"
-        ],
-        [
           "OTR_ImageDirector",
           "request_seed"
         ]
@@ -340,10 +336,6 @@
     "seed_policy.seed_mode": {
       "registry": null,
       "targets": [
-        [
-          "OTR_VideoDirector",
-          "seed_mode"
-        ],
         [
           "OTR_ImageDirector",
           "seed_mode"

@@ -1358,10 +1358,6 @@ class OTRMasterAudioMux:
                                "(the composite's manifest fps); the mux never "
                                "resamples frames.",
                 }),
-                "ffmpeg": ("STRING", {
-                    "default": "ffmpeg",
-                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
-                }),
                 "output_path": ("STRING", {
                     "default": "",
                     "tooltip": "Final mp4 path. Empty -> <output>/otr/episodes/<stem>_final.mp4.",
@@ -1689,7 +1685,7 @@ class OTRMasterAudioMux:
 
     def mux(self, silent_video_path, master_audio_path, audio_done="",
             declared_credits_tail_s=0.0, clip_manifest_json="", fps=25,
-            ffmpeg="ffmpeg", output_path="", video_policy_json="",
+            output_path="", video_policy_json="",
             foley_receipts_json="", script_json=None):
         # ``clip_manifest_json`` is a RETIRED connector (rip-sfx 2026-08-06):
         # still wired on the canonical graph and hashed by IS_CHANGED, but it
@@ -1697,11 +1693,15 @@ class OTRMasterAudioMux:
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
         # operator intent. Discarded HERE, at the node boundary, so no
         # helper underneath can be handed it.
-        try:
-            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
-        except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
-        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_MasterAudioMux")
+        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
+        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
+        # found to reach argv[0] over an unauthenticated /prompt request;
+        # the fix then was to discard it here, at the node boundary. The
+        # declaration is now gone, so ComfyUI never passes the field at
+        # all and there is nothing left to discard -- the channel is
+        # closed rather than sanitised. Everything below already saw ""
+        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        ffmpeg = ""
         # READ THE DELIVERY CONTRACT FIRST, BEFORE ANY WORK. A wire that is
         # connected but unreadable is a wiring fault, and learning that after
         # a ten-minute mux helps nobody.

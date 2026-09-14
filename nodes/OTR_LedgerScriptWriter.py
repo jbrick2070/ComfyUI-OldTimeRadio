@@ -2137,8 +2137,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         except Exception:  # noqa: BLE001 -- INPUT_TYPES must never raise
             _remote_on = False
             _slot_a_id = "openrouter:slot-a"
+        # THE SUFFIX IS PART OF THE VALUE. `dropdown_choices()` offers labels
+        # carrying a size + fit badge, so a BARE repo id matches no choice and
+        # ComfyUI resolves an unmatched COMBO to index 0 -- a node that SAYS one
+        # model and silently runs another. `default_llm_option()` exists for
+        # exactly this and its docstring records the last time it bit (both
+        # writer widgets rendering red, 2026-08-04). The remote slot id is a
+        # real choice when the lane is on, so it stays bare.
         _creative_default = (
-            _slot_a_id if _remote_on else _otr_model_catalog.DEFAULT_LLM
+            _slot_a_id if _remote_on else _otr_model_catalog.default_llm_option()
         )
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
@@ -2213,7 +2220,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "technical_model": (
                     _otr_model_catalog.dropdown_choices(),
                     {
-                        "default": _otr_model_catalog.DEFAULT_LLM,
+                        # The BADGED label, not the bare repo id -- see the
+                        # note on _creative_default above. Measured 2026-09-14:
+                        # this default was 'Qwen/Qwen3.5-4B' while the choices
+                        # read 'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight ...)', so
+                        # it matched nothing and a freshly dropped node fell
+                        # through to index 0. It was right only by the accident
+                        # of that row sorting first.
+                        "default": _otr_model_catalog.default_llm_option(),
                         "tooltip": (
                             "LLM for the technical/structured passes "
                             "(JSON validators, GBNF grammar output, "

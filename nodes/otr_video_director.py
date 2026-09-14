@@ -310,18 +310,21 @@ class OTRVideoDirector:
                     "tooltip": "Video plan canvas height (px). "
                                "Profile/platform-owned -- see canvas_w.",
                 }),
-                "seed_mode": (list(SEED_MODES), {
-                    "default": SEED_MODES[0],
-                    "tooltip": "Recorded on the receipt. The video seed is "
-                               "derived per shot from its request hash, so "
-                               "changing this does not change the picture.",
-                }),
-                "request_seed": ("INT", {
-                    "default": 0, "min": 0, "max": 0xFFFFFFFF,
-                    "tooltip": "Recorded on the receipt, not used to seed video. "
-                               "Each shot seeds itself from its own request "
-                               "hash.",
-                }),
+                # `seed_mode` and `request_seed` stood here until 2026-09-13.
+                # Their own tooltips said what they were: "Recorded on the
+                # receipt. The video seed is derived per shot from its request
+                # hash, so changing this does not change the picture." Two
+                # controls that a user could turn and watch nothing happen.
+                #
+                # They were WRITE-ONLY, which had to be measured rather than
+                # assumed -- they were not inert, they were stamped into the
+                # emitted policy under "seed". Nothing read it back: no module
+                # under nodes/ reads video_policy["seed"], and OTR_ImageDirector
+                # (the live image dispatcher, whose OWN seed widgets stay)
+                # reads image_models, device_policy, aspects, talking,
+                # video_models and effective_video_models -- not seed. Every
+                # ["seed"] read in the engines comes from ImageDirector's own
+                # params.
             },
             "optional": {
                 "custom_models_json": ("STRING", {
@@ -410,7 +413,6 @@ class OTRVideoDirector:
                character_video_model, announcer_image_model,
                music_image_model, character_image_model,
                fps, canvas_w, canvas_h,
-               seed_mode, request_seed,
                custom_models_json="{}",
                gate_in="",
                device_policy="cuda", dtype_policy="fp8_ok",
@@ -595,7 +597,6 @@ class OTRVideoDirector:
                 "character_image_model": character_image_model,
             },
             "canvas": {"w": int(canvas_w), "h": int(canvas_h), "fps": int(fps)},
-            "seed": {"mode": seed_mode, "request_seed": int(request_seed)},
             "warnings": warnings,
         }
         for w in warnings:

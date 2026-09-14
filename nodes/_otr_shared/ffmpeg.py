@@ -196,12 +196,6 @@ def _imageio_ffmpeg() -> Optional[str]:
         return None
 
 
-#: Nodes that have already said their widget value is ignored. One line per
-#: node per process -- an operator who typed a path learns it is dead, and a
-#: soak does not print it on every beat.
-_WIDGET_IGNORED_WARNED = set()
-
-
 #: One probe per resolved binary per process. `ffmpeg -filters` and
 #: `-encoders` each spawn a subprocess and print thousands of lines; a render
 #: asks this question once per beat otherwise.
@@ -388,35 +382,27 @@ def caption_support_gap(path=None) -> Optional[str]:
             % (caps["path"], " and ".join(missing)))
 
 
-def widget_ffmpeg_is_ignored(value, node):
-    """The ffmpeg preference a NODE may express: none, ever. Returns ``""``.
-
-    A ComfyUI widget value arrives in the body of an unauthenticated
-    ``/prompt`` request, and is whatever a downloaded workflow JSON says. It is
-    UNTRUSTED INPUT, not operator intent, so it must not name the binary this
-    pack spawns: honouring it let a workflow point argv[0] at any file on disk
-    named ffmpeg, ahead of the operator's own ``OTR_FFMPEG`` pin, and the
-    ffprobe sibling rule turned one such value into a SECOND attacker binary.
-
-    ``OTR_FFMPEG`` remains the way to pin a build, and a workflow cannot set an
-    environment variable -- which is exactly why the pin is the trustworthy
-    channel and the widget is not.
-
-    NOT A BEHAVIOUR CHANGE FOR ANY SHIPPED GRAPH, measured 2026-09-04: all 465
-    ffmpeg widget values across all 101 workflow JSONs are the bare literal
-    ``"ffmpeg"``, which :func:`_explicit` already treats as "no preference".
-    The widget stays in ``INPUT_TYPES`` and in every execute signature, so
-    ``widgets_values``, the ``inputs`` descriptors and every link ``dst_slot``
-    are untouched -- removing it is a separate, scheduled migration.
-    """
-    try:
-        expressed_a_choice = _explicit(value, _BARE_FFMPEG_NAMES) is not None
-    except Exception:  # noqa: BLE001 -- a junk widget value is still ignored
-        expressed_a_choice = bool(value)
-    if expressed_a_choice and node not in _WIDGET_IGNORED_WARNED:
-        _WIDGET_IGNORED_WARNED.add(node)
-        _log.warning(
-            "[%s] the 'ffmpeg' widget is ignored (%r): a workflow value cannot "
-            "name the binary this pack runs. Set the OTR_FFMPEG environment "
-            "variable to pin a build.", node, str(value)[:120])
-    return ""
+# REMOVED 2026-09-13: ``widget_ffmpeg_is_ignored(value, node)`` lived here,
+# with a module-level warn-once set beside ``_CAPABILITY_CACHE`` above.
+#
+# WHAT IT DEFENDED AGAINST. A ComfyUI widget value arrives in the body of an
+# unauthenticated ``/prompt`` request and is whatever a downloaded workflow
+# JSON says. While five node classes declared an ``ffmpeg`` STRING widget,
+# that value was a channel by which untrusted input could reach argv[0] --
+# ahead of the operator's own ``OTR_FFMPEG`` pin, and the ffprobe sibling
+# rule turned one such value into a SECOND attacker binary. From 2026-09-04
+# the defence was to SANITISE: each execute method handed its widget value to
+# this function, which discarded it and returned ``""``.
+#
+# THE DEFENCE IS NOW NON-DECLARATION, WHICH IS STRICTLY STRONGER. The widget
+# is gone from all five classes that declared it, so ComfyUI never passes a
+# value at all: the channel is closed rather than cleaned. A sanitiser with no
+# caller would not be harmless decoration here -- it would invite a future
+# window to re-declare the widget and "handle" it, restoring the weaker
+# design. Hence the rip, per this repo's orphans rule.
+#
+# ``OTR_FFMPEG`` remains the one way to pin a build, because a workflow cannot
+# set an environment variable -- exactly why the pin is the trustworthy channel
+# and a widget is not. ``resolve_ffmpeg`` here, and ``resolve_ffprobe`` in the
+# sibling ``ffprobe`` module, remain the live security surface: their
+# absolute-path and bare-name rules are what decide argv[0].

@@ -827,15 +827,6 @@
           "link": null
         },
         {
-          "localized_name": "episode_title",
-          "name": "episode_title",
-          "type": "STRING",
-          "widget": {
-            "name": "episode_title"
-          },
-          "link": null
-        },
-        {
           "localized_name": "opening_duration_sec",
           "name": "opening_duration_sec",
           "shape": 7,
@@ -938,7 +929,6 @@
         "Node name for S&R": "OTR_EpisodeAssembler"
       },
       "widgets_values": [
-        "",
         10,
         8,
         500
@@ -1006,16 +996,6 @@
           "link": null
         },
         {
-          "localized_name": "episode_title",
-          "name": "episode_title",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "episode_title"
-          },
-          "link": null
-        },
-        {
           "localized_name": "draw_scopes",
           "name": "draw_scopes",
           "shape": 7,
@@ -1056,7 +1036,6 @@
         "[]",
         25,
         "1920x1080",
-        "",
         false
       ],
       "color": "#382712",
@@ -1673,16 +1652,6 @@
           "link": null
         },
         {
-          "localized_name": "ffmpeg",
-          "name": "ffmpeg",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "ffmpeg"
-          },
-          "link": null
-        },
-        {
           "localized_name": "output_path",
           "name": "output_path",
           "shape": 7,
@@ -1739,7 +1708,6 @@
         1920,
         1080,
         25,
-        "ffmpeg",
         "",
         "off",
         "cpu"
@@ -1806,16 +1774,6 @@
           "link": null
         },
         {
-          "localized_name": "ffmpeg",
-          "name": "ffmpeg",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "ffmpeg"
-          },
-          "link": null
-        },
-        {
           "localized_name": "output_path",
           "name": "output_path",
           "shape": 7,
@@ -1867,7 +1825,6 @@
       },
       "widgets_values": [
         25,
-        "ffmpeg",
         ""
       ],
       "color": "#3C1C37",
@@ -1932,16 +1889,6 @@
           "link": null
         },
         {
-          "localized_name": "ffmpeg",
-          "name": "ffmpeg",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "ffmpeg"
-          },
-          "link": null
-        },
-        {
           "localized_name": "ledger_path",
           "name": "ledger_path",
           "shape": 7,
@@ -1995,7 +1942,6 @@
         true,
         "sdh_standard",
         25,
-        "ffmpeg",
         "",
         ""
       ],
@@ -2106,24 +2052,6 @@
           "link": null
         },
         {
-          "localized_name": "seed_mode",
-          "name": "seed_mode",
-          "type": "COMBO",
-          "widget": {
-            "name": "seed_mode"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "request_seed",
-          "name": "request_seed",
-          "type": "INT",
-          "widget": {
-            "name": "request_seed"
-          },
-          "link": null
-        },
-        {
           "localized_name": "custom_models_json",
           "name": "custom_models_json",
           "shape": 7,
@@ -2192,8 +2120,6 @@
         25,
         832,
         480,
-        "request_hash",
-        42,
         "{}",
         "default",
         "no_fp8_no_fp4",
@@ -3156,7 +3082,7 @@
       83,
       0,
       7,
-      7,
+      6,
       "AUDIO"
     ],
     [
@@ -3164,7 +3090,7 @@
       83,
       1,
       7,
-      8,
+      7,
       "STRING"
     ],
     [
@@ -3180,7 +3106,7 @@
       12,
       1,
       86,
-      8,
+      7,
       "STRING"
     ],
     [
@@ -3188,7 +3114,7 @@
       87,
       0,
       7,
-      9,
+      8,
       "STRING"
     ],
     [
@@ -3196,7 +3122,7 @@
       87,
       0,
       85,
-      8,
+      7,
       "STRING"
     ],
     [
@@ -3204,7 +3130,7 @@
       92,
       1,
       85,
-      9,
+      8,
       "STRING"
     ],
     [
@@ -3212,7 +3138,7 @@
       62,
       6,
       7,
-      10,
+      9,
       "STRING"
     ],
     [
@@ -3228,7 +3154,7 @@
       1,
       1,
       85,
-      10,
+      9,
       "STRING"
     ],
     [

@@ -75,9 +75,33 @@ REPO = HERE.parent
 RUNNER = HERE / "otr_canonical_api_run.py"
 RECEIPT = REPO / "docs" / "2026-08-26-bank-engine-e2b-sweep-receipt.json"
 
-#: The model under test, in BOTH slots, on every leg. Full dropdown label --
-#: `validate_model_id` resolves the size suffix.
-E2B = "google/gemma-4-E2B-it (3.0 GB)"
+#: The model under test, in BOTH slots, on every leg.
+#:
+#: RESOLVED FROM THE LIVE CATALOG, never hand-written. This was the literal
+#: "google/gemma-4-E2B-it (3.0 GB)" until 2026-09-14, by which time the real
+#: label read "google/gemma-4-E2B-it (6.0 GB, mac16-tight nv8 nv16 nv24)" --
+#: the badge gained fit tags and the size was restated. A label that matches no
+#: choice does not fail: ComfyUI resolves an unmatched COMBO to INDEX 0, so the
+#: sweep would have named one model and measured another, which is the one
+#: defect a sweep must never have.
+def _catalog_label(repo_id: str) -> str:
+    """The live dropdown label for ``repo_id``, or a loud failure."""
+    import sys as _sys
+    _sys.path.insert(0, str(REPO))
+    try:
+        from nodes import _otr_model_catalog as _cat
+    finally:
+        _sys.path.pop(0)
+    for choice in _cat.dropdown_choices():
+        if choice == repo_id or choice.startswith(repo_id + " ("):
+            return choice
+    raise SystemExit(
+        "%s is not in the live model catalog any more. The sweep is naming a "
+        "row that no longer exists; pick a current one rather than pinning a "
+        "label." % repo_id)
+
+
+E2B = _catalog_label("google/gemma-4-E2B-it")
 
 #: Bank -> the visual style authored for that lane. scifi_news_pro is absent
 #: on purpose: it qualified live on 2026-08-26 and does not need re-proving.

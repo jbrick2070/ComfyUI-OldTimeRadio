@@ -133,17 +133,38 @@ def _wait_for_idle_queue(*, max_wait_s: int = QUEUE_DRAIN_MAX_S) -> bool:
     return False
 
 
-#: The 7 curated LOCAL LLM rows, in catalog order. Full dropdown labels
-#: (size suffix included) -- validate_model_id resolves them.
-LLM_ROWS = (
-    "mistralai/Mistral-Nemo-Instruct-2407 (12.0 GB)",
-    "google/gemma-4-E2B-it (3.0 GB)",
-    "google/gemma-4-E4B-it (4.5 GB)",
-    "google/gemma-4-12b-it (11.9 GB)",
-    "unsloth/gemma-4-12b-it-GGUF (17.4 GB)",
-    "unsloth/Qwen3-8B-GGUF (10.3 GB)",
-    "google/gemma-2-2b-it (2.6 GB)",
-)
+def _live_llm_rows() -> tuple:
+    """The curated LOCAL LLM rows, READ FROM THE LIVE CATALOG in catalog order.
+
+    THIS WAS A HAND-WRITTEN TUPLE UNTIL 2026-09-14 and every one of its seven
+    entries had gone stale. Four carried sizes the catalog no longer reports
+    (12.0 vs 24.0, 3.0 vs 6.0, 4.5 vs 9.0, 11.9 vs 23.9) and TWO named GGUF rows
+    that no longer exist at all -- `_otr_gguf_backend.GGUF_ROWS` is empty by
+    operator ruling.
+
+    None of that would have raised. ComfyUI resolves a COMBO value it does not
+    recognise to INDEX 0, so the sweep would have run the first catalog row
+    seven times and labelled the results with seven different model names. A
+    measurement that mislabels its own arm is worse than no measurement.
+
+    Remote-lane handles (openrouter:/comfy:/google_api: prefixes) are excluded:
+    they appear only when a key is set, so including them would make the sweep's
+    arm list depend on the operator's environment.
+    """
+    import sys as _sys
+    _sys.path.insert(0, str(REPO))
+    try:
+        from nodes import _otr_model_catalog as _cat
+    finally:
+        _sys.path.pop(0)
+    rows = tuple(c for c in _cat.dropdown_choices()
+                 if ":" not in c.split(" ")[0])
+    if not rows:
+        raise SystemExit("the live model catalog offered no local rows")
+    return rows
+
+
+LLM_ROWS = _live_llm_rows()
 STILL_ENGINES = ("still_flat", "still_motion", "still_pan", "still_word")
 IMAGE_ENGINES = ("z_image_turbo", "flux_gen1", "flux2_klein",
                  "lumina_image", "ideogram4_local")

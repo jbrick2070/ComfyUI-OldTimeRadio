@@ -467,10 +467,6 @@ class OTRCaptionBurn:
                                "match the incoming silent video's real rate or "
                                "captions drift against speech.",
                 }),
-                "ffmpeg": ("STRING", {
-                    "default": "ffmpeg",
-                    "tooltip": "DEPRECATED and IGNORED (2026-09-04). A workflow value cannot name the binary this pack runs -- it arrives over an unauthenticated /prompt request. Set the OTR_FFMPEG environment variable to pin a build.",
-                }),
                 "ledger_path": ("STRING", {
                     "default": "",
                     "tooltip": "Optional explicit timed-ledger path. Empty -> resolved from the video stem (otr_audio_dir / in-flight ledger).",
@@ -523,16 +519,20 @@ class OTRCaptionBurn:
         return os.path.join(out_dir, f"{stem}_captioned.mp4")
 
     def burn(self, video_path, burn_captions=True, caption_style=_DEFAULT_CAPTION_STYLE,
-             fps=25, ffmpeg="ffmpeg", ledger_path="", output_path="", gate_in="",
+             fps=25, ledger_path="", output_path="", gate_in="",
              title_card_plan_json=""):
         # B1 (2026-09-04): the widget is UNTRUSTED /prompt input, not
         # operator intent. Discarded HERE, at the node boundary, so no
         # helper underneath can be handed it.
-        try:
-            from ._otr_shared.ffmpeg import widget_ffmpeg_is_ignored
-        except ImportError:  # pragma: no cover -- flat (sys.path) load
-            from _otr_shared.ffmpeg import widget_ffmpeg_is_ignored  # type: ignore
-        ffmpeg = widget_ffmpeg_is_ignored(ffmpeg, "OTR_CaptionBurn")
+        # The `ffmpeg` widget was REMOVED on 2026-09-13. It had been
+        # DEPRECATED and IGNORED since 2026-09-04, when a widget value was
+        # found to reach argv[0] over an unauthenticated /prompt request;
+        # the fix then was to discard it here, at the node boundary. The
+        # declaration is now gone, so ComfyUI never passes the field at
+        # all and there is nothing left to discard -- the channel is
+        # closed rather than sanitised. Everything below already saw ""
+        # for this name; OTR_FFMPEG remains the one way to pin a build.
+        ffmpeg = ""
         # These paths came from the workflow, so they are untrusted input.
         # A UNC value makes this machine authenticate to the host it names
         # on the first stat -- BEFORE any spawn -- so the refusal belongs
