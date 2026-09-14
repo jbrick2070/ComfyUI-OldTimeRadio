@@ -386,16 +386,31 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his eyeball -- registry and workflow (2026-09-13 night)
 
-* **2.0.0 is PUBLISHED and waiting on Comfy-Org's scanner (2026-09-13
-  22:13Z, commit c491e86b, tag v2.0.0).** He approved it -- "WE GO MAIN NO
-  BETA" / "I APPROVE" -- after sixteen of sixteen shipping graphs proved on
-  real hardware and a full suite diffed clean against the day's baseline.
-  Until the scanner flips it to Active, `latest_version` stays alpha.30 and a
-  Manager install still cannot load the current graphs; alpha.31 waits in the
-  same queue. Nothing to do but read the registry -- and read the WHOLE
-  list: the API sorts by version string, so a bare release sorts BELOW every
-  `-alpha.N` row. Two things fire when it goes Active: the AMD volunteer's
-  ping (row below) and a refresh of this row.
+* **2.0.0 IS ACTIVE. 2.1.0 AND 2.1.1 ARE BOTH PENDING (2026-09-13 night).**
+  2.0.0 cleared the scanner roughly a day after publish, which unblocked
+  everything that had been queued behind the "never stack on a Pending
+  version" rule. Two releases went out the same evening on his direct
+  instruction:
+  * **2.1.0** -- Stable Audio 3 became the music default on fifteen of the
+    sixteen shipped graphs (otr_cpu_low stays on MusicGen: sa3 declares
+    cuda+mps only), My Story joined the source-bank roll as an equal peer,
+    and the registry listing text was replaced -- the old description claimed
+    "No cloud services required", which stopped being true when two banks
+    began fetching live RSS. A false claim on the listing page itself.
+  * **2.1.1** -- took the retired branch name off every surface a user can
+    see: the credit roll burned into every episode read "Made with OTR
+    v2.0-alpha", and ~20 GitHub URLs inside ERROR MESSAGES pointed at that
+    branch, which is where a 404 lands on someone already stuck.
+  **NOTHING TO DO BUT READ THE REGISTRY, and read the WHOLE list** -- the API
+  sorts by version string, so a bare release sorts BELOW every `-alpha.N` row.
+  There is no telemetry; the enum is the only signal.
+  **ONE THING IS GATED ON 2.1.1 GOING ACTIVE, and it is easy to get wrong:**
+  do NOT delete the `v2.0-alpha` branch until then. A published version's
+  metadata is frozen with the Icon URL it shipped, so 2.0.0 and 2.1.0 both
+  still resolve their registry card art through `/v2.0-alpha/`. The listing
+  renders whichever version is CURRENT. Delete the branch while an older row
+  is current and the card art breaks on the live page. Wait for Active,
+  confirm the card, then delete.
   **The pod half of this row is CLOSED (2026-09-13).** It was written when the
   only route to a pod was `install_custom_node` through the MCP, which serves
   the registry version. A pod created from the PyTorch template with an SSH
@@ -659,6 +674,52 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Still genuinely open, and not his call
 
+* **THE WIDGET RENAME/REORDER TIER IS HANDED OFF, NOT DONE
+  (`docs/HANDOFF_WIDGET_RENAME_REORDER.md`, 2026-09-13).** An external UI
+  audit read the whole widget surface. The string-and-default half LANDED
+  (commit 2f11fe88): five receipt-only controls stopped pretending to be
+  switches, tooltips naming retired nodes are fixed -- two of them falsified
+  by that same evening's own node removals -- the four-widget cross-node voice
+  trap is named on all four tooltips, and eleven fresh-node defaults now match
+  the shipped graph (worst: both voice nodes defaulted to `indextts2`, which
+  is noncommercial and absent from an ordinary install, because `engines[0]`
+  is registry order).
+  What is LEFT is positional surgery, and the handoff measures why it was not
+  rushed: a rename breaks **2,074** saved `inputs[].widget.name` references
+  across the 17 shipped graphs, **47** `widget_mapping.json` targets, the node
+  function's keyword parameter and all its callers -- and every workflow a
+  USER has already saved, which cannot be migrated and fails in a way they
+  cannot diagnose. The handoff's first deliverable is a GO/NO-GO on the
+  renames, not an edit, with the instruction to find out why this pack
+  deliberately removed `_RENAME_ALIASES` in the 2026-05-12 clean break
+  (`__init__.py:402`) before anyone proposes bringing it back. If there is no
+  safe path it recommends the REORDER alone, which changes no names.
+
+* **TWO FRESH-NODE DEFAULTS ARE HIS CALL, deliberately left disagreeing with
+  the canonical (2026-09-13).** `llm_quant_policy` (fresh `bnb_nf4`, canonical
+  `none`) and `llm_vram_ceiling_gb` (fresh `14.5`, canonical `10.0`). The
+  audit's rule -- make a dropped node match the graph -- is right everywhere
+  else and stops being safe here: matching would make a fresh node load the
+  writer UNQUANTISED at a HIGHER ceiling, which is correct for the canonical's
+  4B writer and can OOM a small card that the nf4 default would have carried.
+  `act_count` (fresh 3, canonical 1) is left for the same reason: the
+  canonical ships one act because every proving leg ran one on purpose, and
+  three is the friendlier first episode. Taste, not a defect.
+
+* **`stable_audio_3` DECLARES cuda+mps, and a canonical CPU leg ran it anyway
+  (2026-09-13).** The declaration in `nodes/_otr_audio_engines/registry.py`
+  lists no `cpu`, and `tests/test_capability_profiles.py::test_v2_stable_audio_3_lists_mps_but_not_cpu`
+  pins that -- with a docstring giving a TIER PREFERENCE as its reason ("the
+  cpu floor keeps musicgen"), not a capability claim. Measured against it:
+  the canonical, on a `--cpu` server, loaded
+  `stable_audio_3_small_music_base.safetensors`, sampled 100 steps twice at
+  ~1.05 s/it (~3.5 min of a 34.5-minute episode) and published
+  `the_trembling_silver_signet` to obs. So the declaration is arguably stale.
+  Changing it means editing a deliberately-pinned test, and it would let
+  `otr_cpu_low` move to sa3 like the other fifteen. Left alone because a
+  preference expressed as a refusal is exactly the kind of thing that should
+  not be flipped at the tail of a long night.
+
 * **The publish action will soon refuse `exec()` in the checkout.** Its
   pre-scan on the 2.0.0 publish printed, against
   `tests/test_visual_asset_validator_stdlib.py:92`, "We will soon disable
@@ -755,6 +816,14 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   it fires when 2.0.0 (published 2026-09-13 22:13Z, Pending) goes Active --
   a registry state change nobody is watching.** He posts the ping; a window
   drafts it.
+  **THE TRIGGER HAS FIRED: 2.0.0 WENT ACTIVE on 2026-09-13 night.** This is
+  owed NOW. One caveat worth putting in the ping rather than letting him
+  discover it: `otr_amd_still` moved to Stable Audio 3 in 2.1.0 on
+  DECLARATION compatibility (the profile declares `device_backend: cuda`,
+  which is how this repo's vocabulary carries ROCm), NOT on an AMD receipt.
+  No AMD receipt exists for EITHER music engine. If he would rather send him
+  a version whose AMD graph is on the more broadly-measured MusicGen, that is
+  2.0.0 and it is Active today.
 * **`otr_8gb_foley` is RETIRED (operator ruling, 2026-09-13).** He ruled on
   time, not on failure: *"4 hours for 1 act seems too long"*, then *"maybe we
   dump foley on the 8gb lane."* The measurement behind it, from the 4060's own
