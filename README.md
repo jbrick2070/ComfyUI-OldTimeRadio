@@ -59,7 +59,7 @@ pressing **Queue** is the whole path.
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
-| AMD | Experimental. No hardware has run it; [apple/ROCM.md](apple/ROCM.md) has the graph and the open questions. |
+| AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
 
 **1. Install the pack.** In ComfyUI, open **Extensions -> Node Manager** and search
 for **old time radio** (registry id `comfyui-old-time-radio`, publisher `fluxus`).
@@ -204,7 +204,7 @@ folder name is historical; the guides cover every platform.)
 |---|---|
 | [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
 | [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your own card cannot hold. |
-| [apple/ROCM.md](apple/ROCM.md) | AMD. Experimental in v2.0: one graph, no receipts. The first episode off a card makes it v2.1. |
+| [apple/ROCM.md](apple/ROCM.md) | AMD. The first Radeon episode landed 2026-09-14 on RDNA4 under Linux; the page carries that receipt and the gaps still open. |
 | [apple/CLOUD.md](apple/CLOUD.md) | The optional paid writer lanes. Off by default; you do not need them. |
 
 | Adding to it | |
@@ -447,7 +447,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | mime | _not built_ | | | | | | | |
 | **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
-### AMD ROCm (experimental -- no receipts)
+### AMD ROCm (one receipt: RDNA4 / Linux / still tier, 2026-09-14)
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|

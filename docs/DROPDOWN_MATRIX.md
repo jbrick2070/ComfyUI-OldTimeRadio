@@ -21,12 +21,12 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `still_flat` | nothing | -- | fits | **proven** | **proven** | ? | ? |
-| `still_motion` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
+| `still_motion` | nothing | -- | **proven** | **proven** | **proven** | **proven** | ? |
 | `still_pan` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
 | `still_word` | nothing | -- | fits | measured | **proven** | ? | ? |
 | `viz_camera` | nothing | -- | fits | **proven** | **proven** | ? | ? |
 | `viz_green` | nothing | -- | fits | **proven** | **proven** | ? | ? |
-| `viz_mxc_cpu` | nothing | -- | **proven** | **proven** | **proven** | ? | ? |
+| `viz_mxc_cpu` | nothing | -- | **proven** | **proven** | **proven** | **proven** | ? |
 | `viz_mxc_mandala` | nothing | -- | fits | **proven** | fits | ? | ? |
 
 **Video -- hosted, no weights but you supply the key**
@@ -74,7 +74,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
-| `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
 
 **Image -- hosted**
 
@@ -92,7 +92,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** | ? | **proven** |
+| `kokoro` | **auto** | 0.3 GiB | **proven** | **proven** | **proven** | **proven** | **proven** |
 | `musicgen` | **auto** | 2.2 GiB | **proven** | **proven** | measured | ? | **proven** |
 | `chatterbox` | own installer (Windows) | 3.0 GiB | not offered | fits | not offered | not offered | not offered |
 | `stable_audio_3` | **auto** | 3.5 GiB | **proven** | **proven** | **proven** | ? | not offered |

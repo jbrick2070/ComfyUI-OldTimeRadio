@@ -425,7 +425,31 @@ BUNDLES = {
 
 
 def models_root() -> str:
-    """The one authority on where weights live -- never a hardcoded guess."""
+    """Where weights live, resolved in a way that cannot silently be wrong.
+
+    FOUND BY AN OUTSIDE TESTER ON ROCm/LINUX (issue #2, 2026-09-14), and the
+    docstring here used to say "never a hardcoded guess" directly above a
+    hardcoded Windows guess.
+
+    The old order tried `from nodes._otr_gguf_backend import _models_root`
+    FIRST. That import needs ComfyUI's own `folder_paths`, which only exists
+    inside the running ComfyUI process -- so when this script is run standalone,
+    exactly as its own README invocation says to, the import raised, a bare
+    `except Exception` swallowed it, and the function returned
+    `C:\\ComfyUI-Models` on a machine that had never seen a C: drive. No error,
+    no warning; the tester only caught it because `--dry-run` printed a path
+    that made no sense on Ubuntu.
+
+    Two changes. An EXPLICIT environment setting now wins outright, because an
+    operator who names a path means it and should not be overridden by an import
+    that may or may not succeed. And the last resort announces itself on stderr
+    instead of pretending to be an answer.
+    """
+    for var in ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT"):
+        explicit = os.environ.get(var)
+        if explicit:
+            return explicit
+
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     if here not in sys.path:
         sys.path.insert(0, here)
@@ -433,7 +457,27 @@ def models_root() -> str:
         from nodes._otr_gguf_backend import _models_root
         return str(_models_root())
     except Exception:
-        return os.environ.get("OTR_COMFYUI_MODELS_ROOT") or r"C:\ComfyUI-Models"
+        pass
+
+    # A ComfyUI checkout puts custom_nodes/ beside models/, so when this pack
+    # sits where it is installed the sibling directory IS the answer and needs
+    # no environment variable at all. This is what makes the common Linux and
+    # Docker case work out of the box.
+    sibling = os.path.join(os.path.dirname(os.path.dirname(here)), "models")
+    if os.path.isdir(sibling):
+        return sibling
+
+    fallback = r"C:\ComfyUI-Models"
+    sys.stderr.write(
+        "[otr-fetch] WARNING: could not resolve a models root. ComfyUI's\n"
+        "  folder_paths is only importable from inside a running ComfyUI, and\n"
+        "  no models/ directory was found beside this checkout. Falling back to\n"
+        "  %s, which is almost certainly wrong off Windows.\n"
+        "  Set OTR_COMFYUI_MODELS_ROOT to your ComfyUI models directory, e.g.\n"
+        "    OTR_COMFYUI_MODELS_ROOT=/root/ComfyUI/models %s ...\n"
+        % (fallback, os.path.basename(sys.argv[0] or "otr_fetch_lane_weights.py"))
+    )
+    return fallback
 
 
 def human(n: float) -> str:

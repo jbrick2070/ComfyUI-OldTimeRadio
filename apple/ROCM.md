@@ -1,18 +1,47 @@
 # AMD / ROCm
 
-**AMD ships EXPERIMENTAL in v2.0: one graph, no receipts. This page is the map,
-and the first episode off a Radeon is what makes it v2.1.**
+**IT RAN. 2026-09-14: the first full episode off a Radeon, clean pass, no
+traceback.** An outside tester put `workflows/variants/otr_amd_still.json`
+through end to end and it produced a finished episode -- script, cast, voices,
+music, stills, captions, credits, muxed.
 
-This pack writes a full old-time-radio episode -- script, cast, voices, music,
-pictures, video, credits -- locally, offline, on one GPU. It has run on NVIDIA
-(16 GB and 8 GB), on Apple Silicon, and on a rented Linux box. It has **never
-once run on ROCm**, for a boring reason: nobody on the project owns an AMD card,
-and we were not going to claim a platform we could not put an episode through.
+| | |
+|---|---|
+| GPU | AMD Radeon AI PRO R9700 -- 32 GB, **RDNA4 / gfx1201** |
+| OS | **Ubuntu 24.04.4 LTS**, in Docker on Unraid |
+| ROCm | 7.2 (HIP 7.2.53211) |
+| PyTorch | 2.9.1+rocm7.2.4 |
+| ComfyUI | 0.35.1 |
+| Graph edits needed | **none** -- loaded and queued exactly as shipped |
+| Pack commit | `0b38424` |
 
-So AMD ships EXPERIMENTAL in v2.0 -- one graph, no receipts, while the other
-fifteen shipping graphs each carry an episode. **It becomes v2.1 the day one
-of them runs on a Radeon**, and that is not a promise we can keep by
-ourselves: nobody here has the card.
+**Two things about that surprised us, and both are corrections to this page.**
+It landed on **Linux**, where this page had assumed Windows would be first. And
+it landed on **RDNA4**, which the table below has always listed but which the
+public call for testers did not mention -- so the ask was filtering out the one
+architecture that now has a receipt.
+
+**WHAT IS AND IS NOT PROVEN.** One receipt is one receipt. It covers the STILL
+tier on a 32 GB RDNA4 card under Linux. It does not cover RDNA3, Windows, the
+8 GB profile, or any lane past still-image -- the video and AnimateDiff lanes on
+AMD remain unknown.
+
+**AND IT IS DATED.** The run was at `0b38424`. The shipping graphs have been
+regenerated since (the widget cleanup removed ten controls and reordered the
+writer), so what is proven is that the PIPELINE and every engine this graph
+selects run on ROCm -- not that this exact file, byte for byte, has been through
+a Radeon. That is an honest distinction and worth keeping until someone re-runs
+it.
+
+**What the tester also found**, and it is fixed: `scripts/otr_fetch_lane_weights.py`
+resolved the models directory through an import that only works inside a running
+ComfyUI, swallowed the failure, and silently returned a hardcoded Windows path.
+On Ubuntu. An explicit `OTR_COMFYUI_MODELS_ROOT` now wins outright, the ordinary
+ComfyUI layout is detected automatically, and a genuine failure says so instead
+of guessing.
+
+`bitsandbytes` has no ROCm build and is not needed: the loader degrades to bf16
+with a warning, which this run confirmed in the wild rather than in theory.
 
 **It is open source, and it is fair game.** If you have the card, everything
 needed to try is already in the repo and nothing is waiting on us:
