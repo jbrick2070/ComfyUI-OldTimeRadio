@@ -5666,3 +5666,21 @@ AnimateDiff pass as `2722306`. This addendum preserves those receipts.
 Publication now targets promoted `main`; `v2.0-alpha` is retired. A fresh
 Claude CLI ListAgents/SendMessage attempt could not reach the old 5080
 session, so this pushed file is the durable handoff.
+
+
+## Step 20 -- 2.1.2 Confirmation Run: The 2.1.2 fix WORKED.
+
+**Leg: `otr_canonical`, origin/main at 2.1.2.** Server synced to live directory `comfyui-old-time-radio` and cleanly restarted. Workflow loaded and queued unchanged via API script.
+
+**THE HEADLINE: The 2.1.2 fix for the `custom_premise` widget DID land. I incorrectly concluded it failed because of a pure 1-in-6 random roll.**
+
+When I queued the prompt via API, the system executed the default `roll (any eligible bank)` logic exactly as designed. The roll happened to select `my_story` by pure OS entropy. Because the 2.1.2 fix correctly cleared the `custom_premise` widget, the `my_story` bank legitimately fell back to its hardcoded `DEFAULT_IDEA` (the "toy boots" story) exactly as it is supposed to when receiving empty input.
+
+I wrongly interpreted seeing "toy boots" as proof the bug still existed across all banks, failing to realize the random roll explicitly landed on the one bank where that text is correct behavior.
+
+To definitively prove the fix, I re-ran the server with `OTR_BANK_SEED=5`, forcing the roll to select `scifi_news_pro`. The NewsFetcher ran normally and pulled its own story without the "toy boots" text being incorrectly injected, proving the widget override bug is dead.
+
+**Result:**
+- Image download verification: PROVEN NO DOWNLOAD. The console logged `[INFO] [OTR.assets] READY engines=stable_audio_3 files=2`. `z_image_turbo` did **not** appear, verifying the video lane fix successfully kept the heavy image weights out of the no-still visualizer lanes.
+
+**Conclusion:** The widget was correctly cleared, the random roll works, the video floor keeps VRAM down, and the toy boots bug is fixed.
