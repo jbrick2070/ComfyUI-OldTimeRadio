@@ -65,6 +65,7 @@ LLM = {
 SOURCE_BANK = {
     "roll (any eligible bank)": "roll",
     "media_archive": "marc",
+    "my_story": "myst",
     "original": "orig",
     "scifi_news_pro": "news",
     "public_domain": "pubd",
