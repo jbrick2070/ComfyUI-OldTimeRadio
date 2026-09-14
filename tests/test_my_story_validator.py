@@ -46,10 +46,13 @@ def test_literal_admission_persists_before_assets_with_real_prompt_identity(gate
     assert downloads == [True]
 
 
+# {"custom_premise": " "} and {"custom_premise": "", "story_author": [...]}
+# lived here until 2026-09-13. A My Story submission with nothing creative in
+# it is no longer refused -- it writes `SI.DEFAULT_IDEA`, which is what lets
+# the bank sit in the roll pool at all. See the floor test below. Every row
+# that is still genuinely unrunnable stays exactly where it was.
 @pytest.mark.parametrize("values", [
-    {"custom_premise": " "},
     {"source_bank": "original", "story_plot": "A bell rings"},
-    {"custom_premise": "", "story_author": ["8", 0]},
     {"custom_premise": ["8", 0], "source_ref": "forbidden"},
     {"custom_premise": ["8", 0], "replay_from": "forbidden"},
     {"custom_premise": [True, {}]},
@@ -83,13 +86,44 @@ def test_snapshot_conflict_is_known_even_with_linked_creative_input(gate, monkey
 
 
 def test_unrelated_writers_are_ignored_and_all_dependent_writers_checked(gate):
+    """A writer behind a DIFFERENT gate is not this validator's business; a
+    second writer behind THIS one is.
+
+    The refusal vehicle is `source_ref` rather than a blank premise: since
+    2026-09-13 a blank My Story submission is floored, not refused, so it can
+    no longer prove that the second writer was reached at all.
+    """
     run, downloads = gate
-    run(prompt(custom_premise="", gate_in=["93", 0]))
+    run(prompt(source_ref="forbidden", gate_in=["93", 0]))
     queued = prompt()
-    queued["2"] = prompt(custom_premise="")["1"]
+    queued["2"] = prompt(source_ref="forbidden")["1"]
     with pytest.raises(SI.StoryInputError):
         run(queued)
     assert len(downloads) == 1
+
+
+@pytest.mark.parametrize("blank", ["", " ", "\n  "])
+def test_a_blank_my_story_submission_writes_the_standing_premise(gate, blank):
+    """THE FLOOR (2026-09-13). Nothing typed is no longer a refusal: the run
+    proceeds and the persisted draft carries `SI.DEFAULT_IDEA`, which is the
+    whole reason my_story may be drawn by a blank automatic roll.
+    """
+    run, downloads = gate
+    run(prompt(custom_premise=blank))
+    assert len(downloads) == 1
+    files = list(DR.drafts_root().glob("*/input.json"))
+    assert len(files) == 1
+    saved = json.loads(files[0].read_text(encoding="utf-8"))
+    assert saved["fields"]["idea"] == SI.DEFAULT_IDEA
+
+
+def test_a_typed_my_story_submission_is_never_overwritten_by_the_floor(gate):
+    """The floor is a floor, not a default: one typed word beats it."""
+    run, downloads = gate
+    run(prompt(custom_premise="a story about my mother"))
+    files = list(DR.drafts_root().glob("*/input.json"))
+    saved = json.loads(files[0].read_text(encoding="utf-8"))
+    assert saved["fields"]["idea"] == "a story about my mother"
 
 
 def test_storage_failure_prevents_assets(gate, monkeypatch):

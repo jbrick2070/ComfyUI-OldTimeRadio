@@ -3208,6 +3208,20 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         _story_draft = None
         if (_otr_story_routing.story_input_mode(_source_bank_row)
                 == _otr_story_input.INPUT_MODE_USER_FIELDS):
+            # THE FLOOR, applied before the judgement and before the bundle.
+            # A roll can now land on this bank (2026-09-13), and a blind run
+            # types nothing -- DEFAULT_IDEA is what it writes instead of
+            # refusing. Rebinding `_story_raw` here rather than at the capture
+            # keeps the pre-roll evidence intact for every other bank, and
+            # keeps this digest identical to the validator's, which applies
+            # the same floor to the same fields.
+            _story_raw = _otr_story_input.with_default_idea(
+                _story_raw,
+                _otr_story_input.StoryInputPolicy(
+                    mode=_otr_story_input.INPUT_MODE_USER_FIELDS,
+                    bank_id=_source_bank_row.source_bank_id,
+                ),
+            )
             _otr_story_input.check_selection(
                 _story_raw,
                 _otr_story_input.StoryInputPolicy(

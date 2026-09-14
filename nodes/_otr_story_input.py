@@ -25,7 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Literal, Mapping, get_args
 
 #: Bundle schema version. Bump only when the DIGESTED shape changes -- the
@@ -207,6 +207,48 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
         setting=one(fields.setting),
         author=one(fields.author),
     )
+
+
+#: THE STANDING PREMISE, and the reason `my_story` may sit in the roll pool at
+#: all (operator decision 2026-09-13, superseding the 09-10 build).
+#:
+#: The 09-10 design excluded this bank from automatic selection and enforced it
+#: at parse time, because a roll landing here would "fail at admission every
+#: time" -- true, when the only source was whatever the listener had typed and
+#: a blind run types nothing. This constant removes that premise rather than
+#: arguing with it: a My Story run with every creative field blank falls back
+#: to THIS, so the bank can be drawn like any other and still have something to
+#: write from.
+#:
+#: IT LIVES IN CODE, NOT IN A WIDGET VALUE, on purpose. The canonical graph also
+#: carries this text in its Story input widget, but a fresh node, a cleared
+#: field or any graph that never saw it would otherwise put an unrunnable row
+#: back in the pool -- which is exactly the registry fault the old guard
+#: existed to prevent.
+#:
+#: Applied at EVERY admission point through `with_default_idea`, never at just
+#: one: the validator and the writer each build a bundle from these fields, and
+#: a digest that disagreed between them would break the draft identity the
+#: 09-10 design is careful about.
+#:
+#: Anything the listener types overrides it completely. This is a floor, not a
+#: default anyone has to delete.
+DEFAULT_IDEA = (
+    "In a sunlit toy playground -- a hand-high slide, a white picket fence, a painted blue sky -- two small orange toy boots named Stomp and Tiptoe are playing with a toy tennis ball, while Whiskers, a little toy cat statue, sits by the fence with his painted eyes shut and never says a word. Stomp, the left boot, is loud, quick and brave; he talks in short bursts and wants to kick everything first. Tiptoe, the right boot, is careful and sharp-eyed; she counts to three before anything and asks the question Stomp skipped. They do everything on a count of three because it is the only way they ever agree. Then a strange glow rises, rainbow smoke swallows the playground, and when it clears three sealed plastic boxes -- red, green and blue -- float down and settle on the grass. Tiptoe swears the smoke came up from right around Whiskers and that his head is turned differently now; Stomp says statues cannot move, and neither of them quite believes it. They argue about whether to open the boxes at all and who has to touch one first, settle on red, together, and the lid pops with a hiss that sends them both diving behind the slide -- it is only a small toy hairdryer, sparkling faintly, which whirs once by itself and stops. The blue box holds a giant striped candy bar bigger than both of them. The green box is warm and humming, and Stomp, brave all day, will not touch it, so Tiptoe, scared all day, finds she is not, and opens it: a shimmering rainbow candy, the most magical of the three. Thrilled, they carry everything to a toy kitchen where the play stove has a painted flame and no heat, so the hairdryer's warm breath melts the white chocolate squares Stomp breaks off while Tiptoe sorts the candy pieces by color into little bowls. Somewhere in the work they stop counting: they squabble once more over who gets the rainbow candy, then drop it into the melted chocolate so it belongs to everyone, and find they have set out one bowl more than there are boots. They carry it to Whiskers, who has not moved, whose eyes are still shut, and behind whom a thin curl of rainbow smoke is rising. Together, and without counting, they decide not to ask."
+)
+
+
+def with_default_idea(fields: RawStoryFields,
+                      policy: "StoryInputPolicy") -> RawStoryFields:
+    """`fields`, with :data:`DEFAULT_IDEA` supplied when there is nothing else.
+
+    A no-op unless the selected bank actually reads these fields AND every
+    creative one is empty. Returns the SAME object when it changes nothing, so
+    an identity check upstream still means "the listener's own words".
+    """
+    if not policy.is_user_fields or creative_input_present(fields):
+        return fields
+    return replace(fields, idea=DEFAULT_IDEA)
 
 
 def creative_input_present(fields: RawStoryFields) -> bool:
@@ -575,6 +617,10 @@ def check_queued_prompt(
             # The bank itself is computed upstream; nothing here can be judged.
             continue
         policy = resolve_policy(str(bank or ""))
+        # The floor goes on BEFORE the judgement and before the bundle below,
+        # so this path and the writer's own admission build byte-identical
+        # fields -- and therefore the same digest -- for one submission.
+        fields = with_default_idea(fields, policy)
         source_ref = writer.literal("source_ref", "")
         replay_from = writer.literal("replay_from", "")
         check_selection(
@@ -652,6 +698,8 @@ __all__ = [
     "StoryRequest",
     "attribution_receipt",
     "attribution_sentence",
+    "DEFAULT_IDEA",
+    "with_default_idea",
     "build_bundle",
     "capture_raw",
     "check_selection",

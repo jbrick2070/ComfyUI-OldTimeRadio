@@ -360,6 +360,10 @@ def _resolve_inputs(
             mode=_otr_story_input.INPUT_MODE_USER_FIELDS,
             bank_id=_rb_bank.source_bank_id,
         )
+        # Same floor as run() and the validator apply, for the same reason: a
+        # rolled My Story run types nothing and must still have a source. A
+        # direct caller that supplied real fields is untouched.
+        _raw_fields = _otr_story_input.with_default_idea(_raw_fields, _policy)
         # Defensive: run() already refused these. A DIRECT call to this
         # function (a test, a script) gets the same refusal rather than a
         # half-built payload.

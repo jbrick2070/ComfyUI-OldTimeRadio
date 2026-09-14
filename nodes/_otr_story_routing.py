@@ -288,17 +288,24 @@ def _parse_bank(obj: dict, origin: str) -> SourceBank:
         raise RegistryValidationError(
             f"{origin}: defaults.auto_select must be a bool, got {_asel!r}"
         )
-    # The one combination that cannot mean anything: a bank whose story is the
-    # person's typed fields, offered to a roll that types nothing. Refused at
-    # PARSE time -- a roll landing there would fail at admission every time,
-    # and an unrunnable row in the pool is a registry fault, not a run fault.
-    if _sim == _STORY_INPUT_USER_FIELDS and _asel is not False:
-        raise RegistryValidationError(
-            f"{origin}: defaults.story_input_mode='{_STORY_INPUT_USER_FIELDS}' "
-            f"requires defaults.auto_select=false -- a bank whose source is "
-            f"the person's own typed input cannot be selected by a blank "
-            f"automatic run."
-        )
+    # THE GUARD THAT USED TO LIVE HERE IS GONE, and this is the note that
+    # explains why so the next reader does not restore it (operator decision
+    # 2026-09-13: "the roll needs to work").
+    #
+    # It refused `story_input_mode=user_fields_v1` together with any
+    # `auto_select` but false, on the reasoning that a roll landing on a bank
+    # whose source is the person's typed fields "would fail at admission every
+    # time, and an unrunnable row in the pool is a registry fault, not a run
+    # fault." Every word of that was true of the code as it stood.
+    #
+    # What changed is the premise, not the judgement: `_otr_story_input`
+    # now carries a DEFAULT_IDEA floor, applied at every admission point, so a
+    # user-fields bank with nothing typed into it is no longer unrunnable -- it
+    # writes the standing premise instead of refusing. The combination this
+    # guard forbade is now a combination that works, and forbidding it would
+    # only stop the operator from putting the bank in the pool on purpose.
+    #
+    # If that floor is ever removed, THIS GUARD COMES BACK in the same change.
     for _bkey in (
         "propagate_adaptation_cast",
         "provenance_normalize",  # v4 P1(viii): opt-in source-provenance normalizer

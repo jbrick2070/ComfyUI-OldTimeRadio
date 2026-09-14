@@ -152,31 +152,59 @@ def test_bank_pool_is_derived_from_the_live_registry_not_a_literal():
     assert set(order) == expected
 
 
-def test_a_manual_only_bank_is_runnable_but_never_rolled():
-    """The creator bank must be selectable by hand and unreachable by a roll.
+def test_the_creator_bank_rolls_as_an_equal_peer():
+    """OPERATOR DECISION 2026-09-13, replacing the exclusion this row was
+    written to prove: my_story is drawn like every other shipped bank.
 
-    Both halves matter. If it left the pool by becoming non-runnable, picking
-    it deliberately would fail too; if it stayed in the pool, an unattended
-    overnight run would eventually draw a bank with no story to tell and die
-    at admission.
+    The old reasoning -- an unattended run would "draw a bank with no story to
+    tell and die at admission" -- was answered by giving it a story to tell:
+    `_otr_story_input.DEFAULT_IDEA` is the floor a blank run writes.
+
+    What has NOT changed, and is asserted below: the "+ Add Your Own" signpost
+    stays out of the pool, because it is refused by the OTHER filter
+    (runnable=false) and a roll landing on a placeholder really would die.
     """
     bank = ROUTING.require_runnable_bank("my_story")
     assert bank.runnable is True
-    assert ROUTING.effective_auto_select(bank) is False
-    assert "my_story" not in ROLLS.eligible_bank_ids()
-    # Every other shipped bank keeps its place: the new field defaults to
-    # true, so its arrival changed nothing for banks that do not declare it.
+    assert ROUTING.effective_auto_select(bank) is True
+    assert "my_story" in ROLLS.eligible_bank_ids()
     for other in ("media_archive", "original", "scifi_news_pro",
                   "public_domain", "shakespeare"):
         assert other in ROLLS.eligible_bank_ids(), other
+    assert "custom_source_bank" not in ROLLS.eligible_bank_ids()
 
 
 def test_the_pool_diagnosis_names_the_filter_that_removed_each_bank():
-    """An empty or surprising pool has to explain itself by NAME."""
+    """An empty or surprising pool has to explain itself by NAME.
+
+    my_story flipping to auto_select=true (2026-09-13) leaves no shipped bank
+    excluded that way, so the auto_select half is proven against a synthetic
+    row below rather than deleted -- the message format still has to work the
+    day someone declares a manual-only bank again.
+    """
+    message = ROLLS._bank_pool_diagnosis()
+    assert "runnable=false" in message
+    assert "custom_source_bank" in message
+
+
+def test_the_pool_diagnosis_names_an_auto_select_false_bank(monkeypatch):
+    fake = ROUTING.SourceBank(
+        source_bank_id="zzz_manual_only", label="Test Manual Only",
+        source_kind="user_story", interpreter="", fetcher="",
+        default_story_model="my_story", default_story_pipeline="my_story_multipass",
+        defaults={"auto_select": False}, required_seams=(), runnable=True,
+        guide_ref="",
+    )
+    real = ROUTING._ensure_loaded()
+    stub = ROUTING._Registry(
+        banks={**real.banks, "zzz_manual_only": fake},
+        pipelines=real.pipelines, pack_dirs=real.pack_dirs,
+        user_bundles=real.user_bundles, issues=real.issues,
+    )
+    monkeypatch.setattr(ROUTING, "_ensure_loaded", lambda: stub)
     message = ROLLS._bank_pool_diagnosis()
     assert "auto_select=false" in message
-    assert "my_story" in message
-    assert "runnable=false" in message
+    assert "zzz_manual_only" in message
 
 
 def test_style_pool_is_registry_plus_dynamic_sorted():

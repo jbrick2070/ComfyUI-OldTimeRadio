@@ -19,10 +19,10 @@ LIVE_BANKS = (
     "scifi_news_pro",
     "public_domain",
     "shakespeare",
-    # 2026-09-10: the creator bank. Runnable like the rest; the thing that
-    # makes it different is invisible here and lives in the roll pool --
-    # `defaults.auto_select=false`, so a blank automatic run never lands on
-    # a bank that has nothing to write from. See test_rolls_*.
+    # The creator bank. Added 2026-09-10 as manual-only; since 2026-09-13 it
+    # rolls like every other row here, because a blank run now writes
+    # `_otr_story_input.DEFAULT_IDEA` instead of having nothing to write from.
+    # See test_rolls_*.
     "my_story",
 )
 
