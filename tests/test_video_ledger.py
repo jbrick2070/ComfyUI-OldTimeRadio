@@ -300,59 +300,43 @@ def test_video_treatment_forensic_sections(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# Title chain test (helper-level via direct branch testing)
+# Title chain test -- against the PRODUCTION chain, never a copy of it
 # ---------------------------------------------------------------------------
 
-# We test the title chain by exercising it via a stub helper that mirrors
-# the chain logic. The chain logic in render_video is small enough (~30
-# lines) that re-running it inside a probe function gives clean coverage
-# without invoking the full render path.
-
-def _resolve_title_via_chain(led: dict, widget_title: str) -> tuple[str, str]:
-    """Mirror of the title chain in SignalLostVideoRenderer.render_video.
-    Returns (resolved_title, source). Test-only -- the production code
-    is inline at render_video lines ~1262-1336 and reads the same
-    chain logic."""
-    import time as _time
-
-    def _is_clean(s: str) -> bool:
-        return bool(s)
-
-    _meta = led.get("meta") or {}
-    _meta_episode_title = (_meta.get("episode_title") or "").strip()
-    _meta_title = (_meta.get("title") or "").strip()
-    _led_title = (led.get("title") or "").strip()
-    _widget = (widget_title or "").strip()
-
-    if _is_clean(_meta_episode_title):
-        return _meta_episode_title, "led.meta.episode_title"
-    if _is_clean(_meta_title):
-        return _meta_title, "led.meta.title"
-    if _is_clean(_led_title):
-        return _led_title, "led.title (legacy stamp)"
-    if _is_clean(_widget):
-        return _widget, "widget_override"
-    return f"Signal Lost {_time.strftime('%Y%m%d %H%M%S')}", "timestamp_lastresort"
+# This file used to define `_resolve_title_via_chain`, a hand-written MIRROR of
+# the chain that was inline in render_video, and its own docstring said so
+# ("Test-only -- the production code is inline at render_video lines
+# ~1262-1336"). A test that calls a copy proves the copy: either side could
+# drift and the suite would stay green, which is the opposite of what this test
+# is for. The chain now lives in `nodes/_otr_shared/episode_title.py`, both
+# consumers call it -- the renderer's title card and the Episode Assembler's
+# `episode_info` -- and so does this test.
 
 
 def test_video_title_chain():
     """Probe each rung of the title chain in order.
 
     Chain: led.meta.episode_title -> led.meta.title -> led.title ->
-    widget -> TIMESTAMP_LASTRESORT. news_used and meta.news_seed
-    intentionally absent (Path B confirmed 2026-05-09)."""
+    TIMESTAMP_LASTRESORT. news_used and meta.news_seed intentionally absent
+    (Path B confirmed 2026-05-09).
+
+    THE WIDGET RUNG IS GONE (2026-09-14). It sat fourth, behind all three
+    ledger slots, so it could only ever win on a run whose ledger carried no
+    title at all -- which is exactly where the timestamp now answers, and why
+    removing it is safe."""
+    from nodes._otr_shared.episode_title import resolve_episode_title
 
     # Slot 1: led.meta.episode_title
     led1 = make_stub_ledger(title="Test Episode")
     led1["meta"]["episode_title"] = "Saturn Silence"
-    title, source = _resolve_title_via_chain(led1, widget_title="")
+    title, source = resolve_episode_title(led1)
     assert title == "Saturn Silence"
     assert source == "led.meta.episode_title"
 
     # Slot 2: led.meta.title (when episode_title absent)
     led2 = make_stub_ledger()
     led2["meta"]["title"] = "Echo Below"
-    title, source = _resolve_title_via_chain(led2, widget_title="")
+    title, source = resolve_episode_title(led2)
     assert title == "Echo Below"
     assert source == "led.meta.title"
 
@@ -360,21 +344,17 @@ def test_video_title_chain():
     led3 = make_stub_ledger()
     led3.pop("meta", None)  # ensure no meta.title interference
     led3["title"] = "Legacy Title"
-    title, source = _resolve_title_via_chain(led3, widget_title="")
+    title, source = resolve_episode_title(led3)
     assert title == "Legacy Title"
     assert source == "led.title (legacy stamp)"
 
-    # Slot 4: widget override
+    # Last resort: TIMESTAMP_LASTRESORT (every ledger slot empty / stuck).
+    # This rung is load-bearing -- the published episode's title card comes off
+    # this chain, and a titleless ledger must still produce a card rather than
+    # stop the run.
     led4 = make_stub_ledger()
     led4.pop("meta", None)
-    title, source = _resolve_title_via_chain(led4, widget_title="User Override")
-    assert title == "User Override"
-    assert source == "widget_override"
-
-    # Slot 5: TIMESTAMP_LASTRESORT (all empty / stuck)
-    led5 = make_stub_ledger()
-    led5.pop("meta", None)
-    title, source = _resolve_title_via_chain(led5, widget_title="")
+    title, source = resolve_episode_title(led4)
     assert source == "timestamp_lastresort"
     assert title.startswith("Signal Lost ")
     # Format: "Signal Lost YYYYMMDD HHMMSS"
@@ -383,14 +363,23 @@ def test_video_title_chain():
     )
 
     # Any non-empty authored title, including a formerly blacklisted phrase,
-    # is accepted rather than replaced by a Python taste judgment.
-    led6 = make_stub_ledger()
-    led6.pop("meta", None)
-    title, source = _resolve_title_via_chain(
-        led6, widget_title="The Last Frequency",
-    )
+    # is accepted rather than replaced by a Python taste judgment. It arrives
+    # on the ledger now that no node but the writer can be typed into.
+    led5 = make_stub_ledger()
+    led5["meta"]["episode_title"] = "The Last Frequency"
+    title, source = resolve_episode_title(led5)
     assert title == "The Last Frequency"
-    assert source == "widget_override"
+    assert source == "led.meta.episode_title"
+
+    # A ledger that is not a dict at all, and a rung holding a non-string, both
+    # resolve rather than raise -- the chain's whole job is to always answer.
+    title, source = resolve_episode_title(None)
+    assert source == "timestamp_lastresort"
+    led6 = make_stub_ledger()
+    led6["meta"]["episode_title"] = 1947
+    title, source = resolve_episode_title(led6)
+    assert title == "1947"
+    assert source == "led.meta.episode_title"
 
 
 # ---------------------------------------------------------------------------
@@ -426,7 +415,6 @@ def test_video_legacy_list_raises(tmp_path):
                 # voice_assignments + style from L3 ledger meta.
                 fps=24,
                 resolution="832x480",
-                episode_title="Test",
             )
 
     msg = str(excinfo.value)

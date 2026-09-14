@@ -1929,10 +1929,14 @@ class SignalLostVideoRenderer:
                     "default": "1920x1080",
                     "tooltip": "Procgen output resolution. 1920x1080 = delivery res for the final procgen blend (BUG-030 Phase B default). 832x480 was the prior default (rendered cheap, then upscaled with everything else; legacy mode). 1280x720 / 854x480 / 3840x2160 retained for one-off needs."
                 }),
-                "episode_title": ("STRING", {
-                    "default": "",
-                    "tooltip": "Episode title for the title bar. Normally resolved from the script_json title token; widget acts as a last-resort override."
-                }),
+                # `episode_title` stood here until 2026-09-14. It was the
+                # FOURTH rung of the title chain, behind meta.episode_title,
+                # meta.title and led.title, so it could only win on a run whose
+                # ledger carried no title at all -- and three nodes declaring
+                # the same field left no answer to "which one do I type in".
+                # OTR_LedgerScriptWriter owns episode_title now; this node
+                # reads the ledger through _otr_shared/episode_title.py, whose
+                # timestamp last resort covers the case the widget used to.
                 # APPENDED LAST (widgets_values is positional -- only ever
                 # append). v2 scene-aware path sets this False so the floor's
                 # in-frame scopes {2,3,5,6} (centre ring / particles /
@@ -1955,7 +1959,7 @@ class SignalLostVideoRenderer:
 
     def render_video(self, audio, script_json, news_used,
                      fps=25, resolution="1920x1080",
-                     episode_title="", draw_scopes=True):
+                     draw_scopes=True):
 
         from .story_orchestrator import _runtime_log
 
@@ -1999,67 +2003,54 @@ class SignalLostVideoRenderer:
         style = _meta.get("visual_style") or ""
         genre = (_meta.get("visual_plan") or {}).get("genre") or ""
 
-        # Title chain (Path B; slot 1 live since the J.5 title pass):
+        # Title chain (Path B; slot 1 live since the J.5 title pass). The rungs
+        # and the last resort live in _otr_shared/episode_title.py, which the
+        # Episode Assembler and the title-chain test call as well -- one chain,
+        # one owner, no hand-written copy of it anywhere:
         #   1. led["meta"]["episode_title"]   (primary -- stamped on
         #      every run by OTR_LedgerScriptWriter's J.5 post-composition
         #      title pass, which LLM-regenerates the title from the
-        #      finished script, or uses the typed widget value, or
-        #      falls back to outline.title)
+        #      finished script, or uses the writer's typed widget value,
+        #      or falls back to outline.title)
         #   2. led["meta"]["title"]           (forward-compat slot)
         #   3. led["title"]                   (top-level; not stamped
         #      by OTR_LedgerScriptWriter -- pre-LPL legacy slot kept
         #      in the chain for older ledgers loaded from disk)
-        #   4. widget episode_title           (manual override)
-        #   5. TIMESTAMP_LASTRESORT
+        #   4. TIMESTAMP_LASTRESORT
         #
-        # news_used[0].headline and meta.news_seed.headline are
-        # intentionally NOT in this chain -- both surface news/outline
-        # content as titles, neither is what we want on screen. With
-        # the J.5 title pass live, slot 1 is populated on every writer
-        # run; the timestamp last-resort fires only on a degenerate run
-        # where the writer produced no title at all.
-        def _is_clean(s):
-            return bool(s)
+        # THE WIDGET RUNG IS GONE (2026-09-14). This node used to declare its
+        # own `episode_title` and consult it between led.title and the
+        # timestamp. It was the FOURTH rung, so the ledger beat it on every run
+        # that carried a title at all; dropping it changes behaviour only where
+        # the ledger is titleless, and there the timestamp takes over. The
+        # writer's widget is now the one workflow-facing owner of this field.
+        from ._otr_shared.episode_title import (
+            resolve_episode_title as _resolve_episode_title,
+            title_candidates as _title_candidates,
+        )
 
-        _meta = led.get("meta") or {}
-        _meta_episode_title = (_meta.get("episode_title") or "").strip()
-        _meta_title         = (_meta.get("title") or "").strip()
-        _led_title          = (led.get("title") or "").strip()
-        _widget_title       = (episode_title or "").strip()
+        _title_rungs = _title_candidates(led)
+        episode_title, _title_source = _resolve_episode_title(led)
 
-        if _is_clean(_meta_episode_title):
-            episode_title = _meta_episode_title
-            _title_source = "led.meta.episode_title"
-        elif _is_clean(_meta_title):
-            episode_title = _meta_title
-            _title_source = "led.meta.title"
-        elif _is_clean(_led_title):
-            episode_title = _led_title
-            _title_source = "led.title (legacy stamp)"
-        elif _is_clean(_widget_title):
-            episode_title = _widget_title
-            _title_source = "widget_override"
-        else:
-            # Final fallback: timestamp-based unique title. Guarantees
-            # we never crash the run when every title source is empty.
-            episode_title = f"Signal Lost {_time.strftime('%Y%m%d %H%M%S')}"
-            _title_source = "timestamp_lastresort"
+        if _title_source == "timestamp_lastresort":
             log.warning(
                 "[Video] TITLE LAST-RESORT: meta.episode_title='%s', "
-                "meta.title='%s', led.title='%s', widget='%s' -- ALL "
-                "EMPTY. Using timestamp fallback %r so the run "
-                "can finish. This should not happen on a normal run: "
-                "OTR_LedgerScriptWriter's J.5 title pass stamps "
-                "led.meta.episode_title every time. Reaching here means "
-                "the writer produced no title at all.",
-                _meta_episode_title, _meta_title, _led_title,
-                _widget_title, episode_title,
+                "meta.title='%s', led.title='%s' -- ALL EMPTY. Using "
+                "timestamp fallback %r so the run can finish. This should "
+                "not happen on a normal run: OTR_LedgerScriptWriter's J.5 "
+                "title pass stamps led.meta.episode_title every time. "
+                "Reaching here means the writer produced no title at all.",
+                _title_rungs["led.meta.episode_title"],
+                _title_rungs["led.meta.title"],
+                _title_rungs["led.title (legacy stamp)"],
+                episode_title,
             )
 
         _runtime_log(
             f"TITLE_TRACE | source={_title_source} | resolved='{episode_title}' "
-            f"| widget='{_widget_title}' | meta.episode_title='{_meta_episode_title}' "
-            f"| meta.title='{_meta_title}' | led.title='{_led_title}'"
+            f"| meta.episode_title='{_title_rungs['led.meta.episode_title']}' "
+            f"| meta.title='{_title_rungs['led.meta.title']}' "
+            f"| led.title='{_title_rungs['led.title (legacy stamp)']}'"
         )
 
         waveform = audio["waveform"]
@@ -2172,7 +2163,7 @@ class SignalLostVideoRenderer:
 
         # BUG-LOCAL-110 Layer 3 -- SUPERSEDED 2026-05-09 by the v2 ledger
         # title chain at the top of render_video. The chain probes
-        # led.meta.episode_title -> led.meta.title -> led.title -> widget
+        # led.meta.episode_title -> led.meta.title -> led.title
         # -> TIMESTAMP_LASTRESORT against the wire-input ledger, so the
         # singleton-side preference is no longer needed. Slot 3 of the
         # chain (`led.title`) covers the legacy writer's stamp.

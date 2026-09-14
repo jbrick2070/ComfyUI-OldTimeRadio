@@ -1358,6 +1358,43 @@ class EpisodeAssembler:
         meta = obj.get("meta") if isinstance(obj.get("meta"), dict) else obj
         return _rd(meta)
 
+    @staticmethod
+    def _title_from_ledger_wire(replay_descriptor):
+        """The episode title for this node's log line and ``episode_info``.
+
+        NOT authored here and never was: the title is written by
+        ``OTR_LedgerScriptWriter`` and reaches this node inside the v2 ledger
+        JSON that arrives on ``replay_descriptor`` -- canonical link 289, the
+        freeze cascade's ``v2_ledger_json`` output, wired on all 17 shipped
+        graphs despite that input's narrow name. This node used to declare its
+        own ``episode_title`` widget for the same string; it is gone as of
+        2026-09-14 and the ledger answers instead.
+
+        Returns ``(title, source)`` from the one shared chain, so the log can
+        say WHICH rung answered. An unwired or unparseable descriptor resolves
+        to the chain's timestamp last resort rather than raising -- this is a
+        label, and a label must never be the reason an episode fails to
+        assemble.
+        """
+        from ._otr_shared.episode_title import resolve_episode_title
+        raw = str(replay_descriptor or "").strip()
+        led = None
+        if raw:
+            try:
+                led = json.loads(raw)
+            except Exception:  # noqa: BLE001
+                # BLANKET, and deliberately wider than the identical-looking
+                # catch in _replay_from_descriptor above. That one gates a real
+                # DECISION -- whether this is a replay -- and a narrow catch is
+                # right there because an unexpected failure should surface. This
+                # one produces a LABEL, and the standing rule for the title is
+                # that something readable always comes out: a `RecursionError`
+                # from a pathologically nested descriptor must end as the
+                # timestamp, not as the reason an assembled episode does not
+                # reach otr/obs/.
+                led = None
+        return resolve_episode_title(led if isinstance(led, dict) else {})
+
     def _assemble_replay(self, replay, episode_title):
         import hashlib as _hashlib
         import shutil as _shutil
@@ -1472,13 +1509,15 @@ class EpisodeAssembler:
         return {
             "required": {
                 "scene_audio": ("AUDIO",),
-                "episode_title": ("STRING", {
-                    "default": "The Last Frequency",
-                    "tooltip": "Label for this node's episode_info output and "
-                               "log lines ONLY -- the published title comes "
-                               "from the ledger (the Writer's episode_title), "
-                               "not from here. Diagnostic field.",
-                }),
+                # `episode_title` stood here until 2026-09-14, defaulting to
+                # "The Last Frequency". Its own tooltip said the published
+                # title comes from the ledger and not from here, which is the
+                # description of a field that should not be on the panel: an
+                # operator who typed into it changed a log line and nothing
+                # else. The node now reads the title out of the ledger JSON
+                # already arriving on `replay_descriptor` (link 289), so the
+                # label and the published title can no longer disagree.
+                # OTR_LedgerScriptWriter is the one workflow-facing owner.
             },
             "optional": {
                 "opening_theme_audio": ("AUDIO",),
@@ -1559,13 +1598,19 @@ class EpisodeAssembler:
             },
         }
 
-    def assemble(self, scene_audio, episode_title,
+    def assemble(self, scene_audio,
                  music_cue_audio=None, music_cue_manifest_json="",
                  opening_theme_audio=None, closing_theme_audio=None,
                  opening_duration_sec=10.0, closing_duration_sec=8.0,
                  crossfade_ms=500, video_policy_json="",
                  replay_descriptor="",
                  ):
+
+        # The title is READ, never typed here -- see _title_from_ledger_wire.
+        # Resolved before the replay branch below because the replay path
+        # reports it too.
+        episode_title, _title_source = self._title_from_ledger_wire(
+            replay_descriptor)
 
         # CANONICAL REPLAY (campaign item 0): THE ONE SEAM FOR THE FROZEN
         # AUDIO, and it sits BEFORE the cue-pair check below (which would raise
@@ -1858,6 +1903,9 @@ class EpisodeAssembler:
         total_sec = episode_waveform.shape[-1] / sample_rate
         info_dict = {
             "title": episode_title,
+            # Which rung of the shared title chain answered. Cheap to carry and
+            # it is the first thing worth knowing when a title reads wrong.
+            "title_source": _title_source,
             "duration_sec": round(total_sec, 1),
             "duration_min": round(total_sec / 60, 1),
             "sample_rate": sample_rate,
@@ -1867,7 +1915,8 @@ class EpisodeAssembler:
         }
         info = json.dumps(info_dict, indent=2)
 
-        log.info(f"[EpisodeAssembler] '{episode_title}' - {total_sec/60:.1f} min")
+        log.info("[EpisodeAssembler] '%s' (title from %s) - %.1f min",
+                 episode_title, _title_source, total_sec / 60)
 
         # Schema l3 ledger write-back: phase_ms.episode_assembler +
         # audio_gates "post_episode_assembler" sha256 + BUG-LOCAL-106
