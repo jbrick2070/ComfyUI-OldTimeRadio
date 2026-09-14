@@ -64,8 +64,26 @@ ALLOWED_DIRECTOR_SUBSTRINGS = (
     # 2026-06-08). OTR_ImageDirector is the per-role IMAGE engine + grain
     # selector emitting image_policy_json -- NOT the retired legacy
     # LLMDirector; it carries none of the forbidden production_plan_json /
-    # director_json sockets. S&R name + node title carry this class string.
+    # director_json sockets. The S&R name carries this class string.
     "OTR_ImageDirector",
+    # justification: the canvas relayout 6234e44c (2026-09-13) retitled every
+    # node off its bare class name -- ten of the 23 had no title at all and
+    # showed "OTR_VideoDirector" to the user. Node 87 now reads "Video
+    # Director / Settings" on the canvas while its type and its
+    # properties["Node name for S&R"] both stay OTR_VideoDirector. Only the
+    # TITLE moved: the node still emits video_policy_json and carries neither
+    # forbidden socket, so this is the live v2.0 platform node wearing a
+    # readable label, not the retired LLMDirector returning.
+    #
+    # The needle is the ROLE, not the current wording. "/ Settings" is
+    # deliberately left out because bdd4f91b reworded the title hours after
+    # 6234e44c; pinning today's phrasing would just re-break this on the next
+    # cosmetic pass.
+    "Video Director",
+    # justification: the same 6234e44c relayout on node 88, titled "Image
+    # Director / Settings" while its type and S&R name stay OTR_ImageDirector.
+    # It emits image_policy_json and carries neither forbidden socket.
+    "Image Director",
 )
 
 

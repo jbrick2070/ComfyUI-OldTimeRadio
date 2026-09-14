@@ -206,6 +206,47 @@ def _is_generic_english(line_text: str) -> bool:
     return any(g in stripped for g in GENERIC_ENGLISH_LINES)
 
 
+# Canvas TITLES of the live v2.0 platform nodes. The canvas relayout
+# 6234e44c (2026-09-13) retitled every node off its bare class name --
+# ten of the 23 previously showed "OTR_VideoDirector" and the like to
+# the user -- which is the first time the space-separated word
+# "Director" ever appeared in a shipped graph, and so the first time
+# \bDirector\b in LEGACY_PATTERN could match one.
+#
+# These are NOT the retired LLMDirector. Nodes 87 and 88 keep type and
+# properties["Node name for S&R"] of OTR_VideoDirector / OTR_ImageDirector,
+# emit video_policy_json / image_policy_json, and carry neither
+# production_plan_json nor director_json -- the two sockets that actually
+# identify the retired node and that stay in LEGACY_PATTERN above.
+#
+# Matched as a role phrase rather than the full current title: bdd4f91b
+# appended "/ Settings" hours after 6234e44c, and pinning a wording that
+# moves twice in an afternoon just re-breaks this on the next pass.
+LIVE_DIRECTOR_NODE_TITLES = (
+    "Video Director",
+    "Image Director",
+)
+
+
+def _is_live_director_node_title(line_text: str) -> bool:
+    """True when the only Director-era hit on this line is a live platform
+    node's canvas title.
+
+    The 16 variants are single-line minified JSON, so git grep reports each
+    whole file as one hit -- which is why this is a substring test over the
+    line rather than an exact-line allowlist like GENERIC_ENGLISH_LINES.
+    It stays safe because the retired node's own identifiers (director_json,
+    production_plan_json, LLMDirector) are separate alternations in
+    LEGACY_PATTERN: a line carrying one of those still has to answer for it.
+    """
+    if not any(t in line_text for t in LIVE_DIRECTOR_NODE_TITLES):
+        return False
+    return not any(
+        dead in line_text
+        for dead in ("LLMDirector", "director_json", "production_plan_json")
+    )
+
+
 def _is_excluded(path: str) -> bool:
     if path in EXCLUDED_PATHS:
         return True
@@ -360,6 +401,8 @@ def test_no_unclassified_legacy_references():
         if _is_excluded(path):
             continue
         if _is_forensic(content) or _is_generic_english(content):
+            continue
+        if _is_live_director_node_title(content):
             continue
         # Multi-line forensic comment blocks: if any of the
         # _CONTEXT_WINDOW preceding lines has a marker, the current
