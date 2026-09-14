@@ -246,7 +246,14 @@ production look), `anime`, `archival_documentary`, `cartoon`, `paper_origami`,
 and `visual_storybased`, which is minted from the story rather than loaded from
 a pack -- which is why you will not find it among the nine files in
 `nodes/visual_styles/`, and why a rolled run lands on it about a tenth of the
-time. Every style drives both the stills and the video.
+time.
+
+**A style only shows where there is a picture to style.** It drives the stills
+and the video-diffusion lanes. The three procedural lanes the canonical ships
+draw their frames from the audio and never read it -- so on a default run the
+style is written into the episode's filename and changes nothing you can see.
+Switch a video role to a `still_*` or diffusion lane, or pin an image engine,
+and the style starts doing its job.
 
 ### The engines
 
