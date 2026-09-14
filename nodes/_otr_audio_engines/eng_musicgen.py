@@ -43,11 +43,17 @@ class MusicGenEngine:
     #: decides whether it sounds like the genre at all.
     #:
     #: THE FLAG LIVES HERE, ON THE ENGINE, because prompt length is a fact
-    #: about the model rather than about the story -- Stable Audio 3 takes the
-    #: long form happily and keeps it. `stable_audio_theme` reads this and asks
-    #: `_otr_music_prompt.compose_brief_engine_prompt` instead; the short form
-    #: is COMPOSED from the palette, never trimmed from the long one, because
-    #: trimming cuts the middle and the genre/BPM clause sits there.
+    #: about the model rather than about the story. `stable_audio_theme` reads
+    #: it and asks `_otr_music_prompt.compose_brief_engine_prompt` instead; the
+    #: short form is COMPOSED from the palette, never trimmed from the long
+    #: one, because trimming cuts the middle and the genre/BPM clause sits
+    #: there.
+    #:
+    #: This used to add "Stable Audio 3 takes the long form happily and keeps
+    #: it". It does not, as of 2026-09-13: SA3 sets the same flag, on the
+    #: operator's ear -- "they need to be the same musicgen prompts". The long
+    #: form never read `palette.idiom`, so the shipped engine was the only one
+    #: that never heard the genre or the tempo.
     wants_brief_prompt = True
 
     def __init__(self):

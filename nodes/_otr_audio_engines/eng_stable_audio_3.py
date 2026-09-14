@@ -81,10 +81,12 @@ _CLIP_TYPE = otr_env.get("OTR_SA3_CLIP_TYPE", "stable_audio")
 # The prompt anchor is NOT (2026-09-11): every branch of it said "analog tape
 # warmth" and the negative pushed "AWAY from a clean modern sound" -- the
 # radio-hiss texture the operator has now withdrawn ("make them more
-# musical"). The instruments come from the STORY through the shared composer
-# (`_otr_music_prompt.compose_engine_prompt`) for every engine; this adapter
-# sends what it is handed and reads the composer's negative unless the
-# operator overrides it with OTR_SA3_NEG_PROMPT, the one escape hatch.
+# musical"). The genre and tempo come from the STORY through the shared
+# composer -- `_otr_music_prompt.compose_brief_engine_prompt` since
+# 2026-09-13, the same text MusicGen receives (see `wants_brief_prompt` on the
+# class below); this adapter sends what it is handed and reads the composer's
+# negative unless the operator overrides it with OTR_SA3_NEG_PROMPT, the one
+# escape hatch.
 
 
 
@@ -232,6 +234,33 @@ class StableAudio3Engine:
     native = True               # drives ComfyUI's own nodes -> no external dep pilot
     interface = "clip"
     sample_rate = 44100
+
+    #: SA3 HEARS THE SAME PROMPT MUSICGEN HEARS (operator, 2026-09-13:
+    #: "they need to be the same musicgen prompts").
+    #:
+    #: The two forms had drifted apart in what they SAY, not just how long
+    #: they are. The long form is built from `palette.instruments` and never
+    #: reads `palette.idiom`, so SA3 was the only shipped engine that never
+    #: heard the genre name or the tempo -- "Roland TR-909 drum machine, deep
+    #: analog sub bass, ..." with no "Detroit techno at 128 BPM" anywhere in
+    #: it. MusicGen, which is NOT the shipped default, was the only one
+    #: getting the two strongest genre signals.
+    #:
+    #: That inverts the palette file's own measurement, taken 2026-09-12: a
+    #: text-to-audio model answers a named BPM accurately (five renders
+    #: written at 124-135 BPM came back at 125.0, 125.0, 127.7, 130.4 and
+    #: 133.3). The reasoning was reaching the engine nobody renders with.
+    #:
+    #: The short form is also the operator's considered shape rather than an
+    #: economy -- genre and BPM, then the episode's mood, then the
+    #: instrumental instruction, naming no instruments on purpose ("probably
+    #: better to keep to general, to drama, not even mention instruments"),
+    #: because "Detroit techno" already implies the TR-909 and listing it
+    #: risks the model foregrounding one instrument as a solo.
+    #:
+    #: An AUTHORED row is still carried verbatim; only the derived form
+    #: changes. See `_otr_music_prompt.compose_brief_engine_prompt`.
+    wants_brief_prompt = True
 
     def __init__(self):
         self._bundle = None     # (model, clip, vae)
