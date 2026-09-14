@@ -90,8 +90,25 @@ def remove_widget(wf, node_type, widget_name):
 def reorder_widgets(wf, node_type, new_name_order):
     """Reorder a node's widgets to `new_name_order` (a full permutation).
 
-    Moves the widget DESCRIPTORS among themselves, leaving non-widget link
-    sockets exactly where they are, and permutes widgets_values to match."""
+    Moves the widget DESCRIPTORS among themselves and permutes widgets_values
+    to match, then REPAIRS THE LINK TABLE ITSELF before returning.
+
+    The repair is not optional and the caller is not trusted to remember it. A
+    widget descriptor can carry a live `link` of its own -- a widget converted
+    to an input and wired -- and today three do: OTR_SceneSequencer's
+    script_json (link 277), and OTR_SignalLostVideo's script_json (16) and
+    news_used (110). Moving one of those leaves its link row pointing at the
+    slot it used to occupy, so ComfyUI feeds that wire's value into whichever
+    widget now sits there. That is invisible to a widget-count check and is
+    exactly the class CLAUDE.md section 0 exists for.
+
+    An earlier docstring said this "leaves non-widget link sockets exactly
+    where they are", which is true and reads as a completeness guarantee it
+    never was: the sockets OUTSIDE the widget group do not move, but a linked
+    widget INSIDE it does.
+
+    Returns (touched, repairs) so a caller can see what the repair did.
+    """
     touched = []
     for node in wf.get("nodes", []):
         if node.get("type") != node_type:
@@ -107,14 +124,25 @@ def reorder_widgets(wf, node_type, new_name_order):
                    sorted(set(new_name_order) - set(names))))
         by_name_desc = {n: node["inputs"][i] for n, i in zip(names, desc_idx)}
         wv = node.get("widgets_values") or []
-        by_name_val = {n: (wv[k] if k < len(wv) else None)
-                       for k, n in enumerate(names)}
+        if len(wv) != len(names):
+            # REFUSE rather than backfill. An earlier cut wrote None for a
+            # missing value, which turns a graph that is merely inconsistent
+            # into one that is confidently wrong -- and None is a value
+            # ComfyUI will happily hand to a widget.
+            raise ValueError(
+                "node %s: %d widget descriptors but %d saved values. Fix the "
+                "graph before reordering it; a reorder cannot invent the "
+                "missing value." % (node["id"], len(names), len(wv)))
+        by_name_val = {n: wv[k] for k, n in enumerate(names)}
         for slot, nm in zip(desc_idx, new_name_order):
             node["inputs"][slot] = by_name_desc[nm]
         node["widgets_values"] = [by_name_val[n] for n in new_name_order]
         touched.append({"node_id": node["id"], "from": names,
                         "to": list(new_name_order)})
-    return touched
+    # Part 3, run here rather than left to the caller. Identity-based, so it is
+    # safe even when nothing moved and impossible to double-apply.
+    repairs = repair_dst_slots(wf)
+    return touched, repairs
 
 
 def rename_widget(wf, node_type, old_name, new_name):

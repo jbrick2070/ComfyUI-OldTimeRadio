@@ -32,6 +32,7 @@ blind spot.
 from __future__ import annotations
 
 import ast
+import re
 import subprocess
 
 
@@ -241,10 +242,21 @@ def _is_live_director_node_title(line_text: str) -> bool:
     """
     if not any(t in line_text for t in LIVE_DIRECTOR_NODE_TITLES):
         return False
-    return not any(
-        dead in line_text
-        for dead in ("LLMDirector", "director_json", "production_plan_json")
-    )
+    # EXEMPT THE MATCH, NOT THE LINE. The 16 variants are single-line minified
+    # JSON, so git grep reports each whole FILE as one "line": a substring test
+    # that returned True here excused every other legacy symbol in that file
+    # too. Measured by the QA pass that caught it, 6 of the 10 LEGACY_PATTERN
+    # alternations -- voice_map_json, sfx_plan_json, music_plan_json,
+    # director_raw_dump_dir, parser_list and a bare "Director" title -- became
+    # unenforceable inside all 16 variants.
+    #
+    # So: blank out the allowed titles and re-run the pattern on what is left.
+    # Anything that still matches has to answer for itself, whatever else
+    # shares its line.
+    remainder = line_text
+    for allowed in LIVE_DIRECTOR_NODE_TITLES:
+        remainder = remainder.replace(allowed, " ")
+    return not re.search(LEGACY_PATTERN, remainder)
 
 
 def _is_excluded(path: str) -> bool:

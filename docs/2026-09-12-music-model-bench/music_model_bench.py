@@ -1,3 +1,12 @@
+"""HISTORICAL BENCH ARTIFACT -- DOES NOT RUN AS OF 2026-09-13.
+
+It calls `_otr_music_prompt.compose_engine_prompt`, which was removed that day
+when every music engine moved to the short form. The numbers it produced are
+still the record of the 2026-09-12 model bench; the script is kept as that
+record and is not maintained. Anything re-running this bench composes through
+`compose_brief_engine_prompt` instead.
+"""
+
 """WHICH MUSIC MODEL SHIPS -- the bench arm for the GO_FORWARD_PLAN section 1 row.
 
 Three candidates, one recipe held constant per family, the show's OWN composed

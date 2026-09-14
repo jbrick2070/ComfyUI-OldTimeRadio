@@ -52,6 +52,14 @@ def test_freeze_cascade_node_title_never_carries_the_double_dot() -> None:
             f"old double-dot form 'Phase 0..10', which reads as both a "
             f"range and a typo. Title: {title!r}"
         )
+        # AN EMPTY TITLE IS NOT A PASS. Dropping the require-clause left this
+        # green for a node with no title at all -- which is the defect 6234e44c
+        # fixed, ten of 23 nodes showing their bare class name. The typo guard
+        # and a non-empty title are different promises and it keeps both.
+        assert title.strip(), (
+            f"FreezeCascade node id={node['id']} has no title; 6234e44c gave "
+            f"every node one so the canvas stops showing class names"
+        )
         assert ".." not in title, (
             f"FreezeCascade node id={node['id']} title carries a double "
             f"dot, the shape D-final removed. Title: {title!r}"

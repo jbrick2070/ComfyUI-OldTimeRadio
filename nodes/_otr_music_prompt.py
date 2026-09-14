@@ -43,9 +43,15 @@ prompts and make them more musical ... ideally it is relevant to the story"):
   forms actually had was length and the instrument list, which is a taste
   question and was decided as one.
 
-  The character cap went with it and is not missed: Sonilo owns its own
+  The character cap went with it and is not missed. Sonilo owns its own
   1000-character limit and raises on it (`eng_cloud_sonilo.generate_clip`),
-  which is the fail-closed shape this pack prefers over a silent trim.
+  which is the fail-closed shape this pack prefers over a silent trim -- and
+  google_lyria and stable_audio_music, which have NO local length guard, are
+  not exposed by that: measured over the 2029 authored music rows on disk the
+  longest is 374 characters, the p99 is 298, and none exceeds 500. The brief
+  form adds about 60. No limit is invented for those two, because a guessed
+  ceiling would be worse than the measurement that says one is not needed
+  today; if authored rows ever grow, this is the paragraph that has to change.
 
 Mood resolution cascade (preserved from the audited musicgen path so a given
 brief yields the same music): v2 `music_mood_terms` (top 3) -> v1
@@ -224,8 +230,19 @@ def cue_story_flavour(ledger, cue_row) -> str:
 
     text = ""
     if key == "interstitial":
+        # THE ANCHOR IS NOT ALWAYS A SHOT. Counted across every ledger on disk,
+        # "shot_NNN_music" is 270 of roughly 661 anchors; the rest are LINE ids
+        # ("l001", "line_7", "L3"). Resolving only the shot form left most
+        # interstitials with no flavour at all, silently -- the clause simply
+        # did not appear and nothing said why.
         anchor = str(cue_row.get("anchor_line_id") or "")
         shot_id = anchor.rsplit("_music", 1)[0] if anchor.endswith("_music") else ""
+        if not shot_id:
+            # A line anchor: find the line, take the shot it belongs to.
+            for line in (ledger.get("lines") or []):
+                if isinstance(line, dict) and line.get("line_id") == anchor:
+                    shot_id = str(line.get("shot_id") or "")
+                    break
         for shot in (ledger.get("shots") or []):
             if isinstance(shot, dict) and shot.get("shot_id") == shot_id:
                 text = str(shot.get("description") or "").strip()

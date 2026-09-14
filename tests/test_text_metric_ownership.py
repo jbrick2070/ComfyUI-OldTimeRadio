@@ -58,10 +58,22 @@ class _DirectTextWriteVisitor(ast.NodeVisitor):
             and target.slice.value == "text"
         ):
             return False
-        return not (isinstance(target.value, ast.Name)
-                    and target.value.id == "ui")
+        # NAME *AND* SHAPE. Matching only the object name would excuse a real
+        # ledger write that happened to be bound to a local called `ui`.
+        # ComfyUI's preview contract is a LIST of strings; a ledger row's text
+        # is a plain string, so requiring a list literal on the right-hand side
+        # separates them by shape as well as by name.
+        if not (isinstance(target.value, ast.Name)
+                and target.value.id == "ui"):
+            return True
+        assigned = getattr(target, "_otr_assigned_value", None)
+        return not isinstance(assigned, (ast.List, ast.ListComp))
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        for target in node.targets:
+            # The shape of the assigned VALUE decides the ui exemption, so the
+            # target has to know what is being assigned to it.
+            setattr(target, "_otr_assigned_value", node.value)
         if not self._is_self_test() and any(
             self._is_text_target(target) for target in node.targets
         ):
