@@ -826,6 +826,25 @@ def test_the_receipt_lands_on_meta_even_when_nothing_fired():
     assert ledger["meta"]["ledger_clean"]["judge"] == "model"
 
 
+def test_house_source_skips_spoken_source_rewrite_and_still_judges():
+    """A blank My Story still gets the clean-stage judge; it does not spend
+    a source-rewrite slot defending DEFAULT_IDEA from itself."""
+    original = "The lamp has not turned since Tuesday."
+    ledger = _ledger(original, bank="my_story")
+    ledger["meta"]["my_story"] = {"house_source": True, "source_rewrites": []}
+    ledger["meta"]["source_meta"] = {
+        "house_source": True,
+        "story_input": {"fields": {"idea": "toy boots", "characters": "",
+                                   "plot": "", "setting": "", "author": ""}},
+    }
+    slot = _Slot()
+    receipt = lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="my_story")
+    assert receipt["source_rewrite"] is None
+    assert slot.repair_calls == 0
+    assert ledger["lines"][1]["text"] == original
+    assert slot.judge_calls >= 1
+
+
 # ---------------------------------------------------------------------------
 # the fidelity lanes
 # ---------------------------------------------------------------------------

@@ -21,6 +21,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.writer_slots import value as widget_value
+
 PACK_ROOT = Path(__file__).resolve().parent.parent
 
 WORKFLOWS = [PACK_ROOT / "workflows" / "otr_canonical.json"] + sorted(
@@ -28,6 +30,8 @@ WORKFLOWS = [PACK_ROOT / "workflows" / "otr_canonical.json"] + sorted(
 
 #: Slot index of custom_premise on OTR_LedgerScriptWriter, positional.
 _PREMISE_SLOT = 4
+_MY_STORY_CREATIVE_WIDGETS = (
+    "custom_premise", "story_characters", "story_plot", "story_setting")
 
 
 def _writer(graph):
@@ -50,6 +54,25 @@ def test_no_shipped_graph_carries_a_premise(path):
         "from it instead of fetching, silently. The standing premise belongs "
         "in _otr_story_input.DEFAULT_IDEA, which already covers a blank My "
         "Story run." % (path.name, len(value)))
+
+
+@pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
+@pytest.mark.parametrize("widget", _MY_STORY_CREATIVE_WIDGETS)
+def test_no_shipped_graph_carries_my_story_creative_text(path, widget):
+    """A standing value in any creative My Story widget makes every run typed.
+
+    house_source is computed from the raw widgets. A shipped plot, setting or
+    cast list would disable the skip on every rolled My Story pick, the same
+    class of silent seed the custom_premise guard already refuses.
+    """
+    graph = json.loads(path.read_text(encoding="utf-8"))
+    node = _writer(graph)
+    assert node is not None, "%s has no writer" % path.name
+    saved = (widget_value(node, widget) or "").strip()
+    assert saved == "", (
+        "%s ships a non-empty %s (%d chars). That value would stamp "
+        "house_source=False on every My Story run of this graph."
+        % (path.name, widget, len(saved)))
 
 
 def test_the_floor_still_covers_what_the_widget_was_doing():

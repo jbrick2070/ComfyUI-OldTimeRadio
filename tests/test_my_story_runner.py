@@ -137,13 +137,20 @@ class Slots:
 
 
 def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
-         include_act_breaks=True, idea="a keeper hears a voice", raw_num_characters=None):
+         include_act_breaks=True, idea="a keeper hears a voice",
+         characters="Ada, the keeper. Tom.", raw_num_characters=None,
+         house_source=False):
     from nodes import production_ledger as PL
 
     raw_requested = num_characters if raw_num_characters is None else raw_num_characters
+    fields = SI.capture_raw(idea=idea, characters=characters, author=author)
+    if house_source:
+        policy = SI.StoryInputPolicy(
+            mode=SI.INPUT_MODE_USER_FIELDS, bank_id="my_story")
+        assert SI.would_apply_default_idea(fields, policy)
+        fields = SI.with_default_idea(fields, policy)
     bundle = SI.build_bundle(
-        SI.capture_raw(idea=idea, characters="Ada, the keeper. Tom.",
-                       author=author),
+        fields,
         SI.StoryRequest(num_characters=raw_requested, act_count=str(act_count),
                         include_act_breaks=include_act_breaks,
                         source_bank_requested="my_story",
@@ -162,6 +169,7 @@ def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
             "draft_digest": bundle.digest,
             "requested_num_characters": raw_requested,
             "story_author": bundle.normalized.author,
+            "house_source": house_source,
         },
     }
     led = PL.new_ledger(episode_id=None)
@@ -196,6 +204,24 @@ def test_one_call_per_act():
                  or "act" in c[1].lower()]
     # interpretation + treatment + 3 acts + frame
     assert len(slots.calls) == 12, slots.calls  # six author calls, six combined corrections
+
+
+def test_house_source_skips_every_source_rewrite_and_still_fills_the_ledger():
+    """A blank roll invents from DEFAULT_IDEA; there is no listener to contradict."""
+    slots = Slots()
+    led, _ = _run(slots, idea="", characters="", author="", house_source=True)
+    story = led.data["meta"]["my_story"]
+    assert story["house_source"] is True
+    assert story["source_rewrites"] == []
+    assert led.data["meta"]["source_meta"]["house_source"] is True
+    assert all("Check and rewrite" not in prompt[0]["content"]
+               for prompt in slots.prompts)
+    assert len(slots.calls) == 4, slots.calls  # interpret, treatment, act, frame
+    assert story["notes"][0].startswith("House DEFAULT_IDEA")
+    assert "no creative fields were typed" in story["notes"][0]
+    assert led.data["lines"]
+    assert led.data["cast"]
+    assert led.data["beats"]
 
 
 def test_no_source_is_fetched_and_no_spark_is_drawn():

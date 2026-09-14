@@ -2053,8 +2053,9 @@ def run_ledger_clean(
     # A source check must return usable replacement text, not a report-only
     # verdict. One combined operation, at most two calls including its retries;
     # it never enters the row repair loop or checks its own correction again.
-    if isinstance((ledger_data.get("meta") or {}).get("my_story"), Mapping):
-        from ._otr_story_source import rewrite_spoken_from_source
+    from ._otr_story_source import fidelity_wanted, rewrite_spoken_from_source
+    meta_now = ledger_data.get("meta") or {}
+    if fidelity_wanted(meta_now):
         source_rewrite = rewrite_spoken_from_source(
             ledger_data, slot_fn=slot_fn, slot_scheduler=slot_scheduler,
             configured_model_id=configured_model_id)
@@ -2062,6 +2063,10 @@ def run_ledger_clean(
         receipt["model_calls"] += sum(
             bool(attempt.get("generation_started"))
             for attempt in (source_rewrite or {}).get("attempts", []))
+    elif isinstance(meta_now.get("my_story"), dict):
+        # Complement of fidelity_wanted: my_story is on the ledger and the
+        # spoken rewrite was not spent. None means skipped, not forgotten.
+        receipt["source_rewrite"] = None
     _log_verdict(receipt)
     meta = ledger_data.setdefault("meta", {})
     if isinstance(meta, MutableMapping):

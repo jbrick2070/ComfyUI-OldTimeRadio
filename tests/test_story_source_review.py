@@ -271,6 +271,16 @@ def _edit(**overrides):
     return edit
 
 
+def test_house_source_skips_spoken_rewrite_and_leaves_line_text_owned():
+    data = _ledger()
+    data["meta"]["my_story"]["house_source"] = True
+    before = copy.deepcopy(data["lines"])
+    slot = Slot({"edits": [_edit()]})
+    assert source.rewrite_spoken_from_source(data, slot_fn=slot) is None
+    assert slot.calls == []
+    assert data["lines"] == before
+
+
 def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_order():
     data = _ledger()
     before = copy.deepcopy(data)

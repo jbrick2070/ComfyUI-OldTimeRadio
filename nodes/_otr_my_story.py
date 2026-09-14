@@ -1011,6 +1011,7 @@ def run_my_story_episode(
 
     creative_model = str(resolved.get("creative_writing_model") or "")
     technical_model = str(resolved.get("technical_model") or "")
+    house_source = bool(source_meta.get("house_source"))
 
     story: "dict[str, Any]" = {
         "schema_version": MY_STORY_SCHEMA,
@@ -1018,6 +1019,7 @@ def run_my_story_episode(
         "draft_digest": bundle.digest,
         "attempts": [],
         "source_rewrites": [],
+        "house_source": house_source,
         "counts": {
             "requested_acts": act_count, "proposed_acts": None,
             "accepted_acts": None, "actual_acts": None,
@@ -1025,10 +1027,16 @@ def run_my_story_episode(
             "proposed_characters": None, "accepted_characters": None,
             "actual_characters": None,
         },
-        "notes": [
-            "The person's own typed fields are the sole source.",
-            "Selected acts bind treatment acceptance; character count is flexible guidance.",
-        ],
+        "notes": (
+            [
+                "House DEFAULT_IDEA is the source; no creative fields were typed.",
+                "Source-rewrite fidelity is skipped -- there is no listener to contradict.",
+                "Selected acts bind treatment acceptance; character count is flexible guidance.",
+            ] if house_source else [
+                "The person's own typed fields are the sole source.",
+                "Selected acts bind treatment acceptance; character count is flexible guidance.",
+            ]
+        ),
     }
     meta["my_story"] = story
     meta["source_meta"] = source_meta
@@ -1041,8 +1049,10 @@ def run_my_story_episode(
         _require_ledger_save(led, what)
 
     def source_kwargs(model_id):
-        return {"source_rewrite_receipts": story["source_rewrites"],
-                "slot_scheduler": slot_scheduler, "configured_model_id": model_id}
+        kwargs = {"slot_scheduler": slot_scheduler, "configured_model_id": model_id}
+        if not house_source:
+            kwargs["source_rewrite_receipts"] = story["source_rewrites"]
+        return kwargs
 
     # The cameo knob belongs to the house, and this cast belongs to the
     # person who described it. Recorded rather than silently ignored.

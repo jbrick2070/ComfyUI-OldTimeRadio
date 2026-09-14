@@ -9,6 +9,7 @@ Pure / CPU. UTF-8 no BOM.
 """
 from __future__ import annotations
 
+import inspect
 import sys
 from pathlib import Path
 
@@ -275,3 +276,71 @@ def test_resolver_preserves_user_fields_and_the_unclamped_request(monkeypatch):
     assert meta["story_input"]["request"]["num_characters"] == 99
     assert meta["story_input"]["fields"]["plot"] == "ring the bell"
     assert result["seed_source"] == "my_story_fields"
+    assert meta["house_source"] is False
+
+
+def test_blank_my_story_stamps_house_source_and_floors_the_idea(monkeypatch, caplog):
+    from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
+    def forbidden(*a, **kw):
+        pytest.fail("My Story attempted to load a source snapshot")
+    monkeypatch.setattr(SNAP, "load_snapshot_for_bank", forbidden)
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    with caplog.at_level("INFO"):
+        result = WI._resolve_inputs(
+            source_bank="my_story", custom_premise="",
+            story_characters="", story_plot="", story_setting="",
+            story_author="", num_characters=2, act_count="1")
+    meta = result["source_meta"]
+    assert meta["house_source"] is True
+    assert meta["story_input"]["fields"]["idea"] == SI.DEFAULT_IDEA
+    assert result["seed_source"] == "my_story_fields"
+    assert "house DEFAULT_IDEA" in caplog.text
+    assert "1 creative field(s)" not in caplog.text
+
+
+def test_author_only_is_still_a_house_source(monkeypatch):
+    """A name is attribution, not a story. Rewrite fidelity has nothing to keep."""
+    from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
+    def forbidden(*a, **kw):
+        pytest.fail("My Story attempted to load a source snapshot")
+    monkeypatch.setattr(SNAP, "load_snapshot_for_bank", forbidden)
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    result = WI._resolve_inputs(
+        source_bank="my_story", custom_premise="",
+        story_characters="", story_plot="", story_setting="",
+        story_author="A. Listener", num_characters=2, act_count="1")
+    assert result["source_meta"]["house_source"] is True
+    assert result["source_meta"]["story_author"] == "A. Listener"
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"custom_premise": "a bell"},
+    {"story_characters": "Ada"},
+    {"story_plot": "the bell answers"},
+    {"story_setting": "a rock light"},
+])
+def test_any_single_creative_widget_stamps_typed_not_house(monkeypatch, kwargs):
+    from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
+    def forbidden(*a, **kw):
+        pytest.fail("My Story attempted to load a source snapshot")
+    monkeypatch.setattr(SNAP, "load_snapshot_for_bank", forbidden)
+    monkeypatch.delenv("OTR_SOURCE_SNAPSHOT_MANIFEST", raising=False)
+    result = WI._resolve_inputs(
+        source_bank="my_story", num_characters=2, act_count="1", **kwargs)
+    assert result["source_meta"]["house_source"] is False
+
+
+def test_resolver_stamps_house_source_from_raw_fields_before_the_floor():
+    from nodes import _otr_writer_inputs as WI
+    src = inspect.getsource(WI._resolve_inputs)
+    stamp = src.find("_house_source = _otr_story_input.would_apply_default_idea")
+    floor = src.find("_raw_fields = _otr_story_input.with_default_idea")
+    assert stamp != -1 and floor != -1 and stamp < floor
+
+
+def test_writer_run_forwards_the_raw_premise_widget_not_the_floor():
+    from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter
+    src = inspect.getsource(OTR_LedgerScriptWriter.run)
+    before_resolve, _, after = src.partition("resolved = _resolve_inputs")
+    assert "custom_premise =" not in before_resolve
+    assert "custom_premise=custom_premise" in after

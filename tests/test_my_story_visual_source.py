@@ -446,6 +446,32 @@ def test_changed_prompt_discloses_stale_evidence_and_banana_never_claims_pass(im
     assert not receipt["qualified"]
 
 
+def test_house_source_builds_no_scene_rewrite_context():
+    ledger = _ledger()
+    ledger["meta"]["my_story"]["house_source"] = True
+    assert mb._scene_source_context(
+        ledger["meta"], ledger["cast"], ledger["lines"],
+        {"beat_id": "l1", "char_id": "c1"}, ledger["lines"][0], ledger) is None
+
+
+def test_house_source_char_scene_does_not_call_the_source_slot():
+    """The still prompt is still owned; the source-rewrite slot is not spent."""
+    ledger = _ledger()
+    ledger["meta"]["my_story"]["house_source"] = True
+    slot = Slot()
+    warnings = []
+    prompt, provenance = mb._compose_char_scene_prompt(
+        ledger["meta"], ledger["cast"][0], "Los Angeles kitchen",
+        ledger["lines"][0], None, warnings, "c1",
+        source_context=mb._scene_source_context(
+            ledger["meta"], ledger["cast"], ledger["lines"],
+            {"beat_id": "l1", "char_id": "c1"}, ledger["lines"][0], ledger),
+        source_slot_fn=slot)
+    assert slot.calls == []
+    assert provenance != "char_scene_source_rewrite"
+    assert prompt
+
+
 def test_cache_hit_clears_removed_source_receipt(image_dispatch):
     dispatch, calls, _ = image_dispatch
     ledger = _ledger()

@@ -67,6 +67,21 @@ def raw_fields_from_ledger(ledger_data) -> dict | None:
     return _raw_values(stored.get("fields") or {})
 
 
+def fidelity_wanted(meta) -> bool:
+    """True when my_story has a listener's own words to stay faithful to.
+
+    A blank roll floors DEFAULT_IDEA and stamps house_source. That constant
+    is house-authored; rewriting against it defends our own text from ourselves.
+    Typed fields keep the full apparatus.
+    """
+    if not isinstance(meta, dict):
+        return False
+    story = meta.get("my_story")
+    if not isinstance(story, dict):
+        return False
+    return not bool(story.get("house_source"))
+
+
 def _complete_repair(*, original_prompt, failed_output, error):
     # Schema failures also retain the complete response, including its ending.
     return ProviderCapacityMessages([
@@ -348,6 +363,8 @@ def rewrite_spoken_from_source(ledger_data, *, slot_fn, slot_scheduler=None,
                                configured_model_id=None):
     """Source correction owned by ledger_clean, before its transaction closes."""
     from ._otr_ledger_clean import PROTECTED_FACT_COMPONENT_FLAG, set_line_text_metrics
+    if not fidelity_wanted((ledger_data or {}).get("meta") or {}):
+        return None
     raw = raw_fields_from_ledger(ledger_data)
     if raw is None:
         return None

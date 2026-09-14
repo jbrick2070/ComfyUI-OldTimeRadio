@@ -1673,8 +1673,10 @@ class _SceneSourcePrompt(BaseModel):
 
 def _scene_source_context(meta, cast, lines, target, line, ledger_context=None):
     """Exact raw source and a structural scene join, never a presence classifier."""
-    from ._otr_story_source import raw_fields_from_ledger
+    from ._otr_story_source import fidelity_wanted, raw_fields_from_ledger
     ledger = ledger_context or {"meta": meta, "cast": cast, "lines": lines or []}
+    if not fidelity_wanted(meta):
+        return None
     raw = raw_fields_from_ledger(ledger)
     if raw is None:
         return None

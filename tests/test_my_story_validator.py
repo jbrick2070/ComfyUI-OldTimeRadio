@@ -154,6 +154,10 @@ def test_the_writers_own_preroll_check_floors_too_not_just_the_validator():
         bank_id="roll (any eligible bank)",
     )
     assert SI.with_default_idea(raw, sentinel_policy) is raw
+    assert SI.would_apply_default_idea(raw, policy) is True
+    assert SI.would_apply_default_idea(raw, sentinel_policy) is False
+    typed = SI.capture_raw(idea="a story about my mother")
+    assert SI.would_apply_default_idea(typed, policy) is False
 
 
 def test_a_typed_my_story_submission_is_never_overwritten_by_the_floor(gate):

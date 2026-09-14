@@ -220,11 +220,11 @@ def normalize(fields: RawStoryFields) -> RawStoryFields:
 #: to THIS, so the bank can be drawn like any other and still have something to
 #: write from.
 #:
-#: IT LIVES IN CODE, NOT IN A WIDGET VALUE, on purpose. The canonical graph also
-#: carries this text in its Story input widget, but a fresh node, a cleared
-#: field or any graph that never saw it would otherwise put an unrunnable row
-#: back in the pool -- which is exactly the registry fault the old guard
-#: existed to prevent.
+#: IT LIVES IN CODE, NOT IN A WIDGET VALUE, on purpose. Shipped graphs keep
+#: the Story widgets empty (see tests/test_no_shipped_graph_carries_a_premise.py);
+#: a standing premise in the widget would also silently seed every fetcher
+#: bank. A fresh node, a cleared field, or a rolled My Story pick still has
+#: something to write from because the floor lives here.
 #:
 #: Applied at EVERY admission point through `with_default_idea`, never at just
 #: one: the validator and the writer each build a bundle from these fields, and
@@ -249,6 +249,16 @@ def with_default_idea(fields: RawStoryFields,
     if not policy.is_user_fields or creative_input_present(fields):
         return fields
     return replace(fields, idea=DEFAULT_IDEA)
+
+
+def would_apply_default_idea(fields: RawStoryFields,
+                             policy: "StoryInputPolicy") -> bool:
+    """True when :func:`with_default_idea` would write :data:`DEFAULT_IDEA`.
+
+    Call BEFORE flooring. After the floor, ``creative_input_present`` is True
+    because the idea is filled, and the identity signal is gone.
+    """
+    return bool(policy.is_user_fields) and not creative_input_present(fields)
 
 
 def creative_input_present(fields: RawStoryFields) -> bool:
@@ -702,6 +712,7 @@ __all__ = [
     "attribution_sentence",
     "DEFAULT_IDEA",
     "with_default_idea",
+    "would_apply_default_idea",
     "build_bundle",
     "capture_raw",
     "check_selection",
