@@ -85,6 +85,11 @@ The dropdown lists bank *ids*, so `my_story` is the value you pick -- there is n
 "My Story" entry. That bank exists to take your idea and produce it, rather than
 adapting something.
 
+The roll can also land on it on its own (since 2026-09-13). A run that gets
+there with every creative field blank writes a standing premise that ships with
+the pack rather than refusing, so an unattended overnight run is safe. One typed
+word beats it.
+
 ## Changing what renders it
 
 The engine dropdowns live on **OTR_VideoDirector** (video and images),

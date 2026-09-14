@@ -169,7 +169,10 @@ bank and a rolled style change more than anything else you could adjust.
 ids, so that is the value to pick) and put your idea in `custom_premise`. The
 `story_characters`, `story_plot`, `story_setting` and `story_author` fields on the
 same node take the rest. That bank exists to produce your idea rather than adapt
-something, and it is the one bank the roll never lands on.
+something. Since 2026-09-13 the roll can land on it like any other bank: a run
+that arrives with all four fields blank writes a standing premise that ships
+with the pack, so it always has something to perform. Anything you type wins
+over it.
 
 ---
 
@@ -221,7 +224,7 @@ it never rewrites.
 | `public_domain` | A faithful radio adaptation of a public-domain source text. |
 | `shakespeare` | A Folger scene, adapted with the author's own language carried as written. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
 | `original` | No source at all: original fiction seeded from an entropy draw. |
-| `my_story` | Your idea, characters, plot and setting. Never rolled; you choose it. |
+| `my_story` | Your idea, characters, plot and setting. Rolled like any other bank; a blank run writes the standing premise that ships with the pack. |
 
 ### The music each bank gets
 
