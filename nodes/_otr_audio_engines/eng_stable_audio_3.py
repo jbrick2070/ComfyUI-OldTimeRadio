@@ -239,10 +239,11 @@ class StableAudio3Engine:
     #: for part of 2026-09-13, then the fork it selected was removed
     #: entirely: every music engine now receives
     #: `_otr_music_prompt.compose_brief_engine_prompt`, so there is
-    #: nothing left to choose between. The long form it replaced was
-    #: built from `palette.instruments` and never read `palette.idiom`,
-    #: so SA3 -- which is what 16 of the 17 shipped graphs run -- never
-    #: heard the genre name or the tempo.
+    #: nothing left to choose between. The long form it replaced carried
+    #: the genre and the tempo too, via the row text it appended -- an
+    #: earlier version of this comment claimed otherwise and was wrong.
+    #: The change is the operator's taste ("everyone gets brief"), not a
+    #: repair of a missing signal.
 
     def __init__(self):
         self._bundle = None     # (model, clip, vae)

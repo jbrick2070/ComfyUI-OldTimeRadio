@@ -9,10 +9,10 @@ stores and hashes, and the ENGINE prompt every adapter hears -- the palette's
 IDIOM (genre and BPM), one mood word, one setting phrase, plus the one negative
 prompt. No engine prepends its own texture any more.
 
-Since 2026-09-13 there is only ONE engine form. The long instruments-and-anchor
-form was ripped because it never read the idiom, so every engine taking it --
-Stable Audio 3 among them, which is what the shipped graphs run -- never heard
-the genre name or the tempo.
+Since 2026-09-13 there is only ONE engine form, on the operator's ruling that
+every engine gets the short one. The long instruments-and-anchor form carried
+the genre and the tempo too, through the row text it appended -- a claim that it
+did not was made when it was ripped and is false.
 """
 from __future__ import annotations
 
@@ -63,10 +63,9 @@ def test_every_bank_period_and_cue_composes_music_not_texture(bank, year, cue):
     # The ROW keeps the long instrumental tail it has always had; the ENGINE
     # form ends on the shorter instruction, because it is a different product.
     assert engine.text.endswith("instrumental, no vocals")
-    # It LEADS with the palette's idiom -- genre and tempo -- which is the
-    # whole reason the long form was ripped on 2026-09-13: that form was built
-    # from `palette.instruments` and never read the idiom at all, so every
-    # engine taking it never heard the genre name or the BPM.
+    # It LEADS with the palette's idiom -- genre and tempo. The long form
+    # carried those too, at the END, inside the row text it appended; leading
+    # with them is the point of the short form, not a signal it rescued.
     assert P.story_palette(_meta(bank, year)).idiom in engine.text
     assert duration == MP.CUE_DURATIONS[cue]
 

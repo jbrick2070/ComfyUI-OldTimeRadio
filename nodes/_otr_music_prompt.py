@@ -31,13 +31,21 @@ prompts and make them more musical ... ideally it is relevant to the story"):
   to be prepended were the withdrawn ask and appear nowhere.
 
   A LONG FORM used to sit beside this one, built from the palette's
-  INSTRUMENTS plus a production anchor and capped at 1000 characters. It was
-  ripped on 2026-09-13 because it never read the idiom, so every engine taking
-  it -- Stable Audio 3 among them, which is what the shipped graphs run --
-  never heard the genre name or the tempo. Its character cap went with it and
-  is not missed: Sonilo owns its own 1000-character limit and raises on it
-  (`eng_cloud_sonilo.generate_clip`), which is the fail-closed shape this pack
-  prefers over a silent trim.
+  INSTRUMENTS plus a production anchor and the row text, capped at 1000
+  characters. It was ripped on 2026-09-13 on the operator's ruling that every
+  engine gets the short form.
+
+  IT WAS NOT RIPPED FOR MISSING THE IDIOM, whatever an earlier draft of this
+  paragraph said. `compose_engine_prompt` did not read `palette.idiom` itself,
+  but it appended the ROW TEXT, and `compose_music_prompt` puts the idiom on
+  every branch -- so the genre and the BPM reached every engine, in 18 of 18
+  bank/cue combinations when it was finally measured. The difference the two
+  forms actually had was length and the instrument list, which is a taste
+  question and was decided as one.
+
+  The character cap went with it and is not missed: Sonilo owns its own
+  1000-character limit and raises on it (`eng_cloud_sonilo.generate_clip`),
+  which is the fail-closed shape this pack prefers over a silent trim.
 
 Mood resolution cascade (preserved from the audited musicgen path so a given
 brief yields the same music): v2 `music_mood_terms` (top 3) -> v1
@@ -113,6 +121,153 @@ _CUE_CHARACTER_RHYTHMIC: dict[str, str] = {
     "interstitial": "a short rhythmic break that hands off cleanly, short "
                     "instrumental transition",
 }
+
+
+#: THE SHORT FORM'S CUE CLAUSE -- three or four words, never a structure to
+#: perform and never an instrument. The long arcs below say what the music
+#: DOES over its length; these say only which end of the story the cue sits
+#: at, because that is the distinction that was lost and the only one an 8 to
+#: 12 second clip can act on.
+#:
+#: Two variants for the same reason `_CUE_CHARACTER_RHYTHMIC` exists: telling
+#: a 128 BPM drum machine to "resolve" is the contradiction that tore the
+#: techno and house cues on 2026-09-12.
+_BRIEF_CUE_ARC: dict[str, str] = {
+    "opening":      "a rising open",
+    "closing":      "a resolving close",
+    "interstitial": "a short bridge",
+}
+_BRIEF_CUE_ARC_RHYTHMIC: dict[str, str] = {
+    "opening":      "a straight-in open",
+    "closing":      "a close on the downbeat",
+    "interstitial": "a short break",
+}
+
+
+def _canonical_cue(cue_id) -> str:
+    """Map a placement to one of the three canonical cues, tolerantly.
+
+    `compose_music_prompt` KeyErrors on anything else and its callers normalise
+    first; the short form promises never to raise, so an unknown id resolves to
+    "" and simply contributes no clause. `inter_NN` is the real case -- an
+    episode can carry several interstitials.
+    """
+    key = str(cue_id or "").strip().lower()
+    if key in _BRIEF_CUE_ARC:
+        return key
+    if key.startswith("inter"):
+        return "interstitial"
+    return ""
+
+
+#: How much of a scene description the cue is allowed to carry. The whole
+#: point of the short form is that it stays short, so a long scene line is
+#: trimmed rather than riding in full.
+#:
+#: TWELVE, chosen by measuring the 1266 distinct scene and shot descriptions
+#: on disk rather than by taste: their median is 10 words and their p90 is 21.
+#: A cap of 9 truncated 51% of them, 12 truncates 33%, and the difference in
+#: the finished prompt is about two words. Past that the clause stops being
+#: brief, which is the property the short form exists for.
+_FLAVOUR_MAX_WORDS = 12
+
+#: Words a trimmed phrase may not end on -- they promise a noun that the cut
+#: removed, and the model is left completing the sentence instead of scoring
+#: the scene.
+_FLAVOUR_DANGLING = frozenset((
+    "a", "an", "the", "and", "or", "with", "of", "by", "in", "on", "at",
+    "to", "for", "from", "into", "onto", "over", "under", "behind",
+    "beside", "near", "where", "that", "its", "his", "her", "their",
+))
+
+#: Words that mean the scene line is a STAGE NOTE rather than a place. A cue
+#: told "the team discusses the sensor trial results" is being handed plot,
+#: which is not something music can play; "a dimly lit chamber of ancient
+#: tomes" is. Measured across 921 ledgers on disk: roughly a third carry
+#: scene descriptions at all, and a minority of those are this shape.
+_FLAVOUR_STAGE_NOTE = (
+    "discuss", "concludes", "introduces", "provides", "heightens",
+    "explains", "reveals that", "the drama", "the episode", "the report",
+)
+
+
+def cue_story_flavour(ledger, cue_row) -> str:
+    """A short cinematic phrase for where this cue sits in the story.
+
+    The operator's ask (2026-09-13): "a story aware cinematic flavour based on
+    the opening and closing, or beat of a story if interstitial". The ledger
+    already holds it -- `scenes[].description` and `shots[].description` are
+    short place lines like "sunlit toy playground with hand-high slide and
+    white picket fence", authored per scene and carrying no instruments, which
+    is the half of a cue description he does want.
+
+    WHERE EACH CUE LOOKS:
+      opening      -> the FIRST scene, because that is where the story opens
+      closing      -> the LAST scene
+      interstitial -> the shot it is anchored to (`anchor_line_id` is
+                      "shot_NNN_music"), because an interstitial sits at a
+                      specific beat rather than at an end
+
+    ALWAYS OPTIONAL. Only about a third of the ledgers on disk carry scene
+    descriptions, and on a single-scene episode the first and last are the
+    same line -- so this can never be what makes the three cues differ. That
+    job belongs to `_brief_cue_arc`, which is always present. This only adds
+    story when the story is there to add.
+
+    Pure: reads dicts, touches no file.
+    """
+    if not isinstance(ledger, dict) or not isinstance(cue_row, dict):
+        return ""
+    scenes = [s for s in (ledger.get("scenes") or [])
+              if isinstance(s, dict) and str(s.get("description") or "").strip()]
+    key = _canonical_cue(cue_row.get("placement") or cue_row.get("cue_id"))
+
+    text = ""
+    if key == "interstitial":
+        anchor = str(cue_row.get("anchor_line_id") or "")
+        shot_id = anchor.rsplit("_music", 1)[0] if anchor.endswith("_music") else ""
+        for shot in (ledger.get("shots") or []):
+            if isinstance(shot, dict) and shot.get("shot_id") == shot_id:
+                text = str(shot.get("description") or "").strip()
+                break
+    elif key == "opening" and scenes:
+        text = str(scenes[0].get("description") or "").strip()
+    elif key == "closing" and scenes:
+        text = str(scenes[-1].get("description") or "").strip()
+
+    if not text or text.lower() == "preamble":
+        return ""
+    low = text.lower()
+    if any(w in low for w in _FLAVOUR_STAGE_NOTE):
+        return ""
+    # Prefer a CLAUSE boundary, so "a toy kitchen, the grass beyond it" keeps a
+    # whole thought rather than half of one.
+    text = text.replace(";", ",")
+    for clause in text.split(","):
+        clause = clause.strip()
+        if clause and len(clause.split()) <= _FLAVOUR_MAX_WORDS:
+            text = clause
+            break
+    words = text.split()
+    if len(words) > _FLAVOUR_MAX_WORDS:
+        words = words[:_FLAVOUR_MAX_WORDS]
+    # NEVER END ON A DANGLING FUNCTION WORD. A hard word-count cut produced
+    # "white picket" and "the area behind Whiskers by the" -- the second of
+    # which asks the model to finish a preposition. Walk back to the last word
+    # that can end a phrase.
+    while words and words[-1].lower().strip(",.") in _FLAVOUR_DANGLING:
+        words.pop()
+    return " ".join(words).strip(" ,;.")
+
+
+def _brief_cue_arc(cue_id, palette) -> str:
+    """The cue's two-to-four word position clause, or "" if unknown."""
+    key = _canonical_cue(cue_id)
+    if not key:
+        return ""
+    table = (_BRIEF_CUE_ARC_RHYTHMIC if getattr(palette, "groove_arc", False)
+             else _BRIEF_CUE_ARC)
+    return table[key]
 
 
 #: The one negative prompt, for the engines that take one. It names the
@@ -346,7 +501,9 @@ def compose_music_prompt(meta: dict, cue_id: str) -> tuple[str, int]:
     return prompt, CUE_DURATIONS[cue_id]
 
 
-def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePrompt:
+def compose_brief_engine_prompt(meta: dict, authored_text: str = "",
+                                cue_id=None,
+                                story_flavour: str = "") -> EnginePrompt:
     """The SHORT form, for engines trained on short descriptions.
 
     WHY IT EXISTS, measured 2026-09-12 with MusicGen's own T5 tokenizer: the
@@ -433,6 +590,40 @@ def compose_brief_engine_prompt(meta: dict, authored_text: str = "") -> EnginePr
     # THIS story instead of to its genre.
     if setting:
         parts.append("in %s" % setting[0])
+    # WHERE THIS CUE SITS IN THE STORY, in two or three words.
+    #
+    # Without it the three cues were byte-identical: the derived branch reads
+    # no cue at all, so opening, interstitial and closing asked the model for
+    # the same thing and only the seed and the duration differed. The ledger
+    # recorded three different asks and the engine heard one, which is the
+    # arc collapsing at the last hop (caught 2026-09-13 by a contrarian pass,
+    # after a change that moved the brief form from one unshipped engine onto
+    # all five).
+    #
+    # Deliberately the shortest thing that restores the distinction. The
+    # operator's standing objection to the long form's arc clause holds -- an
+    # 8 to 12 second cue has no room to perform a described structure, and
+    # every token spent saying so dilutes the genre conditioning. So this says
+    # only WHICH END of the story it is, and lets the mood and setting above
+    # carry what the story is about. His ask, verbatim: "beat aware, story
+    # aware meta info very briefly to capture the essence of the story start
+    # or end".
+    #
+    # Palette-aware for the same reason the row text is: a 128 BPM drum
+    # machine asked to "resolve" is the contradiction `_CUE_CHARACTER_RHYTHMIC`
+    # exists to prevent.
+    arc = _brief_cue_arc(cue_id, palette)
+    if arc:
+        parts.append(arc)
+    # AND WHAT THE STORY IS DOING THERE, when the ledger knows. `cue_story_flavour`
+    # reads the scene the cue opens on, closes on, or is anchored beside, and
+    # returns a short place line with no instruments in it. It is additive only:
+    # about two thirds of ledgers carry no scene description, and a single-scene
+    # episode gives the same line to opening and closing, so the clause above is
+    # what keeps the three cues distinct and this is what makes them this story's.
+    flavour = str(story_flavour or "").strip(" ,;.")
+    if flavour:
+        parts.append(flavour)
     parts.append("instrumental, no vocals")
     return EnginePrompt(text=", ".join(parts),
                         negative=negative_for(palette),

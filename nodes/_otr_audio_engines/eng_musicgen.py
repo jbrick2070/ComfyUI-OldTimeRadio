@@ -42,13 +42,19 @@ class MusicGenEngine:
     #: 72-88 tokens against Meta's own 12-14 examples ("80s pop track with
     #: bassy drums and synth"), on cues 8 and 12 seconds long.
     #:
-    #: What the long form actually differed in turned out to be the IDIOM it
-    #: omitted rather than the length it added -- it was built from
-    #: `palette.instruments` and never read `palette.idiom`, so the engines
-    #: taking it never heard the genre name or the tempo. The operator's call:
-    #: "everyone gets brief". `_otr_music_prompt.compose_brief_engine_prompt`
-    #: is the only engine form now, and `stable_audio_theme` calls it
-    #: unconditionally.
+    #: The operator's call was simply "everyone gets brief", so the fork went
+    #: and `_otr_music_prompt.compose_brief_engine_prompt` is the only engine
+    #: form; `stable_audio_theme` calls it unconditionally.
+    #:
+    #: A LOAD-BEARING CORRECTION, because the first version of this comment got
+    #: it backwards. It said the long form "never read `palette.idiom`, so the
+    #: engines taking it never heard the genre name or the tempo". The first
+    #: half is true of that function body and the second half does not follow:
+    #: the long form was instruments + anchor + ROW TEXT, and
+    #: `compose_music_prompt` appends the idiom on every branch, so the genre
+    #: and the BPM always arrived -- measured afterwards at 18 of 18 bank/cue
+    #: combinations. Nobody was missing the genre. The change is a taste call,
+    #: not a defect fix, and it should not be re-justified as one.
 
     def __init__(self):
         self._model = None

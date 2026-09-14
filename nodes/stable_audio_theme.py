@@ -31,7 +31,7 @@ from ._otr_voice_node_common import build_engine_combo, coerce_int_seed
 import math
 
 from ._otr_music_prompt import (compose_brief_engine_prompt,
-                                compose_music_prompt)
+                                compose_music_prompt, cue_story_flavour)
 
 #: Where a music cue's peak is allowed to sit. The same -1 dBFS the
 #: delivery master uses, and the level `eng_musicgen` has always
@@ -344,8 +344,13 @@ class StableAudioTheme:
             #
             # An AUTHORED row is still the operator's own words and is carried
             # verbatim; only the derived form is composed.
+            # The placement is passed so the three cues do not collapse into
+            # one identical string: an AUTHORED row is already per-cue, but a
+            # DERIVED one reads nothing else that varies by cue.
             engine_prompt = compose_brief_engine_prompt(
-                meta, prompt if spec.get("authored") else "")
+                meta, prompt if spec.get("authored") else "",
+                cue_id=spec["placement"],
+                story_flavour=cue_story_flavour(led, spec))
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
             with deterministic_inference(engine_seed, warn_only=True):
