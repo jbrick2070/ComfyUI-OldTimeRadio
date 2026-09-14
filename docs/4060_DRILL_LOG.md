@@ -5684,3 +5684,13 @@ To definitively prove the fix, I re-ran the server with `OTR_BANK_SEED=5`, forci
 - Image download verification: PROVEN NO DOWNLOAD. The console logged `[INFO] [OTR.assets] READY engines=stable_audio_3 files=2`. `z_image_turbo` did **not** appear, verifying the video lane fix successfully kept the heavy image weights out of the no-still visualizer lanes.
 
 **Conclusion:** The widget was correctly cleared, the random roll works, the video floor keeps VRAM down, and the toy boots bug is fixed.
+### Test Suite Findings (Commit 0fc0fb9 & 076defa)
+While confirming the fix, I pulled the latest commit ( fc0fb9, the AMD tester's commit) and re-ran the full pytest suite. This surfaced two regressions:
+1. **my_story Shortcode Missing:** The new my_story bank was missing a shortcode mapping, which tripped 	est_every_live_dropdown_value_has_a_code. I fixed this by assigning "my_story": "myst" in 
+odes/_otr_shared/shortcodes.py and pushed the fix ( 76defa).
+2. **Environment Defect in models_root():** The AMD tester's commit modified scripts/otr_fetch_lane_weights.py to remove the fallback import of ComfyUI's older_paths and instead assumes the repo is siblings with models/ (i.e. inside custom_nodes). On this 4060 dev box, the repo is cloned elsewhere (D:\otr-4060-testing...), so models_root() fails to find the models. This caused 50+ tests (catalog scanning, LLM policy, etc.) to fail with AssertionError: assert False is True or __init__.nodes is not a package. Setting OTR_COMFYUI_MODELS_ROOT explicitly fixes the suite.
+
+### Final Verification Results
+- **Runtime:** > 30 minutes (KILLED). The API run was aborted because the scifi_news_pro treatment was caught in a structural validation loop (verbatim ending) and retrying endlessly. Because Qwen3.5-4B is running at 0.3 tok/s on this hardware, each retry takes ~10 minutes, making the run unviable.
+- **OBS filename:** None (aborted before completion).
+- **Verified bytes:** None.
