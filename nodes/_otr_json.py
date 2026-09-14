@@ -30,6 +30,10 @@ _JSON_FENCE_RE = re.compile(
     r"```(?:json)?\s*(.*?)\s*```",
     re.DOTALL | re.IGNORECASE,
 )
+_JSON_FENCE_LABELED_RE = re.compile(
+    r"```json\s*(.*?)\s*```",
+    re.DOTALL | re.IGNORECASE,
+)
 
 
 def _escape_raw_controls_in_strings(blob: str) -> str:
@@ -109,8 +113,15 @@ def _strip_trailing_commas(blob: str) -> str:
             while j < n and blob[j] in " \t\r\n":
                 j += 1
             if j < n and blob[j] in "}]":
-                i += 1
-                continue
+                prev = None
+                for prev_ch in reversed(out):
+                    if prev_ch in " \t\r\n":
+                        continue
+                    prev = prev_ch
+                    break
+                if prev not in ("{", "["):
+                    i += 1
+                    continue
         out.append(ch)
         i += 1
     return "".join(out)
@@ -138,11 +149,11 @@ def _decode_first_object(blob: str) -> str:
     slice. Never scans onward after the first brace fails: that would
     salvage a nested child of a malformed envelope (Codex P5).
 
-    Empty ``{}`` is skipped only when another ``{`` follows it (a
-    preamble like ``Here is {}`` before the real artifact). A repair
-    that turns ``{,}`` into ``{}`` with nothing after is fail-closed so
-    it stays a JSON syntax miss, not a schema miss that skips the
-    structural retry.
+    Empty ``{}`` is skipped only when the next token is another object
+    (``Here is {} {artifact}``). A later ``{`` buried in leftover keys
+    is not a hop. A repair that turns ``{,}`` into ``{}`` with nothing
+    after is fail-closed so it stays a JSON syntax miss, not a schema
+    miss that skips the structural retry.
     """
     decoder = json.JSONDecoder()
     first_brace = blob.find("{")
@@ -166,9 +177,11 @@ def _decode_first_object(blob: str) -> str:
             if obj:
                 return remaining[:end]
             rest = remaining[end:].lstrip()
-            nxt = rest.find("{")
-            if nxt >= 0:
-                remaining = rest[nxt:]
+            # Hop only when the next token is another object. Searching
+            # for a later `{` inside leftover keys would salvage a nested
+            # child of `{} "lines": [ {...} ]`.
+            if rest.startswith("{"):
+                remaining = rest
                 continue
             if is_repair:
                 return ""
@@ -184,8 +197,8 @@ def extract_first_json_block(raw: str) -> str:
     is a repaired *copy* when Gemma left raw newlines in strings or
     trailing commas -- callers must parse it, never require ``block in raw``.
 
-    Primary form: a ```json ... ``` fenced block. Fallback: decode from the
-    first ``{``. ``raw_decode`` stops at the end of the first complete object,
+    Primary form: a ```json ... ``` fenced block, preferred over an earlier
+    unlabelled thinking fence. Fallback: decode from the first ``{``. ``raw_decode`` stops at the end of the first complete object,
     so trailing content (a second hallucinated object or prose note) is
     ignored rather than concatenated into the slice. A malformed outer object
     never falls through to one of its decodable child objects. Never raises.
@@ -200,9 +213,20 @@ def extract_first_json_block(raw: str) -> str:
         return ""
     text = raw.strip()
 
-    fence_match = _JSON_FENCE_RE.search(text)
-    if fence_match:
-        return _decode_first_object(fence_match.group(1).strip())
+    labeled = list(_JSON_FENCE_LABELED_RE.finditer(text))
+    labeled_spans = {(m.start(), m.end()) for m in labeled}
+    other = [
+        m for m in _JSON_FENCE_RE.finditer(text)
+        if (m.start(), m.end()) not in labeled_spans
+    ]
+    saw_fence = False
+    for match in (*labeled, *other):
+        saw_fence = True
+        block = _decode_first_object(match.group(1).strip())
+        if block:
+            return block
+    if saw_fence:
+        return ""
     return _decode_first_object(text)
 
 

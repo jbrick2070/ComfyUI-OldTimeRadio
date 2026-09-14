@@ -112,6 +112,24 @@ def test_empty_preamble_object_does_not_hide_the_real_artifact():
     assert OJ.parse_first_json_object(raw) == _ACT
 
 
+def test_empty_object_does_not_salvage_a_nested_brace_in_leftover_keys():
+    raw = '{} "lines": [ {"speaker": "Ada", "text": "Hi"} ]'
+    assert json.loads(OJ.extract_first_json_block(raw)) == {}
+
+
+def test_stray_comma_in_an_empty_nested_object_stays_a_syntax_miss():
+    raw = '{"n": 2, "scene_setting": "yard", "lines": [{,}]}'
+    assert OJ.extract_first_json_block(raw) == ""
+
+
+def test_json_fence_wins_over_an_earlier_thinking_fence():
+    raw = (
+        "```\nthinking about the act\n```\n"
+        + _fenced(json.dumps(_ACT))
+    )
+    assert OJ.parse_first_json_object(raw) == _ACT
+
+
 def test_genuine_empty_object_still_extracts():
     assert json.loads(OJ.extract_first_json_block("{}")) == {}
 
