@@ -420,9 +420,11 @@ def test_canonical_node_84_widget_shape_unchanged():
                   if n.get("type") == "OTR_SilentComposite"]
     assert len(composites) == 1, f"expected exactly one, got {len(composites)}"
     wv = composites[0]["widgets_values"]
-    assert len(wv) == 7, f"widget count drifted: {wv!r}"
-    assert wv[5] == "off" and wv[6] == "cpu", (
-        f"upscale widgets moved off positions 5/6: {wv!r}")
+    # ffmpeg widget removed repo-wide (2026-09-14): 7 -> 6 on this node, and
+    # upscale_engine/upscale_device shift down one slot, 5/6 -> 4/5.
+    assert len(wv) == 6, f"widget count drifted: {wv!r}"
+    assert wv[4] == "off" and wv[5] == "cpu", (
+        f"upscale widgets moved off positions 4/5: {wv!r}")
 
 
 # --------------------------------------------------------------------------- #

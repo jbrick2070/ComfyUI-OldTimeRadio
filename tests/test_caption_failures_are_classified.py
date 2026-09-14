@@ -131,7 +131,6 @@ def test_a_PLANNED_TITLE_passes_the_clean_master_through_on_a_capability_gap(
         burn_captions=True,
         caption_style="",
         fps=24,
-        ffmpeg="",
         title_card_plan_json='{"card": "x"}',
     )
     assert out == "/out/otr/episodes/ep/final.mp4", \

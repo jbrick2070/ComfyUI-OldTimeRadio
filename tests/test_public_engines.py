@@ -311,13 +311,15 @@ def test_director_direct_resolves_public_pick_to_internal_engine_id():
         music_image_model="flux_gen1",
         character_image_model="flux_gen1",
         fps=25, canvas_w=832, canvas_h=480,
-        seed_mode="request_hash", request_seed=7,
     )
     policy = json.loads(out[0])
     vm = policy["video_models"]
     assert vm["announcer_video_model"]["engine_id"] == "wan_ti2v"
     assert vm["music_video_model"]["engine_id"] == "ltx_video"
     assert vm["character_video_model"]["engine_id"] == "ltx_8gb"
+    # `seed_mode`/`request_seed` are gone from direct() (2026-09-13, write-only
+    # widgets removed) -- the emitted VIDEO policy has no "seed" key at all.
+    assert "seed" not in policy
     # NO public label survives anywhere in the emitted policy string
     for public in _TIER:
         assert public not in out[0] or public == "ltx_8gb"   # ltx_8gb IS internal

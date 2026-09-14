@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pytest
 
+from tests.fixtures.writer_slots import value
+
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CANONICAL_JSON = REPO_ROOT / "workflows" / "otr_canonical.json"
@@ -87,13 +89,13 @@ class TestWriterCanonicalModelSlots:
             "writer widgets_values shorter than expected; widget vector "
             "may have drifted"
         )
-        # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES, post the
-        # 2026-08-14 target_words removal (BUG-LOCAL-269/270 seed-widget
-        # removal predates it and still holds -- no seed widget either):
-        #   [0] episode_title
-        #   [1] num_characters
-        #   [2] creative_writing_model
-        #   [3] technical_model
+        # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES -- resolved BY
+        # NAME via tests/fixtures/writer_slots.value(), never by a literal
+        # index. The absolute order is pinned once, in
+        # tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER;
+        # this test only needs that creative_writing_model and
+        # technical_model carry the measured default, wherever the 2026-09-14
+        # writer reorder (docs/GO_FORWARD_PLAN.md row A4) put them.
         # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane, not the independent GGUF Q8 row whose
@@ -113,13 +115,15 @@ class TestWriterCanonicalModelSlots:
         # graphs and this check together.
         expected_creative = _default_llm_option()
         expected_technical = _default_llm_option()
-        assert widgets[2] == expected_creative, (
+        actual_creative = value(n, "creative_writing_model")
+        actual_technical = value(n, "technical_model")
+        assert actual_creative == expected_creative, (
             f"writer creative_writing_model must be {expected_creative!r}; "
-            f"got {widgets[2]!r}."
+            f"got {actual_creative!r}."
         )
-        assert widgets[3] == expected_technical, (
+        assert actual_technical == expected_technical, (
             f"writer technical_model must be {expected_technical!r}; "
-            f"got {widgets[3]!r}."
+            f"got {actual_technical!r}."
         )
 
 

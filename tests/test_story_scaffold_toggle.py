@@ -49,29 +49,32 @@ class TestWidgetSurface:
         assert choices == ["auto", "on", "off"]
         assert meta["default"] == "auto"
 
-    def test_story_scaffold_leads_the_widgets_appended_after_it(self):
-        """The toggle, and everything that has been appended behind it since,
-        still sit together in that sequence.
+    def test_story_scaffold_leads_the_how_it_reads_widgets_appended_after_it(self):
+        """The toggle leads the "how does it read" knobs immediately behind it.
 
-        This was six assertions against absolute indexes, renumbered by hand
-        every time a widget ahead of the group was removed -- most recently
-        `perfect_run_spacesaver` on 2026-09-13. The claim they were making was
-        never about the absolute position: it was that each later widget
-        APPENDED after this toggle rather than being inserted among them, which
-        is what keeps every saved graph's positional values bound to the right
-        controls. Stated as a relative order it survives the next removal
-        ahead of the group untouched. The absolute order is pinned once, in
-        tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER.
+        This used to claim `story_scaffold` led the WHOLE optional block --
+        true back when it was the first optional widget declared. The
+        2026-09-14 full reorder (three independent readers converged on a new
+        declared order, recorded in tests/test_openrouter_slot_widgets_s2.py::
+        _EXPECTED_INPUT_ORDER) moved it out of that leading spot and into the
+        "How does it read?" thematic group instead: it now sits right after
+        `lemmy_cameo` and leads `creativity`, `min_p`, `repetition_penalty`,
+        `max_new_tokens_cap`, immediately followed by `creative_writing_model`
+        (the start of the "Which brain writes it?" group). The claim this
+        test makes is unchanged in kind -- that the toggle and the widgets
+        appended directly behind it still sit together, in order, so their
+        positional values stay bound to the right controls -- only the actual
+        neighbours (taken from _EXPECTED_INPUT_ORDER) have changed.
         """
         spec = W.OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert_relative_order(order, [
             "story_scaffold",
-            "source_bank",
-            "visual_style",
-            "google_api_slot_a_model",
-            "google_api_slot_b_model",
-            "source_ref",
+            "creativity",
+            "min_p",
+            "repetition_penalty",
+            "max_new_tokens_cap",
+            "creative_writing_model",
         ])
 
 

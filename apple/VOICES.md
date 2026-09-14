@@ -35,7 +35,7 @@ separate dropdowns and can hold different values.
 
 | Engine | What it is | How you get it | Size | Where it runs |
 |---|---|---|---|---|
-| **`kokoro`** | Twenty-eight preset English voices, British and American. The shipped default. | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, and CPU only |
+| **`kokoro`** | Twenty-eight preset English voices, British and American. The shipped default. | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines |
 | **`bark`** | Ten preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
 | **`chatterbox`** | Clones a voice from a reference recording you supply | Its own Windows installer | 3.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`dia`** | Clones a voice from a reference recording you supply | Its own Windows installer | 6.0 GiB | 16 GB+ NVIDIA, Windows |
@@ -51,8 +51,11 @@ always ready.
 **Kokoro is the default for a reason**, not because it was first. It is the only
 voice engine with a published episode behind it on NVIDIA, on Apple Silicon and
 on a machine with no GPU at all, and the only one that is a single click
-everywhere. On a CPU-only machine it runs at about eight times faster than
-realtime, so voices are not what makes those runs long.
+everywhere. On a CPU-only machine it is still much faster than realtime, though
+the exact number depends on which Python build ComfyUI is running: about 6x
+on ComfyUI Desktop and the portable build (Python 3.13, Kokoro's `kokoro-onnx`
+backend) and about 8x on a from-source install (Python 3.12, Kokoro's `torch`
+backend). Either way, voices are not what makes those runs long.
 
 ### The three cloning engines need two things, not one
 
@@ -113,15 +116,27 @@ one with the better voices.
 
 ### What the caster actually does with a bank
 
-Characters are cast one at a time, and **a character's gender is never
-overridden to fill a slot**. If the pool runs out of matching voices the render
-stops rather than giving a man a woman's voice. `allow_voice_reuse` (on by
-default) lets two characters share a voice when the pool is genuinely
-exhausted; turn it off and that situation stops the render instead.
+Characters are cast one at a time, gender-matched first. **But gender is not
+a guarantee.** When a gender's column in the bank runs out of untaken voices,
+the caster does not stop the render -- it falls back to a voice from the
+whole pool, any gender, and keeps going. That fallback is deliberate (a
+voiced character beats a hard cast failure), and it is exactly what happens
+once a cast draws more of one gender than the bank can serve. `google_tts` is
+the one engine that refuses instead of falling back; every other engine takes
+the fallback voice and continues.
 
-This matters most on `bark_legacy`, which has ten presets -- six male, four
-female -- so a cast with four women is already at the edge. Kokoro's
-twenty-eight (thirteen male, fifteen female) do not run out in practice.
+`allow_voice_reuse` (on by default) controls something narrower: whether two
+characters can share an already-used, gender-matching voice before the
+gender-blind fallback above is reached. Turning it off removes that sharing
+step, but it does **not** make the render stop when a gender's voices are
+genuinely gone -- the render still reaches the same gender-blind fallback,
+just without the reuse step first.
+
+So bank size is the real backstop, not a code guarantee. This matters most on
+`bark_legacy`, which has ten presets -- six male, four female -- so a cast
+with more than four women will draw at least one male-column voice for a
+female character. Kokoro's twenty-eight (thirteen male, fifteen female) do
+not run out in practice.
 
 The **announcer is one voice for the whole episode**, drawn by the episode's
 own seed from a curated four-voice British pool: `bm_george`, `bm_fable`,
@@ -203,9 +218,14 @@ not reach the network. The error prints the exact `huggingface-cli download`
 command, and it is deliberately never run during a render -- a mid-render fetch
 once threw away a finished episode.
 
-**"announcer_voice_engine='bark' ... delivery mode is CONTENT_OWNED."** The
-Sci-Fi News Pro bank builds its own announcer and always keeps Kokoro. Use a
-different announcer engine for that bank, or a different bank.
+**"announcer_voice_engine='bark' ... delivery mode is CONTENT_OWNED."** This
+one is about the writer's `source_bank`, not this page's `voice_bank` --
+confusing since both are called "bank." Sci-Fi News Pro (one of the six
+story-content banks on the writer node; see [BANKS.md](BANKS.md)) writes its
+own announcer lines and always keeps Kokoro reading them. Set
+`announcer_voice_engine` to anything but `bark` for that source, or pick a
+different `source_bank` for the episode -- changing this page's `voice_bank`
+does nothing for this error.
 
 **The voices are fine but the run took hours.** Check which engine and which
 device you are on. Bark on Apple Silicon and Bark on CPU are both far slower

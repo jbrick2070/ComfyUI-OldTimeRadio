@@ -93,20 +93,22 @@ def test_canonical_director_ships_the_ceiling_unpinned():
     spec = optional["max_render_frames"][1]
     assert (spec["default"], spec["min"], spec["max"]) == (0, 0, 240)
     widgets = _node_of(_canonical(), "OTR_VideoDirector")["widgets_values"]
-    # APPENDED last (BUG-LOCAL-097): the 14 prior slots keep their positions.
-    assert len(widgets) == 15
+    # APPENDED last (BUG-LOCAL-097): the 12 prior slots keep their positions.
+    # seed_mode/request_seed left the widget list on 2026-09-13 (write-only,
+    # never read back), which is why this is 13, not the old 15.
+    assert len(widgets) == 13
     # NOT ["cuda", "fp8_ok"]: the canonical carries the picks for whichever
     # machine is under test (operator ruling 2026-09-07). What this guard is for
-    # is POSITION -- slots 12 and 13 are device_policy and dtype_policy -- so
+    # is POSITION -- slots 10 and 11 are device_policy and dtype_policy -- so
     # assert membership in the live dropdowns and let the pick move.
     _opt = OTRVideoDirector.INPUT_TYPES()["optional"]
     _device_options = _opt["device_policy"][0]
     _dtype_options = _opt["dtype_policy"][0]
-    assert widgets[12] in _device_options, (
-        "slot 12 is device_policy; %r is not one of %r" % (widgets[12], _device_options))
-    assert widgets[13] in _dtype_options, (
-        "slot 13 is dtype_policy; %r is not one of %r" % (widgets[13], _dtype_options))
-    assert widgets[14] == 0
+    assert widgets[10] in _device_options, (
+        "slot 10 is device_policy; %r is not one of %r" % (widgets[10], _device_options))
+    assert widgets[11] in _dtype_options, (
+        "slot 11 is dtype_policy; %r is not one of %r" % (widgets[11], _dtype_options))
+    assert widgets[12] == 0
 
 
 def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned():
@@ -138,7 +140,9 @@ def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned():
             sys.path.insert(0, str(REPO / "scripts"))
             import build_variants as bv
             graph, _rel, _recipe = bv.build_variant(stem)
-        return _node_of(graph, "OTR_VideoDirector")["widgets_values"][14]
+        # max_render_frames is the LAST widget slot -- 12 since seed_mode/
+        # request_seed left the list on 2026-09-13 (was 14 with them).
+        return _node_of(graph, "OTR_VideoDirector")["widgets_values"][12]
 
     assert _director_ceiling("otr_8gb_wan") == 81
     # The 2026-09-13 curation renamed the shipping set; these are the tiers
@@ -160,7 +164,6 @@ def test_director_and_shot_lock_carry_the_ceiling_onto_the_ledger():
             music_image_model="Flux (gen 1)",
             character_image_model="Flux (gen 1)",
             fps=25, canvas_w=832, canvas_h=480,
-            seed_mode="request_hash", request_seed=0,
             max_render_frames=ceiling,
         )[0]
 

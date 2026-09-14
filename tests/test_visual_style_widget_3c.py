@@ -13,9 +13,13 @@ docstring for the full account.
 
 Pins:
   1. Widget surface: visual_style sits with its neighbours in the declared
-     order -- immediately before the two Google API slots and source_ref;
-     choices == the roll sentinel followed by eligible_style_ids() exactly
-     (registry order, all styles live); default sci_fi_radio.
+     order -- immediately after source_ref and immediately before
+     episode_title (the 2026-09-14 writer reorder, per
+     tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER, moved
+     the Google API slots away to sit after the openrouter/comfy slot
+     pickers instead); choices == the roll sentinel followed by
+     eligible_style_ids() exactly (registry order, all styles live);
+     default sci_fi_radio.
   2. Registration fail-loud: a broken style registry RAISES out of
      INPUT_TYPES (deliberate convention exception -- no baked-in list).
   3. Gate order: an unknown visual_style raises UnknownVisualStyleError
@@ -63,21 +67,25 @@ def _fresh_registry():
 
 class TestWidgetSurface:
     def test_visual_style_neighbour_pin(self):
-        """visual_style leads the Google API slots, which lead source_ref.
+        """source_ref leads visual_style, which leads episode_title.
 
         What the four absolute indexes here used to say was a claim about
-        this GROUP, not about where the group starts: the declared order runs
-        visual_style, both Google API slots, then source_ref, contiguously.
-        That survives an unrelated widget being added or removed earlier in
-        the node, which an absolute index does not.
+        this GROUP, not about where the group starts: the declared order used
+        to run visual_style, both Google API slots, then source_ref,
+        contiguously. The 2026-09-14 writer reorder (see
+        tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER)
+        moved the Google API slots down to sit after the openrouter/comfy
+        slot pickers, and put visual_style between source_ref and
+        episode_title instead. The relative-order claim survives an unrelated
+        widget being added or removed elsewhere in the node, which an
+        absolute index does not.
         """
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert_relative_order(order, [
-            "visual_style",
-            "google_api_slot_a_model",
-            "google_api_slot_b_model",
             "source_ref",
+            "visual_style",
+            "episode_title",
         ])
 
     def test_choices_are_the_roll_sentinel_then_the_registry(self):

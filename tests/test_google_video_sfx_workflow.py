@@ -80,13 +80,18 @@ def test_master_audio_mux_declares_connector_only_clip_manifest_input():
     spec = it["optional"]["clip_manifest_json"]
     assert spec[0] == "STRING"
     assert spec[1]["forceInput"] is True
+    # The `ffmpeg` widget was REMOVED 2026-09-13 (it had been discarded at
+    # every execute-method boundary since 2026-09-04, so the declaration was
+    # a channel to nowhere). The absence is asserted directly so a re-added
+    # widget has to answer for itself here, not just fail a shape check.
+    assert "ffmpeg" not in it["optional"]
     # Connector-only SFX input must not add to the saved widget vector.
     widget_backed = [
         name for name, field in it["optional"].items()
         if field[0] in ("INT", "FLOAT", "STRING", "BOOLEAN")
         and not field[1].get("forceInput")
     ]
-    assert widget_backed == ["fps", "ffmpeg", "output_path"]
+    assert widget_backed == ["fps", "output_path"]
 
 
 def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
@@ -139,6 +144,14 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # fanout below are byte-identical. Read the tuple above -- src 84, dst 86 --
     # and neither id appears in any assertion in this function.
     assert wf["last_link_id"] == 292
+    # `ffmpeg` left node 85's inputs on 2026-09-13 (the widget was discarded at
+    # the method boundary since 2026-09-04 and had no live effect; the
+    # declaration closed the channel rather than keep sanitising it). It sat
+    # mid-list, so removal re-indexed every input after it -- output_path,
+    # video_policy_json, foley_receipts_json and script_json each moved down
+    # one slot. Repaired by IDENTITY in the workflow JSON (each link's
+    # dst_slot set to the index whose inputs[i].link equals that link's id),
+    # so only link 291 (script_json) below actually changes value.
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",
@@ -146,14 +159,13 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
         "declared_credits_tail_s",
         "clip_manifest_json",
         "fps",
-        "ffmpeg",
         "output_path",
         "video_policy_json",
         "foley_receipts_json",
         "script_json",
     ]
     assert [i.get("link") for i in n85["inputs"][:5]] == [274, 263, 249, 276, 278]
-    assert n85["widgets_values"] == [25, "ffmpeg", ""]
+    assert n85["widgets_values"] == [25, ""]
     assert n92["outputs"][1]["name"] == "clip_manifest_json"
     # 271 is gone, and its absence is the CLEAN consequence of 8171e994 rather
     # than collateral: link 271 was [271, 92, 1, 94, 1, "STRING"] -- this same
@@ -165,7 +177,9 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # [278, 92, 1, 85, 4, "STRING"], byte-identical, and still in this fanout.
     assert n92["outputs"][1]["links"] == [261, 275, 278, 288]
     links = {l[0]: l for l in wf["links"]}
-    assert links[291] == [291, 1, 1, 85, 10, "STRING"]
+    # dst_slot 9, not 10 -- script_json shifted down one slot when the
+    # ffmpeg widget in front of it was removed (see the note above).
+    assert links[291] == [291, 1, 1, 85, 9, "STRING"]
     assert links[278] == [278, 92, 1, 85, 4, "STRING"]
     assert links[261] == [261, 92, 1, 84, 2, "STRING"]
     # 271 used to be asserted here as [271, 92, 1, 94, 1, "STRING"]. It is

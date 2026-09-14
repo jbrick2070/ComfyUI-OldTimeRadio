@@ -33,50 +33,54 @@ from tests.fixtures.writer_slots import (  # noqa: E402
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 
 
-def test_source_ref_slot_pinned_with_llm_policy_tail():
-    """`source_ref` keeps its declared neighbourhood, and it is not the tail.
+def test_source_ref_slot_pinned_after_source_bank():
+    """`source_ref` keeps its declared neighbourhood, and the tail is `gate_in`.
 
-    It was once the final append-only widget, which is what this test was
-    originally named for. It is not any more: everything appended since landed
-    AFTER it -- the six explicit LLM runtime-policy widgets
-    (llm_device .. gguf_quant) in the S5 platform-portability pass
-    (2026-07-10), the gate_in forceInput socket, replay_from (canonical
-    replay, 2026-09-02), and the four My Story creative fields (2026-09-10).
-    So what has actually held constant is the ORDER of that run, not
-    `source_ref`'s position in it.
+    This test used to pin `source_ref` between `google_api_slot_b_model` and
+    the six LLM runtime-policy widgets, because that was its neighbourhood
+    from the S5 platform-portability pass (2026-07-10) onward. That
+    neighbourhood is gone: the 2026-09-14 writer reorder (three independent
+    readers converged on one order -- see the docstring on
+    `_EXPECTED_INPUT_ORDER` in test_openrouter_slot_widgets_s2.py, the single
+    place that order is pinned in full) moved `source_ref` from the tail of
+    the model-picker run to the very front, directly after `source_bank` --
+    load-bearing now, not cosmetic: it opens the "what are we making" group
+    that used to be scattered across the node.
 
-    The position has moved three times, every time because a widget AHEAD of
-    `source_ref` was deleted: target_words (2026-08-14), refine_target_grade
-    (2026-08-28) and perfect_run_spacesaver (2026-09-13). That is exactly the
-    class of change an absolute index cannot survive and a relative-order
-    claim does not care about, so this test makes the relative claim.
+    Before this reorder the position had already moved three times, every
+    time because a widget AHEAD of `source_ref` was deleted: target_words
+    (2026-08-14), refine_target_grade (2026-08-28) and
+    perfect_run_spacesaver (2026-09-13). That is exactly the class of change
+    an absolute index cannot survive and a relative-order claim does not care
+    about, so this test makes the relative claim -- now anchored on
+    `source_ref`'s real neighbours instead of its old ones.
     """
     spec = OTR_LedgerScriptWriter.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
 
     assert_relative_order(order, [
         "source_bank",
-        "visual_style",
-        "google_api_slot_a_model",
-        "google_api_slot_b_model",
         "source_ref",
-        "llm_device",
-        "llm_attn_impl",
-        "llm_quant_policy",
-        "llm_vram_ceiling_gb",
-        "gguf_n_ctx",
-        "gguf_quant",
-        "gate_in",
-        "replay_from",
+        "visual_style",
+        "episode_title",
+        "custom_premise",
         "story_characters",
         "story_plot",
         "story_setting",
         "story_author",
+        "act_count",
+        "include_act_breaks",
+        "num_characters",
+        "lemmy_cameo",
+        "story_scaffold",
+        "creativity",
+        "min_p",
+        "repetition_penalty",
     ])
-    # The My Story fields were the last thing appended, so story_author closes
-    # the declared vector. Appending anything after them has to come past this
-    # line, which is the point of asserting the tail rather than an index.
-    assert order[-1] == "story_author"
+    # `gate_in` is the last thing appended (the forceInput validator socket),
+    # so it closes the declared vector now -- not `story_author`, which the
+    # reorder moved up next to `source_ref` (see the chain above).
+    assert order[-1] == "gate_in"
     # A COUNT, not a position -- this one is a literal on purpose. 37 declared
     # inputs carry a 36-wide saved vector because gate_in is a forceInput
     # socket and consumes no widgets_values slot (asserted just below).

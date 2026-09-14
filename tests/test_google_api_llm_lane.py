@@ -12,6 +12,7 @@ from nodes.OTR_LedgerScriptWriter import _build_truncating_generate_fn, _resolve
 from nodes._otr_google_api import client as gclient
 from nodes._otr_google_api import llm as gllm
 from nodes._otr_google_api import models as gmodels
+from tests.fixtures.writer_slots import assert_relative_order
 
 
 class _RequireFullMessages(list):
@@ -167,17 +168,32 @@ def test_complete_patch_capacity_refuses_before_google_request(monkeypatch):
     assert calls == []
 
 
-def test_writer_appends_google_slots_after_visual_style():
+def test_writer_declares_google_slots_with_the_llm_model_pickers():
+    """2026-09-14 writer reorder: `source_bank` is now the ONLY `required`
+    entry (`episode_title` and `num_characters` moved into `optional`), which
+    also moved the google_api slot pickers off of `visual_style`'s shoulder --
+    they no longer sit next to it at all. The pinned full sequence lives at
+    ``tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER``; this
+    asserts the two real, load-bearing groups against it: `source_bank` still
+    leads (nothing else is `required`), and the google_api pickers now sit at
+    the tail of the "which brain writes it" model-slot run, right after
+    `comfy_slot_b_model` rather than right after `visual_style`.
+    """
     spec = W.INPUT_TYPES()
+    assert list(spec["required"].keys()) == ["source_bank"]
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
-    # 2026-08-14: every index dropped by one when the `target_words` widget
-    # was removed from slot 1. Derived from the live order, not retyped.
-    base = order.index("source_bank")
-    assert order[base] == "source_bank"
-    assert order[base + 1] == "visual_style"
-    assert order[base + 2] == "google_api_slot_a_model"
-    assert order[base + 3] == "google_api_slot_b_model"
-    assert order[base + 4] == "source_ref"
+    assert_relative_order(
+        order, ["source_bank", "source_ref", "visual_style", "episode_title"],
+    )
+    assert_relative_order(
+        order,
+        [
+            "creative_writing_model", "technical_model",
+            "openrouter_slot_a_model", "openrouter_slot_b_model",
+            "comfy_slot_a_model", "comfy_slot_b_model",
+            "google_api_slot_a_model", "google_api_slot_b_model",
+        ],
+    )
     assert "target_words" not in order
 
 

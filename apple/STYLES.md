@@ -116,7 +116,9 @@ conflict, how the episode ends -- from a pool chosen by that bank. The
 adaptation banks (Shakespeare, Public Domain) draw only from source-deferential
 grammars so Macbeth stays on the heath, and the archive bank has its own
 curated set. That is not a dropdown, you do not pick it, and it has nothing to
-do with `visual_style`. See [BANKS.md](BANKS.md).
+do with `visual_style`. [BANKS.md](BANKS.md) does not use the word "grammar"
+-- it covers the same adapt-versus-invent split these pools follow, described
+in its own terms.
 
 ---
 
@@ -197,8 +199,7 @@ custom_nodes/ComfyUI-OldTimeRadio/nodes/visual_styles/<your_style_id>.json
 
 1. **Copy the shipped pack closest to what you want.** Do not start from a
    blank file -- every key is required and the validator is strict.
-   `cartoon.json` is the smallest and plainest; `sci_fi_radio.json` is the
-   house look.
+   `cartoon.json` is the plainest; `sci_fi_radio.json` is the house look.
 2. **Rename the file.** The filename *is* the id: `pulp_woodcut.json` must
    declare `"style_id": "pulp_woodcut"`, and a mismatch is refused by name.
    Lowercase letters, digits and underscores only.
@@ -213,10 +214,17 @@ the roll at the same odds as everything else.
 It reads the whole folder at startup and refuses loudly, naming the file, if
 anything is off. The ones that catch people:
 
-- **Every key is required and non-empty**, and no extra keys are allowed. The
-  one exception is `scene_instruction_look`, which may be an empty string.
+- **Every key must be present, and no extra keys are allowed.** Presence and
+  non-emptiness are different rules, though. The newer look/subject fields --
+  the ones step 3 above is really asking you to rewrite -- must be non-empty,
+  with one exception: `scene_instruction_look` may be an empty string. The
+  four older tail fields (`positive_tail`, `image_grade_tail`,
+  `broadcast_tail`, `era_tail`) and `label` must be present but are never
+  checked for emptiness -- three of the nine shipped packs (`cartoon.json`,
+  `anime.json`, `paper_origami.json`) ship today with `image_grade_tail`,
+  `broadcast_tail` and `era_tail` all set to `""`, and that validates fine.
   `negative_tail` (what the style should *avoid* drawing) and `checkpoint` are
-  optional.
+  optional outright -- leave them out of the file and nothing complains.
 - **The placeholders are exact.** `{form}` appears exactly once in
   `announcer_subject_ltx_mouth` and once in each of the three `open_subjects`
   values; `{base}` appears exactly once in `non_character_emblem_fallback`. No

@@ -216,16 +216,19 @@ def test_schema_extra_forbid_and_family_rules():
 def test_widget_vector_exact():
     """Golden pin on the director's required widget order/names (drift guard).
     2026-07-03: three first-class video slots (announcer/music/CHARACTER) --
-    the legacy catch-all video slot retired, character promoted to slot 3. The
-    11-widget vector below matches node 87's widgets_values[0:11] in the JSON."""
+    the legacy catch-all video slot retired, character promoted to slot 3.
+    2026-09-13: `seed_mode` and `request_seed` REMOVED -- both were write-only
+    (stamped into the emitted policy under "seed", never read back by any
+    consumer; see the removal comment in otr_video_director.py). The 9-widget
+    vector below matches node 87's widgets_values[0:9] in the JSON."""
     req = list(OTRVideoDirector.INPUT_TYPES()["required"].keys())
     assert req == [
         "announcer_video_model", "music_video_model", "character_video_model",
         "announcer_image_model", "music_image_model", "character_image_model",
         "fps", "canvas_w", "canvas_h",
-        "seed_mode", "request_seed",
     ]
     assert "seed" not in req  # V-7: no widget literally named 'seed'
+    assert "seed_mode" not in req and "request_seed" not in req  # removed 2026-09-13
 
 
 @pytest.mark.parametrize("cls", [OTRVideoDirector, OTRShotLock])
@@ -274,7 +277,7 @@ def test_director_policy_json_and_clamp(clean_video_registry):
         character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
         music_image_model="Flux (gen 1)", character_image_model="Flux (gen 1)",
         fps=25,
-        canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
+        canvas_w=832, canvas_h=480,
     )
     policy = json.loads(out[0])
     assert policy["canvas"] == {"w": 832, "h": 480, "fps": 25}
@@ -296,7 +299,7 @@ def test_director_fail_closed_incompatible_pick(clean_video_registry):
             character_video_model=ADD_CUSTOM, announcer_image_model="Flux (gen 1)",
             music_image_model="Flux (gen 1)", character_image_model="Flux (gen 1)",
             fps=25,
-            canvas_w=832, canvas_h=480, seed_mode="request_hash", request_seed=0,
+            canvas_w=832, canvas_h=480,
         )
 
 

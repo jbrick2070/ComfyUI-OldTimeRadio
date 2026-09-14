@@ -2158,6 +2158,105 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         _google_slot_b_choices = _otr_model_catalog.google_api_catalog_dropdown_choices("b")
         return {
             "required": {
+                "source_bank": (
+                    [_ROLLS.BANK_SENTINEL]
+                    + list(_otr_story_routing.list_bank_ids()),
+                    {
+                        "default": "scifi_news_pro",
+                        "tooltip": (
+                            "Story-path SOURCE BANK (multi-modal story "
+                            "schema). Selects which registered story pack "
+                            "supplies the pack-routed creative prompts and "
+                            "which lane the episode runs. scifi_news_pro = "
+                            "the local default sci-fi bank, an LLM-first "
+                            "multipass lane using the configured model "
+                            "slots. "
+                            "Each lane is an INDEPENDENT bank (own pack + "
+                            "bank metadata). The only non-runnable row is '+ Add "
+                            "Your Own' (custom_source_bank) -- picking it "
+                            "FAILS LOUD before any story work (no fallback), "
+                            "with its guide_ref naming the real path: author a "
+                            "bundle under user_packs/source_banks/, run "
+                            "'otr_check bank <path> --activate', restart, and "
+                            "your bank joins this list as its own entry "
+                            "(contract: apple/EXTENDING.md, which ships with the "
+                            "pack; docs/EXTENDING_OTR.md is the longer "
+                            "version in the git tree). A bank's own "
+                            "default_story_model picks its story pack -- there "
+                            "is no separate pack widget. "
+                            "ROLL: pick 'roll (any eligible bank)' to let the "
+                            "run choose for you, uniformly, from every "
+                            "runnable bank whose lane can build the requested "
+                            "shape. This is INDEPENDENT of the visual_style "
+                            "roll -- rolling one does not roll the other. The "
+                            "choice is recorded in the ledger at "
+                            "meta.bank_roll (selected id, seed, and the exact "
+                            "pool it drew from); set OTR_BANK_SEED to replay a "
+                            "past roll. A pinned source_ref cannot be combined "
+                            "with the roll -- a pinned source belongs to one "
+                            "bank."
+                        ),
+                    },
+                ),
+                # Stage 3C (2026-07-06) -- the VISUAL STYLE selector, APPENDED
+                # at the END as combined widget slot 24, BUG-LOCAL-097. Choices
+                # LIVE from the lazy visual-style registry; may RAISE
+                # (VisualStyleError) -- the same deliberate INPUT_TYPES
+                # exception as source_bank above (no-fallback law; a broken
+                # pack dir fails node registration LOUD). Unlike story banks,
+                # every listed style is FULLY LIVE (styles rewrite prompt
+                # tails only -- no execution lane needed).
+                # 2026-07-31: this dropdown gets its OWN roll sentinel,
+                # prepended as choice 0 -- the SECOND randomizer, switched
+                # independently of the source_bank roll. Same UI-command
+                # posture: no new widget, no slot shift, no canonical diff.
+            },
+            "optional": {
+                "source_ref": (
+                    "STRING",
+                    {
+                        "default": "",
+                        "multiline": False,
+                        "tooltip": (
+                            "Optional source reference for source-bank lanes "
+                            "(for example a public-domain URL/id/title). Blank "
+                            "uses the bank's default source selection. This is "
+                            "not a fallback; unsupported nonblank references "
+                            "must fail loud in the consuming bank."
+                        ),
+                    },
+                ),
+                # S5 platform-portability (2026-07-10): the six EXPLICIT LLM
+                # runtime-policy widgets, APPENDED after source_ref as
+                # combined widget slots 28-33 (append-only; BUG-LOCAL-097).
+                # Defaults = the nv50 16 GB baseline, so an old workflow with
+                # a 28-slot vector resolves byte-identically. They feed
+                # _resolve_inputs' LLMRuntimePolicy 1:1 (S1) and are
+                # profile-managed via widget_mapping llm.* keys.
+                # Core's host-detected vocabulary plus the legacy names, so a
+                # saved graph never names a machine it was not saved on and
+                # every existing graph still loads. See
+                # nodes/_otr_shared/device_options.py.
+                "visual_style": (
+                    [_ROLLS.STYLE_SENTINEL]
+                    + list(_ROLLS.eligible_style_ids()),
+                    {
+                        "default": "sci_fi_radio",
+                        "tooltip": (
+                            "NO VISIBLE EFFECT ON THE SHIPPED GRAPH. It "
+                            "styles the still and video prompts, and the "
+                            "canonical's three video lanes are procedural -- "
+                            "they draw from the audio and read no still, so "
+                            "this changes the filename and the receipt and "
+                            "nothing you can see. Switch a video lane to a "
+                            "still or diffusion engine first, then it is one "
+                            "of the strongest controls here. "
+                            "Story content is never touched either way. "
+                            "'roll (any style)' picks one for you, recorded "
+                            "at meta.style_roll."
+                        ),
+                    },
+                ),
                 "episode_title": ("STRING", {
                     "default": "",
                     "tooltip": (
@@ -2177,76 +2276,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # `workflows/otr_canonical.json` and all variants were
                 # regenerated in the SAME change. A graph saved before that
                 # change must be re-saved.
-                "num_characters": ("INT", {
-                    "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
-                    "tooltip": (
-                        "REQUESTED number of speaking characters (plus "
-                        "ANNOUNCER bookends). 1 = monologue/diary mode. This "
-                        "is a request, not a cap: a story that genuinely needs "
-                        "another voice may use one. The real ceiling is the "
-                        "voice stock, because two characters never share a "
-                        "voice."
-                    ),
-                }),
-            },
-            "optional": {
-                # S30 B2a: single model_id widget replaced by two slots.
-                # The catalog dropdown_choices() call scans the local HF
-                # cache live and applies display-only suffixes such as
-                # [LOCAL HF], [LOCAL GGUF], and [NOT DOWNLOADED]. Labels are
-                # stripped via _otr_model_catalog._strip_label_suffix
-                # before any consumer / meta stamp gets the value -- raw
-                # widget strings never reach downstream nodes.
-                "creative_writing_model": (
-                    _otr_model_catalog.dropdown_choices(),
-                    {
-                        "default": _creative_default,
-                        "tooltip": (
-                            "LLM for the creative/narrative passes "
-                            "(outline, cast, dialogue composer, polish, "
-                            "style picker invention). Mistral-Nemo is "
-                            "the C7 byte-identical audio baseline. "
-                            "Suffix tags like [LOCAL HF], [LOCAL GGUF], "
-                            "and [NOT DOWNLOADED] are "
-                            "stripped before HF lookup. To use a remote "
-                            "OpenRouter model, set OPENROUTER_API_KEY and "
-                            "pick OpenRouter A/B (see "
-                            "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
-                            "openrouter-setup.md)."
-                        ),
-                    },
-                ),
-                "technical_model": (
-                    _otr_model_catalog.dropdown_choices(),
-                    {
-                        # The BADGED label, not the bare repo id -- see the
-                        # note on _creative_default above. Measured 2026-09-14:
-                        # this default was 'Qwen/Qwen3.5-4B' while the choices
-                        # read 'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight ...)', so
-                        # it matched nothing and a freshly dropped node fell
-                        # through to index 0. It was right only by the accident
-                        # of that row sorting first.
-                        "default": _otr_model_catalog.default_llm_option(),
-                        "tooltip": (
-                            "LLM for the technical/structured passes "
-                            "(JSON validators, GBNF grammar output, "
-                            "reviewer verdicts, cast contract checks, "
-                            "format normalization, news interpreter). "
-                            "Profile/platform-owned baseline: your hardware "
-                            "profile pins it, and a direct headless -Set "
-                            "override is sanctioned and wins over the "
-                            "profile when supplied. Pick a smaller model "
-                            "here when you want Slot 1 != Slot 2 routing "
-                            "for VRAM headroom. To use a remote OpenRouter "
-                            "model, set OPENROUTER_API_KEY and pick "
-                            "OpenRouter A/B (see "
-                            "https://github.com/jbrick2070/"
-                            "ComfyUI-OldTimeRadio/blob/main/docs/"
-                            "openrouter-setup.md)."
-                        ),
-                    },
-                ),
                 "custom_premise": ("STRING", {
                     "multiline": True,
                     "default": "",
@@ -2260,6 +2289,88 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "Other banks keep their own source and premise rules."
                     ),
                 }),
+                "story_characters": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) who is in it -- names, how they know each "
+                        "other, what they are like"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Character names and notes, in ordinary "
+                        "words: 'Ada, the lighthouse keeper. Her brother Tom, "
+                        "who does not believe her.'\n\n"
+                        "Names you write here are kept exactly as you type "
+                        "them. If you say someone is a man or a woman, that is "
+                        "honoured; if you do not say, it is a free choice and "
+                        "is never guessed from the name.\n\n"
+                        "Someone merely mentioned does not become a speaking "
+                        "part. Leave it empty and the cast is invented for you."
+                    ),
+                }),
+                "story_plot": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) what happens -- events, the trouble, how "
+                        "it ends"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Plot ideas: events, the conflict, a "
+                        "twist, an ending you want. Rough notes are fine.\n\n"
+                        "What you ask for here outranks anything the model "
+                        "would rather invent. What you leave out is invented "
+                        "to fit."
+                    ),
+                }),
+                "story_setting": ("STRING", {
+                    "multiline": True,
+                    "default": "",
+                    "placeholder": (
+                        "(optional) where and when -- place, era, atmosphere"
+                    ),
+                    "tooltip": (
+                        "MY STORY ONLY. Setting: place, era, weather, mood, "
+                        "the world it happens in.\n\n"
+                        "This is the story's setting, not its LOOK -- the "
+                        "visual style dropdown chooses the look, and changing "
+                        "it never rewrites your setting."
+                    ),
+                }),
+                "story_author": ("STRING", {
+                    "multiline": False,
+                    "default": "",
+                    "placeholder": "(optional) who the story is by",
+                    "tooltip": (
+                        "MY STORY ONLY. Who the story is by. Put your own "
+                        "name here, or a pen name, or anyone you want it "
+                        "credited to.\n\n"
+                        "The announcer says it out loud and the closing "
+                        "credits print it. Leave it empty and the episode "
+                        "credits 'one of our listeners' -- no name is ever "
+                        "filled in for you."
+                    ),
+                }),
+                "act_count": (
+                    _ACT_COUNT_CHOICES,
+                    {
+                        "default": str(_DEFAULT_ACT_COUNT),
+                        "tooltip": (
+                            "Number of acts, 1-6. This is the only knob "
+                            "that shapes episode length, and your pick "
+                            "is always honoured.\n\n"
+                            "More acts means a story with more turns in "
+                            "it -- each act gets its own beat skeleton "
+                            "and its own pass. The episode ends up as "
+                            "long as the story needs; length is reported "
+                            "afterwards, never requested up front.\n\n"
+                            "  1 -> a single scene\n"
+                            "  2 -> setup, resolution\n"
+                            "  3 -> setup, complication, resolution\n"
+                            "  6 -> the full arc, through crisis and climax"
+                        ),
+                    },
+                ),
                 "include_act_breaks": ("BOOLEAN", {
                     "default": True,
                     "tooltip": (
@@ -2288,26 +2399,84 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # against Outline.beats' own max_length=32) -- not a
                 # "refuse it" ceiling, a bound the schema already had that
                 # this range simply now agrees with.
-                "act_count": (
-                    _ACT_COUNT_CHOICES,
+                "num_characters": ("INT", {
+                    "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
+                    "tooltip": (
+                        "REQUESTED number of speaking characters (plus "
+                        "ANNOUNCER bookends). 1 = monologue/diary mode. This "
+                        "is a request, not a cap: a story that genuinely needs "
+                        "another voice may use one. The real ceiling is the "
+                        "voice stock, because two characters never share a "
+                        "voice."
+                    ),
+                }),
+                "lemmy_cameo": (
+                    _LEMMY_CAMEO_CHOICES,
                     {
-                        "default": str(_DEFAULT_ACT_COUNT),
+                        "default": "roll (~11% chance)",
                         "tooltip": (
-                            "Number of acts, 1-6. This is the only knob "
-                            "that shapes episode length, and your pick "
-                            "is always honoured.\n\n"
-                            "More acts means a story with more turns in "
-                            "it -- each act gets its own beat skeleton "
-                            "and its own pass. The episode ends up as "
-                            "long as the story needs; length is reported "
-                            "afterwards, never requested up front.\n\n"
-                            "  1 -> a single scene\n"
-                            "  2 -> setup, resolution\n"
-                            "  3 -> setup, complication, resolution\n"
-                            "  6 -> the full arc, through crisis and climax"
+                            "LEMMY easter-egg cameo -- the genial Cockney "
+                            "communications officer who occasionally joins "
+                            "the cast.\n\n"
+                            "  roll (~11% chance) -- default; LEMMY may "
+                            "appear at random. The roll uses OS entropy "
+                            "and is NOT tied to the seed (BUG-LOCAL-260), "
+                            "so a fixed seed no longer pins him on or "
+                            "off.\n"
+                            "  always include -- force LEMMY into the "
+                            "cast this run.\n"
+                            "  never include -- keep LEMMY out this "
+                            "run.\n\n"
+                            "'always' / 'never' consume one of the "
+                            "num_characters slots, exactly as a natural "
+                            "roll does."
                         ),
                     },
                 ),
+                # Build 4 (2026-05-28, GO_FORWARD_PLAN_v10): grouped
+                # exchange dialogue path. OFF (default) keeps the per-beat
+                # composer; PD1 byte-identity holds. ON runs a pre-pass
+                # that groups 2-3 consecutive voiced beats and renders
+                # each group as one exchange (compose_exchange) using the
+                # Build 3 slot_drama_contracts + the Build 2 Tier-A
+                # integrity check (one block per slot, repair-by-group
+                # once, then legacy fallback). ANNOUNCER/MUSIC beats and
+                # trailing singletons keep their existing pass; any
+                # failure falls back to the legacy composer per beat so
+                # audio is never blocked.
+                "story_scaffold": (
+                    ["auto", "on", "off"],
+                    {
+                        "default": "auto",
+                        "tooltip": (
+                            "How much the radio-drama SCAFFOLD shapes the story. "
+                            "off = a story drawn straight from the news seed (the "
+                            "base prompt only -- no style catalog, no climax-"
+                            "shape grammar, no grounding gate; the writer's own "
+                            "take). on = the news story shaped by ONE of the ~100 "
+                            "radio-drama styles (varied climax + ending + the "
+                            "premise-grounding body gate). auto (default) = follow "
+                            "the OTR_ENABLE_STYLE_GRAMMAR env / its default (ON). "
+                            "on/off override that env for THIS run."
+                        ),
+                    },
+                ),
+                # Stage 2C (multi-modal story schema, 2026-07-05) -- the
+                # story-path source_bank selector, APPENDED at the END of
+                # optional as combined widget slot 23, BUG-LOCAL-097. Choices
+                # come LIVE from the lazy story-routing registry (stable bank
+                # IDS as values; labels belong in tooltips only). NOTE: this
+                # call may RAISE (StoryRoutingError) -- a DELIBERATE exception
+                # to the "INPUT_TYPES must never raise" convention used by the
+                # openrouter probe above (no-fallback law): a broken
+                # banks.json must fail node registration LOUD, never boot
+                # with a baked-in choice list. Non-runnable banks ARE listed
+                # -- picking one raises a loud StoryBankNotRunnableError at
+                # run() before any story work (honest error on use).
+                # 2026-07-31: the ROLL SENTINEL is PREPENDED as choice 0. It
+                # is a UI command, not a registry row -- no new widget, no
+                # positional slot shift, and ZERO canonical-JSON diff (a
+                # graph persists the selected VALUE, never the choice list).
                 "creativity": (_CREATIVITY_CHOICES, {
                     "default": "balanced",
                     "tooltip": (
@@ -2385,124 +2554,63 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # BUG-LOCAL-260: operator control for the LEMMY cameo.
                 # The natural roll is OS-entropy (~11%, decoupled from
                 # the seed); this widget lets the operator force it.
-                "lemmy_cameo": (
-                    _LEMMY_CAMEO_CHOICES,
+                # S30 B2a: single model_id widget replaced by two slots.
+                # The catalog dropdown_choices() call scans the local HF
+                # cache live and applies display-only suffixes such as
+                # [LOCAL HF], [LOCAL GGUF], and [NOT DOWNLOADED]. Labels are
+                # stripped via _otr_model_catalog._strip_label_suffix
+                # before any consumer / meta stamp gets the value -- raw
+                # widget strings never reach downstream nodes.
+                "creative_writing_model": (
+                    _otr_model_catalog.dropdown_choices(),
                     {
-                        "default": "roll (~11% chance)",
+                        "default": _creative_default,
                         "tooltip": (
-                            "LEMMY easter-egg cameo -- the genial Cockney "
-                            "communications officer who occasionally joins "
-                            "the cast.\n\n"
-                            "  roll (~11% chance) -- default; LEMMY may "
-                            "appear at random. The roll uses OS entropy "
-                            "and is NOT tied to the seed (BUG-LOCAL-260), "
-                            "so a fixed seed no longer pins him on or "
-                            "off.\n"
-                            "  always include -- force LEMMY into the "
-                            "cast this run.\n"
-                            "  never include -- keep LEMMY out this "
-                            "run.\n\n"
-                            "'always' / 'never' consume one of the "
-                            "num_characters slots, exactly as a natural "
-                            "roll does."
+                            "LLM for the creative/narrative passes "
+                            "(outline, cast, dialogue composer, polish, "
+                            "style picker invention). Mistral-Nemo is "
+                            "the C7 byte-identical audio baseline. "
+                            "Suffix tags like [LOCAL HF], [LOCAL GGUF], "
+                            "and [NOT DOWNLOADED] are "
+                            "stripped before HF lookup. To use a remote "
+                            "OpenRouter model, set OPENROUTER_API_KEY and "
+                            "pick OpenRouter A/B (see "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "openrouter-setup.md)."
                         ),
                     },
                 ),
-                # Build 4 (2026-05-28, GO_FORWARD_PLAN_v10): grouped
-                # exchange dialogue path. OFF (default) keeps the per-beat
-                # composer; PD1 byte-identity holds. ON runs a pre-pass
-                # that groups 2-3 consecutive voiced beats and renders
-                # each group as one exchange (compose_exchange) using the
-                # Build 3 slot_drama_contracts + the Build 2 Tier-A
-                # integrity check (one block per slot, repair-by-group
-                # once, then legacy fallback). ANNOUNCER/MUSIC beats and
-                # trailing singletons keep their existing pass; any
-                # failure falls back to the legacy composer per beat so
-                # audio is never blocked.
-                "use_exchange": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "Build 4 grouped-exchange dialogue. OFF (default) "
-                        "keeps the per-beat composer; PD1 byte-identity "
-                        "holds. ON groups 2-3 consecutive voiced beats and "
-                        "renders each as one exchange (compose_exchange) "
-                        "with the Build 3 contracts + Build 2 Tier-A "
-                        "check; one block per slot, one repair-by-group, "
-                        "then legacy fallback. ANNOUNCER/MUSIC + trailing "
-                        "singletons keep their pass. Any failure falls "
-                        "back to legacy per beat -- audio is never "
-                        "blocked. Validate VRAM <= 14.5 GB + zero slot "
-                        "drift on a live N=3 run."
-                    ),
-                }),
-                # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
-                # Stage 3 validators on the legacy dialogue composer.
-                # Observes speaker leaks, banned phrases, length drift,
-                # pronoun mismatches and on-beat misses on the rendered
-                # text BEFORE the ledger is frozen, and stamps what it
-                # finds on meta.lines[].validation_findings for audit.
-                #
-                # IT NEVER REGENERATES A LINE, and the widget said it did
-                # until 2026-08-15. The promise was written in an era that
-                # ended twice over: THE LAW (2026-07-22) forbids failing or
-                # rerolling a story for length, language or style, which is
-                # most of what these validators report; and the one finding
-                # class that IS a real defect -- a character speaking
-                # another's lines -- was built as an attribution repair,
-                # lab-measured on 2026-08-14 at 3/6 then 1/6 recall on
-                # identical fixtures, and shipped disabled for being too
-                # unstable to hand a rewrite. Telemetry is the correct
-                # behaviour here; the tooltip was the defect.
-                #
-                # Default OFF so the legacy PD1 byte-identity contract holds
-                # out-of-the-box; flip ON for production smokes.
-                "enable_production_stage3_validators": ("BOOLEAN", {
-                    "default": False,
-                    "tooltip": (
-                        "OFF (default) preserves PD1 byte-identity on the "
-                        "legacy path -- no validators run. ON wires Stage 3 "
-                        "validators (speaker-leak, banned-phrase, length, "
-                        "pronoun, on-beat) into the production compose_line "
-                        "for every character dialogue beat. TELEMETRY ONLY: "
-                        "findings are stamped on "
-                        "meta.lines[].validation_findings and NOTHING is "
-                        "regenerated, rerolled or rejected -- an audit may "
-                        "never fail a story for length, language, style or "
-                        "quality. Costs no extra LLM call at any severity. "
-                        "Flip ON for production smokes; OFF for the "
-                        "byte-identity regression run."
-                    ),
-                }),
-                # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27
-                # directive: when build_news_briefs exhausts its
-                # Keep the positional widget for workflow compatibility. The
-                # bounded quality chain now handles malformed/rejected model
-                # briefs and always stamps a validated source floor at its
-                # ceiling. This switch governs only the legacy non-quality
-                # SourceInterpretError branch.
-                "news_briefs_required": ("BOOLEAN", {
-                    "default": True,
-                    "tooltip": (
-                        "ON (default): typed non-quality source-interpreter "
-                        "failures stay fail-loud. OFF: the legacy branch may "
-                        "degrade to raw news_seed. Rejected/malformed LLM "
-                        "briefs do not reach this switch: they rotate through "
-                        "fresh technical/creative repair passes and end at a "
-                        "validated bank-specific source floor."
-                    ),
-                }),
-                # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
-                # APPENDED at the END of optional so the existing widget order
-                # is untouched. They land at widgets_values[17]/[18] -- verified
-                # against workflows/otr_canonical.json on 2026-08-07. (This
-                # comment said [19]/[20] until then; a wrong positional claim in
-                # a POSITIONAL widgets_values system is a trap, so it is stated
-                # here only because it was re-verified.) PASSIVE: a pick here
-                # binds a real slug to openrouter:slot-a/b but does NOT activate
-                # remote -- it is used only when creative_writing_model /
-                # technical_model selects that handle. Choices come from the S0
-                # disk cache plus the curated aliases (network-free);
-                # remote-disabled shows the "(enable OpenRouter)" sentinel.
+                "technical_model": (
+                    _otr_model_catalog.dropdown_choices(),
+                    {
+                        # The BADGED label, not the bare repo id -- see the
+                        # note on _creative_default above. Measured 2026-09-14:
+                        # this default was 'Qwen/Qwen3.5-4B' while the choices
+                        # read 'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight ...)', so
+                        # it matched nothing and a freshly dropped node fell
+                        # through to index 0. It was right only by the accident
+                        # of that row sorting first.
+                        "default": _otr_model_catalog.default_llm_option(),
+                        "tooltip": (
+                            "LLM for the technical/structured passes "
+                            "(JSON validators, GBNF grammar output, "
+                            "reviewer verdicts, cast contract checks, "
+                            "format normalization, news interpreter). "
+                            "Profile/platform-owned baseline: your hardware "
+                            "profile pins it, and a direct headless -Set "
+                            "override is sanctioned and wins over the "
+                            "profile when supplied. Pick a smaller model "
+                            "here when you want Slot 1 != Slot 2 routing "
+                            "for VRAM headroom. To use a remote OpenRouter "
+                            "model, set OPENROUTER_API_KEY and pick "
+                            "OpenRouter A/B (see "
+                            "https://github.com/jbrick2070/"
+                            "ComfyUI-OldTimeRadio/blob/main/docs/"
+                            "openrouter-setup.md)."
+                        ),
+                    },
+                ),
                 "openrouter_slot_a_model": (
                     _slot_a_choices,
                     {
@@ -2620,116 +2728,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # widget indices are untouched. The single user-facing control
                 # over the whole bundled scaffold (style grammar + the KILL-1
                 # body-output gate + the announcer non-outcome close).
-                "story_scaffold": (
-                    ["auto", "on", "off"],
-                    {
-                        "default": "auto",
-                        "tooltip": (
-                            "How much the radio-drama SCAFFOLD shapes the story. "
-                            "off = a story drawn straight from the news seed (the "
-                            "base prompt only -- no style catalog, no climax-"
-                            "shape grammar, no grounding gate; the writer's own "
-                            "take). on = the news story shaped by ONE of the ~100 "
-                            "radio-drama styles (varied climax + ending + the "
-                            "premise-grounding body gate). auto (default) = follow "
-                            "the OTR_ENABLE_STYLE_GRAMMAR env / its default (ON). "
-                            "on/off override that env for THIS run."
-                        ),
-                    },
-                ),
-                # Stage 2C (multi-modal story schema, 2026-07-05) -- the
-                # story-path source_bank selector, APPENDED at the END of
-                # optional as combined widget slot 23, BUG-LOCAL-097. Choices
-                # come LIVE from the lazy story-routing registry (stable bank
-                # IDS as values; labels belong in tooltips only). NOTE: this
-                # call may RAISE (StoryRoutingError) -- a DELIBERATE exception
-                # to the "INPUT_TYPES must never raise" convention used by the
-                # openrouter probe above (no-fallback law): a broken
-                # banks.json must fail node registration LOUD, never boot
-                # with a baked-in choice list. Non-runnable banks ARE listed
-                # -- picking one raises a loud StoryBankNotRunnableError at
-                # run() before any story work (honest error on use).
-                # 2026-07-31: the ROLL SENTINEL is PREPENDED as choice 0. It
-                # is a UI command, not a registry row -- no new widget, no
-                # positional slot shift, and ZERO canonical-JSON diff (a
-                # graph persists the selected VALUE, never the choice list).
-                "source_bank": (
-                    [_ROLLS.BANK_SENTINEL]
-                    + list(_otr_story_routing.list_bank_ids()),
-                    {
-                        "default": "scifi_news_pro",
-                        "tooltip": (
-                            "Story-path SOURCE BANK (multi-modal story "
-                            "schema). Selects which registered story pack "
-                            "supplies the pack-routed creative prompts and "
-                            "which lane the episode runs. scifi_news_pro = "
-                            "the local default sci-fi bank, an LLM-first "
-                            "multipass lane using the configured model "
-                            "slots. "
-                            "Each lane is an INDEPENDENT bank (own pack + "
-                            "bank metadata). The only non-runnable row is '+ Add "
-                            "Your Own' (custom_source_bank) -- picking it "
-                            "FAILS LOUD before any story work (no fallback), "
-                            "with its guide_ref naming the real path: author a "
-                            "bundle under user_packs/source_banks/, run "
-                            "'otr_check bank <path> --activate', restart, and "
-                            "your bank joins this list as its own entry "
-                            "(contract: apple/EXTENDING.md, which ships with the "
-                            "pack; docs/EXTENDING_OTR.md is the longer "
-                            "version in the git tree). A bank's own "
-                            "default_story_model picks its story pack -- there "
-                            "is no separate pack widget. "
-                            "ROLL: pick 'roll (any eligible bank)' to let the "
-                            "run choose for you, uniformly, from every "
-                            "runnable bank whose lane can build the requested "
-                            "shape. This is INDEPENDENT of the visual_style "
-                            "roll -- rolling one does not roll the other. The "
-                            "choice is recorded in the ledger at "
-                            "meta.bank_roll (selected id, seed, and the exact "
-                            "pool it drew from); set OTR_BANK_SEED to replay a "
-                            "past roll. A pinned source_ref cannot be combined "
-                            "with the roll -- a pinned source belongs to one "
-                            "bank."
-                        ),
-                    },
-                ),
-                # Stage 3C (2026-07-06) -- the VISUAL STYLE selector, APPENDED
-                # at the END as combined widget slot 24, BUG-LOCAL-097. Choices
-                # LIVE from the lazy visual-style registry; may RAISE
-                # (VisualStyleError) -- the same deliberate INPUT_TYPES
-                # exception as source_bank above (no-fallback law; a broken
-                # pack dir fails node registration LOUD). Unlike story banks,
-                # every listed style is FULLY LIVE (styles rewrite prompt
-                # tails only -- no execution lane needed).
-                # 2026-07-31: this dropdown gets its OWN roll sentinel,
-                # prepended as choice 0 -- the SECOND randomizer, switched
-                # independently of the source_bank roll. Same UI-command
-                # posture: no new widget, no slot shift, no canonical diff.
-                "visual_style": (
-                    [_ROLLS.STYLE_SENTINEL]
-                    + list(_ROLLS.eligible_style_ids()),
-                    {
-                        "default": "sci_fi_radio",
-                        "tooltip": (
-                            "NO VISIBLE EFFECT ON THE SHIPPED GRAPH. It "
-                            "styles the still and video prompts, and the "
-                            "canonical's three video lanes are procedural -- "
-                            "they draw from the audio and read no still, so "
-                            "this changes the filename and the receipt and "
-                            "nothing you can see. Switch a video lane to a "
-                            "still or diffusion engine first, then it is one "
-                            "of the strongest controls here. "
-                            "Story content is never touched either way. "
-                            "'roll (any style)' picks one for you, recorded "
-                            "at meta.style_roll."
-                        ),
-                    },
-                ),
-                # Google BYO API direct LLM slot pickers (2026-07-08),
-                # APPENDED after source_bank/visual_style as combined widget
-                # slots 25/26. Passive: these bind concrete Gemini model ids
-                # only when creative_writing_model / technical_model selects
+                # Google BYO API direct LLM slot pickers (2026-07-08). Passive:
+                # these bind concrete Gemini model ids only when
+                # creative_writing_model / technical_model selects
                 # google_api:slot-a/b. Choices are network-free at INPUT_TYPES.
+                #
+                # The slot NUMBERS this comment used to quote are gone on
+                # purpose. It said "combined widget slots 25/26", the
+                # 2026-09-14 reorder moved them, and the comment was left
+                # stranded above `episode_title` describing widgets 470 lines
+                # away. tests/test_openrouter_slot_widgets_s2.py::
+                # _EXPECTED_INPUT_ORDER is the one place the order is stated;
+                # a number repeated here is a number that goes stale.
                 "google_api_slot_a_model": (
                     _google_slot_a_choices,
                     {
@@ -2760,31 +2770,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # after the Google API pickers as combined widget slot 27.
                 # Blank is inert; future bank-specific fetchers may consume a
                 # URL/id/title here and must add their own fail-loud validators.
-                "source_ref": (
-                    "STRING",
-                    {
-                        "default": "",
-                        "multiline": False,
-                        "tooltip": (
-                            "Optional source reference for source-bank lanes "
-                            "(for example a public-domain URL/id/title). Blank "
-                            "uses the bank's default source selection. This is "
-                            "not a fallback; unsupported nonblank references "
-                            "must fail loud in the consuming bank."
-                        ),
-                    },
-                ),
-                # S5 platform-portability (2026-07-10): the six EXPLICIT LLM
-                # runtime-policy widgets, APPENDED after source_ref as
-                # combined widget slots 28-33 (append-only; BUG-LOCAL-097).
-                # Defaults = the nv50 16 GB baseline, so an old workflow with
-                # a 28-slot vector resolves byte-identically. They feed
-                # _resolve_inputs' LLMRuntimePolicy 1:1 (S1) and are
-                # profile-managed via widget_mapping llm.* keys.
-                # Core's host-detected vocabulary plus the legacy names, so a
-                # saved graph never names a machine it was not saved on and
-                # every existing graph still loads. See
-                # nodes/_otr_shared/device_options.py.
                 "llm_device": (
                     _OTR_DEVICE_OPTIONS.device_options(),
                     {"default": _OTR_DEVICE_OPTIONS.DEFAULT_DEVICE_OPTION,
@@ -2847,18 +2832,90 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # burns -- previously only OTR_VideoDirector was gated
                 # (link 269) and a bad variant wasted the whole story
                 # phase first. forceInput: consumes NO widgets_values slot.
-                "gate_in": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "forceInput": True,
-                    "tooltip": "Ordering/validation signal (wire "
-                               "OTR_WorkflowValidator.validation_report).",
+                "use_exchange": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "Build 4 grouped-exchange dialogue. OFF (default) "
+                        "keeps the per-beat composer; PD1 byte-identity "
+                        "holds. ON groups 2-3 consecutive voiced beats and "
+                        "renders each as one exchange (compose_exchange) "
+                        "with the Build 3 contracts + Build 2 Tier-A "
+                        "check; one block per slot, one repair-by-group, "
+                        "then legacy fallback. ANNOUNCER/MUSIC + trailing "
+                        "singletons keep their pass. Any failure falls "
+                        "back to legacy per beat -- audio is never "
+                        "blocked. Validate VRAM <= 14.5 GB + zero slot "
+                        "drift on a live N=3 run."
+                    ),
                 }),
-                # CANONICAL REPLAY (campaign item 0, 2026-09-02). The LAST
-                # optional entry on purpose: it is the trailing widget, so its
-                # widgets_values slot is appended and every earlier saved
-                # value keeps its index (BUG-LOCAL-097); it also sits after
-                # gate_in so the canonical's inputs descriptor order matches.
+                # Sprint 10B Wave 1 Agent B (2026-05-27): in-line
+                # Stage 3 validators on the legacy dialogue composer.
+                # Observes speaker leaks, banned phrases, length drift,
+                # pronoun mismatches and on-beat misses on the rendered
+                # text BEFORE the ledger is frozen, and stamps what it
+                # finds on meta.lines[].validation_findings for audit.
+                #
+                # IT NEVER REGENERATES A LINE, and the widget said it did
+                # until 2026-08-15. The promise was written in an era that
+                # ended twice over: THE LAW (2026-07-22) forbids failing or
+                # rerolling a story for length, language or style, which is
+                # most of what these validators report; and the one finding
+                # class that IS a real defect -- a character speaking
+                # another's lines -- was built as an attribution repair,
+                # lab-measured on 2026-08-14 at 3/6 then 1/6 recall on
+                # identical fixtures, and shipped disabled for being too
+                # unstable to hand a rewrite. Telemetry is the correct
+                # behaviour here; the tooltip was the defect.
+                #
+                # Default OFF so the legacy PD1 byte-identity contract holds
+                # out-of-the-box; flip ON for production smokes.
+                "enable_production_stage3_validators": ("BOOLEAN", {
+                    "default": False,
+                    "tooltip": (
+                        "OFF (default) preserves PD1 byte-identity on the "
+                        "legacy path -- no validators run. ON wires Stage 3 "
+                        "validators (speaker-leak, banned-phrase, length, "
+                        "pronoun, on-beat) into the production compose_line "
+                        "for every character dialogue beat. TELEMETRY ONLY: "
+                        "findings are stamped on "
+                        "meta.lines[].validation_findings and NOTHING is "
+                        "regenerated, rerolled or rejected -- an audit may "
+                        "never fail a story for length, language, style or "
+                        "quality. Costs no extra LLM call at any severity. "
+                        "Flip ON for production smokes; OFF for the "
+                        "byte-identity regression run."
+                    ),
+                }),
+                # Sprint 2.2 (2026-05-28) -- Jeffrey 2026-05-27
+                # directive: when build_news_briefs exhausts its
+                # Keep the positional widget for workflow compatibility. The
+                # bounded quality chain now handles malformed/rejected model
+                # briefs and always stamps a validated source floor at its
+                # ceiling. This switch governs only the legacy non-quality
+                # SourceInterpretError branch.
+                "news_briefs_required": ("BOOLEAN", {
+                    "default": True,
+                    "tooltip": (
+                        "ON (default): typed non-quality source-interpreter "
+                        "failures stay fail-loud. OFF: the legacy branch may "
+                        "degrade to raw news_seed. Rejected/malformed LLM "
+                        "briefs do not reach this switch: they rotate through "
+                        "fresh technical/creative repair passes and end at a "
+                        "validated bank-specific source floor."
+                    ),
+                }),
+                # S2 (2026-06-01): the two OpenRouter slot-slug pickers,
+                # APPENDED at the END of optional so the existing widget order
+                # is untouched. They land at widgets_values[17]/[18] -- verified
+                # against workflows/otr_canonical.json on 2026-08-07. (This
+                # comment said [19]/[20] until then; a wrong positional claim in
+                # a POSITIONAL widgets_values system is a trap, so it is stated
+                # here only because it was re-verified.) PASSIVE: a pick here
+                # binds a real slug to openrouter:slot-a/b but does NOT activate
+                # remote -- it is used only when creative_writing_model /
+                # technical_model selects that handle. Choices come from the S0
+                # disk cache plus the curated aliases (network-free);
+                # remote-disabled shows the "(enable OpenRouter)" sentinel.
                 "replay_from": ("STRING", {
                     "default": "",
                     "tooltip": (
@@ -2878,68 +2935,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # They are read ONLY by the My Story bank. Filling one while
                 # another source is selected FAILS EARLY and says so, rather
                 # than rendering an episode that quietly ignored them.
-                "story_characters": ("STRING", {
+                "gate_in": ("STRING", {
                     "multiline": True,
                     "default": "",
-                    "placeholder": (
-                        "(optional) who is in it -- names, how they know each "
-                        "other, what they are like"
-                    ),
-                    "tooltip": (
-                        "MY STORY ONLY. Character names and notes, in ordinary "
-                        "words: 'Ada, the lighthouse keeper. Her brother Tom, "
-                        "who does not believe her.'\n\n"
-                        "Names you write here are kept exactly as you type "
-                        "them. If you say someone is a man or a woman, that is "
-                        "honoured; if you do not say, it is a free choice and "
-                        "is never guessed from the name.\n\n"
-                        "Someone merely mentioned does not become a speaking "
-                        "part. Leave it empty and the cast is invented for you."
-                    ),
+                    "forceInput": True,
+                    "tooltip": "Ordering/validation signal (wire "
+                               "OTR_WorkflowValidator.validation_report).",
                 }),
-                "story_plot": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": (
-                        "(optional) what happens -- events, the trouble, how "
-                        "it ends"
-                    ),
-                    "tooltip": (
-                        "MY STORY ONLY. Plot ideas: events, the conflict, a "
-                        "twist, an ending you want. Rough notes are fine.\n\n"
-                        "What you ask for here outranks anything the model "
-                        "would rather invent. What you leave out is invented "
-                        "to fit."
-                    ),
-                }),
-                "story_setting": ("STRING", {
-                    "multiline": True,
-                    "default": "",
-                    "placeholder": (
-                        "(optional) where and when -- place, era, atmosphere"
-                    ),
-                    "tooltip": (
-                        "MY STORY ONLY. Setting: place, era, weather, mood, "
-                        "the world it happens in.\n\n"
-                        "This is the story's setting, not its LOOK -- the "
-                        "visual style dropdown chooses the look, and changing "
-                        "it never rewrites your setting."
-                    ),
-                }),
-                "story_author": ("STRING", {
-                    "multiline": False,
-                    "default": "",
-                    "placeholder": "(optional) who the story is by",
-                    "tooltip": (
-                        "MY STORY ONLY. Who the story is by. Put your own "
-                        "name here, or a pen name, or anyone you want it "
-                        "credited to.\n\n"
-                        "The announcer says it out loud and the closing "
-                        "credits print it. Leave it empty and the episode "
-                        "credits 'one of our listeners' -- no name is ever "
-                        "filled in for you."
-                    ),
-                }),
+                # CANONICAL REPLAY (campaign item 0, 2026-09-02). The LAST
+                # optional entry on purpose: it is the trailing widget, so its
+                # widgets_values slot is appended and every earlier saved
+                # value keeps its index (BUG-LOCAL-097); it also sits after
+                # gate_in so the canonical's inputs descriptor order matches.
             },
             # ComfyUI injects the configured Comfy API key into this hidden
             # input at execution time (the API-nodes auth convention). The

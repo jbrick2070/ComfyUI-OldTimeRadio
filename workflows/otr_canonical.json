@@ -122,40 +122,41 @@
       "mode": 0,
       "inputs": [
         {
+          "localized_name": "source_bank",
+          "name": "source_bank",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "source_bank"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "source_ref",
+          "name": "source_ref",
+          "shape": 7,
+          "type": "STRING",
+          "widget": {
+            "name": "source_ref"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "visual_style",
+          "name": "visual_style",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "visual_style"
+          },
+          "link": null
+        },
+        {
           "localized_name": "episode_title",
           "name": "episode_title",
           "type": "STRING",
           "widget": {
             "name": "episode_title"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "num_characters",
-          "name": "num_characters",
-          "type": "INT",
-          "widget": {
-            "name": "num_characters"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "creative_writing_model",
-          "name": "creative_writing_model",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "creative_writing_model"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "technical_model",
-          "name": "technical_model",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "technical_model"
           },
           "link": null
         },
@@ -170,6 +171,48 @@
           "link": null
         },
         {
+          "name": "story_characters",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_characters"
+          }
+        },
+        {
+          "name": "story_plot",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_plot"
+          }
+        },
+        {
+          "name": "story_setting",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_setting"
+          }
+        },
+        {
+          "name": "story_author",
+          "type": "STRING",
+          "link": null,
+          "widget": {
+            "name": "story_author"
+          }
+        },
+        {
+          "localized_name": "act_count",
+          "name": "act_count",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "act_count"
+          },
+          "link": null
+        },
+        {
           "localized_name": "include_act_breaks",
           "name": "include_act_breaks",
           "shape": 7,
@@ -180,12 +223,31 @@
           "link": null
         },
         {
-          "localized_name": "act_count",
-          "name": "act_count",
+          "localized_name": "num_characters",
+          "name": "num_characters",
+          "type": "INT",
+          "widget": {
+            "name": "num_characters"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "lemmy_cameo",
+          "name": "lemmy_cameo",
           "shape": 7,
           "type": "COMBO",
           "widget": {
-            "name": "act_count"
+            "name": "lemmy_cameo"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "story_scaffold",
+          "name": "story_scaffold",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "story_scaffold"
           },
           "link": null
         },
@@ -230,42 +292,22 @@
           "link": null
         },
         {
-          "localized_name": "lemmy_cameo",
-          "name": "lemmy_cameo",
+          "localized_name": "creative_writing_model",
+          "name": "creative_writing_model",
           "shape": 7,
           "type": "COMBO",
           "widget": {
-            "name": "lemmy_cameo"
+            "name": "creative_writing_model"
           },
           "link": null
         },
         {
-          "localized_name": "use_exchange",
-          "name": "use_exchange",
+          "localized_name": "technical_model",
+          "name": "technical_model",
           "shape": 7,
-          "type": "BOOLEAN",
+          "type": "COMBO",
           "widget": {
-            "name": "use_exchange"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "enable_production_stage3_validators",
-          "name": "enable_production_stage3_validators",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "enable_production_stage3_validators"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "news_briefs_required",
-          "name": "news_briefs_required",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "news_briefs_required"
+            "name": "technical_model"
           },
           "link": null
         },
@@ -310,36 +352,6 @@
           "link": null
         },
         {
-          "localized_name": "story_scaffold",
-          "name": "story_scaffold",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "story_scaffold"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "source_bank",
-          "name": "source_bank",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "source_bank"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "visual_style",
-          "name": "visual_style",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "visual_style"
-          },
-          "link": null
-        },
-        {
           "localized_name": "google_api_slot_a_model",
           "name": "google_api_slot_a_model",
           "shape": 7,
@@ -356,16 +368,6 @@
           "type": "COMBO",
           "widget": {
             "name": "google_api_slot_b_model"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "source_ref",
-          "name": "source_ref",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "source_ref"
           },
           "link": null
         },
@@ -420,6 +422,13 @@
           "link": null
         },
         {
+          "localized_name": "gate_in",
+          "name": "gate_in",
+          "shape": 7,
+          "type": "STRING",
+          "link": 279
+        },
+        {
           "localized_name": "gguf_quant",
           "name": "gguf_quant",
           "shape": 7,
@@ -430,11 +439,34 @@
           "link": null
         },
         {
-          "localized_name": "gate_in",
-          "name": "gate_in",
+          "localized_name": "use_exchange",
+          "name": "use_exchange",
           "shape": 7,
-          "type": "STRING",
-          "link": 279
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "use_exchange"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "enable_production_stage3_validators",
+          "name": "enable_production_stage3_validators",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "enable_production_stage3_validators"
+          },
+          "link": null
+        },
+        {
+          "localized_name": "news_briefs_required",
+          "name": "news_briefs_required",
+          "shape": 7,
+          "type": "BOOLEAN",
+          "widget": {
+            "name": "news_briefs_required"
+          },
+          "link": null
         },
         {
           "localized_name": "replay_from",
@@ -445,38 +477,6 @@
             "name": "replay_from"
           },
           "link": null
-        },
-        {
-          "name": "story_characters",
-          "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "story_characters"
-          }
-        },
-        {
-          "name": "story_plot",
-          "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "story_plot"
-          }
-        },
-        {
-          "name": "story_setting",
-          "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "story_setting"
-          }
-        },
-        {
-          "name": "story_author",
-          "type": "STRING",
-          "link": null,
-          "widget": {
-            "name": "story_author"
-          }
         }
       ],
       "outputs": [
@@ -532,41 +532,41 @@
         "Node name for S&R": "OTR_LedgerScriptWriter"
       },
       "widgets_values": [
+        "roll (any eligible bank)",
         "",
-        2,
-        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
-        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+        "roll (any style)",
         "",
-        true,
+        "",
+        "",
+        "",
+        "",
+        "",
         "1",
+        true,
+        2,
+        "roll (~11% chance)",
+        "auto",
         "balanced",
         0.05,
         1.03,
         200,
-        "roll (~11% chance)",
-        true,
-        true,
-        true,
+        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
+        "Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)",
         "(enable OpenRouter)",
         "(enable OpenRouter)",
         "(enable Comfy Credits)",
         "(enable Comfy Credits)",
-        "auto",
-        "roll (any eligible bank)",
-        "roll (any style)",
         "(select Google API model)",
         "(select Google API model)",
-        "",
         "default",
         "sdpa",
         "none",
         10.0,
         4096,
         "Q8_0",
-        "",
-        "",
-        "",
-        "",
+        true,
+        true,
+        true,
         ""
       ],
       "color": "#1B2940",

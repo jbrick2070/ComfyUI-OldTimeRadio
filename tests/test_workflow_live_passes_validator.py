@@ -133,8 +133,15 @@ def test_production_workflow_visual_structure_pinned():
     # the machine he is aiming at; a test that pins it turns a preference into a
     # red suite. What still matters -- and is asserted below -- is that whatever
     # is picked is RUNNABLE: registered, usable for its role, and invocable.
-    assert len(wv87) == 15, wv87
-    assert wv87[14] == 0, "canonical must ship the render ceiling UNPINNED"
+    # seed_mode / request_seed removal (2026-09-13): both were WRITE-ONLY on
+    # OTR_VideoDirector.direct -- stamped into the emitted policy under
+    # "seed", which nothing downstream read back. Their widget slots (old
+    # indices 9-10) are gone, so the vector shrank 15 -> 13 and every widget
+    # that followed shifted down two: max_render_frames is now index 12, not
+    # 14. This mirrors OTR_ImageDirector, which KEEPS its own seed widgets
+    # unchanged (its own params ARE read).
+    assert len(wv87) == 13, wv87
+    assert wv87[12] == 0, "canonical must ship the render ceiling UNPINNED"
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])

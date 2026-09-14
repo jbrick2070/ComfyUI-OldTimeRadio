@@ -40,22 +40,40 @@ from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 #   refine_target_grade   retired 2026-08-28 (inert revision-loop promise)
 #   target_words          retired 2026-08-14 (length is an observation now)
 #   perfect_run_spacesaver retired 2026-09-13 (inert since 2026-08-08)
+#
+# REORDERED 2026-09-14 after three independent readers (Claude Fable, GPT-5.6
+# Sol, DeepSeek v4 Pro) proposed an order blind to each other and a fourth pass
+# converged them. Reasoning, the contested placements and one driver overrule
+# are recorded in docs/GO_FORWARD_PLAN.md row A4.
+#
+# `source_bank` is the ONLY `required` entry, and that is load-bearing rather
+# than cosmetic: ComfyUI iterates input.required BEFORE input.optional into one
+# ordered map, so `required` always renders on top. While `episode_title` and
+# `num_characters` were the required pair, no order could open with the control
+# that decides what kind of episode you get.
 _EXPECTED_INPUT_ORDER = [
-    "episode_title", "num_characters",
-    "creative_writing_model", "technical_model", "custom_premise",
-    "include_act_breaks", "act_count", "creativity",
+    # What are we making?
+    "source_bank", "source_ref", "visual_style", "episode_title",
+    "custom_premise",
+    "story_characters", "story_plot", "story_setting", "story_author",
+    # How big, and who is in it?
+    "act_count", "include_act_breaks", "num_characters", "lemmy_cameo",
+    # How does it read?
+    "story_scaffold", "creativity",
     "min_p", "repetition_penalty", "max_new_tokens_cap",
-    "lemmy_cameo", "use_exchange", "enable_production_stage3_validators",
-    "news_briefs_required",
+    # Which brain writes it?
+    "creative_writing_model", "technical_model",
     "openrouter_slot_a_model", "openrouter_slot_b_model",
     "comfy_slot_a_model", "comfy_slot_b_model",
-    "story_scaffold", "source_bank", "visual_style",
-    "google_api_slot_a_model", "google_api_slot_b_model", "source_ref",
+    "google_api_slot_a_model", "google_api_slot_b_model",
+    # Set once for this machine.
     "llm_device", "llm_attn_impl", "llm_quant_policy",
     "llm_vram_ceiling_gb", "gguf_n_ctx", "gguf_quant",
-    "gate_in",                      # SOCKET -- no widgets_values slot
+    # Lab equipment.
+    "use_exchange", "enable_production_stage3_validators",
+    "news_briefs_required",
     "replay_from",
-    "story_characters", "story_plot", "story_setting", "story_author",
+    "gate_in",                      # SOCKET -- no widgets_values slot
 ]
 
 
@@ -122,7 +140,7 @@ def test_widget_order_appends_slots_at_end():
 def test_creative_default_local_when_remote_off(remote_off):
     spec = W.INPUT_TYPES()
     _, meta = spec["optional"]["creative_writing_model"]
-    assert meta["default"] == cat.DEFAULT_LLM
+    assert meta["default"] == cat.default_llm_option()
 
 
 def test_creative_default_slot_a_when_remote_on(remote_on):
@@ -137,7 +155,7 @@ def test_creative_default_slot_a_when_remote_on(remote_on):
 def test_technical_default_never_flips(remote_on):
     spec = W.INPUT_TYPES()
     _, meta = spec["optional"]["technical_model"]
-    assert meta["default"] == cat.DEFAULT_LLM
+    assert meta["default"] == cat.default_llm_option()
 
 
 def test_slot_picker_defaults_are_selectable(remote_off):

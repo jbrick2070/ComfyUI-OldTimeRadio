@@ -178,7 +178,13 @@ def test_workflow_json_node87_matches_live_widget_model():
     # WAN 8GB launch contract (2026-07-24): OLD pin 14 -> NEW pin 15
     # (+max_render_frames=0 appended at index 14; append-only again, so every
     # prior slot -- including character_video_model at index 2 -- is untouched).
-    assert len(n87["widgets_values"]) == 15, n87["widgets_values"]
+    # Write-only seed rip (2026-09-13, commit 1f01cd38): OLD pin 15 -> NEW pin 13
+    # (`seed_mode` and `request_seed` REMOVED from the `required` block, where
+    # they sat right after canvas_h -- i.e. AFTER character_video_model, so
+    # every earlier slot, including character_video_model at index 2, is
+    # untouched. OTR_ImageDirector keeps both of its own seed widgets; this
+    # rip was OTR_VideoDirector-only.)
+    assert len(n87["widgets_values"]) == 13, n87["widgets_values"]
     names87 = {i.get("name") for i in n87["inputs"]}
     # the per-role MODEL widgets are EXACTLY the six live ones -- a closed check
     # that catches any legacy model widget leaking back into the canonical JSON.

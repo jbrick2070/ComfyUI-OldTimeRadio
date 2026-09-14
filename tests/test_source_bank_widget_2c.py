@@ -5,10 +5,16 @@ widget on OTR_LedgerScriptWriter (kibitz-converged plan,
 kibitz-runs/2026-07-05-multimodal-2c/r4/final.md).
 
 Pins:
-  1. Widget surface: source_bank sits immediately before visual_style, the two
-     Google API selectors and source_ref, in that order; choices come
-     LIVE from the routing registry (exact list, registry order, including
-     non-runnable custom banks -- the honest-error contract); default scifi_news_pro.
+  1. Widget surface: source_bank sits immediately before source_ref and
+     visual_style, in that order (the 2026-09-14 writer reorder grouped
+     widgets by section rather than by historical append order, so the two
+     Google API selectors now sit beside the other model-brain pickers --
+     comfy_slot_a_model / comfy_slot_b_model -- not beside source_bank);
+     choices come LIVE from the routing registry (exact list, registry
+     order, including non-runnable custom banks -- the honest-error
+     contract); default scifi_news_pro. source_bank is also the sole
+     `required` entry as of the same reorder -- every other writer input,
+     episode_title and num_characters included, is `optional`.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
      (deliberate exception to the "INPUT_TYPES must never raise"
      convention; no baked-in fallback choice list).
@@ -65,18 +71,27 @@ class TestWidgetSurface:
         # The claim is about the GROUP, not about where the group starts.
         # Stage 3C (2026-07-06) appended visual_style after source_bank;
         # Google API (2026-07-08) appended its selector pair after
-        # visual_style; Source Banks v2 appended source_ref after those. That
-        # run of five must stay together in that order -- which is what the
-        # old absolute indexes were really asserting, and what survives the
-        # next add or removal earlier in the node.
+        # visual_style; Source Banks v2 appended source_ref after those --
+        # that used to be a run of five that stayed together. The 2026-09-14
+        # writer reorder deliberately broke that up: widgets now group by
+        # section ("what are we making?" vs. "which brain writes it?")
+        # instead of by historical append order, so the two Google API
+        # selectors moved next to comfy_slot_a_model/comfy_slot_b_model, and
+        # source_ref moved in BETWEEN source_bank and visual_style. What
+        # survives -- and what stays true across the next add or removal
+        # earlier in the node -- is these two smaller groups.
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
         assert_relative_order(order, [
             "source_bank",
+            "source_ref",
             "visual_style",
+        ])
+        assert_relative_order(order, [
+            "comfy_slot_a_model",
+            "comfy_slot_b_model",
             "google_api_slot_a_model",
             "google_api_slot_b_model",
-            "source_ref",
         ])
 
     def test_choices_are_the_roll_sentinel_then_the_registry_in_order(self):
@@ -88,7 +103,9 @@ class TestWidgetSurface:
         from nodes import _otr_rolls as rolls
 
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
-        choices, meta = spec["optional"]["source_bank"]
+        # source_bank is the sole `required` entry as of the 2026-09-14
+        # writer reorder -- it no longer lives in `optional`.
+        choices, meta = spec["required"]["source_bank"]
         assert choices[0] == rolls.BANK_SENTINEL
         assert choices[1:] == list(routing.list_bank_ids())
         assert rolls.BANK_SENTINEL not in routing.list_bank_ids()
@@ -371,7 +388,9 @@ class TestClientBankReachesTheWidget:
 
     def test_client_bank_is_a_choice_on_the_published_widget(self, client_bank):
         """The wave-7 pin: the operator can SELECT an activated client bank."""
-        choices, meta = OTR_LedgerScriptWriter.INPUT_TYPES()["optional"][
+        # source_bank is the sole `required` entry as of the 2026-09-14
+        # writer reorder -- it no longer lives in `optional`.
+        choices, meta = OTR_LedgerScriptWriter.INPUT_TYPES()["required"][
             "source_bank"]
         assert self._CLIENT_ID in choices
         # It joins as a peer -- the shipped rows and the default are untouched.
@@ -411,7 +430,9 @@ class TestClientBankReachesTheWidget:
         assert value(node1, "source_bank") == "roll (any eligible bank)"
         spec = OTR_LedgerScriptWriter.INPUT_TYPES()
         order = list(spec["required"].keys()) + list(spec["optional"].keys())
-        assert_relative_order(order, ["source_bank", "visual_style"])
+        # source_ref now sits between source_bank and visual_style (the
+        # 2026-09-14 writer reorder) -- same claim, new neighbours.
+        assert_relative_order(order, ["source_bank", "source_ref", "visual_style"])
 
 
 # ---------------------------------------------------------------------------

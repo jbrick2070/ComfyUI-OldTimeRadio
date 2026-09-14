@@ -94,6 +94,28 @@ def test_the_scene_sequencer_no_longer_advertises_the_music_bus():
     assert "music_cue_manifest_json" not in declared
 
 
+def test_only_the_writer_declares_episode_title():
+    """One workflow-facing owner of the title, asserted by name (2026-09-14).
+
+    Three nodes declared `episode_title` until this was written:
+    OTR_LedgerScriptWriter (which authors it and stamps it on the ledger),
+    OTR_EpisodeAssembler (whose own tooltip said the published title comes from
+    the ledger and not from there) and OTR_SignalLostVideo (whose widget was the
+    FOURTH rung of the title chain and could only win on a titleless ledger).
+    Two panels that look like they set the title and do not is a support
+    question, not a feature. Downstream nodes read
+    `nodes/_otr_shared/episode_title.py` instead."""
+    owners = sorted(
+        name for name, cls in NODE_CLASS_MAPPINGS.items()
+        if hasattr(cls, "INPUT_TYPES")
+        and "episode_title" in _declared_input_names(cls)
+    )
+    assert owners == ["OTR_LedgerScriptWriter"], (
+        "episode_title must be declared by OTR_LedgerScriptWriter alone; "
+        "found %s. A second node declaring it puts a field on the panel that "
+        "does not set the published title." % (owners,))
+
+
 def test_the_episode_assembler_STILL_owns_the_music_bus():
     """The live half. If this ever fails, the music bus was cut -- opening,
     closing and interstitial cues all arrive through these two sockets."""

@@ -207,7 +207,6 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
         music_image_model="flux_gen1",
         character_image_model="flux_gen1",
         fps=25, canvas_w=832, canvas_h=480,
-        seed_mode="request_hash", request_seed=42,
     )
     policy = json.loads(out[0])
     assert policy["video_models"]["announcer_video_model"]["engine_id"] == "ltx_video"

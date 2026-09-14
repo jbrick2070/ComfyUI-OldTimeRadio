@@ -86,16 +86,26 @@ is exactly what you see below.
 These download nothing and use no video memory. They cost money instead, per
 picture. [CLOUD.md](CLOUD.md) covers the keys and how to set them.
 
-One difference worth knowing: `google_image` refuses immediately if no key is
-set, before the episode is written. The six Comfy partner rows only find out
-when they try to draw, which is after the script and the voices are done.
+All seven hosted rows check credentials at the same point in the pipeline: per
+still, while the dispatcher renders each shot -- which is after the script is
+written and the voices are recorded. Picking `google_image` over a Comfy
+partner row does not buy you an earlier warning; set the key you need before
+you queue, whichever hosted row you use.
 
 ### `+ Add Custom Model`
 
 The last entry in the dropdown is not an engine. It is the door to naming one of
-your own, which you declare in the director's `custom_models_json` widget. Pick
-the sentinel without declaring anything there and the run refuses, naming the
-slot you left dangling.
+your own -- but declare it on **`OTR_ImageDirector`**, not `OTR_VideoDirector`.
+Both nodes carry a widget called `custom_models_json`, and they are not the same
+box: `OTR_VideoDirector`'s copy maps the three *video* roles, so typing your
+image engine there does nothing. The one that resolves an image role's sentinel
+lives on `OTR_ImageDirector` -- map the role key to your engine id there, e.g.
+`{"music_image_model": "my_engine"}`.
+
+Pick the sentinel and leave that role out of the mapping, and nothing refuses on
+the spot. That role's picture is skipped while the rest of the episode keeps
+rendering, and the run only fails at the end, when the completion check finds a
+still missing.
 
 ---
 
@@ -108,7 +118,10 @@ does.
 The other four local engines stop the render and tell you the exact filename they
 want and the folder it belongs in. **That refusal is the install instruction.**
 It never quietly substitutes another model. [MACHINES.md](MACHINES.md) section 3
-lists every file, the repository it comes from, and where to put it.
+has a file table for `flux2_klein` -- repository, folder, size. The other three
+(`lumina_image`, `flux_gen1`, `ideogram4_local`) ship no manifest at all, and
+section 3 says so; for those, the refusal message you get at queue time is the
+only place the filename and folder show up.
 
 `flux2_klein` needs one more thing that is not a download at all: the
 **ComfyUI-GGUF** node pack, installed into `custom_nodes/`. Without it the run
@@ -144,16 +157,17 @@ In the order it actually happens.
 Your role's video lane draws its own frames. See the second section -- this is
 correct behaviour, not a miss.
 
-**It stops and names a file.** You picked one of the four manual engines.
-[MACHINES.md](MACHINES.md) section 3 says where that file comes from and which
-folder under your ComfyUI `models/` directory it goes in.
+**It stops and names a file.** You picked one of the four manual engines. For
+`flux2_klein`, [MACHINES.md](MACHINES.md) section 3 has the file, the repository,
+and the folder. For the other three, section 3 ships no manifest by design --
+the refusal message itself is the only place that information appears.
 
 **It stops and names a missing class.** You picked `flux2_klein` without
 ComfyUI-GGUF. Install the pack, restart ComfyUI, queue again.
 
-**A hosted pick failed partway through.** No credentials. For `google_image` that
-shows up straight away; for the six `cloud_` rows it shows up at the moment it
-tries to draw. [CLOUD.md](CLOUD.md).
+**A hosted pick failed partway through.** No credentials. Every hosted row --
+`google_image` included -- discovers this at the same point, when the dispatcher
+tries to draw that still. [CLOUD.md](CLOUD.md).
 
 **Two heads, mirrored bodies, duplicate limbs -- on `sd15`.** That is SD 1.5
 past its native resolution. The pack already holds it down to 768 on the long

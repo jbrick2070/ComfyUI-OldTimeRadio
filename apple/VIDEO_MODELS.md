@@ -104,8 +104,8 @@ just do not carry the label, which is reserved for the audio-reactive family.
 | Dropdown | What it makes | Needs |
 |---|---|---|
 | `ltx098_low_video` | animates the beat's still. The cheapest local video lane, and the only one that downloads itself | automatic, about 16 GB |
-| `ltx23_low_audio_in` | animates the still, conditioned on the beat's audio | manual weights + ComfyUI-GGUF |
-| `ltx23_high_video` | the LTX 2.3 22B silent lane | manual weights + ComfyUI-GGUF |
+| `ltx23_low_audio_in` | animates the still, conditioned on the beat's audio | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
+| `ltx23_high_video` | the LTX 2.3 22B silent lane | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
 | `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent | licence + manual weights + ComfyUI-GGUF |
 | `ltx25_high_foley_plus` | the same picture, and it **keeps the model's own sound** | licence + manual weights + ComfyUI-GGUF |
 | `ltx25_high_mime` | the same picture, and the model's sound **replaces** the episode audio over those beats | licence + manual weights + ComfyUI-GGUF |
@@ -231,11 +231,19 @@ writing your own prompts anywhere near these lanes, do the same.
 
 ## When something goes wrong
 
-**The render stops naming a node class you have never heard of.** The lane needs
-somebody else's node pack. The error names the pack and its URL. There are only
-two: **ComfyUI-AnimateDiff-Evolved** for the three AnimateDiff lanes, and
-**ComfyUI-GGUF** for the LTX 2.3, LTX 2.5 and Wan lanes. Install it into
-`custom_nodes/`, restart, queue again.
+**The render stops naming a node class you have never heard of.** Two different
+causes look the same on screen, and the error text is what tells them apart:
+
+- **Somebody else's node pack.** There are three: **ComfyUI-AnimateDiff-Evolved**
+  for the three AnimateDiff lanes, **ComfyUI-GGUF** for the LTX 2.3, LTX 2.5 and
+  Wan lanes, and **ComfyUI-LTXVideo** as well, specifically for the two LTX 2.3
+  lanes (`ltx23_low_audio_in`, `ltx23_high_video`). The error names the pack and
+  its URL. Install it into `custom_nodes/`, restart, queue again.
+- **ComfyUI itself.** The three LTX 2.5 lanes and the two MiniMax H3 lanes use
+  node classes that ship inside ComfyUI's own code rather than a separate pack.
+  If your ComfyUI predates them, the error says to update ComfyUI -- and, on
+  rare occasions, that an older ComfyUI-GGUF needs a small patch -- instead of
+  naming anything to install. Update ComfyUI, restart, queue again.
 
 **The render stops naming a missing file.** The lane needs weights that do not
 fetch themselves. Every lane on this page except `ltx098_low_video` and the
@@ -263,7 +271,7 @@ instance, render small and then refine to a larger decode. The canvas widgets
 are what the plan budgets with; an engine that declares its own native size
 wins at render.
 
-**The picture is letterboxed down the sides.** You picked a `(portrait)` lane.
+**The picture is pillarboxed down the sides.** You picked a `(portrait)` lane.
 The episode is 16:9, so a tall clip is pillarboxed into it rather than cropped
 or stretched. Pick the `_wide` twin of the same engine to fill the frame.
 

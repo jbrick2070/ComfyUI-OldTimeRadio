@@ -502,7 +502,7 @@ class TestAudioContract:
         scene = {"waveform": torch.randn(1, 1, 48000).float(), "sample_rate": 48000}
         # assemble() returns 4 outputs, matching EpisodeAssembler.RETURN_NAMES:
         # episode_audio, output_path, episode_info, audio_done.
-        audio, _, _, _ = EpisodeAssembler().assemble(scene, "Test")
+        audio, _, _, _ = EpisodeAssembler().assemble(scene)
         self._check(audio)
 
 

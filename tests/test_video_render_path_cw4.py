@@ -144,7 +144,6 @@ def test_a_failed_publish_FAILS_THE_RUN_it_never_reports_success(tmp_path, monke
             master_audio_path=str(tmp_path / "also_missing.wav"),
             declared_credits_tail_s=0.0,
             fps=25,
-            ffmpeg="ffmpeg",
             output_path=str(tmp_path / "out.mkv"),
         )
 

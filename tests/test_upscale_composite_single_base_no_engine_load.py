@@ -78,7 +78,6 @@ def test_composite_single_base_never_loads_engine(tmp_path, monkeypatch):
     silent, report = node.composite(
         base_video_path=str(src),
         canvas_w=1920, canvas_h=1080, fps=25,
-        ffmpeg="ffmpeg",
         output_path=str(tmp_path / "out.mp4"),
         gate_in="",
         clip_manifest_json="{}",  # NO "clips" key -> single-base path
@@ -127,7 +126,6 @@ def test_composite_single_base_survives_engine_load_error_potential(tmp_path, mo
     silent, report = node.composite(
         base_video_path=str(src),
         canvas_w=1920, canvas_h=1080, fps=25,
-        ffmpeg="ffmpeg",
         output_path=str(tmp_path / "out.mp4"),
         gate_in="",
         clip_manifest_json="{}",  # single-base path
@@ -165,7 +163,6 @@ def test_composite_assemble_path_still_loads_engine(tmp_path, monkeypatch):
     _silent, _report = node.composite(
         base_video_path=str(src),
         canvas_w=1920, canvas_h=1080, fps=25,
-        ffmpeg="ffmpeg",
         output_path=str(tmp_path / "out.mp4"),
         gate_in="",
         clip_manifest_json=json.dumps(manifest),

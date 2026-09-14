@@ -342,8 +342,12 @@ def test_a_pinned_source_ref_is_fine_on_a_manual_pick():
 # ---------------------------------------------------------------------------
 
 def test_both_dropdowns_carry_their_sentinel_as_choice_zero():
-    optional = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()["optional"]
-    bank_choices = optional["source_bank"][0]
+    # `source_bank` is now the ONLY `required` entry (2026-09-14 writer
+    # reorder); `visual_style` stays in `optional`. See CLAUDE.md item 5.
+    input_types = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()
+    required = input_types["required"]
+    optional = input_types["optional"]
+    bank_choices = required["source_bank"][0]
     style_choices = optional["visual_style"][0]
     assert bank_choices[0] == ROLLS.BANK_SENTINEL
     assert bank_choices[1:] == list(ROUTING.list_bank_ids())
@@ -353,8 +357,10 @@ def test_both_dropdowns_carry_their_sentinel_as_choice_zero():
 
 def test_the_shipped_defaults_are_still_concrete_ids_not_the_roll():
     """Zero canonical-JSON diff: the saved graph's VALUES do not change."""
-    optional = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()["optional"]
-    assert optional["source_bank"][1]["default"] == "scifi_news_pro"
+    input_types = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()
+    required = input_types["required"]
+    optional = input_types["optional"]
+    assert required["source_bank"][1]["default"] == "scifi_news_pro"
     assert optional["visual_style"][1]["default"] == "sci_fi_radio"
 
 

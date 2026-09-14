@@ -406,7 +406,7 @@ def test_the_assembler_copies_and_verifies_the_frozen_master_before_audio_done(f
     sj, led = _replay_ledger_json(frozen)
     descriptor = json.dumps({"meta": led.data["meta"]})
     audio, out_path, info, done = EpisodeAssembler().assemble(
-        None, "Frozen", music_cue_audio={"waveform": None, "sample_rate": 48000},
+        None, music_cue_audio={"waveform": None, "sample_rate": 48000},
         music_cue_manifest_json="", replay_descriptor=descriptor)
     want = frozen["ledger"]["audio"]["master_audio_sha256"]
     assert done == "audio_done:replay:" + want[:12]
@@ -414,6 +414,11 @@ def test_the_assembler_copies_and_verifies_the_frozen_master_before_audio_done(f
     assert _sha(Path(out_path).read_bytes()) == want
     assert PL.peek_ledger().data["final_audio_path"] == out_path
     assert json.loads(info)["replay_of_episode"] == frozen["ep"].name
+    # The title is READ off the ledger arriving on replay_descriptor, never
+    # typed into this node -- the fixture's meta.episode_title is "Frozen" and
+    # OTR_EpisodeAssembler no longer declares an episode_title widget to
+    # override it with.
+    assert json.loads(info)["title"] == "Frozen"
 
 
 def test_the_assembler_withholds_audio_done_on_a_digest_mismatch(frozen):
@@ -422,7 +427,7 @@ def test_the_assembler_withholds_audio_done_on_a_digest_mismatch(frozen):
     led.data["meta"]["replay_master_sha256"] = "0" * 64
     descriptor = json.dumps({"meta": led.data["meta"]})
     with pytest.raises(RuntimeError, match="audio_done withheld"):
-        EpisodeAssembler().assemble(None, "Frozen", replay_descriptor=descriptor)
+        EpisodeAssembler().assemble(None, replay_descriptor=descriptor)
     assert not (Path(led.out_dir) / (led.data["episode_id"] + "_master.wav")).exists()
 
 
@@ -431,7 +436,7 @@ def test_the_assembler_refuses_a_descriptor_for_another_workspace(frozen):
     sj, led = _replay_ledger_json(frozen)
     descriptor = json.dumps({"meta": dict(led.data["meta"], replay_workspace_id="not-this-one")})
     with pytest.raises(RuntimeError, match="not the bound"):
-        EpisodeAssembler().assemble(None, "Frozen", replay_descriptor=descriptor)
+        EpisodeAssembler().assemble(None, replay_descriptor=descriptor)
 
 
 def test_shot_lock_reuses_the_planned_section_without_an_llm(frozen, monkeypatch):

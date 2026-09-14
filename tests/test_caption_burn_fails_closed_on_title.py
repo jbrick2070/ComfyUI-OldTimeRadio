@@ -140,14 +140,24 @@ def test_a_title_only_burn_writes_its_ass_beside_the_episode_not_into_the_cwd(
     a live server is the repo root. Rendered assets belong in the episode
     folder; nothing is ever parked elsewhere to be moved later.
 
-    ``ffmpeg`` is pointed at THIS interpreter, deliberately: a missing binary
-    refuses before the .ass is ever built, so it would not reach the window in
-    which the stray file appeared. A real executable that exits nonzero does --
-    the .ass gets written, then the burn fails. Asserting from a DIFFERENT CWD
-    is the whole point.
+    THIS interpreter is pointed at as the ffmpeg binary, deliberately: the
+    ``ffmpeg`` widget is gone from ``burn`` (removed 2026-09-13; the channel is
+    closed, not sanitised), so the resolver is monkeypatched directly, the same
+    way the unknown-style test below does it. The capability PROBE is also
+    monkeypatched to report no gap -- python.exe genuinely has neither the
+    ``ass`` filter nor ``libx264``, and since 2026-09-11 that is a CLASSIFIED
+    capability gap that passes the clean master through even with a planned
+    title (a different, already-pinned contract) -- so answering "no gap" here
+    is what lets the .ass get written and the real spawn fail for real instead.
+    A real executable that exits nonzero does exactly that -- the .ass gets
+    written, then the burn fails. Asserting from a DIFFERENT CWD is the whole
+    point.
     """
     import sys
 
+    from nodes._otr_shared import ffmpeg as ffmpeg_boundary
+    monkeypatch.setattr(burn_mod, "_ffmpeg_bin", lambda _widget: sys.executable)
+    monkeypatch.setattr(ffmpeg_boundary, "caption_support_gap", lambda _bin: None)
     ep = tmp_path / "episodes" / "ep01"
     ep.mkdir(parents=True)
     vid = ep / "ep01_procgen_blended.mp4"
@@ -158,7 +168,6 @@ def test_a_title_only_burn_writes_its_ass_beside_the_episode_not_into_the_cwd(
 
     with pytest.raises(RuntimeError):
         OTRCaptionBurn().burn(str(vid), burn_captions=False,
-                              ffmpeg=sys.executable,
                               title_card_plan_json=plan_json)
 
     assert list(elsewhere.iterdir()) == [], \

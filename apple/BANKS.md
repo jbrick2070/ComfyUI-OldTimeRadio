@@ -20,7 +20,7 @@ lane", because a roll will land somewhere else four times out of five.
 | **Sci-Fi News Pro** `scifi_news_pro` | Science-fiction audio drama | A science news article, pulled live over RSS |
 | **Shakespeare / Folger** `shakespeare` | Shakespeare radio adaptation | A scene from the Folger texts |
 | **Public Domain** `public_domain` | Public-domain radio adaptation | A public-domain source text |
-| **Media RSS / Archive** `media_archive` | Archive-inspired radio drama | An archive / media-history item, pulled live over RSS |
+| **Media RSS / Archive** `media_archive` | Archive-*inspired* radio drama -- invented, not adapted | An archive / media-history item, pulled live over RSS |
 | **My Story** `my_story` | A radio drama from your idea | The four **My Story** boxes on the writer node |
 | **Original Radio Drama** `original` | Original radio drama | Nothing -- the writer invents it outright |
 
@@ -34,10 +34,20 @@ selecting it does nothing. It is there to tell you the door exists --
 ## The two that need something from you
 
 **My Story** reads four boxes on the writer node -- `story_characters`,
-`story_plot`, `story_setting`, `story_author` -- and nothing else. Leave them
-empty and you get a generic episode, because there is nothing to build from.
-Those four boxes are ignored entirely by the other five banks, so an empty
-`story_plot` is not a mistake anywhere else.
+`story_plot`, `story_setting`, `story_author`. Leave them empty and you get a
+generic episode, because there is nothing to build from.
+
+**Those four boxes are not ignored by the other banks -- they are refused.** If
+you type into any of them while a different source is selected, the run stops
+with a message naming the fields and telling you to either select My Story or
+clear them. That is deliberate: the alternative is an episode that renders
+happily, quietly ignores the characters you described, and looks correct. So
+switching from My Story to another bank means clearing those boxes, not just
+changing the source.
+
+`custom_premise` is different and is worth knowing about: it is shared by EVERY
+bank. Typing a premise on the Shakespeare or archive lane is ordinary, not a
+mistake.
 
 **The two RSS banks** -- Sci-Fi News Pro and Media RSS / Archive -- fetch their
 material from the internet at run time. On a machine with no network they
@@ -46,11 +56,23 @@ Original need nothing from the network.
 
 ---
 
-## Adaptation is not invention, and the packs enforce it
+## Two of them adapt. The rest invent. The difference is not cosmetic
 
-Three of the six adapt somebody else's work -- Shakespeare, Public Domain, and
-the archive lane. Those are **fidelity lanes**: the source has already made the
-dramatic choices, and the job is to put a microphone on it.
+This is the thing most worth understanding before you pick, because two banks
+that both "use a source" treat it in opposite ways.
+
+**Shakespeare and Public Domain are FIDELITY lanes.** Their instruction is to
+*adapt the source while preserving its characters, turns, and ending*. The
+source has already made the dramatic choices and the job is to put a microphone
+on it.
+
+**Media RSS / Archive is NOT.** Its instruction is to *build a fictional story
+from* the archive material -- the item is a starting point, not a text to be
+faithful to. If you pick this bank expecting a retelling of the archive item you
+fed it, you will get an invented story that the item inspired. That is working
+as designed; it is just not adaptation.
+
+What follows applies to the two fidelity lanes.
 
 What that means in practice, quoting the rules the packs actually carry:
 

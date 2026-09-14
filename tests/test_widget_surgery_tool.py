@@ -102,19 +102,58 @@ def test_every_value_travels_with_its_own_widget():
 
 # A mid-list writer widget that sits BEFORE the gate_in socket, so removing it
 # moves a live link and exercises part 3 of the removal. This was
-# `perfect_run_spacesaver` (descriptor 8, gate_in at 32) until 2026-09-13, when
-# that widget was removed for real -- `min_p` inherited descriptor 8 and
-# gate_in moved to 31. The fixture is a POSITION, not a particular widget; what
-# it has to be is mid-list and ahead of the socket.
+# `perfect_run_spacesaver` until 2026-09-13, when that widget was removed for
+# real and `min_p` inherited the role. The fixture is a POSITION, not a
+# particular widget, and every reorder moves the exact descriptor index -- so
+# the test below DERIVES the current descriptor position (and gate_in's) from
+# the live node instead of pinning a number here that would just go stale on
+# the next reorder.
 _MIDLIST_VICTIM = "min_p"
 
 
 def test_removing_a_widget_repairs_the_link_that_follows_it():
-    """min_p sits at descriptor 8; gate_in is 31 and carries link 279.
-    Removing the first moves the second, and the repair is by IDENTITY --
-    match inputs[i].link to the row's id -- never by arithmetic."""
+    """min_p must sit ahead of gate_in's linked socket for this fixture to
+    exercise anything -- checked against the live node, not assumed. Removing
+    it moves gate_in's link row, and the repair is by IDENTITY -- match
+    inputs[i].link to the row's id -- never by arithmetic."""
     ws = _tool()
     wf = _canonical()
+    node = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
+
+    # PINNED BY HAND, AND THAT IS THE POINT. An earlier repair replaced this
+    # literal with `widget_descriptor_indexes(node)[widget_names(node).index(
+    # victim)]`, which is exactly what `remove_widget` computes internally from
+    # the same two primitives on the same unmutated node -- so the expectation
+    # and the actual became the same expression, and a bug living inside either
+    # primitive would corrupt both identically and pass. That is a tautology
+    # wearing the clothes of a check.
+    #
+    # These two numbers are read independently, straight out of
+    # workflows/otr_canonical.json: min_p is inputs[15], gate_in is inputs[31]
+    # carrying link 279. When a future migration moves them, this test SHOULD
+    # go red and be re-pinned from the JSON -- that red is the guard working,
+    # not a maintenance burden to engineer away.
+    EXPECTED_INPUT_POS = 15
+    EXPECTED_GATE_POS = 31
+    expected_input_pos = EXPECTED_INPUT_POS
+
+    gate_pos, gate_inp = next(
+        (i, inp) for i, inp in enumerate(node["inputs"])
+        if inp.get("name") == "gate_in")
+    assert gate_pos == EXPECTED_GATE_POS, (
+        "gate_in moved to descriptor %d; re-pin both literals from the "
+        "canonical rather than deriving them from the tool under test"
+        % gate_pos)
+    assert ws.widget_names(node)[
+        ws.widget_descriptor_indexes(node).index(expected_input_pos)
+    ] == _MIDLIST_VICTIM, (
+        "inputs[%d] is no longer %s -- re-pin EXPECTED_INPUT_POS from "
+        "workflows/otr_canonical.json" % (expected_input_pos, _MIDLIST_VICTIM))
+    assert gate_inp.get("link") is not None, "gate_in is no longer linked"
+    assert expected_input_pos < gate_pos, (
+        "%s (descriptor %d) no longer sits ahead of gate_in (descriptor %d); "
+        "the fixture needs a mid-list widget that still does" %
+        (_MIDLIST_VICTIM, expected_input_pos, gate_pos))
 
     before = {r[0]: list(r) for r in wf["links"]}
     # UNPACK BOTH. remove_widget returns (touched, repairs) since it took on
@@ -123,9 +162,10 @@ def test_removing_a_widget_repairs_the_link_that_follows_it():
     touched, repairs = ws.remove_widget(
         wf, "OTR_LedgerScriptWriter", _MIDLIST_VICTIM)
     assert touched, "%s is not on the writer any more" % _MIDLIST_VICTIM
-    assert touched[0]["input_pos"] == 8, (
-        "the fixture assumes a MID-LIST widget ahead of the gate_in socket; "
-        "%s is at descriptor %d" % (_MIDLIST_VICTIM, touched[0]["input_pos"]))
+    assert touched[0]["input_pos"] == expected_input_pos, (
+        "remove_widget reported a different descriptor than the live node "
+        "held; %s is at descriptor %d, not %d" %
+        (_MIDLIST_VICTIM, touched[0]["input_pos"], expected_input_pos))
 
     assert ws.verify(wf, "after-removal") == []
     assert ws.repair_dst_slots(wf) == [], "the repair is not idempotent"

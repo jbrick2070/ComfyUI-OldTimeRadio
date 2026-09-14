@@ -223,7 +223,6 @@ def test_episode_assembler_materializes_bookends_and_mirrors_by_placement(
 
     EpisodeAssembler().assemble(
         scene_audio=_make_audio(1, samples_per=48000, sr=48000),
-        episode_title="Assembler Music",
         music_cue_audio=_make_audio(3, samples_per=4800, sr=48000),
         music_cue_manifest_json=CM.dumps(manifest),
     )
@@ -419,3 +418,53 @@ def test_sequencer_legacy_list_raises(patched_sequencer_env):
     assert "legacy parser-list" in msg or "OTR_LedgerScriptWriter" in msg, (
         f"ValueError message should name the legacy shape; got: {msg!r}"
     )
+
+
+def test_assembler_reads_its_title_off_the_ledger_wire():
+    """The Assembler's label comes from the ledger, not from a widget.
+
+    OTR_EpisodeAssembler declared its own `episode_title` until 2026-09-14,
+    defaulting to "The Last Frequency" -- a field whose own tooltip said the
+    published title comes from the ledger and not from there. The v2 ledger
+    already arrives on `replay_descriptor` (canonical link 289, the freeze
+    cascade's v2_ledger_json, wired on all 17 shipped graphs), so the label and
+    the published title now come from the same chain and cannot disagree.
+
+    Pure function, no audio, no render: this is the wiring assertion, and the
+    chain itself is proved in test_video_ledger.py against the same helper.
+    """
+    from nodes.scene_sequencer import EpisodeAssembler
+
+    wire = json.dumps({"meta": {"episode_title": "Saturn Silence"}})
+    assert EpisodeAssembler._title_from_ledger_wire(wire) == (
+        "Saturn Silence", "led.meta.episode_title")
+
+    # An unwired or unparseable descriptor still yields a title -- the label
+    # must never be the reason an episode fails to assemble.
+    for absent in ("", "   ", "not json at all", "[1, 2, 3]"):
+        title, source = EpisodeAssembler._title_from_ledger_wire(absent)
+        assert source == "timestamp_lastresort"
+        assert title.startswith("Signal Lost ")
+
+    # And no node but the writer can be typed into any more.
+    assert "episode_title" not in EpisodeAssembler.INPUT_TYPES()["required"]
+    assert "episode_title" not in EpisodeAssembler.INPUT_TYPES()["optional"]
+
+
+def test_assembler_title_survives_a_pathological_descriptor():
+    """A descriptor that blows the parser still yields a title, not an error.
+
+    Written after a contrarian read pointed out that the narrow
+    ValueError/TypeError catch did not cover `RecursionError`, while the
+    docstring promised an unparseable descriptor always resolves. The title is
+    a LABEL: the daily stream of episodes reaching otr/obs/ must never stop for
+    one. (`_replay_from_descriptor` next door keeps its NARROW catch on
+    purpose -- that one gates whether this is a replay, which is a decision,
+    not a label.)
+    """
+    from nodes.scene_sequencer import EpisodeAssembler
+
+    title, source = EpisodeAssembler._title_from_ledger_wire(
+        "[" * 20000 + "]" * 20000)
+    assert source == "timestamp_lastresort"
+    assert title.startswith("Signal Lost ")

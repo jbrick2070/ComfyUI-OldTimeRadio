@@ -48,15 +48,22 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
 
     writer = _widgets(_node(workflow, "OTR_LedgerScriptWriter"))
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
-    # 2026-07-20: canonical uses the in-process Transformers safetensors row,
-    # measured in NF4 on the 16 GB card. The separate GGUF Q8 row retains its
-    # own context limitations and is not selected here.
+    # Both writer model widgets are saved as the BADGED dropdown label from
+    # catalog.default_llm_option() (e.g. "Qwen/Qwen3.5-4B (8.7 GB, ...)"), not
+    # the bare DEFAULT_LLM repo id -- a bare id matches no COMBO choice and
+    # ComfyUI resolves an unmatched COMBO to index 0, silently running
+    # whatever sorted first. Derive the expected id from default_llm_option()
+    # itself (through the same validate_model_id normalization) rather than a
+    # hand-written repo id, so this stays correct if DEFAULT_LLM moves again.
+    expected_default_llm = catalog.validate_model_id(
+        catalog.default_llm_option(), hub_root=tmp_path
+    )
     assert catalog.validate_model_id(
         writer["creative_writing_model"], hub_root=tmp_path
-    ) == "google/gemma-4-12b-it"
+    ) == expected_default_llm
     assert catalog.validate_model_id(
         writer["technical_model"], hub_root=tmp_path
-    ) == "google/gemma-4-12b-it"
+    ) == expected_default_llm
 
     audio_nodes = {
         "char_voice": _widgets(_node(workflow, "OTR_BatchCharacterVoices"))["engine"],

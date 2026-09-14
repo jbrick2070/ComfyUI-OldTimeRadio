@@ -50,7 +50,6 @@ def _composite(tmp_path, monkeypatch, **over):
     kw = dict(
         base_video_path=str(src),
         canvas_w=1920, canvas_h=1080, fps=25,
-        ffmpeg="ffmpeg",
         output_path=str(tmp_path / "out.mp4"),
         gate_in="",
         clip_manifest_json="{}",   # no "clips" key -> single-base path

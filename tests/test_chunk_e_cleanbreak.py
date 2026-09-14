@@ -139,7 +139,6 @@ class TestEpisodeAssemblerWavSave:
             # EpisodeAssembler.assemble signature)
             result = node.assemble(
                 scene_audio=audio_in,
-                episode_title="Test Episode",
                 opening_theme_audio=None,
                 closing_theme_audio=None,
             )
@@ -190,7 +189,6 @@ class TestEpisodeAssemblerWavSave:
             node = sc.EpisodeAssembler()
             result = node.assemble(
                 scene_audio=audio_in,
-                episode_title="Fail Test",
                 opening_theme_audio=None,
                 closing_theme_audio=None,
             )

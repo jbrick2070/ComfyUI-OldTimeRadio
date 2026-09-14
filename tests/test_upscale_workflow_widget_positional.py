@@ -2,10 +2,11 @@
 
 BUG-LOCAL-097: widgets_values is POSITIONAL; new widgets MUST APPEND at the
 end, and existing positions MUST NOT SHIFT. This test pins the node-84 shape
-(5 shipped widgets + 2 upscale widgets = 7 total) and asserts:
+(4 shipped widgets + 2 upscale widgets = 6 total, after the `ffmpeg` widget
+was removed from this node) and asserts:
 
-* The two new upscale widgets land at positions 5 and 6 (the LAST two).
-* The five shipped widgets stay at positions 0..4 with their original values.
+* The two new upscale widgets land at positions 4 and 5 (the LAST two).
+* The four shipped widgets stay at positions 0..3 with their original values.
 * Every widget-backed input in inputs[] has a matching widgets_values entry.
 """
 from __future__ import annotations
@@ -33,31 +34,44 @@ def node84(canonical) -> dict:
     return hits[0]
 
 
-def test_widget_count_is_seven(node84):
-    """5 shipped (canvas_w/h, fps, ffmpeg, output_path) + 2 new (upscale_engine,
-    upscale_device) = 7. If someone appends a 3rd upscale widget without
-    updating this test, positional deserialization drift is exactly what
-    BUG-LOCAL-097 guards against."""
+def test_widget_count_is_six(node84):
+    """4 shipped (canvas_w/h, fps, output_path -- `ffmpeg` was removed from
+    this node) + 2 new (upscale_engine, upscale_device) = 6. If someone
+    appends a 3rd upscale widget without updating this test, positional
+    deserialization drift is exactly what BUG-LOCAL-097 guards against."""
     wv = node84.get("widgets_values") or []
-    assert len(wv) == 7, f"expected 7 widgets_values on node 84; got {len(wv)}: {wv!r}"
+    assert len(wv) == 6, f"expected 6 widgets_values on node 84; got {len(wv)}: {wv!r}"
 
 
-def test_first_five_widgets_unchanged(node84):
-    """The 5 shipped widget values must stay at their historical positions;
-    a stale saved workflow relies on positional index."""
+def test_first_four_widgets_unchanged(node84):
+    """The 4 shipped widget values must stay at their historical positions;
+    a stale saved workflow relies on positional index. (`ffmpeg` used to sit
+    at index 3 here; it was removed from this node, so `output_path` shifted
+    down to take its place.)"""
     wv = node84["widgets_values"]
     assert wv[0] == 1920, f"canvas_w moved: got {wv[0]!r}"
     assert wv[1] == 1080, f"canvas_h moved: got {wv[1]!r}"
     assert wv[2] == 25, f"fps moved: got {wv[2]!r}"
-    assert wv[3] == "ffmpeg", f"ffmpeg moved: got {wv[3]!r}"
-    assert wv[4] == "", f"output_path moved: got {wv[4]!r}"
+    assert wv[3] == "", f"output_path moved: got {wv[3]!r}"
 
 
-def test_upscale_widgets_at_positions_5_and_6(node84):
+def test_ffmpeg_widget_removed(node84):
+    """The `ffmpeg` widget was removed from OTR_SilentComposite entirely --
+    it must not be present as a widget-backed input, and its old value must
+    not still be occupying a widgets_values slot."""
+    inputs = node84.get("inputs") or []
+    hit = next((i for i in inputs
+                if isinstance(i, dict) and i.get("name") == "ffmpeg"), None)
+    assert hit is None, f"ffmpeg input should have been removed; found {hit!r}"
+    wv = node84["widgets_values"]
+    assert "ffmpeg" not in wv, f"stale ffmpeg value still in widgets_values: {wv!r}"
+
+
+def test_upscale_widgets_at_positions_4_and_5(node84):
     """Positional law: new widgets append at the end."""
     wv = node84["widgets_values"]
-    assert wv[5] == "off", f"upscale_engine wrong slot/value: got {wv[5]!r}"
-    assert wv[6] == "cpu", f"upscale_device wrong slot/value: got {wv[6]!r}"
+    assert wv[4] == "off", f"upscale_engine wrong slot/value: got {wv[4]!r}"
+    assert wv[5] == "cpu", f"upscale_device wrong slot/value: got {wv[5]!r}"
 
 
 def test_inputs_list_matches_widget_positions(node84):

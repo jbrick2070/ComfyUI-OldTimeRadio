@@ -8,10 +8,25 @@ This is the largest download in the pack and usually the longest part of a run.
 It is also the one choice where picking a model your machine cannot hold costs
 you the whole episode.
 
-You do not have to choose. The shipped graph sets both to **Qwen3.5-4B**, the
-only writer here with a finished episode to its name on an 8 GB NVIDIA card, on
-a 16 GB NVIDIA card and on a 16 GB Mac. It downloads itself. Leaving both alone
-is a good answer on every machine.
+You do not have to choose -- every pre-set graph already ships a writer that
+fits its own tier. Which one depends on which graph you opened:
+
+| Graph | Both slots ship |
+|---|---|
+| 8 GB NVIDIA, 16 GB Mac, AMD, CPU | **Qwen3.5-4B** (8.7 GB) |
+| 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB) |
+
+**Qwen3.5-4B** is the only writer here with a finished episode to its name on
+all three of an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
+downloads itself. It is also what the AMD and CPU graphs ship, though nobody has
+published an episode from either of those yet -- [MACHINES.md](MACHINES.md)
+marks both cells unmeasured rather than proven, and that is the honest word for
+them. Leaving both slots alone is a good answer on every one of those machines.
+The 16 GB+
+NVIDIA graphs -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
+instead; leaving those two slots alone is still a good answer there, but it
+means a roughly 24 GB download the first time you Queue, not the 8.7 GB one
+described below.
 
 ---
 
@@ -42,7 +57,7 @@ This is the whole list, exactly as the dropdown spells it.
 |---|---|---|---|
 | `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The shipped default.** The only writer with a finished episode on all three of 8 GB NVIDIA, 16 GB NVIDIA and 16 GB Mac. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
-| `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)` | 24.0 GB | Apache 2.0 | The 16 GB NVIDIA writer the pack shipped with before the default moved to Qwen. Proven there, and the pack's audio regression baseline. |
+| `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA graphs ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
 | `google/gemma-4-E2B-it (6.0 GB, mac16-tight nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | The smallest ungated writer. Proven on both NVIDIA sizes. **Do not pick it on a Mac** -- see below. |
 | `google/gemma-4-E4B-it (9.0 GB, mac16-tight nv8 nv16 nv24)` | 9.0 GB | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
 | `google/gemma-4-12b-it (23.9 GB, nv16 nv24)` | 23.9 GB | Apache 2.0 | What the 16 GB NVIDIA graphs ship with. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |

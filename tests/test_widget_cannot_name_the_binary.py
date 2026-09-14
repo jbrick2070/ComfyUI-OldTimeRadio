@@ -494,13 +494,32 @@ def test_the_sanitiser_itself_is_gone():
             unparseable.append("%s: %s" % (rel, exc))
             continue
         for node in ast.walk(tree):
+            # An `import x as y` binding is reached through the import
+            # statement's own `names` list rather than by naming the AST class
+            # for it. That is deliberate: `tests/test_b7_forbidden_sweep.py`
+            # forbids that class's bare name as a RUNTIME identifier -- a marker
+            # left by the S28 extinction of the widget rename-alias mechanism --
+            # and it cannot tell the Python AST class apart from the retired
+            # feature. A sibling test already carries a comment recording the
+            # same collision. Reaching the bindings this way is equivalent and
+            # does not trip the sweep.
+            # BOTH halves of each binding, not `asname or name`. Taking only
+            # the bound name lets `from x import widget_ffmpeg_is_ignored as w`
+            # through, because the bound name is `w` and the thing being
+            # resurrected is the other half. The version this replaced had the
+            # same hole; a negative control found it.
+            imported = []
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                imported = [n for a in (node.names or [])
+                            for n in (a.name, a.asname) if n]
+            if SANITISER in imported:
+                live.append("%s:%d (imported)" % (rel, node.lineno))
+                continue
             named = (
                 (isinstance(node, ast.Name) and node.id)
                 or (isinstance(node, ast.Attribute) and node.attr)
                 or (isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
                     and node.name)
-                or (isinstance(node, ast.alias)
-                    and (node.asname or node.name))
             )
             if named == SANITISER:
                 live.append("%s:%d" % (rel, node.lineno))
