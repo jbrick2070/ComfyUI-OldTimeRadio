@@ -44,7 +44,7 @@ import random
 from dataclasses import dataclass
 from typing import Any, Callable, Mapping
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 try:
     from . import _otr_canon as _OTRC
@@ -251,9 +251,37 @@ class StoryTreatment(BaseModel):
 # P2 -- one act
 # ---------------------------------------------------------------------------
 
+#: Live Gemma misspellings of the spoken-line body key. ``tex`` is the
+#: truncated ``text`` that killed RunPod my_story_act_2 on 2026-09-14
+#: (``lines.10.text Field required``, input dict had ``speaker`` plus
+#: ``tex``). Mapping the leftover string is schema tolerance, not new
+#: dialogue -- the model already wrote the words.
+_SPOKEN_TEXT_ALIASES = ("text", "line", "dialogue", "speech", "content", "tex")
+
+
 class SpokenLine(BaseModel):
     speaker: str = Field(min_length=1)
     text: str = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _coerce_spoken_text(cls, value):
+        if not isinstance(value, dict):
+            return value
+        data = dict(value)
+        current = data.get("text")
+        if isinstance(current, str) and current.strip():
+            return data
+        lowered = {str(key).lower(): key for key in data}
+        for alias in _SPOKEN_TEXT_ALIASES:
+            key = lowered.get(alias)
+            if key is None:
+                continue
+            alt = data.get(key)
+            if isinstance(alt, str) and alt.strip():
+                data["text"] = alt
+                return data
+        return data
 
 
 class ActScript(BaseModel):

@@ -15116,3 +15116,43 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
 - confidence: HIGH on mechanism (leg log, both call sites read, the sibling
   module's contrasting pattern read); LOW on frequency/reproducibility (one
   live occurrence).
+
+## PBUG-20260914-01 -- My Story act 2 died on a truncated `tex` key, then fenced repair JSON the extractor fail-closed
+- surfaced: LIVE RunPod Foley 3-act My Story, 2026-09-14, pod
+  `8j96rdgfjtgb3z` (RTX PRO 4000 Blackwell 24 GB), graph `otr_16gb_foley`,
+  house DEFAULT_IDEA. Prompt `a80a816b-5357-47a2-9b33-529d71a64919`. RESULT
+  FAIL at 16:34. `OTR_LedgerScriptWriter` raised
+  `StructuredCallFailedError` from `my_story_act_2` after 3 attempts.
+  Pending dir `pending_20260914_203120` (0-line ledger). No new file in
+  `otr/obs/` (newest obs on the volume is 2026-09-13).
+- symptom: act 1 authored; act 2 exhausted the ladder; no Foley, no publish.
+- root cause: two stacked defects, not story quality. Attempt 1 parsed.
+  Pydantic `ActScript` rejected `lines.10` (`Field required` on `text`).
+  The live `input_value` repr is the Pydantic 2.12 truncation of
+  `{'speaker': 'Stomp', 'tex': '...glowing like a tiny star.'}` -- `tex`
+  is a truncated `text` key, so `text` was missing. Typed repair then
+  re-emitted ```json fenced JSON. `_otr_json.extract_first_json_block`
+  fail-closed the fence body from column 0 (prose preamble, or Gemma
+  pretty-print with a raw newline in a string), so attempts 2-3 raised
+  `JSONDecodeError: no decodable top-level JSON object found` and the
+  structural retry never ran (attempt 1 was already a ValidationError).
+- fix: **FIXED in the same change as this entry.** `SpokenLine` maps
+  leftover body keys (`tex`, `line`, `dialogue`, `speech`, `content`) onto
+  `text` when `text` is missing -- the words were already in the leftover
+  string. The JSON extractor decodes from the first `{` inside a fence,
+  repairs raw newlines/tabs in strings and trailing commas, still
+  fail-closes a malformed outer object (no nested-child salvage) and
+  unescaped inner quotes. Blast radius: shared writer JSON on every box;
+  5080/4060 VRAM paths unchanged.
+- verify idea: `tests/test_otr_json.py` plus
+  `test_spoken_line_accepts_the_truncated_tex_key_from_the_runpod_act` and
+  `test_act_script_accepts_a_tex_line_from_parsed_json`. Re-pull the pod
+  and requeue the same 3-act Foley My Story; success is a file in
+  `/workspace/runpod-slim/ComfyUI/output/otr/obs/`.
+- bible-worthy: yes -- LLM JSON that parsed with a truncated required key
+  is a schema-tolerance miss, and a fenced body that is not itself a
+  JSON object at column 0 must not fail-closed if the first `{` inside
+  the fence is a complete object.
+- confidence: HIGH (pod comfy log lines 346-395, pydantic missing-field
+  repr reproduced on 2.12, extractor fail-closed on fence preamble
+  reproduced locally).

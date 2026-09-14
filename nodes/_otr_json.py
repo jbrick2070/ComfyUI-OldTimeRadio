@@ -11,10 +11,10 @@ second as ``Extra data`` -- the BUG-LOCAL-261 casting crash
 a valid cast object followed by a second object).
 
 The correct logic already lived in ``news_interpreter.extract_json_block``:
-a fenced-block match plus a brace-walk + ``json.JSONDecoder.raw_decode``
-that takes the FIRST complete object and ignores any trailing content.
-This module is that logic's single home; ``news_interpreter`` now
-re-exports ``extract_json_block`` from here.
+a fenced-block match plus ``json.JSONDecoder.raw_decode`` that takes the
+FIRST complete object and ignores any trailing content. This module is
+that logic's single home; ``news_interpreter`` now re-exports
+``extract_json_block`` from here.
 
 Pure stdlib (``json`` + ``re``); no sibling imports, safe to import
 from any node module.
@@ -32,50 +32,178 @@ _JSON_FENCE_RE = re.compile(
 )
 
 
+def _escape_raw_controls_in_strings(blob: str) -> str:
+    """Turn raw control characters inside JSON strings into escapes.
+
+    Gemma pretty-prints dialogue across real line breaks. Strict JSON
+    forbids an unescaped U+000A in a string, so ``raw_decode`` rejects
+    the whole object. The heartbeat logger collapses whitespace, which
+    is why the live log can look like valid JSON while the extractor
+    returns empty. Unescaped quotes are left alone -- inventing where
+    a string ends is not this helper's job.
+    """
+    out: list[str] = []
+    in_string = False
+    escape = False
+    for ch in blob:
+        if not in_string:
+            out.append(ch)
+            if ch == '"':
+                in_string = True
+            continue
+        if escape:
+            out.append(ch)
+            escape = False
+            continue
+        if ch == "\\":
+            out.append(ch)
+            escape = True
+            continue
+        if ch == '"':
+            out.append(ch)
+            in_string = False
+            continue
+        if ch == "\n":
+            out.append("\\n")
+            continue
+        if ch == "\r":
+            out.append("\\r")
+            continue
+        if ch == "\t":
+            out.append("\\t")
+            continue
+        code = ord(ch)
+        if code < 32:
+            out.append("\\u%04x" % code)
+            continue
+        out.append(ch)
+    return "".join(out)
+
+
+def _strip_trailing_commas(blob: str) -> str:
+    """Drop commas that only precede a closing } or ] outside strings."""
+    out: list[str] = []
+    in_string = False
+    escape = False
+    i = 0
+    n = len(blob)
+    while i < n:
+        ch = blob[i]
+        if in_string:
+            out.append(ch)
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if ch == '"':
+            in_string = True
+            out.append(ch)
+            i += 1
+            continue
+        if ch == ",":
+            j = i + 1
+            while j < n and blob[j] in " \t\r\n":
+                j += 1
+            if j < n and blob[j] in "}]":
+                i += 1
+                continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
+def _repair_llm_json(blob: str) -> str:
+    """Apply the two Gemma JSON defects that strict ``raw_decode`` rejects."""
+    return _strip_trailing_commas(_escape_raw_controls_in_strings(blob))
+
+
+def _try_object(decoder: json.JSONDecoder, blob: str):
+    try:
+        obj, end = decoder.raw_decode(blob)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(obj, dict):
+        return None
+    return obj, end
+
+
+def _decode_first_object(blob: str) -> str:
+    """First complete nonempty top-level object starting at the first ``{``.
+
+    Tries the slice as written, then one LLM-JSON repair of that same
+    slice. Never scans onward after the first brace fails: that would
+    salvage a nested child of a malformed envelope (Codex P5).
+
+    Empty ``{}`` is skipped only when another ``{`` follows it (a
+    preamble like ``Here is {}`` before the real artifact). A repair
+    that turns ``{,}`` into ``{}`` with nothing after is fail-closed so
+    it stays a JSON syntax miss, not a schema miss that skips the
+    structural retry.
+    """
+    decoder = json.JSONDecoder()
+    first_brace = blob.find("{")
+    if first_brace < 0:
+        return ""
+    original = blob[first_brace:]
+    repaired = _repair_llm_json(original)
+    seen: set[str] = set()
+    for candidate, is_repair in ((original, False), (repaired, True)):
+        if candidate in seen:
+            continue
+        seen.add(candidate)
+        remaining = candidate
+        hops = 0
+        while remaining and hops < 4:
+            hops += 1
+            got = _try_object(decoder, remaining)
+            if got is None:
+                break
+            obj, end = got
+            if obj:
+                return remaining[:end]
+            rest = remaining[end:].lstrip()
+            nxt = rest.find("{")
+            if nxt >= 0:
+                remaining = rest[nxt:]
+                continue
+            if is_repair:
+                return ""
+            return remaining[:end]
+    return ""
+
+
 def extract_first_json_block(raw: str) -> str:
-    """Return the first complete top-level JSON object in ``raw`` as a
-    substring, or ``""`` when none is found.
+    """Return JSON text for the first complete top-level object, or ``""``.
+
+    The returned string is always ``json.loads``-able when nonempty. It is
+    a substring of ``raw`` when the model already emitted strict JSON; it
+    is a repaired *copy* when Gemma left raw newlines in strings or
+    trailing commas -- callers must parse it, never require ``block in raw``.
 
     Primary form: a ```json ... ``` fenced block. Fallback: decode from the
     first ``{``. ``raw_decode`` stops at the end of the first complete object,
     so trailing content (a second hallucinated object or prose note) is
     ignored rather than concatenated into the slice. A malformed outer object
     never falls through to one of its decodable child objects. Never raises.
+
+    A fenced body may start with prose (``Here is the act:``) before the
+    object; decode still starts at the first ``{`` *inside the fence*.
+    If that body still does not decode, fail closed rather than searching
+    past the fence. Unescaped quotes inside a string still fail closed --
+    inventing the string boundary is not this helper's job.
     """
     if not raw:
         return ""
     text = raw.strip()
 
-    decoder = json.JSONDecoder()
-
-    # Primary: a fenced JSON block. Decode the whole fence body rather than
-    # trying to balance nested braces with a regex. A malformed fenced outer
-    # object must fail closed; otherwise the fallback could wrongly salvage a
-    # valid nested scene/beat object as the model's top-level artifact.
     fence_match = _JSON_FENCE_RE.search(text)
     if fence_match:
-        candidate = fence_match.group(1).strip()
-        try:
-            obj, end = decoder.raw_decode(candidate)
-        except json.JSONDecodeError:
-            return ""
-        if isinstance(obj, dict):
-            return candidate[:end]
-        return ""
-
-    # Fallback: raw_decode the first outer object. Scanning onward after that
-    # object fails would make a malformed envelope look valid by returning a
-    # nested child (the Codex P5 live smoke exposed this exact drift).
-    first_brace = text.find("{")
-    if first_brace < 0:
-        return ""
-    try:
-        obj, end = decoder.raw_decode(text[first_brace:])
-    except json.JSONDecodeError:
-        return ""
-    if isinstance(obj, dict):
-        return text[first_brace:first_brace + end]
-    return ""
+        return _decode_first_object(fence_match.group(1).strip())
+    return _decode_first_object(text)
 
 
 def parse_first_json_object(raw: str) -> dict:

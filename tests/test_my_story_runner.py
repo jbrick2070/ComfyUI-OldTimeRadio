@@ -583,6 +583,26 @@ def test_treatment_rejects_ambiguous_or_reserved_cast_identities(names):
     assert check(MS.StoryTreatment(**_treatment(cast=names)))
 
 
+@pytest.mark.parametrize("key", ["tex", "line", "dialogue", "speech", "content", "Text"])
+def test_spoken_line_accepts_the_truncated_tex_key_from_the_runpod_act(key):
+    """Live 2026-09-14 my_story_act_2: lines[10] parsed as JSON with
+    speaker plus ``tex`` (truncated ``text``). Schema rejected it, then
+    the repair fence miss killed the episode. The words are already in
+    the leftover string; mapping the key is not new dialogue."""
+    line = MS.SpokenLine.model_validate({
+        "speaker": "Stomp",
+        key: "It's glowing like a tiny star.",
+    })
+    assert line.speaker == "Stomp"
+    assert line.text == "It's glowing like a tiny star."
+
+
+def test_spoken_line_still_refuses_a_speaker_with_no_spoken_words():
+    from pydantic import ValidationError
+    with pytest.raises(ValidationError):
+        MS.SpokenLine.model_validate({"speaker": "Stomp"})
+
+
 def test_act_speaker_spelling_normalizes_to_the_accepted_cast():
     check = MS._make_act_validator(MS.StoryTreatment(**_treatment()), 1, ())
     act = MS.ActScript(**_act(speakers=("  ADA  ", "tom")))
