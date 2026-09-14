@@ -118,6 +118,11 @@ stops at the next step rather than instantly, so a long video beat finishes
 first. Nothing is published, and the part-built episode stays in
 `otr/episodes/<episode>/`.
 
+**Queue one episode at a time.** The ledger that carries an episode between
+nodes is held per process, so two runs in flight can read each other's. On a
+machine with more than one GPU, start ComfyUI with `CUDA_VISIBLE_DEVICES` set to
+the card you want.
+
 The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
 
@@ -216,9 +221,10 @@ Every bank has a fixed musical identity, and the composer leads every cue with i
 | `shakespeare` | Elizabethan consort music -- viols, recorders, lute |
 | `my_story` | **Yours.** Type it into the `music_style` widget on **OTR_StableAudioTheme**: "gamelan orchestra", "surf rock", "solo cello". Blank means the house radio orchestra. |
 
-`music_style` is honoured on `my_story` only. Every other bank keeps its idiom
-whatever is typed, because a Shakespeare episode scored as surf rock is not a
-feature.
+`music_style` is honoured on `my_story` only. Every other bank keeps the idiom
+in the table above whatever is typed -- the pairings are part of how each bank
+sounds, and they are fixed so an episode's music matches where its story came
+from.
 
 ### The look
 
@@ -261,6 +267,10 @@ What `otr_canonical` ships, and why:
 - **Voices:** `kokoro` on both slots. It is the only one-click voice on every
   platform, which is why it is the default. Six voice engines come with a Manager
   install; the seventh, the IndexTTS2 voice cloner, ships in the GitHub tree only.
+  Two of the six, **Chatterbox and Dia, assume Windows** -- they run in their own
+  venv and install through PowerShell scripts with no shell twin. Point
+  `OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter to run them
+  elsewhere; nothing here has proven that path.
 - **Music:** `stable_audio_3`. Commercially clean and ungated. MusicGen remains
   selectable and is noncommercial.
 
@@ -631,8 +641,10 @@ instruction.
 ## If your card cannot hold a writer
 
 The script step alone can run on OpenRouter, Google, or Comfy Credits; voices,
-music, images and video stay local either way. It costs money, it is off until
-you turn it on, and it is there for hardware reasons rather than better prose.
+music, images and video stay local either way. It costs money and it is off
+until you turn it on. It exists so a machine that cannot hold a local writer can
+still make episodes -- and it takes the largest model in the graph out of your
+VRAM budget, which is the whole reason on an 8 GB card.
 [apple/CLOUD.md](apple/CLOUD.md) has the three switches.
 
 ---
@@ -724,46 +736,23 @@ the wrongly-quantized model rather than rendering with it.
 
 ---
 
-## What it does not do well
+## The one thing to know before you run it
 
-**Some episodes hand a line to the wrong character.** You may hear a character
-claim a job that belongs to someone else, or -- rarest and most obvious -- address
-themselves by name. It is uncommon, it does not break a render, and the episode
-still plays, but it is real and you should know before you run this.
-
-The automatic fix for it made episodes worse on a 12B-class model -- the
-largest a 16 GB card holds -- so it ships disabled rather than quietly degrading
-the writing. On a much larger model you can try it: the switch is
+**Some episodes hand a line to the wrong character.** A character may claim a
+job that belongs to someone else, or -- rarest and most obvious -- address
+themselves by name. It is uncommon and it does not break a render, but it is
+real, and it is the one limitation that changes whether you want this at all.
+The automatic fix made episodes worse on a 12B model, the largest a 16 GB card
+holds, so it ships off; on a much larger model the switch is
 `JUDGE_ATTRIBUTION` in `nodes/_otr_ledger_clean.py`.
 
-**It expects one episode at a time, and one GPU.** Do not queue several
-prompts at once -- the ledger that carries an episode between nodes is held per
-process, and two runs in flight can read each other's. On a multi-GPU box, set
-`CUDA_VISIBLE_DEVICES`. Neither is hard to fix and neither is fixed, and you
-should not have to discover them.
-
-**Two of the voice engines assume Windows.** The Chatterbox and Dia sidecars
-default to a `.venv\Scripts\python.exe` layout and are installed by PowerShell
-scripts with no shell twin. They run elsewhere if you point
-`OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter, but nothing
-here has proven that. Kokoro is the default on every platform for this reason.
-
-**AMD is experimental in v2.0, and that is a scope line rather than a bug.**
-Nobody on the project owns an AMD card, and we were not going to claim a platform
-we could not put an episode through. The AMD graph,
-`workflows/variants/otr_amd_still.json`, is built from the same source as every
-proven graph and every engine it selects is plain PyTorch, so on paper it should
-work -- and on paper is exactly the problem. It ships marked `draft`, with no
-receipts, while the other fifteen shipping graphs each carry one.
-
-The first episode off a Radeon is what makes it v2.1 -- and Windows is the target
-we want most, since the pack is Windows-native and AMD now ships a ROCm build of
-PyTorch for Radeon on Windows; Linux is welcome too. It is open source and it is
-fair game:
-[apple/ROCM.md](apple/ROCM.md) has the shipped graph, two lab profiles for 16 GB
-and 8 GB cards, a five-minute probe that needs no model download, and the open
-questions written down. If you have the card, none of it is waiting on us -- and
-the first episode out of one earns its author the AMD column in
+**AMD has no receipts yet.** `workflows/variants/otr_amd_still.json` is cut from
+the same source as every proven graph and every engine it selects is plain
+PyTorch, so it should work -- but nobody on the project owns a Radeon, and
+"should" is not a receipt. It ships `draft`.
+[apple/ROCM.md](apple/ROCM.md) has the graph, two lab profiles, a five-minute
+probe that downloads nothing, and the open questions. The first episode off a
+Radeon earns its author the AMD column in
 [apple/MACHINES.md](apple/MACHINES.md).
 
 ---

@@ -83,16 +83,15 @@ folder is `comfyui-old-time-radio` in a registry install and
 `ComfyUI-OldTimeRadio` in a git clone, so a hard-coded path works for one and
 not the other. Restart afterwards so the dropdowns rebuild.
 
-## What it will and will not fix
+## What it changes
 
-**It will** let you write with a model far bigger than your VRAM, and it removes
-the writer from your machine's memory budget entirely — which on an 8 GB card is
-the single largest local model in the graph.
+It lets you write with a model far bigger than your VRAM, and it takes the
+writer out of your machine's memory budget entirely — on an 8 GB card, that is
+the single largest local model in the graph. Everything else still renders
+locally.
 
-**It will not** make episodes better in a way the project chases. Script quality
-is settled and is not something a paid model is adopted to raise. Use a cloud
-writer because your hardware can't hold a local one, not because you expect
-better prose.
+Whether a bigger model writes a better episode is yours to judge. The local
+default is what the project develops against.
 
 ## Turning it off
 
