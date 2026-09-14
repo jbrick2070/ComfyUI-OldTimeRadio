@@ -189,8 +189,10 @@ _FLAVOUR_DANGLING = frozenset((
 #: Words that mean the scene line is a STAGE NOTE rather than a place. A cue
 #: told "the team discusses the sensor trial results" is being handed plot,
 #: which is not something music can play; "a dimly lit chamber of ancient
-#: tomes" is. Measured across 921 ledgers on disk: roughly a third carry
-#: scene descriptions at all, and a minority of those are this shape.
+#: tomes" is. Measured across the 921 ledgers under
+#: <comfy output>/otr/episodes/**/*ledger*.json that CARRY MUSIC ROWS: 295 of
+#: those, about a third, have scene descriptions at all, and a minority of
+#: those are this shape.
 _FLAVOUR_STAGE_NOTE = (
     "discuss", "concludes", "introduces", "provides", "heightens",
     "explains", "reveals that", "the drama", "the episode", "the report",
@@ -214,9 +216,11 @@ def cue_story_flavour(ledger, cue_row) -> str:
                       "shot_NNN_music"), because an interstitial sits at a
                       specific beat rather than at an end
 
-    ALWAYS OPTIONAL, and name the population when you quote the number: 295 of
-    the 921 ledgers on disk that CARRY MUSIC ROWS have scene descriptions, which
-    is about a third of those and about an eighth of all 2,236 ledger files. On
+    ALWAYS OPTIONAL, and name the POPULATION AND THE GLOB when you quote the
+    number, or the next reader re-derives a different one: over
+    <comfy output>/otr/episodes/**/*ledger*.json there are 2,236 files, 921 of
+    them carry music rows, and 295 of those 921 have scene descriptions -- about
+    a third of the music-bearing ledgers and about an eighth of all files. On
     a single-scene episode the first and last scene are the same line -- so this
     can never be what makes the three cues differ. That
     job belongs to `_brief_cue_arc`, which is always present. This only adds

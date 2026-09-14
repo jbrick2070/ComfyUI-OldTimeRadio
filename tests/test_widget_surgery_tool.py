@@ -217,3 +217,59 @@ def test_a_repair_reports_a_stale_node_as_well_as_a_stale_slot():
     assert entry["from"] == (9999, idx), entry
     assert entry["to"] == (node["id"], idx), entry
     assert ws.verify(wf, "after") == []
+
+
+def test_rename_widget_changes_the_name_and_nothing_else():
+    """rename_widget had no coverage at all, and the next window is told to use
+    display_name INSTEAD of renaming -- so if this function is ever reached, it
+    will be by someone who decided to rename anyway. It should at least be
+    provably narrow: the name changes, the position does not, and no link moves.
+    """
+    ws = _tool()
+    wf = _canonical()
+    node = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
+    before_order = ws.widget_names(node)
+    before_values = list(node["widgets_values"])
+    before_links = {r[0]: list(r) for r in wf["links"]}
+
+    touched = ws.rename_widget(wf, "OTR_LedgerScriptWriter", "creativity", "flair")
+
+    assert touched, "creativity is no longer on the writer"
+    after = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
+    names = ws.widget_names(after)
+    assert names == ["flair" if n == "creativity" else n for n in before_order]
+    assert after["widgets_values"] == before_values, "a rename moved a value"
+    assert {r[0]: list(r) for r in wf["links"]} == before_links, "a rename moved a link"
+    assert ws.verify(wf, "after-rename") == []
+
+
+def test_save_preserves_each_file_s_own_shape(tmp_path):
+    """The canonical is pretty-printed and the variants are single-line. save()
+    takes a `compact` flag and a caller who passes the wrong one rewrites the
+    whole file, producing a diff that hides the real change inside it."""
+    ws = _tool()
+    wf = _canonical()
+
+    pretty = tmp_path / "pretty.json"
+    ws.save(str(pretty), wf, compact=False)
+    text = pretty.read_text(encoding="utf-8")
+    assert text.endswith("\n"), "pretty form lost its trailing newline"
+    assert text.count("\n") > 100, "pretty form is not multi-line"
+    assert ws.load(str(pretty)) == wf, "pretty round-trip changed the graph"
+
+    compact = tmp_path / "compact.json"
+    ws.save(str(compact), wf, compact=True)
+    ctext = compact.read_text(encoding="utf-8")
+    assert ctext.count("\n") == 0, "compact form is not single-line"
+    assert ", " not in ctext[:200], "compact form kept separator padding"
+    assert ws.load(str(compact)) == wf, "compact round-trip changed the graph"
+
+
+def test_the_shipped_files_match_the_shape_save_would_write():
+    """The real canonical is pretty and the real variants are single-line -- so
+    a caller using save() with the matching flag produces no incidental diff."""
+    import glob
+    canonical = CANONICAL.read_text(encoding="utf-8")
+    assert canonical.count("\n") > 100 and canonical.endswith("\n")
+    for p in glob.glob(str(REPO / "workflows" / "variants" / "*.json")):
+        assert Path(p).read_text(encoding="utf-8").count("\n") <= 1, p

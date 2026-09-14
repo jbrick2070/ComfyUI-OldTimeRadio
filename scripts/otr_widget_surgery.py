@@ -90,7 +90,9 @@ def remove_widget(wf, node_type, widget_name):
         # by one with no error -- turning a graph that is merely inconsistent
         # into one that is confidently wrong.
         wv = node.get("widgets_values")
-        if names and not isinstance(wv, list):
+        # No `names` check: this branch is only reached for a node of the
+        # requested type that HAS the widget, so names is never empty here.
+        if not isinstance(wv, list):
             # ABSENT is not the same as short, and it is worse: the node
             # declares widget descriptors and saves no values for them, so
             # there is nothing to drop and no way to know what was meant.
