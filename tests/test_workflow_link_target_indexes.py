@@ -41,7 +41,25 @@ WORKFLOWS_DIR = PACK_ROOT / "workflows"
 
 
 def _workflow_paths() -> list[Path]:
-    return sorted(WORKFLOWS_DIR.glob("*.json"))
+    """Every shipped graph -- the canonical AND the 16 generated variants.
+
+    This was `glob("*.json")` until 2026-09-13, and `workflows/` holds exactly
+    one file, so `pytest --collect-only` reported `collected 1 item`: the
+    dedicated backstop for the dst_slot class had never once checked a variant.
+    That is the worst possible place for a blind spot, because the variants are
+    where a bad re-index LANDS -- `build_variants.py` projects the canonical
+    into all 16, so one wrong dst_slot is written sixteen more times.
+
+    `rglob` reaches `workflows/variants/`. It also reaches
+    `workflows/external_examples/`, which is why the filter below exists:
+    those are vendored third-party graphs carrying a stranger's absolute
+    paths, `.comfyignore` keeps them out of the published zip, and nothing in
+    `nodes/` loads them -- so their link tables are not ours to assert.
+    """
+    return sorted(
+        p for p in WORKFLOWS_DIR.rglob("*.json")
+        if "external_examples" not in p.parts
+    )
 
 
 @pytest.mark.parametrize("wf_path", _workflow_paths(),
