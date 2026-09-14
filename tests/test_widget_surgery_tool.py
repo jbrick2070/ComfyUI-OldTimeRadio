@@ -163,3 +163,57 @@ def test_removing_a_widget_that_is_not_there_reports_nothing():
     assert touched == [], touched
     assert repairs == [], repairs
     assert ws.verify(wf, "unchanged") == []
+
+
+def test_removing_from_a_short_widgets_values_is_refused():
+    """The refusal remove_widget gained had NO test, which makes a guarantee
+    decoration -- it is only real if something goes red when it is gone.
+
+    Skipping the value pop on an already-short list and removing the descriptor
+    anyway widens a pre-existing mismatch by one, silently.
+    """
+    ws = _tool()
+    wf = _canonical()
+    node = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
+    node["widgets_values"] = node["widgets_values"][:-1]
+
+    with pytest.raises(ValueError, match="saved values"):
+        ws.remove_widget(wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
+
+
+def test_removing_from_a_node_with_no_widgets_values_is_refused():
+    """ABSENT is not the same as short, and it is worse: the node declares
+    widget descriptors and saves no values, so there is nothing to drop and no
+    way to know what was meant. The length check alone let this through,
+    because a missing key is not a short list."""
+    ws = _tool()
+    wf = _canonical()
+    node = next(n for n in wf["nodes"] if n.get("type") == "OTR_LedgerScriptWriter")
+    node.pop("widgets_values", None)
+
+    with pytest.raises(ValueError, match="no widgets_values"):
+        ws.remove_widget(wf, "OTR_LedgerScriptWriter", "perfect_run_spacesaver")
+
+
+def test_a_repair_reports_a_stale_node_as_well_as_a_stale_slot():
+    """repair_dst_slots corrected a wrong dst_node in place and returned it in
+    nothing, so a caller reading `repairs == []` as "the graph was already
+    consistent" was wrong -- against a docstring promising the return value
+    shows what the repair did."""
+    ws = _tool()
+    wf = _canonical()
+    # Point one link row at a node that does not hold it, leaving the slot right.
+    node = next(n for n in wf["nodes"] if any(i.get("link") is not None
+                                              for i in (n.get("inputs") or [])))
+    idx, inp = next((i, x) for i, x in enumerate(node["inputs"])
+                    if x.get("link") is not None)
+    row = next(r for r in wf["links"] if r[0] == inp["link"])
+    row[3] = 9999
+
+    repairs = ws.repair_dst_slots(wf)
+
+    assert repairs, "a stale dst_node was corrected but reported in nothing"
+    entry = next(r for r in repairs if r["link"] == inp["link"])
+    assert entry["from"] == (9999, idx), entry
+    assert entry["to"] == (node["id"], idx), entry
+    assert ws.verify(wf, "after") == []

@@ -99,7 +99,16 @@ class _DirectTextWriteVisitor(ast.NodeVisitor):
         no ui exemption here, because ComfyUI's preview list is built, not
         appended to, so a `+=` on a "text" key is a ledger write or a mistake.
         """
-        if not self._is_self_test() and isinstance(node.target, ast.Subscript)                 and isinstance(node.target.slice, ast.Constant)                 and node.target.slice.value == "text":
+        if self._is_self_test():
+            self.generic_visit(node)
+            return
+        target = node.target
+        is_text_key = (
+            isinstance(target, ast.Subscript)
+            and isinstance(target.slice, ast.Constant)
+            and target.slice.value == "text"
+        )
+        if is_text_key:
             self.direct_writes.append(node.lineno)
         self.generic_visit(node)
 

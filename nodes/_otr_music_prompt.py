@@ -214,9 +214,11 @@ def cue_story_flavour(ledger, cue_row) -> str:
                       "shot_NNN_music"), because an interstitial sits at a
                       specific beat rather than at an end
 
-    ALWAYS OPTIONAL. Only about a third of the ledgers on disk carry scene
-    descriptions, and on a single-scene episode the first and last are the
-    same line -- so this can never be what makes the three cues differ. That
+    ALWAYS OPTIONAL, and name the population when you quote the number: 295 of
+    the 921 ledgers on disk that CARRY MUSIC ROWS have scene descriptions, which
+    is about a third of those and about an eighth of all 2,236 ledger files. On
+    a single-scene episode the first and last scene are the same line -- so this
+    can never be what makes the three cues differ. That
     job belongs to `_brief_cue_arc`, which is always present. This only adds
     story when the story is there to add.
 

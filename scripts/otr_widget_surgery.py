@@ -39,7 +39,9 @@ def widget_names(node):
 def repair_dst_slots(wf):
     """Set every link row's dst_slot to the slot that actually holds it.
 
-    Returns the repairs made, as (link_id, old_slot, new_slot)."""
+    Returns every mutation as {"link": id, "from": (node, slot),
+    "to": (node, slot)} -- node AND slot, because a stale dst_node used to be
+    corrected in place and reported in nothing."""
     links_by_id = {row[0]: row for row in wf.get("links", [])}
     repairs = []
     for node in wf.get("nodes", []):
@@ -88,6 +90,14 @@ def remove_widget(wf, node_type, widget_name):
         # by one with no error -- turning a graph that is merely inconsistent
         # into one that is confidently wrong.
         wv = node.get("widgets_values")
+        if names and not isinstance(wv, list):
+            # ABSENT is not the same as short, and it is worse: the node
+            # declares widget descriptors and saves no values for them, so
+            # there is nothing to drop and no way to know what was meant.
+            raise ValueError(
+                "node %s: %d widget descriptors and no widgets_values list at "
+                "all. Fix the graph before removing from it."
+                % (node["id"], len(names)))
         if isinstance(wv, list) and len(wv) != len(names):
             raise ValueError(
                 "node %s: %d widget descriptors but %d saved values. Fix the "

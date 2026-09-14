@@ -37,8 +37,25 @@ Already done, do not redo:
   `widgets_values` is shorter than its descriptor count rather than backfilling
   `None`.
 
-  `tests/test_widget_surgery_tool.py` proves both against the real canonical.
-  Run it before you trust a change you make to the tool.
+  **`remove_widget` got the SAME three properties**, and this document did not
+  say so until now -- which mattered, because Task C below tells you to use it.
+  It returns `(touched, repairs)`, repairs the link table itself, and refuses a
+  `widgets_values` that is short OR absent.
+
+  **The trap that return type sets, which has already been sprung once:**
+
+  ```python
+  touched = ws.remove_widget(wf, "OTR_LedgerScriptWriter", "some_widget")
+  assert touched          # ALWAYS TRUE -- a 2-tuple is truthy
+  ```
+
+  Bind both names. A removal that matched nothing returns `([], [])`, and the
+  one-name form hides it behind a truthy tuple. That exact line was written into
+  the tool's own test and survived a green run before it was caught.
+
+  `tests/test_widget_surgery_tool.py` proves all of it against the real
+  canonical -- eleven tests. Run it before you trust a change you make to the
+  tool.
 
 ## The one blocker, and it is not code
 
@@ -167,11 +184,19 @@ already has a ledger source: canonical link 289 carries the full v2_ledger_json
 into replay_descriptor). Leave voice ownership and custom_source_bank alone --
 both are no-goes on evidence, reasons in the verdict.
 
-USE scripts/otr_widget_surgery.py, and note its contract changed on 2026-09-13:
-reorder_widgets returns (touched, repairs) and repairs the link table itself,
-because a WIDGET descriptor can carry a live link and three do today. It also
-refuses a short widgets_values rather than backfilling None. Identity-based
-dst_slot repair is idempotent -- a second pass returns empty. Run
+USE scripts/otr_widget_surgery.py, and note the contract changed on 2026-09-13.
+BOTH remove_widget and reorder_widgets now return (touched, repairs) and repair
+the link table themselves -- a WIDGET descriptor can carry a live link and three
+do today -- and both refuse a widgets_values that is short or absent rather than
+backfilling None.
+
+UNPACK BOTH NAMES. `touched = ws.remove_widget(...)` followed by
+`assert touched` is ALWAYS TRUE, because a 2-tuple is truthy even when nothing
+matched; that line was written into the tool's own test and passed a green run
+before it was caught. A no-match returns ([], []).
+
+Identity-based dst_slot repair is idempotent -- a second pass returns empty --
+and reports a stale dst_node as well as a stale slot. Run
 tests/test_widget_surgery_tool.py before trusting any change you make to it. Do
 not re-derive the three-part removal by hand.
 
