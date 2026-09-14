@@ -77,7 +77,7 @@ The git route, which is the one to use if they want `scripts/` (the headless
 runners and provisioners are **not** in a registry install):
 
 ```
-git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 <ComfyUI Python> -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 ```
 

@@ -137,7 +137,7 @@ git clone https://github.com/comfyanonymous/ComfyUI && cd ComfyUI
 pip install -r requirements.txt
 cd custom_nodes
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
-cd ComfyUI-OldTimeRadio && git checkout v2.0-alpha
+cd ComfyUI-OldTimeRadio
 pip install -r requirements.txt
 ```
 

@@ -34,7 +34,7 @@ runtime, page cache and output room. No single engine wants 100 GiB by itself.
 
 One bootstrap does everything: finds the template's real ComfyUI tree, pins
 ComfyUI core and the partner packs, repairs the CUDA mismatch these images
-usually have, clones or fast-forwards OTR from `v2.0-alpha`, downloads the
+usually have, clones or fast-forwards OTR from `main`, downloads the
 automatic lanes, warms the writer, verifies the manual tiers, and prints one
 receipt.
 

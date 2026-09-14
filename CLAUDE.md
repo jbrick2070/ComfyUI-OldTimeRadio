@@ -353,9 +353,9 @@ NOT THE ONLY HARDWARE.**
 
 **FIRST ACTION OF EVERY SESSION, BEFORE READING OR EDITING ANYTHING:**
 ```
-git fetch origin v2.0-alpha
-git log --oneline HEAD..origin/v2.0-alpha     # what the other box did while you were away
-git pull --rebase origin v2.0-alpha
+git fetch origin main
+git log --oneline HEAD..origin/main     # what the other box did while you were away
+git pull --rebase origin main
 ```
 Then SAY what came down. A session that opens `workflows/otr_canonical.json` without doing this
 is reading a file that may be hours stale, and the moment it edits and pushes, **the other box's
@@ -444,7 +444,8 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
   `.git\index.lock` and retry. Do NOT remove it while a git process is actually running.
 - **TWO WINDOWS, SPLIT BY AREA, BOTH PUSH (operator decision 2026-08-29 -- supersedes the older
   "one coder window at a time" line).** The 5080 and the 4060 both run coder windows and both push
-  to `v2.0-alpha` directly. Serialization by turn-taking was the old answer and it cost more than it
+  to `main` directly (`v2.0-alpha` until it was retired 2026-09-13). Serialization by turn-taking
+  was the old answer and it cost more than it
   bought: on 2026-08-29 the two boxes landed ~25 commits with zero lost work, and the 4060 found
   three defects in the 5080's own files (a fetcher pulling the wrong motion module, an h3 profile
   declaring a canvas its engine overruled, a re-run that could not have tested what it claimed)
@@ -565,16 +566,27 @@ exactly what makes the mistake convincing) and they do NOT live under the ComfyU
   the path through the code above and `Test-Path` THAT. A false "missing" costs him a download
   he does not need and costs you the profile leg you were about to skip.
 ## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
-- ONE branch: `v2.0-alpha`. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
+- ONE branch: **`main`**. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.
-- **`v2.0-alpha` IS THE GITHUB DEFAULT BRANCH as of 2026-08-22.** It was switched from `main`
-  because `main` sits 3,923 commits behind and still advertises `version = "1.0.0"` -- so every
-  bare repo link, every fresh `git clone`, and every ComfyUI-Manager NIGHTLY install was serving
-  stale v1 code while looking like it had worked. A fresh clone now lands on `v2.0-alpha` with the
-  real v2 tree (verified by actual clone, not assumption). Do NOT "helpfully" switch it back, and
-  do not treat `main` as current for ANY purpose -- it is a stale v1.7 release merge, nothing more.
-- The operator eyeball gates TAGS and PROMOTIONS (`v2.0-alpha-stable`, prod, main, v2 release) -- NEVER
-  pushes. Pushing to `v2.0-alpha` is always safe, expected, and required.
+- **V2 WAS PROMOTED ON 2026-09-13 (operator: "no more v2 alpha branch, we are v2 main now").
+  `main` IS THE DEFAULT BRANCH AND THE WORKING BRANCH. `v2.0-alpha` IS RETIRED -- never push to
+  it again.**
+  * This REVERSES the 2026-08-22 line that used to live here, and the reversal is the point: back
+    then `main` was 3,923 commits behind and advertised `version = "1.0.0"`, so every bare repo
+    link and every ComfyUI-Manager nightly install served stale v1 code while looking like it had
+    worked. That is why the default moved to `v2.0-alpha`. It was fixed by hand on 2026-09-13,
+    `mirror_main.yml` kept the two identical from then on, and this promotion is what that was
+    always leading to.
+  * **`v2.0-alpha` is RETIRED, NOT DELETED, and that is deliberate.** `raw.githubusercontent.com`
+    URLs pin a branch NAME: the registry card `Icon` in `pyproject.toml` and the README's logo and
+    hero still all resolved through `/v2.0-alpha/`. Deleting the branch would 404 the icon on the
+    LIVE registry listing. The README URLs moved to `/main/` in this same change; the pyproject one
+    could not, because 2.1.0 was Pending and that file is a release trigger (7A). **Moving the
+    `Icon` URL to `/main/` is owed at the next version bump, and the branch stays until it lands.**
+  * The old v1.7 tip is preserved on `archive/main-v1.7` (0aa6d6e1) -- eleven April 2026 commits
+    v2 never took. Not discarded.
+- The operator eyeball gates TAGS and RELEASES -- NEVER pushes. Pushing to `main` is always safe,
+  expected, and required.
 - This SUPERSEDES any "do not push until the eyeball passes" line written before 2026-06-10 evening.
 - A stable branch only exists if the operator explicitly declares one.
 - After every push verify: HEAD == origin, no 0-byte files, no BOM, AST parse on touched .py files.
@@ -607,7 +619,7 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
     not publish unattended: state the gap and the version, and bump when he says so
     or when he has already asked for this specific release.
 - **EDITING `pyproject.toml` AUTO-FIRES A PUBLISH.** The workflow triggers on any push to
-  `v2.0-alpha` whose diff touches `pyproject.toml`. Treat that file as a release trigger, not a
+  `main` (it rode `v2.0-alpha` until the 2026-09-13 promotion) whose diff touches `pyproject.toml`. Treat that file as a release trigger, not a
   config file: never edit it "just to tidy" mid-session, and never edit it while a version is
   already pending. A push that does NOT touch it never publishes.
 - **THE VERSION LIST SORTS BY STRING, SO A RELEASE SORTS LAST (measured 2026-09-13).**

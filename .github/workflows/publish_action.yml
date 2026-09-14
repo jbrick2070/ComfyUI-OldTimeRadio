@@ -2,10 +2,12 @@ name: Publish to Comfy registry
 on:
   workflow_dispatch:
   push:
-    # Publish rides the v2.0-alpha branch for now. When v2 is promoted,
-    # switch this to main-only so releases publish from main.
+    # v2 was promoted on 2026-09-13: main is the branch, and releases publish
+    # from it. v2.0-alpha is retired -- kept as a frozen ref so the
+    # raw.githubusercontent URLs pinned to it (the registry card icon, the
+    # README images) keep resolving, never pushed to again.
     branches:
-      - v2.0-alpha
+      - main
     paths:
       - "pyproject.toml"
 

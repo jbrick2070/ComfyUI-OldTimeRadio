@@ -16,7 +16,7 @@ it. The registry id is `comfyui-old-time-radio`, published by `fluxus`.
 **Or clone it yourself**, into your ComfyUI `custom_nodes/` folder:
 
 ```bash
-git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 ```
 
 Either branch gives you the current tree. `v2.0-alpha` is the default and

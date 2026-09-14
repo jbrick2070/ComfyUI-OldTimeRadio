@@ -1,7 +1,7 @@
 # ComfyUI-OldTimeRadio
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_icon.gif" alt="Old Time Radio" width="400">
+  <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif" alt="Old Time Radio" width="400">
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 > *"Good evening. This is SIGNAL LOST."*
 
 <p align="center">
-  <a href="https://youtu.be/AOn21EG9u-U"><img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in. Click to watch the episode." width="760"></a>
+  <a href="https://youtu.be/AOn21EG9u-U"><img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in. Click to watch the episode." width="760"></a>
 </p>
 <p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">▶ Hear a complete episode first — ninety seconds</a></strong></p>
 <p align="center"><em><strong>The Shivering Gauge</strong>: a film archivist and his apprentice racing
@@ -65,7 +65,7 @@ pressing **Queue** is the whole path.
 id `comfyui-old-time-radio`, publisher `fluxus`). Or clone it into `custom_nodes/`:
 
 ```bash
-git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 ```
 
@@ -202,7 +202,7 @@ folder name is historical; the guides cover every platform.)
 
 The development record -- bug logs, measurements, design notes -- lives under
 `docs/` in the
-[GitHub tree](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/v2.0-alpha/docs)
+[GitHub tree](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/docs)
 and is **not** part of a Manager install. Nothing in this file depends on it.
 
 ---
