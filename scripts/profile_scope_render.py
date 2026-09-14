@@ -34,51 +34,38 @@ from nodes._otr_shared.scope_draw import analyze_audio_np, freq_bars_green  # no
 
 
 def load_canonical_scope_contract(workflow_path: Path = WORKFLOW_PATH) -> dict[str, Any]:
-    """Return and validate the live node-93/node-94 scope contract."""
+    """Report where the scope nodes stand in the canonical graph.
+
+    This used to VALIDATE a node-93 -> node-94 wiring and raise if it was not
+    there. 8171e994 (2026-09-13) took both nodes out of the canonical: node 93
+    shipped with bypass=True, which copies its input to its output, so the
+    overlay and its scopes render were paying for a pass that drew nothing.
+
+    The wiring is therefore gone on purpose, and a profiler that refuses to
+    start without it would be demanding the operator undo that decision. What
+    this function reports is the STANDING -- present or absent -- which the
+    profiling receipt then stamps, so a reader of an old receipt can tell
+    whether it was measured while the nodes were on the canvas.
+
+    The profiling itself never needed the graph. `profile_scene_scopes` and
+    `profile_post_bars` take explicit frames/width/height/sink arguments and
+    import the node modules directly, both of which still ship
+    (__init__.py registers OTR_PostUpscaleProcgenBlend and OTR_SceneAwareScopes;
+    they are simply unwired, so a user can still drop them on a canvas).
+    """
     wf = json.loads(Path(workflow_path).read_text(encoding="utf-8"))
-    nodes = {int(n["id"]): n for n in wf.get("nodes", [])}
-    links = {int(l[0]): l for l in wf.get("links", [])}
-    n93 = nodes.get(93)
-    n94 = nodes.get(94)
-    if not n93 or n93.get("type") != "OTR_PostUpscaleProcgenBlend":
-        raise RuntimeError("profile_scope_render: node 93 is not OTR_PostUpscaleProcgenBlend")
-    if not n94 or n94.get("type") != "OTR_SceneAwareScopes":
-        raise RuntimeError("profile_scope_render: node 94 is not OTR_SceneAwareScopes")
+    by_type: dict[str, list[int]] = {}
+    for node in wf.get("nodes", []):
+        by_type.setdefault(str(node.get("type")), []).append(int(node["id"]))
 
-    n93_inputs = [i.get("name") for i in n93.get("inputs", [])]
-    n94_outputs = n94.get("outputs", [])
-    if "scopes_mp4_path" not in n93_inputs:
-        raise RuntimeError("profile_scope_render: node 93 lacks scopes_mp4_path input")
-    scope_slot = n93_inputs.index("scopes_mp4_path")
-    scope_link = n93["inputs"][scope_slot].get("link")
-    if scope_link is None:
-        raise RuntimeError("profile_scope_render: node 93 scopes_mp4_path is unwired")
-    link = links.get(int(scope_link))
-    if not link or link[1:5] != [94, 0, 93, scope_slot]:
-        raise RuntimeError(
-            "profile_scope_render: expected node 94 output 0 wired to "
-            f"node 93 scopes slot {scope_slot}; got {link!r}"
-        )
-    if int(scope_link) not in (n94_outputs[0].get("links") or []):
-        raise RuntimeError("profile_scope_render: node 94 output does not list the scope link")
-
-    n93_widgets = list(n93.get("widgets_values") or [])
-    n94_widgets = list(n94.get("widgets_values") or [])
-    if len(n93_widgets) != 11 or n93_widgets[10] not in {"bottom", "off"}:
-        raise RuntimeError("profile_scope_render: node 93 audio_bars widget contract drifted")
-    if len(n94_widgets) != 5 or n94_widgets[1:4] != [1920, 1080, "ffmpeg"]:
-        raise RuntimeError("profile_scope_render: node 94 widget contract drifted")
-    if n94_widgets[4] not in {"off", "bottom"}:
-        raise RuntimeError("profile_scope_render: node 94 landscape_bars widget drifted")
-
+    blend_ids = by_type.get("OTR_PostUpscaleProcgenBlend", [])
+    scene_ids = by_type.get("OTR_SceneAwareScopes", [])
     return {
         "workflow": str(Path(workflow_path)),
-        "scope_link": int(scope_link),
-        "scope_slot": int(scope_slot),
-        "scene_node_id": 94,
-        "blend_node_id": 93,
-        "scene_widgets": n94_widgets,
-        "blend_audio_bars": n93_widgets[10],
+        "blend_on_canonical": bool(blend_ids),
+        "scene_on_canonical": bool(scene_ids),
+        "blend_node_ids": blend_ids,
+        "scene_node_ids": scene_ids,
     }
 
 

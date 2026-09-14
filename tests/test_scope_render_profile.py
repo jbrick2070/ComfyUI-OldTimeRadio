@@ -24,15 +24,31 @@ def _load_profile_module():
     return module
 
 
-def test_canonical_scope_contract_is_live():
+def test_canonical_scope_contract_reports_both_nodes_off_the_canvas():
+    """Both scope nodes left the canonical, and the profiler says so.
+
+    This asserted a live node-93 -> node-94 wiring until 2026-09-13. 8171e994
+    removed both nodes: node 93 shipped with bypass=True, which copies input to
+    output, so the pass drew nothing and still cost a render stage.
+
+    Pinning the ABSENCE rather than deleting the test keeps the decision
+    visible -- if either node comes back to the canonical, this goes red on
+    purpose and whoever rewired it has to say why. The node classes themselves
+    still ship and are still profiled by the tests below; it is only the
+    canonical wiring that is gone.
+    """
     profiler = _load_profile_module()
     contract = profiler.load_canonical_scope_contract()
-    assert contract["scene_node_id"] == 94
-    assert contract["blend_node_id"] == 93
-    assert contract["scope_link"] == 273
-    assert contract["scope_slot"] == 9
-    assert contract["scene_widgets"][1:4] == [1920, 1080, "ffmpeg"]
-    assert contract["blend_audio_bars"] == "bottom"
+    assert contract["blend_on_canonical"] is False, (
+        "OTR_PostUpscaleProcgenBlend is back on the canonical; 8171e994 took "
+        "it off because it shipped bypassed. Say why it returned."
+    )
+    assert contract["scene_on_canonical"] is False, (
+        "OTR_SceneAwareScopes is back on the canonical; it fed the bypassed "
+        "blend. Say why it returned."
+    )
+    assert contract["blend_node_ids"] == []
+    assert contract["scene_node_ids"] == []
 
 
 def test_scene_scope_profile_draw_only_is_nonblank_and_timed():
