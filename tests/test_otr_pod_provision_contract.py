@@ -29,7 +29,13 @@ def test_pod_script_has_one_pack_and_weight_owner():
 
     assert plan_at < pin_at < packs_at < selection_at
     assert "ComfyUI-AnimateDiff-Evolved|" not in text
-    assert 'git clone -q -b v2.0-alpha "$OTR_REPO_URL" "$OTR_ROOT"' in text
+    # main, not v2.0-alpha. v2 was promoted on 2026-09-13 (4e8acae3): main IS
+    # the working branch and v2.0-alpha is retired, so a pod that cloned the
+    # retired branch would provision a tree that stops receiving work. The
+    # branch is kept alive only because published registry versions pin their
+    # card art to raw.githubusercontent URLs under it -- that is an asset
+    # concern, not a source of code.
+    assert 'git clone -q -b main "$OTR_REPO_URL" "$OTR_ROOT"' in text
     assert "otr_fetch_lane_weights.py \"$L\"" not in text
     assert "ComfyUI-GGUF.git" not in text
     assert "ComfyUI-LTXVideo.git" not in text

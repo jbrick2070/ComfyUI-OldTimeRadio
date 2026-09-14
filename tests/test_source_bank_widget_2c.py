@@ -421,7 +421,14 @@ class TestAddYourOwnSignpost:
         assert bank.guide_ref in message
         # It names the landed path, not a runner that never shipped.
         assert "otr_check bank" in message
-        assert "docs/EXTENDING_OTR.md" in message
+        # apple/EXTENDING.md, not docs/EXTENDING_OTR.md, and the move was a FIX
+        # rather than churn: `.comfyignore` excludes the whole `docs/` tree from
+        # the published bundle, so a registry user who clicked "+ Add Your Own"
+        # was pointed at a file their install had never received. `apple/` is
+        # not excluded and does ship, which is what makes the row's own promise
+        # ("the contract is apple/EXTENDING.md, which ships with the pack")
+        # true. Both files exist on GitHub; only one of them reaches a user.
+        assert "apple/EXTENDING.md" in message
         assert "user_packs/source_banks/" in message
 
     def test_runnable_bank_message_does_not_misname_the_client_row_location(

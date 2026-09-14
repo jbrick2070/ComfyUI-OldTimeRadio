@@ -127,10 +127,18 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     # NOTE for whoever bumps this next -- retiring the global-counter line in
     # favour of the scoped assertions would be a deliberate contract change and
     # belongs in its own commit, not in passing.
-    # 291 since My Story: the appended delivery-intent wire reaches the mux.
-    # Existing link 278 and its audio fanout below remain unchanged. This is
-    # the current canonical counter, not a change to the scoped audio contract.
-    assert wf["last_link_id"] == 291
+    # 292 since 8171e994 took the bypassed overlay out of the canonical. That
+    # commit removed nodes 93/94 and RE-ROUTED what they sat between, so the
+    # new link 292 is OTR_SilentComposite.video_path -> OTR_CaptionBurn
+    # ([292, 84, 0, 86, 0, "STRING"]) -- the caption burn now reads the
+    # composite directly instead of through a blend that shipped bypassed.
+    #
+    # This is the SEVENTH bump of a counter that is not this test's subject,
+    # so here is the proof it is additive rather than the usual assurance:
+    # link 292 touches neither node 85 nor node 92, and link 278 and its audio
+    # fanout below are byte-identical. Read the tuple above -- src 84, dst 86 --
+    # and neither id appears in any assertion in this function.
+    assert wf["last_link_id"] == 292
     assert [i["name"] for i in n85["inputs"]] == [
         "silent_video_path",
         "master_audio_path",
@@ -147,12 +155,27 @@ def test_canonical_workflow_wires_clip_manifest_to_master_audio_mux():
     assert [i.get("link") for i in n85["inputs"][:5]] == [274, 263, 249, 276, 278]
     assert n85["widgets_values"] == [25, "ffmpeg", ""]
     assert n92["outputs"][1]["name"] == "clip_manifest_json"
-    assert n92["outputs"][1]["links"] == [261, 271, 275, 278, 288]
+    # 271 is gone, and its absence is the CLEAN consequence of 8171e994 rather
+    # than collateral: link 271 was [271, 92, 1, 94, 1, "STRING"] -- this same
+    # clip_manifest_json output feeding node 94, OTR_SceneAwareScopes. Node 94
+    # left the canonical, so the wire into it left with it, and no other
+    # consumer lost a feed.
+    #
+    # The subject of this test is untouched: link 278 is still
+    # [278, 92, 1, 85, 4, "STRING"], byte-identical, and still in this fanout.
+    assert n92["outputs"][1]["links"] == [261, 275, 278, 288]
     links = {l[0]: l for l in wf["links"]}
     assert links[291] == [291, 1, 1, 85, 10, "STRING"]
     assert links[278] == [278, 92, 1, 85, 4, "STRING"]
     assert links[261] == [261, 92, 1, 84, 2, "STRING"]
-    assert links[271] == [271, 92, 1, 94, 1, "STRING"]
+    # 271 used to be asserted here as [271, 92, 1, 94, 1, "STRING"]. It is
+    # ABSENT on purpose: node 94 (OTR_SceneAwareScopes) left the canonical in
+    # 8171e994, so the wire into it went too. Assert the absence rather than
+    # dropping the line, so a node 94 that comes back has to answer for itself.
+    assert 271 not in links, (
+        "link 271 is back -- it fed OTR_SceneAwareScopes, which 8171e994 took "
+        "off the canonical because the blend it served shipped bypassed"
+    )
     assert links[275] == [275, 92, 1, 95, 1, "STRING"]
     assert links[274][3:5] == [85, 0]
     assert links[263][3:5] == [85, 1]
