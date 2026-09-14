@@ -1,7 +1,7 @@
 # Installing OTR with an AI coding agent
 
 **You do not need this file.** The five steps in the README are the normal path
-and most people should just follow them: install from ComfyUI Manager, put
+and most people should just follow them: install from Extensions -> Node Manager, put
 ffmpeg on PATH, restart, open the template, press Queue. This page exists for
 people who would rather hand the job to Claude Code, Codex, Cursor, Gemini CLI,
 Copilot or any other agent with a terminal -- and for the agent itself, which is

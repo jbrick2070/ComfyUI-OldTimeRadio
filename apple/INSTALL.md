@@ -10,8 +10,9 @@ on your PATH, restart ComfyUI, and look for `[OldTimeRadio]` in the console.
 
 ## 1. Get the pack
 
-**Through ComfyUI Manager** (easiest). Search for **Old Time Radio** and install
-it. The registry id is `comfyui-old-time-radio`, published by `fluxus`.
+**Through the Node Manager** (easiest). In ComfyUI, open **Extensions -> Node
+Manager** and search for **old time radio**, then install it. The registry id is
+`comfyui-old-time-radio`, published by `fluxus`.
 
 **Or clone it yourself**, into your ComfyUI `custom_nodes/` folder:
 
@@ -103,7 +104,7 @@ roll need a real TTF; a headless server image often has none at all.
 
 ## 4. Restart ComfyUI and read the console
 
-Restart fully — Manager's "reload" is not enough for a new pack.
+Restart fully -- the Node Manager's "reload" is not enough for a new pack.
 
 In the console you want to see `[OldTimeRadio]` lines and no traceback. In the
 node menu you want an **OldTimeRadio** category.

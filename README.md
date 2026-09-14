@@ -61,8 +61,9 @@ pressing **Queue** is the whole path.
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | Experimental. No hardware has run it; [apple/ROCM.md](apple/ROCM.md) has the graph and the open questions. |
 
-**1. Install the pack.** In ComfyUI Manager, search for **Old Time Radio** (registry
-id `comfyui-old-time-radio`, publisher `fluxus`). Or clone it into `custom_nodes/`:
+**1. Install the pack.** In ComfyUI, open **Extensions -> Node Manager** and search
+for **old time radio** (registry id `comfyui-old-time-radio`, publisher `fluxus`).
+Or clone it into `custom_nodes/`:
 
 ```bash
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
