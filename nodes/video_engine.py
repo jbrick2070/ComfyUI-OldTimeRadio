@@ -1393,7 +1393,14 @@ def _encode_mp4(frames_iter, total_frames, audio_path, output_path,
 
     if proc.returncode != 0:
         log.error("[Video] ffmpeg failed:\n%s", stderr_text[-2000:])
-        raise RuntimeError(f"ffmpeg exited with code {proc.returncode}")
+        # QUOTE THE CAUSE, DO NOT REPLACE IT. ComfyUI shows the EXCEPTION, not
+        # the log, so a bare exit code hands a user a red bubble with nothing
+        # to act on and an issue with nothing to read. Caption burn and the mux
+        # already put stderr in the raise; this was the outlier.
+        _tail = (stderr_text or "").strip().replace("\n", " ")[-400:]
+        raise RuntimeError(
+            "ffmpeg exited with code %d :: %s"
+            % (proc.returncode, _tail or "no stderr captured"))
 
     elapsed = _time.time() - t0
     log.info("[Video] Encode complete: %d frames in %.1fs (%.1f fps)",

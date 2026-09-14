@@ -1440,8 +1440,24 @@ class EpisodeAssembler:
                           _ta_exc, _wav_exc)
                 episode_audio = {"waveform": _torch.zeros(1, 2, 48000),
                                  "sample_rate": 48000}
+        # DO NOT SAY VERIFIED IF SILENCE WAS SUBSTITUTED. The error above
+        # names both failed readers and the one-second batch; saying "copied
+        # and verified" three lines later, and returning the ordinary
+        # audio_done:replay receipt, told every downstream reader the opposite.
+        # A wire carrying one second cannot be reported like a whole episode.
+        _substituted = int(episode_audio["waveform"].shape[-1]) <= 48000
         info = json.dumps({"episode_id": _ep_id, "replay_of_episode": meta.get("replay_of_episode"),
-                           "master_sha256": want, "title": str(episode_title or "")})
+                           "master_sha256": want, "title": str(episode_title or ""),
+                           "master_readable": not _substituted})
+        if _substituted:
+            log.error("[OTR_EpisodeAssembler] REPLAY DEGRADED: the frozen master "
+                      "at %s could not be read, so this wire carries ONE SECOND "
+                      "of silence, not the episode. Anything measuring it will "
+                      "truncate the render. The file itself is untouched -- fix "
+                      "the reader (torchaudio/soundfile) rather than re-freezing.",
+                      _master_wav)
+            return (episode_audio, _master_wav, info,
+                    "audio_done:replay_unreadable:%s" % want[:12])
         log.warning("[OTR_EpisodeAssembler] REPLAY: frozen master copied and verified -> %s",
                     _master_wav)
         return (episode_audio, _master_wav, info, "audio_done:replay:%s" % want[:12])

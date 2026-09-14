@@ -1150,13 +1150,21 @@ class GGUFNativeBackend:
         # pinning it) stay identical; other rows report their repo id.
         _label = "Gemma 4 12B" if repo_id == ROW_ID else repo_id
         if not model_path.exists():
+            # NAME THE PATH THE RESOLVER JUST CHOSE, not this machine's.
+            # _models_root() is env, then C:\ComfyUI-Models only IF it exists,
+            # then ComfyUI's own folder_paths.models_dir -- so the hardcoded
+            # Windows tree that used to be printed here was the wrong folder on
+            # a Mac, on Linux, and on any box using ComfyUI's models dir. The
+            # destination is already interpolated above; that is the answer.
             raise GGUFNativeConfigError(
-                f"Missing {_label} {quant} GGUF file: {model_path}. "
-                f"Download/convert {expected_name} and place it under "
-                "C:\\ComfyUI-Models\\LLM\\converted\\, or set "
-                "GEMMA4_12B_GGUF_PATH (gemma row only)."
-                + (f" Expected size: {expected_size} bytes."
+                f"Missing {_label} {quant} GGUF file. Download or convert "
+                f"{expected_name} and put it exactly here: {model_path}"
+                + (f" (expected size: {expected_size} bytes)"
                    if expected_size else "")
+                + ". Override the whole models root with "
+                "OTR_COMFYUI_MODELS_ROOT"
+                + (", or this one file with GEMMA4_12B_GGUF_PATH."
+                   if repo_id == ROW_ID else ".")
             )
         # A6 (2026-07-27): an artifact with NO pinned integrity is refused,
         # not accepted unchecked. Both checks below are conditional on their

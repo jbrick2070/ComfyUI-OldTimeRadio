@@ -1180,7 +1180,13 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             # worker so `future.result()` re-raises it and the run fails loud.
             raise
         except Exception as e:
-            log.debug("[NewsFetcher] Feed failed %s: %s", feed_url, e)
+            # WARNING, not debug: when every feed fails, this is the ONLY
+            # record of why. At debug it never reaches a default console, and
+            # the terminal message below could only guess "check your
+            # internet" -- which blamed the user's network for a retired URL,
+            # a TLS failure, or feedparser dying.
+            log.warning("[NewsFetcher] Feed failed %s: %s: %s",
+                        feed_url, type(e).__name__, e)
             return []
 
     pool = []
@@ -1204,10 +1210,16 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
              fetch_time, len(pool), feeds_hit)
 
     if not pool:
-        log.error("[NewsFetcher] ALL feeds failed - check network connectivity")
+        log.error("[NewsFetcher] every feed returned nothing -- see the "
+                  "per-feed warnings above for the cause of each")
         raise RuntimeError(
-            "No science headlines could be fetched. Check your internet connection. "
-            "The OTR ScriptWriter requires live RSS feeds to generate scripts."
+            "No science headlines could be fetched: every configured feed "
+            "returned nothing. The per-feed reason for each is logged just "
+            "above this line -- a retired feed URL, a TLS failure and a "
+            "missing feedparser all land here and are not the same problem. "
+            "This bank is the only one that needs the network: pick a "
+            "different source_bank, or type a premise into the "
+            "`custom_premise` widget, and the run does not touch RSS at all."
         )
 
     # 2026-04-29: history-aware deduplication + LLM-curated ranking.
