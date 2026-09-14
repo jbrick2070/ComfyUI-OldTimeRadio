@@ -144,7 +144,9 @@ Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShel
 
 ### 4. Run one episode
 
-**Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio.** There
+**Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio.** The
+entry is named after the pack's folder, so on a git clone it reads
+`ComfyUI-OldTimeRadio`; the console banner prints the exact name at boot. There
 is exactly one entry, `otr_canonical`. Open it and press **Queue**. Change
 nothing: every dropdown already holds a working value.
 

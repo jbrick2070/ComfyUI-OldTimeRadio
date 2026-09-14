@@ -99,8 +99,9 @@ with them) so the default voice is ready before you ever queue -- if the console
 pauses on `[OldTimeRadio]` lines, that is what it is doing.
 
 **4. Load the show.** **Workflow → Browse Templates → EXTENSIONS →
-comfyui-old-time-radio**. There is exactly one entry, **`otr_canonical`**. Open
-it and press **Queue**. (If the gallery lists it but opening it fails, drag
+comfyui-old-time-radio** (the entry is named after the pack's folder, so a git
+clone lists it as **ComfyUI-OldTimeRadio**). There is exactly one entry,
+**`otr_canonical`**. Open it and press **Queue**. (If the gallery lists it but opening it fails, drag
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json` onto the canvas
 instead -- same graph, and it has happened.) You do not have to change anything: every dropdown already
 holds a working value, and the ones set to *roll* pick for themselves, so two runs

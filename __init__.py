@@ -446,8 +446,13 @@ else:
 # contradicted the README besides: the canonical resolves the device at run
 # time and every dropdown already holds a working value. Say what the README
 # says, or say nothing.
+# The gallery names its EXTENSIONS entry after this pack's FOLDER (ComfyUI's
+# custom_node_manager keys on the directory that holds workflows/), so it reads
+# comfyui-old-time-radio on a Manager install and ComfyUI-OldTimeRadio on a git
+# clone. Print the one this install will actually show.
+_pack_folder = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
 print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-      "EXTENSIONS > comfyui-old-time-radio > otr_canonical  (the only one "
+      f"EXTENSIONS > {_pack_folder} > otr_canonical  (the only one "
       "the gallery lists -- pick it, then Queue Prompt) -- or drag "
       "workflows/otr_canonical.json onto the canvas. Nothing needs changing: "
       "it resolves your device at run time. The finished episode lands in "

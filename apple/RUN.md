@@ -9,8 +9,9 @@ shows.
 
 ## 1. Open the workflow
 
-**Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio.** There is
-exactly one entry, **`otr_canonical`**. That is the authored graph, and it is the
+**Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio** (named
+after the pack's folder, so a git clone lists it as **ComfyUI-OldTimeRadio**).
+There is exactly one entry, **`otr_canonical`**. That is the authored graph, and it is the
 one to start with on any machine: it names no vendor anywhere and resolves your
 GPU at run time, so the same file is correct on NVIDIA, on Apple Silicon and on
 CPU. (Dragging `workflows/otr_canonical.json` onto the canvas loads the same
