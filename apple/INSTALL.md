@@ -41,8 +41,11 @@ python -m pip install -r requirements.txt
 ```
 
 Manager usually does this for you. If it did, skip **this step only** — do not
-skip step 3. A missing ffprobe does not stop the nodes loading; it stops the
-episode at the very end, after everything expensive has already run.
+skip step 3. A missing ffprobe does not stop the nodes loading, and since the
+2026-09-11 PyAV fallback it no longer stops a normal episode either -- the pack
+reads durations through PyAV when no binary resolves. Some optional engines
+still refuse without a real ffprobe, which is why the instruction is still to
+install both.
 
 ## 3. ffmpeg and ffprobe
 
@@ -129,9 +132,12 @@ or for a crash during ComfyUI's startup, before any node loaded.
 
 ## 6. Weights: what you do not have to do
 
-**Nothing, to start.** The canonical workflow downloads what it needs the first
-time you queue it, and nothing before that. There is no setup script to run and
-no model to place by hand.
+**Nothing by hand.** There is no setup script to run and no model to place
+yourself. Almost everything arrives the first time you queue: the one exception
+is the Kokoro voice set, which the pack fetches at STARTUP so the default voice
+is ready before you ever press Queue -- a few hundred MB on Python 3.13, where
+it also brings the ONNX model. If the console pauses on `[OldTimeRadio]` lines
+during a restart, that is what it is doing.
 
 What comes down on that first run is about **12 GB**:
 

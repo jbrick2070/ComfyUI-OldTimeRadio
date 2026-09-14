@@ -77,9 +77,14 @@ build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 On Debian or Ubuntu take a static build -- 22.04's apt ffmpeg is too old to
 write the MP4 this pack makes -- and install one monospace font
 (`fonts-dejavu-core` is enough) for the captions. You do not have to check
-versions yourself: the pack pushes a fifth of a second of silence through your
-build at the start of every run and refuses in about a second if it cannot do
-the job, rather than at the end of a render.
+versions yourself for the part that would waste a whole render: the pack pushes
+a fifth of a second of silence through your build at the start of every run and
+refuses in about a second if it cannot write the final audio, rather than at the
+end. That early check covers the MUX only. Burned captions need more from
+ffmpeg -- the `ass` filter and libx264 -- and a build without them produces a
+finished, playable episode with no captions on it, which the console says out
+loud. A full `winget`/`brew`/static build has everything; the `imageio-ffmpeg`
+wheel that comes down with the requirements typically does not.
 [apple/INSTALL.md](apple/INSTALL.md) has the version floor and what was
 measured where.
 
@@ -88,7 +93,9 @@ measured where.
 
 **4. Load the show.** **Workflow → Browse Templates → EXTENSIONS →
 comfyui-old-time-radio**. There is exactly one entry, **`otr_canonical`**. Open
-it and press **Queue**. You do not have to change anything: every dropdown already
+it and press **Queue**. (If the gallery lists it but opening it fails, drag
+`custom_nodes/ComfyUI-OldTimeRadio/workflows/otr_canonical.json` onto the canvas
+instead -- same graph, and it has happened.) You do not have to change anything: every dropdown already
 holds a working value, and the ones set to *roll* pick for themselves, so two runs
 in a row give you two different shows.
 
@@ -301,9 +308,8 @@ The engine dropdowns live on **OTR_VideoDirector** (video and image roles),
 **OTR_CastLock** (the two voice slots) and **OTR_StableAudioTheme** (music). The
 writer dropdowns are on **OTR_LedgerScriptWriter**.
 
-You never need all the weights in this workflow. One graph ships; the dropdowns
-decide what it loads, and therefore what you have to download. The table below
-decides what it loads, and therefore what you have to download.
+You never need all the weights in this workflow. One graph ships, and its
+dropdowns decide what it loads -- and therefore what you have to download.
 
 **What the canonical selects, and what it costs.** Everything here is either
 already in the pack or fetches itself; a default run downloads no manual file.
@@ -581,6 +587,14 @@ licence click on Hugging Face plus a login; every default weight is ungated.
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 all three to `sd15` first.
 
+**The episode plays but has no captions.** Your ffmpeg can write the audio
+but cannot burn text: captions need the `ass` filter and libx264, and the
+lightweight `imageio-ffmpeg` wheel usually ships neither. The console says
+`CAPABILITY GAP on this host` and names it. The episode is finished and correct
+otherwise -- it is not re-rendered, because a host's missing filter is not worth
+throwing an episode away. Install a full ffmpeg (`winget install Gyan.FFmpeg`,
+`brew install ffmpeg`, or a static Linux build) and the next run has them.
+
 **It ran, but nothing showed up in ComfyUI.** The last node draws one still
 from the finished episode; nothing else in the graph draws anything, and the
 still is skipped rather than retried if it cannot be made. Either way the
@@ -588,6 +602,11 @@ episode is a file: look in `<your ComfyUI output folder>/otr/obs/` for the
 finished `.mp4`, and in `otr/episodes/<episode>/` for the working files it was
 built from. If you run ComfyUI in Docker, that is whichever host folder you
 mapped to ComfyUI's output directory.
+
+**Still stuck?** Open an issue at
+[github.com/jbrick2070/ComfyUI-OldTimeRadio/issues](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues)
+with the console from the end backwards -- the `[OldTimeRadio]` lines and the
+last error are what identify it.
 
 **It finished but nothing is in `otr/obs/`.** Find the `obs_publish` line in
 the console first, because there are two different answers. `obs_publish

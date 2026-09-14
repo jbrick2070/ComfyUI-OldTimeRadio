@@ -69,8 +69,9 @@ run one file:
 dependency that fails at the END: the final mux copies the master audio into the
 MP4 as PCM, which builds older than 6.1 cannot write, so the episode renders in
 full and then dies with `Could not find tag for codec pcm_s16le`. The pack
-refuses in about a second at the start of a run instead -- but only if both
-binaries are reachable. `winget install Gyan.FFmpeg` on Windows;
+refuses in about a second at the start of a run instead. That check is
+ffmpeg's; ffprobe is wanted for the optional engines and for duration reads
+where PyAV is not enough. `winget install Gyan.FFmpeg` on Windows;
 `sudo apt install ffmpeg` on Ubuntu 24.04+ (22.04's apt build is 4.4 and FAILS,
 so take a static build there). Check with `ffmpeg -version; ffprobe -version`.
 
