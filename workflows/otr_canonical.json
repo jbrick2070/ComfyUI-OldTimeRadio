@@ -2,7 +2,7 @@
   "id": "09a7142b-5ada-4855-bfcf-041a5e65c555",
   "revision": 0,
   "last_node_id": 95,
-  "last_link_id": 291,
+  "last_link_id": 292,
   "nodes": [
     {
       "id": 63,
@@ -912,8 +912,7 @@
           "type": "AUDIO",
           "slot_index": 0,
           "links": [
-            15,
-            272
+            15
           ]
         },
         {
@@ -1046,7 +1045,6 @@
           "slot_index": 0,
           "links": [
             246,
-            265,
             284
           ]
         },
@@ -1733,7 +1731,7 @@
           "type": "STRING",
           "slot_index": 0,
           "links": [
-            247
+            292
           ]
         },
         {
@@ -1905,7 +1903,7 @@
           "localized_name": "video_path",
           "name": "video_path",
           "type": "STRING",
-          "link": 266
+          "link": 292
         },
         {
           "localized_name": "gate_in",
@@ -2701,7 +2699,6 @@
           "slot_index": 1,
           "links": [
             261,
-            271,
             275,
             278,
             288
@@ -2723,263 +2720,6 @@
       ],
       "color": "#102F35",
       "bgcolor": "#3B3D42"
-    },
-    {
-      "id": 93,
-      "type": "OTR_PostUpscaleProcgenBlend",
-      "pos": [
-        3920,
-        80
-      ],
-      "size": [
-        339.96875,
-        519.453125
-      ],
-      "flags": {},
-      "order": 19,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "source_mp4_path",
-          "name": "source_mp4_path",
-          "type": "STRING",
-          "widget": {
-            "name": "source_mp4_path"
-          },
-          "link": 247
-        },
-        {
-          "localized_name": "procgen_mp4_path",
-          "name": "procgen_mp4_path",
-          "type": "STRING",
-          "widget": {
-            "name": "procgen_mp4_path"
-          },
-          "link": 265
-        },
-        {
-          "localized_name": "blend_mode",
-          "name": "blend_mode",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "blend_mode"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "blend_opacity",
-          "name": "blend_opacity",
-          "shape": 7,
-          "type": "FLOAT",
-          "widget": {
-            "name": "blend_opacity"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "ffmpeg",
-          "name": "ffmpeg",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "ffmpeg"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "bypass",
-          "name": "bypass",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "bypass"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "out_suffix",
-          "name": "out_suffix",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "out_suffix"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "shadow_crush_threshold",
-          "name": "shadow_crush_threshold",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "shadow_crush_threshold"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "green_only_overlay",
-          "name": "green_only_overlay",
-          "shape": 7,
-          "type": "BOOLEAN",
-          "widget": {
-            "name": "green_only_overlay"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "scopes_mp4_path",
-          "name": "scopes_mp4_path",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "scopes_mp4_path"
-          },
-          "link": 273
-        },
-        {
-          "localized_name": "audio_bars",
-          "name": "audio_bars",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "audio_bars"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "final_mp4_path",
-          "name": "final_mp4_path",
-          "type": "STRING",
-          "links": [
-            266
-          ]
-        },
-        {
-          "localized_name": "report",
-          "name": "report",
-          "type": "STRING",
-          "links": []
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_PostUpscaleProcgenBlend"
-      },
-      "widgets_values": [
-        "",
-        "",
-        "screen",
-        1,
-        "ffmpeg",
-        true,
-        "_procgen_blended",
-        18,
-        true,
-        "",
-        "bottom"
-      ],
-      "color": "#382712",
-      "bgcolor": "#3B3D42",
-      "title": "11 - CRT Overlay"
-    },
-    {
-      "id": 94,
-      "type": "OTR_SceneAwareScopes",
-      "pos": [
-        2960,
-        1400
-      ],
-      "size": [
-        339.96875,
-        271.625
-      ],
-      "flags": {},
-      "order": 18,
-      "mode": 0,
-      "inputs": [
-        {
-          "localized_name": "audio",
-          "name": "audio",
-          "shape": 7,
-          "type": "AUDIO",
-          "link": 272
-        },
-        {
-          "localized_name": "clip_manifest_json",
-          "name": "clip_manifest_json",
-          "type": "STRING",
-          "widget": {
-            "name": "clip_manifest_json"
-          },
-          "link": 271
-        },
-        {
-          "localized_name": "out_w",
-          "name": "out_w",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "out_w"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "out_h",
-          "name": "out_h",
-          "shape": 7,
-          "type": "INT",
-          "widget": {
-            "name": "out_h"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "ffmpeg",
-          "name": "ffmpeg",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "ffmpeg"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "landscape_bars",
-          "name": "landscape_bars",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "landscape_bars"
-          },
-          "link": null
-        }
-      ],
-      "outputs": [
-        {
-          "localized_name": "scopes_mp4_path",
-          "name": "scopes_mp4_path",
-          "type": "STRING",
-          "slot_index": 0,
-          "links": [
-            273
-          ]
-        }
-      ],
-      "properties": {
-        "Node name for S&R": "OTR_SceneAwareScopes"
-      },
-      "widgets_values": [
-        "",
-        1920,
-        1080,
-        "ffmpeg",
-        "off"
-      ],
-      "color": "#102F35",
-      "bgcolor": "#3B3D42",
-      "title": "9e - Scope Overlays"
     },
     {
       "id": 95,
@@ -3223,14 +2963,6 @@
       "STRING"
     ],
     [
-      247,
-      84,
-      0,
-      93,
-      0,
-      "STRING"
-    ],
-    [
       249,
       7,
       3,
@@ -3351,22 +3083,6 @@
       "STRING"
     ],
     [
-      265,
-      12,
-      0,
-      93,
-      1,
-      "STRING"
-    ],
-    [
-      266,
-      93,
-      0,
-      86,
-      0,
-      "STRING"
-    ],
-    [
       267,
       91,
       1,
@@ -3396,30 +3112,6 @@
       0,
       88,
       0,
-      "STRING"
-    ],
-    [
-      271,
-      92,
-      1,
-      94,
-      1,
-      "STRING"
-    ],
-    [
-      272,
-      7,
-      0,
-      94,
-      0,
-      "AUDIO"
-    ],
-    [
-      273,
-      94,
-      0,
-      93,
-      9,
       "STRING"
     ],
     [
@@ -3549,6 +3241,14 @@
       85,
       10,
       "STRING"
+    ],
+    [
+      292,
+      84,
+      0,
+      86,
+      0,
+      "STRING"
     ]
   ],
   "groups": [
@@ -3598,7 +3298,7 @@
         2930,
         10,
         2005.640625,
-        619.453125
+        610
       ],
       "color": "#AD916B",
       "font_size": 24,
@@ -3623,7 +3323,7 @@
       "bounding": [
         530,
         1330,
-        2799.96875,
+        2359.96875,
         719.515625
       ],
       "color": "#6A9CA6",

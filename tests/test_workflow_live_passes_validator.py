@@ -54,10 +54,9 @@ def test_production_workflow_visual_structure_pinned():
     matches the prior quality bar. Pins the three restored pieces:
 
       1. burned-in SDH captions: node 86 OTR_CaptionBurn OWNS the burn
-         (burn_captions=True, sdh_standard) and now sits AFTER the procgen blend
-         (2026-07-04 widget-audit Batch 3 -- single caption owner); node 93
-         OTR_PostUpscaleProcgenBlend no longer carries the burn_captions /
-         caption_style widgets;
+         (burn_captions=True, sdh_standard) -- the single caption owner since
+         the 2026-07-04 widget audit, and since 2026-09-13 it reads the
+         composite directly;
       2. the lean visual defaults: node 87 OTR_VideoDirector routes all three
          beat classes to still_flat over z_image_turbo stills. (This bullet
          used to claim ltx_video and had been WRONG since 2026-07-07, when the
@@ -65,11 +64,13 @@ def test_production_workflow_visual_structure_pinned():
          corrected 2026-08-15 with the still_flat change so the docstring and
          the asserts stop disagreeing.) Heavy/video engines remain explicit
          profile overrides, never saved-workflow defaults;
-      3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds BOTH
-         the composite base (node 84) and the blend texture (node 93), and the
-         chain runs 84 -> 93 -> 86 -> 95 -> 85: captions (node 86) burn BEFORE
-         the late OTR_CreditsRoll (node 95, credits enrichment 2026-07-03), which
-         appends the unified SILENT credits roll and declares its tail duration to
+      3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds the
+         composite base (node 84) -- it is the radio FLOOR that fills head,
+         gaps and tail so the assembled length equals the master, which is the
+         pre-mux A/V-sync guard -- and the chain runs 84 -> 86 -> 95 -> 85:
+         captions (node 86) burn BEFORE the late OTR_CreditsRoll (node 95,
+         credits enrichment 2026-07-03), which appends the unified SILENT
+         credits roll and declares its tail duration to
          the credits-aware terminal mux (node 85).
 
     If any of these regress to headless-only defaults again, this fires.
@@ -79,22 +80,16 @@ def test_production_workflow_visual_structure_pinned():
     links = {l[0]: l for l in wf["links"]}
 
     # -- 1. caption ownership (86-owner migration, 2026-07-04 widget-audit) ----
-    n93 = nodes[93]
-    assert n93["type"] == "OTR_PostUpscaleProcgenBlend"
-    wv93 = n93["widgets_values"]
-    # post-migration vector (11): [src, pgn, blend_mode, opacity, ffmpeg, bypass,
-    #                              out_suffix, crush, green_only, scopes, audio_bars]
-    assert len(wv93) == 11, (
-        "node 93 widgets_values must be 11 (caption widgets removed): %r" % wv93)
-    # bypass (index 5) is NOT pinned. Operator ruling 2026-09-05: a saved widget
-    # value the operator chooses -- dropdown or toggle -- is not the suite's to
-    # guard; he turned the procgen blend OFF for the low-friction canonical, and
-    # a test asserting otherwise just turns a preference into a red suite. The
-    # STRUCTURE above (11 widgets, caption inputs gone) is what this pin is for.
-    n93_input_names = [i.get("name") for i in n93["inputs"]]
-    assert ("burn_captions" not in n93_input_names
-            and "caption_style" not in n93_input_names), (
-        "node 93 must NOT carry caption widgets -- ownership moved to node 86")
+    # OPERATOR DECISION 2026-09-13: OTR_PostUpscaleProcgenBlend (node 93) and
+    # OTR_SceneAwareScopes (node 94) left the canonical. The blend had shipped
+    # with bypass=True since the 2026-09-05 low-friction ruling, so it copied
+    # its input to its output on every render, and the scopes node encoded an
+    # MP4 whose only consumer was that bypassed input. Both CLASSES remain
+    # registered and selectable -- this removed the unused work, not the
+    # capability. The composite now feeds the caption node directly.
+    assert 93 not in nodes and 94 not in nodes, (
+        "the bypassed blend / scopes pair is back in the canonical; if that is "
+        "deliberate, re-pin the chain below")
     n86 = nodes[86]
     assert n86["type"] == "OTR_CaptionBurn"
     assert n86["widgets_values"][0] is True, (
@@ -143,16 +138,17 @@ def test_production_workflow_visual_structure_pinned():
 
     # -- 3. the credits-bearing procgen wiring + chain order ------------------
     out12 = set(nodes[12]["outputs"][0].get("links") or [])
-    assert {246, 265} <= out12, (
-        "node 12 procgen must feed the composite base (246) AND the blend "
-        "texture (265); got %r" % sorted(out12))
+    assert 246 in out12, (
+        "node 12 procgen must feed the composite base (246) -- it is the radio "
+        "FLOOR that fills head, gaps and tail so the assembled video matches "
+        "the master length; got %r" % sorted(out12))
     assert links[246][1:5] == [12, 0, 84, 0]
-    assert links[265][1:5] == [12, 0, 93, 1]
-    assert links[247][1:5] == [84, 0, 93, 0]   # composite -> blend source
-    assert links[266][1:5] == [93, 0, 86, 0]   # blend -> caption node
-    assert links[273][1:5] == [94, 0, 93, 9]   # scopes -> blend (dst_slot 11->9 post strip)
+    # 2026-09-13: the composite feeds the caption node DIRECTLY. The overlay
+    # that used to sit between them was bypassed and is gone; pinning the edge
+    # by id means a future rewire that puts a step back has to say so here.
+    assert links[292][1:5] == [84, 0, 86, 0]   # composite -> caption node
     # credits enrichment 2026-07-03 + 86-owner migration 2026-07-04: the chain is
-    # 84 -> 93 -> 86 -> 95 -> 85. Captions (node 86) burn BEFORE the credits roll
+    # 84 -> 86 -> 95 -> 85. Captions (node 86) burn BEFORE the credits roll
     # (node 95) so the *_with_credits concat is never re-encoded and captions land
     # on dialogue only. OTR_CreditsRoll stays terminal-before-mux.
     assert links[250][1:5] == [86, 0, 95, 0]   # caption final -> credits roll

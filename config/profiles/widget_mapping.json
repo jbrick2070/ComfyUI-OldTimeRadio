@@ -215,10 +215,6 @@
         [
           "OTR_SilentComposite",
           "canvas_h"
-        ],
-        [
-          "OTR_SceneAwareScopes",
-          "out_h"
         ]
       ]
     },
@@ -237,10 +233,6 @@
         [
           "OTR_SilentComposite",
           "canvas_w"
-        ],
-        [
-          "OTR_SceneAwareScopes",
-          "out_w"
         ]
       ]
     },
