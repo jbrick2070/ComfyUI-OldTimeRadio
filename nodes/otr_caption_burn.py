@@ -314,7 +314,8 @@ def _resolve_ledger_path(video_path: str) -> Optional[str]:
     stem = Path(video_path).stem
     # strip our pipeline suffixes so the stem matches the episode id. The
     # 86-owner migration (2026-07-04 widget-audit) moved CaptionBurn to AFTER the
-    # procgen blend (node 93), so the incoming video is now
+    # procgen blend, which left the canonical 2026-09-13, so the incoming
+    # video is now
     # "<slug>_procgen_blended.mp4" -- strip that suffix too (ported from the
     # legacy blend node's resolver).
     for suf in ("_procgen_blended", "_silent", "_captioned", "_final", "_blend"):
@@ -499,7 +500,8 @@ class OTRCaptionBurn:
 
     def _default_out(self, video_path: str) -> str:
         # Write the captioned mp4 BESIDE the input video. The 86-owner input is
-        # node 93's "<slug>_procgen_blended.mp4" inside otr/episodes/<ep>/, so the
+        # the composite's own mp4 inside otr/episodes/<ep>/ (it was the blend's
+        # "<slug>_procgen_blended.mp4" until that node left the graph), so the
         # captioned twin lands in that same per-episode folder -- never the flat
         # episodes root (2026-07-04 widget-audit). Fall back to otr/episodes only
         # when the input path carries no resolvable directory.

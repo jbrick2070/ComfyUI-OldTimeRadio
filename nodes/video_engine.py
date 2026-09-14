@@ -577,7 +577,7 @@ def _hero_title_in_procgen():
     produce would contain the "after" as well.
 
     The TITLE-FREE control the acceptance measurement needs is a different and
-    cheaper thing -- with the suppression in place, node 93's own output is
+    cheaper thing -- with the suppression in place, the blend's own output is
     already title-free, so the brightest-underlying-source ROI is read from
     there rather than from a third render.
     """

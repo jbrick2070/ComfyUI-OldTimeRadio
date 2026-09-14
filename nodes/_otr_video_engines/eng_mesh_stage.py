@@ -704,8 +704,10 @@ class MeshStageEngine(_CheapFamilyBase):
         nodes execute inside the mesher graph (V-5: adapter-internal, lazy)."""
         if not self._installed():
             raise RuntimeError(
+                # OTR_ENABLE_MESH_STAGE gates nothing (requires_flag is None);
+                # the checkpoint is the requirement.
                 "mesh_stage not installed: hy3d checkpoint missing at %s -- "
-                "install it, set OTR_ENABLE_MESH_STAGE=1, and run the GPU "
+                "install it and run the GPU "
                 "probe" % self._ckpt_path())
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())

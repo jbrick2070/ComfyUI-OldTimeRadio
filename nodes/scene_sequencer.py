@@ -1717,7 +1717,8 @@ class EpisodeAssembler:
         #
         # BUT SIMPLY SKIPPING THE PASS WOULD BREAK TWO OTHER CONSUMERS. This
         # node's episode_audio output fans out to OTR_SignalLostVideo (node 12)
-        # and OTR_SceneAwareScopes (node 94), and both receive the POST-LUFS
+        # and, when it is wired by hand, OTR_SceneAwareScopes -- which left
+        # the canonical 2026-09-13. Each receives the POST-LUFS
         # tensor today; skipping would make procgen and the scopes hotter on
         # foley episodes only, for no reason connected to the bed.
         #

@@ -942,8 +942,10 @@ class HuMoEngine(_MC.MotionEngineBase):
         GPU smoke (operator)."""
         if not self._installed():
             raise RuntimeError(
+                # OTR_ENABLE_HUMO gates nothing (requires_flag is None here);
+                # the wrapper and the checkpoint are the requirement.
                 "humo not installed: checkpoint missing at %s -- install the HuMo "
-                "wrapper + ckpt, set OTR_ENABLE_HUMO=1, and run the A-S6 GPU "
+                "wrapper + ckpt, and run the A-S6 GPU "
                 "smoke" % self._ckpt_path())
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())

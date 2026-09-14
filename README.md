@@ -556,7 +556,7 @@ The published file is named after what produced it, so a folder of episodes read
 at a glance without opening any of them:
 
 ```
-<title>_<timestamp>__<style>__<video>__<image>__<tts>__<bank>_final.mp4
+<title>_<timestamp>__<style>__<video>__<image>__<tts>__<bank>__<writer>__<music>_final.mp4
 ```
 
 A lane that renders no stills reports `none` in the image field. Point OBS, or any

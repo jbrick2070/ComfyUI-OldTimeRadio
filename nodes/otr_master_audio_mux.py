@@ -1545,7 +1545,8 @@ class OTRMasterAudioMux:
         """Truthfully stamp all terminal asset pointers in the live ledger.
 
         The tail chain grew a credits roll (node 95) + this mux (node 85) AFTER
-        the procgen blend (node 93), whose ``_stamp_ledger_final_video_path``
+        the procgen blend (out of the canonical since 2026-09-13), whose
+        ``_stamp_ledger_final_video_path``
         left the ledger pointing at the pre-credits / pre-mux intermediate blend.
         This node is the terminal stage, so it owns the archival video, frozen
         master audio, and published OBS pointers together. ``save_ledger_safe``
@@ -1810,7 +1811,7 @@ class OTRMasterAudioMux:
                     decision.summary(), final,
                 )
             # N2 (truthful ledger): this terminal node restamps
-            # final_video_path over node 93's pre-credits/pre-mux blend.
+            # final_video_path over the pre-credits/pre-mux video it is handed.
             report.append(self._stamp_terminal_paths(
                 final, obs_copy, master_audio_path))
             # THE REQUIRED-DELIVERY GATE. Only after the stamp above, because

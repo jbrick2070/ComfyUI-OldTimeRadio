@@ -1127,8 +1127,13 @@ class WanTi2vEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         classes. Weights load when the loader nodes execute in render_clip."""
         if not self._installed():
             raise RuntimeError(
+                # The weights are what unblock this. OTR_ENABLE_WAN_TI2V used
+                # to gate selection and no longer does -- requires_flag is None
+                # on this class -- so telling a stuck user to set it sent them
+                # to a variable nothing reads.
                 "%s not installed: UNET missing at %s -- fetch the Wan2.2 "
-                "TI2V-5B GGUF, set OTR_ENABLE_WAN_TI2V=1"
+                "TI2V-5B GGUF and put it exactly there. Nothing else gates "
+                "this engine; the file is the whole requirement."
                 % (self.name, self._ckpt_path()))
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
