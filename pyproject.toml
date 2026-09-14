@@ -1,6 +1,6 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.1.0"
+version = "2.1.1"
 description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. Optional sound-generating video lanes create the scene's effects instead of using a stock library."
 readme = "README.md"
 license = {file = "LICENSE"}
@@ -131,7 +131,7 @@ PublisherId = "fluxus"
 DisplayName = "ComfyUI-OldTimeRadio"
 # Registry card art. Must be a URL (SVG/PNG/JPG/GIF, max 800x400) -- the raw
 # GitHub path on the publish branch. Regenerate with tools/make_registry_icon.py.
-Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/assets/otr_icon.gif"
+Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -405,7 +405,7 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="OpenRouter remote model A (opt-in, default-off). Binds "
             "to OPENROUTER_MODEL_A; zero local VRAM. See "
             "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            "v2.0-alpha/docs/openrouter-setup.md.",
+            "main/docs/openrouter-setup.md.",
             **common,
         ),
         CuratedModel(
@@ -413,7 +413,7 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="OpenRouter remote model B (opt-in, default-off). Binds "
             "to OPENROUTER_MODEL_B; zero local VRAM. See "
             "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            "v2.0-alpha/docs/openrouter-setup.md.",
+            "main/docs/openrouter-setup.md.",
             **common,
         ),
     )
@@ -454,7 +454,7 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="Comfy Credits remote model A (opt-in, default-off). "
             "Credit-billed via ComfyUI's partner-node proxy; zero local "
             "VRAM. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/"
-            "blob/v2.0-alpha/docs/comfy-credits-setup.md.",
+            "blob/main/docs/comfy-credits-setup.md.",
             **common,
         ),
         CuratedModel(
@@ -462,7 +462,7 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="Comfy Credits remote model B (opt-in, default-off). "
             "Credit-billed via ComfyUI's partner-node proxy; zero local "
             "VRAM. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/"
-            "blob/v2.0-alpha/docs/comfy-credits-setup.md.",
+            "blob/main/docs/comfy-credits-setup.md.",
             **common,
         ),
     )
@@ -1758,7 +1758,7 @@ def validate_model_id(
             f"(plus OPENROUTER_MODEL_A / OPENROUTER_MODEL_B), then restart "
             f"ComfyUI in a fresh terminal. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            f"v2.0-alpha/docs/openrouter-setup.md."
+            f"main/docs/openrouter-setup.md."
         )
 
     # In-app hint: a Comfy Credits handle that reached here means the lane
@@ -1771,7 +1771,7 @@ def validate_model_id(
             f"Comfy account with credits, then restart ComfyUI in a fresh "
             f"terminal. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            f"v2.0-alpha/docs/comfy-credits-setup.md."
+            f"main/docs/comfy-credits-setup.md."
         )
 
     if normalized.startswith("google_api:"):

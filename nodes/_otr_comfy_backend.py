@@ -444,7 +444,7 @@ class ComfyCreditsBackend:
                 f"OTR_ENABLE_COMFY_CREDITS=1 and log in to a Comfy account "
                 f"with credits (see "
                 f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"v2.0-alpha/docs/comfy-credits-setup.md)."
+                f"main/docs/comfy-credits-setup.md)."
             )
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
@@ -506,7 +506,7 @@ class ComfyCreditsBackend:
                 "(or set a Comfy API key) so ComfyUI injects the hidden "
                 "auth into the writer node. See "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "v2.0-alpha/docs/comfy-credits-setup.md."
+                "main/docs/comfy-credits-setup.md."
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
 

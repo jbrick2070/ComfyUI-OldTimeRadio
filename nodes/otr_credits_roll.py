@@ -589,7 +589,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         "col1": col1,
         "col2": col2,
         "col3_flow": flow,
-        "footer_l": "Made with OTR v2.0-alpha — 100%% generated",
+        "footer_l": "Made with OTR v2 — 100%% generated",
         "footer_c": ">> voices from the CastLock final stamp — "
                     "delivered, not planned.",
     }

@@ -72,9 +72,9 @@ python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 **Run that `pip install` with ComfyUI's own Python, not a system one** -- this
 is the most common way an install fails, and it fails much later, as nodes that
 quietly refuse to load. Python 3.10 through 3.13 are fine; 3.14 has no Kokoro
-voice build yet. Either branch is current: `v2.0-alpha` is the default and
-`main` now tracks it, so an older clone of `main` is a v1.7 tree and wants
-re-cloning rather than pulling.
+voice build yet. `main` is the branch: it is the default and the only one
+that moves. An older clone of `main` from before 2026-09-13 is a v1.7 tree and
+wants re-cloning rather than pulling.
 
 **2. Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.

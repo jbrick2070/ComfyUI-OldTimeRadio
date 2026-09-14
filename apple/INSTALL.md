@@ -19,9 +19,9 @@ it. The registry id is `comfyui-old-time-radio`, published by `fluxus`.
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 ```
 
-Either branch gives you the current tree. `v2.0-alpha` is the default and
-where the work lands; `main` is held on the same commit automatically, so
-cloning it plainly works too. This was not true before 2026-09-13 -- `main`
+`main` is the branch: it is the default and where the work lands.
+`v2.0-alpha` was retired on 2026-09-13 and no longer moves, so clone `main`
+plainly and ignore it. This was not true before 2026-09-13 -- `main`
 sat 5,029 commits behind and served a v1.7 tree -- so if you cloned it before
 then, clone again rather than pull.
 

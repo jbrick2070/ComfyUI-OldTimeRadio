@@ -90,7 +90,7 @@ def render() -> str:
       "# 1. system libraries pip cannot provide (Linux)\n"
       "sudo apt-get install -y libcairo2-dev pkg-config ffmpeg\n\n"
       "# 2. the pack and its Python dependencies -- INTO THE PYTHON COMFYUI RUNS\n"
-      "git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio\n"
+      "git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio\n"
       "<comfyui-python> -m pip install -r ComfyUI-OldTimeRadio/requirements.txt\n\n"
       "# 3. model weights for the lane you want\n"
       "python scripts/otr_fetch_lane_weights.py haunted\n\n"

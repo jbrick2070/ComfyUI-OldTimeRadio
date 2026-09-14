@@ -580,9 +580,14 @@ exactly what makes the mistake convincing) and they do NOT live under the ComfyU
   * **`v2.0-alpha` is RETIRED, NOT DELETED, and that is deliberate.** `raw.githubusercontent.com`
     URLs pin a branch NAME: the registry card `Icon` in `pyproject.toml` and the README's logo and
     hero still all resolved through `/v2.0-alpha/`. Deleting the branch would 404 the icon on the
-    LIVE registry listing. The README URLs moved to `/main/` in this same change; the pyproject one
-    could not, because 2.1.0 was Pending and that file is a release trigger (7A). **Moving the
-    `Icon` URL to `/main/` is owed at the next version bump, and the branch stays until it lands.**
+    LIVE registry listing. The README URLs moved to `/main/` with the promotion, and the
+    pyproject `Icon` followed in **2.1.1**, along with the credit-roll footer and six writer
+    tooltips that also named the branch.
+  * **THE BRANCH CAN ONLY BE DELETED ONCE 2.1.1 IS *ACTIVE*, NOT WHEN IT IS PUBLISHED.** A
+    published version's metadata is frozen with the Icon URL it shipped: 2.0.0 and 2.1.0 both
+    carry `/v2.0-alpha/`, and the listing renders whichever version is CURRENT. While 2.1.1 sits
+    Pending, `latest_version` is still an older row pointing at the retired branch -- delete it
+    then and the card art breaks on the live page. Wait for Active, confirm the card, then delete.
   * The old v1.7 tip is preserved on `archive/main-v1.7` (0aa6d6e1) -- eleven April 2026 commits
     v2 never took. Not discarded.
 - The operator eyeball gates TAGS and RELEASES -- NEVER pushes. Pushing to `main` is always safe,

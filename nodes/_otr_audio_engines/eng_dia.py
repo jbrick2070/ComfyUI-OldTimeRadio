@@ -106,7 +106,7 @@ class DiaEngine:
                 raise RuntimeError(
                     "Dia Path B not installed: %s missing at %s -- run "
                     "the installer at https://github.com/jbrick2070/"
-                    "ComfyUI-OldTimeRadio/blob/v2.0-alpha/scripts/"
+                    "ComfyUI-OldTimeRadio/blob/main/scripts/"
                     "_otr_dia_install.ps1 (creates an isolated Python venv, "
                     "installs Dia from source, and fetches its weights, "
                     "separate from the main ComfyUI venv) before rendering "

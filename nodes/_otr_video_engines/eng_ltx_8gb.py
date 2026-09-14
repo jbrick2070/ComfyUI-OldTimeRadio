@@ -739,7 +739,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "from comfyanonymous/flux_text_encoders belongs in "
                 "models/text_encoders), or run the script at "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1"
+                "main/scripts/download_ltx_0_9_8.ps1"
                 % self._ckpt_name(), kind="video")
         t5 = self._loader_token_path(
             ("text_encoders", "clip"), self._t5_name(), "OTR_LTX_8GB_T5_DIR")
@@ -1096,7 +1096,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
                 "into models/checkpoints, or run the script at "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1"
+                "main/scripts/download_ltx_0_9_8.ps1"
                 % (ckpt, size, _LTX8_CKPT_MIN_BYTES), kind="video")
 
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -1129,7 +1129,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "models/text_encoders), register its folder in "
                 "extra_model_paths.yaml, or run the script at "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1 -- OTR_LTX_8GB_CKPT "
+                "main/scripts/download_ltx_0_9_8.ps1 -- OTR_LTX_8GB_CKPT "
                 "only names a file, it cannot make the loader find one"
                 % self._ckpt_name(), kind="video")
         self._assert_checkpoint_integrity(ckpt)
@@ -1296,7 +1296,7 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
                 "ltxv-2b-0.9.8-distilled.safetensors from Lightricks/LTX-Video "
                 "into models/checkpoints, or run the script at "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "v2.0-alpha/scripts/download_ltx_0_9_8.ps1" % self._ckpt_name())
+                "main/scripts/download_ltx_0_9_8.ps1" % self._ckpt_name())
         from . import wrapper_bridge as _wb
         self._classes = _wb.resolve_graph_classes(self._node_candidates())
         self._loaded = True
