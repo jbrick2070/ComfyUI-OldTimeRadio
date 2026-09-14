@@ -1,6 +1,6 @@
 {
   "id": "otr_mac16_low",
-  "display_name": "Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, MusicGen. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+  "display_name": "Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
   "status": "shipping",
   "platform": "mac",
   "device_backend": "mps",
@@ -19,7 +19,7 @@
     "voice_bank": "kokoro_builtin",
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "musicgen",
+    "music_engine": "stable_audio_3",
     "video_render_engine": "viz_camera"
   },
   "features": {

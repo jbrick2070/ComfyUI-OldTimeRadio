@@ -1,6 +1,6 @@
 {
   "id": "otr_8gb_video",
-  "display_name": "8 GB NVIDIA -- real video diffusion on LTX 0.9.8, the ONLY video engine that downloads itself (16.1 GB at queue time, no account, no licence click) and the only one proven on 8 GB, 16 GB and Mac alike. SD 1.5 stills, Kokoro voices, MusicGen.",
+  "display_name": "8 GB NVIDIA -- real video diffusion on LTX 0.9.8, the ONLY video engine that downloads itself (16.1 GB at queue time, no account, no licence click) and the only one proven on 8 GB, 16 GB and Mac alike. SD 1.5 stills, Kokoro voices, Stable Audio 3.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cuda",
@@ -18,7 +18,7 @@
   "slot_overrides": {
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "musicgen",
+    "music_engine": "stable_audio_3",
     "video_render_engine": "ltx_8gb"
   },
   "features": {

@@ -1,6 +1,6 @@
 {
   "id": "otr_mac16_video",
-  "display_name": "Apple Silicon -- real video diffusion on LTX 0.9.8 -- the only video engine that downloads itself. SD 1.5 stills, Kokoro voices, MusicGen, no upscaler. Proven on a 16 GB M4.",
+  "display_name": "Apple Silicon -- real video diffusion on LTX 0.9.8 -- the only video engine that downloads itself. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.",
   "status": "shipping",
   "platform": "mac",
   "device_backend": "mps",
@@ -19,7 +19,7 @@
     "voice_bank": "kokoro_builtin",
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "musicgen",
+    "music_engine": "stable_audio_3",
     "video_render_engine": "ltx098_low_video"
   },
   "features": {
