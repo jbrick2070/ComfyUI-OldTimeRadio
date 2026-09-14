@@ -44,8 +44,15 @@ _ARCHES = (
 #: Tiers in reading order, named by what the episode is made of.
 _TIERS = ("low", "still", "video", "foley", "mime", "animatediff")
 
+# acts and chars were columns until 2026-09-13. All sixteen rows read 3 and 3,
+# and sat beside the word `shipping` -- while every qualification leg ran at ONE
+# act by design (scripts/otr_shipping_set_legs.ps1; the receipt in
+# otr/legs/shipping_set_20260913_132016/otr_16gb_low.log line 6 reads
+# act_count='1'). Both columns were true, and the pair implied something false:
+# that the three-act configuration is the proven one. The facts now live in a
+# sentence beside the tables, which can state both without implying either.
 _COLUMNS = ("tier", "graph", "writer", "quant", "lanes (announcer / music / character)",
-            "image", "weights", "also install", "acts", "chars", "status")
+            "image", "weights", "also install", "status")
 
 
 def _load_profile(profile_id: str) -> dict:
@@ -88,7 +95,6 @@ def _row(profile_id: str, tier: str, packs: dict) -> list:
     p = _load_profile(profile_id)
     llm = p.get("llm") or {}
     roles = p.get("role_overrides") or {}
-    feats = p.get("features") or {}
     lanes = [_public(roles.get(k, "")) for k in
              ("announcer_visual", "music_visual", "character_visual")]
     lanes_cell = (lanes[0] if len(set(lanes)) == 1 else " / ".join(lanes))
@@ -112,8 +118,6 @@ def _row(profile_id: str, tier: str, packs: dict) -> list:
         image,
         _weights([l for l in lanes if l]),
         ", ".join(also) or "nothing",
-        str(feats.get("act_count", "(canonical)")),
-        str(feats.get("num_characters", "(canonical)")),
         str(p.get("status", "")),
     ]
 

@@ -47,7 +47,7 @@ anything.** `obs_publish BLOCKED -- ...` means the run SUCCEEDED and the
 episode is in `otr/episodes/<episode>/`; only the published copy was
 withheld, because the rights receipt did not clear. No `obs_publish` line at
 all means the run did not finish, however green the console
-looked. That folder is the finish line.
+looked.
 
 ---
 

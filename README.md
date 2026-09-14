@@ -55,7 +55,7 @@ pressing **Queue** is the whole path.
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
 | Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
 | No GPU at all | About half an hour, and it works. Start ComfyUI with `--cpu`. |
-| AMD | Experimental, unproven, and honestly documented as such in [apple/ROCM.md](apple/ROCM.md). |
+| AMD | Experimental. No hardware has run it; [apple/ROCM.md](apple/ROCM.md) has the graph and the open questions. |
 
 **1. Install the pack.** In ComfyUI Manager, search for **Old Time Radio** (registry
 id `comfyui-old-time-radio`, publisher `fluxus`). Or clone it into `custom_nodes/`:
@@ -105,23 +105,18 @@ it lives; the still is only there so a finished run does not look like one that
 did nothing. The first person outside this project to run it had no still, went
 looking in the UI, found nothing, and only then found the files.
 
-That folder is the finish line. **If nothing is in `otr/obs/`, the run did not
-finish**, however green the console looked -- go to
+That folder is the finish line, and the console says which of two things
+happened. **`obs_publish OK -> <path>`** names the published file.
+**`obs_publish BLOCKED -- ...`** means the run SUCCEEDED and only the published
+copy was withheld, because the episode's rights receipt did not clear -- the
+finished episode is in `otr/episodes/<episode>/`. **No `obs_publish` line at
+all** means the run did not finish, however green the console looked; go to
 [When something goes wrong](#when-something-goes-wrong).
 
 To stop a run, press **Cancel** in the ComfyUI menu (or clear the queue). It
 stops at the next step rather than instantly, so a long video beat finishes
 first. Nothing is published, and the part-built episode stays in
 `otr/episodes/<episode>/`.
-
-**The one exception, and it is deliberate.** Publication is a separate decision
-from production. If an episode's rights receipt does not clear -- a
-research-only source, or a receipt the terminal node cannot match to this
-episode -- the finished episode is still written, to
-`otr/episodes/<episode>/`, and only the `otr/obs/` copy is withheld. The run
-really did succeed. Your console says which happened, in as many words:
-`obs_publish OK -> ...` or `obs_publish BLOCKED -- ...`. Read that line before
-you conclude anything from an empty folder.
 
 The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
@@ -483,8 +478,13 @@ diffusion. **foley** is video that generates its own sound, mixed under the
 voices; **mime** is the same render as a silent performance -- the video's
 own sound carries its beats and the voices and music are muted there.
 **animatediff** is SD 1.5 motion driven by the text prompt alone; it mints
-no still. Kokoro voices, three acts and three characters on every graph; the
-upscaler is off.
+no still. Kokoro voices on every graph; the upscaler is off.
+
+**Each preset opens at three acts and three characters, and the hardware proof
+behind `shipping` was a one-act episode.** The qualification run smokes every
+graph in a night, which means overriding the act count; the preset itself is
+unchanged and is what you get when you open it. Both facts are true and neither
+implies the other.
 
 Every pre-set graph scores with **MusicGen**, not the canonical's Stable Audio
 3. MusicGen is noncommercial (see [Licence](#licence-and-credits)), so if that
@@ -494,58 +494,58 @@ opening the graph.
 <!-- BEGIN GENERATED: tier-matrix -->
 ### 8 GB NVIDIA
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
-| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | 3 | 3 | shipping |
-| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | 3 | 3 | shipping |
-| foley | _not built_ | | | | | | | | | |
-| mime | _not built_ | | | | | | | | | |
-| **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | shipping |
+| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | shipping |
+| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | shipping |
+| foley | _not built_ | | | | | | | |
+| mime | _not built_ | | | | | | | |
+| **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
 ### 16 GB NVIDIA
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | shipping |
-| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | z_image_turbo | manual | ComfyUI-GGUF | 3 | 3 | shipping |
-| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | shipping |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | shipping |
+| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | shipping |
+| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | shipping |
+| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | z_image_turbo | manual | ComfyUI-GGUF | shipping |
+| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
 ### Apple Silicon, 16 GB
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_mac16_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
-| **still** | `otr_mac16_still` | Qwen3.5-4B | none | still_motion | sd15 | none | nothing | 3 | 3 | shipping |
-| **video** | `otr_mac16_video` | Qwen3.5-4B | none | ltx098_low_video | sd15 | auto | nothing | 3 | 3 | shipping |
-| foley | _not built_ | | | | | | | | | |
-| mime | _not built_ | | | | | | | | | |
-| **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | 3 | 3 | shipping |
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_mac16_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
+| **still** | `otr_mac16_still` | Qwen3.5-4B | none | still_motion | sd15 | none | nothing | shipping |
+| **video** | `otr_mac16_video` | Qwen3.5-4B | none | ltx098_low_video | sd15 | auto | nothing | shipping |
+| foley | _not built_ | | | | | | | |
+| mime | _not built_ | | | | | | | |
+| **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
 ### AMD ROCm (experimental -- no receipts)
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| low | _not built_ | | | | | | | | | |
-| **still** | `otr_amd_still` | Qwen3.5-4B | none | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | 3 | 3 | draft |
-| video | _not built_ | | | | | | | | | |
-| foley | _not built_ | | | | | | | | | |
-| mime | _not built_ | | | | | | | | | |
-| animatediff | _not built_ | | | | | | | | | |
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| low | _not built_ | | | | | | | |
+| **still** | `otr_amd_still` | Qwen3.5-4B | none | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | draft |
+| video | _not built_ | | | | | | | |
+| foley | _not built_ | | | | | | | |
+| mime | _not built_ | | | | | | | |
+| animatediff | _not built_ | | | | | | | |
 
 ### CPU only
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | acts | chars | status |
-|---|---|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | 3 | 3 | shipping |
-| still | _not built_ | | | | | | | | | |
-| video | _not built_ | | | | | | | | | |
-| foley | _not built_ | | | | | | | | | |
-| mime | _not built_ | | | | | | | | | |
-| animatediff | _not built_ | | | | | | | | | |
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
+| still | _not built_ | | | | | | | |
+| video | _not built_ | | | | | | | |
+| foley | _not built_ | | | | | | | |
+| mime | _not built_ | | | | | | | |
+| animatediff | _not built_ | | | | | | | |
 <!-- END GENERATED: tier-matrix -->
 
 Weights marked **auto** download themselves the first time you queue;
