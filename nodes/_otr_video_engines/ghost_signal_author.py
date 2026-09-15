@@ -58,6 +58,11 @@ try:  # pragma: no cover -- exercised by both import shapes in the suite
 except ImportError:  # pragma: no cover -- flat test imports
     import ghost_signal_prompt as _gsp  # type: ignore
 
+try:
+    from .._otr_json import normalize_json_keys
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_json import normalize_json_keys  # type: ignore
+
 
 # --------------------------------------------------------------------------- #
 # Identity. Every constant here is pinned by a test.
@@ -1059,6 +1064,11 @@ def parse_batch_response(raw, expected_ids, *, subjects_out=None) -> dict:
     names row 10. See `_canonical_opaque_id` for the measurement that bought
     it. Every repair is WARNING-logged naming both spellings -- no silent
     anything -- and every other strictness here is untouched.
+
+    A second leftover-JSON identity, not a loosened field set: padded keys
+    (``"shots "``, ``"id "``, ``"drawable_beat "``) are stripped before the
+    exact-key checks. Extra fields and exact duplicate keys still reject.
+    ``"id"`` vs ``"id "`` become one key after strip (last-wins).
     """
     expected = list(expected_ids or ())
     body = _strip_one_fence(raw)
@@ -1077,6 +1087,7 @@ def parse_batch_response(raw, expected_ids, *, subjects_out=None) -> dict:
         raise GhostAuthorParseError(
             "Ghost batch response carries trailing content after the JSON "
             "object -- prose and second objects are not transport wrapping")
+    payload = normalize_json_keys(payload)
     if not isinstance(payload, dict):
         raise GhostAuthorParseError(
             "Ghost batch response is a %s, not an object"

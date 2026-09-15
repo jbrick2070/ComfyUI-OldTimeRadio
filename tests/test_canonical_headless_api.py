@@ -38,6 +38,12 @@ def _default_llm_option() -> str:
     return default_llm_option()
 
 
+def _video_pick(internal: str) -> str:
+    """Live VideoDirector combo string for a registered engine."""
+    from nodes.otr_video_director import exact_menu_option_for
+    return exact_menu_option_for(internal)
+
+
 RETIRED_FULL_WORKFLOW_HARNESSES = {
     "COMBO_MATRIX.md",
     "FABLE_SOAK_REVIEW.md",
@@ -202,9 +208,10 @@ def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
     assert "profile=google_veo_media" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     director = _node(prompt, "OTR_VideoDirector")
-    assert director["inputs"]["announcer_video_model"] == "google_veo_video"
-    assert director["inputs"]["music_video_model"] == "google_veo_video"
-    assert director["inputs"]["character_video_model"] == "google_veo_video"
+    veo = _video_pick("google_veo_video")
+    assert director["inputs"]["announcer_video_model"] == veo
+    assert director["inputs"]["music_video_model"] == veo
+    assert director["inputs"]["character_video_model"] == veo
     assert director["inputs"]["announcer_image_model"] == "google_image"
     assert director["inputs"]["music_image_model"] == "google_image"
     assert director["inputs"]["character_image_model"] == "google_image"
@@ -223,9 +230,10 @@ def test_google_omni_media_profile_dry_run_builds_prompt(tmp_path):
     assert "profile=google_omni_media" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     director = _node(prompt, "OTR_VideoDirector")
-    assert director["inputs"]["announcer_video_model"] == "google_omni_video"
-    assert director["inputs"]["music_video_model"] == "google_omni_video"
-    assert director["inputs"]["character_video_model"] == "google_omni_video"
+    omni = _video_pick("google_omni_video")
+    assert director["inputs"]["announcer_video_model"] == omni
+    assert director["inputs"]["music_video_model"] == omni
+    assert director["inputs"]["character_video_model"] == omni
     assert director["inputs"]["announcer_image_model"] == "google_image"
     assert director["inputs"]["music_image_model"] == "google_image"
     assert director["inputs"]["character_image_model"] == "google_image"
@@ -273,9 +281,10 @@ def test_google_all_profile_dry_run_builds_prompt(
     assert char_voice["inputs"]["engine"] == "google_tts"
     assert announcer_voice["inputs"]["engine"] == "google_tts"
     assert music["inputs"]["engine"] == "google_lyria"
-    assert director["inputs"]["announcer_video_model"] == video_engine
-    assert director["inputs"]["music_video_model"] == video_engine
-    assert director["inputs"]["character_video_model"] == video_engine
+    video_label = _video_pick(video_engine)
+    assert director["inputs"]["announcer_video_model"] == video_label
+    assert director["inputs"]["music_video_model"] == video_label
+    assert director["inputs"]["character_video_model"] == video_label
     assert director["inputs"]["announcer_image_model"] == "google_image"
     assert director["inputs"]["music_image_model"] == "google_image"
     assert director["inputs"]["character_image_model"] == "google_image"

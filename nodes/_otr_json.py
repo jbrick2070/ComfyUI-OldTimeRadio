@@ -18,6 +18,13 @@ that logic's single home; ``news_interpreter`` now re-exports
 
 Pure stdlib (``json`` + ``re``); no sibling imports, safe to import
 from any node module.
+
+Padded-key identity (live Gemma 2026-09-14): leftover JSON keys such as
+``"speaker "`` are the same keys after whitespace is stripped. That is
+identity of leftover JSON, not new content -- the same rule SpokenLine
+documents. ``parse_first_json_object`` applies it after ``json.loads``;
+string VALUES are never rewritten. Key-strip is structural identity, so
+``validate_tolerant_data``'s "never rewrites strings" rule is untouched.
 """
 from __future__ import annotations
 
@@ -230,14 +237,45 @@ def extract_first_json_block(raw: str) -> str:
     return _decode_first_object(text)
 
 
+def normalize_json_keys(value):
+    """Strip whitespace from leftover JSON object keys.
+
+    Live Gemma 2026-09-14 emitted ``"speaker "`` (trailing space). The
+    words were already in the object; the schema missed the key.
+    Stripping is identity of leftover JSON keys, not new content --
+    string VALUES are not mutated.
+
+    Recurses into nested dicts and lists; scalars are returned unchanged.
+    Empty keys after strip are dropped. Duplicate keys after strip
+    last-wins (the same overwrite SpokenLine uses when it rebuilds the
+    dict).
+    """
+    if isinstance(value, dict):
+        out = {}
+        for key, val in value.items():
+            stripped = str(key).strip()
+            if not stripped:
+                continue
+            out[stripped] = normalize_json_keys(val)
+        return out
+    if isinstance(value, list):
+        return [normalize_json_keys(item) for item in value]
+    return value
+
+
 def parse_first_json_object(raw: str) -> dict:
     """Parse and return the first complete top-level JSON object in
     ``raw``.
 
     Tolerates markdown fences, leading prose, and -- the BUG-LOCAL-261
     failure mode -- a second object or trailing prose AFTER the first
-    object. Raises ``json.JSONDecodeError`` when ``raw`` carries no
-    decodable top-level object, so existing ``except json.JSONDecodeError``
+    object. After ``json.loads``, leftover padded keys (``"speaker "``,
+    ``"lines "``) are stripped to their identity -- the same rule
+    SpokenLine documents -- so structured consumers see the keys they
+    declared. String VALUES are not rewritten.
+
+    Raises ``json.JSONDecodeError`` when ``raw`` carries no decodable
+    top-level object, so existing ``except json.JSONDecodeError``
     handlers at the call sites still fire unchanged.
     """
     block = extract_first_json_block(raw)
@@ -245,4 +283,4 @@ def parse_first_json_object(raw: str) -> dict:
         raise json.JSONDecodeError(
             "no decodable top-level JSON object found", raw or "", 0,
         )
-    return json.loads(block)
+    return normalize_json_keys(json.loads(block))

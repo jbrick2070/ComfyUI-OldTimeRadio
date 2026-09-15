@@ -64,6 +64,17 @@ def test_the_exact_spelling_is_still_the_normal_case():
     assert out == dict(zip(ELEVEN, LEAVES))
 
 
+def test_padded_envelope_and_row_keys_parse():
+    """Leftover ``"shots "`` / ``"id "`` / ``"drawable_beat "`` are the
+    same keys after strip -- not extra fields and not invented ids."""
+    import json
+    raw = json.dumps({
+        "shots ": [{"id ": "g000", "drawable_beat ": LEAVES[0]}],
+    })
+    out = gsa.parse_batch_response(raw, ["g000"])
+    assert out == {"g000": LEAVES[0]}
+
+
 def test_a_padding_variant_of_a_row_the_batch_did_not_ask_for_is_still_unknown():
     """Tolerance is about SPELLING, never about admitting an extra row."""
     ids = list(ELEVEN)

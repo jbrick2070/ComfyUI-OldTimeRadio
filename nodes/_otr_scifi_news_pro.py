@@ -112,6 +112,11 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
     import _otr_canon as _OTRC  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
 
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_json  # type: ignore
+
 # Cast pools: relative in production (package load), absolute under test.
 try:
     from ..config import cast_pools as _POOLS  # type: ignore[no-redef]
@@ -3652,7 +3657,7 @@ def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
             if "script speakers" not in str(error):
                 return None
             try:
-                payload = json.loads(failed_output)
+                payload = _otr_json.normalize_json_keys(json.loads(failed_output))
             except Exception:
                 return None
             if not isinstance(payload, dict) or not _complete_cast(payload):
@@ -3670,7 +3675,7 @@ def _make_casting_repair(menu: VoiceMenu, speakers: "list[str]"):
         ):
             return None
         try:
-            payload = json.loads(failed_output)
+            payload = _otr_json.normalize_json_keys(json.loads(failed_output))
         except Exception:
             return None
         if not isinstance(payload, dict):

@@ -47,6 +47,11 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover -- flat test imports
+    import _otr_json  # type: ignore
+
 # ---------------------------------------------------------------------------
 # Role mapping + which roles are "character-bearing" (get the rich derivation)
 # ---------------------------------------------------------------------------
@@ -1196,7 +1201,9 @@ def _parse_directives(raw: str, expected_ids: list) -> dict:
     Returns ``{}`` on empty / unparseable / truncated output (the collapse
     guard's trigger); :func:`_classify_unparsed_reply` tells those three apart
     for the caller's warning. Accepts a JSON list or object; tolerant of extra
-    keys.
+    keys. Leftover padded keys (``"beat_id "``, ``"camera "``) and a padded
+    ``beat_id`` VALUE are the same leftover JSON identity after strip --
+    not invented ids.
     """
     if not raw or not str(raw).strip():
         return {}
@@ -1206,7 +1213,7 @@ def _parse_directives(raw: str, expected_ids: list) -> dict:
         i, j = txt.find(opener), txt.rfind(closer)
         if 0 <= i < j:
             try:
-                data = json.loads(txt[i:j + 1])
+                data = _otr_json.normalize_json_keys(json.loads(txt[i:j + 1]))
                 break
             except (ValueError, TypeError):
                 continue
@@ -1219,7 +1226,7 @@ def _parse_directives(raw: str, expected_ids: list) -> dict:
     for row in rows:
         if not isinstance(row, dict):
             continue
-        bid = str(row.get("beat_id") or "")
+        bid = str(row.get("beat_id") or "").strip()
         if bid and bid in expected_ids:
             parsed = {k: str(row.get(k) or "").strip() for k in _DIRECTIVE_KEYS}
             # An adapter MAY author the full rich prompt; captured here and

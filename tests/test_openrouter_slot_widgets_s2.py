@@ -165,9 +165,11 @@ def test_slot_picker_defaults_are_selectable(remote_off):
     for key in ("openrouter_slot_a_model", "openrouter_slot_b_model"):
         choices, meta = spec["optional"][key]
         assert meta["default"] in choices
-    # remote off -> the sole choice is the enable sentinel.
+    # remote off -> sentinel leads; curated aliases stay listed so a
+    # saved deluxe graph storing ~openai/gpt-latest still validates.
     a_choices, _ = spec["optional"]["openrouter_slot_a_model"]
-    assert a_choices == [cat.OPENROUTER_ENABLE_SENTINEL]
+    assert a_choices[0] == cat.OPENROUTER_ENABLE_SENTINEL
+    assert "~openai/gpt-latest" in a_choices
 
 
 # --- _resolve_inputs migration + threading ----------------------------------

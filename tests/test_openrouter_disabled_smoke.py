@@ -1,11 +1,11 @@
 """S6 -- disabled-state smoke proof.
 
-With remote OFF (the default), the OpenRouter feature must be completely
-inert: no virtual rows in the dropdowns, no remote path reachable, no
-extra run-meta on local runs, and the audio byte-identical baseline
-fixtures untouched. This is the autonomous half of S6; the ENABLED live
-smoke (a real OpenRouter call that spends credits on a GPU episode) is
-the one operator gate left for Jeffrey.
+With remote OFF (no API key), generate() / backend.load() still fail
+closed and local run-meta stays empty. Virtual rows and curated aliases
+remain in the dropdowns so a saved deluxe graph loads on a keyless
+canvas; the pick is the enable. The ENABLED live smoke (a real
+OpenRouter call that spends credits on a GPU episode) is the one
+operator gate left for Jeffrey.
 """
 from __future__ import annotations
 
@@ -16,9 +16,6 @@ import pytest
 from nodes import _otr_model_catalog as cat
 from nodes import _otr_openrouter_backend as orb
 from nodes import _otr_model_loader as loader
-from nodes._otr_model_inputs import UnknownModelError
-
-
 A = "openrouter:slot-a"
 B = "openrouter:slot-b"
 LOCAL = "mistralai/Mistral-Nemo-Instruct-2407"
@@ -35,19 +32,19 @@ def test_remote_reports_disabled():
     assert orb.openrouter_enabled() is False
 
 
-def test_no_openrouter_rows_in_dropdowns(tmp_path):
+def test_openrouter_rows_in_dropdowns_when_disabled(tmp_path):
     choices = cat.dropdown_choices(hub_root=tmp_path)
-    assert all("openrouter:" not in c for c in choices)
+    assert A in choices
+    assert B in choices
 
 
-def test_validate_rejects_remote_handles_when_disabled():
-    for handle in (A, B):
-        with pytest.raises(UnknownModelError):
-            cat.validate_model_id(handle)
+def test_validate_admits_remote_handles_when_disabled():
+    assert cat.validate_model_id(A) == A
+    assert cat.validate_model_id(B) == B
 
 
-def test_request_slot_remote_unreachable_when_disabled():
-    with pytest.raises(UnknownModelError):
+def test_request_slot_remote_fails_closed_when_disabled():
+    with pytest.raises(orb.OpenRouterConfigError):
         loader.request_slot("creative", A)
 
 

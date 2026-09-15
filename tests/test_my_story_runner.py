@@ -609,6 +609,56 @@ def test_spoken_line_accepts_speaker_key_with_trailing_space():
     assert line.text == "It's glowing like a tiny star."
 
 
+def test_cast_member_accepts_padded_name_key_via_parse():
+    from nodes import _otr_json as OJ
+    member = MS.CastMember.model_validate(OJ.parse_first_json_object(
+        '{"name ": "Ada", "role": "lead", "register ": "plain"}'
+    ))
+    assert member.name == "Ada"
+    assert member.role == "lead"
+    assert member.speech_register == "plain"
+
+
+def test_story_treatment_accepts_padded_cast_and_acts_keys_via_parse():
+    from nodes import _otr_json as OJ
+    body = _treatment()
+    raw = json.dumps({
+        "title ": body["title"],
+        "logline": body["logline"],
+        "dramatic_question": body["dramatic_question"],
+        "setting": body["setting"],
+        "time_of_day": body["time_of_day"],
+        "cast ": [
+            {"name ": row["name"], "role": row["role"],
+             "character_description": row["character_description"],
+             "gender": row["gender"], "age_band": row["age_band"],
+             "register ": row["register"], "timbre": row["timbre"]}
+            for row in body["cast"]
+        ],
+        "acts ": body["acts"],
+        "ending": body["ending"],
+    })
+    treatment = MS.StoryTreatment.model_validate(OJ.parse_first_json_object(raw))
+    assert treatment.title == "The Fog Bell"
+    assert treatment.names() == ["Ada", "Tom"]
+    assert len(treatment.acts) == 1
+    assert treatment.cast[0].speech_register == "plain"
+
+
+def test_act_script_accepts_padded_lines_key_via_parse():
+    from nodes import _otr_json as OJ
+    raw = json.dumps({
+        "n ": 1,
+        "scene_setting ": "the lamp room",
+        "lines ": [{"speaker ": "Ada", "text": "Line 1 from Ada."}],
+    })
+    act = MS.ActScript.model_validate(OJ.parse_first_json_object(raw))
+    assert act.n == 1
+    assert act.scene_setting == "the lamp room"
+    assert act.lines[0].speaker == "Ada"
+    assert act.lines[0].text == "Line 1 from Ada."
+
+
 def test_spoken_line_still_refuses_a_speaker_with_no_spoken_words():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):

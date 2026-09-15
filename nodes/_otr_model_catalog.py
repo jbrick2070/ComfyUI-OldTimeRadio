@@ -369,22 +369,21 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
 
 
 def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The two virtual OpenRouter rows (S2) -- present ONLY when remote
-    is enabled (OPENROUTER_API_KEY set; C6: the OTR_ENABLE_OPENROUTER opt-in
-    flag gate was removed). When
-    disabled the tuple is empty, so _by_repo_id / dropdowns / Path-1
-    validation never see them and the offline baseline is untouched (C3,
-    C8). Per FC4 these carry loader_backend='openrouter_http',
+    """The two virtual OpenRouter rows -- always in the writer dropdown.
+
+    Deluxe cloud graphs pin ``openrouter:slot-a|b`` plus a catalog alias
+    (``~openai/gpt-latest``). A saved graph that stores those values must
+    load on a canvas that has not set OPENROUTER_API_KEY yet. The pick is
+    the enable, same as Comfy Credits: generate() / backend.load() still
+    fail closed without a key. These carry loader_backend='openrouter_http',
     vram_fit_tier='PASS', approx_safetensors_gb=0.0, context_window=8192,
-    provider='openrouter'. The real model slug lives in env
-    (OPENROUTER_MODEL_A/B); only the named handle appears here, never the
-    slug. The rows join the curated set so validate_model_id Path 1
-    admits 'openrouter:slot-a|b' with NO validator surgery."""
+    provider='openrouter'. The real model slug lives in the slot picker /
+    env; only the named handle appears here, never the slug. The rows join
+    the curated set so validate_model_id Path 1 admits 'openrouter:slot-a|b'
+    with NO validator surgery."""
     try:
         from . import _otr_openrouter_backend as _orb
     except Exception:  # noqa: BLE001 -- a backend import hiccup must never break the catalog
-        return ()
-    if not _orb.openrouter_enabled():
         return ()
     common = dict(
         requires_auth=False,
@@ -420,10 +419,13 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
 
 
 def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
-    """The two virtual Comfy Credits rows -- present ONLY when the lane is
-    enabled (OTR_ENABLE_COMFY_CREDITS=1). When disabled the tuple is empty,
-    so _by_repo_id / dropdowns / Path-1 validation never see them and the
-    offline baseline is untouched (mirrors the OpenRouter gate). These carry
+    """The two virtual Comfy Credits rows -- always in the writer dropdown.
+
+    Cloud shipping graphs pin ``comfy:slot-a|b`` plus a catalog slug
+    (Grok 4.20). A saved graph that stores those values must load on
+    Comfy Cloud, which does not set OTR_ENABLE_COMFY_CREDITS. The pick
+    is the enable, same as partner video engines: generate() still
+    fails closed without a Comfy API key. These carry
     loader_backend='comfy_credits_http', provider='comfy_credits',
     approx_safetensors_gb=0.0; the real catalog slug resolves behind the
     scenes (the comfy slot pickers / recommended default). The rows join the
@@ -432,8 +434,6 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
     try:
         from . import _otr_comfy_backend as _occ
     except Exception:  # noqa: BLE001 -- a backend import hiccup must never break the catalog
-        return ()
-    if not _occ.comfy_credits_enabled():
         return ()
     common = dict(
         requires_auth=False,
@@ -579,7 +579,9 @@ def _curated_with_gguf_native_peer() -> tuple[CuratedModel, ...]:
 
 
 def _active_curated_models() -> tuple[CuratedModel, ...]:
-    """CURATED_LLM_MODELS plus enabled-only HTTP virtual rows.
+    """CURATED_LLM_MODELS plus HTTP virtual rows that the writer dropdown
+    should list. Comfy Credits and OpenRouter handles are always present
+    so a saved cloud graph loads; Google API rows stay enable-gated.
 
     Consumers that should surface HTTP lanes when enabled (the dropdown
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
@@ -917,7 +919,7 @@ class DropdownEntry:
 def build_dropdown_choices(
     hub_root: Path | None = None,
 ) -> list[DropdownEntry]:
-    """List the curated writer models + enabled remote handles + any
+    """List the curated writer models + remote handles + any
     locally-discovered causal-LM repos.
 
     Labels are the bare repo id / remote handle -- NO download-state badge.
@@ -939,8 +941,9 @@ def build_dropdown_choices(
         if provider == "gguf_native":
             on_disk = _gguf_native_row_on_disk(m.repo_id)
         elif provider != "local":
-            # Remote lane (OpenRouter / Comfy Credits / Google API): present
-            # in the active set only when its lane is enabled, so selectable.
+            # Remote lane (OpenRouter / Comfy Credits / Google API): listed
+            # so a saved graph's handle stays a live combo choice. generate()
+            # still fails closed without the matching key.
             on_disk = True
         else:
             on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
@@ -1239,7 +1242,10 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     Sentinel-led in EVERY state (BUG-LOCAL-400): OPENROUTER_ENABLE_SENTINEL is
     always choices[0] -- the 'off / use-local' default -- so a saved workflow
     that stores it validates whether or not the lane is enabled.
-    Remote disabled -> [OPENROUTER_ENABLE_SENTINEL].
+    Remote disabled -> sentinel, recommended lead, curated aliases, routers.
+    A saved deluxe graph stores ``~openai/gpt-latest``; that alias must stay
+    a live combo choice before the key is set. generate() still fails closed
+    without OPENROUTER_API_KEY.
     Remote enabled  -> the sentinel, then an ordered, de-duplicated list:
         1. recommended default for the slot -- the per-slot
            OTR_OPENROUTER_SLOT_x_DEFAULT override when set AND present in the
@@ -1250,17 +1256,15 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
         3. OPENROUTER_CURATED_ALIASES -- the `~family-latest` routing aliases
         4. the full filtered catalog, alphabetically, ONLY under explicit
            narrowing or OTR_OPENROUTER_FULL_CATALOG=1
-    Enabled but empty/cold cache ->
-    [OPENROUTER_ENABLE_SENTINEL, recommended_default, EMPTY_CACHE_SENTINEL].
+    Enabled but empty/cold cache -> the same curated block as the default
+    warm view, plus EMPTY_CACHE_SENTINEL so the operator is pointed at a
+    refresh. The aliases stay listed: discarding them made a saved
+    ``~openai/gpt-latest`` pin invalid on a cold canvas.
 
-    WHERE THE ALIASES ARE *NOT* OFFERED -- two states, both deliberate, and both
-    easy to misdescribe (the pre-2026-08-07 comment here claimed they were
-    offered "UNCONDITIONALLY", which the code has never done):
+    WHERE THE ALIASES ARE *NOT* OFFERED -- one state, deliberate:
         * explicit narrowing (allowlist / provider filter) -- the operator asked
-          for an exact set, so it is honoured verbatim;
-        * the cold-cache branch -- it returns lead + empty-cache sentinel so the
-          operator is pointed at a refresh rather than handed a long list.
-    Consequence worth knowing: in the default warm view the aliases BYPASS
+          for an exact set, so it is honoured verbatim.
+    Consequence worth knowing: in the default view the aliases BYPASS
     _filter_catalog_models, so REQUIRE_JSON and the denylist do not narrow them.
     They are curated policy, not catalog discovery.
 
@@ -1273,10 +1277,10 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
         from . import _otr_openrouter_backend as _orb
     except Exception:  # noqa: BLE001 -- a backend import hiccup must never break INPUT_TYPES
         return [OPENROUTER_ENABLE_SENTINEL]
-    if not _orb.openrouter_enabled():
-        return [OPENROUTER_ENABLE_SENTINEL]
-
-    models = _filter_catalog_models(_orb.cached_models(), slot=s)
+    enabled = _orb.openrouter_enabled()
+    models = (
+        _filter_catalog_models(_orb.cached_models(), slot=s) if enabled else []
+    )
     by_id = {m["id"]: m for m in models}
 
     # Tier 1 lead: the per-slot env override iff present in the filtered cache,
@@ -1304,10 +1308,11 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     # The CURATED alias block (default view only). SKIPPED when the operator set
     # an EXPLICIT allowlist / provider-filter -- there they asked for an exact
-    # narrowed set, so we honour it verbatim.
+    # narrowed set, so we honour it verbatim. Keyless / disabled canvases still
+    # get the aliases: a saved deluxe graph stores ~openai/gpt-latest.
     allowlist = (otr_env.get("OTR_OPENROUTER_MODEL_ALLOWLIST") or "").strip()
     provider_filter = (otr_env.get("OTR_OPENROUTER_PROVIDER_FILTER") or "").strip()
-    explicit_narrowing = bool(allowlist or provider_filter)
+    explicit_narrowing = bool(enabled and (allowlist or provider_filter))
 
     if not explicit_narrowing:
         for mid in OPENROUTER_CURATED_ALIASES:
@@ -1324,18 +1329,19 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
     # fast; in the default view it is OPT-IN (OTR_OPENROUTER_FULL_CATALOG=1) so
     # the dropdown stays short. When the operator is explicitly narrowing
     # (allowlist / provider-filter), show the full filtered set as before.
-    if explicit_narrowing or otr_env.get(
-            "OTR_OPENROUTER_FULL_CATALOG", "0").strip() == "1":
+    if enabled and (explicit_narrowing or otr_env.get(
+            "OTR_OPENROUTER_FULL_CATALOG", "0").strip() == "1"):
         for m in sorted(models, key=lambda m: m["id"]):
             _add(m["id"])
 
-    if not models:
-        # Cold / fully-filtered cache: keep the recommended default selectable
-        # and flag that discovery is empty so the operator runs a refresh.
-        return _lead_with_sentinel(
-            OPENROUTER_ENABLE_SENTINEL,
-            [lead, OPENROUTER_EMPTY_CACHE_SENTINEL],
-        )
+    if enabled and not models:
+        # Cold / fully-filtered cache: keep the curated block selectable
+        # (saved deluxe graphs pin ~openai/gpt-latest) and flag that
+        # discovery is empty so the operator runs a refresh.
+        rest = list(ordered)
+        if OPENROUTER_EMPTY_CACHE_SENTINEL not in rest:
+            rest.append(OPENROUTER_EMPTY_CACHE_SENTINEL)
+        return _lead_with_sentinel(OPENROUTER_ENABLE_SENTINEL, rest)
     return _lead_with_sentinel(OPENROUTER_ENABLE_SENTINEL, ordered)
 
 
@@ -1359,10 +1365,11 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
     Sentinel-led in EVERY state (BUG-LOCAL-400): COMFY_ENABLE_SENTINEL is always
     choices[0] -- the 'off / use-local' default -- so a saved workflow that
     stores it validates whether or not the lane is enabled.
-    Lane disabled -> [COMFY_ENABLE_SENTINEL].
-    Lane enabled  -> the sentinel, then the recommended default for the slot,
-    then OTR_COMFY_FAVORITES (operator order), then the full pinned catalog
-    alphabetically. Deduped.
+    The pinned catalog is always listed after the sentinel so a shipping
+    cloud graph that stores x-ai/grok-4.20 loads on Comfy Cloud (no
+    OTR_ENABLE_COMFY_CREDITS in that environment). generate() still fails
+    closed without a Comfy API key. Then: recommended default, favorites,
+    full catalog alphabetically. Deduped.
     INPUT_TYPES-safe: reads the pinned constant only, never the network.
     """
     s = slot.strip().lower()
@@ -1371,8 +1378,6 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
     try:
         from . import _otr_comfy_backend as _occ
     except Exception:  # noqa: BLE001 -- a backend import hiccup must never break INPUT_TYPES
-        return [COMFY_ENABLE_SENTINEL]
-    if not _occ.comfy_credits_enabled():
         return [COMFY_ENABLE_SENTINEL]
 
     catalog = list(_occ.COMFY_LLM_MODELS)

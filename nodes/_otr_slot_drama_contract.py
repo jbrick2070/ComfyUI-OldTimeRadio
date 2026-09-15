@@ -59,6 +59,11 @@ try:
 except ImportError:  # pragma: no cover - flat import fallback
     from _otr_generation_budget import GenerationDegeneracyError  # type: ignore[no-redef]
 
+try:
+    from . import _otr_json
+except ImportError:  # pragma: no cover - flat import fallback
+    import _otr_json  # type: ignore
+
 
 log = logging.getLogger("OTR")
 
@@ -404,7 +409,7 @@ def generate_slot_job_fields(
         temperature=temperature,
         max_new_tokens=max_new_tokens,
     )
-    data = json.loads(raw)
+    data = _otr_json.normalize_json_keys(json.loads(raw))
     return SlotJobFields.model_validate(data)
 
 

@@ -21,7 +21,9 @@ the operator chose for whichever happens to sort first.
 The root cause was in `_otr_workflow_apply._director_option_value`, which only
 rewrote to the exact menu label for the five renamed-tier engines in
 `_INTERNAL_TO_PUBLIC`, while `_label_for` appends a suffix to any engine that
-declares one -- nineteen registered engines do.
+declares one -- nineteen registered engines do. The applier now labels every
+registered VideoDirector engine, so this audit covers canonical AND the
+generated variants.
 """
 from __future__ import annotations
 
@@ -90,14 +92,10 @@ def _saved_combo_values(path, choices):
 
 
 def _graphs():
-    # CANONICAL ONLY, deliberately, until the variant half is fixed.
-    # `apply_profile` writes a BARE engine id for the nineteen engines whose
-    # menu label carries an aspect suffix, so all ten haunted variants carry
-    # an illegal value today. The one-line fix -- labelling every registered
-    # engine -- also relabels values that profile application expects bare,
-    # breaking five other tests. Asserting over the variants here would just
-    # encode that unsolved problem as a red suite.
-    return [f for f in [CANONICAL] if f.is_file()]
+    graphs = [p for p in [CANONICAL] if p.is_file()]
+    if VARIANTS.is_dir():
+        graphs.extend(sorted(VARIANTS.glob("otr_*.json")))
+    return graphs
 
 
 def test_the_audit_actually_inspects_something():

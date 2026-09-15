@@ -471,6 +471,26 @@ class StableAudioTheme:
                     "anchor_line_id": anchor_line_id,
                     "cue_spec_sha256": cue_spec_sha256,
                 })
+            
+            for i, line_id in enumerate(role_lines["music_inter"]):
+                slot = "interstitial"
+                prompt, duration_s = compose_music_prompt(meta, slot)
+                cue_id = f"inter_{i+1:02d}"
+                cue_spec_sha256 = music_cue_spec_sha256({
+                    "generation_prompt": prompt,
+                    "target_duration_s": float(duration_s),
+                    "placement": slot,
+                    "anchor_line_id": line_id,
+                })
+                specs.append({
+                    "cue_id": cue_id,
+                    "placement": slot,
+                    "prompt": prompt,
+                    "requested_duration_s": float(duration_s),
+                    "seed_key": cue_id,
+                    "anchor_line_id": line_id,
+                    "cue_spec_sha256": cue_spec_sha256,
+                })
         return specs
 
     @staticmethod

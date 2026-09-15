@@ -151,3 +151,64 @@ def test_act_script_accepts_a_tex_line_from_parsed_json():
     })
     act = MS.ActScript.model_validate(OJ.parse_first_json_object(raw))
     assert act.lines[1].text == "It's glowing like a tiny star."
+
+
+def test_padded_nested_keys_match_the_unpadded_object():
+    """Live Gemma 2026-09-14: leftover ``"speaker "`` / ``"lines "``."""
+    raw = json.dumps({
+        "n ": _ACT["n"],
+        "scene_setting": _ACT["scene_setting"],
+        "lines ": [
+            {"speaker ": "Stomp", "text": _ACT["lines"][0]["text"]},
+            {"speaker": "Tiptoe", "text": _ACT["lines"][1]["text"]},
+        ],
+    })
+    parsed = OJ.parse_first_json_object(raw)
+    assert parsed == _ACT
+    assert OJ.parse_first_json_object(_fenced(raw)) == _ACT
+
+
+def test_padded_key_collision_is_last_wins():
+    raw = '{"speaker": "Ada", "speaker ": "Tom", "text": "Hi."}'
+    assert OJ.parse_first_json_object(raw) == {"speaker": "Tom", "text": "Hi."}
+
+
+def test_empty_key_after_strip_is_dropped():
+    raw = '{"": 1, "  ": 2, "n": 3}'
+    assert OJ.parse_first_json_object(raw) == {"n": 3}
+
+
+def test_normalize_json_keys_does_not_mutate_string_values():
+    raw = {"speaker ": "Stomp ", "title ": "  Fog  ", "nested": [{"a ": " x "}]}
+    assert OJ.normalize_json_keys(raw) == {
+        "speaker": "Stomp ",
+        "title": "  Fog  ",
+        "nested": [{"a": " x "}],
+    }
+
+
+def test_act_script_accepts_padded_lines_from_parsed_json():
+    raw = json.dumps({
+        "n ": 2,
+        "scene_setting": "yard",
+        "lines ": [
+            {"speaker ": "Stomp", "text": "Move!"},
+            {"speaker": "Tiptoe", "text": "Wait."},
+        ],
+    })
+    act = MS.ActScript.model_validate(OJ.parse_first_json_object(raw))
+    assert act.n == 2
+    assert [line.speaker for line in act.lines] == ["Stomp", "Tiptoe"]
+    assert act.lines[0].text == "Move!"
+
+
+def test_shot_lock_parse_directives_accepts_padded_beat_id():
+    from nodes import otr_shot_lock as sl
+    raw = json.dumps([
+        {"beat_id ": "b001 ", "expression": "grim",
+         "motion": "steps forward", "camera ": "push in"},
+    ])
+    out = sl._parse_directives(raw, ["b001"])
+    assert out["b001"]["camera"] == "push in"
+    assert out["b001"]["expression"] == "grim"
+    assert out["b001"]["motion"] == "steps forward"

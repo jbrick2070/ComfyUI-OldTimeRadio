@@ -1122,17 +1122,32 @@ class SceneSequencer:
             # -- LEDGER ROLE DISPATCH --------------------------------------
 
             if item_type == "music":
-                # Passthrough -- music_open / music_close (EpisodeAssembler
-                # prepends/appends the theme audio) and any music_inter with
-                # no manifest cue (legacy lanes: byte-parity preserved).
-                log.info(
-                    "[SceneSequencer] passthrough music line %s (role=%s)",
-                    line_id_for_log, speaker_role,
-                )
-                render_log.append(
-                    f"[{global_idx}] MUSIC passthrough: {speaker_role}"
-                )
-                continue
+                if speaker_role == "music_inter":
+                    # Create a 4.0s gap for the bridge so start_s/dur_s are stamped on the line
+                    from .otr_shot_lock import MUSIC_BRIDGE_FALLBACK_DUR_S
+                    dur_s = MUSIC_BRIDGE_FALLBACK_DUR_S
+                    segment_np = np.zeros(int(dur_s * sample_rate), dtype=np.float32)
+                    dialogue_positions.append({
+                        "line_id": item.get("line_id"),
+                        "speaker": _OTRLC.speaker_name(led, item),
+                        "speaker_role": speaker_role,
+                        "start_s": float(current_sample_pos) / float(sample_rate),
+                        "dur_s": float(dur_s),
+                    })
+                    render_log.append(
+                        f"[{global_idx}] MUSIC gap: {dur_s}s for {speaker_role}"
+                    )
+                else:
+                    # Passthrough -- music_open / music_close (EpisodeAssembler
+                    # prepends/appends the theme audio)
+                    log.info(
+                        "[SceneSequencer] passthrough music line %s (role=%s)",
+                        line_id_for_log, speaker_role,
+                    )
+                    render_log.append(
+                        f"[{global_idx}] MUSIC passthrough: {speaker_role}"
+                    )
+                    continue
 
             elif item_type == "dialogue":
                 character_name = _OTRLC.speaker_name(led, item)
@@ -2057,6 +2072,41 @@ class EpisodeAssembler:
                     # (scene_end - xfade) + scene_dur - xfade
                     # = total_master - closing_dur. Write them by
                     # canonical placement match against ledger.music[].
+                    
+                    # -------------------------------------------------------------
+                    # Overlay interstitial cues into the gaps created by SceneSequencer
+                    # -------------------------------------------------------------
+                    if _cue_manifest is not None and music_cue_audio is not None:
+                        for _r in _cue_manifest.get("cues", []):
+                            if _r.get("placement") == "interstitial" and _r.get("anchor_line_id"):
+                                _anchor_id = _r.get("anchor_line_id")
+                                _start_s_scene = None
+                                for _ln in (_led.get("lines") or []):
+                                    if _ln.get("line_id") == _anchor_id:
+                                        # Use the scene_audio space start_s to find where to overlay
+                                        _start_s_scene = float(_ln.get("start_s", 0.0))
+                                        if _ln.get("start_s_space") == "master_mix":
+                                            # If already promoted (e.g. by shift above), back it out for the overlay calculation
+                                            _start_s_scene -= _shift_s
+                                        break
+                                if _start_s_scene is not None:
+                                    _cue_audio = self._cue_from_batch(music_cue_audio, _cue_manifest, _r)
+                                    if _cue_audio is not None:
+                                        _cue_wf = self._extract_waveform(_cue_audio, target_sr=sample_rate)
+                                        _start_idx = int(_shift_samples) + int(_start_s_scene * sample_rate)
+                                        _end_idx = _start_idx + _cue_wf.shape[-1]
+                                        
+                                        if _end_idx > episode_waveform.shape[-1]:
+                                            _pad = torch.zeros((1, episode_waveform.shape[1], _end_idx - episode_waveform.shape[-1]), device=episode_waveform.device)
+                                            episode_waveform = torch.cat([episode_waveform, _pad], dim=-1)
+                                        
+                                        _channels = min(episode_waveform.shape[1], _cue_wf.shape[1])
+                                        episode_waveform[:, :_channels, _start_idx:_end_idx] += _cue_wf[:, :_channels, :]
+                                        log.info(
+                                            "[EpisodeAssembler] mixed interstitial cue %s at %.2fs (scene) / %.2fs (master)",
+                                            _r.get("cue_id"), _start_s_scene, _start_idx / sample_rate
+                                        )
+
                     _music_rows = _led.get("music") or []
                     log.info(
                         "[EpisodeAssembler] music_rows=%d segments=%d "
@@ -2097,6 +2147,26 @@ class EpisodeAssembler:
                                 )
                                 _mc["dur_s"] = _closing_dur_s
                                 _mc["start_s_space"] = "master_mix"
+                            elif (
+                                _placement == "interstitial" 
+                                and _mc.get("anchor_line_id")
+                            ):
+                                _anchor_id = _mc.get("anchor_line_id")
+                                _start_s_master = None
+                                _dur_s = 4.0
+                                for _ln in (_led.get("lines") or []):
+                                    if _ln.get("line_id") == _anchor_id:
+                                        # _ln["start_s"] is already shifted to master_mix space!
+                                        if _ln.get("start_s_space") == "master_mix":
+                                            _start_s_master = float(_ln.get("start_s", 0.0))
+                                        else:
+                                            _start_s_master = float(_ln.get("start_s", 0.0)) + _shift_s
+                                        _dur_s = float(_ln.get("dur_s", 4.0))
+                                        break
+                                if _start_s_master is not None:
+                                    _mc["start_s"] = _start_s_master
+                                    _mc["dur_s"] = _dur_s
+                                    _mc["start_s_space"] = "master_mix"
 
                     # BUG-LOCAL-130 fix (2026-05-01): the music-line
                     # mirror was previously nested inside the

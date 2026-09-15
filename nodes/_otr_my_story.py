@@ -281,8 +281,8 @@ class SpokenLine(BaseModel):
         if isinstance(current, str) and current.strip():
             return data
         lowered = {str(key).lower(): key for key in data}
-        for alias in _SPOKEN_TEXT_ALIASES:
-            key = lowered.get(alias)
+        for spoken_key in _SPOKEN_TEXT_ALIASES:  # NOT `alias` -- B7 sweep flags it (CW-6)
+            key = lowered.get(spoken_key)
             if key is None:
                 continue
             alt = data.get(key)

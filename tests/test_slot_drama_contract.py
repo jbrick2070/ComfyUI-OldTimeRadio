@@ -299,6 +299,26 @@ def test_generate_slot_job_fields_parses_fake():
     assert "brother" in jobs.hidden_pressure
 
 
+def test_generate_slot_job_fields_accepts_padded_keys():
+    def gen(messages, *, temperature, max_new_tokens):
+        return json.dumps({
+            "line_job ": "back Maeve into naming the cost out loud",
+            "hidden_pressure ": "the brother whose freedom hangs on her silence",
+        })
+    jobs = sdc.generate_slot_job_fields(
+        gen,
+        speaker="Doyle",
+        dramatic_state=DRAMATIC_STATE,
+        state_before="standoff",
+        state_after="standoff",
+        must_turn=False,
+        beat_intent="press for the signature",
+        concrete_detail_required=["the confession form"],
+    )
+    assert jobs.line_job.startswith("back Maeve")
+    assert "brother" in jobs.hidden_pressure
+
+
 def test_build_contract_llm_path_first_try():
     contract, source = sdc.build_slot_drama_contract(
         _fake_generate_ok,

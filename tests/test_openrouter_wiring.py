@@ -101,12 +101,11 @@ def test_request_slot_remote_does_not_evict_resident_local(enabled, monkeypatch,
 
 
 def test_request_slot_remote_raises_clean_when_disabled(monkeypatch):
-    """Disabled: the row is not curated, so validate_model_id raises a
-    clean UnknownModelError (no remote path reachable, C3)."""
+    """Disabled: the handle is listed so a saved graph loads, but
+    backend.load() still fails closed without OPENROUTER_API_KEY."""
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.delenv("OTR_ENABLE_OPENROUTER", raising=False)
-    from nodes._otr_model_inputs import UnknownModelError
-    with pytest.raises(UnknownModelError):
+    with pytest.raises(orb.OpenRouterConfigError):
         loader.request_slot("creative", SLOT_A)
 
 

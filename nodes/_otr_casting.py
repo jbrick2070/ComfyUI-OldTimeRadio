@@ -1591,7 +1591,7 @@ def _extract_json_list(raw):
     try:
         v = json.loads(s)
         if isinstance(v, list):
-            return v
+            return _otr_json.normalize_json_keys(v)
     except Exception:
         pass
     a, b = s.find("["), s.rfind("]")
@@ -1599,7 +1599,7 @@ def _extract_json_list(raw):
         try:
             v = json.loads(s[a:b + 1])
             if isinstance(v, list):
-                return v
+                return _otr_json.normalize_json_keys(v)
         except Exception:
             return None
     return None

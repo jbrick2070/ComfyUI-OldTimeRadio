@@ -1,11 +1,10 @@
-"""S2 -- OpenRouter virtual catalog rows are enabled-gated.
+"""S2 -- OpenRouter virtual catalog rows are always listed.
 
 Pins the contract: the two virtual rows (openrouter:slot-a|b) appear in
-both writer dropdowns and pass validate_model_id Path 1 ONLY when remote
-is enabled (OPENROUTER_API_KEY + OTR_ENABLE_OPENROUTER=1); when disabled
-they are absent everywhere and validate raises cleanly -- with NO change
-to the validator's admit-paths (FC4). The dropdown shows the named
-handle, never the real model slug.
+both writer dropdowns and pass validate_model_id Path 1 whether or not
+OPENROUTER_API_KEY is set, so a saved deluxe graph loads on a keyless
+canvas. generate() / backend.load() still fail closed without a key.
+The dropdown shows the named handle, never the real model slug.
 """
 from __future__ import annotations
 
@@ -17,11 +16,20 @@ import pytest
 
 from nodes import _otr_model_catalog as cat
 from nodes import _otr_openrouter_backend as orb
-from nodes._otr_model_inputs import UnknownModelError
-
-
 SLOT_A = "openrouter:slot-a"
 SLOT_B = "openrouter:slot-b"
+
+
+def _curated_picker_rest(slot):
+    """Sentinel + lead + aliases + routers, de-duplicated in builder order."""
+    lead = (orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT if slot == "a"
+            else orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT)
+    expected = [cat.OPENROUTER_ENABLE_SENTINEL, lead]
+    expected += [mid for mid in cat.OPENROUTER_CURATED_ALIASES
+                 if mid not in expected]
+    expected += [mid for mid in cat.OPENROUTER_CURATED_ROUTERS
+                 if mid not in expected]
+    return expected
 
 
 @pytest.fixture
@@ -39,34 +47,32 @@ def enabled(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Disabled (default) -- rows absent everywhere
+# Disabled (no key) -- rows still listed so a saved deluxe graph loads
 # ---------------------------------------------------------------------------
 
 
-def test_rows_absent_from_by_repo_id_when_disabled(disabled):
+def test_rows_present_in_by_repo_id_when_disabled(disabled):
     ids = cat._by_repo_id()
-    assert SLOT_A not in ids
-    assert SLOT_B not in ids
+    assert SLOT_A in ids
+    assert SLOT_B in ids
 
 
-def test_rows_absent_from_dropdown_when_disabled(disabled, tmp_path):
+def test_rows_present_in_dropdown_when_disabled(disabled, tmp_path):
     choices = cat.dropdown_choices(hub_root=tmp_path)
-    assert all("openrouter:" not in c for c in choices)
+    assert SLOT_A in choices
+    assert SLOT_B in choices
 
 
-def test_validate_raises_when_disabled(disabled):
-    with pytest.raises(UnknownModelError):
-        cat.validate_model_id(SLOT_A)
-    with pytest.raises(UnknownModelError):
-        cat.validate_model_id(SLOT_B)
+def test_validate_admits_when_disabled(disabled):
+    assert cat.validate_model_id(SLOT_A) == SLOT_A
+    assert cat.validate_model_id(SLOT_B) == SLOT_B
 
 
-def test_flag_without_key_stays_disabled(monkeypatch):
+def test_flag_without_key_still_lists_handles(monkeypatch):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
-    assert SLOT_A not in cat._by_repo_id()
-    with pytest.raises(UnknownModelError):
-        cat.validate_model_id(SLOT_A)
+    assert SLOT_A in cat._by_repo_id()
+    assert cat.validate_model_id(SLOT_A) == SLOT_A
 
 
 # ---------------------------------------------------------------------------
@@ -232,9 +238,13 @@ def enabled_cached(monkeypatch, tmp_path):
 # --- disabled -> sentinel --------------------------------------------------
 
 
-def test_slot_picker_sentinel_when_disabled(disabled):
-    assert cat.openrouter_catalog_dropdown_choices("a") == [cat.OPENROUTER_ENABLE_SENTINEL]
-    assert cat.openrouter_catalog_dropdown_choices("b") == [cat.OPENROUTER_ENABLE_SENTINEL]
+def test_slot_picker_keeps_curated_aliases_when_disabled(disabled):
+    """Saved deluxe graphs store ~openai/gpt-latest. That alias must stay
+    a live combo choice before the key is set."""
+    for slot in ("a", "b"):
+        choices = cat.openrouter_catalog_dropdown_choices(slot)
+        assert choices == _curated_picker_rest(slot)
+        assert "~openai/gpt-latest" in choices
 
 
 def test_slot_picker_invalid_slot_raises():
@@ -449,23 +459,21 @@ def test_full_catalog_optin_restores_cache_rows(enabled_cached, monkeypatch):
 # --- enabled but cold/empty cache ------------------------------------------
 
 
-def test_empty_cache_when_enabled_leads_and_points_at_refresh(monkeypatch, tmp_path):
-    """Cold cache: the slot's default stays selectable and the operator is
-    pointed at a refresh. The curated aliases are deliberately NOT listed here
-    -- the cold branch is a 'go refresh' signal, not a browse view."""
+def test_empty_cache_when_enabled_keeps_aliases_and_points_at_refresh(
+        monkeypatch, tmp_path):
+    """Cold cache: curated aliases stay selectable (saved deluxe graphs pin
+    ~openai/gpt-latest) and the empty-cache sentinel still points at a
+    refresh."""
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-test")
     monkeypatch.setenv("OTR_ENABLE_OPENROUTER", "1")
     monkeypatch.setenv("OTR_OPENROUTER_CACHE_DIR", str(tmp_path))  # no cache file
     for k in _FILTER_ENV:
         monkeypatch.delenv(k, raising=False)
-    a = cat.openrouter_catalog_dropdown_choices("a")
-    assert a == [cat.OPENROUTER_ENABLE_SENTINEL,
-                 orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT,
-                 cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
-    b = cat.openrouter_catalog_dropdown_choices("b")
-    assert b == [cat.OPENROUTER_ENABLE_SENTINEL,
-                 orb.OPENROUTER_RECOMMENDED_TECHNICAL_DEFAULT,
-                 cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
+    for slot in ("a", "b"):
+        choices = cat.openrouter_catalog_dropdown_choices(slot)
+        assert choices == _curated_picker_rest(slot) + [
+            cat.OPENROUTER_EMPTY_CACHE_SENTINEL]
+        assert "~openai/gpt-latest" in choices
 
 
 # --- INPUT_TYPES safety: the builder never touches the network -------------
