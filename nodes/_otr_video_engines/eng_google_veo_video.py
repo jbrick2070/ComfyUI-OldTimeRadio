@@ -603,7 +603,9 @@ class GoogleVeoVideoEngine:
     def canonicalize(self, raw, request, profile):  # noqa: ARG002
         from .._otr_shared.cloud_media_canonical import (
             canonicalize_video,
+            canonical_clip_frame_count,
             cloud_delivery_wh,
+            engine_request_target_frames,
         )
 
         rw = int(_canvas_get(request, "w", 0) or 0)
@@ -616,12 +618,16 @@ class GoogleVeoVideoEngine:
             land_default="1280x720",
             port_default="720x1280",
         )
-        asset = canonicalize_video(raw, {
+        spec = {
             "w": tw,
             "h": th,
             "fps": int(_canvas_get(request, "fps", 25) or 25),
-        })
-        frame_count = int(round((asset.duration_s or 0.0) * (asset.fps or 0.0)))
+        }
+        n = engine_request_target_frames(request)
+        if n:
+            spec["target_frames"] = n
+        asset = canonicalize_video(raw, spec)
+        frame_count = canonical_clip_frame_count(asset)
         return {
             "clip_id": _req_get(request, "shot_id") or f"{self.name}_clip",
             "type": "video",
@@ -640,11 +646,9 @@ class GoogleVeoVideoEngine:
             "provider_job_id": asset.provider_job_id,
             "content_sha256": asset.sha256,
             "actual_duration_s": asset.duration_s,
-            # The honesty receipts (2026-08-06). Native by construction, like
-            # every provider lane: the asset is downloaded whole and
-            # ``frame_count`` is derived from its own measured duration and fps
-            # directly above, so both counts are one derivation rather than two
-            # that could drift.
+            # The honesty receipts (2026-08-06). Native by construction: the
+            # asset is downloaded whole and ``frame_count`` is the counted
+            # length of that file after the declared tail trim.
             "native_frame_count": frame_count,
             "extension_mode": "none",
         }

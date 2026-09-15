@@ -10,9 +10,10 @@ Pins the 2026-06-01 contract:
     every numbered comment written about it went stale within weeks. The
     writer's declared order is stated ONCE, in
     tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER.
-  * The lane is opt-in / default-off via OTR_ENABLE_COMFY_CREDITS=1 -- when
-    disabled the virtual rows + slug catalog never reach the dropdowns, so
-    the offline baseline is untouched (mirrors the OpenRouter gate).
+  * The Comfy Credits catalog is always listed after the enable-sentinel
+    so a saved cloud graph that stores x-ai/grok-4.20 loads on Comfy Cloud.
+    generate() still fails closed without a Comfy API key. The env flag
+    OTR_ENABLE_COMFY_CREDITS=1 remains a headless opt-in.
   * comfy:slot-a|b resolve to a real catalog slug via the bind -> env ->
     recommended chain; the backend tags provider="comfy_credits" and posts
     behind the cost guard with the ComfyUI-injected auth.
@@ -31,11 +32,17 @@ from tests.fixtures.writer_slots import assert_relative_order
 
 
 @pytest.fixture(autouse=True)
-def _clean_lane_state():
-    """Each test starts with no slot bindings / auth / accrued budget."""
+def _clean_lane_state(monkeypatch):
+    """Each test starts with no slot bindings / auth / accrued budget.
+
+    OTR_COMFY_API_KEY is a User-env credential on the operator box, so a
+    test that means "no credential" must unpin it or `_bearer()` will
+    silently succeed.
+    """
     occ.clear_slot_bindings()
     occ.clear_auth()
     occ.reset_run_budget()
+    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
     yield
     occ.clear_slot_bindings()
     occ.clear_auth()
@@ -66,9 +73,15 @@ def test_lane_enabled_with_flag(comfy_on):
 # --- slot picker choices ----------------------------------------------------
 
 
-def test_slot_choices_disabled_show_enable_sentinel(comfy_off):
+def test_slot_choices_always_include_pinned_catalog(comfy_off):
+    """Saved cloud graphs store x-ai/grok-4.20. That slug must be a real
+    combo choice even when OTR_ENABLE_COMFY_CREDITS is unset."""
     for slot in ("a", "b"):
-        assert cat.comfy_catalog_dropdown_choices(slot) == [cat.COMFY_ENABLE_SENTINEL]
+        choices = cat.comfy_catalog_dropdown_choices(slot)
+        assert choices[0] == cat.COMFY_ENABLE_SENTINEL
+        assert "x-ai/grok-4.20" in choices
+        for slug in occ.COMFY_LLM_MODELS:
+            assert slug in choices
 
 
 def test_slot_choices_enabled_lead_with_recommended(comfy_on):
@@ -101,13 +114,13 @@ def test_slot_choices_reject_bad_slot():
         cat.comfy_catalog_dropdown_choices("c")
 
 
-# --- virtual rows: present only when enabled --------------------------------
+# --- virtual rows: always present (pick is the enable) ----------------------
 
 
-def test_virtual_rows_absent_when_disabled(comfy_off):
+def test_virtual_rows_present_when_disabled(comfy_off):
     labels = cat.dropdown_choices()
-    assert occ.SLOT_A_ID not in labels
-    assert occ.SLOT_B_ID not in labels
+    assert occ.SLOT_A_ID in labels
+    assert occ.SLOT_B_ID in labels
 
 
 def test_virtual_rows_present_when_enabled(comfy_on):
@@ -163,10 +176,30 @@ def test_backend_load_tags_provider(comfy_on):
     assert "model" not in entry and "tokenizer" not in entry
 
 
-def test_backend_load_rejects_when_disabled(comfy_off):
+def test_backend_load_rejects_when_disabled_and_no_auth(comfy_off):
     row = types.SimpleNamespace(context_window=8192)
     with pytest.raises(occ.ComfyCreditsConfigError):
         occ.ComfyCreditsBackend().load(occ.SLOT_A_ID, row)
+
+
+def test_backend_load_accepts_signed_in_auth_without_env_flag(comfy_off):
+    occ.set_auth(api_key="key-abc")
+    row = types.SimpleNamespace(context_window=8192)
+    entry = occ.ComfyCreditsBackend().load(occ.SLOT_A_ID, row)
+    assert entry["provider"] == "comfy_credits"
+    assert entry["slug"] == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
+
+
+def test_backend_load_accepts_env_key_when_flag_off(comfy_off, monkeypatch):
+    """Headless --cpu with sqlite:///:memory: never injects api_key_comfy_org.
+    The first cheap-cloud 1-act died on ComfyCreditsConfigError for that
+    reason. OTR_COMFY_API_KEY is the same credential the media lane already
+    uses."""
+    monkeypatch.setenv("OTR_COMFY_API_KEY", "env-headless-key")
+    row = types.SimpleNamespace(context_window=8192)
+    entry = occ.ComfyCreditsBackend().load(occ.SLOT_A_ID, row)
+    assert entry["provider"] == "comfy_credits"
+    assert occ._bearer() == "env-headless-key"
 
 
 def test_backend_generate_posts_and_extracts(comfy_on, monkeypatch):
@@ -203,7 +236,7 @@ def test_backend_generate_requires_auth(comfy_on, monkeypatch):
     row = types.SimpleNamespace(context_window=8192)
     backend = occ.ComfyCreditsBackend()
     entry = backend.load(occ.SLOT_A_ID, row)
-    # No set_auth() -> no credential -> fail closed before any network call.
+    # No set_auth() and no OTR_COMFY_API_KEY -> fail closed before any network call.
     with pytest.raises(occ.ComfyCreditsConfigError):
         backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=8)
 

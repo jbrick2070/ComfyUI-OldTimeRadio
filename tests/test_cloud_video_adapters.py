@@ -608,3 +608,82 @@ def test_vidu_q2_normal_canonicalize_strips_provider_audio_without_sfx(tmp_path)
          str(clip["path"])], capture_output=True, text=True, timeout=60)
     streams = json.loads(probe.stdout)["streams"]
     assert all(s["codec_type"] != "audio" for s in streams)
+
+
+def _nb_frames(path: Path) -> int:
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-count_frames", "-show_entries", "stream=nb_read_frames",
+         "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, timeout=60)
+    assert probe.returncode == 0, probe.stderr
+    return int(probe.stdout.strip().splitlines()[-1])
+
+
+def _make_24fps_overlong(tmp_path, *, duration_s: float = 1.08) -> Path:
+    """A 24 fps provider clip slightly longer than an integer second.
+
+    canonicalize_video's duration-preserving fps=25 filter turns this into
+    a two-frame surplus against a 25-frame plan -- the live Vidu Q2 shape
+    (5.08 s -> 127 frames against 125).
+    """
+    out = tmp_path / "provider_24fps_overlong.mp4"
+    cmd = [
+        _FFMPEG, "-v", "error", "-y",
+        "-f", "lavfi", "-i",
+        f"testsrc=size=128x72:rate=24:duration={duration_s}",
+        "-an", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(out),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    return out
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_canonicalize_video_without_cap_keeps_fps_resample_surplus(tmp_path):
+    src = _make_24fps_overlong(tmp_path)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "job-surplus",
+           "raw_meta": {}}
+    asset = canonicalize_video(raw, {"w": 320, "h": 192, "fps": 25})
+    got = _nb_frames(asset.path)
+    assert got > 25, (
+        "fixture must reproduce the live surplus; got %d after fps=25"
+        % got)
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_canonicalize_video_caps_fps_resample_surplus_to_the_plan(tmp_path):
+    src = _make_24fps_overlong(tmp_path)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "job-trim",
+           "raw_meta": {}}
+    asset = canonicalize_video(
+        raw, {"w": 320, "h": 192, "fps": 25, "target_frames": 25})
+    assert asset.frame_count == 25
+    assert _nb_frames(asset.path) == 25
+    assert abs(float(asset.duration_s) - 1.0) < 1e-6
+
+
+def test_vidu_canonicalize_forwards_the_plan_length(tmp_path, monkeypatch):
+    seen = {}
+
+    def _capture(raw, spec, session=None):
+        seen.update(spec)
+        return CanonicalAsset(
+            path=tmp_path / "captured.mp4", sha256="0" * 64,
+            media_type="video", duration_s=5.0, width=320, height=192,
+            fps=25.0, container="mp4", provider_job_id="vidu-cap",
+            frame_count=125)
+
+    monkeypatch.setattr(
+        "nodes._otr_shared.cloud_media_canonical.canonicalize_video",
+        _capture)
+    req = _request(tmp_path, timing={"target_frame_count": 125})
+    clip = ecv.ViduQ2ProFast720p.canonicalize(
+        {"path": str(tmp_path / "unused.mp4"), "content_type": "video/mp4",
+         "duration_s": None, "provider_job_id": "vidu-cap", "raw_meta": {}},
+        req, {})
+    assert seen.get("target_frames") == 125
+    assert clip["frame_count"] == 125
+    assert clip["native_frame_count"] == 125
+

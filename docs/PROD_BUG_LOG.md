@@ -15156,3 +15156,69 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
 - confidence: HIGH (pod comfy log lines 346-395, pydantic missing-field
   repr reproduced on 2.12, extractor fail-closed on fence preamble
   reproduced locally).
+
+## PBUG-20260915-01 -- Vidu Q2 billed 5 s, canonicalize emitted 127 frames, plan asked for 125
+- surfaced: LIVE cheap-cloud 1-act on headless `--cpu` `:8000`, 2026-09-14
+  23:46, graph `otr_cloud_low_1act`, prompt `4fc14cfb-2260-43cf-92dd-6de932641740`,
+  episode `signal_lost_the_rainbow_bowl_20260914_234615`. Writer, TTS, Luma
+  stills, and Vidu Q2 Pro Fast I2V all ran. Died at assembly. No new
+  `rainbow_bowl` file in `otr/obs/` (MCP smoke `comfy_mcp_vidu_q2_t2v_*` is
+  a different clip).
+- symptom: `RenderError: shot shot_shot_000_b1 segment 0 rendered 127
+  frame(s) but its plan asked for 125 (a surplus of 2). NO FALLBACK`.
+  Log: `tmp/comfy_cpu_8000.log`. `Prompt executed in 00:20:32`. CPU
+  server then gone.
+- root cause: `canonicalize_video` conforms with ffmpeg `fps=25`
+  duration-preserving. Vidu was asked for 5 s; the delivered clip was a
+  hair longer (~5.08 s). 5.08 * 25 = 127. The adapter already declared
+  `allow_tail_trim=True` (the FrameContract field whose docstring says
+  trim happens at canonicalization) and never passed the plan length
+  into the conform, so the surplus reached `render_driver` which
+  correctly refused to assemble a clip that is not `segment.render_frames`.
+  This is not the LTX overstated-ladder class (PBUG-20260802-01): the
+  plan's 125 was legal; the provider+resample overshot.
+- fix: **FIXED in the same change as this entry.** `canonicalize_video`
+  accepts `target_frames` (`segment.render_frames`, not the later
+  visible count after assembly `trim_tail`) and keeps that many pictures
+  with `-frames:v`. When the container header has no `nb_frames`, the
+  output is decode-counted. Cloud, Veo, and Omni adapters forward
+  `timing.target_frame_count`. Blast radius: cloud video canonicalize
+  only; local engines and the 16 GB Desktop `:8188` path unchanged.
+- verify idea: `test_canonicalize_video_without_cap_keeps_fps_resample_surplus`
+  plus `test_canonicalize_video_caps_fps_resample_surplus_to_the_plan`
+  plus `test_vidu_canonicalize_forwards_the_plan_length`. Live proof is
+  a `*rainbow_bowl*` (or later cheap-cloud 1-act) mp4 in
+  `C:\Users\jeffr\Documents\ComfyUI\output\otr\obs` and `obs_publish OK`
+  on the CPU server log.
+- bible-worthy: yes -- a declared `allow_tail_trim` that no code performs
+  is an overstated contract, same family as an overstated frame ladder:
+  the planner commits, the render discovers the lie.
+- confidence: HIGH (live RenderError + ffmpeg fps-filter surplus
+  reproduced on a 24 fps over-long fixture).
+
+## PBUG-20260915-02 -- headless `--cpu` Comfy Credits has no hidden API key
+- surfaced: LIVE cheap-cloud 1-act, first queue on `:8000` with
+  `--database-url sqlite:///:memory:`, 2026-09-14. Died in ~0.15 s.
+  Prompt `7b0a5552`. No obs asset.
+- symptom: `ComfyCreditsConfigError` -- writer Grok (`comfy:slot-a` /
+  `x-ai/grok-4.20`) had no bearer. Desktop `:8188` injects
+  `api_key_comfy_org` from the signed-in session; the in-memory DB does
+  not.
+- root cause: `_bearer()` returned only `_auth["api_key"]` from the
+  hidden input. The old comment claimed `OTR_COMFY_API_KEY` 401s on the
+  chat proxy (media vs LLM key split). The same env key then completed
+  Grok on this box (~190k tokens) on the next queue. The comment was
+  wrong for current Comfy Cloud Pro.
+- fix: **FIXED in the same change as this entry.** `_bearer()` falls
+  back to `OTR_COMFY_API_KEY`. `load()` admits the lane when either the
+  enable flag or a bearer is present. Tests unpin the User-env key so
+  "no credential" cases stay honest on this machine. Blast radius:
+  Comfy Credits writer auth on headless only; Desktop hidden-input path
+  unchanged (it still wins when injected).
+- verify idea: `test_backend_load_accepts_env_key_when_flag_off` plus
+  the live 1-act writer completing past the Grok call.
+- bible-worthy: yes -- a hidden-input-only credential on a headless
+  server with an empty session DB is a structural refusal, not a missing
+  export the next boot has to remember.
+- confidence: HIGH (first prompt 0.15 s ConfigError; second prompt with
+  env fallback wrote the Rainbow Bowl script).

@@ -47,7 +47,9 @@ __all__ = [
     "canonicalize_audio",
     "canonicalize_image",
     "canonicalize_video",
+    "canonical_clip_frame_count",
     "cloud_delivery_wh",
+    "engine_request_target_frames",
 ]
 
 
@@ -76,8 +78,52 @@ def cloud_delivery_wh(request_w, request_h, *, land_env, port_env,
     except (ValueError, IndexError, AttributeError):
         return (1080, 1920) if portrait else (1920, 1080)
 
+
+def engine_request_target_frames(request) -> int:
+    """The coverage plan's render length for this clip, or 0 if absent.
+
+    ``timing.target_frame_count`` is ``segment.render_frames`` -- the length
+    the assembler will demand -- not the later visible count after
+    ``trim_tail``. A zero means the canonicalizer must not cap.
+    """
+    if request is None:
+        return 0
+    if isinstance(request, dict):
+        timing = request.get("timing") or {}
+    else:
+        timing = getattr(request, "timing", None) or {}
+    if isinstance(timing, dict):
+        raw = timing.get("target_frame_count", 0)
+    else:
+        raw = getattr(timing, "target_frame_count", 0)
+    try:
+        n = int(raw or 0)
+    except (TypeError, ValueError):
+        return 0
+    return n if n > 0 else 0
+
+
+def canonical_clip_frame_count(asset: CanonicalAsset) -> int:
+    """Pictures this canonical file carries. Prefer a counted field."""
+    raw = getattr(asset, "frame_count", None)
+    try:
+        counted = int(raw)
+    except (TypeError, ValueError):
+        counted = 0
+    if counted > 0:
+        return counted
+    try:
+        fps = float(asset.fps or 0.0)
+        dur = float(asset.duration_s or 0.0)
+    except (TypeError, ValueError):
+        return 0
+    if fps <= 0.0 or dur <= 0.0:
+        return 0
+    return int(round(dur * fps))
+
+
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).
-CANONICALIZER_VERSION = 2
+CANONICALIZER_VERSION = 3
 
 #: RESOLVED (cloud-audio S0/C8, 2026-07-03): the local lane's real loudness
 #: handling is scene_sequencer's per-segment RMS leveling (NOT a LUFS
@@ -115,6 +161,11 @@ class CanonicalAsset:
     container: Optional[str]
     provider_job_id: Optional[str]
     validation_warnings: tuple = ()
+    #: Counted pictures in the canonical file when known. Optional so older
+    #: still/audio constructors stay valid. Video adapters prefer this over
+    #: ``round(duration_s * fps)``, which is how a 5.08 s provider clip became
+    #: a 127-frame receipt against a 125-frame plan (PBUG-20260915-01).
+    frame_count: Optional[int] = None
 
 
 def validate_partner_result(raw: dict) -> PartnerResult:
@@ -350,6 +401,30 @@ def _ffprobe_streams(path: str) -> dict:
     }
 
 
+def _count_output_frames(path: str) -> int | None:
+    """Decoded picture count when the container header has no nb_frames.
+
+    ``-frames:v`` is supposed to be exact; a missing header is not proof
+    it held. Decode-count the output the same way the assembly boundary
+    does, and let the caller fail closed on a surplus.
+    """
+    from . import ffprobe as _ffp
+    try:
+        doc = _ffp.probe_json(
+            path, "stream=nb_read_frames", select_streams="v:0",
+            extra_args=("-count_frames",), timeout=120)
+    except _ffp.FFprobeError:
+        return None
+    streams = doc.get("streams") or []
+    if not streams:
+        return None
+    try:
+        n = int(streams[0].get("nb_read_frames"))
+    except (TypeError, ValueError):
+        return None
+    return n if n > 0 else None
+
+
 def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
     """S3 (2026-07-02). Conform a provider clip to the ROLE contract:
 
@@ -364,7 +439,13 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
 
     ``request`` supplies ``{"w", "h", "fps"}`` (all required, fail-closed) and
     optionally ``out_path`` (default: a fresh mp4 beside the input with a
-    ``.canon.mp4`` suffix)."""
+    ``.canon.mp4`` suffix) and ``target_frames`` (the coverage plan's
+    ``render_frames``). When ``target_frames`` is a positive integer, the
+    encoder keeps that many pictures after the duration-preserving ``fps``
+    filter -- the ``allow_tail_trim`` the cloud adapters already declare.
+    A billed N-second provider clip (and the fps resample onto the 25 fps
+    canvas) routinely emits two extra frames; without the cap those frames
+    fail the plan-vs-output proof at assembly."""
     import hashlib
     validated = validate_partner_result(dict(raw))
     src = Path(validated["path"])
@@ -377,6 +458,21 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
             CloudErrorCode.MALFORMED_CONFIG,
             "canonicalize_video request must carry integer w/h/fps "
             f"(got {request!r})")
+    raw_target = request.get("target_frames")
+    target_frames = 0
+    if raw_target not in (None, ""):
+        try:
+            target_frames = int(raw_target)
+        except (TypeError, ValueError):
+            raise CloudMediaError(
+                CloudErrorCode.MALFORMED_CONFIG,
+                "canonicalize_video target_frames must be an integer "
+                f"(got {raw_target!r})")
+        if target_frames < 0:
+            raise CloudMediaError(
+                CloudErrorCode.MALFORMED_CONFIG,
+                "canonicalize_video target_frames must be >= 0 "
+                f"(got {target_frames})")
     probe = _ffprobe_streams(str(src))
     if not probe["video"]:
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
@@ -392,9 +488,13 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
         raise CloudMediaError(CloudErrorCode.CORRUPT_OUTPUT,
                               "ffmpeg not found -- cannot canonicalize video")
     cmd = [ffmpeg_bin, "-v", "error", "-y", "-i", str(src), "-an",
-           "-vf", vf, "-c:v", "libx264", "-preset", "medium", "-crf", "18",
-           "-colorspace", "bt709", "-color_primaries", "bt709",
-           "-color_trc", "bt709", "-movflags", "+faststart", str(out_path)]
+           "-vf", vf]
+    if target_frames > 0:
+        cmd.extend(["-frames:v", str(target_frames)])
+    cmd.extend(["-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                "-colorspace", "bt709", "-color_primaries", "bt709",
+                "-color_trc", "bt709", "-movflags", "+faststart",
+                str(out_path)])
     try:
         res = otr_proc.run(cmd, capture_output=True, text=True, timeout=600)
         if res.returncode != 0:
@@ -418,15 +518,41 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     if probe["audio"]:
         warnings = (f"provider audio stripped ({len(probe['audio'])} "
                     f"stream(s); strip proof: 0 in output)",)
+    v0 = (post.get("video") or [{}])[0]
+    counted = None
+    raw_nb = v0.get("nb_frames")
+    try:
+        parsed_nb = int(raw_nb)
+    except (TypeError, ValueError):
+        parsed_nb = 0
+    if parsed_nb > 0:
+        counted = parsed_nb
+    duration_s = post["duration_s"]
+    frame_count = counted
+    if target_frames > 0:
+        if counted is None:
+            counted = _count_output_frames(str(out_path))
+        if counted is not None and counted > target_frames:
+            raise CloudMediaError(
+                CloudErrorCode.CORRUPT_OUTPUT,
+                f"canonical {out_path} kept {counted} frame(s) after "
+                f"-frames:v {target_frames}")
+        kept = counted if counted is not None else target_frames
+        frame_count = kept
+        if counted is None or counted == target_frames:
+            # Stamp the plan's duration so round(duration*fps) cannot
+            # revive a container-header surplus of a couple of frames.
+            duration_s = float(kept) / float(fps)
     return CanonicalAsset(
         path=out_path,
         sha256=sha.hexdigest(),
         media_type="video",
-        duration_s=post["duration_s"],
+        duration_s=duration_s,
         width=w, height=h, fps=float(fps),
         container="mp4",
         provider_job_id=validated.get("provider_job_id"),
         validation_warnings=warnings,
+        frame_count=frame_count,
     )
 
 

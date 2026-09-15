@@ -536,7 +536,8 @@ class _CloudVideoBase:
 
     def _canonical_video_asset(self, raw, request):
         from .._otr_shared.cloud_media_canonical import (
-            canonicalize_video, cloud_delivery_wh)
+            canonicalize_video, cloud_delivery_wh,
+            engine_request_target_frames)
         canvas = _req_get(request, "canvas") or {}
         c_get = canvas.get if isinstance(canvas, dict) else (
             lambda k, d=None: getattr(canvas, k, d))
@@ -550,9 +551,13 @@ class _CloudVideoBase:
         tw, th = cloud_delivery_wh(
             rw, rh, land_env="OTR_CLOUD_VIDEO_CANVAS",
             port_env="OTR_CLOUD_VIDEO_CANVAS_PORTRAIT")
-        return canonicalize_video(raw, {
+        spec = {
             "w": tw, "h": th, "fps": int(c_get("fps", 25) or 25),
-        })
+        }
+        n = engine_request_target_frames(request)
+        if n:
+            spec["target_frames"] = n
+        return canonicalize_video(raw, spec)
 
     def render_clip(self, request, prepared):
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
@@ -566,8 +571,10 @@ class _CloudVideoBase:
             timeout_s=_timeout_s(), estimated_usd=_est_usd())
 
     def canonicalize(self, raw, request, profile):
+        from .._otr_shared.cloud_media_canonical import (
+            canonical_clip_frame_count)
         asset = self._canonical_video_asset(raw, request)
-        frame_count = int(round((asset.duration_s or 0.0) * (asset.fps or 0.0)))
+        frame_count = canonical_clip_frame_count(asset)
         return {
             "clip_id": _req_get(request, "shot_id") or f"{self.name}_clip",
             "type": "video", "path": str(asset.path),
@@ -588,10 +595,9 @@ class _CloudVideoBase:
             # A provider clip is native BY CONSTRUCTION, and the reason is
             # structural rather than a claim about the vendor: the delivered
             # asset is downloaded and re-containered whole, and OTR owns no code
-            # on this path that could lengthen it. ``frame_count`` is derived
-            # from the asset's OWN measured duration and fps just above, so the
-            # native count is the same number by the same derivation -- not a
-            # second measurement that could disagree with the first.
+            # on this path that could lengthen it. ``frame_count`` is the
+            # counted length of THAT file after the fps-resample cap to
+            # ``segment.render_frames``. Assembly ``trim_tail`` is later.
             "native_frame_count": frame_count,
             "extension_mode": "none",
         }

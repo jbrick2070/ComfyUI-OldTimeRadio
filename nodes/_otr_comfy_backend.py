@@ -11,12 +11,16 @@ Qwen / Mistral / GLM / Kimi / Perplexity). So this backend is, in shape,
   * Catalog: a PINNED constant (`COMFY_LLM_MODELS`) -- the partner node's
     curated model list. No disk cache / refresh script (unlike the
     own-key OpenRouter lane, whose catalog is fetched).
-  * Auth: NOT an env key. ComfyUI injects the configured Comfy API key
-    into a node via the hidden input `api_key_comfy_org`. The writer node
-    captures it at run() and hands it here via `set_auth(...)`. The
-    logged-in account's session bearer is never requested: the Comfy
-    Registry scan treats a third-party pack declaring that hidden input
-    as credential access and flags the version (PBUG-20260902-04).
+  * Auth: ComfyUI injects the configured Comfy API key into a node via
+    the hidden input `api_key_comfy_org` when the Desktop session is
+    signed in. Headless `--cpu` with `sqlite:///:memory:` never injects
+    that input, so `_bearer()` also accepts `OTR_COMFY_API_KEY` -- the
+    same credential the cloud media lane already uses. The writer node
+    still captures a hidden input at run() when present via
+    `set_auth(...)`. The logged-in account's session bearer is never
+    requested: the Comfy Registry scan treats a third-party pack
+    declaring that hidden input as credential access and flags the
+    version (PBUG-20260902-04).
   * Gate: `OTR_ENABLE_COMFY_CREDITS=1` (opt-in, default-off) -- mirrors
     the OpenRouter enable gate so the offline baseline + the dropdowns
     stay untouched until the operator opts in (C3 parity, no surprise
@@ -325,17 +329,10 @@ def clear_auth() -> None:
 
 
 def _bearer() -> str | None:
-    """The credential to send: the configured Comfy API key (it works on
-    non-whitelisted hosts too).
-
-    API-KEY-RESPECTFUL (2026-07-04): the Comfy Credits LLM chat proxy authenticates
-    ONLY via ComfyUI's own injected credential (the writer's hidden input
-    api_key_comfy_org). We do NOT repurpose the media-lane OTR_COMFY_API_KEY here
-    -- it is rejected by the chat proxy (HTTP 401) and mixing key surfaces
-    confuses users. Headless cloud LLM = the OpenRouter own-key lane; Comfy
-    Credits LLM = the Desktop app signed in with a Comfy API key. The session
-    bearer is no longer requested (PBUG-20260902-04)."""
-    return _auth.get("api_key")
+    """The credential to send: the configured Comfy API key (via ComfyUI's
+    injected api_key_comfy_org hidden input, or OTR_COMFY_API_KEY in headless
+    environments)."""
+    return _auth.get("api_key") or otr_env.get("OTR_COMFY_API_KEY")
 
 
 # ---------------------------------------------------------------------------
@@ -438,11 +435,11 @@ class ComfyCreditsBackend:
                 f"{repo_id}: 'comfy_credits' lane is not admitted by the "
                 f"profile lane_allowlist {list(policy.lane_allowlist)}."
             )
-        if not comfy_credits_enabled():
+        if not comfy_credits_enabled() and not _bearer():
             raise ComfyCreditsConfigError(
-                f"{repo_id} selected but Comfy Credits is not enabled. Set "
-                f"OTR_ENABLE_COMFY_CREDITS=1 and log in to a Comfy account "
-                f"with credits (see "
+                f"{repo_id} selected but Comfy Credits has no credential. "
+                f"Queue from a signed-in Comfy account (api_key_comfy_org) "
+                f"or set OTR_COMFY_API_KEY (see "
                 f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
                 f"main/docs/comfy-credits-setup.md)."
             )
