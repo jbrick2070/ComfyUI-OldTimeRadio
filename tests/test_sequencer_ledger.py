@@ -236,14 +236,17 @@ def test_episode_assembler_materializes_bookends_and_mirrors_by_placement(
     assert by_cue["interstitial"]["start_s"] == pytest.approx(0.4)
     assert all(row["wav_path"] for row in by_cue.values())
 
+    # Interstitial audio is stamped on music[] and mixed into the 4s
+    # sequencer gap. The writer music_inter line is the video beat;
+    # assembler must not mint a second mirrored_from=music row.
     mirrors = [
         row for row in saved["lines"]
         if row.get("mirrored_from") == "music"
     ]
     assert {row["speaker_role"] for row in mirrors} == {
-        "music_open", "music_inter", "music_close",
+        "music_open", "music_close",
     }
-    assert {row["music_cue_id"] for row in mirrors} == set(by_cue)
+    assert {row["music_cue_id"] for row in mirrors} == {"opening", "closing"}
 
 
 def test_sequencer_rejects_sfx_row_loud(patched_sequencer_env):

@@ -2077,35 +2077,75 @@ class EpisodeAssembler:
                     # Overlay interstitial cues into the gaps created by SceneSequencer
                     # -------------------------------------------------------------
                     if _cue_manifest is not None and music_cue_audio is not None:
+                        from .otr_shot_lock import MUSIC_BRIDGE_FALLBACK_DUR_S as _GAP_S
                         for _r in _cue_manifest.get("cues", []):
-                            if _r.get("placement") == "interstitial" and _r.get("anchor_line_id"):
-                                _anchor_id = _r.get("anchor_line_id")
-                                _start_s_scene = None
-                                for _ln in (_led.get("lines") or []):
-                                    if _ln.get("line_id") == _anchor_id:
-                                        # Use the scene_audio space start_s to find where to overlay
-                                        _start_s_scene = float(_ln.get("start_s", 0.0))
-                                        if _ln.get("start_s_space") == "master_mix":
-                                            # If already promoted (e.g. by shift above), back it out for the overlay calculation
-                                            _start_s_scene -= _shift_s
-                                        break
-                                if _start_s_scene is not None:
-                                    _cue_audio = self._cue_from_batch(music_cue_audio, _cue_manifest, _r)
-                                    if _cue_audio is not None:
-                                        _cue_wf = self._extract_waveform(_cue_audio, target_sr=sample_rate)
-                                        _start_idx = int(_shift_samples) + int(_start_s_scene * sample_rate)
-                                        _end_idx = _start_idx + _cue_wf.shape[-1]
-                                        
-                                        if _end_idx > episode_waveform.shape[-1]:
-                                            _pad = torch.zeros((1, episode_waveform.shape[1], _end_idx - episode_waveform.shape[-1]), device=episode_waveform.device)
-                                            episode_waveform = torch.cat([episode_waveform, _pad], dim=-1)
-                                        
-                                        _channels = min(episode_waveform.shape[1], _cue_wf.shape[1])
-                                        episode_waveform[:, :_channels, _start_idx:_end_idx] += _cue_wf[:, :_channels, :]
-                                        log.info(
-                                            "[EpisodeAssembler] mixed interstitial cue %s at %.2fs (scene) / %.2fs (master)",
-                                            _r.get("cue_id"), _start_s_scene, _start_idx / sample_rate
-                                        )
+                            if (
+                                _r.get("placement") != "interstitial"
+                                or not _r.get("anchor_line_id")
+                            ):
+                                continue
+                            _anchor_id = _r.get("anchor_line_id")
+                            _start_s_scene = None
+                            _gap_s = float(_GAP_S)
+                            for _ln in (_led.get("lines") or []):
+                                if _ln.get("line_id") != _anchor_id:
+                                    continue
+                                _raw_start = _ln.get("start_s")
+                                if not isinstance(_raw_start, (int, float)):
+                                    break
+                                _start_s_scene = float(_raw_start)
+                                if _ln.get("start_s_space") == "master_mix":
+                                    _start_s_scene -= _shift_s
+                                _raw_dur = _ln.get("dur_s")
+                                if (
+                                    isinstance(_raw_dur, (int, float))
+                                    and float(_raw_dur) > 0.0
+                                ):
+                                    _gap_s = float(_raw_dur)
+                                break
+                            if _start_s_scene is None:
+                                continue
+                            _cue_audio = self._cue_from_batch(
+                                music_cue_audio, _cue_manifest, _r,
+                            )
+                            if _cue_audio is None:
+                                continue
+                            _cue_wf = self._extract_waveform(
+                                _cue_audio, target_sr=sample_rate,
+                            )
+                            _start_idx = (
+                                int(_shift_samples)
+                                + int(_start_s_scene * sample_rate)
+                            )
+                            if _start_idx < 0 or _start_idx >= int(
+                                episode_waveform.shape[-1]
+                            ):
+                                continue
+                            _gap_samples = max(
+                                1, int(round(_gap_s * float(sample_rate))),
+                            )
+                            _mix_len = min(
+                                int(_cue_wf.shape[-1]),
+                                _gap_samples,
+                                int(episode_waveform.shape[-1]) - _start_idx,
+                            )
+                            if _mix_len <= 0:
+                                continue
+                            _channels = min(
+                                episode_waveform.shape[1], _cue_wf.shape[1],
+                            )
+                            episode_waveform[
+                                :, :_channels,
+                                _start_idx:_start_idx + _mix_len,
+                            ] += _cue_wf[:, :_channels, :_mix_len]
+                            log.info(
+                                "[EpisodeAssembler] mixed interstitial cue %s "
+                                "at %.2fs (scene) / %.2fs (master) "
+                                "window=%d/%d samples",
+                                _r.get("cue_id"), _start_s_scene,
+                                _start_idx / sample_rate,
+                                _mix_len, int(_cue_wf.shape[-1]),
+                            )
 
                     _music_rows = _led.get("music") or []
                     log.info(
@@ -2155,14 +2195,24 @@ class EpisodeAssembler:
                                 _start_s_master = None
                                 _dur_s = 4.0
                                 for _ln in (_led.get("lines") or []):
-                                    if _ln.get("line_id") == _anchor_id:
-                                        # _ln["start_s"] is already shifted to master_mix space!
-                                        if _ln.get("start_s_space") == "master_mix":
-                                            _start_s_master = float(_ln.get("start_s", 0.0))
-                                        else:
-                                            _start_s_master = float(_ln.get("start_s", 0.0)) + _shift_s
-                                        _dur_s = float(_ln.get("dur_s", 4.0))
+                                    if _ln.get("line_id") != _anchor_id:
+                                        continue
+                                    _raw_start = _ln.get("start_s")
+                                    if not isinstance(_raw_start, (int, float)):
                                         break
+                                    if _ln.get("start_s_space") == "master_mix":
+                                        _start_s_master = float(_raw_start)
+                                    else:
+                                        _start_s_master = (
+                                            float(_raw_start) + _shift_s
+                                        )
+                                    _raw_dur = _ln.get("dur_s")
+                                    if (
+                                        isinstance(_raw_dur, (int, float))
+                                        and float(_raw_dur) > 0.0
+                                    ):
+                                        _dur_s = float(_raw_dur)
+                                    break
                                 if _start_s_master is not None:
                                     _mc["start_s"] = _start_s_master
                                     _mc["dur_s"] = _dur_s
@@ -2258,7 +2308,6 @@ class EpisodeAssembler:
                         _PLACEMENT_TO_ROLE = {
                             "opening":   "music_open",
                             "closing":   "music_close",
-                            "interstitial": "music_inter",
                         }
                         _appended_music = 0
                         _chunked_cues = 0
@@ -2273,6 +2322,12 @@ class EpisodeAssembler:
                             _placement = _CM.canonical_placement(
                                 _mc.get("placement"), _cue,
                             )
+                            if _placement == "interstitial":
+                                # Writer music_inter is the video beat.
+                                # Minting music_<cue>_001 doubled
+                                # extract_beats (timed writer + timed
+                                # mirror). Open/close still mirror.
+                                continue
                             _role = _PLACEMENT_TO_ROLE[_placement]
                             _full_start = float(_mc.get("start_s") or 0.0)
                             _full_dur = float(_mc.get("dur_s"))

@@ -200,3 +200,47 @@ def test_the_fallback_is_scoped_to_act_breaks_only():
     assert spoken["dur_s"] is None, (
         "an untimed CHARACTER line was handed the music-bridge fallback; the "
         "zero-frame warning is the correct outcome there")
+
+
+def test_five_act_timed_writer_bridges_are_four_video_beats():
+    """media_archive shape after sequencer stamp, without assembler mirrors."""
+    lines = [
+        {"line_id": "music_opening_001", "speaker_role": "music_open",
+         "start_s": 0.0, "dur_s": 10.0, "text": "", "char_id": ""},
+        {"line_id": "b001", "speaker_role": "announcer",
+         "start_s": 10.0, "dur_s": 5.0, "text": "hello", "char_id": "n"},
+    ]
+    inter_ids = ("b006", "b011", "b016", "b021")
+    t = 15.0
+    for bid in inter_ids:
+        lines.append({
+            "line_id": bid, "speaker_role": "music_inter",
+            "start_s": t, "dur_s": MUSIC_BRIDGE_FALLBACK_DUR_S,
+            "text": "", "char_id": "",
+        })
+        t += MUSIC_BRIDGE_FALLBACK_DUR_S + 8.0
+    lines.append({
+        "line_id": "music_closing_001", "speaker_role": "music_close",
+        "start_s": t, "dur_s": 8.0, "text": "", "char_id": "",
+    })
+    beats = extract_beats({"lines": lines, "music": [], "cast": []})
+    inter = [b for b in beats if b["beat_id"] in inter_ids]
+    assert [b["beat_id"] for b in inter] == list(inter_ids)
+    assert all(b["dur_s"] == MUSIC_BRIDGE_FALLBACK_DUR_S for b in inter)
+
+
+def test_timed_writer_plus_assembler_mirror_still_double_emits():
+    """ShotLock will not drop a timed writer. Assembler must not mint the mirror."""
+    led = {
+        "lines": [
+            {"line_id": "b006", "speaker_role": "music_inter",
+             "start_s": 15.0, "dur_s": 4.0, "text": "", "char_id": ""},
+            {"line_id": "music_inter_01_001", "speaker_role": "music_inter",
+             "start_s": 15.0, "dur_s": 4.0, "text": "", "char_id": "",
+             "mirrored_from": "music", "music_cue_id": "inter_01"},
+        ],
+        "music": [],
+        "cast": [],
+    }
+    beats = extract_beats(led)
+    assert {b["beat_id"] for b in beats} == {"b006", "music_inter_01_001"}

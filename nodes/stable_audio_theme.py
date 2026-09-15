@@ -282,11 +282,11 @@ class StableAudioTheme:
                       music_style=""):
         """Render every cue for this episode into raw clips + metadata.
 
-        scifi_news_pro lane: one clip per authored ``ledger.music[]`` row (each carries
-        its own generation_prompt / placement / anchor_line_id). Legacy lane
-        (no ledger.music[]): SYNTHESIZE the three fixed cues via
-        compose_music_prompt with the SLOT seed key -- byte-identical to the
-        pre-C3 opening/closing/interstitial render.
+        scifi_news_pro / my_story: one clip per authored ``ledger.music[]``
+        row, plus a synthesized interstitial for every ``music_inter`` line
+        that no authored row anchors. Legacy lane (no ledger.music[]):
+        synthesize opening, closing, and one interstitial per music_inter
+        line.
         """
         from ._otr_engine_profiles import (
             assert_model_available, assert_token_for_profile, require_resolver,
@@ -384,7 +384,7 @@ class StableAudioTheme:
     # ------------------------------------------------------------------ #
     def _resolve_cue_specs(self, meta, music_rows, ledger_lines=None):
         """Build the ordered cue-spec list. scifi_news_pro (authored music[]) vs legacy
-        (synthesize the 3 fixed cues, byte-parity slot seed keys)."""
+        (synthesize opening/closing plus one interstitial per music_inter line)."""
         from ._otr_music_prompt import CUE_DURATIONS, compose_music_prompt
         from .production_ledger import music_cue_spec_sha256
 
@@ -428,6 +428,21 @@ class StableAudioTheme:
                         or music_cue_spec_sha256(row)
                     ),
                 })
+            anchored = {
+                str(row.get("anchor_line_id") or "")
+                for row in music_rows
+                if (
+                    self._canonical_placement(
+                        row.get("placement"), row.get("cue_id"),
+                    ) == "interstitial"
+                    and row.get("anchor_line_id")
+                )
+            }
+            unmatched = [
+                line_id for line_id in self._music_inter_line_ids(ledger_lines)
+                if line_id not in anchored
+            ]
+            self._append_interstitial_specs(specs, meta, unmatched)
         else:
             role_lines: dict[str, list[str]] = {
                 "music_open": [], "music_inter": [], "music_close": [],
@@ -471,27 +486,54 @@ class StableAudioTheme:
                     "anchor_line_id": anchor_line_id,
                     "cue_spec_sha256": cue_spec_sha256,
                 })
-            
-            for i, line_id in enumerate(role_lines["music_inter"]):
-                slot = "interstitial"
-                prompt, duration_s = compose_music_prompt(meta, slot)
-                cue_id = f"inter_{i+1:02d}"
-                cue_spec_sha256 = music_cue_spec_sha256({
-                    "generation_prompt": prompt,
-                    "target_duration_s": float(duration_s),
-                    "placement": slot,
-                    "anchor_line_id": line_id,
-                })
-                specs.append({
-                    "cue_id": cue_id,
-                    "placement": slot,
-                    "prompt": prompt,
-                    "requested_duration_s": float(duration_s),
-                    "seed_key": cue_id,
-                    "anchor_line_id": line_id,
-                    "cue_spec_sha256": cue_spec_sha256,
-                })
+            self._append_interstitial_specs(
+                specs, meta, role_lines["music_inter"],
+            )
         return specs
+
+    @staticmethod
+    def _music_inter_line_ids(ledger_lines):
+        ids = []
+        for line in ledger_lines or []:
+            if not isinstance(line, dict):
+                continue
+            if str(line.get("speaker_role") or "") != "music_inter":
+                continue
+            line_id = str(line.get("line_id") or "")
+            if line_id:
+                ids.append(line_id)
+        return ids
+
+    def _append_interstitial_specs(self, specs, meta, line_ids):
+        """Synthesize one interstitial cue per unanchored music_inter line."""
+        from ._otr_music_prompt import compose_music_prompt
+        from .production_ledger import music_cue_spec_sha256
+
+        existing_ids = {str(spec.get("cue_id") or "") for spec in specs}
+        n = 1
+        for line_id in line_ids:
+            while f"inter_{n:02d}" in existing_ids:
+                n += 1
+            cue_id = f"inter_{n:02d}"
+            slot = "interstitial"
+            prompt, duration_s = compose_music_prompt(meta, slot)
+            cue_spec_sha256 = music_cue_spec_sha256({
+                "generation_prompt": prompt,
+                "target_duration_s": float(duration_s),
+                "placement": slot,
+                "anchor_line_id": line_id,
+            })
+            specs.append({
+                "cue_id": cue_id,
+                "placement": slot,
+                "prompt": prompt,
+                "requested_duration_s": float(duration_s),
+                "seed_key": cue_id,
+                "anchor_line_id": line_id,
+                "cue_spec_sha256": cue_spec_sha256,
+            })
+            existing_ids.add(cue_id)
+            n += 1
 
     @staticmethod
     def _canonical_placement(placement, cue_id):

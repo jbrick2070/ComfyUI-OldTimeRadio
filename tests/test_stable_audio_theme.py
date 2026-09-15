@@ -175,10 +175,12 @@ def test_legacy_synth_binds_ordered_music_sentinels(monkeypatch):
     out = StableAudioTheme().generate(
         script_json=_ledger(lines=lines), engine="musicgen",
     )
-    manifest = CM.parse_manifest(out[1], batch_size=2)
+    manifest = CM.parse_manifest(out[1], batch_size=3)
     by_cue = {r["cue_id"]: r for r in manifest["cues"]}
 
+    assert set(by_cue) == {"opening", "closing", "inter_01"}
     assert by_cue["opening"]["anchor_line_id"] == "b000"
+    assert by_cue["inter_01"]["anchor_line_id"] == "b005"
     assert by_cue["closing"]["anchor_line_id"] == "b900"
     assert all(row["cue_spec_sha256"] for row in by_cue.values())
 
@@ -346,6 +348,75 @@ def test_node_wired_into_init_by_table_not_literal_key():
     assert "new_node_modules_table" in text
     literal_keys = set(re.findall(r'"(OTR_\w+)"\s*:', text))
     assert "OTR_StableAudioTheme" not in literal_keys
+
+
+def test_authored_bookends_still_synth_unanchored_inter_lines(monkeypatch):
+    """Opening+closing in music[] must not suppress an unanchored music_inter line."""
+    import json
+
+    from nodes import _otr_cue_manifest as CM
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    ledger = json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [],
+        "lines": [
+            {"line_id": "b000", "speaker_role": "music_open"},
+            {"line_id": "b006", "speaker_role": "music_inter"},
+            {"line_id": "b900", "speaker_role": "music_close"},
+        ],
+        "meta": {},
+        "music": [
+            {"cue_id": "opening", "placement": "opening",
+             "anchor_line_id": "b000", "generation_prompt": "open",
+             "target_duration_s": 12.0},
+            {"cue_id": "closing", "placement": "closing",
+             "anchor_line_id": "b900", "generation_prompt": "close",
+             "target_duration_s": 8.0},
+        ],
+    })
+    out = StableAudioTheme().generate(script_json=ledger, engine="musicgen")
+    manifest = CM.parse_manifest(out[1], batch_size=3)
+    by_cue = {r["cue_id"]: r for r in manifest["cues"]}
+    assert set(by_cue) == {"opening", "closing", "inter_01"}
+    assert by_cue["inter_01"]["anchor_line_id"] == "b006"
+    assert len(calls) == 3
+
+
+def test_authored_inter_is_not_duplicated_when_line_is_present(monkeypatch):
+    """Join key is anchor_line_id, not cue_id-on-the-line (lines have none)."""
+    import json
+
+    from nodes import _otr_cue_manifest as CM
+    from nodes.stable_audio_theme import StableAudioTheme
+
+    calls = []
+    _stub_musicgen_generate_clip(monkeypatch, calls)
+    ledger = json.dumps({
+        "schema_version": "l3-2026-05-14",
+        "cast": [],
+        "lines": [
+            {"line_id": "shot_001_music", "speaker_role": "music_inter"},
+        ],
+        "meta": {},
+        "music": [
+            {"cue_id": "opening", "placement": "opening",
+             "generation_prompt": "open", "target_duration_s": 12.0},
+            {"cue_id": "inter_01", "placement": "interstitial",
+             "anchor_line_id": "shot_001_music",
+             "generation_prompt": "bridge", "target_duration_s": 4.0},
+            {"cue_id": "closing", "placement": "closing",
+             "generation_prompt": "close", "target_duration_s": 8.0},
+        ],
+    })
+    out = StableAudioTheme().generate(script_json=ledger, engine="musicgen")
+    manifest = CM.parse_manifest(out[1], batch_size=3)
+    by_cue = {r["cue_id"]: r for r in manifest["cues"]}
+    assert "inter_02" not in by_cue
+    assert by_cue["inter_01"]["anchor_line_id"] == "shot_001_music"
+    assert len(calls) == 3
 
 
 def test_importing_node_triggers_no_engine_lib_imports():
