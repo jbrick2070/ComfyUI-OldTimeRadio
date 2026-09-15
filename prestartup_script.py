@@ -27,6 +27,15 @@ from os import environ  # bare name clears the registry $env_read literal
 import sys
 import types
 
+# Duplicate pack folders each run this file. The mock is idempotent; the
+# OK banner is not. A second copy must not look like a second pack booting.
+_OTR_PRESTARTUP_GUARD = "_comfyui_old_time_radio_prestartup_singleton"
+_otr_pre_dup = _OTR_PRESTARTUP_GUARD in sys.modules
+if not _otr_pre_dup:
+    sys.modules[_OTR_PRESTARTUP_GUARD] = types.ModuleType(_OTR_PRESTARTUP_GUARD)
+if _otr_pre_dup:
+    print("[OldTimeRadio] prestartup skipped: another OldTimeRadio folder already ran it")
+
 # ---------------------------------------------------------------------------
 # 1. EARLIEST POSSIBLE MOCK -- runs before ANY transformers import.
 #    The fake module goes into sys.modules before ComfyUI begins loading
@@ -63,8 +72,9 @@ if "HF_HOME" not in environ:
 logging.getLogger("OTR").info(
     "OldTimeRadio prestartup: HF_HOME=%s | safetensors_conversion mocked EARLY",
     environ.get("HF_HOME"))
-print("[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any "
-      "transformers import")
+if not _otr_pre_dup:
+    print("[OldTimeRadio] prestartup OK: safetensors_conversion mocked before any "
+          "transformers import")
 
 # ---------------------------------------------------------------------------
 # 3. One-time Kokoro English voice prefetch (operator, 2026-08-24).

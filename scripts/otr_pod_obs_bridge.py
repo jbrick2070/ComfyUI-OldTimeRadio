@@ -105,6 +105,32 @@ def fetch(base: str, fn: str, sub: str, typ: str, dest_dir: str):
     return dest
 
 
+def _ssh_common(args):
+    return ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=20",
+            "-o", "BatchMode=yes", "-o", "IdentitiesOnly=yes", "-i", args.key]
+
+
+def ssh_queue_counts(args):
+    """(running, pending) from the pod's local Comfy queue, or None."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["ssh"] + _ssh_common(args) + ["-p", str(args.port),
+             "root@" + args.host,
+             "curl -fsS http://127.0.0.1:8188/queue"],
+            capture_output=True, text=True, timeout=30)
+    except (subprocess.TimeoutExpired, OSError):
+        return None
+    if result.returncode != 0:
+        return None
+    try:
+        queue = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        return None
+    return (len(queue.get("queue_running") or []),
+            len(queue.get("queue_pending") or []))
+
+
 def sync_over_ssh(args) -> int:
     """Pull every published episode the pod has and this box does not.
 
@@ -116,21 +142,21 @@ def sync_over_ssh(args) -> int:
         print("  --host <ip> is required for the SSH route "
               "(or pass --http to use the empty /history route)")
         return 2
-    common = ["-o", "StrictHostKeyChecking=no", "-o", "ConnectTimeout=20",
-              "-o", "BatchMode=yes", "-i", args.key]
+    common = _ssh_common(args)
     listing = subprocess.run(
         ["ssh"] + common + ["-p", str(args.port), "root@" + args.host,
          "ls -1 %s/*%s.mp4 2>/dev/null" % (args.pod_obs, _PUBLISHED_MARKER)],
         capture_output=True, text=True, timeout=120)
     names = [ln.strip() for ln in listing.stdout.splitlines() if ln.strip()]
-    print("  published episodes on the pod: %d" % len(names))
+    print("  published episodes on the pod: %d" % len(names), flush=True)
     os.makedirs(args.dest, exist_ok=True)
     pulled = 0
     for remote in names:
         fn = remote.rsplit("/", 1)[-1]
         dest = os.path.join(args.dest, fn)
         if os.path.exists(dest):
-            print("  SKIP (add-only, already present): %s" % fn[:70])
+            print("  SKIP (add-only, already present): %s" % fn[:70],
+                  flush=True)
             continue
         tmp = dest + ".part"
         rc = subprocess.run(
@@ -140,14 +166,58 @@ def sync_over_ssh(args) -> int:
         if rc == 0 and os.path.getsize(tmp) > 0:
             os.replace(tmp, dest)
             print("  PULLED %8.1f MB  %s"
-                  % (os.path.getsize(dest) / 1048576.0, fn[:60]))
+                  % (os.path.getsize(dest) / 1048576.0, fn[:60]),
+                  flush=True)
             pulled += 1
         else:
             if os.path.exists(tmp):
                 os.remove(tmp)
-            print("  FAILED %s" % fn[:60])
-    print("  %d new episode(s) in obs" % pulled)
+            print("  FAILED %s" % fn[:60], flush=True)
+    print("  %d new episode(s) in obs" % pulled, flush=True)
     return 0
+
+
+def _watch_stop_on_idle(counts, saw_busy):
+    """Idle-exit only after a non-empty queue was observed.
+
+    A watcher started before the prompt is queued used to treat the first
+    successful (0, 0) as done and return after one sync. Failed polls are
+    never idle.
+    """
+    if counts is None:
+        return False, saw_busy
+    running, pending = counts
+    if running or pending:
+        return False, True
+    return bool(saw_busy), saw_busy
+
+
+def watch_over_ssh(args) -> int:
+    """Poll the pod queue, pull into local obs whenever a `_final` appears."""
+    t0 = time.time()
+    print("dest : %s" % args.dest, flush=True)
+    print("watch: ssh %s:%s until queue idle after work (max %d min)"
+          % (args.host, args.port, args.max_wait_s // 60), flush=True)
+    last = sync_over_ssh(args)
+    saw_busy = False
+    while time.time() - t0 < args.max_wait_s:
+        counts = ssh_queue_counts(args)
+        stop, saw_busy = _watch_stop_on_idle(counts, saw_busy)
+        if stop:
+            print("  queue idle after %.0f min" % ((time.time() - t0) / 60),
+                  flush=True)
+            return sync_over_ssh(args)
+        if counts is None:
+            print("  queue poll failed (%.0f min)" % ((time.time() - t0) / 60),
+                  flush=True)
+        else:
+            print("  running=%d pending=%d (%.0f min)"
+                  % (counts[0], counts[1], (time.time() - t0) / 60),
+                  flush=True)
+        time.sleep(args.poll_s)
+        last = sync_over_ssh(args)
+    print("  max-wait reached", flush=True)
+    return last
 
 
 def main(argv=None) -> int:
@@ -155,7 +225,7 @@ def main(argv=None) -> int:
     ap.add_argument("pod_id")
     ap.add_argument("--dest", default=DEFAULT_DEST)
     ap.add_argument("--watch", action="store_true",
-                    help="poll until the pod's queue is idle, then pull")
+                    help="poll until the pod's queue has run work and gone idle")
     ap.add_argument("--poll-s", type=int, default=60)
     ap.add_argument("--host", help="pod IP for the SSH route (default route)")
     ap.add_argument("--port", default="22", help="pod SSH port")
@@ -170,6 +240,8 @@ def main(argv=None) -> int:
     args = ap.parse_args(argv)
 
     if not args.http:
+        if args.watch:
+            return watch_over_ssh(args)
         return sync_over_ssh(args)
 
     base = "https://%s-8188.proxy.runpod.net" % args.pod_id
@@ -180,18 +252,22 @@ def main(argv=None) -> int:
 
     if args.watch:
         t0 = time.time()
+        saw_busy = False
         while time.time() - t0 < args.max_wait_s:
+            counts = None
             try:
                 q = get_json(base, "/queue", timeout=30)
-                run = len(q.get("queue_running", []))
-                pend = len(q.get("queue_pending", []))
-                if run == 0 and pend == 0:
-                    print("  queue idle after %.0f min" % ((time.time()-t0)/60))
-                    break
-                print("  running=%d pending=%d (%.0f min)"
-                      % (run, pend, (time.time()-t0)/60), flush=True)
+                counts = (len(q.get("queue_running") or []),
+                          len(q.get("queue_pending") or []))
             except Exception as exc:
                 print("  poll failed: %s" % type(exc).__name__, flush=True)
+            stop, saw_busy = _watch_stop_on_idle(counts, saw_busy)
+            if stop:
+                print("  queue idle after %.0f min" % ((time.time()-t0)/60))
+                break
+            if counts is not None:
+                print("  running=%d pending=%d (%.0f min)"
+                      % (counts[0], counts[1], (time.time()-t0)/60), flush=True)
             time.sleep(args.poll_s)
 
     try:

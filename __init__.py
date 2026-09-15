@@ -126,6 +126,54 @@ if not otr_env.get("OTR_OUTPUT_DIR"):
 NODE_CLASS_MAPPINGS = {}
 NODE_DISPLAY_NAME_MAPPINGS = {}
 
+# DUPLICATE PACK GUARD (2026-09-14). ComfyUI loads every folder under
+# custom_nodes. A git clone plus a Manager install, or a leftover .bak
+# folder, used to decorate GET /otr/latest_ledger twice. aiohttp then
+# raised "method HEAD is already registered" in add_routes and the
+# server never came up.
+#
+# A registry zip is one folder. First install and later Manager update
+# both hit this branch with _otr_dup is None and load exactly as before.
+# Fail OPEN if the helper cannot import: a missing guard must not skip
+# the nodes or the HTTP route for a normal single-folder install.
+_otr_dup = None
+try:
+    from .nodes._otr_pack_singleton import (
+        PACK_GUARD as _OTR_PACK_GUARD,
+        claim as _otr_claim_pack,
+    )
+    _otr_dup = _otr_claim_pack(
+        _OTR_PACK_GUARD,
+        os.path.abspath(os.path.dirname(__file__)),
+    )
+except Exception:  # pragma: no cover -- fail open for a single pack
+    try:
+        from nodes._otr_pack_singleton import (  # type: ignore
+            PACK_GUARD as _OTR_PACK_GUARD,
+            claim as _otr_claim_pack,
+        )
+        _otr_dup = _otr_claim_pack(
+            _OTR_PACK_GUARD,
+            os.path.abspath(os.path.dirname(__file__)),
+        )
+    except Exception:
+        _otr_dup = None
+if _otr_dup is not None:
+    print(
+        "[OldTimeRadio] DUPLICATE PACK skipped.\n"
+        "  Already loaded from:\n"
+        f"    {_otr_dup}\n"
+        "  This extra copy is:\n"
+        f"    {os.path.abspath(os.path.dirname(__file__))}\n"
+        "  Keep ONE OldTimeRadio folder under custom_nodes (git clone "
+        "OR Manager install, not both). Do not leave a .bak next to "
+        "the live pack -- ComfyUI only skips names ending in "
+        ".disabled. A second copy used to crash boot: GET "
+        "/otr/latest_ledger registered twice, aiohttp raised "
+        "'method HEAD is already registered', and the server never "
+        "came up."
+    )
+
 _NODE_MODULES = {
     # key = NODE_CLASS_MAPPINGS key (permanent public ID — never rename)
     # value = (module_path, class_name, display_name)
@@ -380,23 +428,24 @@ except Exception as _otr_audio_reg_exc:  # noqa: BLE001
         _otr_audio_reg_exc,
     )
 
-for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
-    try:
-        mod = importlib.import_module(module_path, package=__name__)
-        cls = getattr(mod, class_name)
+if _otr_dup is None:
+    for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
+        try:
+            mod = importlib.import_module(module_path, package=__name__)
+            cls = getattr(mod, class_name)
 
-        # Single canonical registration (OTR_ prefix only). The legacy
-        # bare-name (NodeName) alias mirror loop was deleted in the
-        # voice-path-cleanbreak 2026-05-12 sprint per the Standing
-        # Directive. Saved workflow JSONs that reference bare-name
-        # node types are expected to be rewritten against the OTR_
-        # prefix; there is no parallel legacy-workflow path.
-        NODE_CLASS_MAPPINGS[node_name] = cls
-        NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
+            # Single canonical registration (OTR_ prefix only). The legacy
+            # bare-name (NodeName) alias mirror loop was deleted in the
+            # voice-path-cleanbreak 2026-05-12 sprint per the Standing
+            # Directive. Saved workflow JSONs that reference bare-name
+            # node types are expected to be rewritten against the OTR_
+            # prefix; there is no parallel legacy-workflow path.
+            NODE_CLASS_MAPPINGS[node_name] = cls
+            NODE_DISPLAY_NAME_MAPPINGS[node_name] = display_name
 
-    except Exception as e:
-        log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
-        print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
+        except Exception as e:
+            log.warning("[OldTimeRadio] Failed to load '%s': %s", node_name, e)
+            print(f"[OldTimeRadio] Skipped '{node_name}': {e}")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Clean-break v2.0-alpha (2026-05-12): _RENAME_ALIASES dict removed. No
@@ -409,10 +458,11 @@ for node_name, (module_path, class_name, display_name) in _NODE_MODULES.items():
 
 _loaded = sum(1 for k in NODE_CLASS_MAPPINGS if k.startswith("OTR_"))
 _total = len(_NODE_MODULES)
-if _loaded == _total:
-    print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
-else:
-    print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
+if _otr_dup is None:
+    if _loaded == _total:
+        print(f"[OldTimeRadio] OK - All {_total} nodes loaded successfully")
+    else:
+        print(f"[OldTimeRadio] Loaded {_loaded}/{_total} nodes ({_total - _loaded} failed)")
 # A first-time user has a menu full of nodes and no idea the episode graph
 # exists. Registering
 # nodes is not the deliverable -- the workflow is. Point at it from the one place
@@ -451,12 +501,13 @@ else:
 # comfyui-old-time-radio on a Manager install and ComfyUI-OldTimeRadio on a git
 # clone. Print the one this install will actually show.
 _pack_folder = os.path.basename(os.path.dirname(os.path.abspath(__file__)))
-print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
-      f"EXTENSIONS > {_pack_folder} > otr_canonical  (the only one "
-      "the gallery lists -- pick it, then Queue Prompt) -- or drag "
-      "workflows/otr_canonical.json onto the canvas. Nothing needs changing: "
-      "it resolves your device at run time. The finished episode lands in "
-      "<output>/otr/obs/.")
+if _otr_dup is None:
+    print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
+          f"EXTENSIONS > {_pack_folder} > otr_canonical  (the only one "
+          "the gallery lists -- pick it, then Queue Prompt) -- or drag "
+          "workflows/otr_canonical.json onto the canvas. Nothing needs changing: "
+          "it resolves your device at run time. The finished episode lands in "
+          "<output>/otr/obs/.")
 
 # =====================================================================
 # HTTP route: GET /otr/latest_ledger
@@ -465,8 +516,16 @@ print("[OldTimeRadio] Load the show:  Workflow > Browse Templates > "
 # HTTP server. Lets the live-run-tail Cowork artifact poll a single URL
 # without needing Desktop Commander or any MCP transport.
 # Wrapped in try/except so a server import failure cannot break node load.
+# A single-folder install (first time or a later update) always enters
+# this try: _otr_dup is None. Only a second custom_nodes folder skips.
 # =====================================================================
+class _OTRDuplicateRoute(Exception):
+    """Internal: extra pack folder; do not decorate GET /otr/latest_ledger."""
+
+
 try:
+    if _otr_dup is not None:
+        raise _OTRDuplicateRoute()
     import json as _otr_json
     import os as _otr_os
     from server import PromptServer as _otr_PromptServer  # type: ignore
@@ -586,6 +645,8 @@ try:
         return _otr_web.Response(status=204, headers=_OTR_CORS_HEADERS)
 
     print("[OldTimeRadio] HTTP route registered: GET /otr/latest_ledger (with CORS)")
+except _OTRDuplicateRoute:
+    print("[OldTimeRadio] HTTP route skipped (duplicate pack folder)")
 except Exception as _otr_route_err:
     print(f"[OldTimeRadio] HTTP route registration skipped: {_otr_route_err}")
 
