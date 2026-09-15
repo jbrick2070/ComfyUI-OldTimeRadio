@@ -790,12 +790,20 @@ def fit_frames_to_target(frames, target_frame_count):
 def _bt709_encode_args(crf):
     """The shared silent-clip encode tail: H.264, yuv420p, bt709, NO audio
     (V-1). One definition so every builder emits the identical CanonicalClip
-    colour contract."""
+    colour contract.
+
+    ``-pix_fmt yuv420p`` alone does NOT force that pixel format: a JPEG-range
+    input (``yuvj420p`` / ``color_range=pc``, typical of Vidu Q2) makes
+    libx264 keep ``yuvj420p`` even with the pix_fmt flag, and
+    ``validate_silent_clip_contract`` then refuses the assembled beat.
+    ``-color_range tv`` is the missing half of the pin.
+    """
     return [
         "-an",                                     # V-1: only the mux adds audio
         "-c:v", "libx264", "-crf", str(int(crf)), "-pix_fmt", PIX_FMT,
         "-color_primaries", COLOR_PRIMARIES, "-color_trc", COLOR_PRIMARIES,
-        "-colorspace", COLOR_PRIMARIES, "-movflags", "+faststart",
+        "-colorspace", COLOR_PRIMARIES, "-color_range", "tv",
+        "-movflags", "+faststart",
     ]
 
 

@@ -123,7 +123,7 @@ def canonical_clip_frame_count(asset: CanonicalAsset) -> int:
 
 
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).
-CANONICALIZER_VERSION = 3
+CANONICALIZER_VERSION = 4
 
 #: RESOLVED (cloud-audio S0/C8, 2026-07-03): the local lane's real loudness
 #: handling is scene_sequencer's per-segment RMS leveling (NOT a LUFS
@@ -432,7 +432,11 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
       shipped rows -- master audio is frozen upstream, mux is LAST), with a
       POST-STRIP PROOF (re-probe: zero audio streams) recorded on the asset;
     - role canvas (fit + pad, never distort) + role fps + h264/yuv420p/bt709
-      mp4 (the CanonicalClip container contract every local engine ships);
+      mp4 (the CanonicalClip container contract every local engine ships).
+      Provider JPEG-range clips (``yuvj420p`` / ``color_range=pc``) are
+      encoded ``-pix_fmt yuv420p -color_range tv``; ``format=yuv420p`` in
+      the filtergraph is not enough -- libx264 then keeps ``yuvj420p`` and
+      beat assembly's silent-clip contract refuses the concat;
     - ``actual_duration_s`` measured from the OUTPUT (named error when the
       provider clip carries no duration);
     - sha256 of the canonical bytes.
@@ -492,8 +496,10 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     if target_frames > 0:
         cmd.extend(["-frames:v", str(target_frames)])
     cmd.extend(["-c:v", "libx264", "-preset", "medium", "-crf", "18",
+                "-pix_fmt", "yuv420p",
                 "-colorspace", "bt709", "-color_primaries", "bt709",
-                "-color_trc", "bt709", "-movflags", "+faststart",
+                "-color_trc", "bt709", "-color_range", "tv",
+                "-movflags", "+faststart",
                 str(out_path)])
     try:
         res = otr_proc.run(cmd, capture_output=True, text=True, timeout=600)
@@ -519,6 +525,11 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
         warnings = (f"provider audio stripped ({len(probe['audio'])} "
                     f"stream(s); strip proof: 0 in output)",)
     v0 = (post.get("video") or [{}])[0]
+    got_fmt = v0.get("pix_fmt")
+    if got_fmt != "yuv420p":
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"canonical {out_path} pix_fmt={got_fmt!r}, expected 'yuv420p'")
     counted = None
     raw_nb = v0.get("nb_frames")
     try:

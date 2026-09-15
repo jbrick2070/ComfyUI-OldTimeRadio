@@ -557,6 +557,8 @@ def test_canonicalize_video_strips_audio_and_conforms(tmp_path):
          str(asset.path)], capture_output=True, text=True, timeout=60)
     streams = json.loads(probe.stdout)["streams"]
     assert all(s["codec_type"] != "audio" for s in streams)
+    assert all(s.get("pix_fmt") == "yuv420p"
+               for s in streams if s.get("codec_type") == "video")
 
 
 @pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
@@ -662,6 +664,38 @@ def test_canonicalize_video_caps_fps_resample_surplus_to_the_plan(tmp_path):
     assert asset.frame_count == 25
     assert _nb_frames(asset.path) == 25
     assert abs(float(asset.duration_s) - 1.0) < 1e-6
+
+
+def _pix_fmt(path: Path) -> str:
+    probe = subprocess.run(
+        ["ffprobe", "-v", "error", "-select_streams", "v:0",
+         "-show_entries", "stream=pix_fmt", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, timeout=60)
+    assert probe.returncode == 0, probe.stderr
+    return probe.stdout.strip().splitlines()[-1]
+
+
+def _make_yuvj_fixture(tmp_path) -> Path:
+    """JPEG-range provider clip -- Vidu Q2's live shape."""
+    out = tmp_path / "provider_yuvj.mp4"
+    cmd = [
+        _FFMPEG, "-v", "error", "-y",
+        "-f", "lavfi", "-i", "testsrc=size=128x72:rate=25:duration=1",
+        "-an", "-c:v", "libx264", "-pix_fmt", "yuvj420p", str(out),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    return out
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_canonicalize_video_converts_yuvj420p_to_yuv420p(tmp_path):
+    src = _make_yuvj_fixture(tmp_path)
+    assert _pix_fmt(src) == "yuvj420p"
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "job-yuvj",
+           "raw_meta": {}}
+    asset = canonicalize_video(raw, {"w": 320, "h": 192, "fps": 25})
+    assert _pix_fmt(asset.path) == "yuv420p"
 
 
 def test_vidu_canonicalize_forwards_the_plan_length(tmp_path, monkeypatch):

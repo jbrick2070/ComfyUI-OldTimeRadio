@@ -185,8 +185,18 @@ def test_ffmpeg_silent_cmd_contract():
     assert "-an" in cmd                                  # V-1 no audio
     pix_vals = [cmd[k + 1] for k, v in enumerate(cmd) if v == "-pix_fmt"]
     assert pix_vals == ["rgb24", "yuv420p"]              # input raw rgb24, out yuv420p
+    assert cmd[cmd.index("-color_range") + 1] == "tv"
     assert "bt709" in cmd and cmd[-1] == "o.mp4"
     assert "832x480" in " ".join(cmd)
+
+
+def test_concat_cmd_pins_limited_range_yuv420p():
+    """Beat assembly re-encodes through this tail. Missing -color_range tv
+    is the live cheap-cloud 1-act failure: Vidu JPEG-range in, yuvj420p out,
+    silent-clip contract refuse."""
+    cmd = wb.ffmpeg_concat_segments_cmd([("a.mp4", 0, 5)], "out.mp4")
+    assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+    assert cmd[cmd.index("-color_range") + 1] == "tv"
 
 
 def test_the_declared_size_is_the_PIPED_size_never_rounded():
@@ -255,6 +265,23 @@ def test_encode_frames_roundtrip(tmp_path):
          "-show_entries", "stream=index", "-of", "csv=p=0", str(out)],
         capture_output=True, text=True)
     assert a.stdout.strip() == ""                        # V-1: silent clip
+
+
+@pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),
+                    reason="ffmpeg/ffprobe not on PATH")
+def test_concat_yuvj_segments_emits_yuv420p(tmp_path):
+    src = tmp_path / "yuvj.mp4"
+    subprocess.run(
+        ["ffmpeg", "-v", "error", "-y",
+         "-f", "lavfi", "-i", "testsrc=size=128x72:rate=25:duration=1",
+         "-an", "-c:v", "libx264", "-pix_fmt", "yuvj420p", str(src)],
+        check=True, capture_output=True, timeout=120)
+    assert "yuvj420p" in _probe(src, "pix_fmt")
+    out = tmp_path / "assembled.mp4"
+    wb.run_ffmpeg(wb.ffmpeg_concat_segments_cmd([(str(src), 0, 10)], str(out)))
+    fields = _probe(out, "pix_fmt")
+    assert "yuv420p" in fields
+    assert "yuvj420p" not in fields
 
 
 @pytest.mark.skipif(not (_HAS_FFMPEG and _HAS_FFPROBE),

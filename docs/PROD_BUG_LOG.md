@@ -15222,3 +15222,40 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   export the next boot has to remember.
 - confidence: HIGH (first prompt 0.15 s ConfigError; second prompt with
   env fallback wrote the Rainbow Bowl script).
+
+## PBUG-20260915-03 -- Vidu JPEG-range clip assembled as yuvj420p, silent-clip contract refused
+- surfaced: LIVE cheap-cloud 1-act on headless `--cpu` `:8000`, 2026-09-15
+  00:29, graph `otr_cloud_low_1act`, prompt
+  `b3fe1522-7328-4e28-b7b9-809cc2a9580a`, episode
+  `signal_lost_the_ledger_page_that_fluttered_to_the_fl_20260915_002020`.
+  Writer Grok, ElevenLabs, Luma stills, and Vidu Q2 Pro Fast all ran
+  (paid). Died at beat assembly. No obs publish. `Prompt executed in
+  00:12:27`.
+- symptom: `GraphExecutionError: silent-clip contract: pix_fmt='yuvj420p',
+  expected 'yuv420p'` at `assemble_beat_segments` /
+  `validate_silent_clip_contract`. Node 92 `OTR_VideoRenderBatch`.
+- root cause: `canonicalize_video` vf `format=yuv420p` does not pin the
+  encoder. Vidu delivers JPEG-range (`yuvj420p` / `color_range=pc`).
+  libx264 then keeps `yuvj420p` even through beat concat's
+  `_bt709_encode_args`, which already had `-pix_fmt yuv420p` but not
+  `-color_range tv`. Measured: those two flags together emit `yuv420p`;
+  pix_fmt alone does not.
+- fix: **FIXED in the same change as this entry.** Canonicalize encode
+  adds `-pix_fmt yuv420p -color_range tv` and fail-closes if the output
+  is not `yuv420p`. Shared `_bt709_encode_args` (concat / silent / still
+  / floor) gets the same range pin so a JPEG-range segment cannot leak
+  through assembly. `CANONICALIZER_VERSION = 4`. Blast radius: cloud
+  video canonicalize plus every local silent encode tail (tag only;
+  local rgb24/yuv420p engines already met pix_fmt). GPU `:8188` 16 GB
+  legs already in flight keep the old imported module until that
+  process restarts.
+- verify idea: `test_canonicalize_video_converts_yuvj420p_to_yuv420p`,
+  `test_concat_cmd_pins_limited_range_yuv420p`,
+  `test_concat_yuvj_segments_emits_yuv420p`. Live proof is a new
+  cheap-cloud 1-act mp4 in Documents `otr/obs` (not the MCP smoke, not
+  `the_count_of_three_*`) plus `obs_publish OK` on the CPU server log.
+- bible-worthy: yes -- a CanonicalClip encoder that claims yuv420p
+  while ffmpeg reports yuvj420p is an overstated color contract, same
+  family as an overstated frame cap.
+- confidence: HIGH (live GraphExecutionError + local ffmpeg repro of
+  yuvj in / yuvj out without `-color_range tv`, yuv420p with it).
