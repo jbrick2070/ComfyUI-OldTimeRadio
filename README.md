@@ -447,7 +447,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | mime | _not built_ | | | | | | | |
 | **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
-### AMD ROCm (one receipt: RDNA4 / Linux / still tier, 2026-09-14)
+### AMD ROCm (experimental -- no receipts)
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
@@ -468,6 +468,15 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | foley | _not built_ | | | | | | | |
 | mime | _not built_ | | | | | | | |
 | animatediff | _not built_ | | | | | | | |
+
+### Comfy Cloud (opt-in easter egg; needs OTR_COMFY_API_KEY)
+
+| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
+|---|---|---|---|---|---|---|---|---|
+| **low_1act** | `otr_cloud_low_1act` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low** | `otr_cloud_low` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low_7act** | `otr_cloud_low_7act` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_7act** | `otr_cloud_deluxe_7act` | openrouter:slot-a | none | cloud_wan_i2v_audio | cloud_luma_photon_flash | manual | nothing | shipping |
 <!-- END GENERATED: tier-matrix -->
 
 Weights marked **auto** download themselves the first time you queue;

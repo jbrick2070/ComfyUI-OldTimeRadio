@@ -33,6 +33,7 @@ import sys
 import pytest
 
 from nodes import _otr_workflow_apply as wa
+from nodes.otr_video_director import exact_menu_option_for
 from nodes._otr_shared import capability_profiles as cp
 from nodes._otr_shared.capability_profiles import ProfileError
 
@@ -160,12 +161,22 @@ def test_apply_8gb_lite_lands_its_overrides(schemas, master_copy, mapping):
         for node_type, widget in mapping["managed"][dotted]["targets"]:
             slots = wa.serialized_slot_names(node_type, schemas)
             node = nodes_by_type[node_type]
-            assert node["widgets_values"][slots.index(widget)] == value, (dotted, node_type)
+            expected = value
+            if (node_type == "OTR_VideoDirector"
+                    and widget in wa._VIDEO_DIRECTOR_WIDGETS):
+                expected = exact_menu_option_for(value)
+            assert node["widgets_values"][slots.index(widget)] == expected, (
+                dotted, node_type)
 
 
 def _widget_value(nodes_by_type, schemas, node_type, widget):
     slots = wa.serialized_slot_names(node_type, schemas)
     return nodes_by_type[node_type]["widgets_values"][slots.index(widget)]
+
+
+def _director_video_label(internal_id):
+    """Live VideoDirector combo string for a registered engine."""
+    return exact_menu_option_for(internal_id)
 
 
 def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
@@ -202,13 +213,104 @@ def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
     ):
         assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", widget
-        ) == "cloud_wan_i2v_audio"
+        ) == _director_video_label("cloud_wan_i2v_audio")
     for widget in (
         "announcer_image_model", "music_image_model", "character_image_model",
     ):
         assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", widget
         ) == "cloud_nano_banana_2"
+
+
+def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_copy):
+    """Paid axis is act_count. All three cheap cloud-low graphs share
+    Grok 4.20 on Comfy Credits plus Vidu Q2 Pro Fast 720p (mute) and the
+    cheapest partner stack so credits scale with length, not model.
+    Deluxe/riches stays Wan audio-in and is not this test."""
+    expected_acts = {
+        "otr_cloud_low_1act": "1",
+        "otr_cloud_low": "3",
+        "otr_cloud_low_7act": "7",
+    }
+    for pid, acts in expected_acts.items():
+        applied = wa.apply_profile(master_copy, pid, schemas=schemas)
+        nodes_by_type = {n["type"]: n for n in applied["nodes"]}
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter", "act_count"
+        ) == acts, pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+            "creative_writing_model"
+        ) == "comfy:slot-a", pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+            "technical_model"
+        ) == "comfy:slot-b", pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+            "comfy_slot_a_model"
+        ) == "x-ai/grok-4.20", pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+            "comfy_slot_b_model"
+        ) == "x-ai/grok-4.20", pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
+        ) == "elevenlabs"
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
+        ) == "sonilo"
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
+        ) == "cloud_vidu_q2_pro_fast_720p"
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
+        ) == "cloud_luma_photon_flash"
+        for widget in (
+            "announcer_video_model", "music_video_model", "character_video_model",
+        ):
+            assert _widget_value(
+                nodes_by_type, schemas, "OTR_VideoDirector", widget
+            ) == _director_video_label("cloud_vidu_q2_pro_fast_720p"), (
+                pid, widget)
+
+
+def test_apply_otr_cloud_deluxe_7act_is_chatgpt_and_wan_audio_in(
+        schemas, master_copy):
+    """Riches SKU: OpenRouter ChatGPT writer, Wan I2V with audio-in."""
+    applied = wa.apply_profile(
+        master_copy, "otr_cloud_deluxe_7act", schemas=schemas)
+    nodes_by_type = {n["type"]: n for n in applied["nodes"]}
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter", "act_count"
+    ) == "7"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "creative_writing_model"
+    ) == "openrouter:slot-a"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter", "technical_model"
+    ) == "openrouter:slot-b"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "openrouter_slot_a_model"
+    ) == "~openai/gpt-latest"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "openrouter_slot_b_model"
+    ) == "~openai/gpt-latest"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
+    ) == "cloud_wan_i2v_audio"
+    for widget in (
+        "announcer_video_model", "music_video_model", "character_video_model",
+    ):
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoDirector", widget
+        ) == _director_video_label("cloud_wan_i2v_audio"), widget
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
+    ) == "cloud_luma_photon_flash"
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):

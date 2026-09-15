@@ -184,6 +184,14 @@ six dropdowns by hand:
 | 16 GB+ NVIDIA | `variants/otr_16gb_video.json` | `ltx25_high_video` |
 | Mac 16 GB | `variants/otr_mac16_video.json` | `ltx098_low_video` |
 | CPU only | `variants/otr_cpu_low.json` | the visualizers |
+| Comfy Cloud (cheap, 1/3/7-act) | `variants/otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
+| Comfy Cloud (deluxe, audio-in) | `variants/otr_cloud_deluxe_7act.json` | `cloud_wan_i2v_audio` |
+
+**The pack default is the three viz lanes on `otr_canonical.json`.** That is the GPU-friendly first run: no video weights, no Comfy credits. Local machine graphs keep the local lane in the table above.
+
+**On the Comfy Cloud graphs, Vidu is the saved default** -- all three VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **The deluxe exception is `otr_cloud_deluxe_7act`**, which pins `cloud_wan_i2v_audio` instead (audio-in Wan, not Vidu, not Seedance).
+
+On any other graph the same Vidu combo is in the dropdown if you want to spend credits. Pick is the enable; without `OTR_COMFY_API_KEY` (or a signed-in Comfy session) the render stops and says so.
 
 Choosing by hand instead, the short version: **on 8 GB, start at
 `ltx098_low_video`** -- it is what the 8 GB graph ships and the safe local

@@ -203,10 +203,8 @@ class Outline(BaseModel):
     premise: str = Field(..., min_length=1)
     setting: str = Field(..., min_length=1)
     time_of_day: str = Field(..., min_length=1)
-    # Phase 2A (2026-05-11) raised max from 24 -> 32 so 6- and 7-act
-    # outlines (synthesis §3 Phase 2A beat-count table) still fit
-    # within the schema cap with music_inter beats.
-    beats: list[Beat] = Field(..., min_length=1, max_length=32)
+    # 7-act is 5*7+1 = 36 beats with act breaks on. 8-act (41) stays refused.
+    beats: list[Beat] = Field(..., min_length=1, max_length=36)
 
     # Story-spine Stream A (2026-05-31): arc gate. central_tension rides
     # the Stage-1 _MacroShape LLM call; turning_point + button are
@@ -541,7 +539,7 @@ Schema:
   "premise":     non-empty string,
   "setting":     non-empty string,
   "time_of_day": non-empty string,
-  "beats":       array 1-32 of Beat objects:
+  "beats":       array 1-36 of Beat objects:
                  {
                    "beat_id":      "b001", "b002", ... monotonic,
                    "speaker":      exact name from Cast, or "NARRATOR" for music beats,

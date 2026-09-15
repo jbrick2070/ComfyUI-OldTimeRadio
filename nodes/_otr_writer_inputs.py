@@ -113,11 +113,9 @@ def _resolve_creativity(creativity: str) -> tuple[float, float]:
 #: It is NOT derived from anything -- deriving it is what was removed.
 _DEFAULT_ACT_COUNT: int = 3
 
-#: Operator-facing act choices. Explicit 1..6 (narrowed from 1..8,
-#: PBUG-20260825-01 -- 7 and 8 always overflowed Outline.beats' own
-#: max_length=32); there is deliberately no 'auto' option, because 'auto'
-#: meant "derive from target_words". DERIVED from MIN/MAX_ACT_COUNT, not a
-#: second hardcoded range -- the two stay in lockstep by construction.
+#: Operator-facing act choices. Explicit 1..7 (7-act is a paid-length
+#: cloud UI; Outline.beats max_length=36 fits 5*7+1. 8-act stays refused).
+#: DERIVED from MIN/MAX_ACT_COUNT, not a second hardcoded range.
 _ACT_COUNT_CHOICES: list[str] = [
     str(n) for n in range(_OTRB.MIN_ACT_COUNT, _OTRB.MAX_ACT_COUNT + 1)
 ]

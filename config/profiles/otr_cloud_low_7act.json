@@ -1,6 +1,6 @@
 {
-  "id": "otr_cloud_low",
-  "display_name": "Comfy Cloud 3-act -- Grok 4.20 writer (Comfy Credits dropdown), cheapest partners (ElevenLabs, Sonilo, Luma Flash, Vidu Q2 Pro Fast I2V). Length is what credits buy. Needs OTR_COMFY_API_KEY.",
+  "id": "otr_cloud_low_7act",
+  "display_name": "Comfy Cloud 7-act -- Grok 4.20 writer (Comfy Credits dropdown), same cheapest partners as the 1-act trial and 3-act graphs (Vidu Q2 Pro Fast I2V). Long paid-length episode. Needs OTR_COMFY_API_KEY.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cpu",
@@ -26,7 +26,7 @@
   "features": {
     "burn_captions": true,
     "caption_style": "sdh_standard",
-    "act_count": "3",
+    "act_count": "7",
     "num_characters": 3
   },
   "seed_policy": {

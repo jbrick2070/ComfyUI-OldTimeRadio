@@ -79,16 +79,10 @@ class TestComputeEpisodeBudget:
         with pytest.raises(InvalidEpisodeBudgetError):
             compute_episode_budget(MAX_ACT_COUNT + 1, True, 2)
 
-    def test_seven_and_eight_acts_are_rejected_again(self):
-        # The ceiling moved 7 -> 8 on 2026-08-14, making this test assert
-        # 8 was IN range; it moved back to 6 on 2026-08-25
-        # (PBUG-20260825-01) -- 7 and 8 were reachable through this check
-        # but guaranteed to fail three frames later at Outline construction
-        # (Outline.beats' own max_length=32 only fits act_count<=6). Both
-        # values are OUT of range again, same as the original pre-08-14
-        # ceiling, for an unrelated reason this time.
-        with pytest.raises(InvalidEpisodeBudgetError):
-            compute_episode_budget(7, True, 2)
+    def test_seven_acts_fit_the_outline_cap_eight_still_refused(self):
+        eb = compute_episode_budget(7, True, 2)
+        assert eb.act_count == 7
+        assert sum(eb.per_phase_beats) + eb.music_inter_count + eb.announcer_beats == 36
         with pytest.raises(InvalidEpisodeBudgetError):
             compute_episode_budget(8, True, 2)
 
@@ -158,7 +152,7 @@ class TestActCountConfigSanity:
 
 
 # ---------------------------------------------------------------------------
-# Outline schema -- arc_phase field + 32-beat cap
+# Outline schema -- arc_phase field + 36-beat cap (7-act)
 # ---------------------------------------------------------------------------
 
 
@@ -201,8 +195,8 @@ class TestOutlineSchemaChanges:
         b = Beat(**_ok_beat("b001", phase="setup"))
         assert b.arc_phase == "setup"
 
-    def test_outline_accepts_32_beats(self):
-        beats = [_ok_beat(f"b{i:03d}") for i in range(1, 33)]
+    def test_outline_accepts_36_beats(self):
+        beats = [_ok_beat(f"b{i:03d}") for i in range(1, 37)]
         Outline.model_validate({
             "title": "Test",
             "premise": "A test premise of sufficient length.",
@@ -211,8 +205,8 @@ class TestOutlineSchemaChanges:
             "beats": beats,
         })  # should not raise
 
-    def test_outline_rejects_33_beats(self):
-        beats = [_ok_beat(f"b{i:03d}") for i in range(1, 34)]
+    def test_outline_rejects_37_beats(self):
+        beats = [_ok_beat(f"b{i:03d}") for i in range(1, 38)]
         from pydantic import ValidationError
         with pytest.raises(ValidationError):
             Outline.model_validate({

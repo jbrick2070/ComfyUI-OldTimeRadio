@@ -1,6 +1,6 @@
 {
-  "id": "otr_cloud_low",
-  "display_name": "Comfy Cloud 3-act -- Grok 4.20 writer (Comfy Credits dropdown), cheapest partners (ElevenLabs, Sonilo, Luma Flash, Vidu Q2 Pro Fast I2V). Length is what credits buy. Needs OTR_COMFY_API_KEY.",
+  "id": "otr_cloud_deluxe_7act",
+  "display_name": "Comfy Cloud 7-act deluxe -- OpenRouter ChatGPT writer, Wan I2V with audio-in (the live dropdown row cloud_wan_i2v_audio). Needs OPENROUTER_API_KEY and OTR_COMFY_API_KEY.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cpu",
@@ -8,9 +8,9 @@
   "toolchains": [],
   "allow_sidecars": false,
   "role_overrides": {
-    "announcer_visual": "cloud_vidu_q2_pro_fast_720p",
-    "music_visual": "cloud_vidu_q2_pro_fast_720p",
-    "character_visual": "cloud_vidu_q2_pro_fast_720p",
+    "announcer_visual": "cloud_wan_i2v_audio",
+    "music_visual": "cloud_wan_i2v_audio",
+    "character_visual": "cloud_wan_i2v_audio",
     "announcer_image": "cloud_luma_photon_flash",
     "music_image": "cloud_luma_photon_flash",
     "character_image": "cloud_luma_photon_flash"
@@ -21,12 +21,12 @@
     "char_voice_engine": "elevenlabs",
     "announcer_voice_engine": "elevenlabs",
     "music_engine": "sonilo",
-    "video_render_engine": "cloud_vidu_q2_pro_fast_720p"
+    "video_render_engine": "cloud_wan_i2v_audio"
   },
   "features": {
     "burn_captions": true,
     "caption_style": "sdh_standard",
-    "act_count": "3",
+    "act_count": "7",
     "num_characters": 3
   },
   "seed_policy": {
@@ -42,12 +42,12 @@
     "vram_ceiling_gb": 0,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",
-    "creative_model": "comfy:slot-a",
-    "technical_model": "comfy:slot-b",
-    "openrouter_slot_a_model": "(enable OpenRouter)",
-    "openrouter_slot_b_model": "(enable OpenRouter)",
-    "comfy_slot_a_model": "x-ai/grok-4.20",
-    "comfy_slot_b_model": "x-ai/grok-4.20",
+    "creative_model": "openrouter:slot-a",
+    "technical_model": "openrouter:slot-b",
+    "openrouter_slot_a_model": "~openai/gpt-latest",
+    "openrouter_slot_b_model": "~openai/gpt-latest",
+    "comfy_slot_a_model": "(enable Comfy Credits)",
+    "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
     "lane_allowlist": [
@@ -80,14 +80,12 @@
   },
   "preflight": {
     "required_models": [],
-    "required_keys": ["OTR_COMFY_API_KEY"]
+    "required_keys": ["OPENROUTER_API_KEY", "OTR_COMFY_API_KEY"]
   },
   "launch": {
     "boot_contract": "cpu",
     "sage_attention": false,
     "extra_args": [],
-    "env": {
-      "OTR_ENABLE_COMFY_CREDITS": "1"
-    }
+    "env": {}
   }
 }

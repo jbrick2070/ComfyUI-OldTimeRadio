@@ -76,12 +76,36 @@ def test_semantic_hash_ignores_creative_flags_managed(canonical, schemas,
 # ---------------------------------------------------------------------------
 
 def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
-    # Ratified 2026-07-10 morning: 16gb_full (baseline regen) + otr_mac_mps
-    # (ceiling 10.0) emit now; the cloud tier stays gated on its OpenRouter
-    # slot pins -- the ONE live example of the refusal contract.
+    # Lab cloud_lanes stays gated. The four shipping cloud SKUs
+    # (low_1act / low / low_7act / deluxe_7act) are not this contract.
     with pytest.raises(bv.EmitRefused, match="UNRATIFIED"):
         bv.build_variant("otr_cloud_lanes", schemas=schemas, mapping=mapping,
                          canonical=canonical)
+
+
+@pytest.mark.parametrize("profile_id", [
+    "otr_cloud_low_1act",
+    "otr_cloud_low",
+    "otr_cloud_low_7act",
+    "otr_cloud_deluxe_7act",
+])
+def test_build_variant_emits_shipping_cloud_skus(
+        profile_id, canonical, schemas, mapping):
+    variant, rel, recipe = bv.build_variant(
+        profile_id, schemas=schemas, mapping=mapping, canonical=canonical)
+    assert rel == f"workflows/variants/{profile_id}.json"
+    vnode = next(n for n in variant["nodes"]
+                 if n["type"] == "OTR_WorkflowValidator")
+    assert value(vnode, "profile_id") == profile_id
+    from nodes.otr_video_director import exact_menu_option_for
+    director = next(n for n in variant["nodes"]
+                    if n["type"] == "OTR_VideoDirector")
+    engine = ("cloud_wan_i2v_audio" if profile_id.endswith("deluxe_7act")
+              else "cloud_vidu_q2_pro_fast_720p")
+    label = exact_menu_option_for(engine)
+    assert value(director, "announcer_video_model") == label
+    assert value(director, "character_video_model") == label
+    assert "OTR_COMFY_API_KEY" in recipe
 
 
 def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,

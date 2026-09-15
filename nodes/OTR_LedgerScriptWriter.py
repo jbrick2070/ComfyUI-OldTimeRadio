@@ -10,7 +10,7 @@ Pipeline (unchanged from v2.0 LPL):
          _otr_style_catalog.build_story_contract(), made once cast_seed
          and script_brief both exist (style-engine consolidation,
          2026-07-05). No widget, no LLM picker.
-       - act_count from widget (1-6, PBUG-20260825-01); episode length is an observation
+       - act_count from widget (1-7; 8 still refused)
          target_length presets ("30 words", "tiny"). Words are the
          single canonical length unit for story writing; seconds is
          only computed post-hoc for the est_minutes output socket.
@@ -76,7 +76,7 @@ Widget surface (current as of 2026-05-23):
         custom_premise    STRING  (RSS override; empty triggers feed fetch)
         include_act_breaks BOOLEAN (True -> outline LLM plans music_inter
                                     beats between acts; False -> continuous)
-        act_count         combo   ('1'-'6' -- THE one length-shaped knob;
+        act_count         combo   ('1'-'7' -- THE one length-shaped knob;
                                    always honoured, never derived)
         creativity        combo   (maps to temperature + top_p preset)
         min_p             FLOAT   (sampling tail cut; 0.0 disables)
@@ -2356,7 +2356,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     {
                         "default": str(_DEFAULT_ACT_COUNT),
                         "tooltip": (
-                            "Number of acts, 1-6. This is the only knob "
+                            "Number of acts, 1-7. This is the only knob "
                             "that shapes episode length, and your pick "
                             "is always honoured.\n\n"
                             "More acts means a story with more turns in "
@@ -2364,10 +2364,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "and its own pass. The episode ends up as "
                             "long as the story needs; length is reported "
                             "afterwards, never requested up front.\n\n"
-                            "  1 -> a single scene\n"
+                            "  1 -> a single scene (trial length)\n"
                             "  2 -> setup, resolution\n"
                             "  3 -> setup, complication, resolution\n"
-                            "  6 -> the full arc, through crisis and climax"
+                            "  7 -> the full arc, through crisis and climax"
                         ),
                     },
                 ),
@@ -2393,12 +2393,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # and the range grew from 1-7 to 1-8. Whatever is picked
                 # here is honoured: there is no derived floor or ceiling
                 # that can refuse it.
-                # NARROWED 1-8 -> 1-6 (PBUG-20260825-01, operator decision,
-                # 2026-08-25): 7 and 8 were reachable but mathematically
-                # guaranteed to fail at Outline construction (36/41 beats
-                # against Outline.beats' own max_length=32) -- not a
-                # "refuse it" ceiling, a bound the schema already had that
-                # this range simply now agrees with.
+                # 7-act is admitted (Outline.beats max_length=36).
+                # 8-act stays refused (41 beats).
                 "num_characters": ("INT", {
                     "default": 2, "min": 1, "max": _FABLE2_MAX_CAST, "step": 1,
                     "tooltip": (
@@ -2677,10 +2673,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "'comfy:slot-a' handle (the creative slot). "
                             "Passive: only used when creative_writing_model "
                             "is set to 'comfy:slot-a'. Choices are the pinned "
-                            "ComfyUI partner-node catalog; shows '(enable "
-                            "Comfy Credits)' until OTR_ENABLE_COMFY_CREDITS=1 "
-                            "and a Comfy account with credits is logged in. "
-                            "Credit-billed. See "
+                            "ComfyUI partner-node catalog (Grok 4.20 is "
+                            "always listed so a saved cloud graph loads). "
+                            "The enable-sentinel remains choices[0]. "
+                            "Credit-billed at generate() when a Comfy "
+                            "API key is present. See "
                             "https://github.com/jbrick2070/"
                             "ComfyUI-OldTimeRadio/blob/main/docs/"
                             "comfy-credits-setup.md."
@@ -2696,9 +2693,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "'comfy:slot-b' handle (the technical slot). "
                             "Passive: only used when technical_model is set "
                             "to 'comfy:slot-b'. Choices are the pinned "
-                            "ComfyUI partner-node catalog; shows '(enable "
-                            "Comfy Credits)' until the lane is enabled. "
-                            "Credit-billed. See "
+                            "ComfyUI partner-node catalog (Grok 4.20 is "
+                            "always listed so a saved cloud graph loads). "
+                            "The enable-sentinel remains choices[0]. "
+                            "Credit-billed at generate() when a Comfy "
+                            "API key is present. See "
                             "https://github.com/jbrick2070/"
                             "ComfyUI-OldTimeRadio/blob/main/docs/"
                             "comfy-credits-setup.md."

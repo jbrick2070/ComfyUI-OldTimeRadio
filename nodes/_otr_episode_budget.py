@@ -81,19 +81,13 @@ class InvalidEpisodeBudgetError(ValueError):
 #: outside, which made a word total able to refuse an act choice. That was a
 #: word-count veto in a project whose law says word targets are advisory.
 #:
-#: MAX_ACT_COUNT LOWERED 8 -> 6 (PBUG-20260825-01, operator decision). The
-#: outline topology is `5*act_count + 1` total beats (4 voiced beats/act +
-#: 2 announcer + `act_count-1` music-interstitial, with `include_act_breaks`
-#: defaulting True end to end) against `Outline.beats`'s own hard
-#: `max_length=32` in `_otr_outline.py` -- which only 1..6 ever satisfy. 7
-#: and 8 were reachable through this range check but GUARANTEED to fail
-#: three call-frames later at `Outline` construction (36 and 41 beats
-#: respectively); reproduced live on two banks the same night this was
-#: found. Confirmed before lowering: the canonical workflow and every
-#: variant have `act_count` saved as `'3'` (the default), never `'7'` or
-#: `'8'`, so no saved graph goes invalid.
+#: MAX_ACT_COUNT is 7 (2026-09-14). PBUG-20260825-01 had lowered it 8 -> 6
+#: because Outline.beats max_length=32 only fit 1..6 (5*act_count+1 beats).
+#: 7-act is back as a paid-length cloud UI; the outline cap moves with it to
+#: 36. 8-act stays refused (41 beats). Widget choices derive from this
+#: constant, so the dropdown and the schema stay in lockstep.
 MIN_ACT_COUNT: int = 1
-MAX_ACT_COUNT: int = 6
+MAX_ACT_COUNT: int = 7
 
 
 # ---------------------------------------------------------------------------
@@ -150,11 +144,12 @@ ACT_COUNT_CONFIG: dict[int, dict] = {
         "arc_phases":            ("setup", "catalyst", "rising_action",
                                   "complication", "climax", "resolution"),
     },
+    7: {
+        "arc_phases":            ("setup", "catalyst", "rising_action",
+                                  "complication", "crisis", "climax",
+                                  "resolution"),
+    },
 }
-# 7 and 8 REMOVED (PBUG-20260825-01, same change that lowered MAX_ACT_COUNT):
-# both were unreachable dead entries the moment the range check above stops
-# admitting them, and leaving them in this table would read as "still a
-# valid choice" to the next person scanning it.
 
 # `voiced_beats_per_act` is DERIVED, not authored: one entry per arc phase,
 # every entry BEATS_PER_ACT. Derived rather than typed out so the two can

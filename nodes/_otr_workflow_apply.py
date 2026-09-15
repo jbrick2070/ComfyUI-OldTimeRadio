@@ -571,38 +571,26 @@ def _flatten_profile_values(profile: dict) -> dict:
 
 
 def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
-    """For an OTR_VideoDirector role widget selecting one of the four PUBLIC-aliased
-    tier engines, write the EXACT live menu option (the public label) -- so a
-    generated variant stores what the UI would save and round-trips (e.g. profile
-    ``wan_ti2v`` -> ``'wan_8gb (16:9)'``). Video-tiers (2026-07-20), boundary 5.
+    """Write the EXACT live menu option for an OTR_VideoDirector video-role
+    widget so a generated variant stores what the UI would save.
 
-    SCOPED to the four renamed tier engines (``_INTERNAL_TO_PUBLIC``): their id
-    CHANGED, so a stored bare internal id would not match any visible menu option.
-    Every OTHER engine keeps its existing stored form (its bare id -- still admissible
-    via the resolver), so non-tier variants do NOT churn (additive only). The
-    ``OTR_VideoRenderBatch.engine`` widget and every non-director target keep the raw
-    INTERNAL value. ADD_CUSTOM / empty / unregistered pass through raw."""
+    ``_label_for`` appends an aspect (and sometimes behaviour) suffix to any
+    registered engine that declares one. A stored bare internal id is not a
+    member of the live combo, so ComfyUI renders the dropdown invalid and one
+    save can coerce it to index 0. Label every registered engine via
+    ``exact_menu_option_for``. Unregistered / ADD_CUSTOM / empty pass through.
+    ``OTR_VideoRenderBatch.engine`` is a STRING widget and keeps the raw
+    internal id. Callers that need the internal id resolve the saved label
+    with ``_engine_id_from_pick``."""
     if node_type != "OTR_VideoDirector" or widget not in _VIDEO_DIRECTOR_WIDGETS:
         return value
     if not isinstance(value, str) or not value or value == "+ Add Custom Model":
         return value
-    from ._otr_shared.public_engines import resolve_engine_id, _INTERNAL_TO_PUBLIC
+    from ._otr_shared.public_engines import resolve_engine_id
     from ._otr_video_engines import registry as _vreg
     internal = resolve_engine_id(value)
-    if internal not in _INTERNAL_TO_PUBLIC or not _vreg.is_registered(internal):
+    if not _vreg.is_registered(internal):
         return value
-    # NOT WIDENED, and the attempt is recorded so it is not retried blind.
-    # `_label_for` appends an aspect suffix to nineteen registered engines that
-    # are NOT in `_INTERNAL_TO_PUBLIC`, so profiles selecting them write a BARE
-    # id into the saved graph -- which is not a member of the live combo, and
-    # renders as an invalid dropdown on the ComfyUI canvas (all ten haunted
-    # variants carry one today). Widening this guard to label every registered
-    # engine DOES fix that, but it also relabels values that callers legitimately
-    # expect bare: it broke test_apply_8gb_lite_lands_its_overrides,
-    # test_apply_otr_cloud_lanes_lands_cloud_only_routes and three google/veo
-    # dry-run tests. The bare id is the contract for profile APPLICATION; the
-    # label is only needed for canvas DISPLAY, and the two want separating
-    # before this changes. Tracked rather than half-done.
     from .otr_video_director import exact_menu_option_for
     return exact_menu_option_for(internal)
 
