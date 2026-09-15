@@ -183,16 +183,13 @@ def test_widget_vectors_exact(by_id):
     character-engine controls disagree.
     """
     mapping = _new_class_mapping()
-    # CastLock (80): intentional index-workflow override (see docstring).
-    # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); the
-    # "neutral" kwarg default still applies + is validated/stamped by lock().
     # S5 platform-portability (2026-07-10): OLD pin 5 widgets -> NEW pin 6
-    # (+voice_device="cuda" appended at index 5, the explicit audio device
-    # policy; append-only, never inserted).
-    # 2026-09-02 (kokoro-onnx): voice_bank default -> kokoro_builtin and
-    # char_voice_engine indextts2 -> kokoro; six values, none inserted.
+    # (+voice_device appended at index 5; append-only, never inserted).
+    # 2026-09-02 (kokoro-onnx): voice_bank -> kokoro_builtin, char_voice_engine -> kokoro.
+    # 2026-09-14 (apple-clean): voice_device "cuda" -> "default" for cross-platform portability.
     assert by_id[80]["widgets_values"] == [
-        "kokoro_builtin", "auto_registry", True, "kokoro", "kokoro", "cuda"]
+        "kokoro_builtin", "auto_registry", True, "kokoro", "kokoro", "default"]
+
     # BatchCharacterVoices (81): its own engine widget agrees with CastLock.
     assert by_id[81]["widgets_values"] == ["kokoro"]
     # 83 (StableAudioTheme) joins 80/81 as a node whose SAVED engine is the
@@ -201,9 +198,10 @@ def test_widget_vectors_exact(by_id):
     # they are workable options provided you have the hardware and stack to
     # handle it." Canonical ships musicgen (transformers auto-download, ungated,
     # small) while the class default is still stable_audio_3, and asserting the
-    # class default here would make that choice a red suite. The vector's SHAPE
-    # is still pinned -- exactly one widget.
-    assert len(by_id[83]["widgets_values"]) == 1, by_id[83]["widgets_values"]
+    # class default here would make that choice a red suite.
+    # The vector SHAPE is pinned: engine (index 0) + music_style (index 1,
+    # appended 2026-09-15 per CLAUDE.md append-only rule; value "" = bank genre).
+    assert len(by_id[83]["widgets_values"]) == 2, by_id[83]["widgets_values"]
     for key, nid in NEW_NODE_IDS.items():
         if nid in (80, 81, 83):
             continue
