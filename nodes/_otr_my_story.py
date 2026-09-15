@@ -268,7 +268,15 @@ class SpokenLine(BaseModel):
     def _coerce_spoken_text(cls, value):
         if not isinstance(value, dict):
             return value
-        data = dict(value)
+        # Live Gemma 2026-09-14 1-act: ``"speaker "`` (trailing space)
+        # three times. The words were already in the object; the schema
+        # missed the key. Stripping is identity of the leftover JSON,
+        # not new dialogue.
+        data = {}
+        for key, val in value.items():
+            stripped = str(key).strip()
+            if stripped:
+                data[stripped] = val
         current = data.get("text")
         if isinstance(current, str) and current.strip():
             return data

@@ -597,6 +597,18 @@ def test_spoken_line_accepts_the_truncated_tex_key_from_the_runpod_act(key):
     assert line.text == "It's glowing like a tiny star."
 
 
+def test_spoken_line_accepts_speaker_key_with_trailing_space():
+    """Live 2026-09-14 1-act Foley: Gemma wrote ``"speaker "`` on three
+    lines. Schema said Field required and the episode died in the
+    writer. Mapping the leftover name is not new dialogue."""
+    line = MS.SpokenLine.model_validate({
+        "speaker ": "Stomp",
+        "text": "It's glowing like a tiny star.",
+    })
+    assert line.speaker == "Stomp"
+    assert line.text == "It's glowing like a tiny star."
+
+
 def test_spoken_line_still_refuses_a_speaker_with_no_spoken_words():
     from pydantic import ValidationError
     with pytest.raises(ValidationError):
