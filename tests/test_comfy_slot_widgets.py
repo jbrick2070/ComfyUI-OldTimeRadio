@@ -595,6 +595,95 @@ def test_generate_accounts_provider_usage_not_the_output_cap(monkeypatch):
     assert occ._run_token_total == 350
 
 
+def _credits_choice(text="ok"):
+    return {
+        "status_code": 200,
+        "json": {
+            "choices": [{"message": {"content": text}}],
+            "usage": {"total_tokens": 12},
+        },
+        "text": "",
+    }
+
+
+def test_generate_retries_invalid_comfy_api_key_401(comfy_on, monkeypatch):
+    """Live 2026-09-16: deluxe died on one 401 after billed Sol calls.
+
+    The same key then probed 200. Treat 401 as a proxy flake, not a dead
+    credential, and wait longer than the 5xx 2s cap.
+    """
+    sleeps = []
+    calls = {"n": 0}
+
+    def fake_post(*, url, bearer, payload, timeout_s):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return {
+                "status_code": 401,
+                "json": {"message": "Invalid Comfy API key"},
+                "text": '{"message":"Invalid Comfy API key"}',
+            }
+        return _credits_choice()
+
+    monkeypatch.setattr(occ, "_post_comfy_chat_completion", fake_post)
+    monkeypatch.setattr(occ.time, "sleep", lambda s: sleeps.append(s))
+    occ.set_auth(api_key="key-abc")
+    backend = occ.ComfyCreditsBackend()
+    entry = backend.load(occ.SLOT_A_ID, types.SimpleNamespace(context_window=8192))
+    text = backend.generate(
+        entry, [{"role": "user", "content": "hi"}], max_new_tokens=64,
+    )
+    assert text == "ok"
+    assert calls["n"] == 2
+    assert sleeps and sleeps[0] >= 2.0
+
+
+def test_generate_401_exhausted_reports_actual_attempts(comfy_on, monkeypatch):
+    monkeypatch.setattr(
+        occ, "_post_comfy_chat_completion",
+        lambda **k: {
+            "status_code": 401,
+            "json": {"message": "Invalid Comfy API key"},
+            "text": "",
+        },
+    )
+    monkeypatch.setattr(occ.time, "sleep", lambda s: None)
+    occ.set_auth(api_key="key-abc")
+    backend = occ.ComfyCreditsBackend()
+    entry = backend.load(occ.SLOT_A_ID, types.SimpleNamespace(context_window=8192))
+    with pytest.raises(occ.ComfyCreditsCallFailedError, match="failed after 5 attempt"):
+        backend.generate(
+            entry, [{"role": "user", "content": "hi"}], max_new_tokens=64,
+        )
+
+
+def test_generate_500_still_stops_at_default_retries(comfy_on, monkeypatch):
+    calls = {"n": 0}
+
+    def fake_post(*, url, bearer, payload, timeout_s):
+        calls["n"] += 1
+        return {"status_code": 500, "json": {"message": "upstream"}, "text": ""}
+
+    monkeypatch.setattr(occ, "_post_comfy_chat_completion", fake_post)
+    monkeypatch.setattr(occ.time, "sleep", lambda s: None)
+    occ.set_auth(api_key="key-abc")
+    backend = occ.ComfyCreditsBackend()
+    entry = backend.load(occ.SLOT_A_ID, types.SimpleNamespace(context_window=8192))
+    with pytest.raises(occ.ComfyCreditsCallFailedError, match="failed after 3 attempt"):
+        backend.generate(
+            entry, [{"role": "user", "content": "hi"}], max_new_tokens=64,
+        )
+    assert calls["n"] == 3
+
+
+def test_error_snippet_reads_comfy_top_level_message():
+    snippet = occ.ComfyCreditsBackend._error_snippet({
+        "json": {"message": "Invalid Comfy API key"},
+        "text": '{"message":"Invalid Comfy API key"}',
+    })
+    assert snippet == "Invalid Comfy API key"
+
+
 def test_every_cloud_credits_json_raises_the_run_cap():
     from pathlib import Path
     import json

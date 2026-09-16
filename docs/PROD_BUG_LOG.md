@@ -15259,3 +15259,40 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   family as an overstated frame cap.
 - confidence: HIGH (live GraphExecutionError + local ffmpeg repro of
   yuvj in / yuvj out without `-color_range tv`, yuv420p with it).
+
+## PBUG-20260916-01 -- Comfy Credits 401 "Invalid Comfy API key" aborts a billed run
+- surfaced: LIVE overnight queue on headless `--cpu` `:8000`, 2026-09-16
+  ~00:28-00:38. Cheap Vidu 1-act `the_extra_bowl_20260915_233340_*`
+  published (`obs_publish OK`, Prompt executed 00:59:49). Deluxe Foley
+  1-act (`otr_cloud_deluxe_7act` act 1) died in `ledger_clean_line_judge`
+  after ~316k accounted tokens. Deluxe Foley 5-act died on the first
+  Luna call (3.79s). Deluxe audio-in 5-act wrote acts 1-5 then died on
+  `my_story_frame`. Same error all three: `HTTP 401: {"message":"Invalid
+  Comfy API key"}` to `api.comfy.org/proxy/openrouter/...`.
+- symptom: `ComfyCreditsCallFailedError` after "3 attempt(s)" (the
+  counter was `max_retries+1` even when the first 401 was not retried).
+  401 was not in `_RETRYABLE_STATUS`. Billing kept recording Sol
+  `api_usage_completed` rows; a probe of the same `OTR_COMFY_API_KEY`
+  returned HTTP 200 four minutes later.
+- root cause: the OpenRouter-through-Comfy proxy flaps 401 under a
+  ledger_clean / multi-act burst. That is not a dead key and not a
+  ceiling. `_post_with_retries` treated 401 as fatal on the first
+  response, so a 5-act deluxe that had already paid for five acts
+  aborted before frame.
+- fix: **FIXED in the same change as this entry.** 401 and 429 retry
+  with a 2/4/8/16s backoff (four extra tries, 30s cap). 5xx stay on the old
+  two-retry / 2s cap. The error names the attempts that actually ran.
+  `_error_snippet` reads Comfy's top-level `message`. Blast radius:
+  Comfy Credits HTTP only; partner Vidu/LTX/Luma auth unchanged.
+  Headless `:8000` must recycle to load it. Do not bump `pyproject.toml`
+  while 2.1.5 is Pending.
+- verify idea: `test_generate_retries_invalid_comfy_api_key_401`,
+  `test_generate_401_exhausted_reports_actual_attempts`,
+  `test_generate_500_still_stops_at_default_retries`. Live proof is the
+  three deluxe my_story+recur_frac requeue reaching past writer on
+  `:8000` without a 401 abort, then `obs_publish OK`.
+- bible-worthy: yes -- a proxy 401 after billed calls is a transient
+  auth flap, not a missing credential. Failing closed on the first 401
+  turns a retryable blip into a lost paid episode.
+- confidence: HIGH (three live aborts + billed usage continuing + 200
+  probe on the same key).

@@ -207,8 +207,16 @@ DEFAULT_MIN_OUTPUT_TOKENS = 1024
 DEFAULT_MIN_OUTPUT_TOKENS_REASONING = 4096
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2
+# Live 2026-09-16: deluxe Foley/audio-in died on a single HTTP 401
+# "Invalid Comfy API key" after many billed Sol/Luna calls. The same
+# OTR_COMFY_API_KEY then returned 200 on a probe. The OpenRouter proxy
+# flaps auth under a ledger_clean burst; 2 s of 5xx backoff is not
+# enough. These are extra retries for 401/429 only.
+DEFAULT_AUTH_FLAKE_RETRIES = 4
+DEFAULT_AUTH_BACKOFF_CAP_S = 30.0
 
-_RETRYABLE_STATUS = frozenset({408, 409, 429, 500, 502, 503, 504})
+_RETRYABLE_STATUS = frozenset({401, 408, 409, 429, 500, 502, 503, 504})
+_AUTH_FLAKE_STATUS = frozenset({401, 429})
 
 
 # ---------------------------------------------------------------------------
@@ -764,20 +772,29 @@ class ComfyCreditsBackend:
         url = _chat_url()
         timeout_s = _int_env("OTR_COMFY_TIMEOUT_S", DEFAULT_TIMEOUT_S)
         max_retries = _int_env("OTR_COMFY_MAX_RETRIES", DEFAULT_MAX_RETRIES)
+        auth_retries = min(
+            8,
+            _int_env("OTR_COMFY_AUTH_RETRIES", DEFAULT_AUTH_FLAKE_RETRIES),
+        )
         last_err = ""
-        for attempt in range(max_retries + 1):
+        tries = 0
+        for attempt in range(max(max_retries, auth_retries) + 1):
+            tries = attempt + 1
+            token = _bearer() or bearer
             try:
                 result = _post_comfy_chat_completion(
-                    url=url, bearer=bearer, payload=payload, timeout_s=timeout_s,
+                    url=url, bearer=token, payload=payload, timeout_s=timeout_s,
                 )
             except Exception as exc:  # noqa: BLE001 -- network/transport error
                 last_err = f"transport error: {type(exc).__name__}: {exc}"
-                log.warning(
-                    "[ComfyCredits] attempt %d/%d failed (%s)",
-                    attempt + 1, max_retries + 1, last_err,
-                )
-                self._sleep_backoff(attempt)
-                continue
+                if attempt < max_retries:
+                    log.warning(
+                        "[ComfyCredits] attempt %d failed (%s) -- retry",
+                        tries, last_err,
+                    )
+                    self._sleep_backoff(attempt)
+                    continue
+                break
 
             status = int(result.get("status_code") or 0)
             if status == 200:
@@ -788,17 +805,18 @@ class ComfyCreditsBackend:
                 )
 
             last_err = f"HTTP {status}: {self._error_snippet(result)}"
-            if status in _RETRYABLE_STATUS and attempt < max_retries:
+            cap = auth_retries if status in _AUTH_FLAKE_STATUS else max_retries
+            if status in _RETRYABLE_STATUS and attempt < cap:
                 log.warning(
-                    "[ComfyCredits] attempt %d/%d retryable (%s)",
-                    attempt + 1, max_retries + 1, last_err,
+                    "[ComfyCredits] attempt %d retryable (%s)",
+                    tries, last_err,
                 )
-                self._sleep_backoff(attempt)
+                self._sleep_backoff(attempt, status=status)
                 continue
             break
 
         raise ComfyCreditsCallFailedError(
-            f"Comfy Credits call to {slug} failed after {max_retries + 1} "
+            f"Comfy Credits call to {slug} failed after {tries} "
             f"attempt(s): {last_err}. Endpoint was {url!r} -- if this is the "
             f"first credit-billed run, confirm OTR_COMFY_API_BASE / "
             f"OTR_COMFY_CHAT_PATH against the live Comfy proxy. Aborting the "
@@ -806,8 +824,11 @@ class ComfyCreditsBackend:
         )
 
     @staticmethod
-    def _sleep_backoff(attempt: int) -> None:
-        delay = min(2.0, 0.25 * (2 ** attempt))
+    def _sleep_backoff(attempt: int, *, status: int | None = None) -> None:
+        if status in _AUTH_FLAKE_STATUS:
+            delay = min(DEFAULT_AUTH_BACKOFF_CAP_S, 2.0 * (2 ** attempt))
+        else:
+            delay = min(2.0, 0.25 * (2 ** attempt))
         if delay > 0:
             time.sleep(delay)
 
@@ -858,6 +879,9 @@ class ComfyCreditsBackend:
             err = body.get("error")
             if isinstance(err, dict) and err.get("message"):
                 return str(err["message"])[:200]
+            msg = body.get("message")
+            if isinstance(msg, str) and msg.strip():
+                return msg.strip()[:200]
         text = result.get("text") or ""
         return str(text)[:200]
 
