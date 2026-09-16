@@ -954,7 +954,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 # 0.30: under every normal take, above every artifact. One preset scored
 # 0.00-0.62; whether it derails or is simply an odd voice is the operator's
 # ear (its takes are in obs), and either way the guard re-rolls it at most
-# twice per line.
+# once per line (operator 2026-09-16: one extra take, not two).
 # ---------------------------------------------------------------------------
 
 #: Pitch range a human speaking voice can sit in, for the frame test.
@@ -981,8 +981,9 @@ _SPEECH_PAUSE_RMS = 0.02
 #: A take PASSES the guard at this score or above (see the numbers above).
 SPEECH_SHAPE_PASS = 0.30
 #: How many EXTRA takes the guard may spend on one line. Bounded on purpose:
-#: a bark line costs tens of seconds, so a failing line costs at most three.
-BARK_REROLLS_MAX = 2
+#: a bark line costs tens of seconds. Operator 2026-09-16: at most one
+#: extra take (two generates worst case), not two extras.
+BARK_REROLLS_MAX = 1
 #: A large odd stride, not `seed + 1`: engine seeds are 63-bit hashes and
 #: adjacent integers are not reserved, so a retry seed is pushed far away.
 _BARK_REROLL_STRIDE = 0x9E3779B97F4A7C15
@@ -1030,7 +1031,7 @@ def _pitched_fraction(window, sample_rate):
     would cover that case and would also let a 2.6 kHz tone through (its
     9-sample period times seven lands squarely in the speaking range),
     which is the defect this guard exists to catch. So the edge stays: such
-    a line costs up to three takes and never costs the take. Every bark
+    a line costs up to two takes and never costs the take. Every bark
     preset measured that day sits at 95-250 Hz on a normal balance.
     """
     n = int(sample_rate * _SPEECH_FRAME_S)

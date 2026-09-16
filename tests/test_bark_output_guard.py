@@ -87,7 +87,7 @@ def test_the_range_edge_is_measured_and_deliberate():
     It is left here on purpose. Accepting integer multiples of the first
     peak would cover this case and would also admit the 2.6 kHz tone -- its
     9-sample period times seven lands squarely in the speaking range -- which
-    is the defect the guard exists to catch. Such a line costs up to three
+    is the defect the guard exists to catch. Such a line costs up to two
     takes and never costs the take."""
     t = _t(4.0)
 
@@ -119,7 +119,7 @@ def test_the_pass_line_sits_between_the_artifacts_and_normal_speech():
     """Calibration (docs/2026-09-12-bark-output-guard/): normal presets scored
     0.50-1.00, every artifact 0.00. The line must stay in that gap."""
     assert 0.0 < lib.SPEECH_SHAPE_PASS < 0.5
-    assert lib.BARK_REROLLS_MAX == 2, "bounded: at most three takes a line"
+    assert lib.BARK_REROLLS_MAX == 1, "bounded: at most one extra take a line"
 
 
 def test_the_reroll_seed_ladder_is_deterministic_and_far_from_the_line_seed():
@@ -161,7 +161,7 @@ def _call(eng, seed=7):
 
 
 def _ladder(seed=7):
-    return [lib.bark_reroll_seed(seed, k) for k in range(3)]
+    return [lib.bark_reroll_seed(seed, k) for k in range(1 + lib.BARK_REROLLS_MAX)]
 
 
 def test_a_take_shaped_like_speech_ships_on_the_first_call(bark_engine, caplog):
@@ -173,7 +173,7 @@ def test_a_take_shaped_like_speech_ships_on_the_first_call(bark_engine, caplog):
 
 
 def test_the_bible_condition_tone_then_speech_takes_one_retry(bark_engine, caplog):
-    s0, s1, _ = _ladder()
+    s0, s1 = _ladder()
     bark_engine._takes = {s0: tone(), s1: buzz()}
     with caplog.at_level(logging.WARNING, logger="OTR"):
         out = _call(bark_engine)
@@ -185,23 +185,23 @@ def test_the_bible_condition_tone_then_speech_takes_one_retry(bark_engine, caplo
 
 
 def test_every_take_failing_ships_the_best_and_never_raises(bark_engine, caplog):
-    s0, s1, s2 = _ladder()
+    s0, s1 = _ladder()
     weaker = noise()
     # One speech-shaped second in four: score 0.25, under the 0.30 line, so it
-    # FAILS the guard -- and still outscores the noise and the tone.
+    # FAILS the guard -- and still outscores the noise.
     stronger = np.concatenate([tone(3.0), buzz(1.0)])
     assert lib.speech_shape_score(stronger, SR) < lib.SPEECH_SHAPE_PASS
-    bark_engine._takes = {s0: weaker, s1: tone(), s2: stronger}
+    bark_engine._takes = {s0: weaker, s1: stronger}
     with caplog.at_level(logging.WARNING, logger="OTR"):
         out = _call(bark_engine)
-    assert bark_engine._seeds == [s0, s1, s2], "three takes, then stop"
+    assert bark_engine._seeds == [s0, s1], "one extra take, then stop"
     got = out["waveform"].reshape(-1).numpy()
     assert np.allclose(got, stronger), "the best-scoring take ships"
-    assert any("best of 3" in r.getMessage() for r in caplog.records)
+    assert any("best of 2" in r.getMessage() for r in caplog.records)
 
 
 def test_a_silent_take_is_not_a_candidate_but_does_not_end_the_line(bark_engine):
-    s0, s1, _ = _ladder()
+    s0, s1 = _ladder()
     bark_engine._takes = {s0: np.zeros(SR * 2, dtype=np.float32), s1: buzz()}
     out = _call(bark_engine)
     assert bark_engine._seeds == [s0, s1]
@@ -212,13 +212,13 @@ def test_silence_on_every_take_still_raises_the_silent_output_error(bark_engine)
     bark_engine._default_take = np.zeros(SR * 2, dtype=np.float32)
     with pytest.raises(BarkSilentOutputError, match="never remap"):
         _call(bark_engine)
-    assert len(bark_engine._seeds) == 3, "the ladder was walked before giving up"
+    assert len(bark_engine._seeds) == 1 + lib.BARK_REROLLS_MAX, "the ladder was walked before giving up"
 
 
 def test_the_guard_is_bounded_to_the_ladder_and_never_loops(bark_engine):
     bark_engine._default_take = tone()
     _call(bark_engine)
-    assert bark_engine._seeds == _ladder(), "three takes and not one more"
+    assert bark_engine._seeds == _ladder(), "two takes and not one more"
 
 
 def test_a_thrown_attempt_does_not_discard_a_banked_take(bark_engine, caplog):
@@ -226,7 +226,7 @@ def test_a_thrown_attempt_does_not_discard_a_banked_take(bark_engine, caplog):
     Before the guard, one failed generation meant one failed line and there
     was nothing banked to lose; now attempt 2 raising must not throw away a
     usable take from attempt 1 (Sonnet QA, 2026-09-12)."""
-    s0, s1, s2 = _ladder()
+    s0, s1 = _ladder()
     banked = np.concatenate([tone(3.0), buzz(1.0)])     # usable, fails the guard
     assert lib.speech_shape_score(banked, SR) < lib.SPEECH_SHAPE_PASS
 
@@ -242,7 +242,7 @@ def test_a_thrown_attempt_does_not_discard_a_banked_take(bark_engine, caplog):
     caplog.set_level(logging.WARNING, logger="OTR")
     _lib._generate_single_line = _gen                    # monkeypatched fixture
     out = _call(bark_engine)
-    assert bark_engine._seeds == [s0, s1, s2]
+    assert bark_engine._seeds == [s0, s1]
     assert np.allclose(out["waveform"].reshape(-1).numpy(), banked)
     assert any("raised" in r.getMessage() for r in caplog.records)
 
@@ -258,15 +258,15 @@ def test_when_every_attempt_throws_the_real_error_reaches_the_caller(bark_engine
     _lib._generate_single_line = _boom
     with pytest.raises(RuntimeError, match="not installed correctly"):
         _call(bark_engine)
-    assert len(bark_engine._seeds) == 3
+    assert len(bark_engine._seeds) == 1 + lib.BARK_REROLLS_MAX
 
 
 def test_the_shipped_sample_rate_belongs_to_the_take_that_shipped(bark_engine):
     """`sr` from the last loop iteration would mislabel the audio the day
     anything reloads the model mid-ladder (Sonnet QA, 2026-09-12)."""
-    s0, s1, s2 = _ladder()
+    s0, s1 = _ladder()
     banked = np.concatenate([tone(3.0), buzz(1.0)])
-    rates = {s0: 24000, s1: 48000, s2: 16000}
+    rates = {s0: 24000, s1: 48000}
 
     def _gen(text, preset, model, processor, **kw):
         seed = kw["seed"]
