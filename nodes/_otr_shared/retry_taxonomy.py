@@ -75,6 +75,7 @@ class FailureKind(str, enum.Enum):
     OOM = "oom"
     TIMEOUT = "timeout"
     CRASH_BEFORE_LOAD = "crash_before_load"
+    CONTENT_REFUSED = "content_refused"
     CORRUPT_OUTPUT = "corrupt_output"
     TRANSIENT_IO = "transient_io"
     # --- WARN: subjective quality / coherence / NSFW + A/V-sync ---
@@ -92,6 +93,7 @@ HARD_KINDS = frozenset({
     FailureKind.OOM,
     FailureKind.TIMEOUT,
     FailureKind.CRASH_BEFORE_LOAD,
+    FailureKind.CONTENT_REFUSED,
     FailureKind.CORRUPT_OUTPUT,
     FailureKind.TRANSIENT_IO,
 })
@@ -176,6 +178,21 @@ _POLICY: Dict[FailureKind, RetryDecision] = {
         FailureKind.TIMEOUT, _HARD, same_seed_retries=0),
     FailureKind.CRASH_BEFORE_LOAD: RetryDecision(
         FailureKind.CRASH_BEFORE_LOAD, _HARD, same_seed_retries=1),
+    # ZERO RETRIES. A provider policy gate is DETERMINISTIC -- the same prompt
+    # returns the same verdict -- so a retry would be a second charge for a
+    # refusal already read. Stated honestly: nothing on the render path reads
+    # `same_seed_retries` today (see wan_shared.py, which says so), and
+    # `render_shot` raises on the first exception under NO FALLBACKS. So this
+    # zero DOCUMENTS the policy rather than enforcing it; it is here so that
+    # the day a retry budget is wired up, this kind does not inherit the
+    # CRASH_BEFORE_LOAD default of one free retry against an immovable gate.
+    #
+    # HARD because no clip exists -- a WARN kind keeps its output and there is
+    # nothing here to keep. What HARD does NOT decide is whether the episode
+    # dies: the cloud commit path floors the beat the way it floors a
+    # spend-cap skip, so one refused prompt costs one beat, not the run.
+    FailureKind.CONTENT_REFUSED: RetryDecision(
+        FailureKind.CONTENT_REFUSED, _HARD, same_seed_retries=0),
     FailureKind.CORRUPT_OUTPUT: RetryDecision(
         FailureKind.CORRUPT_OUTPUT, _HARD, same_seed_retries=1,
         reseed_retries=1),

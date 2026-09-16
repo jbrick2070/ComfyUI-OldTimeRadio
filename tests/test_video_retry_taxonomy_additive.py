@@ -103,3 +103,17 @@ def test_fallback_action_api_is_gone():
     for name in ("build_fallback_decision", "restamp_shot_row",
                  "append_runtime_fallback_decision", "format_swap_log"):
         assert not hasattr(rt, name)
+
+
+def test_content_refused_is_hard_with_no_retries():
+    """A policy gate is deterministic: a retry buys the same verdict twice."""
+    from nodes._otr_shared import retry_taxonomy as _rt
+    decision = _rt.classify(_rt.FailureKind.CONTENT_REFUSED)
+    assert decision.is_hard
+    assert decision.same_seed_retries == 0
+    assert decision.reseed_retries == 0
+    assert decision.max_attempts == 1
+    # No clip exists, so there is nothing a WARN class could keep.
+    assert decision.keep_output is False
+    assert decision.aborts_episode is False
+    _rt.assert_decision_invariants(decision)

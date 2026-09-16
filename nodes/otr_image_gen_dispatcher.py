@@ -1125,6 +1125,38 @@ def _pending_holds_portrait(pending, char_id) -> bool:
     return False
 
 
+def _still_engine_refused(exc, engine_id=None) -> bool:
+    """True when the STILL engine declined the card, however it said so.
+
+    TWO DIALECTS, ONE VERDICT. The local and Google engines mark a refusal by
+    setting ``is_model_refusal`` on the exception (eng_google_image,
+    ideogram4_local). A PARTNER engine cannot: it raises a
+    ``CloudMediaError`` stamped ``CONTENT_REFUSED`` at the cloud invoke
+    boundary and carries no such attribute, so every cloud still refusal used
+    to skip the sanctioned-gap path entirely and re-raise as "NO FALLBACK --
+    fix the engine" -- taking the whole fan-out wave, already submitted and
+    already paid, down with it. Found 2026-09-16 alongside the video-side
+    twin; the two funnels now read the same verdict the same way.
+
+    THE ENGINE GATE IS NOT DECORATION, and the video funnel had it from the
+    start while this one did not. ``is_content_refusal`` falls back to prose
+    when NOTHING in the chain carries a stamped code -- which is exactly the
+    shape of a LOCAL engine crash. So a local Flux or SDXL traceback whose
+    text happened to contain a needle would have been recorded as a
+    sanctioned model refusal and published as a degraded episode. A local
+    engine keeps its explicit ``is_model_refusal`` dialect and nothing else.
+    """
+    if getattr(exc, "is_model_refusal", False):
+        return True
+    if engine_id is not None and not _is_cloud_image_engine(engine_id):
+        return False
+    try:
+        from ._otr_shared.cloud_media_backend import is_content_refusal
+    except Exception:  # noqa: BLE001 -- classification must never itself raise
+        return False
+    return is_content_refusal(exc)
+
+
 def _render_still_pixels(job, ctx):
     """Partner/local gen_fn -> pixels. Model refusal is a result, not a raise."""
     gen_fn = ctx["gen_fn"]
@@ -1136,7 +1168,7 @@ def _render_still_pixels(job, ctx):
             wait_sleep_s=ctx["handoff_wait_sleep_s"],
         )
     except Exception as exc:  # noqa: BLE001 -- split refusal vs engine fault
-        if getattr(exc, "is_model_refusal", False):
+        if _still_engine_refused(exc, job.get("engine_id")):
             return {"refusal": exc}
         raise
     return {
@@ -1146,26 +1178,47 @@ def _render_still_pixels(job, ctx):
     }
 
 
-def _record_still_refusal(job, exc, ctx):
+def _cloud_still_job_failure(exc, engine_id=None):
+    """The job-scoped cloud failure code for a still, or "".
+
+    The still-funnel twin of ``render_driver._cloud_floor_reason``, and it
+    reads the same stamped codes: one object failed on the provider side, and
+    the next object is unaffected. Run-scoped codes (AUTH, BUDGET, the config
+    four) and unstamped exceptions get nothing -- those still raise.
+    """
+    if engine_id is not None and not _is_cloud_image_engine(engine_id):
+        return ""
+    try:
+        from ._otr_shared.cloud_media_backend import cloud_job_failure_code
+    except Exception:  # noqa: BLE001 -- classification must never itself raise
+        return ""
+    code = cloud_job_failure_code(exc)
+    return code.value if code is not None else ""
+
+
+def _record_still_refusal(job, exc, ctx, reason=None):
     oid = job["oid"]
     engine_id = job["engine_id"]
     prompt = job["prompt"]
     seed = job["seed"]
+    reason = str(reason or _receipt.SANCTIONABLE_SKIP_REASON)
+    is_refusal = reason == _receipt.SANCTIONABLE_SKIP_REASON
+    headline = "MODEL REFUSAL" if is_refusal else "CLOUD JOB FAILED"
     ctx["skip_evidence_by_oid"][oid] = {
-        "reason": "model_refusal", "role": job["role"], "engine_id": engine_id,
+        "reason": reason, "role": job["role"], "engine_id": engine_id,
         "prompt": prompt, "seed": seed, "detail": str(exc),
     }
     ctx["warnings"].append(
-        f"{oid}: '{engine_id}' MODEL REFUSAL -- no still for this "
+        f"{oid}: '{engine_id}' {headline} -- no still for this "
         f"object; the episode continues (operator 2026-08-22). "
         f"prompt={prompt!r} seed={seed} ({exc})")
     log.warning(
-        "[OTR_ImageGenDispatcher] MODEL REFUSAL on %s via '%s': %s\n"
+        "[OTR_ImageGenDispatcher] %s on %s via '%s': %s\n"
         "  prompt: %s\n  negative: %s\n  seed: %s\n"
         "  The episode CONTINUES with no still for this object. This "
-        "prompt is recorded so the refusal can be diagnosed as seed- "
-        "or content-driven -- the previous hard-fail erased it.",
-        oid, engine_id, exc, prompt, job["effective_neg"], seed)
+        "prompt is recorded so the outcome can be diagnosed as seed-, "
+        "content- or provider-driven -- the previous hard-fail erased it.",
+        headline, oid, engine_id, exc, prompt, job["effective_neg"], seed)
 
 
 def _commit_minted_still(job, pixels, content_hash, lap, ctx):
@@ -1271,6 +1324,10 @@ def _mint_still_serial(job, ctx, *, take_lease):
         if getattr(exc, "is_model_refusal", False):
             _record_still_refusal(job, exc, ctx)
             return
+        if _cloud_still_job_failure(exc, job.get("engine_id")):
+            _record_still_refusal(
+                job, exc, ctx, reason=_receipt.CLOUD_JOB_SKIP_REASON)
+            return
         wrapped = _wrap_still_render_error(job, exc)
         if wrapped is exc:
             raise
@@ -1313,6 +1370,17 @@ def _flush_pending_cloud_stills(pending, ctx):
     for job in jobs:
         oid = job["oid"]
         if oid in outcome.errors:
+            # A PROVIDER-SIDE FAILURE IS ONE OBJECT, NOT THE WAVE. Every still
+            # in this fan-out was submitted and paid before the walk begins,
+            # so raising here discarded all of them for one bad job. Only
+            # job-scoped codes floor; an unstamped crash still fails LOUD.
+            _why = _cloud_still_job_failure(
+                outcome.errors[oid], job.get("engine_id"))
+            if _why:
+                _record_still_refusal(
+                    job, outcome.errors[oid], ctx,
+                    reason=_receipt.CLOUD_JOB_SKIP_REASON)
+                continue
             raise _wrap_still_render_error(job, outcome.errors[oid]) from outcome.errors[oid]
         packed = outcome.results.get(oid)
         if packed is None:
@@ -2129,26 +2197,30 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # episode here would reinstate exactly the behaviour the operator ruled
         # against -- one blemish destroying every finished beat around it.
         #
-        # NARROW ON PURPOSE: only `reason == "model_refusal"` is tolerated. A
-        # dead path, a historical-row-only target, a no-engine skip and every
-        # other absence still raise, so the gate keeps its whole job for real
-        # gaps. This does not soften the 2026-06-18 NO FALLBACKS rule: nothing
-        # is substituted and nothing is silent.
+        # STILL NARROW ON PURPOSE, and now exactly two reasons wide:
+        # `model_refusal` (the model declined the card, 2026-08-22) and
+        # `cloud_job_failed` (a partner job produced no image for this object,
+        # 2026-09-16 -- a timeout, a corrupt file, a lost job). A dead path, a
+        # historical-row-only target, a no-engine skip and every other absence
+        # still raise, so the gate keeps its whole job for real gaps. This does
+        # not soften the 2026-06-18 NO FALLBACKS rule: nothing is substituted
+        # and nothing is silent. `is_sanctionable_skip` owns the list so this
+        # site cannot drift from the vocabulary again.
         refused_targets = [
             m for m in missing_targets
-            if str(((m.get("evidence") or {}).get("reason") or ""))
-            == _receipt.SANCTIONABLE_SKIP_REASON]
+            if _receipt.is_sanctionable_skip(
+                (m.get("evidence") or {}).get("reason"))]
         if refused_targets:
             missing_targets = [m for m in missing_targets
                                if m not in refused_targets]
             for miss in refused_targets:
                 ev = miss.get("evidence") or {}
                 log.warning(
-                    "[OTR_ImageGenDispatcher] TOLERATED REFUSAL %s: the model "
-                    "declined this card and the episode continues WITHOUT it "
-                    "(engine=%s seed=%s). prompt=%r",
-                    miss.get("object_id"), ev.get("engine_id"), ev.get("seed"),
-                    ev.get("prompt"))
+                    "[OTR_ImageGenDispatcher] TOLERATED GAP %s [%s]: no still "
+                    "was produced for this object and the episode continues "
+                    "WITHOUT it (engine=%s seed=%s). prompt=%r",
+                    miss.get("object_id"), ev.get("reason"),
+                    ev.get("engine_id"), ev.get("seed"), ev.get("prompt"))
                 # THE ROW THE WHOLE CONTROL PATH WAS MISSING (2026-08-28).
                 # Until now a tolerated refusal was logged and then dropped:
                 # ``skip_evidence_by_oid`` is function-local and dies with this

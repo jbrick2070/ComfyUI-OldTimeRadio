@@ -83,6 +83,11 @@ __all__ = [
     "is_cloud_budget_error",
     "is_wallet_empty_message",
     "is_auth_failure_message",
+    "is_content_policy_message",
+    "is_content_refusal",
+    "cloud_job_failure_code",
+    "JOB_SCOPED_CODES",
+    "RUN_SCOPED_CODES",
 ]
 
 # ---------------------------------------------------------------------------
@@ -99,6 +104,7 @@ class CloudErrorCode(str, enum.Enum):
     BUDGET = "budget"
     RETRYABLE_TRANSPORT = "retryable_transport"
     PROVIDER_REJECTED = "provider_rejected"
+    CONTENT_REFUSED = "content_refused"
     TIMEOUT = "timeout"
     INTERRUPTED = "interrupted"
     CORRUPT_OUTPUT = "corrupt_output"
@@ -148,6 +154,155 @@ def is_auth_failure_message(text: str) -> bool:
     if re.search(r"\b401\b", blob):
         return True
     return False
+
+
+#: Provider language that means "the policy gate declined this prompt".
+#: Compared against an ALPHANUMERIC-ONLY normalization of both sides, because
+#: five providers spell one verdict five ways and the separators are the only
+#: thing that differs: LTX ``content_filtered_error`` (proven live 2026-09-16),
+#: BFL ``Content Moderated`` / ``Request Moderated``, Gemini
+#: ``IMAGE_PROHIBITED_CONTENT``, ByteDance
+#: ``OutputAudioSensitiveContentDetected``, Comfy's own
+#: ``image_content_policy_violation``. Matching the normalized form covers all
+#: of them with one needle each instead of four spellings each.
+#:
+#: EVERY NEEDLE HERE IS SELF-ANCHORED -- it names content AND a verdict in the
+#: same token. That rule is what keeps ordinary faults out. Four needles were
+#: cut on 2026-09-16 review for failing it, and the reasons are worth keeping:
+#: ``policy restriction`` matches a corporate proxy's "blocked by policy
+#: restriction", which is systemic and would floor EVERY beat; ``safety
+#: system`` matches "our safety system is temporarily unavailable", a
+#: retryable outage; ``safety filter`` matches a FileNotFoundError for a model
+#: file named ``safety_filter_v2.pth``; ``sensitive content`` is ordinary
+#: English that a prompt echoed into an error body can carry. A needle that
+#: can match a crash is worse than a needle that misses a refusal -- a miss
+#: fails LOUD, which is merely the old behavior, while a false match launders
+#: a broken render into a publishable "degraded" episode.
+_CONTENT_POLICY_NEEDLES = (
+    "contentfiltered",
+    "contentpolicy",
+    "contentmoderat",        # ...moderation / ...moderated
+    "requestmoderated",
+    "prohibitedcontent",
+    "sensitivecontentdetected",
+)
+
+
+def _alnum(text) -> str:
+    """Lowercase, with every separator removed -- see the needle note."""
+    return re.sub(r"[^a-z0-9]+", "", str(text or "").lower())
+
+
+def is_content_policy_message(text: str) -> bool:
+    """True when the provider refused the PROMPT, not the request.
+
+    Distinct from :func:`is_auth_failure_message` (refused the key) and
+    :func:`is_wallet_empty_message` (refused the charge). Those two say
+    nothing about the beat; this one says this beat, as written, will never
+    render on this provider, so a retry is money spent on the same verdict.
+    """
+    blob = _alnum(text)
+    return any(needle in blob for needle in _CONTENT_POLICY_NEEDLES)
+
+
+def _cause_chain(exc: BaseException | None):
+    """Yield ``exc`` and everything it was raised from, once each."""
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        yield cur
+        nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+        cur = nxt if isinstance(nxt, BaseException) else None
+
+
+def is_content_refusal(exc: BaseException | None) -> bool:
+    """True when this failure is a provider content-policy refusal.
+
+    TWO PASSES, AND THE ORDER IS THE WHOLE CONTRACT. The still funnel's
+    sanctioned gap (2026-08-28) is minted from a RECORDED FACT -- a receipt row
+    written where the refusal happened -- and ``otr_video_render_batch`` states
+    the standard as "AN ABSENCE IS NOT A SANCTION". A substring match on an
+    exception string is an absence being read as a sanction, so prose may only
+    speak where no verdict was recorded at all.
+
+    PASS 1 walks the chain for a stamped :class:`CloudErrorCode`.
+    ``CONTENT_REFUSED`` anywhere in the chain is the answer. Any OTHER stamped
+    code VETOES -- the invoke boundary already adjudicated that failure with
+    the provider's own words in hand, and prose sniffing one layer up must not
+    overturn it. This is not hypothetical: ``render_shot`` wraps every failure
+    in a ``RenderError`` whose message CONCATENATES the whole inner chain, so
+    without the veto a ``RETRYABLE_TRANSPORT`` or ``TIMEOUT`` carrying refusal
+    words in its quoted body would floor a beat the boundary called retryable.
+
+    PASS 2 runs only when nothing in the chain carries a code -- a direct BYO
+    engine, or a partner path that raised before ``_map_exception`` could
+    stamp it. Prose is the last resort, never the first reading.
+    """
+    stamped: str | None = None
+    for cur in _cause_chain(exc):
+        code = getattr(cur, "code", None)
+        value = getattr(code, "value", None)
+        if value is None:
+            continue
+        if value == CloudErrorCode.CONTENT_REFUSED.value:
+            return True
+        if stamped is None:
+            stamped = value
+    if stamped is not None:
+        return False
+    return any(is_content_policy_message(str(cur)) for cur in _cause_chain(exc))
+
+
+#: Cloud failures that are ABOUT ONE JOB. The provider answered (or failed to)
+#: for THIS request; the next request is unaffected, so the beat can be floored
+#: and the episode can go on. Operator directive 2026-09-16: "any of them could
+#: easily get a failed output; a failed output on a cloud video or still should
+#: not break the system."
+JOB_SCOPED_CODES = frozenset({
+    CloudErrorCode.CONTENT_REFUSED,
+    CloudErrorCode.PROVIDER_REJECTED,
+    CloudErrorCode.TIMEOUT,
+    CloudErrorCode.RETRYABLE_TRANSPORT,
+    CloudErrorCode.CORRUPT_OUTPUT,
+    CloudErrorCode.ORPHANED_JOB,
+})
+
+#: Cloud failures that are ABOUT THE RUN. Flooring these would floor EVERY
+#: beat and publish an empty episode as "degraded", which is the laundering
+#: the sanctioned-gap channel exists to prevent -- so they stay LOUD.
+#: ``BUDGET`` is loud in its own way (it halts and floors what it already
+#: paid for); ``AUTH`` and the four config codes mean nothing will ever
+#: render and the operator must fix the key or the config.
+#: ``INTERRUPTED`` is deliberately in NEITHER set: a cancel is the operator
+#: saying stop, and turning that into 40 floored beats would be obscene.
+RUN_SCOPED_CODES = frozenset({
+    CloudErrorCode.AUTH,
+    CloudErrorCode.BUDGET,
+    CloudErrorCode.MALFORMED_CONFIG,
+    CloudErrorCode.UNSUPPORTED_SCHEMA,
+    CloudErrorCode.INCOMPATIBLE_PROFILE,
+    CloudErrorCode.GATED_BY_FLAG,
+})
+
+
+def cloud_job_failure_code(exc: BaseException | None):
+    """The JOB-SCOPED :class:`CloudErrorCode` in this chain, or ``None``.
+
+    ``None`` for a run-scoped code, for an interrupt, and -- crucially -- for
+    anything that never reached the cloud invoke boundary at all. A local
+    engine fault, a torch error or a driver assertion carries no code and gets
+    no floor: those still fail LOUD under NO FALLBACKS. Read the stamped code
+    and ONLY the stamped code here; unlike :func:`is_content_refusal` there is
+    no prose fallback, because "some exception happened during a cloud beat"
+    is far too wide a net to floor a beat on.
+    """
+    for cur in _cause_chain(exc):
+        code = getattr(cur, "code", None)
+        if not isinstance(code, CloudErrorCode):
+            continue
+        return code if code in JOB_SCOPED_CODES else None
+    return None
 
 
 def is_cloud_budget_error(exc: BaseException | None) -> bool:

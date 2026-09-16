@@ -314,3 +314,8 @@ workflows/*__ORIGINAL_*.json
 /kibitz/
 /otr_soak_receipts/
 /scratch_check_server.py
+
+# Never let a credential ride along on a careless `git add .` (2026-09-16).
+# _tmp_openrouter.secret was sitting untracked and unignored in a PUBLIC repo.
+*.secret
+_tmp_*.secret

@@ -940,3 +940,403 @@ def test_engine_failure_raises_loud(stub_registry):
         ]})
     with pytest.raises(rd.RenderError):
         rd.run_episode(led)
+
+
+def test_classify_failure_names_a_policy_verdict_not_a_crash():
+    """CRASH_BEFORE_LOAD was the old answer and it was wrong twice over."""
+    from nodes._otr_shared import cloud_media_backend as cmb
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED,
+        "cloud_ltx25_i2v: Content filtered due to policy restrictions")
+    assert rd.classify_failure(refused) is rt.FailureKind.CONTENT_REFUSED
+    wrap = RuntimeError("shot shot_shot_001_b40 failed to render")
+    wrap.__cause__ = refused
+    assert rd.classify_failure(wrap) is rt.FailureKind.CONTENT_REFUSED
+    # Everything else keeps the answer it had.
+    assert rd.classify_failure(RuntimeError("boom")) is (
+        rt.FailureKind.CRASH_BEFORE_LOAD)
+    assert rd.classify_failure(FileNotFoundError("nope")) is (
+        rt.FailureKind.DEPENDENCY_MISSING)
+
+
+def test_cloud_floor_reason_sees_through_the_render_error_wrap():
+    """render_shot wraps every failure, so the cause walk is the contract."""
+    from nodes._otr_shared import cloud_media_backend as cmb
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+    wrap = RuntimeError("fallbacks are disabled")
+    wrap.__cause__ = refused
+    cloud = {"shot_id": "shot_b040", "engine_id": "cloud_ltx25_foley_plus"}
+    assert rd._cloud_floor_reason(
+        "shot_b040", {"shot_b040": wrap}, cloud) == "content_refused"
+    # A beat with no error, and a beat with an ordinary one, still raise.
+    assert rd._cloud_floor_reason("shot_b040", {}, cloud) == ""
+    assert rd._cloud_floor_reason(
+        "shot_b040", {"shot_b040": RuntimeError("engine exploded")},
+        cloud) == ""
+
+
+def test_content_floor_is_gated_to_cloud_engines():
+    """Only a PROVIDER issues a policy verdict; a local fault fails loud.
+
+    The predicate sits on the general except around render_beat_coverage --
+    the same path a local torch or ffmpeg failure takes -- so without this
+    gate a coincidental phrase could floor a beat the card could render.
+    """
+    from nodes._otr_shared import cloud_media_backend as cmb
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+    errors = {"shot_b040": refused}
+    assert rd._cloud_floor_reason(
+        "shot_b040", errors,
+        {"engine_id": "cloud_ltx25_foley_plus"}) == "content_refused"
+    assert rd._cloud_floor_reason(
+        "shot_b040", errors, {"engine_id": "humo"}) == ""
+    assert rd._cloud_floor_reason(
+        "shot_b040", errors, {"engine_id": "ltx_video"}) == ""
+
+
+def test_report_cloud_floors_escalates_when_failures_look_systemic(caplog):
+    """One failed job is a job; a quarter of the show is a provider problem."""
+    import logging
+    floored = [rd._stamp_cloud_floor_shot({"shot_id": "s%d" % i},
+                                          "content_refused")
+               for i in range(4)]
+    clean = [{"shot_id": "ok%d" % i} for i in range(4)]
+    with caplog.at_level(logging.WARNING):
+        assert rd._report_cloud_floors(clean + floored[:1]) == ["s0"]
+    assert "publishes DEGRADED" in caplog.text
+    assert "SYSTEMIC" not in caplog.text
+    caplog.clear()
+    with caplog.at_level(logging.WARNING):
+        rd._report_cloud_floors(clean + floored)
+    assert "SYSTEMIC CLOUD FAILURE" in caplog.text
+    # It reports; it never raises. Aborting here would reinstate the defect.
+    assert rd._report_cloud_floors([]) == []
+
+
+def test_report_cloud_floors_covers_every_reason_not_just_refusals(caplog):
+    """A provider OUTAGE must not be quieter than one refused prompt.
+
+    An earlier draft counted only ``content_floor``, so a whole episode
+    floored on ``timeout`` got per-beat lines and no aggregate banner --
+    backwards, since the wider the failure the louder it should be.
+    """
+    import logging
+    from nodes._otr_shared import cloud_media_backend as cmb
+    outage = [rd._stamp_cloud_floor_shot({"shot_id": "s%d" % i}, "timeout")
+              for i in range(4)]
+    with caplog.at_level(logging.WARNING):
+        got = rd._report_cloud_floors(outage + [{"shot_id": "ok0"}])
+    assert got == ["s0", "s1", "s2", "s3"]
+    assert "SYSTEMIC CLOUD FAILURE" in caplog.text
+    assert "timeout: s0, s1, s2, s3" in caplog.text
+    # Every job-scoped reason reaches the tally, not just the refusal.
+    for code in cmb.JOB_SCOPED_CODES:
+        caplog.clear()
+        with caplog.at_level(logging.WARNING):
+            rd._report_cloud_floors(
+                [rd._stamp_cloud_floor_shot({"shot_id": "s0"}, code.value)])
+        assert code.value in caplog.text, code
+
+
+def test_build_clip_manifest_counts_content_floor_as_sanctioned_gap():
+    """The refused beat keeps its place; the episode is degraded, not broken."""
+    from nodes._otr_shared import still_receipt as _receipt
+    result = {
+        "ledger": {"video": {
+            "video_revision": 1, "fps": 25,
+            "canonical_canvas": {"w": 1472, "h": 832},
+            "shots": [
+                {"shot_id": "shot_b039", "beat_id": "b039",
+                 "engine_id": "cloud_ltx25_foley_plus",
+                 "target_frame_count": 50},
+                rd._stamp_cloud_floor_shot({
+                    "shot_id": "shot_b040", "beat_id": "b040",
+                    "engine_id": "cloud_ltx25_foley_plus",
+                    "target_frame_count": 50,
+                }, "content_refused"),
+            ]}},
+        "clips": {
+            "shot_b039": {"engine_id": "cloud_ltx25_foley_plus",
+                          "frame_count": 50, "path": __file__},
+        },
+    }
+    m = rd.build_clip_manifest(result, episode_id="ep_content")
+    assert m["clips"][0]["status"] == _receipt.STATUS_OK
+    assert m["clips"][1]["exists"] is False
+    assert m["clips"][1]["status"] == _receipt.STATUS_SANCTIONED_GAP
+    assert _receipt.is_sanctioned_gap(m["clips"][1])
+    _sanctioned = sum(1 for c in m["clips"] if _receipt.is_sanctioned_gap(c))
+    _delivered_n = sum(1 for c in m["clips"] if (c or {}).get("exists"))
+    assert len(m["clips"]) - _delivered_n - _sanctioned == 0
+    # The floor is its OWN stamp: a content refusal is not a spend cap.
+    assert rd._shot_is_content_floor(result["ledger"]["video"]["shots"][1])
+    assert not rd._shot_is_budget_floor(result["ledger"]["video"]["shots"][1])
+
+
+# --------------------------------------------------------------------------- #
+# A provider policy refusal floors ONE beat; the episode survives (2026-09-16)
+# --------------------------------------------------------------------------- #
+def _content_refusal():
+    from nodes._otr_shared import cloud_media_backend as cmb
+    return cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED,
+        "cloud_ltx25_i2v: Polling aborted due to error: Task failed: "
+        '{"error": {"type": "content_filtered_error", "message": '
+        '"Content filtered due to policy restrictions"}}')
+
+
+class _StubCloudOK(_StubBase):
+    name = "cloud_stub_ok"
+    provider_side = True
+
+    def render_clip(self, request, prepared):
+        return {"raw": True}
+
+
+class _StubCloudRefused(_StubBase):
+    name = "cloud_stub_refused"
+    provider_side = True
+
+    def render_clip(self, request, prepared):
+        raise _content_refusal()
+
+
+@pytest.fixture
+def cloud_stub_registry():
+    saved = dict(vreg._VIDEO_REGISTRY._registry)
+    vreg.register(_StubCloudOK())
+    vreg.register(_StubCloudRefused())
+    try:
+        yield vreg._VIDEO_REGISTRY
+    finally:
+        vreg._VIDEO_REGISTRY._registry.clear()
+        vreg._VIDEO_REGISTRY._registry.update(saved)
+
+
+def _cloud_ledger(refused_index, n=3):
+    shots = []
+    for i in range(n):
+        shots.append({
+            "shot_id": "shot_%04d" % i, "beat_id": "b%d" % i,
+            "role": "retired_role_b",
+            "engine_id": ("cloud_stub_refused" if i == refused_index
+                          else "cloud_stub_ok"),
+            "family": "abstract", "group_id": "g%d" % i,
+            "target_frame_count": 25, "degradation_trail": [],
+        })
+    return rd.build_full_ledger({"video_revision": 1, "fps": 25, "shots": shots})
+
+
+def test_content_refusal_floors_one_beat_and_the_episode_survives(
+        cloud_stub_registry, monkeypatch):
+    """THE DEFECT, END TO END (live 2026-09-16).
+
+    LTX 2.5 filtered beat 40 and the episode raised, discarding 39 beats that
+    had already rendered and already been paid for. The refused beat must now
+    keep its place as a counted gap while every other beat commits.
+    """
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    led = _cloud_ledger(refused_index=1)
+    # Prove WHICH branch this exercises -- both paths stamp the same shot, so
+    # without this the serial test and this one could be the same test twice.
+    assert rd._should_fanout_cloud_episode(led["video"], set()) is True
+    out = rd.run_episode(led)
+    shots = out["ledger"]["video"]["shots"]
+    assert [s["shot_id"] for s in shots] == [
+        "shot_0000", "shot_0001", "shot_0002"]        # order is preserved
+    assert rd._shot_is_content_floor(shots[1])
+    assert not rd._shot_is_content_floor(shots[0])
+    assert not rd._shot_is_content_floor(shots[2])
+    # The beats AFTER the refusal still rendered -- that is the whole point.
+    assert "shot_0000" in out["clips"] and "shot_0002" in out["clips"]
+    assert "shot_0001" not in out["clips"]
+    assert out["ledger"]["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
+
+
+def test_content_refusal_floors_on_the_serial_path_too(
+        cloud_stub_registry, monkeypatch):
+    """Fan-out off (OTR_CLOUD_FANOUT=1) walks the other branch."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    monkeypatch.setenv("OTR_CLOUD_VIDEO_FANOUT", "1")
+    led = _cloud_ledger(refused_index=0)
+    assert rd._should_fanout_cloud_episode(led["video"], set()) is False
+    out = rd.run_episode(led)
+    shots = out["ledger"]["video"]["shots"]
+    assert rd._shot_is_content_floor(shots[0])
+    # A refusal is a fact about ONE prompt: it must NOT halt the queue the way
+    # an empty wallet does, so the beats behind it still get their attempt.
+    assert "shot_0001" in out["clips"] and "shot_0002" in out["clips"]
+    assert not rd._shot_is_budget_floor(shots[0])
+
+
+def test_an_ordinary_cloud_crash_still_fails_loud(cloud_stub_registry,
+                                                  monkeypatch):
+    """The floor must not launder a real fault into a publishable gap."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+
+    class _StubCloudBroken(_StubBase):
+        name = "cloud_stub_broken"
+        provider_side = True
+
+        def render_clip(self, request, prepared):
+            raise RuntimeError("the engine actually exploded")
+
+    vreg.register(_StubCloudBroken())
+    led = _cloud_ledger(refused_index=1)
+    led["video"]["shots"][1]["engine_id"] = "cloud_stub_broken"
+    with pytest.raises(rd.RenderError):
+        rd.run_episode(led)
+
+
+def test_cloud_floor_reason_covers_every_job_scoped_verdict():
+    """Operator 2026-09-16: a failed cloud output must not break the system."""
+    from nodes._otr_shared import cloud_media_backend as cmb
+    cloud = {"shot_id": "s1", "engine_id": "cloud_ltx25_foley_plus"}
+    for code in cmb.JOB_SCOPED_CODES:
+        err = cmb.CloudMediaError(code, "no clip")
+        wrap = rd.RenderError("fallbacks are disabled")
+        wrap.__cause__ = err
+        assert rd._cloud_floor_reason("s1", {"s1": wrap}, cloud) == code.value
+        # every reason gets a sentence an operator can act on
+        assert rd._cloud_floor_sentence(code.value).endswith(".")
+    # Run-scoped verdicts and unstamped crashes still raise.
+    for code in cmb.RUN_SCOPED_CODES | {cmb.CloudErrorCode.INTERRUPTED}:
+        assert rd._cloud_floor_reason(
+            "s1", {"s1": cmb.CloudMediaError(code, "x")}, cloud) == ""
+    assert rd._cloud_floor_reason(
+        "s1", {"s1": RuntimeError("engine exploded")}, cloud) == ""
+    assert rd._cloud_floor_reason("s1", {}, cloud) == ""
+    # LOCAL engines are never floored, whatever the exception says.
+    assert rd._cloud_floor_reason(
+        "s1", {"s1": cmb.CloudMediaError(cmb.CloudErrorCode.TIMEOUT, "x")},
+        {"engine_id": "humo"}) == ""
+
+
+class _StubCloudTimeout(_StubBase):
+    name = "cloud_stub_timeout"
+    provider_side = True
+
+    def render_clip(self, request, prepared):
+        from nodes._otr_shared import cloud_media_backend as cmb
+        raise cmb.CloudMediaError(
+            cmb.CloudErrorCode.TIMEOUT, "cloud_stub: no answer in 900s")
+
+
+class _StubCloudAuth(_StubBase):
+    name = "cloud_stub_auth"
+    provider_side = True
+
+    def render_clip(self, request, prepared):
+        from nodes._otr_shared import cloud_media_backend as cmb
+        raise cmb.CloudMediaError(cmb.CloudErrorCode.AUTH, "HTTP 401")
+
+
+def test_a_cloud_timeout_floors_one_beat_and_the_episode_survives(
+        cloud_stub_registry, monkeypatch):
+    """Not just refusals: ANY job-scoped cloud verdict keeps the run alive."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    vreg.register(_StubCloudTimeout())
+    led = _cloud_ledger(refused_index=1)
+    led["video"]["shots"][1]["engine_id"] = "cloud_stub_timeout"
+    out = rd.run_episode(led)
+    shots = out["ledger"]["video"]["shots"]
+    assert rd._shot_is_cloud_floor(shots[1])
+    assert shots[1]["cloud_floor"] == "timeout"
+    # A timeout is NOT a content refusal, and the ledger must not say it was.
+    assert not rd._shot_is_content_floor(shots[1])
+    assert "shot_0000" in out["clips"] and "shot_0002" in out["clips"]
+
+
+def test_a_run_scoped_cloud_verdict_still_fails_loud(cloud_stub_registry,
+                                                     monkeypatch):
+    """AUTH means nothing will EVER render; flooring would publish a void."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    vreg.register(_StubCloudAuth())
+    led = _cloud_ledger(refused_index=1)
+    led["video"]["shots"][1]["engine_id"] = "cloud_stub_auth"
+    with pytest.raises(rd.RenderError):
+        rd.run_episode(led)
+
+
+def test_every_floor_kind_is_counted_as_a_sanctioned_gap():
+    """Budget, content and job floors all ride ONE accounting channel."""
+    from nodes._otr_shared import still_receipt as _receipt
+    rows = [
+        rd._stamp_budget_floor_shot({"shot_id": "s0", "beat_id": "b0"}),
+        rd._stamp_cloud_floor_shot({"shot_id": "s1", "beat_id": "b1"},
+                                   "content_refused"),
+        rd._stamp_cloud_floor_shot({"shot_id": "s2", "beat_id": "b2"},
+                                   "timeout"),
+    ]
+    for row in rows:
+        assert row["status"] == _receipt.STATUS_SANCTIONED_GAP
+    # The content stamp keeps its own boolean; the others do not claim it.
+    assert rd._shot_is_content_floor(rows[1])
+    assert not rd._shot_is_content_floor(rows[2])
+    assert rd._shot_is_cloud_floor(rows[1]) and rd._shot_is_cloud_floor(rows[2])
+    assert rd._shot_is_budget_floor(rows[0])
+
+
+# --------------------------------------------------------------------------- #
+# The CASCADE: a floored beat must not kill the run through its dependent
+# --------------------------------------------------------------------------- #
+def test_floored_predecessor_is_found_for_a_chain_successor():
+    assert rd._floored_predecessor(
+        {"shot_id": "s2", "starts_on_last_frame_of": "s1"}, {"s1"}) == "s1"
+    # A predecessor that rendered is not a floor.
+    assert rd._floored_predecessor(
+        {"shot_id": "s2", "starts_on_last_frame_of": "s1"}, set()) == ""
+    # A jump beat has no predecessor at all.
+    assert rd._floored_predecessor({"shot_id": "s2"}, {"s1"}) == ""
+    assert rd._floored_predecessor({"shot_id": "s2"}, None) == ""
+
+
+class _StubCloudChainRefused(_StubBase):
+    name = "cloud_stub_chain_refused"
+    provider_side = True
+
+    def render_clip(self, request, prepared):
+        from nodes._otr_shared import cloud_media_backend as cmb
+        raise cmb.CloudMediaError(
+            cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+
+
+def test_a_floored_beat_does_not_kill_the_run_through_its_chain_successor(
+        cloud_stub_registry, monkeypatch):
+    """THE CASCADE THE FIRST DRAFT MISSED.
+
+    run_cloud_fanout only submits a shot once every predecessor is in
+    finished_ok. A floored predecessor never lands there, so its CHAIN
+    successor is never submitted, comes back in stuck_ids rather than errors,
+    and used to sail past every floor branch into "cloud fan-out never
+    rendered shot" -- which raises. The floor held for jump beats and quietly
+    failed for chained ones, which is the harder half of the episode.
+    """
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    vreg.register(_StubCloudChainRefused())
+    led = _cloud_ledger(refused_index=1, n=4)
+    shots = led["video"]["shots"]
+    shots[1]["engine_id"] = "cloud_stub_chain_refused"
+    # shot_0002 can only start on the last frame of the beat that gets refused.
+    shots[2]["starts_on_last_frame_of"] = "shot_0001"
+    out = rd.run_episode(led)
+    done = out["ledger"]["video"]["shots"]
+    assert [s["shot_id"] for s in done] == [
+        "shot_0000", "shot_0001", "shot_0002", "shot_0003"]
+    assert done[1]["cloud_floor"] == "content_refused"
+    # The successor is floored FOR ITS OWN STATED REASON, not silently absent.
+    assert done[2]["cloud_floor"] == "predecessor_floored"
+    assert rd._shot_is_cloud_floor(done[2])
+    # It is NOT a content refusal -- nothing refused it; it was never asked.
+    assert not rd._shot_is_content_floor(done[2])
+    # The independent beats around the chain still rendered and committed.
+    assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
+    assert "shot_0001" not in out["clips"] and "shot_0002" not in out["clips"]
+
+
+def test_a_missing_shot_with_no_floored_predecessor_still_raises():
+    """The cascade branch must not become a blanket excuse for absence."""
+    assert rd._floored_predecessor(
+        {"shot_id": "s9", "starts_on_last_frame_of": "s8"}, {"s7"}) == ""

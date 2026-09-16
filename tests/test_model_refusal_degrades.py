@@ -203,3 +203,144 @@ def test_a_real_engine_fault_still_hard_fails(tmp_path, boom):
             _policy(), _payload("still_b001"), gen_fn=gen,
             output_dir=str(tmp_path), lockdir=tmp_path / "lease.lockdir")
     assert "NO FALLBACK" in str(ei.value)
+
+
+# --------------------------------------------------------------------------- #
+# The PARTNER dialect of the same refusal (2026-09-16)
+# --------------------------------------------------------------------------- #
+def test_a_partner_still_refusal_degrades_like_a_local_one():
+    """TWO DIALECTS, ONE VERDICT -- and only one of them used to be heard.
+
+    A local or Google engine marks a refusal by setting ``is_model_refusal``
+    on the exception. A PARTNER engine cannot: it raises a CloudMediaError
+    stamped CONTENT_REFUSED at the cloud invoke boundary and carries no such
+    attribute. So every cloud still refusal skipped the sanctioned-gap path
+    the 2026-08-22 ruling built and re-raised as "fix the engine", taking the
+    whole fan-out wave -- already submitted, already paid -- down with it.
+    """
+    from nodes import otr_image_gen_dispatcher as d
+    from nodes._otr_shared import cloud_media_backend as cmb
+
+    partner = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED,
+        "cloud_luma_photon: Content filtered due to policy restrictions")
+    assert d._still_engine_refused(partner)
+
+    class _LocalRefusal(RuntimeError):
+        is_model_refusal = True
+
+    assert d._still_engine_refused(_LocalRefusal("declined"))
+    # AN ENGINE FAULT STILL HARD-FAILS -- the 2026-08-22 distinction is intact.
+    assert not d._still_engine_refused(MemoryError("cuda oom"))
+    assert not d._still_engine_refused(RuntimeError("decode failed"))
+    assert not d._still_engine_refused(
+        cmb.CloudMediaError(cmb.CloudErrorCode.AUTH, "bad key"))
+    assert not d._still_engine_refused(
+        cmb.CloudMediaError(cmb.CloudErrorCode.BUDGET, "reserve $0.50"))
+
+
+def test_partner_still_refusal_returns_a_result_not_a_raise():
+    """_render_still_pixels must hand the refusal BACK, not let it escape."""
+    from nodes import otr_image_gen_dispatcher as d
+    from nodes._otr_shared import cloud_media_backend as cmb
+
+    refusal = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+
+    def _refuse(_request):
+        raise refusal
+
+    ctx = {"gen_fn": _refuse, "handoff_min_bytes": 1,
+           "handoff_wait_attempts": 1, "handoff_wait_sleep_s": 0}
+    out = d._render_still_pixels({"request": {}}, ctx)
+    assert out == {"refusal": refusal}
+
+    def _explode(_request):
+        raise RuntimeError("the engine actually broke")
+
+    with pytest.raises(RuntimeError):
+        d._render_still_pixels({"request": {}}, dict(ctx, gen_fn=_explode))
+
+
+def test_a_failed_cloud_still_job_degrades_instead_of_killing_the_wave():
+    """Operator 2026-09-16, the still half of the same directive.
+
+    Every still in a fan-out wave is submitted and paid before the commit
+    walk begins, so raising on one bad job discarded all of them.
+    """
+    from nodes import otr_image_gen_dispatcher as d
+    from nodes._otr_shared import cloud_media_backend as cmb
+    from nodes._otr_shared import still_receipt as _receipt
+
+    for code in cmb.JOB_SCOPED_CODES:
+        assert d._cloud_still_job_failure(
+            cmb.CloudMediaError(code, "partner said no")) == code.value
+    # Run-scoped verdicts and ordinary faults still raise.
+    for code in cmb.RUN_SCOPED_CODES | {cmb.CloudErrorCode.INTERRUPTED}:
+        assert d._cloud_still_job_failure(
+            cmb.CloudMediaError(code, "x")) == ""
+    assert d._cloud_still_job_failure(MemoryError("cuda oom")) == ""
+    assert d._cloud_still_job_failure(RuntimeError("decode failed")) == ""
+
+    # Both reasons are sanctionable; nothing else is.
+    assert _receipt.is_sanctionable_skip(_receipt.SANCTIONABLE_SKIP_REASON)
+    assert _receipt.is_sanctionable_skip(_receipt.CLOUD_JOB_SKIP_REASON)
+    for unsanctionable in ("dead_path", "no_engine", "historical_row", "", None):
+        assert not _receipt.is_sanctionable_skip(unsanctionable)
+
+
+def test_a_cloud_still_gap_is_recorded_under_its_own_reason():
+    """A timeout is not a refusal, and the receipt must not say it was."""
+    from nodes import otr_image_gen_dispatcher as d
+    from nodes._otr_shared import cloud_media_backend as cmb
+    from nodes._otr_shared import still_receipt as _receipt
+
+    ctx = {"skip_evidence_by_oid": {}, "warnings": []}
+    job = {"oid": "obj_1", "engine_id": "cloud_luma_photon", "role": "scene",
+           "prompt": "a street at night", "seed": 7, "effective_neg": ""}
+    d._record_still_refusal(
+        job, cmb.CloudMediaError(cmb.CloudErrorCode.TIMEOUT, "no answer"),
+        ctx, reason=_receipt.CLOUD_JOB_SKIP_REASON)
+    ev = ctx["skip_evidence_by_oid"]["obj_1"]
+    assert ev["reason"] == _receipt.CLOUD_JOB_SKIP_REASON
+    assert ev["prompt"] == "a street at night" and ev["seed"] == 7
+    assert "CLOUD JOB FAILED" in ctx["warnings"][0]
+    # The default is still a model refusal, so every existing caller is intact.
+    d._record_still_refusal(job, RuntimeError("declined"), ctx)
+    assert ctx["skip_evidence_by_oid"]["obj_1"]["reason"] == (
+        _receipt.SANCTIONABLE_SKIP_REASON)
+
+
+def test_a_local_still_engine_crash_is_never_laundered_into_a_gap():
+    """THE ENGINE GATE the still funnel was missing (2026-09-16).
+
+    is_content_refusal falls back to PROSE when nothing in the chain carries
+    a stamped code -- which is exactly the shape of a local engine crash. So
+    a local Flux/SDXL traceback whose text happened to contain a needle would
+    have been recorded as a sanctioned model refusal and published.
+    """
+    from nodes import otr_image_gen_dispatcher as d
+    from nodes._otr_shared import cloud_media_backend as cmb
+
+    # An unstamped local crash whose text matches a needle.
+    local_crash = RuntimeError("flux sampler died: prohibited content in lora")
+    assert cmb.is_content_policy_message(str(local_crash))   # the needle bites
+    assert d._still_engine_refused(local_crash, "flux_local") is False
+    assert d._still_engine_refused(local_crash, "ideogram4_local") is False
+    assert d._cloud_still_job_failure(local_crash, "flux_local") == ""
+
+    # The same text from a CLOUD engine is still read, because prose is all
+    # there is when a partner raised before the boundary could stamp it.
+    assert d._still_engine_refused(local_crash, "cloud_luma_photon") is True
+
+    # A local engine's EXPLICIT dialect is always honored, gate or no gate.
+    class _LocalRefusal(RuntimeError):
+        is_model_refusal = True
+
+    assert d._still_engine_refused(_LocalRefusal("declined"), "flux_local")
+
+    # A stamped partner verdict needs no prose and is still cloud-gated.
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "no policy words here")
+    assert d._still_engine_refused(refused, "cloud_luma_photon") is True
+    assert d._still_engine_refused(refused, "flux_local") is False

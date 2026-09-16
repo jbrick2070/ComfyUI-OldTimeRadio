@@ -418,6 +418,19 @@ def out_of_memory_in_chain(exc):
     return False
 
 
+def _is_provider_content_refusal(exc):
+    """True when this failure is a cloud provider's content-policy refusal.
+
+    Imported lazily for this module's cold-import budget, matching the
+    ``is_cloud_budget_error`` idiom already used further down.
+    """
+    try:
+        from .._otr_shared.cloud_media_backend import is_content_refusal
+    except Exception:  # noqa: BLE001 -- classification must never itself raise
+        return False
+    return is_content_refusal(exc)
+
+
 def classify_failure(exc):
     """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
     if isinstance(exc, OomSignal):
@@ -425,6 +438,16 @@ def classify_failure(exc):
     # BEFORE the type table: an OOM wearing a GraphExecutionError is an OOM.
     if out_of_memory_in_chain(exc):
         return _rt.FailureKind.OOM
+    # A PROVIDER POLICY VERDICT IS NOT A CRASH, and it reached this function
+    # wearing one. ``CloudMediaError`` matches no branch below, so a filtered
+    # prompt fell through to CRASH_BEFORE_LOAD -- "the engine died before it
+    # loaded" -- about an engine that loaded, submitted, polled, and got an
+    # answer. The wrong name cost twice: it licensed a same-seed retry against
+    # a gate that returns the same verdict every time, and it told the
+    # operator to "fix the engine or its inputs" when the engine was fine.
+    # Walks the cause chain -- ``render_beat_coverage`` may have wrapped it.
+    if _is_provider_content_refusal(exc):
+        return _rt.FailureKind.CONTENT_REFUSED
     name = type(exc).__name__
     if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",
                 "KeyError", "FileNotFoundError", "FamilyInputGap"):
@@ -5462,6 +5485,161 @@ def _shot_is_budget_floor(shot) -> bool:
     return bool(isinstance(shot, dict) and shot.get("budget_floor"))
 
 
+def _shot_is_content_floor(shot) -> bool:
+    return bool(isinstance(shot, dict) and shot.get("content_floor"))
+
+
+def _cloud_floor_reason(sid, errors, shot=None):
+    """Why this cloud beat may be floored instead of raising -- or "".
+
+    THE GENERAL CASE OF THE CONTENT FLOOR (operator 2026-09-16: "any of them
+    could easily get a failed output; a failed output on a cloud video or
+    still should not break the system"). A provider timing out, returning a
+    corrupt file, losing a job or rejecting one request tells us exactly as
+    much about the NEXT beat as a content refusal does: nothing. Every one of
+    them used to abort the episode and discard every clip already paid for.
+
+    THREE GATES, ALL OF WHICH MUST HOLD:
+      * the shot's engine is a CLOUD engine -- a local fault is a local fault
+        and keeps failing LOUD under NO FALLBACKS;
+      * the failure carries a stamped JOB-SCOPED CloudErrorCode, read at the
+        invoke boundary where the provider's own words were in hand. No prose
+        fallback: "an exception happened during a cloud beat" is far too wide
+        a net to floor on, and an unstamped exception is an ordinary crash;
+      * it is not run-scoped. AUTH and the config codes mean nothing will ever
+        render, so flooring them would publish an empty episode as "degraded".
+        BUDGET takes its own door above this one, because it must also HALT.
+    """
+    from .._otr_shared.cloud_media_backend import cloud_job_failure_code
+    if shot is not None and not _is_cloud_video_engine(
+            str((shot or {}).get("engine_id") or "")):
+        return ""
+    code = cloud_job_failure_code((errors or {}).get(sid))
+    return code.value if code is not None else ""
+
+
+def _stamp_cloud_floor_shot(shot, reason):
+    """Floor one cloud beat, recording WHICH verdict floored it.
+
+    All three floors ride the sanctioned-gap ACCOUNTING channel so node 92
+    counts them instead of calling them unexplained holes; ``cloud_floor``
+    keeps them tellable apart in the ledger afterwards, and ``content_floor``
+    stays as its own boolean because the content case is the one with an
+    operator ruling attached.
+    """
+    row = dict(shot or {})
+    row["status"] = _receipt.STATUS_SANCTIONED_GAP
+    row["cloud_floor"] = str(reason or "")
+    if str(reason or "") == "content_refused":
+        row["content_floor"] = True
+    return row
+
+
+def _shot_is_cloud_floor(shot) -> bool:
+    return bool(isinstance(shot, dict) and shot.get("cloud_floor"))
+
+
+def _floored_predecessor(shot, floored_sids):
+    """The floored beat this shot chains from, or "".
+
+    THE CASCADE THE FIRST DRAFT MISSED, and it would have undone the whole
+    fix for any CHAIN beat. A chain successor declares
+    ``starts_on_last_frame_of``, and ``run_cloud_fanout`` only submits a shot
+    once every predecessor is in ``finished_ok``. A floored predecessor never
+    lands there, so its successor is never submitted, comes back in
+    ``stuck_ids`` rather than in ``errors``, and reaches the commit walk with
+    no error of its own -- straight past every floor branch and into
+    "cloud fan-out never rendered shot", which raises and takes the episode
+    down anyway. The floor would have held for jump beats and quietly failed
+    for chained ones.
+
+    It is also the honest reading: this successor CANNOT be rendered. Its
+    first frame is its predecessor's last frame, and that clip does not
+    exist. So it is floored for a stated reason rather than raised on.
+    """
+    for pred in cloud_frame_predecessors(shot):
+        if str(pred) in (floored_sids or ()):
+            return str(pred)
+    return ""
+
+
+#: What the log says for each floorable cloud verdict, in the operator's
+#: terms rather than the taxonomy's. Every one of these used to end the run.
+_CLOUD_FLOOR_WHY = {
+    "content_refused": ("the provider's policy gate REFUSED this prompt, and "
+                        "no retry changes that verdict."),
+    "provider_rejected": ("the provider rejected this request without saying "
+                          "why."),
+    "timeout": "the provider did not answer within the render timeout.",
+    "retryable_transport": ("the connection to the provider failed for this "
+                            "request."),
+    "corrupt_output": "the provider returned a file that would not decode.",
+    "orphaned_job": "the provider lost this job before it delivered.",
+    "predecessor_floored": ("the beat it chains from was floored, so its first "
+                            "frame does not exist and never will."),
+}
+
+
+def _cloud_floor_sentence(reason):
+    """The operator-facing sentence for a floor reason; never blank."""
+    return _CLOUD_FLOOR_WHY.get(
+        str(reason or ""),
+        "the provider returned no usable clip for this request.")
+
+
+#: Above this share of the episode, floors look SYSTEMIC rather than per-job
+#: and the operator needs to be told in those words.
+CLOUD_FLOOR_SYSTEMIC_SHARE = 0.25
+
+
+def _report_cloud_floors(shots):
+    """Name every floored beat once, and say so louder when it is not one beat.
+
+    EVERY FLOOR REASON, not just refusals. An earlier draft counted only
+    ``content_floor``, which left the other five job-scoped verdicts with
+    per-beat ERROR lines and no aggregate signal -- so a provider OUTAGE
+    flooring the whole episode on ``timeout`` would have been quieter than a
+    single refused prompt. That is backwards, and the operator directive this
+    serves was general from the start.
+
+    THIS DOES NOT RAISE, and the restraint is the point. Aborting here would
+    reinstate the exact defect the floor exists to remove -- discarding beats
+    that already rendered and already cost money. What a systemic run needs is
+    not a smaller receipt, it is a louder one: the episode still muxes, still
+    publishes as degraded, and the log says plainly that a quarter of the show
+    never came back, and why.
+    """
+    floored, by_reason = [], {}
+    for shot in (shots or ()):
+        if not _shot_is_cloud_floor(shot):
+            continue
+        sid = str((shot or {}).get("shot_id") or "")
+        why = str((shot or {}).get("cloud_floor") or "")
+        floored.append(sid)
+        by_reason.setdefault(why, []).append(sid)
+    if not floored:
+        return floored
+    total = max(1, len(list(shots or ())))
+    share = len(floored) / float(total)
+    tally = "; ".join(
+        "%s: %s" % (why, ", ".join(ids))
+        for why, ids in sorted(by_reason.items()))
+    if share >= CLOUD_FLOOR_SYSTEMIC_SHARE:
+        _LOG.error(
+            "[OTR video] SYSTEMIC CLOUD FAILURE: the provider returned no clip "
+            "for %d of %d beat(s) (%.0f%%) -- this is no longer one job. The "
+            "episode still assembles and publishes DEGRADED with every floored "
+            "beat counted, but read the reasons below (and the shot prompts, "
+            "for a refusal) before spending on another run. %s",
+            len(floored), total, share * 100.0, tally)
+    else:
+        _LOG.warning(
+            "[OTR video] %d beat(s) floored by a cloud job failure; the "
+            "episode publishes DEGRADED with the hole(s) counted. %s",
+            len(floored), tally)
+    return floored
+
+
 def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
                         canvas, oom_engines, oom_shot_id, host_caps, profile,
                         prompt_id=None):
@@ -5689,6 +5867,9 @@ def run_episode(ledger, *, oom_shot_id=None,
             rendered = outcome.results
             errors = outcome.errors
             halted = set(outcome.halted_ids or ())
+            # Every id floored below, so a CHAIN successor can see that the
+            # frame it was going to start from is never going to exist.
+            floored_sids = set()
             if outcome.stuck_ids and not errors:
                 raise RenderError(
                     "cloud fan-out stuck; shots never became ready: %s"
@@ -5703,6 +5884,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), shot.get("beat_id"))
                     new_shots.append(shot)
+                    floored_sids.add(sid)
                     continue
                 if _cloud_budget_floor_sid(sid, errors, halted):
                     _LOG.error(
@@ -5713,10 +5895,38 @@ def run_episode(ledger, *, oom_shot_id=None,
                         sid,
                         errors.get(sid) or "not submitted after spend-cap halt")
                     new_shots.append(_stamp_budget_floor_shot(shot))
+                    floored_sids.add(sid)
+                    continue
+                _floor_why = _cloud_floor_reason(sid, errors, shot)
+                if _floor_why:
+                    _LOG.error(
+                        "[OTR video] CLOUD floor shot %s (beat %s) [%s] -- %s "
+                        "The beat keeps its place, the episode still "
+                        "assembles, and SilentComposite floors it. %s",
+                        sid, bid, _floor_why,
+                        _cloud_floor_sentence(_floor_why), errors.get(sid))
+                    new_shots.append(
+                        _stamp_cloud_floor_shot(shot, _floor_why))
+                    floored_sids.add(sid)
                     continue
                 if sid in errors:
                     raise errors[sid]
                 if sid not in rendered:
+                    _pred = _floored_predecessor(shot, floored_sids)
+                    if _pred:
+                        _LOG.error(
+                            "[OTR video] CLOUD floor shot %s (beat %s) "
+                            "[predecessor_floored] -- %s It chains from %s, "
+                            "which was floored, so it was never submitted. "
+                            "The beat keeps its place and SilentComposite "
+                            "floors it.",
+                            sid, bid,
+                            _cloud_floor_sentence("predecessor_floored"),
+                            _pred)
+                        new_shots.append(_stamp_cloud_floor_shot(
+                            shot, "predecessor_floored"))
+                        floored_sids.add(sid)
+                        continue
                     raise RenderError(
                         "cloud fan-out never rendered shot %s" % sid)
                 packed = rendered[sid]
@@ -5859,6 +6069,16 @@ def run_episode(ledger, *, oom_shot_id=None,
                         new_shots.append(_stamp_budget_floor_shot(shot))
                         cloud_spend_halt = True
                         continue
+                    _floor_why = _cloud_floor_reason(sid, {sid: exc}, shot)
+                    if _floor_why:
+                        _LOG.error(
+                            "[OTR video] CLOUD floor shot %s [%s] -- %s The "
+                            "beat keeps its place and SilentComposite floors "
+                            "it. %s", sid, _floor_why,
+                            _cloud_floor_sentence(_floor_why), exc)
+                        new_shots.append(
+                            _stamp_cloud_floor_shot(shot, _floor_why))
+                        continue
                     raise
                 # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
                 # raises RenderError; there are no runtime fallback decisions and no
@@ -5948,6 +6168,7 @@ def run_episode(ledger, *, oom_shot_id=None,
         for _scoped_id in list(_scoped_engines):
             _end_engine_scope(_scoped_id)
     section["shots"] = new_shots
+    _report_cloud_floors(new_shots)
     ledger["video"] = section
     receipts = []
     for _s in new_shots:
@@ -7033,7 +7254,8 @@ def build_clip_manifest(result, *, episode_id=""):
             # missing file.
             "status": (_receipt.STATUS_SANCTIONED_GAP
                        if (bid in _gap_beats_for_manifest
-                           or _shot_is_budget_floor(shot))
+                           or _shot_is_budget_floor(shot)
+                           or _shot_is_cloud_floor(shot))
                        else _receipt.STATUS_OK),
             "role": str(shot.get("role") or ""),
             "family": clip.get("family") or shot.get("family") or "",

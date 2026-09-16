@@ -347,14 +347,41 @@ def test_headless_prompt_server_progress_sink_preserves_real_server(monkeypatch)
 
 
 def test_provider_rejection_releases_budget(monkeypatch, rig):
+    # THE FIXTURE STRING MATTERS (2026-09-16). This used to say "provider
+    # says: content policy", which is now its own code -- CONTENT_REFUSED --
+    # so the test was silently asserting the catch-all about a string that is
+    # no longer the catch-all. The rejection this test is about is the one
+    # where the provider said no and did NOT say why, so the string says that.
     async def _rejects(self, **kwargs):
-        raise RuntimeError("provider says: content policy")
+        raise RuntimeError("provider says: HTTP 422 unprocessable")
 
     monkeypatch.setattr(_RecordingNode, "EXECUTE_NORMALIZED_ASYNC", _rejects)
     with pytest.raises(CloudMediaError) as ei:
         invoke.invoke_partner_node(
             rig["node_key"], {}, timeout_s=30, estimated_usd=0.50)
     assert ei.value.code is CloudErrorCode.PROVIDER_REJECTED
+    sess = _session(rig)
+    assert sess.spent_usd() == 0.0  # released, never billed
+    assert sess.open_reservations() == []
+
+
+def test_content_policy_rejection_maps_to_content_refused_and_releases(
+        monkeypatch, rig):
+    """The live 2026-09-16 LTX refusal, through the real invoke boundary.
+
+    A filtered job fails in ~5 s having produced nothing, so billing the
+    estimate would charge the operator for a verdict.
+    """
+    async def _filtered(self, **kwargs):
+        raise RuntimeError(
+            'Task failed: {"error": {"type": "content_filtered_error", '
+            '"message": "Content filtered due to policy restrictions"}}')
+
+    monkeypatch.setattr(_RecordingNode, "EXECUTE_NORMALIZED_ASYNC", _filtered)
+    with pytest.raises(CloudMediaError) as ei:
+        invoke.invoke_partner_node(
+            rig["node_key"], {}, timeout_s=30, estimated_usd=0.50)
+    assert ei.value.code is CloudErrorCode.CONTENT_REFUSED
     sess = _session(rig)
     assert sess.spent_usd() == 0.0  # released, never billed
     assert sess.open_reservations() == []

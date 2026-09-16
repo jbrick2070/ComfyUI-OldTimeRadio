@@ -306,7 +306,163 @@ def test_error_codes_canonical_spelling():
     expected = {
         "malformed_config", "unsupported_schema", "incompatible_profile",
         "gated_by_flag", "auth", "budget", "retryable_transport",
-        "provider_rejected", "timeout", "interrupted", "corrupt_output",
-        "orphaned_job",
+        "provider_rejected", "content_refused", "timeout", "interrupted",
+        "corrupt_output", "orphaned_job",
     }
     assert {c.value for c in cmb.CloudErrorCode} == expected
+
+
+# -- content-policy refusals ----------------------------------------------------
+
+
+def test_is_content_policy_message_matches_every_provider_spelling():
+    """One verdict, five separator dialects -- see the needle note."""
+    # LTX 2.5, the proven live 2026-09-16 refusal.
+    assert cmb.is_content_policy_message(
+        'Task failed: {"error": {"type": "content_filtered_error", '
+        '"message": "Content filtered due to policy restrictions"}}')
+    # BFL statuses, Gemini, ByteDance, Comfy's own violation code.
+    assert cmb.is_content_policy_message('{"status": "Content Moderated"}')
+    assert cmb.is_content_policy_message('{"status": "Request Moderated"}')
+    assert cmb.is_content_policy_message("IMAGE_PROHIBITED_CONTENT")
+    assert cmb.is_content_policy_message(
+        "OutputAudioSensitiveContentDetected.PolicyViolation")
+    assert cmb.is_content_policy_message("image_content_policy_violation")
+    assert cmb.is_content_policy_message("flagged by content moderation")
+
+
+def test_content_policy_needles_cannot_swallow_an_ordinary_fault():
+    """A false match launders a broken render into a publishable episode.
+
+    Every string here matched a needle that was CUT on 2026-09-16 review. A
+    miss only restores the old fail-loud behavior; a false match floors a beat
+    that a real fix would have rendered, which is the worse direction.
+    """
+    benign = [
+        # cut needle 'policy restriction' -- systemic, would floor EVERY beat
+        "ProxyError: 403 Forbidden - request blocked by policy restriction",
+        "AccessDenied: denied by a policy restriction on the account",
+        # cut needle 'safety system' -- a retryable outage, not a verdict
+        '{"message": "our safety system is temporarily unavailable, retry"}',
+        # cut needle 'safety filter' -- a MODEL FILE whose name contains it
+        "FileNotFoundError: upscale_models/safety_filter_v2.pth",
+        # cut needle 'sensitive content' -- ordinary English, echo-reachable
+        '{"raw": "prompt: keep sensitive content out of frame"}',
+        # ordinary faults that must always fail loud
+        "HTTP 500 upstream", "CUDA out of memory",
+        "HTTP 402 Payment Required", "HTTP 401 Unauthorized",
+        "ffmpeg exited with code 1", "", None,
+    ]
+    for text in benign:
+        assert not cmb.is_content_policy_message(text), text
+
+
+def test_the_exact_live_ltx_refusal_maps_to_content_refused():
+    """The 2026-09-16 bytes, verbatim -- this is why no credits are needed.
+
+    A live one-shot LTX call would prove exactly one thing: that this string
+    becomes CONTENT_REFUSED. The string is already in hand, so the test proves
+    it for free and keeps proving it after the wallet is empty.
+    """
+    from nodes._otr_shared import cloud_media_invoke as cmi
+    live = (
+        "Polling aborted due to error: Task failed: "
+        '{"id": "70d5715281164ec880371706c11fe8d9", '
+        '"created_at": "2026-09-16T20:32:39.717Z", "status": "failed", '
+        '"completed_at": "2026-09-16T20:32:44.904Z", '
+        '"error": {"type": "content_filtered_error", '
+        '"message": "Content filtered due to policy restrictions"}}')
+    err = cmi._map_exception(Exception(live), "cloud_ltx25_i2v")
+    assert err.code is cmb.CloudErrorCode.CONTENT_REFUSED
+    assert cmb.is_content_refusal(err)
+
+
+def test_is_content_refusal_prefers_the_stamped_code_over_prose():
+    """A stamped verdict is a recorded fact; prose is the last resort."""
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED,
+        "cloud_ltx25_i2v: Content filtered due to policy restrictions")
+    assert cmb.is_content_refusal(refused)
+    # render_shot wraps every failure, and the wrap message CONCATENATES the
+    # inner chain -- so the walk is the contract, not a nicety.
+    wrap = RuntimeError(
+        "shot shot_shot_001_b40 engine 'cloud_ltx25_foley_plus' failed to "
+        "render; fallbacks are disabled")
+    wrap.__cause__ = refused
+    assert cmb.is_content_refusal(wrap)
+    # The code alone settles it with no policy words in the message at all.
+    assert cmb.is_content_refusal(
+        cmb.CloudMediaError(cmb.CloudErrorCode.CONTENT_REFUSED, "beat 40"))
+    # No code anywhere -> prose may speak (a BYO engine, or a pre-stamp raise).
+    assert cmb.is_content_refusal(RuntimeError("Content Moderated"))
+    assert not cmb.is_content_refusal(RuntimeError("timeout"))
+    assert not cmb.is_content_refusal(None)
+
+
+def test_a_different_stamped_code_vetoes_the_prose():
+    """The invoke boundary already adjudicated; prose must not overturn it.
+
+    A timeout or transport blip whose body QUOTES the refusal words of some
+    other job would otherwise floor a beat the boundary called retryable.
+    """
+    for code in (cmb.CloudErrorCode.RETRYABLE_TRANSPORT,
+                 cmb.CloudErrorCode.TIMEOUT,
+                 cmb.CloudErrorCode.PROVIDER_REJECTED,
+                 cmb.CloudErrorCode.BUDGET):
+        noisy = cmb.CloudMediaError(
+            code, "cloud_ltx25_i2v: content_filtered_error seen on job 41")
+        assert not cmb.is_content_refusal(noisy), code
+        wrap = RuntimeError("fallbacks are disabled")
+        wrap.__cause__ = noisy
+        assert not cmb.is_content_refusal(wrap), code
+    # A refusal is not a spend halt, and a spend halt is not a refusal.
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+    assert not cmb.is_cloud_budget_error(refused)
+    assert not cmb.is_content_refusal(
+        cmb.CloudMediaError(cmb.CloudErrorCode.BUDGET, "reserve $0.50"))
+
+
+def test_content_refused_releases_its_reservation():
+    """A 5-second verdict produced no media; billing it charges for nothing."""
+    from nodes._otr_shared import cloud_media_invoke as cmi
+    assert cmb.CloudErrorCode.CONTENT_REFUSED in cmi._RELEASE_CODES
+
+
+# -- job-scoped vs run-scoped (operator 2026-09-16) -----------------------------
+
+
+def test_job_scoped_and_run_scoped_codes_partition_the_taxonomy():
+    """Every code is job-scoped, run-scoped, or deliberately neither."""
+    job, run = cmb.JOB_SCOPED_CODES, cmb.RUN_SCOPED_CODES
+    assert not (job & run)
+    # INTERRUPTED is in NEITHER on purpose: a cancel is the operator saying
+    # stop, and turning that into 40 floored beats would be obscene.
+    assert set(cmb.CloudErrorCode) - job - run == {
+        cmb.CloudErrorCode.INTERRUPTED}
+    # The run-scoped set is the "nothing will ever render" set.
+    assert cmb.CloudErrorCode.AUTH in run
+    assert cmb.CloudErrorCode.BUDGET in run
+    assert cmb.CloudErrorCode.CONTENT_REFUSED in job
+    assert cmb.CloudErrorCode.TIMEOUT in job
+
+
+def test_cloud_job_failure_code_reads_only_a_stamped_verdict():
+    """A failed output on ONE cloud job must not break the system."""
+    for code in cmb.JOB_SCOPED_CODES:
+        err = cmb.CloudMediaError(code, "cloud_ltx25_i2v: no clip")
+        assert cmb.cloud_job_failure_code(err) is code
+        wrap = RuntimeError("fallbacks are disabled")
+        wrap.__cause__ = err
+        assert cmb.cloud_job_failure_code(wrap) is code
+    # Run-scoped codes, a cancel, and anything that never reached the cloud
+    # boundary at all get NOTHING -- those still fail LOUD.
+    for code in cmb.RUN_SCOPED_CODES | {cmb.CloudErrorCode.INTERRUPTED}:
+        assert cmb.cloud_job_failure_code(
+            cmb.CloudMediaError(code, "x")) is None
+    assert cmb.cloud_job_failure_code(RuntimeError("torch blew up")) is None
+    assert cmb.cloud_job_failure_code(MemoryError("cuda oom")) is None
+    assert cmb.cloud_job_failure_code(None) is None
+    # No prose fallback here, unlike is_content_refusal: "an exception during
+    # a cloud beat" is far too wide a net to floor a beat on.
+    assert cmb.cloud_job_failure_code(RuntimeError("Content filtered")) is None

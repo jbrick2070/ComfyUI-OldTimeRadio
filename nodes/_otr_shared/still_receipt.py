@@ -26,11 +26,19 @@ precisely the defect the 2026-08-28 panel caught in the first draft of this
 work: counting every absent clip as sanctioned would report a crashed render
 as a publishable degraded episode.
 
-**NOT every absence is sanctionable, and this is deliberately narrow.** Only
-``reason == "model_refusal"`` earns a gap row. A dead path, a historical-row-
-only target, a no-engine skip and every other absence still raise in the
-dispatcher exactly as before. Widening this set would re-open the failure the
-gate exists to catch.
+**NOT every absence is sanctionable, and this is STILL deliberately narrow.**
+Exactly TWO reasons earn a gap row -- ``model_refusal`` (the model declined the
+card, 2026-08-22) and ``cloud_job_failed`` (a partner job produced no image for
+this object, 2026-09-16). Both mean the same thing about the NEXT object:
+nothing. A dead path, a historical-row-only target, a no-engine skip and every
+other absence still raise in the dispatcher exactly as before.
+
+The set was widened ONCE, on evidence, and the bar for widening it again is the
+same: the reason must be a POSITIVE record that something specific declined or
+failed for this object, never an inference from a missing file. Read the set
+through :func:`is_sanctionable_skip`, never by comparing against one constant --
+that comparison is what this docstring used to describe, and a caller still
+doing it would silently stop tolerating half the sanctionable cases.
 """
 from __future__ import annotations
 
@@ -50,6 +58,27 @@ RECEIPT_STATUSES = frozenset({STATUS_OK, STATUS_SANCTIONED_GAP})
 #: narrowness travels with the vocabulary instead of living only in a comment
 #: at the one site that currently enforces it.
 SANCTIONABLE_SKIP_REASON = "model_refusal"
+
+#: The second sanctionable reason (operator 2026-09-16: "any of them could
+#: easily get a failed output; a failed output on a cloud video or still
+#: should not break the system"). A partner still that timed out, lost its
+#: job or returned an undecodable file produced no image for THIS object and
+#: says nothing about the next one -- the same shape as a refusal, in a
+#: different provider's words. It is recorded under its own reason rather
+#: than borrowed from ``model_refusal`` because a timeout is not a refusal
+#: and a receipt that says otherwise is a receipt that lies.
+CLOUD_JOB_SKIP_REASON = "cloud_job_failed"
+
+#: STILL NARROW. A dead path, a historical-row-only target, a no-engine skip
+#: and every other absence remain unsanctionable and still fail the episode.
+SANCTIONABLE_SKIP_REASONS = frozenset({
+    SANCTIONABLE_SKIP_REASON, CLOUD_JOB_SKIP_REASON,
+})
+
+
+def is_sanctionable_skip(reason) -> bool:
+    """True when this skip reason may be converted into a sanctioned gap."""
+    return str(reason or "") in SANCTIONABLE_SKIP_REASONS
 
 
 def is_sanctioned_gap(row) -> bool:

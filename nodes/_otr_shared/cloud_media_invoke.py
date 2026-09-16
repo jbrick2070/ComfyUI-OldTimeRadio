@@ -42,6 +42,7 @@ from .cloud_media_backend import (
     CloudMediaError,
     get_or_create_session,
     is_auth_failure_message,
+    is_content_policy_message,
     is_wallet_empty_message,
 )
 from .cloud_media_canonical import PartnerResult, validate_partner_result
@@ -721,9 +722,13 @@ def _normalize_result(raw: Any, row: dict, session,
 # ---------------------------------------------------------------------------
 
 #: provider said no / never charged -> the reservation releases.
+#: CONTENT_REFUSED belongs here on the same evidence as the rest: the live
+#: 2026-09-16 LTX refusal failed 5.2 s after submit with no media produced,
+#: so billing the estimate would charge the operator for a verdict.
 _RELEASE_CODES = frozenset({
     CloudErrorCode.AUTH,
     CloudErrorCode.BUDGET,
+    CloudErrorCode.CONTENT_REFUSED,
     CloudErrorCode.PROVIDER_REJECTED,
     CloudErrorCode.RETRYABLE_TRANSPORT,
     CloudErrorCode.UNSUPPORTED_SCHEMA,
@@ -757,6 +762,16 @@ def _map_exception(exc: BaseException, node_key: str) -> CloudMediaError:
             f"{node_key}: wallet empty ({exc})")
     if is_auth_failure_message(text):
         return CloudMediaError(CloudErrorCode.AUTH, f"{node_key}: {exc}")
+    # A POLICY VERDICT IS NOT A GENERIC REJECTION, and the difference is the
+    # whole reason this branch exists. PROVIDER_REJECTED is the catch-all for
+    # "the provider said no and we do not know why", and the render driver
+    # treats not-knowing as a crash -- which killed a 58-minute episode at
+    # beat 40 on 2026-09-16 over one filtered prompt. Naming the verdict here,
+    # while the provider's own words are still in hand, is what lets the
+    # driver floor that one beat instead of the whole run.
+    if is_content_policy_message(text):
+        return CloudMediaError(CloudErrorCode.CONTENT_REFUSED,
+                               f"{node_key}: {exc}")
     return CloudMediaError(CloudErrorCode.PROVIDER_REJECTED,
                            f"{node_key}: {exc}")
 
