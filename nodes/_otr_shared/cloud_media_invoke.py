@@ -748,12 +748,14 @@ def _map_exception(exc: BaseException, node_key: str) -> CloudMediaError:
         return CloudMediaError(CloudErrorCode.RETRYABLE_TRANSPORT,
                                f"{node_key}: {exc}")
     text = str(exc).lower()
-    if "unauthorized" in text or "401" in text or "forbidden" in text:
-        return CloudMediaError(CloudErrorCode.AUTH, f"{node_key}: {exc}")
+    # Wallet-empty (HTTP 402) before AUTH: a 402 body that also says
+    # "unauthorized" is still an empty account, not a flaky key.
     if is_wallet_empty_message(text):
         return CloudMediaError(
             CloudErrorCode.BUDGET,
             f"{node_key}: wallet empty ({exc})")
+    if "unauthorized" in text or "401" in text or "forbidden" in text:
+        return CloudMediaError(CloudErrorCode.AUTH, f"{node_key}: {exc}")
     return CloudMediaError(CloudErrorCode.PROVIDER_REJECTED,
                            f"{node_key}: {exc}")
 

@@ -385,6 +385,18 @@ def test_http_402_payment_required_maps_to_budget(monkeypatch, rig):
     assert sess.open_reservations() == []
 
 
+def test_http_402_wins_over_unauthorized_in_the_same_body():
+    err = invoke._map_exception(
+        RuntimeError("HTTP 402 Unauthorized"), "cloud_ltx25_i2v")
+    assert err.code is CloudErrorCode.BUDGET
+
+
+def test_http_401_still_maps_to_auth():
+    err = invoke._map_exception(
+        RuntimeError("HTTP 401 Unauthorized"), "cloud_ltx25_i2v")
+    assert err.code is CloudErrorCode.AUTH
+
+
 def test_comfy_processing_interrupted_maps_to_interrupted():
     ProcessingInterrupted = type("ProcessingInterrupted", (Exception,), {})
     err = invoke._map_exception(

@@ -5707,9 +5707,9 @@ def run_episode(ledger, *, oom_shot_id=None,
                 if _cloud_budget_floor_sid(sid, errors, halted):
                     _LOG.error(
                         "[OTR video] BUDGET floor shot %s -- "
-                        "OTR_CLOUD_MEDIA_BUDGET_USD refused a further reserve; "
-                        "the beat keeps its place and SilentComposite floors it. "
-                        "%s",
+                        "local media cap or empty wallet refused a further "
+                        "reserve; the beat keeps its place and "
+                        "SilentComposite floors it. %s",
                         sid,
                         errors.get(sid) or "not submitted after spend-cap halt")
                     new_shots.append(_stamp_budget_floor_shot(shot))

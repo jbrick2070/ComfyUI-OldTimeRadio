@@ -122,12 +122,13 @@ def is_wallet_empty_message(text: str) -> bool:
     Live 2026-09-16: Credits returned ``HTTP 402 Payment Required``. The
     partner LTX path used to map unknown HTTP errors to
     ``PROVIDER_REJECTED``, so fan-out halt has to recognize the
-    wallet-empty text too.
+    wallet-empty text too. ``402`` is matched as a whole token so a job
+    id containing 1402 does not trip this.
     """
     blob = str(text or "").lower()
-    if "payment required" in blob:
+    if "payment required" in blob or "insufficient credit" in blob:
         return True
-    if "402" in blob and ("payment" in blob or "credit" in blob):
+    if re.search(r"\b402\b", blob):
         return True
     return False
 
