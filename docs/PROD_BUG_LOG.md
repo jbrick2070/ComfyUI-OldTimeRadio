@@ -15342,3 +15342,8 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
 - bible-worthy: yes -- a per-prompt spend cap that raises instead of
   flooring burns paid clips and produces no obs artifact.
 - confidence: HIGH (live 5-act traceback + Comfy invoice + idle queue).
+- follow-up same day (Agy QA of 2bef7557): partner HTTP 402 now maps to
+  `BUDGET` so fan-out halt fires on an empty wallet, not only the local
+  cap; the serial `work==1` cloud path floors the same way; unset
+  `DEFAULT_BUDGET_USD` is $300 so a boot that skips `_tmp_boot_cpu_8000.py`
+  is not silently $10. Still do not recycle/requeue while Credits are 402.

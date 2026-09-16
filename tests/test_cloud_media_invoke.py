@@ -371,6 +371,20 @@ def test_auth_error_text_maps_to_auth(monkeypatch, rig):
     assert ei.value.code is CloudErrorCode.AUTH
 
 
+def test_http_402_payment_required_maps_to_budget(monkeypatch, rig):
+    async def _empty_wallet(self, **kwargs):
+        raise RuntimeError("HTTP 402 Payment Required")
+
+    monkeypatch.setattr(_RecordingNode, "EXECUTE_NORMALIZED_ASYNC",
+                        _empty_wallet)
+    with pytest.raises(CloudMediaError) as ei:
+        invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=30)
+    assert ei.value.code is CloudErrorCode.BUDGET
+    sess = _session(rig)
+    assert sess.spent_usd() == 0.0
+    assert sess.open_reservations() == []
+
+
 def test_comfy_processing_interrupted_maps_to_interrupted():
     ProcessingInterrupted = type("ProcessingInterrupted", (Exception,), {})
     err = invoke._map_exception(

@@ -5735,6 +5735,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                                  else max(vram_peak, int(used)))
                 _last_engine = str(out_shot.get("engine_id") or "")
         else:
+            cloud_spend_halt = False
             for shot in section["shots"]:
                 # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
                 #
@@ -5762,6 +5763,13 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), shot.get("beat_id"))
                     new_shots.append(shot)
+                    continue
+                if cloud_spend_halt:
+                    _LOG.error(
+                        "[OTR video] BUDGET floor shot %s -- "
+                        "not submitted after spend-cap halt",
+                        shot.get("shot_id"))
+                    new_shots.append(_stamp_budget_floor_shot(shot))
                     continue
                 # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
                 # DIFFERENT engine than the one the prior beat left resident, drain the
@@ -5831,10 +5839,27 @@ def run_episode(ledger, *, oom_shot_id=None,
                 # multi-segment plan opens ONE beat session, renders each segment from
                 # its own request, chains terminal frames inside the loop, and assembles
                 # the result before it comes back.
-                clip, out_shot, attempts, used = render_beat_coverage(
-                    shot, ledger, request=request, request_builder=request_builder,
-                    canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
-                    host_caps=_episode_host_caps, profile=_episode_profile)
+                try:
+                    clip, out_shot, attempts, used = render_beat_coverage(
+                        shot, ledger, request=request,
+                        request_builder=request_builder,
+                        canvas=canvas, oom_engines=oom_engines,
+                        oom_shot_id=oom_shot_id,
+                        host_caps=_episode_host_caps,
+                        profile=_episode_profile)
+                except Exception as exc:
+                    sid = str(shot.get("shot_id") or "")
+                    if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
+                        _LOG.error(
+                            "[OTR video] BUDGET floor shot %s -- "
+                            "OTR_CLOUD_MEDIA_BUDGET_USD or empty wallet "
+                            "refused a further reserve; SilentComposite "
+                            "floors it. %s",
+                            sid, exc)
+                        new_shots.append(_stamp_budget_floor_shot(shot))
+                        cloud_spend_halt = True
+                        continue
+                    raise
                 # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
                 # raises RenderError; there are no runtime fallback decisions and no
                 # AS-2 family-change group prune (the family can never change here).

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+from pathlib import Path
 
 import pytest
 
@@ -129,6 +130,33 @@ def test_cloud_budget_floor_sid_sees_wrapped_render_error():
     assert rd._cloud_budget_floor_sid("s2", {}, ["s2"])
     assert not rd._cloud_budget_floor_sid(
         "s3", {"s3": RuntimeError("boom")}, [])
+
+
+def test_run_cloud_fanout_halts_on_partner_402_text():
+    started = []
+    lock = threading.Lock()
+
+    def execute(item):
+        with lock:
+            started.append(item)
+        if item == "a":
+            raise cmb.CloudMediaError(
+                cmb.CloudErrorCode.PROVIDER_REJECTED,
+                "cloud_ltx25_i2v: HTTP 402 Payment Required")
+        return item
+
+    out = cf.run_cloud_fanout(
+        ["a", "b", "c"], item_id=lambda x: x, execute=execute, workers=1)
+    assert started == ["a"], started
+    assert cmb.is_cloud_budget_error(out.errors["a"])
+    assert out.halted_ids == ["b", "c"]
+
+
+def test_render_driver_stamps_budget_floors_on_fanout_and_serial_paths():
+    src = Path(rd.__file__).read_text(encoding="utf-8")
+    assert src.count("new_shots.append(_stamp_budget_floor_shot(shot))") >= 3
+    assert "cloud_spend_halt" in src
+    assert "_shot_is_budget_floor(shot)" in src
 
 
 def _img_stub(**kw):

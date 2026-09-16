@@ -81,6 +81,7 @@ __all__ = [
     "resolve_cache_root",
     "SESSION_SWEEP_MAX_AGE_S",
     "is_cloud_budget_error",
+    "is_wallet_empty_message",
 ]
 
 # ---------------------------------------------------------------------------
@@ -115,13 +116,30 @@ class CloudMediaError(RuntimeError):
         super().__init__(msg)
 
 
+def is_wallet_empty_message(text: str) -> bool:
+    """True when the provider refused because the Comfy account is empty.
+
+    Live 2026-09-16: Credits returned ``HTTP 402 Payment Required``. The
+    partner LTX path used to map unknown HTTP errors to
+    ``PROVIDER_REJECTED``, so fan-out halt has to recognize the
+    wallet-empty text too.
+    """
+    blob = str(text or "").lower()
+    if "payment required" in blob:
+        return True
+    if "402" in blob and ("payment" in blob or "credit" in blob):
+        return True
+    return False
+
+
 def is_cloud_budget_error(exc: BaseException | None) -> bool:
     """True when this exception (or its cause chain) is a spend-cap refusal.
 
     Live 2026-09-16: a 5-act Foley hit ``OTR_CLOUD_MEDIA_BUDGET_USD`` and
     ``render_shot`` wrapped the ``CloudMediaError`` in ``RenderError``.
     Callers that need to stop submitting more partner jobs have to see
-    through that wrap.
+    through that wrap. A partner HTTP 402 is the same halt: the wallet
+    is empty, further reserves must not fire.
     """
     seen: set[int] = set()
     cur: BaseException | None = exc
@@ -130,7 +148,8 @@ def is_cloud_budget_error(exc: BaseException | None) -> bool:
         code = getattr(cur, "code", None)
         if code is CloudErrorCode.BUDGET or getattr(code, "value", None) == "budget":
             return True
-        if "cloud media: budget" in str(cur):
+        blob = str(cur)
+        if "cloud media: budget" in blob or is_wallet_empty_message(blob):
             return True
         nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
         cur = nxt if isinstance(nxt, BaseException) else None
@@ -144,9 +163,13 @@ def is_cloud_budget_error(exc: BaseException | None) -> bool:
 _TRUTHY = {"1", "true", "yes", "on"}
 
 #: Per-run USD safety cap when OTR_CLOUD_MEDIA_BUDGET_USD is unset.
-#: PRICING.md 2026-07-02: episode envelope ~$1.55 (Kling lipsync-heavy);
-#: $10 covers a heavy episode with headroom while still bounding a runaway.
-DEFAULT_BUDGET_USD = 10.0
+#: PRICING.md 2026-07-02 used $10 for a Kling-era episode envelope.
+#: Live 2026-09-16 deluxe Foley 5-act billed ~$84 of LTX Fast in one UTC
+#: day and died at a $40 boot ceiling; a full 5-act needs hundreds of
+#: seconds of LTX. $300 is one deluxe episode plus stills/TTS/music in
+#: the same prompt session. An explicit 0 is still spend-off. The wallet
+#: can 402 first.
+DEFAULT_BUDGET_USD = 300.0
 
 
 def mute_ok_roles() -> frozenset:

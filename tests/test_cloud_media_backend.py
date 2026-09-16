@@ -283,6 +283,15 @@ def test_is_cloud_budget_error_walks_cause_chain():
     assert cmb.is_cloud_budget_error(wrap)
     assert not cmb.is_cloud_budget_error(RuntimeError("timeout"))
     assert not cmb.is_cloud_budget_error(None)
+    rejected = cmb.CloudMediaError(
+        cmb.CloudErrorCode.PROVIDER_REJECTED,
+        "cloud_ltx25_i2v: HTTP 402 Payment Required")
+    assert cmb.is_cloud_budget_error(rejected)
+    wrap402 = RuntimeError("shot failed")
+    wrap402.__cause__ = rejected
+    assert cmb.is_cloud_budget_error(wrap402)
+    assert cmb.is_wallet_empty_message("HTTP 402: Payment Required")
+    assert not cmb.is_wallet_empty_message("HTTP 500 upstream")
 
 
 def test_error_codes_canonical_spelling():
