@@ -15347,3 +15347,37 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   cap; the serial `work==1` cloud path floors the same way; unset
   `DEFAULT_BUDGET_USD` is $300 so a boot that skips `_tmp_boot_cpu_8000.py`
   is not silently $10. Still do not recycle/requeue while Credits are 402.
+
+## PBUG-20260916-03 -- cloud Foley JUMP segment 1 overwrites segment 0's stem
+- surfaced: LIVE deluxe Foley 1-act on headless `--cpu` `:8000`, 2026-09-16
+  ~11:03. Prompt `b65b0811-f04a-4af6-8636-23c6af3515d9`, episode
+  `signal_lost_behind_the_carved_screen_20260916_110348`. Writer,
+  ElevenLabs, Luma stills, and seven of eight LTX shots ran; fan-out
+  then raised. `video_mp4=0`, nothing in `otr/obs/`.
+- symptom: `FoleyStemError: foley stem ...\audio\foley\shot_b004.wav
+  holds 480000 sample(s) but its segment asks for frames [0, 500) of
+  it, which needs 960000`. Log showed b004 JUMP segment 0/2 sliced
+  20.000s then segment 1/2 sliced 10.000s; partner payloads
+  `ltx25_duration_s` 20 then 10. Single-segment beats assembled.
+- root cause: `CloudLtx25FoleyPlus.canonicalize` named the durable
+  stem `<foley_dir>/<shot_id>.wav` (`clip_id` is `shot_id`). Intra-beat
+  JUMP/CHAIN segments render serially and share that name, so the 10s
+  second write replaced the 20s first file. Local LTX already names
+  from the unique video basename + `_foley.wav`. Not a duration snap
+  (20 is on the Fast menu) and not a budget floor.
+- fix: **FIXED in the same change as this entry.** Harvest tmp is
+  `<raw_partner_basename>.src.wav` (harvest runs before
+  `clip["path"]` exists). Durable stem is
+  `<canon_video_basename>_foley.wav`. `clip_id` stays `shot_id`.
+  FoleyStemError stays fail-loud. Blast radius: cloud LTX Foley
+  canonicalize only. 5080/4060 local LTX paths are untouched. Do not
+  requeue paid Foley until `:8000` recycles onto this commit. Do not
+  bump `pyproject.toml` while 2.1.5 is Pending.
+- verify idea: `test_ltx25_foley_jump_segments_keep_distinct_stems`.
+  Live proof is a deluxe Foley 1-act JUMP beat reaching `obs_publish
+  OK` after recycle -- spend that only after this commit is the
+  resident bytecode.
+- bible-worthy: yes -- a durable asset named by shot_id will collide
+  on any multi-segment beat.
+- confidence: HIGH (live 1-act traceback + leftover 10s wav on disk +
+  Agy HOLDS Fix A).

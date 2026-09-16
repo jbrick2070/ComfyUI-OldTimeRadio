@@ -812,6 +812,63 @@ def test_ltx25_foley_harvests_audio_before_parent_strip(tmp_path, monkeypatch):
 
 
 @pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_ltx25_foley_jump_segments_keep_distinct_stems(tmp_path, monkeypatch):
+    """Same shot_id, two unique mp4s must not share one durable wav.
+
+    Live 2026-09-16 JUMP b004: segment 1 wrote shot_b004.wav over segment 0
+    and assemble asked 500 frames of a 10s leftover.
+    """
+    from nodes._otr_video_engines import foley_stems as fs
+
+    foley_dir = tmp_path / "foley"
+    foley_dir.mkdir()
+    monkeypatch.setattr(fs, "durable_foley_dir", lambda: str(foley_dir))
+    fixture = _make_av_fixture(tmp_path)
+    src_a = tmp_path / "cloud_ltx25_i2v_foley-aaaaaaaa.mp4"
+    src_b = tmp_path / "cloud_ltx25_i2v_foley-bbbbbbbb.mp4"
+    shutil.copy(fixture, src_a)
+    shutil.copy(fixture, src_b)
+    req = _request(tmp_path, shot_id="shot_b004")
+    harvests = []
+    orig_extract = fs.extract_pcm16_wav_from_video
+
+    def _spy(src, dest):
+        harvests.append(Path(dest).name)
+        return orig_extract(src, dest)
+
+    monkeypatch.setattr(fs, "extract_pcm16_wav_from_video", _spy)
+    clip0 = ecv.Ltx25FoleyPlus.canonicalize(
+        {"path": str(src_a), "content_type": "video/mp4",
+         "duration_s": None, "provider_job_id": "j0", "raw_meta": {}},
+        req, {})
+    clip1 = ecv.Ltx25FoleyPlus.canonicalize(
+        {"path": str(src_b), "content_type": "video/mp4",
+         "duration_s": None, "provider_job_id": "j1", "raw_meta": {}},
+        req, {})
+    p0 = Path(clip0["foley_path"])
+    p1 = Path(clip1["foley_path"])
+    assert p0 != p1
+    assert p0.is_file() and p1.is_file()
+    assert p0.name.endswith("_foley.wav") and p1.name.endswith("_foley.wav")
+    assert p0.name != "shot_b004.wav" and p1.name != "shot_b004.wav"
+    assert clip0["clip_id"] == "shot_b004"
+    assert clip1["clip_id"] == "shot_b004"
+    assert harvests == [
+        "cloud_ltx25_i2v_foley-aaaaaaaa.src.wav",
+        "cloud_ltx25_i2v_foley-bbbbbbbb.src.wav",
+    ]
+    n0 = int(clip0["frame_count"])
+    n1 = int(clip1["frame_count"])
+    out = foley_dir / "beat_shot_b004_foley.wav"
+    receipts = fs.assemble_beat_foley_segments(
+        [(str(p0), 0, n0), (str(p1), 0, n1)], out,
+        expect_frames=n0 + n1, fps=int(clip0["fps"] or 25))
+    step = fs.samples_per_frame(
+        receipts["foley_sample_rate"], int(clip0["fps"] or 25))
+    assert receipts["foley_samples"] == (n0 + n1) * step
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
 def test_ltx25_foley_canonicalize_fails_closed_without_audio(
         tmp_path, monkeypatch):
     from nodes._otr_video_engines import foley_stems as fs

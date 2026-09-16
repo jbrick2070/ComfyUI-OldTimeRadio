@@ -1295,8 +1295,18 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
 
         raw_path = str(validate_partner_result(dict(raw))["path"])
         dest_dir = durable_foley_dir()
-        clip_hint = str(_req_get(request, "shot_id") or self.name)
-        harvest_tmp = os.path.join(str(dest_dir), clip_hint + ".src.wav")
+        # JUMP/CHAIN segments share shot_id. Naming the harvest or the
+        # durable stem from shot_id made segment 1 overwrite segment 0
+        # (live 2026-09-16 FoleyStemError on shot_b004.wav: 10s leftover
+        # against a 20s first picture). Local LTX already names from the
+        # unique video basename. Harvest runs BEFORE parent canonicalize,
+        # so it keys off the partner tmp path; the durable stem keys off
+        # clip["path"] after that call. clip_id stays shot_id for trace.
+        raw_stem = os.path.splitext(os.path.basename(raw_path))[0]
+        if not raw_stem:
+            raise FoleyStemError(
+                "cloud Foley harvest has no basename from %r" % raw_path)
+        harvest_tmp = os.path.join(str(dest_dir), raw_stem + ".src.wav")
         # Harvest the provider bed FIRST. Parent canonicalize_video writes a
         # sibling .canon.mp4 with -an; if that ever became an in-place strip
         # the bed would already be gone. Fail closed before the picture
@@ -1305,8 +1315,13 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
             extract_pcm16_wav_from_video(raw_path, harvest_tmp)
             arr, rate = read_pcm16_wav(harvest_tmp)
             clip = super().canonicalize(raw, request, profile)
-            clip_id = str(clip.get("clip_id") or self.name)
-            stem_path = os.path.join(str(dest_dir), clip_id + ".wav")
+            video_stem = os.path.splitext(
+                os.path.basename(str(clip.get("path") or "")))[0]
+            if not video_stem:
+                raise FoleyStemError(
+                    "cloud Foley cannot name a stem from empty clip path "
+                    "(shot %s)" % (_req_get(request, "shot_id") or self.name))
+            stem_path = os.path.join(str(dest_dir), video_stem + "_foley.wav")
             matched = conform_stem_to_frame_count(
                 arr, rate, int(clip["frame_count"]), int(clip["fps"] or 25))
             n_samples, n_ch = write_pcm16_wav(stem_path, matched, rate)
