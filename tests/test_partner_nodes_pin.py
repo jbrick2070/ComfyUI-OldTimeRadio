@@ -24,6 +24,7 @@ EXPECTED_ROW_IDS = {
     "cloud_krea_2_turbo", "cloud_luma_photon_flash",
     "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
     "cloud_vidu_q2_i2v",
+    "cloud_ltx25_i2v", "cloud_ltx25_a2v",
     # 2026-07-02 roster expansion:
     "cloud_ideogram_v4", "cloud_seedream_2",
     "cloud_elevenlabs_voice_selector",

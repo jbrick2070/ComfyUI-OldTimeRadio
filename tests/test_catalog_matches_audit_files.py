@@ -34,16 +34,18 @@ def test_catalog_license_fields_match_audit_files_for_every_row() -> None:
     catalog_rows = list(catalog.CURATED_LLM_MODELS)
     failures: list[str] = []
 
-    # Every catalog row must have an audit file.
+    # Every catalog row must have an audit file (Quant twins share the
+    # parent's Hugging Face id).
     for row in catalog_rows:
-        if row.repo_id not in audit_targets:
+        audit_id = catalog.hf_weights_id(row.repo_id)
+        if audit_id not in audit_targets:
             failures.append(
-                f"catalog row {row.repo_id!r} has no entry in "
-                f"docs/model-license-audit-targets.txt; D0b "
+                f"catalog row {row.repo_id!r} (weights {audit_id!r}) has no "
+                f"entry in docs/model-license-audit-targets.txt; D0b "
                 f"framework cannot validate it"
             )
             continue
-        record = load_audit_record(row.repo_id)
+        record = load_audit_record(audit_id)
         fm = record.frontmatter
         if fm.get("license") != row.license:
             failures.append(
@@ -60,10 +62,10 @@ def test_catalog_license_fields_match_audit_files_for_every_row() -> None:
             )
 
     # Every audit target must have a catalog row (catches dangling
-    # audit files for retired models).
-    catalog_repo_ids = {r.repo_id for r in catalog_rows}
+    # audit files for retired models). A Quant twin is not its own target.
+    catalog_audit_ids = {catalog.hf_weights_id(r.repo_id) for r in catalog_rows}
     for target in audit_targets:
-        if target not in catalog_repo_ids:
+        if target not in catalog_audit_ids:
             failures.append(
                 f"audit target {target!r} has no corresponding catalog "
                 f"row in CURATED_LLM_MODELS; either add the row or "

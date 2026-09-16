@@ -30,6 +30,7 @@ _FFMPEG = shutil.which("ffmpeg")
 _CLOUD_ROWS = (
     "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
     "cloud_wan_i2v_audio", "cloud_vidu_q2_pro_fast_720p",
+    "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
 )
 _MUSIC_OPEN_RISKY_PROMPT = (
     "Continuous shot, same console throughout. Dial whip-pans across "
@@ -55,7 +56,7 @@ def test_cloud_rows_never_default():
     # default_engine_for_role is the automatic-selection surface).
     for eng in (
             ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
-            ecv.ViduQ2ProFast720p):
+            ecv.ViduQ2ProFast720p, ecv.Ltx25FoleyPlus, ecv.Ltx25AudioIn):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
         default = vreg.default_engine_for_role(role)
@@ -68,9 +69,11 @@ def test_reactivity_descriptors_match_pass04():
     assert ecv.WanI2V.reactivity == "mute_only"
     assert ecv.WanI2VAudio.reactivity == "required_audio_ref"
     assert ecv.ViduQ2ProFast720p.reactivity == "mute_only"
+    assert ecv.Ltx25FoleyPlus.reactivity == "mute_only"
+    assert ecv.Ltx25AudioIn.reactivity == "required_audio_ref"
     assert all(e.must_strip_audio for e in
                (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
-                ecv.ViduQ2ProFast720p))
+                ecv.ViduQ2ProFast720p, ecv.Ltx25FoleyPlus, ecv.Ltx25AudioIn))
 
 
 def test_schema_grounded_v3_video_rows_are_partner_invocable():
@@ -81,10 +84,14 @@ def test_schema_grounded_v3_video_rows_are_partner_invocable():
     assert ecv.WanI2V.invocable is True
     assert ecv.WanI2VAudio.invocable is True
     assert ecv.ViduQ2ProFast720p.invocable is True
+    assert ecv.Ltx25FoleyPlus.invocable is True
+    assert ecv.Ltx25AudioIn.invocable is True
     assert ecv.Seedance2.invocability_reason == ""
     assert ecv.WanI2V.invocability_reason == ""
     assert ecv.WanI2VAudio.invocability_reason == ""
     assert ecv.ViduQ2ProFast720p.invocability_reason == ""
+    assert ecv.Ltx25FoleyPlus.invocability_reason == ""
+    assert ecv.Ltx25AudioIn.invocability_reason == ""
 
 
 def test_assert_usable_no_enable_flag(monkeypatch):
@@ -100,10 +107,10 @@ def test_assert_usable_no_enable_flag(monkeypatch):
 # --------------------------------------------------------------------------- #
 
 
-def _fixture_png(tmp_path):
+def _fixture_png(tmp_path, size=(512, 768)):
     from PIL import Image
-    p = tmp_path / "init.png"
-    Image.new("RGB", (64, 36), (200, 120, 40)).save(str(p))
+    p = tmp_path / ("init_%dx%d.png" % size)
+    Image.new("RGB", size, (200, 120, 40)).save(str(p))
     return str(p)
 
 
@@ -202,6 +209,38 @@ def test_kling_avatar_pads_request_audio_to_provider_floor(tmp_path):
     ins = ecv.KlingAvatar._partner_inputs(req)
     assert ins["sound_file"]["sample_rate"] == 16000
     assert ins["sound_file"]["waveform"].shape[-1] == 32000
+
+
+def test_kling_avatar_keeps_the_shot_action_prompt_and_never_says_subtle(
+        tmp_path):
+    action = (
+        "She slams the studio door, strides to the microphone, and "
+        "points at the dials as the camera dollies in.")
+    ins = ecv.KlingAvatar._partner_inputs(
+        _request(tmp_path, text_prompt=action))
+    assert ins["prompt"].startswith(action)
+    assert "full, decisive action" in ins["prompt"]
+    assert "supplied audio" in ins["prompt"]
+    assert "spoken line" in ins["prompt"]
+    assert "subtle" not in ins["prompt"].lower()
+    assert "small natural head" not in ins["prompt"].lower()
+    assert "no exaggerated gestures" not in ins["prompt"].lower()
+
+
+def test_kling_avatar_wants_talking_stills_and_a_face_photo_plan():
+    assert ecv.KlingAvatar.wants_talking_prompt() is True
+    kinds = tuple(row.kind for row in ecv.KlingAvatar.still_plan)
+    assert kinds == ("portrait",)
+    row = ecv.KlingAvatar.still_plan[0]
+    assert row.required == "always"
+    assert row.aspect == "portrait"
+    assert row.target_class == "portrait"
+
+
+def test_kling_avatar_rejects_init_image_below_comfy_minimum(tmp_path):
+    tiny = _fixture_png(tmp_path, size=(64, 36))
+    with pytest.raises(RuntimeError, match="minimum 300px"):
+        ecv.KlingAvatar._partner_inputs(_request(tmp_path, init_image=tiny))
 
 
 def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
@@ -720,4 +759,87 @@ def test_vidu_canonicalize_forwards_the_plan_length(tmp_path, monkeypatch):
     assert seen.get("target_frames") == 125
     assert clip["frame_count"] == 125
     assert clip["native_frame_count"] == 125
+
+
+def test_ltx25_foley_partner_inputs_keep_generate_audio(tmp_path, monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_LTX25_DURATION", raising=False)
+    ins = ecv.Ltx25FoleyPlus._partner_inputs(_request(tmp_path))
+    assert ins["model"]["generate_audio"] is True
+    assert ins["model"]["model"] == "LTX-2.5 (Fast)"
+    assert ins["model"]["resolution"] == "1920x1080"
+    assert ins["model"]["fps"] == "25"
+    assert int(ins["model"]["duration"]) in ecv._LTX25_FAST_DURATIONS
+    assert "audio" not in ins
+    assert hasattr(ins["image"], "ndim")
+
+
+def test_ltx25_foley_snaps_duration_to_the_partner_menu(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LTX25_DURATION", "7")
+    ins = ecv.Ltx25FoleyPlus._partner_inputs(_request(tmp_path))
+    assert ins["model"]["duration"] == "8"
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_ltx25_foley_harvests_audio_before_parent_strip(tmp_path, monkeypatch):
+    """If parent strip ever mutates the provider file, the bed is already out."""
+    from nodes._otr_video_engines import foley_stems as fs
+
+    src = _make_av_fixture(tmp_path, with_audio=True)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "foley-harvest",
+           "raw_meta": {}}
+    monkeypatch.setattr(fs, "durable_foley_dir", lambda: str(tmp_path))
+    orig = ecv._CloudVideoBase._canonical_video_asset
+
+    def _eat_src_audio_then_canon(self, raw_in, request):
+        eaten = tmp_path / "eaten.mp4"
+        subprocess.run(
+            [_FFMPEG, "-v", "error", "-y", "-i", str(raw_in["path"]),
+             "-an", "-c:v", "copy", str(eaten)],
+            check=True, capture_output=True, timeout=60)
+        Path(raw_in["path"]).write_bytes(eaten.read_bytes())
+        return orig(self, raw_in, request)
+
+    monkeypatch.setattr(
+        ecv._CloudVideoBase, "_canonical_video_asset",
+        _eat_src_audio_then_canon)
+    clip = ecv.Ltx25FoleyPlus.canonicalize(raw, _request(tmp_path), {})
+    assert clip["has_audio"] is False
+    stem = Path(clip["foley_path"])
+    assert stem.is_file() and stem.stat().st_size > 44
+    assert clip["foley_samples"] > 0
+    assert clip["foley_sample_rate"] == 48000
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_ltx25_foley_canonicalize_fails_closed_without_audio(
+        tmp_path, monkeypatch):
+    from nodes._otr_video_engines import foley_stems as fs
+    from nodes._otr_video_engines.foley_stems import FoleyStemError
+
+    src = _make_av_fixture(tmp_path, with_audio=False)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "foley-silent",
+           "raw_meta": {}}
+    monkeypatch.setattr(fs, "durable_foley_dir", lambda: str(tmp_path))
+    with pytest.raises(FoleyStemError, match="no harvestable audio"):
+        ecv.Ltx25FoleyPlus.canonicalize(raw, _request(tmp_path), {})
+
+
+def test_ltx25_audio_in_partner_inputs_send_audio_and_image(
+        tmp_path, monkeypatch):
+    req = _request(tmp_path, audio_ref=_fixture_wav(tmp_path, dur_s=3.0))
+    ins = ecv.Ltx25AudioIn._partner_inputs(req)
+    assert "waveform" in ins["audio"]
+    assert ins["model"]["model"] == "LTX-2.5 (Fast)"
+    assert ins["model"]["resolution"] == "1920x1080"
+    assert hasattr(ins["image"], "ndim")
+    assert set(ins["model"]) == {"model", "resolution"}
+
+
+def test_ltx25_audio_in_resolution_env_matches_payload(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_LTX25_A2V_RESOLUTION", "1080x1920")
+    req = _request(tmp_path, audio_ref=_fixture_wav(tmp_path, dur_s=3.0))
+    ins = ecv.Ltx25AudioIn._partner_inputs(req)
+    assert ins["model"]["resolution"] == "1080x1920"
 

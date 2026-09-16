@@ -160,8 +160,8 @@ open one.
 ### Hosted -- no weights, but you supply a key
 
 `cloud_kling_avatar`, `cloud_seedance_2`, `cloud_wan_i2v`, `cloud_wan_i2v_audio`,
-`cloud_vidu_q2_pro_fast_720p` and `word_razzle` render on Comfy's partner
-services and bill your Comfy credits. `google_veo_video` and
+`cloud_vidu_q2_pro_fast_720p`, `cloud_ltx25_foley_plus`, `cloud_ltx25_audio_in`
+and `word_razzle` render on Comfy's partner services and bill your Comfy credits. `google_veo_video` and
 `google_omni_video` go straight to Google and bill your Google key.
 
 They download nothing and use no VRAM, so they run on any machine. Selecting one
@@ -185,11 +185,12 @@ six dropdowns by hand:
 | Mac 16 GB | `variants/otr_mac16_video.json` | `ltx098_low_video` |
 | CPU only | `variants/otr_cpu_low.json` | the visualizers |
 | Comfy Cloud (cheap, 1/3/7-act) | `variants/otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
-| Comfy Cloud (deluxe, audio-in) | `variants/otr_cloud_deluxe_7act.json` | `cloud_wan_i2v_audio` |
+| Comfy Cloud (deluxe Foley) | `variants/otr_cloud_deluxe_7act.json` | `cloud_ltx25_foley_plus` |
+| Comfy Cloud (deluxe audio-in) | `variants/otr_cloud_deluxe_audio_in_7act.json` | `cloud_ltx25_audio_in` |
 
 **The pack default is the three viz lanes on `otr_canonical.json`.** That is the GPU-friendly first run: no video weights, no Comfy credits. Local machine graphs keep the local lane in the table above.
 
-**On the Comfy Cloud graphs, Vidu is the saved default** -- all three VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **The deluxe exception is `otr_cloud_deluxe_7act`**, which pins `cloud_wan_i2v_audio` instead (audio-in Wan, not Vidu, not Seedance).
+**On the Comfy Cloud graphs, Vidu is the saved default** -- all three VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **Two deluxe 7-act variations share Sol/Luna writers:** `otr_cloud_deluxe_7act` pins LTX 2.5 Foley (picture + native bed mixed 0.50 under TTS) and `otr_cloud_deluxe_audio_in_7act` pins LTX 2.5 Audio-to-Video (episode audio drives the picture). Wan audio-in stays in the dropdown; it is not the deluxe default.
 
 On any other graph the same Vidu combo is in the dropdown if you want to spend credits. Pick is the enable; without `OTR_COMFY_API_KEY` (or a signed-in Comfy session) the render stops and says so.
 

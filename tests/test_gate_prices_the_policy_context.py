@@ -23,10 +23,16 @@ import types
 
 import pytest
 
+from nodes import _otr_gguf_backend as ggf
 from nodes import _otr_model_catalog as cat
 from nodes._otr_model_loader import _assert_policy_admits_vram
 
 GEMMA_GGUF = "unsloth/gemma-4-12b-it-GGUF"
+_skip_no_gguf_row = pytest.mark.skipif(
+    not ggf.GGUF_ROWS,
+    reason="no GGUF writer row ships; row-content contracts are dormant "
+           "(see nodes/_otr_gguf_backend.GGUF_ROWS)",
+)
 
 
 def _policy(ceiling=6.8, quant="Q4_K_M", n_ctx=4096):
@@ -38,11 +44,13 @@ def _ctx(value=8192, tier="UNKNOWN"):
     return types.SimpleNamespace(value=value, tier=tier)
 
 
+@_skip_no_gguf_row
 def test_the_measured_4060_configuration_is_admitted():
     """n_ctx 4096, Q4_K_M, 6.8 ceiling -- measured at 7,751 MiB on real hardware."""
     _assert_policy_admits_vram(GEMMA_GGUF, _ctx(8192), _policy(n_ctx=4096))
 
 
+@_skip_no_gguf_row
 def test_the_row_max_context_does_not_override_the_policy():
     """The bug: ctx_verdict carried 8192 and won over the policy's 4096."""
     at_4096 = cat.check_vram_fit(GEMMA_GGUF, 4096, ceiling_gb=6.8, gguf_quant="Q4_K_M")
@@ -52,6 +60,7 @@ def test_the_row_max_context_does_not_override_the_policy():
     _assert_policy_admits_vram(GEMMA_GGUF, _ctx(8192), _policy(n_ctx=4096))
 
 
+@_skip_no_gguf_row
 def test_a_policy_that_really_asks_for_8192_is_still_priced_at_8192():
     """Removing the over-price must not become an under-price."""
     with pytest.raises(Exception) as ei:
@@ -76,6 +85,7 @@ def test_native_advertised_window_does_not_price_unallocated_kv():
         _assert_policy_admits_vram("Qwen/Qwen3.5-4B", _ctx(capacity), policy)
 
 
+@_skip_no_gguf_row
 def test_the_oversize_guard_still_bites():
     """The fix must not turn the gate into a rubber stamp."""
     pol = types.SimpleNamespace(vram_ceiling_gb=6.8, gguf_quant="Q8_0", gguf_n_ctx=8192)

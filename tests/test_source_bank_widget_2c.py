@@ -12,7 +12,8 @@ Pins:
      comfy_slot_a_model / comfy_slot_b_model -- not beside source_bank);
      choices come LIVE from the routing registry (exact list, registry
      order, including non-runnable custom banks -- the honest-error
-     contract); default scifi_news_pro. source_bank is also the sole
+     contract); canvas default is the roll command, same as every shipping
+     JSON. source_bank is also the sole
      `required` entry as of the same reorder -- every other writer input,
      episode_title and num_characters included, is `optional`.
   2. Registration fail-loud: a broken registry RAISES out of INPUT_TYPES
@@ -109,8 +110,7 @@ class TestWidgetSurface:
         assert choices[0] == rolls.BANK_SENTINEL
         assert choices[1:] == list(routing.list_bank_ids())
         assert rolls.BANK_SENTINEL not in routing.list_bank_ids()
-        # The saved graph still stores a concrete id, so no canonical diff.
-        assert meta["default"] == "scifi_news_pro"
+        assert meta["default"] == rolls.BANK_SENTINEL
         # The honest-error contract: non-runnable custom banks ARE listed.
         assert _NON_RUNNABLE_BANK in choices
         assert _PUBLIC_DOMAIN_BANK in choices
@@ -393,14 +393,14 @@ class TestClientBankReachesTheWidget:
         choices, meta = OTR_LedgerScriptWriter.INPUT_TYPES()["required"][
             "source_bank"]
         assert self._CLIENT_ID in choices
-        # It joins as a peer -- the shipped rows and the default are untouched.
+        # It joins as a peer of the shipped rows. The canvas default is roll.
         assert _PUBLIC_DOMAIN_BANK in choices
         assert _NON_RUNNABLE_BANK in choices
-        assert meta["default"] == "scifi_news_pro"
+        from nodes import _otr_rolls as rolls
+        assert meta["default"] == rolls.BANK_SENTINEL
+        assert self._CLIENT_ID in rolls.eligible_bank_ids()
         # Choice 0 is the roll command (a UI command, never a registry row);
         # everything after it is exactly the registry, client row included.
-        from nodes import _otr_rolls as rolls
-
         assert choices[0] == rolls.BANK_SENTINEL
         assert choices[1:] == list(routing.list_bank_ids())
 

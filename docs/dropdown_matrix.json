@@ -76,6 +76,22 @@
       },
       "size_gb": null
     },
+    "cloud_ltx25_audio_in": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
+    "cloud_ltx25_foley_plus": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
+    },
     "cloud_nano_banana_2": {
       "memory": {
         "mac16": "fits",

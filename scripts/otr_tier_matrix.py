@@ -44,8 +44,10 @@ _ARCHES = (
 
 #: Tiers in reading order, named by what the episode is made of.
 _TIERS = ("low", "still", "video", "foley", "mime", "animatediff")
-#: Cloud rows: cheap length SKUs (Vidu Q2 mute) plus deluxe 7-act (Wan audio-in).
-_CLOUD_TIERS = ("low_1act", "low", "low_7act", "deluxe_7act")
+#: Cloud rows: cheap length SKUs (Vidu Q2 mute) plus two deluxe 7-act
+#: variations (LTX 2.5 Foley, LTX 2.5 audio-in).
+_CLOUD_TIERS = ("low_1act", "low", "low_7act", "deluxe_7act",
+                "deluxe_audio_in_7act")
 
 # acts and chars were columns until 2026-09-13. All sixteen rows read 3 and 3,
 # and sat beside the word `shipping` -- while every qualification leg ran at ONE
@@ -111,7 +113,13 @@ def _row(profile_id: str, tier: str, packs: dict) -> list:
     if picked and all(_proven_no_still(_internal(l), None) for l in picked):
         image = "none (dormant)"
     also = sorted({packs[_internal(l)] for l in lanes if _internal(l) in packs})
-    writer = str(llm.get("creative_model", "(canonical)")).split("/")[-1]
+    creative = str(llm.get("creative_model", "(canonical)"))
+    writer = creative.split("/")[-1]
+    if creative.startswith("comfy:"):
+        a = str(llm.get("comfy_slot_a_model") or "").split("/")[-1]
+        b = str(llm.get("comfy_slot_b_model") or "").split("/")[-1]
+        if a and b:
+            writer = "%s / %s" % (a, b) if a != b else a
     return [
         "**%s**" % tier,
         "`%s`" % profile_id,

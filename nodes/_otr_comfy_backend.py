@@ -71,7 +71,20 @@ SLOT_A_ID = "comfy:slot-a"
 SLOT_B_ID = "comfy:slot-b"
 COMFY_ROW_IDS = frozenset({SLOT_A_ID, SLOT_B_ID})
 
+# Placeholder on the static `comfy:slot-a|b` catalog rows. Those two
+# handles stand in for every Credits slug, so this number cannot describe
+# the model actually bound. `load()` reads the OpenRouter catalog cache
+# (Credits is that same catalog through Comfy's proxy) and never uses
+# this as the live clamp. Kept at 8192 so the virtual-row shape stays
+# identical to the OpenRouter slots.
 DEFAULT_CONTEXT_WINDOW = 8192
+# Credits-only boxes often have no OPENROUTER_API_KEY, so the OpenRouter
+# cold-cache heal never fires. Falling back to 8192 then is the defect
+# that starved gpt-5.6-sol on a 1-act script (2026-09-15): requested 8192
+# output, context_cap 8192, prompt ate the rest, finish_reason=length.
+# A remote default leaves the output cap alone; the provider still
+# enforces the real window.
+DEFAULT_REMOTE_CONTEXT_WINDOW = 131072
 
 # The Comfy API proxy surface. Verified 2026-06-01 against the bundled
 # partner-node source: path from `comfy_api_nodes/nodes_openrouter.py`
@@ -84,12 +97,27 @@ DEFAULT_CONTEXT_WINDOW = 8192
 DEFAULT_BASE_URL = "https://api.comfy.org"
 DEFAULT_CHAT_PATH = "/proxy/openrouter/api/v1/chat/completions"
 
-# Recommended slugs (the dropdown lead + the resolution fallback). Both are
-# present in the Comfy partner-node catalog below. Anthropic tops out at
-# claude-opus-4.7 on Comfy's curated list (the own-key OpenRouter lane uses
-# 4.8) -- so the Comfy lane carries its own creative default.
-COMFY_RECOMMENDED_CREATIVE_DEFAULT = "anthropic/claude-opus-4.7"
-COMFY_RECOMMENDED_TECHNICAL_DEFAULT = "google/gemini-3.5-flash"
+# Credits OpenRouterLLMNode ids (operator 2026-09-15). Native OpenAIChatNode /
+# ClaudeNode labels (bare gpt-5.6-terra, "Sonnet 5") are a different node
+# family -- this backend posts to the OpenRouter proxy, so it uses the
+# provider/model slugs. Do not add ~*-latest aliases; Credits rejects them.
+COMFY_GPT_TERRA = "openai/gpt-5.6-terra"
+COMFY_GPT_TERRA_PRO = "openai/gpt-5.6-terra-pro"
+COMFY_GPT_LUNA = "openai/gpt-5.6-luna"
+COMFY_GPT_LUNA_PRO = "openai/gpt-5.6-luna-pro"
+COMFY_GPT_SOL = "openai/gpt-5.6-sol"
+COMFY_GPT_SOL_PRO = "openai/gpt-5.6-sol-pro"
+COMFY_CLAUDE_SONNET_5 = "anthropic/claude-sonnet-5"
+
+# Recommended slugs (the dropdown lead + the resolution fallback). Cheap
+# Comfy Cloud graphs pin Sonnet 5 creative / Luna technical. Deluxe pins
+# GPT 5.6 Sol on creative (profile override) and the same Luna technical.
+# Luna is sent with reasoning_effort=none on the OpenRouter proxy (Credits
+# widget label is off). Sonnet 5 cannot turn thinking fully off, so
+# creative sends reasoning_effort=low. Sol omits the field (catalog
+# default) and still gets the reasoning output floor.
+COMFY_RECOMMENDED_CREATIVE_DEFAULT = COMFY_CLAUDE_SONNET_5
+COMFY_RECOMMENDED_TECHNICAL_DEFAULT = COMFY_GPT_LUNA
 
 # CURATED (operator directive 2026-07-04): ONE recognizable, NON-REASONING model
 # per major brand, ordered cheapest -> premium. Reasoning models (deepseek-*-pro,
@@ -116,31 +144,67 @@ COMFY_RECOMMENDED_TECHNICAL_DEFAULT = "google/gemini-3.5-flash"
 # this block was written about, on the exact SKU pattern it names, thirteen
 # months of model churn later. The rule is load-bearing. Do not delete it; if
 # the slugs need re-dating, that is a separate mechanical pass.
+# 2026-09-15 operator pin: Sonnet 5 creative / Luna technical on cheap
+# cloud SKUs; GPT 5.6 Sol creative / Luna technical on deluxe. That does
+# NOT reopen reasoning-branded SKUs (deepseek-*-pro, sonar-reasoning,
+# gpt-5.5-pro). Luna/Terra send effort=none so JSON passes do not buy
+# thinking tokens; Sonnet 5 cannot turn reasoning off, so creative uses
+# low. Sol stays on the combo as the deluxe creative pin.
 COMFY_LLM_MODELS: tuple[str, ...] = (
     "google/gemini-3.5-flash",        # Gemini   -- LOW/cheap, fast, PROVEN 2026-07-04
     "deepseek/deepseek-v3.2",         # DeepSeek -- cheap general chat (NON-reasoning)
     "mistralai/mistral-large-2512",   # Mistral  -- mid, capable general model
-    "x-ai/grok-4.20",                 # Grok     -- mid
-    "openai/gpt-5.5",                 # ChatGPT  -- upper-mid (the non-pro, non-reasoning tier)
-    "anthropic/claude-opus-4.7",      # Claude   -- UPPER, strongest writer (creative default)
+    "x-ai/grok-4.20",                 # Grok     -- mid (kept so older saved graphs load)
+    "openai/gpt-5.5",                 # ChatGPT  -- upper-mid (kept for older deluxe graphs)
+    COMFY_GPT_TERRA,                  # ChatGPT  -- optional twin (effort=none)
+    COMFY_GPT_TERRA_PRO,              # ChatGPT  -- optional pro twin (effort=none)
+    COMFY_GPT_LUNA,                   # ChatGPT  -- shipping technical default (effort=none)
+    COMFY_GPT_LUNA_PRO,               # ChatGPT  -- optional pro twin (effort=none)
+    COMFY_GPT_SOL,                    # ChatGPT  -- deluxe creative pin (catalog default effort)
+    COMFY_GPT_SOL_PRO,                # ChatGPT  -- optional pro twin
+    COMFY_CLAUDE_SONNET_5,            # Claude   -- shipping cheap-cloud creative (effort=low)
+    "anthropic/claude-opus-4.7",      # Claude   -- UPPER, kept on the combo
 )
+
+# OpenRouterLLMNode widgets spell disable as ``off``. This backend posts the
+# OpenRouter chat-completions proxy, whose vocabulary is ``none`` (Terra's
+# catalog default_effort is medium -- omitting the field would buy thinking
+# tokens). Sonnet 5 has no off/none; low is the cheapest legal setting.
+_COMFY_REASONING_OFF = frozenset({
+    COMFY_GPT_TERRA,
+    COMFY_GPT_TERRA_PRO,
+    COMFY_GPT_LUNA,
+    COMFY_GPT_LUNA_PRO,
+})
+_COMFY_REASONING_LOW_REQUIRED = frozenset({COMFY_CLAUDE_SONNET_5})
+_COMFY_SOL_FAMILY = frozenset({COMFY_GPT_SOL, COMFY_GPT_SOL_PRO})
+_COMFY_NO_TEMPERATURE = frozenset({COMFY_CLAUDE_SONNET_5})
 
 # Cost-guard defaults (mirror the OpenRouter lane). Prepaid credits already
 # cap spend account-side; these are a second belt-and-suspenders ceiling.
 DEFAULT_MAX_TOKENS_PER_CALL = 32768
-DEFAULT_MAX_TOKENS_PER_RUN = 300000
-DEFAULT_OUTPUT_TOKENS_CAP = 8192
+# 300000 aborted a live 1-act on 2026-09-15: each call's pre-call estimate
+# added the 16384 output cap, so ledger_clean died around the 50th Credits
+# post. Account actual usage after the call; keep this ceiling as a 7-act
+# envelope, overridable via OTR_COMFY_MAX_TOKENS_PER_RUN on every cloud JSON.
+DEFAULT_MAX_TOKENS_PER_RUN = 1000000
+# Match the OpenRouter lane (R3 2026-06-22): 8192 starved reasoning
+# models -- hidden thinking spends the output budget first, then
+# finish_reason=length cuts the story body. Live 2026-09-15: Sol on
+# Credits hit that exact abort on `_pass_script` after the 8192 context
+# clamp left 5487 tokens. Override per slot via OTR_COMFY_<A|B>_MAXTOK.
+DEFAULT_OUTPUT_TOKENS_CAP = 16384
 # BUG-LOCAL-301: 1024 (was 512). Parity with the OpenRouter lane's BUG-294
 # output-token floor. max_tokens is a CEILING -- a higher floor costs nothing
 # on short replies (the model stops at finish_reason=stop and bills only actual
 # tokens) but stops a verbose / reasoning technical model from being cut off
-# mid-object. The recommended technical default deepseek-v4-pro is a reasoning
-# model: it emits chain-of-thought before the JSON, so a 512 floor truncated
-# build_news_briefs (finish_reason=length -> JSONDecodeError -> the writer
-# halted at news_interpreter). Reasoning-heavy models can still need more --
-# bump OTR_COMFY_MIN_OUTPUT_TOKENS, or use a non-reasoning / local technical
-# model for the structured-JSON passes.
+# mid-object. Sonnet 5 is the shipping cheap-cloud creative slot and
+# cannot turn reasoning off -- generate() lifts to
+# DEFAULT_MIN_OUTPUT_TOKENS_REASONING (4096, same as the OpenRouter lane)
+# whenever effort is not ``none``, and for Sol/Sol-pro whose effort is
+# omitted so the catalog default can think.
 DEFAULT_MIN_OUTPUT_TOKENS = 1024
+DEFAULT_MIN_OUTPUT_TOKENS_REASONING = 4096
 DEFAULT_TIMEOUT_S = 120
 DEFAULT_MAX_RETRIES = 2
 
@@ -226,6 +290,59 @@ def _slot_letter(repo_id: str) -> str:
         f"not a Comfy Credits virtual row id: {repo_id!r} "
         f"(expected one of {sorted(COMFY_ROW_IDS)})"
     )
+
+
+def resolve_context_window(slug: str, *, row_default: int | None = None) -> int:
+    """The bound slug's advertised window, not the virtual row's 8192.
+
+    Credits posts through Comfy's OpenRouter proxy. The two `comfy:slot-*`
+    rows are static, so `row.context_window` is a local VRAM-shaped
+    placeholder -- the same fiction the own-key OpenRouter lane already
+    stopped clamping against. Read the OpenRouter catalog cache for the
+    resolved slug. If that cache is cold and no OpenRouter key is present
+    to heal it, use ``DEFAULT_REMOTE_CONTEXT_WINDOW`` rather than 8192.
+    ``row_default`` is ignored when it is the local placeholder; a larger
+    explicit default still wins.
+    """
+    from . import _otr_openrouter_backend as orb
+
+    advertised = orb._advertised_context_window(slug)
+    if advertised > 0:
+        return advertised
+    if orb.openrouter_enabled():
+        healed = orb.resolve_context_window(
+            slug, row_default=DEFAULT_REMOTE_CONTEXT_WINDOW)
+        if healed > 0:
+            return healed
+    explicit = int(row_default or 0)
+    if explicit > DEFAULT_CONTEXT_WINDOW:
+        return explicit
+    log.warning(
+        "[ComfyCredits] %s has no context_length in the OpenRouter catalog "
+        "cache; using remote default %d. Credits is the OpenRouter proxy "
+        "-- never clamp against the virtual row's %d.",
+        slug, DEFAULT_REMOTE_CONTEXT_WINDOW, DEFAULT_CONTEXT_WINDOW,
+    )
+    return DEFAULT_REMOTE_CONTEXT_WINDOW
+
+
+def reasoning_effort_for_slug(slug: str) -> str | None:
+    """Credits reasoning_effort for one catalog slug, or None to omit.
+
+    Terra/Luna family: ``none`` on the OpenRouter proxy (Credits widget
+    label is ``off`` -- same meaning, no thinking tokens). Sonnet 5:
+    ``low`` (cheapest legal; the model cannot turn reasoning fully off).
+    Sol/Sol-pro omit the field so Credits keeps the catalog default;
+    generate() still lifts the reasoning output floor for those slugs.
+    Other catalog rows omit the field so they keep the pre-2026-09-15
+    payload.
+    """
+    s = str(slug or "").strip()
+    if s in _COMFY_REASONING_OFF:
+        return "none"
+    if s in _COMFY_REASONING_LOW_REQUIRED:
+        return "low"
+    return None
 
 
 def recommended_slug_for_slot(letter: str) -> str:
@@ -358,6 +475,30 @@ def _estimate_request_tokens(messages: list[dict], out_tokens: int) -> int:
     return (chars // 4) + int(out_tokens or 0)
 
 
+def _usage_tokens(body: dict) -> int:
+    """Provider-reported tokens for the run accumulator.
+
+    The pre-call estimate adds the full max_tokens cap. Accounting that
+    number after every ledger_clean judge is what burned a 1-act at 300k
+    while the billed usage was a fraction of the estimate.
+    """
+    usage = body.get("usage") if isinstance(body, dict) else None
+    if not isinstance(usage, dict):
+        return 0
+    try:
+        total = int(usage.get("total_tokens") or 0)
+    except (TypeError, ValueError):
+        total = 0
+    if total > 0:
+        return total
+    try:
+        prompt = int(usage.get("prompt_tokens") or 0)
+        completion = int(usage.get("completion_tokens") or 0)
+    except (TypeError, ValueError):
+        return 0
+    return max(0, prompt + completion)
+
+
 def catalog_models() -> list[dict]:
     """The pinned catalog as id-dicts (shape parity with the OpenRouter
     cache so the dropdown builder can share filtering logic)."""
@@ -445,9 +586,12 @@ class ComfyCreditsBackend:
             )
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
-        context_window = int(
-            getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW)
-            or DEFAULT_CONTEXT_WINDOW
+        # The window belongs to the SLUG, not the static virtual row.
+        # Reading it from the row capped every Credits model at 8192 and
+        # `fit_output_tokens` then strangled the OpenRouter-proxy call.
+        context_window = resolve_context_window(
+            slug,
+            row_default=getattr(row, "context_window", DEFAULT_CONTEXT_WINDOW),
         )
         cache_entry: dict[str, Any] = {
             "provider": PROVIDER,
@@ -506,9 +650,15 @@ class ComfyCreditsBackend:
                 "main/docs/comfy-credits-setup.md."
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
+        effort = reasoning_effort_for_slug(slug)
 
         cap = int(cache_entry.get("max_tokens_cap") or DEFAULT_OUTPUT_TOKENS_CAP)
         floor = _int_env("OTR_COMFY_MIN_OUTPUT_TOKENS", DEFAULT_MIN_OUTPUT_TOKENS)
+        if (effort and effort != "none") or slug in _COMFY_SOL_FAMILY:
+            floor = max(floor, _int_env(
+                "OTR_COMFY_MIN_OUTPUT_TOKENS_REASONING",
+                DEFAULT_MIN_OUTPUT_TOKENS_REASONING,
+            ))
         requested_tokens = max(1, int(max_new_tokens or 0))
         if (require_full_output or bounded_capacity) and requested_tokens > cap:
             capacity = GenerationContextOverflowError(
@@ -558,18 +708,22 @@ class ComfyCreditsBackend:
             "messages": messages,
             "max_tokens": out_tokens,
         }
-        if temp is not None:
+        if temp is not None and slug not in _COMFY_NO_TEMPERATURE:
             payload["temperature"] = float(temp)
+        if effort:
+            payload["reasoning_effort"] = effort
         if stop:
             payload["stop"] = [s for s in stop if s]
         if response_format is not None:
             payload["response_format"] = response_format
 
+        self._last_usage_tokens = 0
         text = self._post_with_retries(
             bearer=bearer, payload=payload, slug=slug,
             fail_on_output_limit=fail_on_output_limit,
         )
-        self._account_spend(est)
+        used = int(getattr(self, "_last_usage_tokens", 0) or 0)
+        self._account_spend(used if used > 0 else est)
         return text
 
     def unload(self, model: Any) -> None:  # noqa: ARG002
@@ -627,6 +781,7 @@ class ComfyCreditsBackend:
 
             status = int(result.get("status_code") or 0)
             if status == 200:
+                self._last_usage_tokens = _usage_tokens(result.get("json") or {})
                 return self._extract_text(
                     result, slug=slug,
                     fail_on_output_limit=fail_on_output_limit,
@@ -767,9 +922,22 @@ __all__ = [
     "SLOT_B_ID",
     "COMFY_ROW_IDS",
     "COMFY_LLM_MODELS",
+    "COMFY_GPT_TERRA",
+    "COMFY_GPT_TERRA_PRO",
+    "COMFY_GPT_LUNA",
+    "COMFY_GPT_LUNA_PRO",
+    "COMFY_GPT_SOL",
+    "COMFY_GPT_SOL_PRO",
+    "COMFY_CLAUDE_SONNET_5",
     "COMFY_RECOMMENDED_CREATIVE_DEFAULT",
     "COMFY_RECOMMENDED_TECHNICAL_DEFAULT",
+    "reasoning_effort_for_slug",
+    "resolve_context_window",
     "DEFAULT_CONTEXT_WINDOW",
+    "DEFAULT_REMOTE_CONTEXT_WINDOW",
+    "DEFAULT_OUTPUT_TOKENS_CAP",
+    "DEFAULT_MIN_OUTPUT_TOKENS",
+    "DEFAULT_MIN_OUTPUT_TOKENS_REASONING",
     "ComfyCreditsError",
     "ComfyCreditsConfigError",
     "ComfyCreditsCostCeilingError",

@@ -192,7 +192,10 @@ class CatalogOptInTests(unittest.TestCase):
         opted = sorted(
             row.repo_id for row in CATALOG.CURATED_LLM_MODELS
             if row.text_only_load == "native_text_decoder")
-        self.assertEqual(opted, ["Qwen/Qwen3.5-4B", "google/gemma-4-E2B-it"])
+        self.assertEqual(
+            opted,
+            ["Qwen/Qwen3.5-4B", "Qwen/Qwen3.5-4B:nf4", "google/gemma-4-E2B-it"],
+        )
 
     def test_the_16gb_canonical_writer_is_not_opted_in(self):
         """gemma-4-12b-it carries the SAME loader_backend as the opted-in rows,

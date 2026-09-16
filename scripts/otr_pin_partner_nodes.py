@@ -52,6 +52,7 @@ def _resolve_comfy_root() -> Path:
     env = os.environ.get("OTR_COMFY_CORE_ROOT", "").strip()
     if env:
         candidates.append(Path(env))
+    candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI (1)\ComfyUI"))
     candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI"))
     candidates.append(REPO_ROOT.parent.parent)
     for cand in candidates:
@@ -84,6 +85,14 @@ CURATED_ROWS = {
                                "music/b-roll reactive default; audio-ref + identity"),
     "cloud_wan_i2v":          ("Wan2ImageToVideoApi", "WAN", 0,
                                "mute_only OPT-DOWN row (operator amendment)"),
+    "cloud_ltx25_i2v":        ("Ltx25ImageToVideoNode", "LTX", 0,
+                               "LTX 2.5 Image-to-Video; cloud_ltx25_foley_plus "
+                               "keeps generate_audio and harvests the native "
+                               "bed. Not LTX 3.0 -- that node is not on the "
+                               "installed partner catalog."),
+    "cloud_ltx25_a2v":        ("Ltx25AudioToVideoNode", "LTX", 0,
+                               "LTX 2.5 Audio-to-Video; cloud_ltx25_audio_in "
+                               "feeds the beat audio. Not Foley."),
     "cloud_vidu_q2_i2v":      ("Vidu2ImageToVideoNode", "VIDU", 0,
                                "cheap Vidu Q2 image-to-video row; served by "
                                "cloud_vidu_q2_pro_fast_720p with "

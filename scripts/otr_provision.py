@@ -1570,6 +1570,8 @@ _NO_STILL_VIDEO_ENGINES = _ANIMATEDIFF_ENGINES | {
 _REMOTE_NO_WEIGHT_VIDEO_ENGINES = {
     "cloud_wan_i2v",
     "cloud_wan_i2v_audio",
+    "cloud_ltx25_foley_plus",
+    "cloud_ltx25_audio_in",
     "google_omni_video",
     "google_veo_video",
     "word_razzle",

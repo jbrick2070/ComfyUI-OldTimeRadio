@@ -209,7 +209,8 @@ folder name is historical; the guides cover every platform.)
 
 | Adding to it | |
 |---|---|
-| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, or a source bank of your own. |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, a source bank, or a writer LLM of your own. |
+| [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | The seven gates for adding a writer LLM. You can pick anything; this is also what the pack ships. |
 | [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will actually work. |
 
 The development record -- bug logs, measurements, design notes -- lives under
@@ -473,10 +474,11 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
-| **low_1act** | `otr_cloud_low_1act` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **low** | `otr_cloud_low` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **low_7act** | `otr_cloud_low_7act` | comfy:slot-a | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_7act** | `otr_cloud_deluxe_7act` | openrouter:slot-a | none | cloud_wan_i2v_audio | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low_1act** | `otr_cloud_low_1act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low** | `otr_cloud_low` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low_7act** | `otr_cloud_low_7act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_7act** | `otr_cloud_deluxe_7act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_audio_in_7act** | `otr_cloud_deluxe_audio_in_7act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_luma_photon_flash | manual | nothing | shipping |
 <!-- END GENERATED: tier-matrix -->
 
 Weights marked **auto** download themselves the first time you queue;
@@ -696,10 +698,13 @@ Radeon earns its author the AMD column in
 
 ## Adding to it
 
-Two things you can add: an **engine** -- a way of rendering video, images,
-speech, music or an upscale -- and a **source bank**, a place stories come from.
-An engine is a Python adapter in this repo; a bank can be a folder of your own
-that this repo never sees. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe
+Three things you can add: an **engine** -- a way of rendering video, images,
+speech, music or an upscale -- a **source bank**, a place stories come from, and
+a **writer LLM**, the model that writes the script. An engine is a Python
+adapter in this repo; a bank can be a folder of your own that this repo never
+sees; a writer is either a snapshot in your Hugging Face cache or a curated
+catalog row. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe,
+[apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) is the writer-LLM page,
 and [apple/PREFLIGHT.md](apple/PREFLIGHT.md) is the checklist, and the rule
 underneath both is the same one the rest of the pack lives by: **green tests are
 not a lane.** The proof is one real render through `otr_canonical` that lands a

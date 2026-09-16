@@ -115,7 +115,8 @@ GATE_TITLES = {
 # ---------------------------------------------------------------------------
 _CLOUD_LANES = (
     "cloud_kling_avatar", "cloud_seedance_2", "cloud_vidu_q2_pro_fast_720p",
-    "cloud_wan_i2v", "cloud_wan_i2v_audio", "google_omni_video",
+    "cloud_wan_i2v", "cloud_wan_i2v_audio", "cloud_ltx25_foley_plus",
+    "cloud_ltx25_audio_in", "google_omni_video",
     "google_veo_video", "word_razzle",
 )
 #: CPU/ffmpeg still lanes -- zero VRAM, no diffusion model, no frame ladder.

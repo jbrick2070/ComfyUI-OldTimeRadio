@@ -76,8 +76,9 @@ def test_semantic_hash_ignores_creative_flags_managed(canonical, schemas,
 # ---------------------------------------------------------------------------
 
 def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
-    # Lab cloud_lanes stays gated. The four shipping cloud SKUs
-    # (low_1act / low / low_7act / deluxe_7act) are not this contract.
+    # Lab cloud_lanes stays gated. The five shipping cloud SKUs
+    # (low_1act / low / low_7act / deluxe Foley / deluxe audio-in)
+    # are not this contract.
     with pytest.raises(bv.EmitRefused, match="UNRATIFIED"):
         bv.build_variant("otr_cloud_lanes", schemas=schemas, mapping=mapping,
                          canonical=canonical)
@@ -88,6 +89,7 @@ def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
     "otr_cloud_low",
     "otr_cloud_low_7act",
     "otr_cloud_deluxe_7act",
+    "otr_cloud_deluxe_audio_in_7act",
 ])
 def test_build_variant_emits_shipping_cloud_skus(
         profile_id, canonical, schemas, mapping):
@@ -100,12 +102,31 @@ def test_build_variant_emits_shipping_cloud_skus(
     from nodes.otr_video_director import exact_menu_option_for
     director = next(n for n in variant["nodes"]
                     if n["type"] == "OTR_VideoDirector")
-    engine = ("cloud_wan_i2v_audio" if profile_id.endswith("deluxe_7act")
-              else "cloud_vidu_q2_pro_fast_720p")
+    if profile_id.endswith("deluxe_audio_in_7act"):
+        engine = "cloud_ltx25_audio_in"
+    elif "deluxe" in profile_id:
+        engine = "cloud_ltx25_foley_plus"
+    else:
+        engine = "cloud_vidu_q2_pro_fast_720p"
     label = exact_menu_option_for(engine)
     assert value(director, "announcer_video_model") == label
     assert value(director, "character_video_model") == label
     assert "OTR_COMFY_API_KEY" in recipe
+    writer = next(n for n in variant["nodes"]
+                  if n["type"] == "OTR_LedgerScriptWriter")
+    assert value(writer, "creative_writing_model") == "comfy:slot-a"
+    want_a = (
+        "openai/gpt-5.6-sol" if "deluxe" in profile_id
+        else "anthropic/claude-sonnet-5"
+    )
+    assert value(writer, "comfy_slot_a_model") == want_a
+    assert value(writer, "comfy_slot_b_model") == "openai/gpt-5.6-luna"
+    want_cast = (
+        4 if profile_id.endswith("7act") else 3
+    )
+    assert value(writer, "num_characters") == want_cast
+    if profile_id.endswith("deluxe_7act") or profile_id.endswith("deluxe_audio_in_7act"):
+        assert "OPENROUTER_API_KEY" not in recipe
 
 
 def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,

@@ -9,6 +9,9 @@ Four rows from the S0 pin table, invoked through the S0 bridge
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
     cloud_wan_i2v_audio  required_audio_ref   (init_image, audio_ref)
     cloud_vidu_q2_pro_fast_720p mute_only     (init_image, text_prompt)
+    cloud_ltx25_foley_plus mute_only          (init_image, text_prompt;
+                                              generate_audio harvested as foley)
+    cloud_ltx25_audio_in   required_audio_ref (init_image, audio_ref)
 
 S3-CORE SCOPE: rows REGISTER unconditionally (registry-IS-the-menu C6) with
 empty ``default_roles`` -- selectable, NEVER automatic. Operator directive
@@ -99,40 +102,32 @@ _CLOUD_VIDEO_SHAPE_A_BASE_PLAN = (
 )
 
 
-#: Same as ``_CLOUD_VIDEO_SHAPE_A_BASE_PLAN`` but portrait REQUIRED=always,
-#: for the audio-driven-face lane (``cloud_kling_avatar``): the provider
-#: consumes an init face image every beat, so the portrait is structural.
+#: Kling Avatar (Comfy ``KlingAvatarNode``) is audio-in, not I2V. The
+#: canonical node takes ONE reference photo + ``sound_file`` + an optional
+#: prompt for actions / emotions / camera -- it does not take a scene still.
+#: Minting Shape-A wide scenes here spent image credits on stills the adapter
+#: never sends, and ``aspect="inherit_engine"`` against ``render_aspect=wide``
+#: minted 16:9 "portraits" instead of a face photo.
+#: https://docs.comfy.org/built-in-nodes/KlingAvatarNode
 _CLOUD_KLING_AVATAR_PLAN = (
-    StillPlanRow(kind="scene_open", cardinality="per_beat",
-                 target_class="scene", aspect="wide", required="always",
-                 framing_geometry=(
-                     "full-frame macro, centered subject"),
-                 style_tail_policy="full"),
-    StillPlanRow(kind="scene_beat", cardinality="per_beat",
-                 target_class="scene", aspect="wide", required="always",
-                 framing_geometry=(
-                     ("cinematic three-quarter framing, the subject shown "
-                      "whole with clear space around it inside frame, "
-                      "balanced composition")),
-                 style_tail_policy="full"),
-    StillPlanRow(kind="scene_character", cardinality="per_beat",
-                 target_class="scene", aspect="wide", required="always",
-                 framing_geometry=(
-                     ("cinematic medium shot, the character framed within a "
-                      "wide 16:9 environment, full head and shoulders with "
-                      "clear headroom inside frame, face unobstructed, "
-                      "balanced landscape composition")),
-                 style_tail_policy="full"),
     StillPlanRow(kind="portrait", cardinality="per_subject",
-                 target_class="portrait", aspect="inherit_engine",
+                 target_class="portrait", aspect="portrait",
                  required="always",
                  framing_geometry=(
-                     ("in-character cinematic medium shot, head and "
-                      "shoulders, face clearly visible, subject centred with "
-                      "natural headroom above the head (never crop the top of "
-                      "the head)")),
+                     ("single avatar reference photo, head and shoulders, "
+                      "face clearly visible, mouth unobstructed, subject "
+                      "centred with natural headroom above the head "
+                      "(never crop the top of the head); fill the frame "
+                      "with the person -- this image is Kling Avatar's "
+                      "only visual input")),
                  style_tail_policy="full"),
 )
+
+#: Comfy KlingAvatarNode image gate: min 300px on both edges, aspect
+#: between 1:2.5 and 2.5:1.
+_KLING_AVATAR_MIN_PX = 300
+_KLING_AVATAR_ASPECT_MIN = 1.0 / 2.5
+_KLING_AVATAR_ASPECT_MAX = 2.5
 
 #: kling avatar mode COMBO -- the pin excludes combo options (S0), so the
 #: adapter ships the provider's documented std tier; env-overridable.
@@ -146,27 +141,26 @@ _KLING_MODE_ALIASES = {
     "professional mode": "pro",
 }
 _KLING_AVATAR_MARKER = (
-    "Natural broadcast avatar delivery; lip sync leads all motion.")
-#: MOTION RAISED, LIP-SYNC PROTECTED (2026-08-27, operator: cloud lanes take
-#: better action, "just be sure audio-in mention the requirements for lip sync
-#: inc feeding dialogue and audio"). The lip-sync sentence LEADS and is
-#: strengthened to name BOTH inputs this lane is given -- the beat's audio and
-#: its spoken line -- because that pairing is the whole product here. What
-#: changed is the second half: "subtle facial expression ... small natural head
-#: movement. No exaggerated gestures" was the 2026-08-17 damping antipattern,
-#: and on a talking-head lane it bought nothing the framing rule does not
-#: already buy. The frame discipline (head and shoulders held, no camera shake,
-#: no reframing) is KEPT -- on an audio-driven face that is protection, not
-#: damping -- while expression and gesture are freed.
+    "Kling avatar audio-in; lip sync leads, action is full and sustained.")
+#: SAME ACTION BUDGET AS WAN / VIDU / SEEDANCE, plus the audio-in contract.
+#: Operator 2026-09-15: no silly subtle prompts -- keep the shot's action
+#: prompt and append the lane clause, exactly as the other cloud lanes do.
+#: Operator 2026-08-27 still stands for the extra sentence: audio-in must
+#: name lip-sync and that we feed both the beat audio and the spoken line.
+#: Artifact guards (whip pans, jump cuts, warped faces) stay; "subtle" /
+#: "small natural head movement" / "no exaggerated gestures" stay gone.
 _KLING_AVATAR_BASE_CLAUSE = (
-    "Broadcast-style digital human delivery. Natural lip sync follows the "
-    "supplied audio exactly and matches the spoken line word for word -- the "
-    "sync leads everything else. Vivid facial expression and live eye "
-    "contact, with full upper-body performance: the subject leans, turns, "
-    "shifts weight and gestures freely with the words, and may rise or step "
-    "within the scene as the line demands. The camera moves with intent -- a "
-    "push, a track or a considered reframe. Keep the face unobstructed so the "
-    "mouth stays readable. No camera shake, no sudden reframing. "
+    "Generate one continuous audio-driven shot from the reference photo and "
+    "the supplied audio. Natural lip sync follows the supplied audio exactly "
+    "and matches the spoken line word for word -- feed both the beat audio "
+    "and the dialogue; the sync leads identity. The subject performs a full, "
+    "decisive action that develops across the shot -- turning, reaching, "
+    "rising, gesturing, crossing the space -- and lands on a clear final "
+    "position, with a purposeful camera move that follows the action. Motion "
+    "begins immediately in the first frame and is sustained throughout. Keep "
+    "the face unobstructed so the mouth stays readable. Preserve the "
+    "reference-image subject and style. No whip pans, jump cuts, melting "
+    "geometry, warped faces, drifting text, black frames, or pillarbox bars. "
     f"{_KLING_AVATAR_MARKER}")
 
 _SEEDANCE_MODEL_ALIASES = {
@@ -312,6 +306,10 @@ _VIDU_Q2_PROMPT_VARIANT = "vidu_q2_pro_fast_720p_action_v2"
 
 
 def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":
+    """Keep the shot's ACTION prompt, then append the audio-in lip-sync
+    clause -- the same append shape as Wan / Vidu / Seedance. Never replace
+    the action with a damped talking-head blurb.
+    """
     original = str(prompt or "")
     if _KLING_AVATAR_MARKER in original:
         conditioned = original
@@ -457,6 +455,31 @@ def _load_image_tensor(path: str):
     img = Image.open(path).convert("RGB")
     arr = np.asarray(img).astype("float32") / 255.0
     return torch.from_numpy(arr)[None, ...]
+
+
+def _assert_kling_avatar_image(tensor) -> None:
+    """Fail closed on the Comfy KlingAvatarNode image contract.
+
+    Width and height must be at least 300px; aspect must sit between
+    1:2.5 and 2.5:1. A too-small or ultra-wide still is a provider 400,
+    not a render we can salvage.
+    """
+    if tensor is None or not hasattr(tensor, "shape") or tensor.ndim != 4:
+        raise RuntimeError(
+            "cloud_kling_avatar: init_image is not an IMAGE tensor "
+            "[1,H,W,C] -- NO FALLBACK")
+    _n, height, width, _c = (int(v) for v in tensor.shape)
+    if height < _KLING_AVATAR_MIN_PX or width < _KLING_AVATAR_MIN_PX:
+        raise RuntimeError(
+            "cloud_kling_avatar: init_image %dx%d is below KlingAvatarNode "
+            "minimum %dpx on both edges -- mint a face photo, NO FALLBACK"
+            % (width, height, _KLING_AVATAR_MIN_PX))
+    aspect = float(width) / float(height) if height else 0.0
+    if not (_KLING_AVATAR_ASPECT_MIN <= aspect <= _KLING_AVATAR_ASPECT_MAX):
+        raise RuntimeError(
+            "cloud_kling_avatar: init_image %dx%d aspect %.4f is outside "
+            "KlingAvatarNode 1:2.5 .. 2.5:1 -- NO FALLBACK"
+            % (width, height, aspect))
 
 
 def _load_audio_dict(path: str):
@@ -744,6 +767,20 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
     #: init face every beat (audio-driven-face family; spec section 3).
     still_plan = _CLOUD_KLING_AVATAR_PLAN
 
+    def wants_talking_prompt(self):
+        """Stills must be minted face-forward with a readable mouth.
+
+        KlingAvatarNode lip-syncs the reference photo to ``sound_file``.
+        Without this hook the director stamps talking=false and the image
+        phase writes I2V scene stills instead of an avatar photo.
+        """
+        return True
+
+    def _init_image_input(self, request):
+        tensor = super()._init_image_input(request)
+        _assert_kling_avatar_image(tensor)
+        return tensor
+
     def _mode(self) -> str:
         raw = otr_env.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
         folded = raw.lower()
@@ -760,7 +797,7 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
         log_fields = dict(prompt_meta)
         log_fields.update({
             "engine": self.name,
-            "prompt_variant": "kling_avatar_broadcast_v1",
+            "prompt_variant": "kling_avatar_action_v2",
         })
         _LOG.info("[OTR.cloud.kling_avatar] prompt_conditioner %s",
                   json.dumps(log_fields, sort_keys=True))
@@ -1105,16 +1142,237 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         }
 
 
+#: LTX 2.5 partner I2V duration menu (Fast). Pro stops at 10. Snap, never send
+#: a second the combo does not list (7 and 9 are missing on purpose).
+_LTX25_FAST_DURATIONS = (2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20)
+_LTX25_PRO_DURATIONS = (2, 3, 4, 5, 6, 8, 10)
+_LTX25_FAST_LABEL = "LTX-2.5 (Fast)"
+_LTX25_PRO_LABEL = "LTX-2.5 (Pro)"
+_LTX25_I2V_RESOLUTIONS = (
+    "1280x720", "720x1280", "1920x1080", "1080x1920",
+    "2560x1440", "1440x2560", "3840x2160", "2160x3840",
+)
+_LTX25_A2V_RESOLUTIONS = ("1920x1080", "1080x1920")
+#: Comfy canonical API template ``api_ltx2_5_i2v`` widgets_values:
+#: Fast, duration "8", 1920x1080, fps "25", generate_audio true.
+_LTX25_FOLEY_RES_DEFAULT = "1920x1080"
+_LTX25_A2V_RES_DEFAULT = "1920x1080"
+_LTX25_I2V_FPS_DEFAULT = "25"
+
+
+def _snap_ltx25_duration(secs, legal):
+    secs = max(int(secs), int(legal[0]))
+    for item in legal:
+        if item >= secs:
+            return item
+    return int(legal[-1])
+
+
+class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
+    """Cloud analogue of local ``ltx25_foley_plus``.
+
+    NOT audio-in. Partner node ``LtxApi25ImageToVideo`` (Comfy template
+    ``api_ltx2_5_i2v``): Fast, 1920x1080, 25 fps, ``generate_audio=True``.
+    The native bed is harvested BEFORE ``canonicalize_video`` strips the
+    picture, then mixed 0.50/0.50 under the episode master. Family stays
+    ``image_to_video`` so ShotLock never asks who owns the lips.
+    """
+
+    name = "cloud_ltx25_foley_plus"
+    node_key = "cloud_ltx25_i2v"
+    family = "image_to_video"
+    required_inputs = ("init_image", "text_prompt")
+    reactivity = "mute_only"
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
+    frame_contract = FrameContract(
+        min_frames=50,
+        max_frames=500,
+        quantum=25,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
+
+    def _model_label(self) -> str:
+        from .._otr_shared.cloud_model_ids import resolve_model_id
+        label = resolve_model_id(self.node_key)
+        if label not in (_LTX25_FAST_LABEL, _LTX25_PRO_LABEL):
+            raise RuntimeError(
+                "%s: unsupported LTX 2.5 model %r; expected %r or %r"
+                % (self.name, label, _LTX25_FAST_LABEL, _LTX25_PRO_LABEL))
+        return label
+
+    def _duration_menu(self, label):
+        return (_LTX25_PRO_DURATIONS if label == _LTX25_PRO_LABEL
+                else _LTX25_FAST_DURATIONS)
+
+    def _fps_menu(self, label):
+        return (("24", "25", "50") if label == _LTX25_PRO_LABEL
+                else ("24", "25", "48", "50"))
+
+    def _partner_inputs(self, request):
+        label = self._model_label()
+        legal = self._duration_menu(label)
+        duration = _snap_ltx25_duration(
+            self._duration_seconds(
+                request, env="OTR_CLOUD_LTX25_DURATION",
+                default=8, min_s=legal[0], max_s=legal[-1]),
+            legal)
+        resolution = self._choice(
+            "OTR_CLOUD_LTX25_RESOLUTION", _LTX25_FOLEY_RES_DEFAULT,
+            _LTX25_I2V_RESOLUTIONS)
+        fps = self._choice(
+            "OTR_CLOUD_LTX25_FPS", _LTX25_I2V_FPS_DEFAULT, self._fps_menu(label))
+        if duration > 10 and (
+                int(fps) > 25 or resolution in (
+                    "2560x1440", "1440x2560", "3840x2160", "2160x3840")):
+            raise RuntimeError(
+                "%s: LTX 2.5 durations over 10s require 720p/1080p and 24/25 "
+                "fps (got resolution=%s fps=%s)" % (
+                    self.name, resolution, fps))
+        prompt = self._text_prompt_input(request)
+        _LOG.info("[OTR.cloud.ltx25_foley] %s", json.dumps({
+            "engine": self.name,
+            "ltx25_model": label,
+            "ltx25_duration_s": duration,
+            "ltx25_resolution": resolution,
+            "ltx25_fps": fps,
+            "generate_audio": True,
+        }, sort_keys=True))
+        return {
+            "image": self._init_image_input(request),
+            "model": {
+                "model": label,
+                # Combo options in api_ltx2_5_i2v / LtxApi25ImageToVideo are
+                # strings ("8", "25"), not ints.
+                "duration": str(duration),
+                "resolution": resolution,
+                "fps": fps,
+                "generate_audio": True,
+            },
+            "prompt": prompt,
+            "seed": self._seed(request),
+        }
+
+    def canonicalize(self, raw, request, profile):
+        from .._otr_shared.cloud_media_canonical import (
+            validate_partner_result)
+        from .foley_stems import (
+            FoleyStemError, conform_stem_to_frame_count, durable_foley_dir,
+            extract_pcm16_wav_from_video, read_pcm16_wav, sha256_of_file,
+            write_pcm16_wav,
+        )
+
+        raw_path = str(validate_partner_result(dict(raw))["path"])
+        dest_dir = durable_foley_dir()
+        clip_hint = str(_req_get(request, "shot_id") or self.name)
+        harvest_tmp = os.path.join(str(dest_dir), clip_hint + ".src.wav")
+        # Harvest the provider bed FIRST. Parent canonicalize_video writes a
+        # sibling .canon.mp4 with -an; if that ever became an in-place strip
+        # the bed would already be gone. Fail closed before the picture
+        # conform so a silent provider file never becomes a mute foley clip.
+        try:
+            extract_pcm16_wav_from_video(raw_path, harvest_tmp)
+            arr, rate = read_pcm16_wav(harvest_tmp)
+            clip = super().canonicalize(raw, request, profile)
+            clip_id = str(clip.get("clip_id") or self.name)
+            stem_path = os.path.join(str(dest_dir), clip_id + ".wav")
+            matched = conform_stem_to_frame_count(
+                arr, rate, int(clip["frame_count"]), int(clip["fps"] or 25))
+            n_samples, n_ch = write_pcm16_wav(stem_path, matched, rate)
+        except FoleyStemError:
+            raise
+        finally:
+            try:
+                if os.path.isfile(harvest_tmp):
+                    os.remove(harvest_tmp)
+            except OSError:
+                pass
+        duration_s = n_samples / float(rate) if rate else 0.0
+        clip.update({
+            "foley_path": stem_path,
+            "foley_sha256": sha256_of_file(stem_path),
+            "foley_samples": int(n_samples),
+            "foley_sample_rate": int(rate),
+            "foley_channels": int(n_ch),
+            "foley_duration_s": float(duration_s),
+        })
+        return clip
+
+
+class CloudLtx25AudioInEngine(_CloudVideoBase):
+    """Cloud analogue of local ``ltx_audio_in`` on LTX 2.5 Audio-to-Video.
+
+    There is no Comfy ``api_ltx2_5_a2v`` template. The live node
+    ``LtxApi25AudioToVideo`` is the contract: audio 2-20s SETS duration,
+    Fast/Pro with resolution 1920x1080 or 1080x1920 only, prompt, seed,
+    optional first-frame image. No duration/fps/generate_audio widgets --
+    those belong to I2V Foley. Audio DRIVES the picture. Not Foley. Joins
+    ``_AUDIO_IN_CHARACTER_ENGINES`` so a character beat owns a mouth.
+    """
+
+    name = "cloud_ltx25_audio_in"
+    node_key = "cloud_ltx25_a2v"
+    family = "audio_conditioned_video"
+    required_inputs = ("init_image", "audio_ref", "text_prompt")
+    reactivity = "required_audio_ref"
+    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
+    frame_contract = FrameContract(
+        min_frames=50,
+        max_frames=500,
+        quantum=25,
+        native_fps=25,
+        allow_tail_trim=True,
+        continuity=CONTINUITY_SOFT_REFERENCE,
+    )
+
+    def _model_label(self) -> str:
+        from .._otr_shared.cloud_model_ids import resolve_model_id
+        label = resolve_model_id(self.node_key)
+        if label not in (_LTX25_FAST_LABEL, _LTX25_PRO_LABEL):
+            raise RuntimeError(
+                "%s: unsupported LTX 2.5 A2V model %r; expected %r or %r"
+                % (self.name, label, _LTX25_FAST_LABEL, _LTX25_PRO_LABEL))
+        return label
+
+    def _partner_inputs(self, request):
+        label = self._model_label()
+        prompt = self._text_prompt_input(request)
+        audio = self._audio_input(
+            request, min_duration_s=2.0, max_duration_s=20.0,
+            pad_to_min=True)
+        resolution = self._choice(
+            "OTR_CLOUD_LTX25_A2V_RESOLUTION", _LTX25_A2V_RES_DEFAULT,
+            _LTX25_A2V_RESOLUTIONS)
+        _LOG.info("[OTR.cloud.ltx25_a2v] %s", json.dumps({
+            "engine": self.name,
+            "ltx25_model": label,
+            "ltx25_resolution": resolution,
+        }, sort_keys=True))
+        return {
+            "audio": audio,
+            "model": {
+                "model": label,
+                "resolution": resolution,
+            },
+            "prompt": prompt,
+            "seed": self._seed(request),
+            "image": self._init_image_input(request),
+        }
+
+
 KlingAvatar = CloudKlingAvatarEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WanI2VAudio = CloudWanI2VAudioEngine()
 ViduQ2ProFast720p = CloudViduQ2ProFast720pEngine()
 WordRazzle = CloudWordRazzleEngine()
+Ltx25FoleyPlus = CloudLtx25FoleyPlusEngine()
+Ltx25AudioIn = CloudLtx25AudioInEngine()
 
 for _eng in (
         KlingAvatar, Seedance2, WanI2V, WanI2VAudio,
-        ViduQ2ProFast720p, WordRazzle):
+        ViduQ2ProFast720p, WordRazzle, Ltx25FoleyPlus, Ltx25AudioIn):
     register(_eng)
 
 __all__ = [
@@ -1122,4 +1380,5 @@ __all__ = [
     "CloudWanI2VEngine", "CloudWanI2VAudioEngine",
     "CloudViduQ2ProFast720pEngine",
     "CloudWordRazzleEngine",
+    "CloudLtx25FoleyPlusEngine", "CloudLtx25AudioInEngine",
 ]

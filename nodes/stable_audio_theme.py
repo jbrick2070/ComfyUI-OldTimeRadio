@@ -320,6 +320,11 @@ class StableAudioTheme:
             f"music: rendering {len(cue_specs)} cue(s) on '{engine}' "
             f"(profile {profile.profile_id})"
         ]
+        from ._otr_shared.cloud_fanout import (
+            adapter_is_cloud_side, cloud_fanout_workers, run_cloud_fanout,
+            snapshot_prompt_id,
+        )
+        cue_jobs = []
         for spec in cue_specs:
             prompt = spec["prompt"]
             duration_s = spec["requested_duration_s"]
@@ -351,13 +356,64 @@ class StableAudioTheme:
                 meta, prompt if spec.get("authored") else "",
                 cue_id=spec["placement"],
                 story_flavour=cue_story_flavour(led, spec))
+            cue_jobs.append({
+                "job_id": str(spec.get("cue_id") or spec.get("placement") or ""),
+                "spec": spec,
+                "prompt": prompt,
+                "duration_s": duration_s,
+                "engine_seed": engine_seed,
+                "engine_prompt": engine_prompt,
+            })
+
+        def _forward_one_music_cue(job):
             # G1: scope determinism + seed/restore around the single forward
             # (non-strict; bit_exact is gated on the F pilot -- see voice path).
+            engine_seed = job["engine_seed"]
+            engine_prompt = job["engine_prompt"]
+            spec = job["spec"]
             with deterministic_inference(engine_seed, warn_only=True):
-                clip = adapter.generate_clip(
-                    engine_prompt.text, duration_s, engine_seed,
+                return adapter.generate_clip(
+                    engine_prompt.text, job["duration_s"], engine_seed,
                     placement=spec["placement"],
                     negative_prompt=engine_prompt.negative)
+
+        workers = cloud_fanout_workers()
+        fan_ok = (
+            adapter_is_cloud_side(adapter)
+            and workers > 1
+            and len(cue_jobs) > 1
+        )
+        clips_by_id = {}
+        if fan_ok:
+            log_lines.append(
+                "music: cloud fan-out %d cue(s), workers=%d; assemble stays cue order"
+                % (len(cue_jobs), min(workers, len(cue_jobs))))
+            outcome = run_cloud_fanout(
+                cue_jobs,
+                item_id=lambda j: j["job_id"],
+                execute=_forward_one_music_cue,
+                workers=min(workers, len(cue_jobs)),
+                prompt_id=snapshot_prompt_id())
+            if outcome.stuck_ids and not outcome.errors:
+                raise RuntimeError(
+                    "cloud music fan-out stuck: %s" % outcome.stuck_ids)
+            for job in cue_jobs:
+                jid = job["job_id"]
+                if jid in outcome.errors:
+                    raise outcome.errors[jid]
+                if jid not in outcome.results:
+                    raise RuntimeError(
+                        "cloud music fan-out never rendered cue %s" % jid)
+                clips_by_id[jid] = outcome.results[jid]
+        else:
+            for job in cue_jobs:
+                clips_by_id[job["job_id"]] = _forward_one_music_cue(job)
+
+        for job in cue_jobs:
+            spec = job["spec"]
+            engine_prompt = job["engine_prompt"]
+            duration_s = job["duration_s"]
+            clip = clips_by_id[job["job_id"]]
             clip, ceiling = self._ceiling_the_cue(clip, spec["cue_id"])
             cue_rows.append({
                 "cue_id": spec["cue_id"],
@@ -369,8 +425,8 @@ class StableAudioTheme:
                     dict(clip.get("receipt") or {})
                     if isinstance(clip, dict) and isinstance(clip.get("receipt"), dict)
                     else {}),
-                "prompt": prompt,
-                "seed": int(engine_seed),
+                "prompt": job["prompt"],
+                "seed": int(job["engine_seed"]),
                 "requested_duration_s": float(duration_s),
                 "anchor_line_id": spec.get("anchor_line_id"),
                 "cue_spec_sha256": spec.get("cue_spec_sha256"),

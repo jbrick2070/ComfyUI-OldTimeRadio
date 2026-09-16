@@ -2,8 +2,9 @@
 
 Pins the contract: the two virtual rows (openrouter:slot-a|b) appear in
 both writer dropdowns and pass validate_model_id Path 1 whether or not
-OPENROUTER_API_KEY is set, so a saved deluxe graph loads on a keyless
-canvas. generate() / backend.load() still fail closed without a key.
+OPENROUTER_API_KEY is set, so a graph that stores those handles (or a
+user who picks them on a Comfy Cloud SKU) loads on a keyless canvas.
+generate() / backend.load() still fail closed without a key.
 The dropdown shows the named handle, never the real model slug.
 """
 from __future__ import annotations

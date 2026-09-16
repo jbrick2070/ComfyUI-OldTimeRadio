@@ -742,6 +742,18 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
+    "cloud_ltx25_foley_plus": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
+    "cloud_ltx25_audio_in": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": True, "sidecar_conditional": False,
+        "model_requirements": []},
     # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
     # (Pixverse row cloud_pixverse_i2v). Provider-side render, cpu_ok. Selectable;
     # NO enable flag (dropdown pick is the enable; missing OTR_COMFY_API_KEY

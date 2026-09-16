@@ -53,7 +53,8 @@ except ImportError:  # pragma: no cover -- flat / standalone load
 # ---------------------------------------------------------------------------
 
 DEFAULT_LLM = "Qwen/Qwen3.5-4B"
-"""Fallback for empty/unsaved writer inputs.
+"""The full-precision Qwen 3.5 4B identity -- Hugging Face repo id, canonical
+saved pick, and empty-widget family name.
 
 WAS ``mistralai/Mistral-Nemo-Instruct-2407`` until 2026-09-06. That row is the
 single highest-friction writer in the catalog and it was the value a
@@ -68,6 +69,12 @@ a complete one-act episode end to end (obs_publish OK, 32m34s) on that card.
 Mistral-Nemo remains in the catalog and remains selectable; it is simply no
 longer what you get by accident.
 
+THE DROPDOWN HAS TWO QWEN IDENTITIES (2026-09-15). One Hugging Face snapshot
+cannot honestly wear both ``nv8`` (the NF4 load) and Quant ``none`` (the Mac /
+canonical load). This constant is the FULL pick; :data:`DEFAULT_LLM_NF4` is
+the 4-bit pick. A user can still choose Gemma, Llama, a cache-discovered
+CausalLM, or a cloud slot -- that is not the same as what the pack ships.
+
 ALSO FIXES A LATENT MISMATCH. Every curated dropdown label is
 ``repo_id + vram_badge_for(repo_id)``, so the option list holds
 ``'... (12.0 GB)'`` while this constant is the BARE id -- the declared default
@@ -75,6 +82,13 @@ was never a member of its own option list, and ComfyUI fell through to whichever
 row happened to sit at index 0. That fallback is undefined behaviour dressed as
 a default. Consumers normalize through ``_strip_label_suffix``, so a bare id
 here is correct; what was wrong was pointing it at a row an 8 GB user cannot run.
+"""
+
+DEFAULT_LLM_NF4 = "Qwen/Qwen3.5-4B:nf4"
+"""The NF4 twin of :data:`DEFAULT_LLM`. Same Hugging Face weights; the ``:nf4``
+suffix survives ``_strip_label_suffix`` so the picker cannot collapse it into
+the full row. Fresh writer nodes default here, matching
+``llm_quant_policy`` ``bnb_nf4``.
 """
 
 TEST_TECHNICAL_LLM = "google/gemma-4-E2B-it"
@@ -174,6 +188,15 @@ class CuratedModel:
     # Default "composite" keeps every pre-existing row, and any fixture that
     # omits the field, loading exactly as before.
     text_only_load: Literal["composite", "native_text_decoder"] = "composite"
+    # Same Hugging Face snapshot as ``repo_id`` when empty. A dropdown twin
+    # (Qwen NF4 vs full) keeps a distinct ``repo_id`` that survives
+    # ``_strip_label_suffix``, and names the real HF id here so download
+    # and from_pretrained still hit one cache folder.
+    hf_repo_id: str = ""
+    # When non-empty, this pick OWNS Quant. The Quant widget must match
+    # or request_slot fails loud. Empty means the widget still decides
+    # (Gemma, Llama, cache-discovered ids -- anything a user picks).
+    implied_quant_policy: Literal["", "none", "bnb_nf4", "bnb_8bit"] = ""
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -184,15 +207,17 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="WARN",
         # Official shards: 9,319,828,096 bytes / 2**30. Disk, not VRAM.
         approx_safetensors_gb=8.68,
-        notes="Official Apache-2.0, ungated Qwen3.5 text-only native "
-        "Transformers lane; ordinary NF4 policy. THINKING template, suppressed "
-        "-- read from the published chat_template.jinja 2026-09-06: with "
-        "add_generation_prompt it emits a closed '<think>\\n\\n</think>' "
-        "envelope when enable_thinking is false and an OPEN '<think>' "
-        "otherwise, so chat_template_kwargs must reach every generate call or "
-        "the model is forced to reason (see test_chat_template_kwargs_wired). "
-        "Two shards, 9,319,828,096 bytes. 8GB speed, memory and episode "
-        "qualification pending; not soak-tested.",
+        notes="FULL / unquantized identity of the official Apache-2.0 ungated "
+        "Qwen3.5 4B writer. Canonical and the Mac graphs save this pick with "
+        "Quant none. The NF4 twin is Qwen/Qwen3.5-4B:nf4 -- same weights, "
+        "different Quant. THINKING template, suppressed -- read from the "
+        "published chat_template.jinja 2026-09-06: with add_generation_prompt "
+        "it emits a closed '<think>\\n\\n</think>' envelope when "
+        "enable_thinking is false and an OPEN '<think>' otherwise, so "
+        "chat_template_kwargs must reach every generate call or the model is "
+        "forced to reason (see test_chat_template_kwargs_wired). Two shards, "
+        "9,319,828,096 bytes. Finished episodes exist on 16 GB Mac (quant "
+        "none) and, via the NF4 twin, on 8 GB and 16 GB NVIDIA.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
@@ -204,6 +229,28 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # (conversion_mapping.py: "qwen3_5_text" -> language_model/model), so
         # OTR supplies no key_mapping of its own here.
         text_only_load="native_text_decoder",
+        implied_quant_policy="none",
+    ),
+    CuratedModel(
+        repo_id="Qwen/Qwen3.5-4B:nf4",
+        requires_auth=False,
+        loader_backend="transformers_multimodal_text_only",
+        vram_fit_tier="WARN",
+        approx_safetensors_gb=8.68,
+        notes="NF4 identity of Qwen3.5 4B. Same Hugging Face snapshot as "
+        "Qwen/Qwen3.5-4B; the :nf4 suffix is the dropdown identity so this "
+        "pick can wear nv8 without lying about Quant none. 8 GB NVIDIA "
+        "graphs and a freshly dropped writer node save this pick with "
+        "bnb_nf4. No mac16 tag -- bitsandbytes is not a Metal path.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        text_only_load="native_text_decoder",
+        hf_repo_id="Qwen/Qwen3.5-4B",
+        implied_quant_policy="bnb_nf4",
     ),
     CuratedModel(
         repo_id="unsloth/Llama-3.2-3B-Instruct",
@@ -347,9 +394,9 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     # A dropdown row is a promise the model will load; that one could not
     # keep it on this hardware. Nothing required Ollama -- the GGUF lane is
     # in-process llama-cpp-python -- so that half of the sweep had no
-    # targets. See docs/LLM_PREFLIGHT_GUIDE.md for the seven gates a new
-    # row must clear, and test_every_curated_local_row_is_pass_tier for the
-    # invariant that keeps a WARN row from returning silently.
+    # targets. See apple/LLM_PREFLIGHT.md for the seven gates a new
+    # row must clear. WARN is information, not an automatic rip
+    # (operator 2026-09-06); ripping a row is an explicit decision.
     # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
     # removed. The curated set now also includes the official Gemma 4 12B HF
@@ -371,11 +418,12 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
 def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
     """The two virtual OpenRouter rows -- always in the writer dropdown.
 
-    Deluxe cloud graphs pin ``openrouter:slot-a|b`` plus a catalog alias
-    (``~openai/gpt-latest``). A saved graph that stores those values must
-    load on a canvas that has not set OPENROUTER_API_KEY yet. The pick is
-    the enable, same as Comfy Credits: generate() / backend.load() still
-    fail closed without a key. These carry loader_backend='openrouter_http',
+    Shipping Comfy Cloud graphs pin ``comfy:slot-a|b``. OpenRouter handles
+    stay in the writer dropdown on those graphs too -- the picker is not
+    stripped -- so a canvas that stores ``openrouter:slot-a|b`` must still
+    load without OPENROUTER_API_KEY. The pick is the enable, same as Comfy
+    Credits: generate() / backend.load() still fail closed without a key.
+    These carry loader_backend='openrouter_http',
     vram_fit_tier='PASS', approx_safetensors_gb=0.0, context_window=8192,
     provider='openrouter'. The real model slug lives in the slot picker /
     env; only the named handle appears here, never the slug. The rows join
@@ -421,11 +469,14 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
 def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
     """The two virtual Comfy Credits rows -- always in the writer dropdown.
 
-    Cloud shipping graphs pin ``comfy:slot-a|b`` plus a catalog slug
-    (Grok 4.20). A saved graph that stores those values must load on
-    Comfy Cloud, which does not set OTR_ENABLE_COMFY_CREDITS. The pick
-    is the enable, same as partner video engines: generate() still
-    fails closed without a Comfy API key. These carry
+    Cloud shipping graphs pin ``comfy:slot-a|b`` plus catalog slugs
+    (cheap cloud: Sonnet 5 creative / Luna technical; deluxe: Sol
+    creative / Luna technical). Sonnet 5, Luna, GPT-5.5 and Sol stay on
+    the Comfy slot combo of every graph, including canonical, whose
+    saved default remains the enable-sentinel. A saved graph that stores
+    those values must load on Comfy Cloud, which does not set
+    OTR_ENABLE_COMFY_CREDITS. The pick is the enable, same as partner video
+    engines: generate() still fails closed without a Comfy API key. These carry
     loader_backend='comfy_credits_http', provider='comfy_credits',
     approx_safetensors_gb=0.0; the real catalog slug resolves behind the
     scenes (the comfy slot pickers / recommended default). The rows join the
@@ -598,6 +649,70 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
 
 def _by_repo_id() -> dict[str, CuratedModel]:
     return {m.repo_id: m for m in _active_curated_models()}
+
+
+def hf_weights_id(model_id: str) -> str:
+    """The Hugging Face repo that actually holds this pick's snapshot.
+
+    Dropdown twins (``Qwen/Qwen3.5-4B:nf4``) keep a distinct catalog id so
+    ``_strip_label_suffix`` cannot collapse them; download and
+    ``from_pretrained`` still need the real ``org/name``.
+    """
+    if not isinstance(model_id, str) or not model_id.strip():
+        return ""
+    bare = _strip_label_suffix(model_id)
+    row = _by_repo_id().get(bare)
+    if row is None:
+        return bare
+    named = (getattr(row, "hf_repo_id", "") or "").strip()
+    return named or row.repo_id
+
+
+def resolve_pick_for_quant(model_id: str, quant_policy: str) -> str:
+    """When a family has implied-quant twins, return the twin matching Quant.
+
+    Profiles still store the family id ``Qwen/Qwen3.5-4B`` plus a separate
+    ``quant_policy``. The applier composes those two fields into one pick.
+    A user pick that is not part of a twin family is returned unchanged --
+    Gemma, Llama, cache-discovered CausalLMs, cloud slots stay the user's.
+    """
+    bare = _strip_label_suffix(model_id) if isinstance(model_id, str) else ""
+    if not bare or not quant_policy:
+        return bare
+    weights = hf_weights_id(bare)
+    twins = [
+        m for m in _active_curated_models()
+        if getattr(m, "provider", "local") == "local"
+        and hf_weights_id(m.repo_id) == weights
+        and (getattr(m, "implied_quant_policy", "") or "")
+    ]
+    if not twins:
+        return bare
+    for m in twins:
+        if m.implied_quant_policy == quant_policy:
+            return m.repo_id
+    return bare
+
+
+def quant_pick_mismatch(model_id: str, quant_policy: str) -> str | None:
+    """Reason string when the pick owns Quant and the widget disagrees.
+
+    None means the widget still decides (uncurated ids, Gemma, Llama) or
+    the pick and Quant already agree.
+    """
+    if not isinstance(model_id, str) or not model_id:
+        return None
+    row = _by_repo_id().get(_strip_label_suffix(model_id))
+    implied = getattr(row, "implied_quant_policy", "") or ""
+    if not implied:
+        return None
+    if str(quant_policy) == implied:
+        return None
+    return (
+        f"writer pick {row.repo_id!r} is the {implied} load; Quant is "
+        f"{quant_policy!r}. Pick the matching Qwen 3.5 entry or change "
+        "Quant to match -- the pick owns the load, it does not guess."
+    )
 
 
 def text_only_load_mode(model_id: str) -> str:
@@ -946,7 +1061,8 @@ def build_dropdown_choices(
             # still fails closed without the matching key.
             on_disk = True
         else:
-            on_disk = m.repo_id in scan and scan[m.repo_id].on_disk
+            weights = hf_weights_id(m.repo_id)
+            on_disk = weights in scan and scan[weights].on_disk
         entries.append(DropdownEntry(
             m.repo_id + vram_badge_for(m.repo_id), m.repo_id,
             on_disk, curated=True))
@@ -996,6 +1112,17 @@ def default_llm_option() -> str:
     answers identically on a cold box and a warm one.
     """
     return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
+
+
+def fresh_llm_option() -> str:
+    """The exact COMBO label a newly dropped writer node should save.
+
+    Canonical keeps :func:`default_llm_option` (full Qwen + Quant none).
+    A fresh node defaults ``llm_quant_policy`` to ``bnb_nf4``, so its
+    combo default is the NF4 twin -- otherwise the pick and Quant lie
+    about each other the moment the node hits the canvas.
+    """
+    return DEFAULT_LLM_NF4 + vram_badge_for(DEFAULT_LLM_NF4)
 
 
 # ---------------------------------------------------------------------------
@@ -1366,10 +1493,11 @@ def comfy_catalog_dropdown_choices(slot: str) -> list[str]:
     choices[0] -- the 'off / use-local' default -- so a saved workflow that
     stores it validates whether or not the lane is enabled.
     The pinned catalog is always listed after the sentinel so a shipping
-    cloud graph that stores x-ai/grok-4.20 loads on Comfy Cloud (no
-    OTR_ENABLE_COMFY_CREDITS in that environment). generate() still fails
-    closed without a Comfy API key. Then: recommended default, favorites,
-    full catalog alphabetically. Deduped.
+    cloud graph that stores anthropic/claude-sonnet-5, openai/gpt-5.6-luna
+    or openai/gpt-5.6-sol
+    loads on Comfy Cloud (no OTR_ENABLE_COMFY_CREDITS in that environment).
+    generate() still fails closed without a Comfy API key. Then: recommended
+    default, favorites, full catalog alphabetically. Deduped.
     INPUT_TYPES-safe: reads the pinned constant only, never the network.
     """
     s = slot.strip().lower()
@@ -1575,11 +1703,19 @@ def fit_tags_for(repo_id: str) -> tuple:
     download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
     if download_gb <= 0.0:
         return ()
+    implied = getattr(curated, "implied_quant_policy", "") or ""
     tags = []
     for name, budget_gb in _fit_budgets():
-        # Apple Silicon pays the unquantized price; NVIDIA gets bitsandbytes.
-        resident = (metal_resident_gb(repo_id, download_gb)[0]
-                    if name == "mac16" else download_gb / 2.0)
+        # Apple Silicon pays the unquantized price; NVIDIA gets bitsandbytes
+        # unless this pick owns Quant none (the Qwen full row).
+        if name == "mac16":
+            if implied == "bnb_nf4":
+                continue
+            resident = metal_resident_gb(hf_weights_id(repo_id), download_gb)[0]
+        elif implied == "none":
+            resident = download_gb
+        else:
+            resident = download_gb / 2.0
         if resident <= budget_gb:
             tags.append(name)
         elif name == "mac16" and resident <= _MAC16_PHYSICAL_GB:
@@ -1880,8 +2016,9 @@ def resolve_context_cap(
     """
     pin = (_hard_vram_context_limit() if context_pin is _CONTEXT_PIN_UNSET
            else normalized_context_pin(context_pin))
+    weights = hf_weights_id(model_id) if isinstance(model_id, str) else model_id
     native = (read_native_context(config) if config is not None
-              else _read_config_context(model_id, hub_root=hub_root))
+              else _read_config_context(weights, hub_root=hub_root))
     if native is not None:
         value = min(native, pin) if pin is not None else native
         source = ("loaded decoder config" if config is not None else "snapshot config.json")
@@ -1889,9 +2026,15 @@ def resolve_context_cap(
         if pin is not None:
             source += f", explicit context pin {pin}"
         return ContextCapVerdict("PASS", value, source, native, pin)
-    estimate = CURATED_CONTEXT_OVERRIDES.get(model_id, DEFAULT_CONTEXT_ESTIMATE)
+    estimate = CURATED_CONTEXT_OVERRIDES.get(
+        model_id, CURATED_CONTEXT_OVERRIDES.get(weights, DEFAULT_CONTEXT_ESTIMATE)
+        if isinstance(weights, str) else DEFAULT_CONTEXT_ESTIMATE)
     value = min(estimate, pin) if pin is not None else estimate
-    source = ("curated context estimate" if model_id in CURATED_CONTEXT_OVERRIDES
+    in_overrides = (
+        model_id in CURATED_CONTEXT_OVERRIDES
+        or (isinstance(weights, str) and weights in CURATED_CONTEXT_OVERRIDES)
+    )
+    source = ("curated context estimate" if in_overrides
               else "unknown native capacity; default context estimate")
     source += f" {estimate}"
     if pin is not None:
@@ -1970,9 +2113,12 @@ def _estimate_resident_gb(
     # SPECIAL table wins -- uncurated-but-known-oversize stays in policy
     # surface without polluting the curated dropdown.
     special = SPECIAL_VRAM_ESTIMATES_GB.get(model_id)
+    if special is None and isinstance(model_id, str):
+        special = SPECIAL_VRAM_ESTIMATES_GB.get(_strip_label_suffix(model_id))
     if special is not None:
         return float(special)
-    curated = _by_repo_id().get(model_id)
+    lookup = _strip_label_suffix(model_id) if isinstance(model_id, str) else model_id
+    curated = _by_repo_id().get(lookup)
     if curated is not None:
         # gguf_native rows carry the REAL on-disk artifact size (derived from
         # pinned bytes), not a BF16 download -- so NO /2 halve. Peak resident
@@ -2011,7 +2157,11 @@ def _estimate_resident_gb(
             if weights_gb <= 0.0:
                 return None
             return weights_gb + kv_gb
-        return float(curated.approx_safetensors_gb) / 2.0
+        download = float(curated.approx_safetensors_gb)
+        implied = getattr(curated, "implied_quant_policy", "") or ""
+        if implied == "none":
+            return download
+        return download / 2.0
     if safetensors_gb_hint is not None and safetensors_gb_hint > 0:
         return float(safetensors_gb_hint) / 2.0
     return None
@@ -2226,8 +2376,9 @@ def auto_download_if_missing(
     # disk, return the path immediately. This also makes a cached gated
     # repo (e.g. Mistral-Nemo) usable when HF_TOKEN is unset -- the user
     # downloaded it once; we don't punish them for losing their token.
+    weights_id = hf_weights_id(repo_id) if isinstance(repo_id, str) else repo_id
     scan = {r.repo_id: r for r in scan_local_llm_cache(hub_root=hub_root)}
-    cached = scan.get(repo_id)
+    cached = scan.get(weights_id)
     if cached is not None and cached.on_disk and cached.snapshot_path:
         return cached.snapshot_path
 
@@ -2242,11 +2393,11 @@ def auto_download_if_missing(
 
     # Pre-flight gated check: must run BEFORE any HF API call (otherwise
     # the user gets a generic 401 from snapshot_download).
-    if repo_id in GATED_CURATED_MODELS and resolve_hf_token() is None:
-        raise GatedModelError(_format_gated_message(repo_id))
+    if weights_id in GATED_CURATED_MODELS and resolve_hf_token() is None:
+        raise GatedModelError(_format_gated_message(weights_id))
 
     # Pre-flight size estimate + disk-space check.
-    size_gb = estimate_model_size_gb(repo_id, _hf_api=_hf_api)
+    size_gb = estimate_model_size_gb(weights_id, _hf_api=_hf_api)
     size_bytes = int(size_gb * 1024**3)
     hub_root_path = hub_root if hub_root is not None else _hf_hub_root()
     if hub_root_path is None:
@@ -2267,7 +2418,7 @@ def auto_download_if_missing(
     # Announce download intent to the console (cheap; queue UI gets the
     # ProgressBar separately).
     print(
-        f"[OTR] Downloading {repo_id} -- {size_gb:.1f} GB -> "
+        f"[OTR] Downloading {weights_id} -- {size_gb:.1f} GB -> "
         f"{hub_root_path} (first run only)"
     )
 
@@ -2296,7 +2447,7 @@ def auto_download_if_missing(
     # has to REPAIR after import. An env var cannot win that race; an argument
     # always does.
     kwargs: dict[str, object] = {
-        "repo_id": repo_id,
+        "repo_id": weights_id,
         "allow_patterns": list(ALLOW_PATTERNS),
         "token": resolve_hf_token(),
         "cache_dir": str(hub_root_path),
@@ -2417,6 +2568,7 @@ __all__ = [
     "text_only_load_mode",
     "GATED_CURATED_MODELS",
     "DEFAULT_LLM",
+    "DEFAULT_LLM_NF4",
     "TEST_TECHNICAL_LLM",
     "TEST_OVERSIZED_LLM",
     "NOT_DOWNLOADED_SUFFIX",
@@ -2435,6 +2587,10 @@ __all__ = [
     "build_dropdown_choices",
     "dropdown_choices",
     "default_llm_option",
+    "fresh_llm_option",
+    "hf_weights_id",
+    "resolve_pick_for_quant",
+    "quant_pick_mismatch",
     "openrouter_catalog_dropdown_choices",
     "OPENROUTER_ENABLE_SENTINEL",
     "OPENROUTER_EMPTY_CACHE_SENTINEL",

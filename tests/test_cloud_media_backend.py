@@ -101,7 +101,10 @@ def test_provider_id_invalid_fails():
 
 def test_semaphore_defaults():
     assert cmb.provider_semaphore_size("kling") == 1  # pinned default
-    assert cmb.provider_semaphore_size("seedream") == 2  # global default
+    assert cmb.provider_semaphore_size("vidu") == 8  # cheap-cloud video overlap
+    assert cmb.provider_semaphore_size("seedream") == 8  # same overlap as Vidu
+    assert cmb.provider_semaphore_size("luma") == 8
+    assert cmb.provider_semaphore_size("elevenlabs") == 8
 
 
 def test_semaphore_env_override(monkeypatch):

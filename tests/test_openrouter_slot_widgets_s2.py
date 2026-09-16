@@ -140,7 +140,7 @@ def test_widget_order_appends_slots_at_end():
 def test_creative_default_local_when_remote_off(remote_off):
     spec = W.INPUT_TYPES()
     _, meta = spec["optional"]["creative_writing_model"]
-    assert meta["default"] == cat.default_llm_option()
+    assert meta["default"] == cat.fresh_llm_option()
 
 
 def test_creative_default_slot_a_when_remote_on(remote_on):
@@ -155,7 +155,7 @@ def test_creative_default_slot_a_when_remote_on(remote_on):
 def test_technical_default_never_flips(remote_on):
     spec = W.INPUT_TYPES()
     _, meta = spec["optional"]["technical_model"]
-    assert meta["default"] == cat.default_llm_option()
+    assert meta["default"] == cat.fresh_llm_option()
 
 
 def test_slot_picker_defaults_are_selectable(remote_off):

@@ -195,11 +195,21 @@ def _authored_row(engine_id, policy):
     return row
 
 
+def _roles_requiring_stills(policy):
+    """True-consuming roles. The dispatcher no longer exposes
+    ``roles_requiring_stills``; this is the same proof from
+    ``still_consumer_capabilities``."""
+    caps = disp.still_consumer_capabilities(policy)
+    if not isinstance(caps, dict):
+        return None
+    return sorted(role for role, cap in caps.items() if cap is True)
+
+
 def _materialized_row(engine_id, policy):
     """The dispatcher / image-director read of the policy: what the ledger
     will carry through to render dispatch."""
     caps = disp.still_consumer_capabilities(policy)
-    stills = disp.roles_requiring_stills(policy)
+    stills = _roles_requiring_stills(policy)
     mesh = imgdir.mesh_fodder_roles_from_video_policy(policy)
     vm = policy["video_models"]
     effective = {
@@ -302,8 +312,8 @@ def _special_cases():
             "incomplete_policy_no_video_models": {
                 "capabilities": disp.still_consumer_capabilities(no_vm),
                 "roles_requiring_stills": (
-                    sorted(disp.roles_requiring_stills(no_vm))
-                    if disp.roles_requiring_stills(no_vm) is not None
+                    sorted(_roles_requiring_stills(no_vm))
+                    if _roles_requiring_stills(no_vm) is not None
                     else None),
                 "mesh_fodder_roles": list(
                     imgdir.mesh_fodder_roles_from_video_policy(no_vm)),
@@ -314,8 +324,8 @@ def _special_cases():
                 # v3-only rejection is a named delta.
                 "capabilities": disp.still_consumer_capabilities(v1),
                 "roles_requiring_stills": (
-                    sorted(disp.roles_requiring_stills(v1))
-                    if disp.roles_requiring_stills(v1) is not None
+                    sorted(_roles_requiring_stills(v1))
+                    if _roles_requiring_stills(v1) is not None
                     else None),
                 "mesh_fodder_roles": list(
                     imgdir.mesh_fodder_roles_from_video_policy(v1)),
@@ -323,8 +333,8 @@ def _special_cases():
             "empty_video_models_dict": {
                 "capabilities": disp.still_consumer_capabilities(empty_vm),
                 "roles_requiring_stills": (
-                    sorted(disp.roles_requiring_stills(empty_vm))
-                    if disp.roles_requiring_stills(empty_vm) is not None
+                    sorted(_roles_requiring_stills(empty_vm))
+                    if _roles_requiring_stills(empty_vm) is not None
                     else None),
                 "mesh_fodder_roles": list(
                     imgdir.mesh_fodder_roles_from_video_policy(empty_vm)),
@@ -332,8 +342,8 @@ def _special_cases():
             "empty_engine_id_per_slot": {
                 "capabilities": disp.still_consumer_capabilities(empty_slot),
                 "roles_requiring_stills": (
-                    sorted(disp.roles_requiring_stills(empty_slot))
-                    if disp.roles_requiring_stills(empty_slot) is not None
+                    sorted(_roles_requiring_stills(empty_slot))
+                    if _roles_requiring_stills(empty_slot) is not None
                     else None),
                 "mesh_fodder_roles": list(
                     imgdir.mesh_fodder_roles_from_video_policy(empty_slot)),

@@ -19,6 +19,12 @@ from nodes import _otr_gguf_backend as gguf
 from nodes import _otr_model_loader as ml
 from nodes._otr_shared import llm_policy as lp
 
+_skip_no_gguf_row = pytest.mark.skipif(
+    not gguf.GGUF_ROWS,
+    reason="no GGUF writer row ships; row-content contracts are dormant "
+           "(see nodes/_otr_gguf_backend.GGUF_ROWS)",
+)
+
 
 # --------------------------------------------------------------------------
 # The policy object itself
@@ -191,21 +197,21 @@ def test_native_pin_is_captured_once_and_shapes_reuse(monkeypatch, clean_llm_cac
     monkeypatch.setattr(ml, "load_llm", load)
     policy = lp.LLMRuntimePolicy(vram_ceiling_gb=0)
     monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", " 000128 ")
-    first = ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)
+    first = ml.request_slot("creative", "Qwen/Qwen3.5-4B:nf4", policy=policy)
     assert first["context_cap"] == 128
     assert ml.LLM_CACHE["policy_key"] == (policy.cache_key(), 128)
     monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "128")
-    assert ml.request_slot("technical", "Qwen/Qwen3.5-4B", policy=policy) is first
+    assert ml.request_slot("technical", "Qwen/Qwen3.5-4B:nf4", policy=policy) is first
     assert len(loaded) == 1
     monkeypatch.delenv("OTR_HARD_VRAM_CONTEXT_LIMIT", raising=False)
-    assert ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)["context_cap"] == 262144
+    assert ml.request_slot("creative", "Qwen/Qwen3.5-4B:nf4", policy=policy)["context_cap"] == 262144
     assert loaded[-1].explicit_pin is None
     assert ml.LLM_CACHE["policy_key"] == (policy.cache_key(), None)
     monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "invalid")
-    ml.request_slot("technical", "Qwen/Qwen3.5-4B", policy=policy)
+    ml.request_slot("technical", "Qwen/Qwen3.5-4B:nf4", policy=policy)
     assert len(loaded) == 2
     monkeypatch.setenv("OTR_HARD_VRAM_CONTEXT_LIMIT", "256")
-    ml.request_slot("creative", "Qwen/Qwen3.5-4B", policy=policy)
+    ml.request_slot("creative", "Qwen/Qwen3.5-4B:nf4", policy=policy)
     assert len(loaded) == 3 and loaded[-1].explicit_pin == 256
     assert all(path == tmp_path / "hub" for path in roots)
 
@@ -459,6 +465,7 @@ def _gguf_load_config(repo, n_ctx=4096, quant="Q8_0"):
     )
 
 
+@_skip_no_gguf_row
 def test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier():
     """Real registry arithmetic, no fixture and no stub. The ceiling this
     repo ships (14.5) must keep admitting the GGUF writer it ships, and the
@@ -475,6 +482,7 @@ def test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier():
     assert refused.ceiling_gb == _EIGHT_GB_TIER
 
 
+@_skip_no_gguf_row
 def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
     monkeypatch, clean_llm_cache,
 ):
@@ -507,6 +515,7 @@ def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
     assert backend.loads == [_GEMMA_GGUF]
 
 
+@_skip_no_gguf_row
 def test_gguf_fresh_load_consults_the_policy_ceiling(
     monkeypatch, clean_llm_cache,
 ):
@@ -529,6 +538,7 @@ def test_gguf_fresh_load_consults_the_policy_ceiling(
     assert backend.loads == []  # refused BEFORE the backend was touched
 
 
+@_skip_no_gguf_row
 def test_gguf_ceiling_zero_disables_the_gate(monkeypatch, clean_llm_cache):
     """vram_ceiling_gb == 0 is the cpu tier: there is no VRAM to fit, so
     admission must be DISABLED there, not maximally strict."""
@@ -644,6 +654,7 @@ def test_q4_pin_is_the_quant_the_8gb_profile_selects():
     assert q4_sha != q8_sha
 
 
+@_skip_no_gguf_row
 def test_registry_row_carries_the_table_shas_not_a_none_slot():
     """The gemma row used to graft sha=None onto every quant while building
     its artifacts, which discarded any sha the table carried. One table,
@@ -665,6 +676,7 @@ def test_env_fallback_path_gets_the_same_sha_contract(monkeypatch, tmp_path):
     assert "expected_name, expected_size, expected_sha" in src
 
 
+@_skip_no_gguf_row
 def test_unpinned_artifact_is_refused_not_loaded_unchecked(
     monkeypatch, tmp_path,
 ):
@@ -690,6 +702,7 @@ def test_unpinned_artifact_is_refused_not_loaded_unchecked(
     assert "size" in message and "sha256" in message
 
 
+@_skip_no_gguf_row
 def test_pinned_quant_still_catches_a_short_file(monkeypatch, tmp_path):
     """The other half of the row: with the size pinned, a non-zero SHORT
     file is rejected as incomplete rather than loaded."""

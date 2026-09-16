@@ -101,6 +101,8 @@ ENGINE_FAMILY = {
     # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
     # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
     "ltx_audio_in": "audio_conditioned_video",
+    "cloud_ltx25_foley_plus": "image_to_video",
+    "cloud_ltx25_audio_in": "audio_conditioned_video",
 }
 
 #: The (role, engine, family) rotation covering the 3 roles + the non-3D
@@ -188,6 +190,8 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     "ltx25_video",
     "ltx25_foley_plus",
     "ltx25_mime",
+    "cloud_ltx25_foley_plus",
+    "cloud_ltx25_audio_in",
 })
 
 #: Engines that DO get a bookend scene prompt, but the COMPACTED one-action form
@@ -2157,7 +2161,8 @@ def ltx_prompt_diversity_status(trace):
 #: the check. A family outside the campaign's motion families makes frozen
 #: clips motion-EXEMPT, so the beat would stop being checked for motion at all
 #: -- trading a loud plan-time refusal for a silent quality hole.
-_AUDIO_IN_CHARACTER_ENGINES = ("ltx_audio_in", "minimax_h3_audio_in")
+_AUDIO_IN_CHARACTER_ENGINES = (
+    "ltx_audio_in", "minimax_h3_audio_in", "cloud_ltx25_audio_in")
 
 
 def _is_character_face_beat(shot):
@@ -2663,6 +2668,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # generic rule took it anyway, and the test that was meant to prove it was
     # LEXICAL (it grepped the source instead of calling the function) so it
     # passed against the wrong behaviour.
+    #
+    # cloud_ltx25_audio_in does NOT join that exclusion. MOUTH_HUMAN on a
+    # character beat is ShotLock voice/prompt ownership, not "init on a
+    # portrait". LTX 2.5 A2V's first frame is the beat's wide scene still --
+    # the 2.3 analog OUTSIDE the IA2V talking register. That register is
+    # gated to engine_id == "ltx_audio_in" because it is a local 2.3
+    # two-stage graph; the Comfy partner has no such recipe. Putting cloud
+    # A2V on this exclusion list without that graph would leave the portrait
+    # as init_image (the H3 tokenizer path) and skip the dedicated
+    # ltx_audio_in branch at the still_pan tuple, which that engine_id is
+    # not on. The partner image input is optional; we still send the scene.
     _engine_scene_init_required = (
         "init_image" in _required_inputs_for_engine(_eng_id, _family)
         and _family != "audio_driven_face"
@@ -4083,7 +4099,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # Reuses the id resolved once above -- one normalisation for the whole
     # request builder, not a second copy of the same map.
     _jav_engine = _engine_id
-    if _jav_engine in ("ltx25_foley_plus", "ltx25_mime"):
+    if _jav_engine in ("ltx25_foley_plus", "ltx25_mime",
+                       "cloud_ltx25_foley_plus"):
         try:
             from .eng_ltx25 import (finish_joint_av_positive,
                                     identity_leaks_in,
@@ -5256,6 +5273,198 @@ def build_episode_render_policy(section):
     }
 
 
+#: Prompt-observability keys copied from the request onto the node-92 trace.
+#: Keep in lockstep with the serial commit in :func:`run_episode`.
+_TRACE_OBS_KEYS = (
+    "prompt_source", "prompt_subsource", "prompt_sha8",
+    "prompt_chars", "init_source", "init_image",
+    "i2v_still_missing", "video_seed",
+    "visual_style", "prompt_field_source",
+    "banana_route", "banana_table_version",
+    "banana_substitutions", "banana_sha256_before",
+    "banana_sha256_after", "banana_varieties",
+    "prompt_version", "negative_sha8", "negative_chars",
+    "prompt_slots", "subject_sigil_sha8",
+    "prompt_slot_tokens", "prompt_dropped",
+    "kernel_source",
+    "author_version", "ghost_schema_version",
+    "ghost_source", "ghost_fallback_reason",
+    "ghost_model_id", "ghost_mode", "ghost_motif_cue",
+    "ghost_request_sha8", "ghost_output_sha8",
+    "ghost_drawable_beat", "ghost_drawable_beat_sha8",
+    "positive_clip_tokens", "positive_clip_windows",
+    "negative_clip_tokens", "negative_clip_windows",
+    "clip_window_max", "clip_counter",
+    "joint_av_prompt", "joint_av_sounds",
+    "joint_av_identity_leak",
+)
+
+
+def cloud_video_fanout_workers() -> int:
+    """How many cloud beats may be in flight.
+
+    Same knob as stills / TTS / music: ``OTR_CLOUD_FANOUT``, with the
+    older ``OTR_CLOUD_VIDEO_FANOUT`` name still honored. Unset defaults
+    to 8. ``1`` (or less) forces the historical serial walk. Local-GPU
+    episodes never consult this -- they cannot share VRAM.
+    """
+    from .._otr_shared.cloud_fanout import cloud_fanout_workers as _workers
+    return _workers()
+
+
+def _shot_is_first_to_last_chain(shot) -> bool:
+    """True when THIS beat's later segments start on an earlier segment's last frame.
+
+    That is intra-beat JOIN_CHAIN. Those segments stay serial inside
+    ``render_beat_coverage``. They do NOT block other beats from flying.
+    """
+    raw = (shot or {}).get("coverage_plan")
+    if not isinstance(raw, dict):
+        return False
+    return str(raw.get("join_mode") or "").strip().lower() == "chain"
+
+
+def cloud_frame_predecessors(shot) -> tuple:
+    """Shot ids whose LAST frame this shot needs as its FIRST frame.
+
+    Empty today: cheap Vidu / jump / single all start from a still already
+    on disk, so every beat is ready at t=0.
+
+    Later first-to-last (start-end, or a beat that starts on another
+    beat's terminal frame) stamps ``starts_on_last_frame_of`` on the shot
+    or its coverage_plan. The cloud ready-queue fires that shot only
+    after the predecessor has landed -- other independent beats keep
+    overlapping. Local GPU never uses this queue.
+    """
+    shot = shot or {}
+    raw = shot.get("coverage_plan") if isinstance(shot.get("coverage_plan"), dict) else {}
+    pred = shot.get("starts_on_last_frame_of") or raw.get("starts_on_last_frame_of")
+    if pred in (None, ""):
+        return ()
+    if isinstance(pred, (list, tuple)):
+        return tuple(str(p) for p in pred if p not in (None, ""))
+    return (str(pred),)
+
+
+def cloud_shots_ready_now(shots, finished_shot_ids) -> list:
+    """Cloud parallel path: units whose first (and last, if pre-minted) frames exist.
+
+    A predecessor last-frame is 'exists' only once that shot id is in
+    ``finished_shot_ids``. Pre-minted stills need no predecessor.
+    """
+    done = {str(s) for s in (finished_shot_ids or ())}
+    ready = []
+    for shot in shots or ():
+        deps = cloud_frame_predecessors(shot)
+        if all(d in done for d in deps):
+            ready.append(shot)
+    return ready
+
+
+def _should_fanout_cloud_episode(section, gap_beats) -> bool:
+    """True only when every renderable shot is provider-side and fan-out > 1.
+
+    A mixed local+cloud episode stays on the serial walk. One local engine
+    in the set is enough: that card cannot render two weights at once.
+
+    Intra-beat CHAIN is allowed: those last-frame starts stay serial
+    inside one beat. Cross-beat first-to-last is a later ready-queue
+    (``run_cloud_fanout`` + ``cloud_frame_predecessors``), not a reason
+    to disable fan-out here.
+    """
+    if cloud_video_fanout_workers() <= 1:
+        return False
+    if _section_has_local_video_engine(section):
+        return False
+    work = 0
+    for shot in (section or {}).get("shots") or ():
+        bid = str((shot or {}).get("beat_id") or "")
+        if bid and bid in (gap_beats or ()):
+            continue
+        eid = str((shot or {}).get("engine_id") or "")
+        if not eid:
+            return False
+        if not _is_cloud_video_engine(eid):
+            return False
+        work += 1
+    return work >= 2
+
+
+def _amp_row_from_request(shot, request):
+    """Best-effort audio-motion row. Never raises."""
+    try:
+        amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
+        amp_wav = amp_ref.get("path") if isinstance(amp_ref, dict) else None
+        if not amp_wav:
+            return None
+        return {
+            "id": str(shot.get("shot_id") or ""),
+            "start_s": float(shot.get("start_s") or 0.0),
+            "dur_s": float(shot.get("dur_s") or 0.0),
+            "_wav": str(amp_wav),
+        }
+    except Exception:  # noqa: BLE001 -- profiling collection is never fatal
+        return None
+
+
+def _trace_row_from_shot(request, clip, out_shot, attempts):
+    row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
+           "final_engine": out_shot["engine_id"]}
+    obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
+    for key in _TRACE_OBS_KEYS:
+        if key in obs:
+            row[key] = obs[key]
+        elif isinstance(request, dict) and ("_" + key) in request:
+            row[key] = request["_" + key]
+    if isinstance(clip, dict):
+        for key in _CADENCE_DELIVERY_RECEIPT_KEYS:
+            if key in clip:
+                row[key] = clip[key]
+    return row
+
+
+def _fanout_prompt_id():
+    """Prompt id from THIS Comfy execution thread. See cloud_fanout."""
+    from .._otr_shared.cloud_fanout import snapshot_prompt_id
+    return snapshot_prompt_id()
+
+
+def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
+                        canvas, oom_engines, oom_shot_id, host_caps, profile,
+                        prompt_id=None):
+    """One provider-side beat. Safe to run beside other cloud beats.
+
+    CHAIN segments inside the beat stay serial (they need the prior
+    terminal frame). JUMP / single-clip beats are independent of each
+    other, which is why the episode can fire them together.
+    """
+    from .._otr_shared.cloud_media_invoke import bind_prompt_id
+
+    def _run():
+        if request_builder is not None:
+            request = request_builder(shot, ledger, canvas=canvas)
+        else:
+            request = build_request(shot, assets, frame_count, canvas)
+        clip, out_shot, attempts, used = render_beat_coverage(
+            shot, ledger, request=request, request_builder=request_builder,
+            canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+            host_caps=host_caps, profile=profile)
+        return {
+            "shot_id": str(out_shot.get("shot_id") or shot.get("shot_id") or ""),
+            "request": request,
+            "clip": clip,
+            "out_shot": out_shot,
+            "attempts": attempts,
+            "used": used,
+            "amp_row": _amp_row_from_request(shot, request),
+        }
+
+    if prompt_id:
+        with bind_prompt_id(str(prompt_id)):
+            return _run()
+    return _run()
+
+
 def run_episode(ledger, *, oom_shot_id=None,
                 oom_engines=frozenset(), assets=None, frame_count=25,
                 canvas=None, request_builder=None):
@@ -5398,185 +5607,269 @@ def run_episode(ledger, *, oom_shot_id=None,
         # Beats whose required still the image model REFUSED. Read once, not
         # per beat: the receipt is frozen by the time the render starts.
         _gap_beats = sanctioned_gap_beat_ids(ledger)
-        for shot in section["shots"]:
-            # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
+        if _should_fanout_cloud_episode(section, _gap_beats):
+            # CLOUD-ONLY FAN-OUT. Partner HTTP waits, not VRAM.
+            # Predecessor-ready beats are requested in waves via
+            # run_cloud_fanout + cloud_frame_predecessors (today every
+            # cheap-Vidu / jump / single shot has an empty predecessor
+            # list, so wave 1 is the episode). cloud_shots_ready_now is
+            # the same predicate, kept for the first-to-last unit test.
+            # Clips may land in any order; clips / new_shots / trace are
+            # committed in LEDGER order so SilentComposite never sees a
+            # scrambled timeline.
             #
-            # HERE is load-bearing. The obvious place looks like the request
-            # builder, but ``build_request_from_shot`` returns a REQUEST, not a
-            # shot, and on the cheap families a missing still does not even
-            # raise there -- it logs and sets ``init_image=""``, and the raise
-            # lands later in ``cheap_families.render_clip``. Skipping at the
-            # top of the loop is the only point that precedes BOTH the engine
-            # scope and every raise site, so a beat nobody will render also
-            # never loads an engine's weights.
-            #
-            # The ORIGINAL ShotLock shot is kept, not a synthesized stand-in:
-            # the beat is a real fact about the episode and it keeps its id,
-            # role, family, position and frame budget. What it does not get is
-            # a clip -- ``build_clip_manifest`` derives existence from the clip
-            # file, so the manifest row comes out absent on its own, and the
-            # composite's existing floor-fill covers the hole. Nothing is
-            # substituted and nothing is silent: the gap row in the receipt is
-            # the record, and the warning below is the log.
-            if str(shot.get("beat_id") or "") in _gap_beats:
-                _LOG.warning(
-                    "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
-                    "rendered -- the image model refused its required still. "
-                    "The beat keeps its place in the timeline and is floored.",
-                    shot.get("shot_id"), shot.get("beat_id"))
-                new_shots.append(shot)
-                continue
-            # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
-            # DIFFERENT engine than the one the prior beat left resident, drain the
-            # prior engine's residue and FLUSH the allocator, so two heavy engines
-            # never co-reside on the 16GB card -- the cause of the 29s/it edge
-            # page-thrash (ltx 12.5GB + humo 7GB -> 19.5GB). The per-beat teardown
-            # already DETACHES + waits, but it does not return the freed-but-cached
-            # blocks to the driver; the surgical Lever-1 freer's cuda flush does.
-            # SELECTIVE: same-engine consecutive beats SKIP this (no reload churn --
-            # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
-            # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
-            _this_engine = str(shot.get("engine_id") or "")
-            # CLOSE THE OUTGOING ENGINE'S SCOPE ON *ANY* ENGINE CHANGE, and on
-            # its own condition -- NOT inside the reclaim gate below.
-            #
-            # THIS WAS A REAL BUG AND THE PANEL CAUGHT IT.
-            # ``_should_reclaim_between_engines`` ends in
-            # ``and not _is_cloud_video_engine(this)`` (:1885-1888), because a
-            # VRAM reclaim only matters before a LOCAL engine loads. Nesting
-            # the scope release inside it meant a local -> CLOUD hand-off never
-            # released the local engine's 8.86 GiB: the predicate is about
-            # whether to drain VRAM, and ownership is a different question that
-            # happens to have shared a line.
-            #
-            # Ordering still matters: the release runs BEFORE the reclaim, so
-            # the reclaim is not draining around the largest thing in the room.
-            if _last_engine and _this_engine and _this_engine != _last_engine:
-                _end_engine_scope(_last_engine)
-            if _should_reclaim_between_engines(_last_engine, _this_engine):
+            # LOCAL engines never enter this branch -- a mixed episode keeps
+            # the serial walk below. CHAIN segments inside one beat still
+            # render one-after-another inside render_beat_coverage.
+            work_shots = []
+            for shot in section["shots"]:
+                if str(shot.get("beat_id") or "") in _gap_beats:
+                    continue
+                work_shots.append(shot)
+                _begin_engine_scope(str(shot.get("engine_id") or ""))
+            from .._otr_shared.cloud_fanout import run_cloud_fanout
+            workers = min(cloud_video_fanout_workers(), len(work_shots))
+            fanout_prompt_id = _fanout_prompt_id()
+            _LOG.warning(
+                "[OTR video] cloud fan-out: %d shot(s), workers=%d; "
+                "assemble stays ledger order; prompt_id=%s",
+                len(work_shots), workers,
+                "yes" if fanout_prompt_id else "missing")
+
+            def _exec_shot(shot):
+                return _execute_cloud_shot(
+                    shot, ledger,
+                    request_builder=request_builder, assets=assets,
+                    frame_count=frame_count, canvas=canvas,
+                    oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+                    host_caps=_episode_host_caps,
+                    profile=_episode_profile,
+                    prompt_id=None)
+
+            outcome = run_cloud_fanout(
+                work_shots,
+                item_id=lambda s: str(s.get("shot_id") or ""),
+                execute=_exec_shot,
+                predecessors=cloud_frame_predecessors,
+                workers=workers,
+                prompt_id=fanout_prompt_id)
+            rendered = outcome.results
+            errors = outcome.errors
+            if outcome.stuck_ids and not errors:
+                raise RenderError(
+                    "cloud fan-out stuck; shots never became ready: %s"
+                    % outcome.stuck_ids)
+            for shot in section["shots"]:
+                bid = str(shot.get("beat_id") or "")
+                sid = str(shot.get("shot_id") or "")
+                if bid in _gap_beats:
+                    _LOG.warning(
+                        "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
+                        "rendered -- the image model refused its required still. "
+                        "The beat keeps its place in the timeline and is floored.",
+                        shot.get("shot_id"), shot.get("beat_id"))
+                    new_shots.append(shot)
+                    continue
+                if sid in errors:
+                    raise errors[sid]
+                if sid not in rendered:
+                    raise RenderError(
+                        "cloud fan-out never rendered shot %s" % sid)
+                packed = rendered[sid]
+                amp = packed.get("amp_row")
+                if amp:
+                    amp_rows.append(amp)
+                clip = packed["clip"]
+                out_shot = packed["out_shot"]
+                clips[out_shot["shot_id"]] = clip
+                new_shots.append(out_shot)
+                trace.append(_trace_row_from_shot(
+                    packed["request"], clip, out_shot, packed["attempts"]))
+                used = packed.get("used")
+                if used is not None:
+                    vram_peak = (int(used) if vram_peak is None
+                                 else max(vram_peak, int(used)))
+                _last_engine = str(out_shot.get("engine_id") or "")
+        else:
+            for shot in section["shots"]:
+                # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
+                #
+                # HERE is load-bearing. The obvious place looks like the request
+                # builder, but ``build_request_from_shot`` returns a REQUEST, not a
+                # shot, and on the cheap families a missing still does not even
+                # raise there -- it logs and sets ``init_image=""``, and the raise
+                # lands later in ``cheap_families.render_clip``. Skipping at the
+                # top of the loop is the only point that precedes BOTH the engine
+                # scope and every raise site, so a beat nobody will render also
+                # never loads an engine's weights.
+                #
+                # The ORIGINAL ShotLock shot is kept, not a synthesized stand-in:
+                # the beat is a real fact about the episode and it keeps its id,
+                # role, family, position and frame budget. What it does not get is
+                # a clip -- ``build_clip_manifest`` derives existence from the clip
+                # file, so the manifest row comes out absent on its own, and the
+                # composite's existing floor-fill covers the hole. Nothing is
+                # substituted and nothing is silent: the gap row in the receipt is
+                # the record, and the warning below is the log.
+                if str(shot.get("beat_id") or "") in _gap_beats:
+                    _LOG.warning(
+                        "[OTR.render_driver] SANCTIONED GAP shot %s (beat %s): not "
+                        "rendered -- the image model refused its required still. "
+                        "The beat keeps its place in the timeline and is floored.",
+                        shot.get("shot_id"), shot.get("beat_id"))
+                    new_shots.append(shot)
+                    continue
+                # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
+                # DIFFERENT engine than the one the prior beat left resident, drain the
+                # prior engine's residue and FLUSH the allocator, so two heavy engines
+                # never co-reside on the 16GB card -- the cause of the 29s/it edge
+                # page-thrash (ltx 12.5GB + humo 7GB -> 19.5GB). The per-beat teardown
+                # already DETACHES + waits, but it does not return the freed-but-cached
+                # blocks to the driver; the surgical Lever-1 freer's cuda flush does.
+                # SELECTIVE: same-engine consecutive beats SKIP this (no reload churn --
+                # the resident-stack reuse, e.g. humo x3, is preserved). Best-effort,
+                # never fatal; no unload_all_models (V-4/V-5); MEASURED telemetry.
+                _this_engine = str(shot.get("engine_id") or "")
+                # CLOSE THE OUTGOING ENGINE'S SCOPE ON *ANY* ENGINE CHANGE, and on
+                # its own condition -- NOT inside the reclaim gate below.
+                #
+                # THIS WAS A REAL BUG AND THE PANEL CAUGHT IT.
+                # ``_should_reclaim_between_engines`` ends in
+                # ``and not _is_cloud_video_engine(this)`` (:1885-1888), because a
+                # VRAM reclaim only matters before a LOCAL engine loads. Nesting
+                # the scope release inside it meant a local -> CLOUD hand-off never
+                # released the local engine's 8.86 GiB: the predicate is about
+                # whether to drain VRAM, and ownership is a different question that
+                # happens to have shared a line.
+                #
+                # Ordering still matters: the release runs BEFORE the reclaim, so
+                # the reclaim is not draining around the largest thing in the room.
+                if _last_engine and _this_engine and _this_engine != _last_engine:
+                    _end_engine_scope(_last_engine)
+                if _should_reclaim_between_engines(_last_engine, _this_engine):
+                    try:
+                        from .._otr_vram_levers import (
+                            free_otr_pipeline_residue as _free_residue)
+                        _ir = _free_residue(
+                            reason="inter-beat %s->%s" % (_last_engine, _this_engine))
+                        _LOG.warning(
+                            "[OTR video] inter-beat reclaim %s->%s: free_gb_after=%s",
+                            _last_engine, _this_engine, _ir.get("free_gb_after"))
+                    except Exception as _exc:  # noqa: BLE001 -- best-effort, never fatal
+                        _LOG.warning(
+                            "[OTR video] inter-beat reclaim skipped: %s", _exc)
+                # OPEN THIS ENGINE'S EPISODE SCOPE. After the reclaim above, so a
+                # scope is never opened into memory that is about to be drained,
+                # and idempotent, so the 2nd..Nth beat on the same engine is free.
+                _begin_engine_scope(_this_engine)
+                if request_builder is not None:
+                    request = request_builder(shot, ledger, canvas=canvas)
+                else:
+                    request = build_request(shot, assets, frame_count, canvas)
+                # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
+                # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
+                # a collection hiccup must never perturb the render.
                 try:
-                    from .._otr_vram_levers import (
-                        free_otr_pipeline_residue as _free_residue)
-                    _ir = _free_residue(
-                        reason="inter-beat %s->%s" % (_last_engine, _this_engine))
-                    _LOG.warning(
-                        "[OTR video] inter-beat reclaim %s->%s: free_gb_after=%s",
-                        _last_engine, _this_engine, _ir.get("free_gb_after"))
-                except Exception as _exc:  # noqa: BLE001 -- best-effort, never fatal
-                    _LOG.warning(
-                        "[OTR video] inter-beat reclaim skipped: %s", _exc)
-            # OPEN THIS ENGINE'S EPISODE SCOPE. After the reclaim above, so a
-            # scope is never opened into memory that is about to be drained,
-            # and idempotent, so the 2nd..Nth beat on the same engine is free.
-            _begin_engine_scope(_this_engine)
-            if request_builder is not None:
-                request = request_builder(shot, ledger, canvas=canvas)
-            else:
-                request = build_request(shot, assets, frame_count, canvas)
-            # S-C C1: record this shot's resolved conditioning WAV + id/timing so the
-            # post-render pass can stamp a per-beat audio_motion_profile. Best-effort;
-            # a collection hiccup must never perturb the render.
-            try:
-                _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
-                _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
-                if _amp_wav:
-                    amp_rows.append({
-                        "id": str(shot.get("shot_id") or ""),
-                        "start_s": float(shot.get("start_s") or 0.0),
-                        "dur_s": float(shot.get("dur_s") or 0.0),
-                        "_wav": str(_amp_wav),
-                    })
-            except Exception:  # noqa: BLE001 -- profiling collection is never fatal
-                pass
-            # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
-            # A shot with no coverage plan or a single-clip one goes straight to
-            # render_shot with the request already built above -- unchanged. A
-            # multi-segment plan opens ONE beat session, renders each segment from
-            # its own request, chains terminal frames inside the loop, and assembles
-            # the result before it comes back.
-            clip, out_shot, attempts, used = render_beat_coverage(
-                shot, ledger, request=request, request_builder=request_builder,
-                canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
-                host_caps=_episode_host_caps, profile=_episode_profile)
-            # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
-            # raises RenderError; there are no runtime fallback decisions and no
-            # AS-2 family-change group prune (the family can never change here).
-            clips[out_shot["shot_id"]] = clip
-            new_shots.append(out_shot)
-            row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
-                   "final_engine": out_shot["engine_id"]}
-            # Round 5 F2: prompt observability rides the trace (durable in the
-            # node-92 /history report) -- the diversity gate + the operator's
-            # "did the prompts actually differ" check read these. The stamps live
-            # on the request's schema-real ``observability`` dict (W7-pre builder
-            # migration; the legacy top-level ``_<key>`` spelling is still read
-            # for hand-built requests).
-            obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
-            for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
-                        "prompt_chars", "init_source", "init_image",
-                        "i2v_still_missing", "video_seed",
-                        "visual_style", "prompt_field_source",
-                        # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
-                        # -- without these the keys never reach the node-92 report.
-                        "banana_route", "banana_table_version",
-                        "banana_substitutions", "banana_sha256_before",
-                        "banana_sha256_after", "banana_varieties",
-                        # GHOST SIGNAL PROMPT RECEIPTS (2026-08-22). These live
-                        # on the REQUEST's observability, which is why they
-                        # belong in this loop and the cadence keys below do not.
-                        "prompt_version", "negative_sha8", "negative_chars",
-                        "prompt_slots", "subject_sigil_sha8",
-                        # PROMPT v3 RECEIPTS (2026-09-02). `prompt_slots` stays
-                        # the name list it has always been; these three say how
-                        # many tokens each slot spent, which whole units the
-                        # fitter dropped, and which tier of the kernel ladder
-                        # fed the subject. Stamped and allowlisted in the same
-                        # change, because a key that is stamped and not listed
-                        # here never reaches the node-92 report at all.
-                        "prompt_slot_tokens", "prompt_dropped",
-                        "kernel_source",
-                        # GHOST PROMPT v2 RECEIPTS (2026-08-22). A key that is
-                        # stamped but not listed here never reaches the node-92
-                        # /history report, which is the only place the operator
-                        # can read what a published episode actually asked for.
-                        "author_version", "ghost_schema_version",
-                        "ghost_source", "ghost_fallback_reason",
-                        "ghost_model_id", "ghost_mode", "ghost_motif_cue",
-                        "ghost_request_sha8", "ghost_output_sha8",
-                        "ghost_drawable_beat", "ghost_drawable_beat_sha8",
-                        "positive_clip_tokens", "positive_clip_windows",
-                        "negative_clip_tokens", "negative_clip_windows",
-                        "clip_window_max", "clip_counter",
-                        # JOINT-AV RECEIPTS. Stamped on the request and declared
-                        # in the schema, but omitted from this allowlist -- so
-                        # the published /history evidence never carried what a
-                        # joint-AV beat actually asked for or was heard to say.
-                        # `joint_av_identity_leak` is only present when a leak
-                        # was detected; absent stays absent, never invented.
-                        "joint_av_prompt", "joint_av_sounds",
-                        "joint_av_identity_leak"):
-                if key in obs:
-                    row[key] = obs[key]
-                elif isinstance(request, dict) and ("_" + key) in request:
-                    row[key] = request["_" + key]
-            # THE CADENCE / DELIVERY KEYS COME FROM THE CLIP, NOT THE REQUEST.
-            # Appending them to the loop above would have been the natural-
-            # looking mistake and they would ALL have been silently absent: they
-            # are stamped by the adapter on what it RETURNED, never on what was
-            # asked for -- which is the point, since a receipt sourced from
-            # request intent could describe a render that did not happen.
-            # Without this, node 92's /history report drops them entirely.
-            if isinstance(clip, dict):
-                for key in _CADENCE_DELIVERY_RECEIPT_KEYS:
-                    if key in clip:
-                        row[key] = clip[key]
-            trace.append(row)
-            if used is not None:
-                vram_peak = (int(used) if vram_peak is None
-                             else max(vram_peak, int(used)))
-            # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
-            # the next beat reclaims only when it crosses to a different engine.
-            _last_engine = str(out_shot.get("engine_id") or "")
+                    _amp_ref = (request.get("audio_ref") or {}) if isinstance(request, dict) else {}
+                    _amp_wav = _amp_ref.get("path") if isinstance(_amp_ref, dict) else None
+                    if _amp_wav:
+                        amp_rows.append({
+                            "id": str(shot.get("shot_id") or ""),
+                            "start_s": float(shot.get("start_s") or 0.0),
+                            "dur_s": float(shot.get("dur_s") or 0.0),
+                            "_wav": str(_amp_wav),
+                        })
+                except Exception:  # noqa: BLE001 -- profiling collection is never fatal
+                    pass
+                # ONE BEAT, however many renders it takes (2026-07-26, chunks 6c/6d).
+                # A shot with no coverage plan or a single-clip one goes straight to
+                # render_shot with the request already built above -- unchanged. A
+                # multi-segment plan opens ONE beat session, renders each segment from
+                # its own request, chains terminal frames inside the loop, and assembles
+                # the result before it comes back.
+                clip, out_shot, attempts, used = render_beat_coverage(
+                    shot, ledger, request=request, request_builder=request_builder,
+                    canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
+                    host_caps=_episode_host_caps, profile=_episode_profile)
+                # NO FALLBACKS (2026-07-02): render_shot either returns a clip or
+                # raises RenderError; there are no runtime fallback decisions and no
+                # AS-2 family-change group prune (the family can never change here).
+                clips[out_shot["shot_id"]] = clip
+                new_shots.append(out_shot)
+                row = {"shot_id": out_shot["shot_id"], "attempts": attempts,
+                       "final_engine": out_shot["engine_id"]}
+                # Round 5 F2: prompt observability rides the trace (durable in the
+                # node-92 /history report) -- the diversity gate + the operator's
+                # "did the prompts actually differ" check read these. The stamps live
+                # on the request's schema-real ``observability`` dict (W7-pre builder
+                # migration; the legacy top-level ``_<key>`` spelling is still read
+                # for hand-built requests).
+                obs = (request.get("observability") or {}) if isinstance(request, dict) else {}
+                for key in ("prompt_source", "prompt_subsource", "prompt_sha8",
+                            "prompt_chars", "init_source", "init_image",
+                            "i2v_still_missing", "video_seed",
+                            "visual_style", "prompt_field_source",
+                            # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
+                            # -- without these the keys never reach the node-92 report.
+                            "banana_route", "banana_table_version",
+                            "banana_substitutions", "banana_sha256_before",
+                            "banana_sha256_after", "banana_varieties",
+                            # GHOST SIGNAL PROMPT RECEIPTS (2026-08-22). These live
+                            # on the REQUEST's observability, which is why they
+                            # belong in this loop and the cadence keys below do not.
+                            "prompt_version", "negative_sha8", "negative_chars",
+                            "prompt_slots", "subject_sigil_sha8",
+                            # PROMPT v3 RECEIPTS (2026-09-02). `prompt_slots` stays
+                            # the name list it has always been; these three say how
+                            # many tokens each slot spent, which whole units the
+                            # fitter dropped, and which tier of the kernel ladder
+                            # fed the subject. Stamped and allowlisted in the same
+                            # change, because a key that is stamped and not listed
+                            # here never reaches the node-92 report at all.
+                            "prompt_slot_tokens", "prompt_dropped",
+                            "kernel_source",
+                            # GHOST PROMPT v2 RECEIPTS (2026-08-22). A key that is
+                            # stamped but not listed here never reaches the node-92
+                            # /history report, which is the only place the operator
+                            # can read what a published episode actually asked for.
+                            "author_version", "ghost_schema_version",
+                            "ghost_source", "ghost_fallback_reason",
+                            "ghost_model_id", "ghost_mode", "ghost_motif_cue",
+                            "ghost_request_sha8", "ghost_output_sha8",
+                            "ghost_drawable_beat", "ghost_drawable_beat_sha8",
+                            "positive_clip_tokens", "positive_clip_windows",
+                            "negative_clip_tokens", "negative_clip_windows",
+                            "clip_window_max", "clip_counter",
+                            # JOINT-AV RECEIPTS. Stamped on the request and declared
+                            # in the schema, but omitted from this allowlist -- so
+                            # the published /history evidence never carried what a
+                            # joint-AV beat actually asked for or was heard to say.
+                            # `joint_av_identity_leak` is only present when a leak
+                            # was detected; absent stays absent, never invented.
+                            "joint_av_prompt", "joint_av_sounds",
+                            "joint_av_identity_leak"):
+                    if key in obs:
+                        row[key] = obs[key]
+                    elif isinstance(request, dict) and ("_" + key) in request:
+                        row[key] = request["_" + key]
+                # THE CADENCE / DELIVERY KEYS COME FROM THE CLIP, NOT THE REQUEST.
+                # Appending them to the loop above would have been the natural-
+                # looking mistake and they would ALL have been silently absent: they
+                # are stamped by the adapter on what it RETURNED, never on what was
+                # asked for -- which is the point, since a receipt sourced from
+                # request intent could describe a render that did not happen.
+                # Without this, node 92's /history report drops them entirely.
+                if isinstance(clip, dict):
+                    for key in _CADENCE_DELIVERY_RECEIPT_KEYS:
+                        if key in clip:
+                            row[key] = clip[key]
+                trace.append(row)
+                if used is not None:
+                    vram_peak = (int(used) if vram_peak is None
+                                 else max(vram_peak, int(used)))
+                # CS-3: remember what ACTUALLY rendered (post-fallback final_engine) so
+                # the next beat reclaims only when it crosses to a different engine.
+                _last_engine = str(out_shot.get("engine_id") or "")
     finally:
         # THE SCOPES CLOSE EVEN WHEN THE EPISODE DOES NOT FINISH. A raise
         # anywhere in the loop -- an OOM, a refused beat, a bad ledger row --
@@ -6139,7 +6432,8 @@ _LTX_OPEN_ENGINES = frozenset(
      # renders on one is every bit as real an LTX open as `ltx25_video`.
      # Omitting them would report a healthy open as a procgen soft-open and,
      # under OTR_LTX_OPEN_STRICT=1, fail a build that did nothing wrong.
-     "ltx25_foley_plus", "ltx25_mime"})
+     "ltx25_foley_plus", "ltx25_mime",
+     "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})

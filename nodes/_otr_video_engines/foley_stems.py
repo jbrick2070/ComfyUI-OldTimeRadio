@@ -108,12 +108,18 @@ FOLEY_RECEIPT_KEYS = (
 FOLEY_LANE_GAINS = {
     "ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_mime": (1.00, 0.00),
+    # Same 0.50/0.50 bed as local Foley -- harvested from the partner mp4
+    # instead of the audio latent, then mixed by this table, not a second mux.
+    "cloud_ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
 }
 
 #: The lane whose master gain applies GLOBALLY rather than per-window. Exactly
 #: one lane does this and the distinction is a ruling, not an implementation
 #: detail -- see the table above.
-GLOBAL_MASTER_GAIN_LANES = frozenset({"ltx25_foley_plus"})
+GLOBAL_MASTER_GAIN_LANES = frozenset({
+    "ltx25_foley_plus",
+    "cloud_ltx25_foley_plus",
+})
 
 #: `FOLEY_ENGINE_ID` / `MIME_ENGINE_ID` were removed 2026-08-28. Their comment
 #: claimed "three call sites already read" them and there were none: every
@@ -169,6 +175,77 @@ def is_foley_route(video_policy_json):
         from _otr_shared.public_engines import resolve_engine_id  # type: ignore
     return any(resolve_engine_id(value) in FOLEY_LANE_GAINS
                for value in effective.values())
+
+
+def extract_pcm16_wav_from_video(video_path, dest_wav, *, sample_rate=48000,
+                                 channels=2):
+    """Take the audio stream out of a provider mp4 as 16-bit PCM.
+
+    THE FOLEY LANE'S HARVEST. Cloud LTX 2.5 I2V returns picture+audio in one
+    file; ``canonicalize_video`` then strips the audio from the picture. This
+    must run FIRST, against the raw provider file, or the bed is gone.
+
+    FAILS CLOSED when ffmpeg cannot find an audio stream: a foley route that
+    silently delivers no foley is the false green this path exists to stop.
+    """
+    import subprocess
+
+    src = os.path.abspath(str(video_path))
+    dest = os.path.abspath(str(dest_wav))
+    if not os.path.isfile(src):
+        raise FoleyStemError(
+            "cannot harvest foley from %r -- the provider clip is missing"
+            % src)
+    os.makedirs(os.path.dirname(dest) or ".", exist_ok=True)
+    cmd = [
+        _ffmpeg_bin(), "-y", "-i", src, "-vn",
+        "-ac", str(int(channels)), "-ar", str(int(sample_rate)),
+        "-c:a", "pcm_s16le", dest,
+    ]
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, timeout=120, check=False)
+    except OSError as exc:
+        raise FoleyStemError(
+            "ffmpeg could not extract foley from %s: %s" % (src, exc)
+        ) from exc
+    if proc.returncode != 0 or not os.path.isfile(dest) or os.path.getsize(dest) < 44:
+        err = (proc.stderr or b"").decode("utf-8", "replace")[-400:]
+        raise FoleyStemError(
+            "provider clip %s has no harvestable audio stream (ffmpeg rc=%s). "
+            "cloud_ltx25_foley_plus requires generate_audio=True and a native "
+            "bed. %s" % (src, proc.returncode, err.strip() or "no stderr"))
+    return dest
+
+
+def conform_stem_to_frame_count(samples, sample_rate, frame_count, fps):
+    """Pad or trim a stem to exactly ``frame_count`` frames at ``fps``.
+
+    Same contract as the local LTX 2.5 foley decode: a surplus is CUT (the
+    canonicalizer already dropped those pictures); a shortfall under one
+    frame is silence-padded; anything larger is a refusal.
+    """
+    import numpy as np
+
+    arr = np.asarray(samples)
+    if arr.ndim == 1:
+        arr = arr[None, :]
+    step = samples_per_frame(int(sample_rate), int(fps))
+    want = int(frame_count) * step
+    have = int(arr.shape[-1])
+    if have == want:
+        return arr
+    if have > want:
+        return arr[:, :want]
+    deficit = want - have
+    if deficit > step:
+        raise FoleyStemError(
+            "foley stem is %d sample(s) for %d frame(s) at %d Hz/%d fps "
+            "(needs %d). More than one frame short -- the decode disagreed "
+            "with the picture about length. NO FALLBACK"
+            % (have, int(frame_count), int(sample_rate), int(fps), want))
+    pad = np.zeros((arr.shape[0], deficit), dtype=arr.dtype)
+    return np.concatenate([arr, pad], axis=-1)
 
 
 def route_lane_ids(video_policy_json):
@@ -667,6 +744,11 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
     """
     import numpy as np
 
+    try:
+        from .._otr_shared.public_engines import resolve_engine_id
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared.public_engines import resolve_engine_id  # type: ignore
+
     arr = np.asarray(master, dtype=np.float32)
     if arr.ndim == 1:
         arr = arr[None, :]
@@ -678,8 +760,11 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
     # than by which beats produced a stem, because RULING 1's "whether or not a
     # foley stem exists for that beat" is precisely a statement about beats
     # that have none. A row's own engine_id is the fallback for a manifest
-    # handed in without a policy.
-    row_lanes = {str((r or {}).get("engine_id") or "") for r in rows}
+    # handed in without a policy. Resolve the same way is_foley_route does --
+    # a saved ``cloud_ltx25_foley_plus (16:9)`` is the cloud Foley lane, not a
+    # mystery string the mix must refuse.
+    row_lanes = {resolve_engine_id(str((r or {}).get("engine_id") or ""))
+                 for r in rows}
     present = set(lane_ids) | (row_lanes & set(FOLEY_LANE_GAINS))
     global_master_gain = 1.0
     for lane in sorted(present & GLOBAL_MASTER_GAIN_LANES):
@@ -769,7 +854,7 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
         # row's own engine_id rather than assumed from the episode: a mixed
         # episode can legitimately carry both lanes, on different roles, and
         # they attenuate the master differently.
-        lane = str((row or {}).get("engine_id") or "")
+        lane = resolve_engine_id(str((row or {}).get("engine_id") or ""))
         if lane not in FOLEY_LANE_GAINS:
             raise FoleyStemError(
                 "manifest row %r carries a foley stem but its engine_id is "

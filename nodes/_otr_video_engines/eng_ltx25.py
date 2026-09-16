@@ -2124,7 +2124,7 @@ class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
 
 #: The lanes that KEEP the model's own audio. Exact internal ids -- never a
 #: prefix match, because ``ltx25_video`` shares the prefix and must not finish.
-_JOINT_AV_ENGINES = ("ltx25_foley_plus", "ltx25_mime")
+_JOINT_AV_ENGINES = ("ltx25_foley_plus", "ltx25_mime", "cloud_ltx25_foley_plus")
 
 #: THE INVARIANT TERMINATOR. Every finished joint-AV positive ends with this
 #: exact clause, and the golden recipes are why it is worded this plainly.

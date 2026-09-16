@@ -19,7 +19,7 @@ Pins:
      the Google API slots away to sit after the openrouter/comfy slot
      pickers instead); choices == the roll sentinel followed by
      eligible_style_ids() exactly (registry order, all styles live);
-     default sci_fi_radio.
+     canvas default is the roll command, same as every shipping JSON.
   2. Registration fail-loud: a broken style registry RAISES out of
      INPUT_TYPES (deliberate convention exception -- no baked-in list).
   3. Gate order: an unknown visual_style raises UnknownVisualStyleError
@@ -102,8 +102,7 @@ class TestWidgetSurface:
         assert choices[0] == rolls.STYLE_SENTINEL
         assert choices[1:] == list(rolls.eligible_style_ids())
         assert rolls.STYLE_SENTINEL not in rolls.eligible_style_ids()
-        # The saved graph still stores a concrete id, so no canonical diff.
-        assert meta["default"] == "sci_fi_radio"
+        assert meta["default"] == rolls.STYLE_SENTINEL
         # ALL styles are live (no execution lane); known non-defaults listed.
         for sid in ("anime", "cartoon", "paper_origami",
                     "archival_documentary", "recur_frac", "shakespeare_stage_realism",

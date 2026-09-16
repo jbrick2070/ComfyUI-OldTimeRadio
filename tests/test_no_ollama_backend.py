@@ -52,15 +52,19 @@ def test_gemma_12b_hf_pin_is_accepted_without_a_sidecar(tmp_path):
 
 
 def test_hf_and_gguf_gemma_12b_rows_are_explicit_peers():
+    from nodes import _otr_gguf_backend as ggf
+
     ids = catalog._by_repo_id()
-    assert "unsloth/gemma-4-12b-it-GGUF" in ids
     assert "google/gemma-4-12b-it" in ids
-    gguf_row = ids["unsloth/gemma-4-12b-it-GGUF"]
     hf_row = ids["google/gemma-4-12b-it"]
-    assert gguf_row.loader_backend == "gguf_native"
-    assert gguf_row.provider == "gguf_native"
     assert hf_row.loader_backend == "transformers_multimodal_text_only"
     assert hf_row.provider == "local"
     assert hf_row.requires_auth is False
     assert hf_row.vram_fit_tier == "PASS"
     assert hf_row.context_window == 8192
+    if not ggf.GGUF_ROWS:
+        assert "unsloth/gemma-4-12b-it-GGUF" not in ids
+        return
+    gguf_row = ids["unsloth/gemma-4-12b-it-GGUF"]
+    assert gguf_row.loader_backend == "gguf_native"
+    assert gguf_row.provider == "gguf_native"

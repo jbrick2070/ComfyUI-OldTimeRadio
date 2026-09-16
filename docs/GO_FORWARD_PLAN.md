@@ -882,28 +882,18 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 * **An IP-Adapter on the AnimateDiff lanes.** **He ruled hold.** It is a new
   dependency for the registry story and a recipe change on hard-won recipes;
   after the wave, if at all.
-* **The ROCm recruitment post.** Posted by him, and it WORKED -- see the row
-  below. `apple/ROCM.md`, the hero still, and the drafts in
-  `docs/rocm-recruitment-post-draft.md`. **A window must never post anything
-  there.** Every reply is drafted in that file and he sends it.
+* **The ROCm recruitment post.** Posted by him, and it WORKED -- Kate on the
+  R9700, two still-tier episodes, issue #2. `apple/ROCM.md`, the hero still,
+  and the drafts in `docs/rocm-recruitment-post-draft.md`. **A window must
+  never post anything there.** Every public reply is drafted and he sends it,
+  except the GitHub #2 thank-you he asked a window to post (2026-09-15).
+  **Do not ping her for another test.** Operator, same day, after that
+  comment: we told her another run is not needed. That kills the old
+  "ping when Manager carries `otr_amd_still`" owe -- it was a third queue.
+  Fold her second receipt into `apple/ROCM.md` ourselves; do not ask her.
 
 ### Owed to people outside this machine (2026-09-13)
 
-* **PING THE AMD VOLUNTEER WHEN A REGISTRY VERSION CARRIES `otr_amd_still`.**
-  An R9700 owner (32 GB, RDNA4) answered the recruitment post and was told to
-  clone from git, because that graph was created 2026-09-13 and exists in NO
-  published version -- Active is alpha.30 (09-12 05:45Z) and alpha.31 has been
-  Pending since 09-12 21:56Z. The reply promises him a ping when a version
-  carrying it is live, so he can test the one-click Manager path too, which is
-  worth having from someone who is not the author. **Owed, and easy to lose:
-  it fires when 2.0.0 (published 2026-09-13 22:13Z, Pending) goes Active --
-  a registry state change nobody is watching.** He posts the ping; a window
-  drafts it.
-  **TRIGGER FIRED -- 2.0.0 is Active, so this is owed NOW.** Put one line in
-  the ping: `otr_amd_still` moved to Stable Audio 3 in 2.1.0 on declaration
-  compatibility, not on an AMD receipt (none exists for either music
-  engine). If he would rather send a version whose AMD graph is on the
-  more broadly measured MusicGen, that is 2.0.0.
 * **`otr_8gb_foley` is RETIRED (operator ruling, 2026-09-13).** He ruled on
   time, not on failure: *"4 hours for 1 act seems too long"*, then *"maybe we
   dump foley on the 8gb lane."* The measurement behind it, from the 4060's own

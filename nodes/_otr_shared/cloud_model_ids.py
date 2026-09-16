@@ -57,6 +57,14 @@ V3_MODEL_IDS = {
         "default": "Seedance 2.0 Fast",
     },
     "cloud_wan_i2v": {"env": "OTR_CLOUD_WAN_MODEL", "default": "wan2.7-i2v"},
+    "cloud_ltx25_i2v": {
+        "env": "OTR_CLOUD_LTX25_MODEL",
+        "default": "LTX-2.5 (Fast)",
+    },
+    "cloud_ltx25_a2v": {
+        "env": "OTR_CLOUD_LTX25_A2V_MODEL",
+        "default": "LTX-2.5 (Fast)",
+    },
 }
 
 

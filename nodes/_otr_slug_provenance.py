@@ -121,6 +121,16 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     ("mistralai/mistral-large-2512", "comfy"): _signal(_COMFY_SIGNAL),
     ("x-ai/grok-4.20", "comfy"):               _signal(_COMFY_SIGNAL),
     ("openai/gpt-5.5", "comfy"):               _signal(_COMFY_SIGNAL),
+    # Operator named these Credits combo ids on 2026-09-15. That is not a
+    # catalog listing: no Comfy partner fetch and no OpenRouter sweep date
+    # them, so they stay UNVERIFIED until a human checks the authority.
+    ("openai/gpt-5.6-terra", "comfy"):         _UNSET,
+    ("openai/gpt-5.6-terra-pro", "comfy"):     _UNSET,
+    ("openai/gpt-5.6-luna", "comfy"):          _UNSET,
+    ("openai/gpt-5.6-luna-pro", "comfy"):      _UNSET,
+    ("openai/gpt-5.6-sol", "comfy"):           _UNSET,
+    ("openai/gpt-5.6-sol-pro", "comfy"):       _UNSET,
+    ("anthropic/claude-sonnet-5", "comfy"):    _UNSET,
     ("anthropic/claude-opus-4.7", "comfy"):    _signal(_COMFY_SIGNAL),
 
     # --- google_api text -----------------------------------------------------
@@ -298,6 +308,20 @@ EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
     ("x-ai/grok-4.20", "comfy"):
         "Comfy partner catalog is a pinned curated list; pointer support unverified",
     ("openai/gpt-5.5", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-terra", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-terra-pro", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-luna", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-luna-pro", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-sol", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("openai/gpt-5.6-sol-pro", "comfy"):
+        "Comfy partner catalog is a pinned curated list; pointer support unverified",
+    ("anthropic/claude-sonnet-5", "comfy"):
         "Comfy partner catalog is a pinned curated list; pointer support unverified",
     ("anthropic/claude-opus-4.7", "comfy"):
         "Comfy partner catalog is a pinned curated list; pointer support unverified",

@@ -170,12 +170,15 @@ def test_default_llm_is_not_gated():
 
 
 def test_default_llm_is_pass_tier_for_c7_baseline():
-    """The C7 audio-baseline model MUST be PASS-tier."""
+    """Qwen 3.5 4B is the shipping default and stays WARN (09-06)."""
+    found = False
     for m in catalog.CURATED_LLM_MODELS:
         if m.repo_id == catalog.DEFAULT_LLM:
-            assert m.vram_fit_tier == "PASS"
-            return
-    pytest.fail("DEFAULT_LLM not found in curated set")
+            assert m.vram_fit_tier == "WARN"
+            found = True
+    assert found, "DEFAULT_LLM not found in curated set"
+    nf4 = catalog._by_repo_id().get(catalog.DEFAULT_LLM_NF4)
+    assert nf4 is not None and nf4.vram_fit_tier == "WARN"
 
 
 # ---------------------------------------------------------------------------
@@ -191,7 +194,7 @@ def test_scan_with_mistral_nemo_returns_one_result(hub_root_with_mistral_nemo):
     results = catalog.scan_local_llm_cache(hub_root=hub_root_with_mistral_nemo)
     assert len(results) == 1
     r = results[0]
-    assert r.repo_id == catalog.DEFAULT_LLM
+    assert r.repo_id == "mistralai/Mistral-Nemo-Instruct-2407"
     assert r.on_disk is True
     assert r.snapshot_path is not None
     assert r.advertised_context == 131072
@@ -204,7 +207,7 @@ def test_scan_skips_non_models_dirs(tmp_path):
     (root / "models--mistralai--Mistral-Nemo-Instruct-2407" / "snapshots" / "x").mkdir(parents=True)
     results = catalog.scan_local_llm_cache(hub_root=root)
     assert len(results) == 1
-    assert results[0].repo_id == catalog.DEFAULT_LLM
+    assert results[0].repo_id == "mistralai/Mistral-Nemo-Instruct-2407"
 
 
 # ---------------------------------------------------------------------------
@@ -237,7 +240,7 @@ def test_dropdown_with_mistral_nemo_sets_on_disk_flag(hub_root_with_mistral_nemo
     for e in entries:
         assert e.label == e.repo_id + catalog.vram_badge_for(e.repo_id)
         _assert_no_state_badge(e.label)
-        if e.repo_id == catalog.DEFAULT_LLM:
+        if e.repo_id == "mistralai/Mistral-Nemo-Instruct-2407":
             assert e.on_disk is True
 
 
@@ -462,7 +465,7 @@ def test_validator_recovery_hint_lists_top_installed(hub_root_with_mistral_nemo,
     with pytest.raises(UnknownModelError) as exc:
         catalog.validate_model_id("totally/unknown-id-xyz", hub_root=hub_root_with_mistral_nemo)
     # Top installed alternative (Mistral-Nemo) should be in the message.
-    assert catalog.DEFAULT_LLM in str(exc.value)
+    assert "mistralai/Mistral-Nemo-Instruct-2407" in str(exc.value)
 
 
 # ---------------------------------------------------------------------------

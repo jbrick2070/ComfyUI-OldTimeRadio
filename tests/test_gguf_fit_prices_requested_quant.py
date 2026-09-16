@@ -15,12 +15,19 @@ from __future__ import annotations
 
 import pytest
 
+from nodes import _otr_gguf_backend as ggf
 from nodes import _otr_model_catalog as cat
 from nodes._otr_gguf_backend import gguf_row_for_repo
 
 GEMMA_GGUF = "unsloth/gemma-4-12b-it-GGUF"
+_skip_no_gguf_row = pytest.mark.skipif(
+    not ggf.GGUF_ROWS,
+    reason="no GGUF writer row ships; row-content contracts are dormant "
+           "(see nodes/_otr_gguf_backend.GGUF_ROWS)",
+)
 
 
+@_skip_no_gguf_row
 def test_a_small_quant_is_not_priced_as_the_big_one():
     small = cat.check_vram_fit(GEMMA_GGUF, 2048, ceiling_gb=6.8, gguf_quant="Q4_K_M")
     big = cat.check_vram_fit(GEMMA_GGUF, 2048, ceiling_gb=6.8, gguf_quant="Q8_0")
@@ -29,6 +36,7 @@ def test_a_small_quant_is_not_priced_as_the_big_one():
         "is being ignored again" % (small.estimated_gb, big.estimated_gb))
 
 
+@_skip_no_gguf_row
 def test_the_8gb_profiles_own_writer_is_not_refused():
     """The exact request 8gb_lite / otr_8gb_* / otr_amd8_rocm make."""
     v = cat.check_vram_fit(GEMMA_GGUF, 2048, ceiling_gb=6.8, gguf_quant="Q4_K_M")
@@ -37,6 +45,7 @@ def test_the_8gb_profiles_own_writer_is_not_refused():
         "cannot load the model they ship with" % v.estimated_gb)
 
 
+@_skip_no_gguf_row
 def test_mac_and_12gb_profiles_pass():
     for ceiling in (10.0, 10.5):
         v = cat.check_vram_fit(GEMMA_GGUF, 4096, ceiling_gb=ceiling,
@@ -45,6 +54,7 @@ def test_mac_and_12gb_profiles_pass():
             "ceiling %.1f refused at %.2f GB" % (ceiling, v.estimated_gb))
 
 
+@_skip_no_gguf_row
 def test_kv_scales_with_the_requested_context_not_the_row_maximum():
     row = gguf_row_for_repo(GEMMA_GGUF)
     assert row.kv_gb_per_1k, "row has no measured KV cost; test is vacuous"
@@ -63,6 +73,7 @@ def test_an_oversize_pick_is_still_refused():
     assert v.tier == "FAIL", "the oversize guard stopped guarding"
 
 
+@_skip_no_gguf_row
 def test_an_unknown_quant_falls_back_rather_than_crashing():
     v = cat.check_vram_fit(GEMMA_GGUF, 2048, ceiling_gb=6.8, gguf_quant="Q2_NOPE")
     assert v.estimated_gb and v.estimated_gb > 0

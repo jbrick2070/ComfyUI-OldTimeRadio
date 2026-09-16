@@ -61,6 +61,8 @@ without that map would play ~4% short.
 | animatediff15_v3_haunted_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | animatediff15_v3_stillin_lab_video | local | text_to_video | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | cloud_kling_avatar | provider | audio_driven_face | wide | provider default (none sent) | 50-7500 | 2-300 s | 25 | soft_reference | yes |
+| cloud_ltx25_audio_in | provider | audio_conditioned_video | wide | env OTR_CLOUD_LTX25_A2V_RESOLUTION, default 1920x1080 | 50-500 step 25 | 2-20 s | 25 | soft_reference | yes |
+| cloud_ltx25_foley_plus | provider | image_to_video | wide | env OTR_CLOUD_LTX25_RESOLUTION, default 1920x1080 | 50-500 step 25 | 2-20 s | 25 | soft_reference | yes |
 | cloud_seedance_2 | provider | audio_conditioned_video | wide | env OTR_CLOUD_SEEDANCE_RESOLUTION, default 720p | 100-375 step 25 | 4-15 s | 25 | soft_reference | yes |
 | cloud_vidu_q2_pro_fast_720p | provider | image_to_video | wide | 720p (fixed) | 25-250 step 25 | 1-10 s | 25 | soft_reference | yes |
 | cloud_wan_i2v | provider | image_to_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
@@ -100,6 +102,8 @@ without that map would play ~4% short.
 | animatediff15_v3_haunted_video | text_prompt | text_prompt REQUIRED |
 | animatediff15_v3_stillin_lab_video | text_prompt | text_prompt REQUIRED |
 | cloud_kling_avatar | init_image, audio_ref | text_prompt OPTIONAL (sent when present) |
+| cloud_ltx25_audio_in | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
+| cloud_ltx25_foley_plus | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_seedance_2 | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
 | cloud_vidu_q2_pro_fast_720p | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v | init_image, text_prompt | text_prompt REQUIRED |
@@ -142,7 +146,9 @@ the engine's own `aspect` column above.
 | animatediff15_lightning_video | none |
 | animatediff15_v3_haunted_video | none |
 | animatediff15_v3_stillin_lab_video | none |
-| cloud_kling_avatar | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
+| cloud_kling_avatar | portrait/portrait/always |
+| cloud_ltx25_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
+| cloud_ltx25_foley_plus | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_seedance_2 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_vidu_q2_pro_fast_720p | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -188,6 +194,8 @@ means the adapter sizes itself and IGNORES the request canvas.
 | animatediff15_v3_haunted_video | 512x288 | declared |
 | animatediff15_v3_stillin_lab_video | 512x288 | declared |
 | cloud_kling_avatar | n/a -- renders remotely | see `resolution` column |
+| cloud_ltx25_audio_in | n/a -- renders remotely | see `resolution` column |
+| cloud_ltx25_foley_plus | n/a -- renders remotely | see `resolution` column |
 | cloud_seedance_2 | n/a -- renders remotely | see `resolution` column |
 | cloud_vidu_q2_pro_fast_720p | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v | n/a -- renders remotely | see `resolution` column |
@@ -237,6 +245,8 @@ JUMP plan on a still-consuming lane ever re-mints.
 | animatediff15_v3_haunted_video | single | 1: 442 | 442 | 442 | 0 |
 | animatediff15_v3_stillin_lab_video | single | 1: 442 | 442 | 442 | 0 |
 | cloud_kling_avatar | single | 1: 442 | 442 | 442 | 0 |
+| cloud_ltx25_audio_in | single | 1: 450 | 450 | 442 | 0 |
+| cloud_ltx25_foley_plus | single | 1: 450 | 450 | 442 | 0 |
 | cloud_seedance_2 | jump | 2: 350, 100 | 450 | 442 | 1 |
 | cloud_vidu_q2_pro_fast_720p | jump | 2: 250, 200 | 450 | 442 | 1 |
 | cloud_wan_i2v | jump | 2: 375, 75 | 450 | 442 | 1 |
@@ -283,6 +293,8 @@ and it read exactly like a measured number until someone looked.
 | animatediff15_v3_haunted_video | - | contract max | none cited |
 | animatediff15_v3_stillin_lab_video | - | contract max | docs/2026-09-02-animatediff-ledger-experiments, docs/SPEC_haunted_image_to_video.md |
 | cloud_kling_avatar | - | contract max | none cited |
+| cloud_ltx25_audio_in | - | contract max | none cited |
+| cloud_ltx25_foley_plus | - | contract max | none cited |
 | cloud_seedance_2 | - | contract max | none cited |
 | cloud_vidu_q2_pro_fast_720p | - | contract max | none cited |
 | cloud_wan_i2v | - | contract max | none cited |
@@ -316,7 +328,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **34**
-* provider-side: **8**
+* registered engine names: **36**
+* provider-side: **10**
 * local: **26**
 * can chain (strict_first_frame): **8**

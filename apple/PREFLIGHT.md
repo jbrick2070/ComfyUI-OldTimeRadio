@@ -94,16 +94,25 @@ borrows the video weight-resolution gate, and its own comment explains why: the
 upscale namespace had thirteen test files and not one asked whether the engine's
 checkpoint was reachable. Follow the video section's rules 1 and 2.
 
-## Writer model row
+## Writer LLM
 
-There is a guide for adding a curated LLM row, but **no preflight matrix test**.
-Two things worth knowing before you add one:
+The add-your-own page is [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md) -- same job as
+this file's engine sections, for a language model. You can pick anything the
+dropdown will take. What the pack ships is Qwen 3.5 transformers with two
+honest identities (NF4 vs full), not a GGUF writer.
 
-- **The GGUF writer lane ships nothing.** `GGUF_ROWS` is an empty tuple by
-  operator directive, so any instruction about GGUF quants, grammars or
-  `think_policy` describes a lane that is not in the dropdown.
-- **A WARN fit tier stays in the dropdown.** WARN is not a reason to remove a
-  row; it is information for the person picking.
+There is still no preflight matrix test. Schema tests that must stay green
+against the real catalog:
+
+`tests/test_model_catalog_schema.py`,
+`tests/test_model_catalog_scan.py`,
+`tests/test_loader_backend_protocol.py`,
+`tests/test_chat_template_kind_dispatch.py`,
+`tests/test_context_window_precondition.py`,
+`tests/test_qwen_quant_twins.py`.
+
+Green here means the row is well-formed, not that it can write an episode.
+Then the render at the bottom.
 
 ## Cloud partner rows
 

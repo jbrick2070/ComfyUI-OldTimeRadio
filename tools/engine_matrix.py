@@ -83,6 +83,10 @@ def _resolution(engine, name):
         return "env OTR_CLOUD_SEEDANCE_RESOLUTION, default 720p"
     if name.startswith("cloud_wan"):
         return "env OTR_CLOUD_WAN_RESOLUTION, default 720P"
+    if name == "cloud_ltx25_foley_plus":
+        return "env OTR_CLOUD_LTX25_RESOLUTION, default 1920x1080"
+    if name == "cloud_ltx25_audio_in":
+        return "env OTR_CLOUD_LTX25_A2V_RESOLUTION, default 1920x1080"
     if name == "word_razzle":
         return "env OTR_CLOUD_PIXVERSE_QUALITY, default 1080p"
     if name == "cloud_kling_avatar":

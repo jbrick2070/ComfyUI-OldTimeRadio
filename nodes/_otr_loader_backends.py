@@ -91,7 +91,8 @@ def chat_template_kwargs(model_id: str) -> dict:
     Other models keep their exact previous template arguments. This controls
     template formatting, not sampling or a synthetic prompt rewrite.
     """
-    if str(model_id or "").split(" ", 1)[0] == "Qwen/Qwen3.5-4B":
+    stripped = str(model_id or "").split(" ", 1)[0]
+    if _otr_model_catalog.hf_weights_id(stripped) == "Qwen/Qwen3.5-4B":
         return {"enable_thinking": False}
     return {}
 

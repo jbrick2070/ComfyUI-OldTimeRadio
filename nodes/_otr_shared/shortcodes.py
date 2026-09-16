@@ -54,12 +54,21 @@ SENTINELS = ("+ Add Custom Model",)
 
 LLM = {
     "Qwen/Qwen3.5-4B": "q354b",
+    "Qwen/Qwen3.5-4B:nf4": "q354n",
     "unsloth/Llama-3.2-3B-Instruct": "lla3",
     "mistralai/Mistral-Nemo-Instruct-2407": "nemo",
     "google/gemma-4-E2B-it": "g4e2",
     "google/gemma-4-E4B-it": "g4e4",
     "google/gemma-4-12b-it": "g412",
     "google/gemma-2-2b-it": "g22b",
+    # Virtual cloud handles appear in the live COMBO only when the matching
+    # key is configured. They still reach the published filename.
+    "openrouter:slot-a": "orsa",
+    "openrouter:slot-b": "orsb",
+    "comfy:slot-a": "cmsa",
+    "comfy:slot-b": "cmsb",
+    "google_api:slot-a": "gasa",
+    "google_api:slot-b": "gasb",
 }
 
 #: KEYED ON BANK IDS, which is also what the dropdown offers -- the one
@@ -116,6 +125,8 @@ VIDEO_LANE = {
     "animatediff15_v3_stillin_lab_video": "adsl",
     "animatediff15_lightning_video": "adlt",
     "cloud_kling_avatar": "ckla",
+    "cloud_ltx25_audio_in": "clta",
+    "cloud_ltx25_foley_plus": "cltf",
     "cloud_seedance_2": "csd2",
     "cloud_vidu_q2_pro_fast_720p": "cvdu",
     "cloud_wan_i2v": "cwan",

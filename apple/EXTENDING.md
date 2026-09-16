@@ -1,12 +1,15 @@
 # Adding to OTR
 
-Two things you can add: an **engine** (a way of rendering video, images, speech,
-music or an upscale) and a **source bank** (a place stories come from). They are
-different jobs. Engines are a Python file in this repo; a source bank can be a
-folder of your own that this repo never sees.
+Three things you can add: an **engine** (a way of rendering video, images, speech,
+music or an upscale), a **source bank** (a place stories come from), and a
+**writer LLM** (the model that writes the script). They are different jobs.
+Engines are a Python file in this repo. A source bank can be a folder of your
+own that this repo never sees. A writer LLM is either a snapshot in your
+Hugging Face cache, or a curated row in the catalog.
 
 Read the one page first. Then [PREFLIGHT.md](PREFLIGHT.md) is the checklist that
-says whether what you built will actually work.
+says whether what you built will actually work. The writer page is
+[LLM_PREFLIGHT.md](LLM_PREFLIGHT.md).
 
 ---
 
@@ -98,6 +101,23 @@ needs it.
 
 ---
 
+## Adding a writer LLM
+
+This is not an engine. There is no `@register` and no adapter file.
+
+**You can pick anything the dropdown will take.** Cache a CausalLM, choose
+Gemma, use a cloud slot. That is not the same as what the pack ships.
+
+**What the pack ships:** Qwen 3.5 as transformers, two honest dropdown
+identities (NF4 vs full). There is no GGUF writer row; a transformers twin
+already exists.
+
+The full checklist -- on-machine cache path, catalog row, seven gates -- is
+[LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to
+read the badge, is [WRITERS.md](WRITERS.md).
+
+---
+
 ## Adding your own source bank
 
 This one does not touch this repository at all. A bank is a self-contained folder:
@@ -118,9 +138,9 @@ Every key is required except `defaults`: `source_bank_id`, `label`,
 
 Two `defaults` keys are worth knowing because nothing else announces them:
 
-- **`auto_select`** — whether a blank automatic run may roll onto your bank.
-  `runnable: true` alone does **not** put you in the roll pool; you need both.
-  Set it false while you are still testing.
+- **`auto_select`** — whether Queue-on-roll may land on your bank. Omit it or
+  set it true, and a runnable bank is an **equal** in the roll pool with the
+  shipped rows. Set it false only to keep the bank manual-pick while you test.
 - **`story_input_mode`** — how your bank takes its input.
 
 ### The two functions

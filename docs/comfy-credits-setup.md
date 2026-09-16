@@ -43,8 +43,10 @@ When the lane is disabled the pickers show **`(enable Comfy Credits)`** and the
 
 | Slot | Default slug | Why |
 |------|--------------|-----|
-| creative (`comfy_slot_a_model`) | `anthropic/claude-opus-4.7` | strongest Anthropic on Comfy's curated catalog (the own-key lane uses 4.8) |
-| technical (`comfy_slot_b_model`) | `deepseek/deepseek-v4-pro` | cheap, stable structured output |
+| creative (`comfy_slot_a_model`) | `anthropic/claude-sonnet-5` | Cheap-cloud story pass; native Sonnet 5 cannot turn reasoning off, so the lane sends `reasoning_effort=low` |
+| technical (`comfy_slot_b_model`) | `openai/gpt-5.6-luna` | JSON / bookkeeping with `reasoning_effort=none` on the OpenRouter proxy (Credits widget label `off`) |
+
+Shipping cheap Comfy Cloud graphs pin that pair (1-act / 3-act / 7-act). Deluxe pins `openai/gpt-5.6-sol` on creative and the same Luna on technical. The combo also lists Terra, the `-pro` twins, Grok 4.20, GPT-5.5, and Claude Opus 4.7 so older saved graphs still load. Do not add `~*-latest` aliases — Credits rejects them.
 
 Override per slot without changing the pick via
 `OTR_COMFY_SLOT_A_DEFAULT` / `OTR_COMFY_SLOT_B_DEFAULT`. The full pinned catalog
@@ -64,8 +66,9 @@ Belt-and-suspenders on top of prepaid credits:
 
 - `OTR_COMFY_MAX_TOKENS_PER_CALL` (default 32768) — per-call ceiling, enforced
   **before** the network call.
-- `OTR_COMFY_MAX_TOKENS_PER_RUN` (default 300000) — per-episode ceiling, reset
-  by the writer at the top of every run.
+- `OTR_COMFY_MAX_TOKENS_PER_RUN` (default 1000000) — per-episode ceiling, reset
+  by the writer at the top of every run. Counts returned usage, not the 16384
+  output-cap estimate.
 - `OTR_COMFY_A_MAXTOK` / `OTR_COMFY_B_MAXTOK` — per-slot output caps.
 
 A failed call **aborts the run** with a clear error — there is no mid-episode

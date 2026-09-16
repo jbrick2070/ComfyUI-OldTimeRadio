@@ -81,6 +81,9 @@
     "boot_contract": "cpu",
     "sage_attention": false,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000",
+      "OPENROUTER_MAX_TOKENS_PER_RUN": "1000000"
+    }
   }
 }

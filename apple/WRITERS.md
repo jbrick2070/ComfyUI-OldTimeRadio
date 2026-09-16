@@ -13,8 +13,16 @@ fits its own tier. Which one depends on which graph you opened:
 
 | Graph | Both slots ship |
 |---|---|
-| 8 GB NVIDIA, 16 GB Mac, AMD, CPU | **Qwen3.5-4B** (8.7 GB) |
+| 8 GB NVIDIA, AMD, CPU | **Qwen3.5-4B NF4** (`Qwen/Qwen3.5-4B:nf4`) |
+| 16 GB Mac, canonical | **Qwen3.5-4B full** (`Qwen/Qwen3.5-4B`, Quant `none`) |
 | 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB) |
+| Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
+| Comfy Cloud deluxe (`otr_cloud_deluxe_7act`) | creative **GPT 5.6 Sol** (`openai/gpt-5.6-sol`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
+
+The Comfy Cloud graphs split the two slots on purpose -- cheap SKUs use
+Sonnet 5 to write and Luna for JSON; deluxe uses Sol to write and the same
+Luna for JSON -- and bill Credits rather than VRAM. Leaving those two
+dropdowns alone is still the right answer there.
 
 **Qwen3.5-4B** is the only writer here with a finished episode to its name on
 all three of an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
@@ -49,13 +57,15 @@ headroom for a larger creative one.
 
 ---
 
-## The seven
+## The eight
 
-This is the whole list, exactly as the dropdown spells it.
+This is the whole list, exactly as the dropdown spells it. You can still pick
+any of them -- the two Qwen identities are what the pack *ships*, not a lock.
 
 | What the dropdown says | Download | Licence | Worth knowing |
 |---|---|---|---|
-| `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The shipped default.** The only writer with a finished episode on all three of 8 GB NVIDIA, 16 GB NVIDIA and 16 GB Mac. |
+| `Qwen/Qwen3.5-4B:nf4 (8.7 GB, nv8 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The NF4 pick.** Same weights as the row below. 8 GB NVIDIA graphs and a freshly dropped writer node save this with Quant `bnb_nf4`. No Mac tag -- there is no Metal NF4. |
+| `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)` | 8.7 GB | Apache 2.0 | **The full pick.** Canonical and the Mac graphs save this with Quant `none`. No `nv8` -- unquantized it does not fit an 8 GB card. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
 | `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA graphs ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
 | `google/gemma-4-E2B-it (6.0 GB, mac16-tight nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | The smallest ungated writer. Proven on both NVIDIA sizes. **Do not pick it on a Mac** -- see below. |
@@ -63,7 +73,7 @@ This is the whole list, exactly as the dropdown spells it.
 | `google/gemma-4-12b-it (23.9 GB, nv16 nv24)` | 23.9 GB | Apache 2.0 | What the 16 GB NVIDIA graphs ship with. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
 | `google/gemma-2-2b-it (5.2 GB, gated mac16 nv8 nv16 nv24)` | 5.2 GB | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
-Six of the seven download themselves. The seventh is the gated one.
+Seven of the eight download themselves. The eighth is the gated one.
 
 If your dropdown also shows `openrouter:`, `comfy:` or `google_api:` entries,
 those are the optional paid cloud writers -- see [CLOUD.md](CLOUD.md). They are
@@ -74,12 +84,12 @@ absent unless you set a key yourself.
 ## Reading the label
 
 The size and the machine hints in the label are not decoration. Take
-`Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)` apart:
+`Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)` apart:
 
 | Piece | Means |
 |---|---|
 | `8.7 GB` | What it downloads, once. Not what it occupies while running. |
-| `nv8` `nv16` `nv24` | Fits an NVIDIA card of that many GB. |
+| `nv8` `nv16` `nv24` | Fits an NVIDIA card of that many GB **at the Quant this pick owns**. The NF4 Qwen row has `nv8`. The full Qwen row does not. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |
 | `gated` | Needs a Hugging Face account and an accepted licence before it will download. |
@@ -215,3 +225,16 @@ model than the one the graph names.
 
 Which writers have actually been proven on which hardware -- as opposed to
 which ones fit on paper -- is in [MACHINES.md](MACHINES.md) section 2.
+
+---
+
+## A model that is not in this list
+
+The eight rows above are the curated set. You can run a different Hugging Face
+causal LM without editing this pack: put a complete snapshot in the cache,
+restart ComfyUI, pick it. That is allowed. It is not the same as what the pack
+ships. Shipping a new row in the dropdown is a catalog change and wants the
+git clone.
+
+Both paths, and the checks that decide whether it will actually write an
+episode, are [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md).

@@ -2145,7 +2145,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # writer widgets rendering red, 2026-08-04). The remote slot id is a
         # real choice when the lane is on, so it stays bare.
         _creative_default = (
-            _slot_a_id if _remote_on else _otr_model_catalog.default_llm_option()
+            _slot_a_id if _remote_on else _otr_model_catalog.fresh_llm_option()
         )
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
@@ -2162,7 +2162,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     [_ROLLS.BANK_SENTINEL]
                     + list(_otr_story_routing.list_bank_ids()),
                     {
-                        "default": "scifi_news_pro",
+                        "default": _ROLLS.BANK_SENTINEL,
                         "tooltip": (
                             "Story-path SOURCE BANK (multi-modal story "
                             "schema). Selects which registered story pack "
@@ -2241,7 +2241,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     [_ROLLS.STYLE_SENTINEL]
                     + list(_ROLLS.eligible_style_ids()),
                     {
-                        "default": "sci_fi_radio",
+                        "default": _ROLLS.STYLE_SENTINEL,
                         "tooltip": (
                             "NO VISIBLE EFFECT ON THE SHIPPED GRAPH. It "
                             "styles the still and video prompts, and the "
@@ -2587,7 +2587,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         # it matched nothing and a freshly dropped node fell
                         # through to index 0. It was right only by the accident
                         # of that row sorting first.
-                        "default": _otr_model_catalog.default_llm_option(),
+                        "default": _otr_model_catalog.fresh_llm_option(),
                         "tooltip": (
                             "LLM for the technical/structured passes "
                             "(JSON validators, GBNF grammar output, "
@@ -2673,8 +2673,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "'comfy:slot-a' handle (the creative slot). "
                             "Passive: only used when creative_writing_model "
                             "is set to 'comfy:slot-a'. Choices are the pinned "
-                            "ComfyUI partner-node catalog (Grok 4.20 is "
-                            "always listed so a saved cloud graph loads). "
+                            "ComfyUI partner-node catalog (Sonnet 5, Luna "
+                            "and Sol are always listed so a saved cloud "
+                            "graph loads). "
                             "The enable-sentinel remains choices[0]. "
                             "Credit-billed at generate() when a Comfy "
                             "API key is present. See "
@@ -2693,8 +2694,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "'comfy:slot-b' handle (the technical slot). "
                             "Passive: only used when technical_model is set "
                             "to 'comfy:slot-b'. Choices are the pinned "
-                            "ComfyUI partner-node catalog (Grok 4.20 is "
-                            "always listed so a saved cloud graph loads). "
+                            "ComfyUI partner-node catalog (Sonnet 5, Luna "
+                            "and Sol are always listed so a saved cloud "
+                            "graph loads). "
                             "The enable-sentinel remains choices[0]. "
                             "Credit-billed at generate() when a Comfy "
                             "API key is present. See "
@@ -3047,16 +3049,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # bundled scaffold via OTR_ENABLE_STYLE_GRAMMAR (see the resolver at the
         # top of the body). Default "auto" => env/default => byte-identical.
         story_scaffold="auto",
-        # Stage 2C (2026-07-05): the story-path source_bank selector,
-        # appended at the END of the widget surface (slot 23). Default
-        # science_news = the production lane, byte-identical. Gated FIRST
-        # in the body via require_runnable_bank (no fallback).
-        source_bank="scifi_news_pro",
-        # Stage 3C (2026-07-06): the visual-style selector, appended at the
-        # END of the widget surface (slot 24). Default sci_fi_radio = the
-        # production look, byte-identical. Validated fail-loud beside the
-        # bank gate; stamped at meta["visual_style"] (the threading channel).
-        visual_style="sci_fi_radio",
+        # Stage 2C (2026-07-05): the story-path source_bank selector.
+        # Canvas default is the roll command, same as every shipping JSON.
+        source_bank=_ROLLS.BANK_SENTINEL,
+        # Stage 3C (2026-07-06): the visual-style selector. Canvas default
+        # is the roll command, same as every shipping JSON.
+        visual_style=_ROLLS.STYLE_SENTINEL,
         # Google BYO API slot pickers (2026-07-08), appended after visual_style.
         # Default "" => unset; selecting google_api:slot-a/b with an unset slot
         # fails loud before the HTTP request.

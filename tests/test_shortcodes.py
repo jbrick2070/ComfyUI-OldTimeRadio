@@ -68,6 +68,10 @@ class TableShapeTests(unittest.TestCase):
         self.assertEqual(SC.code_for("llm", "Qwen/Qwen3.5-4B"), "q354b",
                          "the ledger stores the bare id, the dropdown a badged "
                          "one; both must resolve")
+        self.assertEqual(
+            SC.code_for("llm", "Qwen/Qwen3.5-4B:nf4 (8.7 GB, nv8 nv16 nv24)"),
+            "q354n")
+        self.assertEqual(SC.code_for("llm", "openrouter:slot-a"), "orsa")
         # An id that is spelled the same in both vocabularies, so the aspect tag
         # and the trailing note still have to be stripped.
         self.assertEqual(
@@ -214,6 +218,14 @@ class CompletenessTests(unittest.TestCase):
             "code, so their episodes would all be named 'unk':\n  "
             + "\n  ".join(missing))
 
+    def _is_uncurated_llm(self, text):
+        try:
+            from nodes import _otr_model_catalog as cat
+        except Exception:
+            return False
+        bare = SC._bare(text)
+        return bare not in cat._by_repo_id()
+
     def _object_info(self):
         import json
         import urllib.error
@@ -244,6 +256,10 @@ class CompletenessTests(unittest.TestCase):
                 if text in SC.SENTINELS:
                     continue
                 if SC.code_for(dimension, text) == "unk":
+                    if dimension == "llm" and self._is_uncurated_llm(text):
+                        # Cache-discovered CausalLMs are the custom-model
+                        # case: code_for is designed to fall back to unk.
+                        continue
                     missing.append("%s: %r" % (dimension, text))
         self.assertFalse(
             missing,

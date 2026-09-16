@@ -433,6 +433,8 @@ def test_the_route_is_decided_by_ONE_function_for_both_audio_stages():
     # False for an episode that really is on the route.
     assert fs.is_foley_route(policy(music="ltx25_high_foley_plus"))
     assert fs.is_foley_route(policy(music="ltx25_high_foley_plus (16:9)"))
+    assert fs.is_foley_route(policy(music="cloud_ltx25_foley_plus"))
+    assert "cloud_ltx25_foley_plus" in fs.GLOBAL_MASTER_GAIN_LANES
     # ANY role, not all: the episode has ONE master WAV, so one foley role puts
     # the whole thing on the route.
     assert fs.is_foley_route(
@@ -447,6 +449,33 @@ def test_the_route_is_decided_by_ONE_function_for_both_audio_stages():
     # And the mux really uses it, rather than a second copy of the question.
     assert MUX._foley_route(policy(music="ltx25_foley_plus")) is True
     assert MUX._foley_route(policy(music="ltx25_video")) is False
+    assert MUX._foley_route(policy(music="cloud_ltx25_foley_plus")) is True
+    assert MUX._foley_route(
+        policy(music="cloud_ltx25_foley_plus (16:9)")) is True
+
+
+def test_cloud_foley_mixes_at_the_same_gains_as_local(tmp_path):
+    """Cloud Foley is the same 0.50/0.50 bed as local, including a saved
+    display-suffix engine_id the mux would otherwise refuse."""
+    assert (fs.FOLEY_LANE_GAINS["cloud_ltx25_foley_plus"]
+            == fs.FOLEY_LANE_GAINS["ltx25_foley_plus"]
+            == (0.50, 0.50))
+    master = np.full((2, 100 * STEP), 0.5, dtype=np.float32)
+    bed = _stem(tmp_path, "bed.wav", 100, 0.25)
+    local, sl = fs.mix_foley_under_master(
+        master, RATE, [_row(bed, 0.0, 100)], fps=FPS)
+    cloud, sc = fs.mix_foley_under_master(
+        master, RATE,
+        [_row(bed, 0.0, 100, engine="cloud_ltx25_foley_plus")], fps=FPS)
+    labelled, _sd = fs.mix_foley_under_master(
+        master, RATE,
+        [_row(bed, 0.0, 100, engine="cloud_ltx25_foley_plus (16:9)")],
+        fps=FPS)
+    assert sl["global_master_gain"] == sc["global_master_gain"] == 0.50
+    assert sl["lanes"] == {"ltx25_foley_plus": 1}
+    assert sc["lanes"] == {"cloud_ltx25_foley_plus": 1}
+    assert np.allclose(local, cloud)
+    assert np.allclose(local, labelled)
 
 
 # ---------------------------------------------------------------------------

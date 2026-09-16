@@ -757,6 +757,135 @@ def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
     return degraded
 
 
+def _forward_one_voice_line(adapter, engine, job):
+    """One TTS forward. Cloud fan-out and the serial walk share this."""
+    from ._otr_determinism import deterministic_inference
+    engine_seed = job["engine_seed"]
+    with deterministic_inference(engine_seed, warn_only=True):
+        if job.get("google_tts_cache"):
+            return adapter.generate_voice(
+                job["prepared"], job["voice_ref"], job["delivery_vector"],
+                engine_seed,
+                disable_retry=True,
+                resolved_model=job["provider_model_id_stamp"],
+            )
+        return adapter.generate_voice(
+            job["prepared"], job["voice_ref"], job["delivery_vector"],
+            engine_seed,
+        )
+
+
+def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
+                       ledger_stamps, log_lines, sr, engine, log):
+    audio = job["audio"]
+    line_id = job["line_id"]
+    occ = job["occ"]
+    resolved_ref = job["resolved_ref"]
+    voice_preset = job["voice_preset"]
+    cache_status = job["cache_status"]
+    cached_record = job.get("cached_record")
+    provider_model_id_stamp = job["provider_model_id_stamp"]
+    request = job["request"]
+    _got_sr = int(audio.get("sample_rate", sr) or sr)
+    if _got_sr != sr:
+        _sr_msg = (
+            f"{role}: WARNING line={line_id or occ} clip sample "
+            f"rate {_got_sr} != pack rate {sr} (engine {engine}) -- "
+            f"investigate before trusting this episode's voice lane"
+        )
+        log_lines.append(_sr_msg)
+        log.warning("[OTR voice P-OBS] %s", _sr_msg)
+    if resolved_ref.is_policy_route:
+        job["policy_line"] = True
+    from ._otr_ledger import compute_audio_sample_hash
+    _asample_hash = compute_audio_sample_hash(
+        audio["waveform"] if isinstance(audio, dict) else audio
+    )
+    _dur_s = (
+        float(audio["waveform"].shape[-1]) / float(_got_sr)
+        if _got_sr else 0.0
+    )
+    if not cache_enabled and resolved_ref.is_policy_route:
+        ledger_stamps.append((line_id, {
+            "tts_engine": engine,
+            "voice_preset": voice_preset or "",
+            "render_ms": int(
+                (time.monotonic() - job["_render_start"]) * 1000),
+            "generated_dur_s": _dur_s,
+            "audio_sample_hash": _asample_hash,
+            "sample_rate": _got_sr,
+            "voice_route_id": resolved_ref.route_id,
+        }))
+    if cache_enabled:
+        if cache_status == "hit":
+            ledger_stamps.append((line_id, {
+                "tts_engine": engine,
+                "voice_preset": voice_preset or "",
+                "render_ms": 0,
+                "generated_dur_s": _dur_s,
+                "audio_sample_hash": _asample_hash,
+                "audio_cache_key": cached_record.cache_key,
+                "audio_sha256": cached_record.audio_sha256,
+                "provider_model_id": cached_record.provider_model_id or "",
+                "sample_rate": _got_sr,
+                "voice_route_id": resolved_ref.route_id,
+            }))
+        else:
+            _elapsed_ms = int((time.monotonic() - job["_render_start"]) * 1000)
+            if _got_sr != sr:
+                job["cache_status"] = "degraded_write"
+                cache_stats["degraded_write"] += 1
+                ledger_stamps.append((line_id, {
+                    "tts_engine": engine,
+                    "voice_preset": voice_preset or "",
+                    "render_ms": _elapsed_ms,
+                    "generated_dur_s": _dur_s,
+                    "audio_sample_hash": _asample_hash,
+                    "provider_model_id": provider_model_id_stamp,
+                    "sample_rate": _got_sr,
+                    "voice_route_id": resolved_ref.route_id,
+                }))
+            elif cache is not None:
+                try:
+                    fresh_record = cache.put(
+                        request, audio,
+                        allowed_for_release=(
+                            job["license_clean"]
+                        ),
+                        actual_sample_rate=_got_sr,
+                        provider_model_id=provider_model_id_stamp,
+                    )
+                    job["cache_status"] = "miss"
+                    cache_stats["miss"] += 1
+                    ledger_stamps.append((line_id, {
+                        "tts_engine": engine,
+                        "voice_preset": voice_preset or "",
+                        "render_ms": _elapsed_ms,
+                        "generated_dur_s": _dur_s,
+                        "audio_sample_hash": _asample_hash,
+                        "audio_cache_key": request.cache_key,
+                        "audio_sha256": fresh_record.audio_sha256,
+                        "provider_model_id": provider_model_id_stamp,
+                        "sample_rate": _got_sr,
+                        "voice_route_id": resolved_ref.route_id,
+                    }))
+                except Exception as _put_err:  # noqa: BLE001
+                    log.warning("[OTR voice cache] put failed: %s", _put_err)
+                    job["cache_status"] = "degraded_write"
+                    cache_stats["degraded_write"] += 1
+                    ledger_stamps.append((line_id, {
+                        "tts_engine": engine,
+                        "voice_preset": voice_preset or "",
+                        "render_ms": _elapsed_ms,
+                        "generated_dur_s": _dur_s,
+                        "audio_sample_hash": _asample_hash,
+                        "provider_model_id": provider_model_id_stamp,
+                        "sample_rate": _got_sr,
+                        "voice_route_id": resolved_ref.route_id,
+                    }))
+    clips.append(audio)
+
+
 # --------------------------------------------------------------------------- #
 # Shared node base
 # --------------------------------------------------------------------------- #
@@ -1002,11 +1131,9 @@ class OTRVoiceNodeBase:
             assert_model_available, assert_token_for_profile,
             effective_license_state, require_resolver,
         )
-        from ._otr_ledger import compute_audio_sample_hash
         from ._otr_resolved_request import (
             _seed_to_int64, build_resolved_request, empty_audio_batch,
         )
-        from ._otr_determinism import deterministic_inference
         from ._otr_script_prep import prepare_text as _neutral_prepare_text
         from ._otr_text_delivery import (
             delivery_mode_for_meta, resolve_line_delivery,
@@ -1168,6 +1295,7 @@ class OTRVoiceNodeBase:
             )
 
         try:
+            line_jobs = []
             for occ, ln in enumerate(lines):
                 # C2 (S2 P1.3): resolve canonical vs delivery through the ONE
                 # resolver. `text` is the DELIVERY string every downstream
@@ -1442,166 +1570,107 @@ class OTRVoiceNodeBase:
                 # Cloud-audio-cache chunk 2 (2026-08-08): when profile.use_cache is
                 # True, look up FileAudioCache first; on a hit skip the API call
                 # entirely. On a miss run the forward, cache the bytes, stamp the
-                # ledger. Both branches inline "adapter.generate_voice(" under the
-                # deterministic_inference CM to keep the source-grep guard at
-                # tests/test_audio_determinism_wrap.py:158-163 green.
+                # ledger. The forward lives in `_forward_one_voice_line` so a
+                # cloud engine can fire many lines at once; assemble stays line
+                # order. `adapter.generate_voice(` stays inside
+                # `deterministic_inference` for the source-grep guard.
                 #
                 # Per-line try/finally (r4 Fable gate SF#2): ensures P-OBS emits
                 # per line even when generate_voice raises, so a dying render
                 # always logs which line it died on -- preserves the pre-chunk
                 # observability contract ("per-line attribution, ALWAYS").
-                _render_start = time.monotonic()
-                cache_status = "off"
-                audio = None
+                job = {
+                    "job_id": "%s:%s" % (line_id or "ln", occ),
+                    "occ": occ,
+                    "line_id": line_id,
+                    "prepared": prepared,
+                    "voice_ref": voice_ref,
+                    "delivery_vector": delivery_vector,
+                    "engine_seed": engine_seed,
+                    "google_tts_cache": bool(cache_enabled and engine == "google_tts"),
+                    "provider_model_id_stamp": provider_model_id_stamp,
+                    "request": request,
+                    "resolved_ref": resolved_ref,
+                    "voice_preset": voice_preset,
+                    "license_clean": (
+                        cache_enabled
+                        and effective_license_state(profile) == "clean"
+                    ),
+                    "_pobs": _pobs,
+                    "_render_start": time.monotonic(),
+                    "audio": None,
+                    "cache_status": "off",
+                    "cached_record": None,
+                }
+                if cache_enabled and cache is not None:
+                    loaded = cache.load(request)
+                    if loaded is not None:
+                        job["audio"], job["cached_record"] = loaded
+                        job["cache_status"] = "hit"
+                        cache_stats["hit"] += 1
+                line_jobs.append(job)
+
+            from ._otr_shared.cloud_fanout import (
+                adapter_is_cloud_side, cloud_fanout_workers, run_cloud_fanout,
+                snapshot_prompt_id,
+            )
+            misses = [j for j in line_jobs if j["audio"] is None]
+            outcome_errors = {}
+            workers = cloud_fanout_workers()
+            fan_ok = (
+                adapter_is_cloud_side(adapter)
+                and workers > 1
+                and len(misses) > 1
+            )
+            if fan_ok:
+                log.info(
+                    "[OTR voice] cloud fan-out: %d line(s), workers=%d; "
+                    "assemble stays line order",
+                    len(misses), min(workers, len(misses)))
+                outcome = run_cloud_fanout(
+                    misses,
+                    item_id=lambda j: j["job_id"],
+                    execute=lambda j: _forward_one_voice_line(adapter, engine, j),
+                    workers=min(workers, len(misses)),
+                    prompt_id=snapshot_prompt_id())
+                if outcome.stuck_ids and not outcome.errors:
+                    raise RuntimeError(
+                        "cloud TTS fan-out stuck: %s" % outcome.stuck_ids)
+                outcome_errors = outcome.errors
+                for j in misses:
+                    if j["job_id"] in outcome.results:
+                        j["audio"] = outcome.results[j["job_id"]]
+            else:
+                for j in misses:
+                    try:
+                        j["audio"] = _forward_one_voice_line(adapter, engine, j)
+                    except Exception as exc:  # noqa: BLE001 -- raise in line order
+                        outcome_errors[j["job_id"]] = exc
+                        break
+
+            for j in line_jobs:
+                cache_status = j["cache_status"]
                 try:
-                    if cache_enabled and cache is not None:
-                        loaded = cache.load(request)
-                        if loaded is not None:
-                            audio, cached_record = loaded
-                            cache_status = "hit"
-                            cache_stats["hit"] += 1
-                    if audio is None:
-                        if cache_enabled and engine == "google_tts":
-                            with deterministic_inference(engine_seed, warn_only=True):
-                                audio = adapter.generate_voice(
-                                    prepared, voice_ref, delivery_vector, engine_seed,
-                                    disable_retry=True,
-                                    resolved_model=provider_model_id_stamp,
-                                )
-                        else:
-                            with deterministic_inference(engine_seed, warn_only=True):
-                                audio = adapter.generate_voice(
-                                    prepared, voice_ref, delivery_vector, engine_seed,
-                                )
-                    # P-OBS sample-rate assert: a primary-engine clip whose rate does
-                    # not match the pack rate is a real defect (the pack would crash
-                    # or silently resample later) -- LOUD, never silent.
-                    _got_sr = int(audio.get("sample_rate", sr) or sr)
-                    if _got_sr != sr:
-                        _sr_msg = (
-                            f"{self.ROLE}: WARNING line={line_id or occ} clip sample "
-                            f"rate {_got_sr} != pack rate {sr} (engine {engine}) -- "
-                            f"investigate before trusting this episode's voice lane"
-                        )
-                        log_lines.append(_sr_msg)
-                        log.warning("[OTR voice P-OBS] %s", _sr_msg)
-                    # Cloud-audio-cache: on the miss path, cache the bytes (unless
-                    # rate mismatched, in which case skip the put -- a mismatched
-                    # clip cached would silently mispitch on the next hit). On any
-                    # path collect the ledger stamp bundle. r4 MF#4: hit stamps
-                    # render_ms=0 (valid persisted value under the new
-                    # render_ms=None-is-skip signature); miss stamps the elapsed time.
-                    if resolved_ref.is_policy_route:
-                        _policy_line_ids.add(line_id)
-                    _asample_hash = compute_audio_sample_hash(
-                        audio["waveform"] if isinstance(audio, dict) else audio
-                    )
-                    _dur_s = (
-                        float(audio["waveform"].shape[-1]) / float(_got_sr)
-                        if _got_sr else 0.0
-                    )
-                    if not cache_enabled and resolved_ref.is_policy_route:
-                        # Plan 5.3: LOCAL renders leave a receipt too. They never
-                        # did -- every stamp below sat inside the cache branch --
-                        # so an indextts2 episode finished with no per-line record
-                        # of which engine, which route or which bytes had spoken,
-                        # and Lemmy's route is a LOCAL one. A qualified route
-                        # whose evidence only exists on the cloud lane is not
-                        # evidence.
-                        #
-                        # SCOPED TO POLICY-ROUTE LINES ON PURPOSE. Stamping every
-                        # local line would reload-and-resave the whole ledger file
-                        # on every ordinary leg, which
-                        # test_end_to_end_google_tts_cache_off_byte_identity
-                        # exists to forbid -- and it is right to: two voice roles
-                        # rewriting one file per render is a corruption hazard
-                        # bought for telemetry nobody asked for. A proved route is
-                        # different; its receipt is the entire point of proving
-                        # it. Today no row carries a route, so this branch never
-                        # runs and the control's invariant holds byte-for-byte.
-                        ledger_stamps.append((line_id, {
-                            "tts_engine": engine,
-                            "voice_preset": voice_preset or "",
-                            "render_ms": int(
-                                (time.monotonic() - _render_start) * 1000),
-                            "generated_dur_s": _dur_s,
-                            "audio_sample_hash": _asample_hash,
-                            "sample_rate": _got_sr,
-                            "voice_route_id": resolved_ref.route_id,
-                        }))
-                    if cache_enabled:
-                        if cache_status == "hit":
-                            ledger_stamps.append((line_id, {
-                                "tts_engine": engine,
-                                "voice_preset": voice_preset or "",
-                                "render_ms": 0,
-                                "generated_dur_s": _dur_s,
-                                "audio_sample_hash": _asample_hash,
-                                "audio_cache_key": cached_record.cache_key,
-                                "audio_sha256": cached_record.audio_sha256,
-                                "provider_model_id": cached_record.provider_model_id or "",
-                                "sample_rate": _got_sr,
-                                "voice_route_id": resolved_ref.route_id,
-                            }))
-                        else:
-                            _elapsed_ms = int((time.monotonic() - _render_start) * 1000)
-                            if _got_sr != sr:
-                                cache_status = "degraded_write"
-                                cache_stats["degraded_write"] += 1
-                                ledger_stamps.append((line_id, {
-                                    "tts_engine": engine,
-                                    "voice_preset": voice_preset or "",
-                                    "render_ms": _elapsed_ms,
-                                    "generated_dur_s": _dur_s,
-                                    "audio_sample_hash": _asample_hash,
-                                    "provider_model_id": provider_model_id_stamp,
-                                    "sample_rate": _got_sr,
-                                    "voice_route_id": resolved_ref.route_id,
-                                }))
-                            elif cache is not None:
-                                try:
-                                    fresh_record = cache.put(
-                                        request, audio,
-                                        allowed_for_release=(
-                                            effective_license_state(profile) == "clean"
-                                        ),
-                                        actual_sample_rate=_got_sr,
-                                        provider_model_id=provider_model_id_stamp,
-                                    )
-                                    cache_status = "miss"
-                                    cache_stats["miss"] += 1
-                                    ledger_stamps.append((line_id, {
-                                        "tts_engine": engine,
-                                        "voice_preset": voice_preset or "",
-                                        "render_ms": _elapsed_ms,
-                                        "generated_dur_s": _dur_s,
-                                        "audio_sample_hash": _asample_hash,
-                                        "audio_cache_key": request.cache_key,
-                                        "audio_sha256": fresh_record.audio_sha256,
-                                        "provider_model_id": provider_model_id_stamp,
-                                        "sample_rate": _got_sr,
-                                        "voice_route_id": resolved_ref.route_id,
-                                    }))
-                                except Exception as _put_err:  # noqa: BLE001
-                                    log.warning("[OTR voice cache] put failed: %s", _put_err)
-                                    cache_status = "degraded_write"
-                                    cache_stats["degraded_write"] += 1
-                                    ledger_stamps.append((line_id, {
-                                        "tts_engine": engine,
-                                        "voice_preset": voice_preset or "",
-                                        "render_ms": _elapsed_ms,
-                                        "generated_dur_s": _dur_s,
-                                        "audio_sample_hash": _asample_hash,
-                                        "provider_model_id": provider_model_id_stamp,
-                                        "sample_rate": _got_sr,
-                                        "voice_route_id": resolved_ref.route_id,
-                                    }))
+                    if j["job_id"] in outcome_errors:
+                        raise outcome_errors[j["job_id"]]
+                    if j["audio"] is None:
+                        raise RuntimeError(
+                            "cloud TTS fan-out never rendered line %s"
+                            % j["job_id"])
+                    if j["resolved_ref"].is_policy_route:
+                        _policy_line_ids.add(j["line_id"])
+                    _finish_voice_line(
+                        j, role=self.ROLE, clips=clips, cache=cache,
+                        cache_enabled=cache_enabled, cache_stats=cache_stats,
+                        ledger_stamps=ledger_stamps, log_lines=log_lines,
+                        sr=sr, engine=engine, log=log)
+                    cache_status = j["cache_status"]
                 finally:
                     if cache_enabled:
                         _pobs_tail = f" cache={cache_status}"
-                        log_lines.append(_pobs + _pobs_tail)
-                        log.info("[OTR voice P-OBS] %s%s", _pobs, _pobs_tail)
-                clips.append(audio)
+                        log_lines.append(j["_pobs"] + _pobs_tail)
+                        log.info("[OTR voice P-OBS] %s%s", j["_pobs"], _pobs_tail)
+
             packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
             n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
             log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")

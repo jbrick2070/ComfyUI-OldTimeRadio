@@ -127,7 +127,7 @@ def _hard_mock_loader_paths(monkeypatch, tmp_path):
 
 
 def test_check_vram_fit_curated_pass_returns_pass_tier():
-    v = catalog.check_vram_fit(catalog.DEFAULT_LLM, 8192)
+    v = catalog.check_vram_fit("google/gemma-4-E2B-it", 8192)
     assert v.tier == "PASS"
     assert v.soak_tested is True
     assert v.estimated_gb > 0
@@ -212,19 +212,24 @@ def test_every_curated_local_row_is_pass_tier():
     rigs". Shipping one in the dropdown promises a load that may not
     happen on the 16 GB target card.
 
-    This is the gate that keeps the ruling from decaying: a new WARN (or
-    UNKNOWN/FAIL) row fails HERE, by name, instead of failing in front of
-    an operator mid-render.
+    2026-09-06 amended the roster, not the ruling: Qwen 3.5 4B (both
+    dropdown identities) and Llama 3.2 3B stay WARN because they have
+    finished episodes but are not the 08-25 soak-PASS set. A NEW WARN
+    (or UNKNOWN/FAIL) row still fails HERE, by name.
     """
+    allowed_warn = {
+        catalog.DEFAULT_LLM,
+        catalog.DEFAULT_LLM_NF4,
+        "unsloth/Llama-3.2-3B-Instruct",
+    }
     offenders = [
         f"{row.repo_id} (tier={row.vram_fit_tier})"
         for row in catalog.CURATED_LLM_MODELS
-        if row.vram_fit_tier != "PASS"
+        if row.vram_fit_tier != "PASS" and row.repo_id not in allowed_warn
     ]
     assert not offenders, (
-        "curated rows must be PASS-tier (operator 2026-08-25, "
-        "'I only want easy to load LLMs'); offenders: "
-        + ", ".join(offenders)
+        "curated rows must be PASS-tier unless named in the 09-06 WARN "
+        "set; offenders: " + ", ".join(offenders)
     )
 
 
@@ -236,7 +241,7 @@ def test_check_vram_fit_unknown_for_arbitrary_uncurated():
 
 def test_check_vram_fit_custom_ceiling():
     """Operator can override the ceiling for testing or bigger rigs."""
-    v = catalog.check_vram_fit(catalog.DEFAULT_LLM, 8192, ceiling_gb=64.0)
+    v = catalog.check_vram_fit("google/gemma-4-E2B-it", 8192, ceiling_gb=64.0)
     assert v.tier == "PASS"
     assert v.ceiling_gb == 64.0
 
@@ -334,10 +339,10 @@ def test_request_slot_rejects_unknown_slot_name():
 
 
 def test_request_slot_creative_loads_default_llm():
-    entry = loader.request_slot("creative", catalog.DEFAULT_LLM)
-    assert entry["model_id"] == catalog.DEFAULT_LLM
+    entry = loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
+    assert entry["model_id"] == catalog.DEFAULT_LLM_NF4
     assert loader.LLM_CACHE["slot"] == "creative"
-    assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM
+    assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM_NF4
 
 
 def test_request_slot_uses_ported_body():
@@ -541,8 +546,8 @@ def test_request_slot_same_model_returns_cached_entry(monkeypatch):
         lambda mid, **kw: (load_calls.append(mid) or original_load(mid, **kw)),
     )
 
-    entry1 = loader.request_slot("creative", catalog.DEFAULT_LLM)
-    entry2 = loader.request_slot("technical", catalog.DEFAULT_LLM)
+    entry1 = loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
+    entry2 = loader.request_slot("technical", catalog.DEFAULT_LLM_NF4)
 
     assert entry1 is entry2  # exact same cached object
     assert len(load_calls) == 1  # second call hit the cache, no reload
@@ -563,7 +568,7 @@ def test_request_slot_different_model_triggers_full_teardown(monkeypatch):
 
     monkeypatch.setattr(loader, "_self_unload", counting_self_unload)
 
-    loader.request_slot("creative", catalog.DEFAULT_LLM)
+    loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
     assert len(unload_calls) == 0  # first load has no prior resident
     loader.request_slot("technical", catalog.TEST_TECHNICAL_LLM)
     assert len(unload_calls) == 1  # transition unloaded once
@@ -608,7 +613,7 @@ def test_load_failure_cleanup_does_not_tear_down_a_foreign_live_entry(monkeypatc
     monkeypatch.setattr(loader, "load_llm", _failing_load_llm)
 
     with pytest.raises(RuntimeError, match="simulated load failure"):
-        loader.request_slot("creative", catalog.DEFAULT_LLM)
+        loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
 
     assert loader.LLM_CACHE.get("cache_entry") is foreign_entry, (
         "a different, legitimate caller's freshly-published model must "

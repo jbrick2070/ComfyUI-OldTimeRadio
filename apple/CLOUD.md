@@ -68,6 +68,16 @@ which is the dropdown telling you the lane is off.
 Two slots exist so the creative pass and the technical pass can use different
 models — a larger one to write, a cheaper one for structural work.
 
+**Shipping cheap Comfy Cloud graphs pin Sonnet 5 on creative and GPT 5.6
+Luna on tech.** Deluxe pins GPT 5.6 Sol on creative and the same Luna on
+tech. The Credits combo uses the OpenRouter ids
+`anthropic/claude-sonnet-5`, `openai/gpt-5.6-luna` and `openai/gpt-5.6-sol`.
+Luna is sent with `reasoning_effort=none` on the Comfy OpenRouter proxy
+(the Credits node widget spells that `off`). Sonnet 5 cannot turn
+reasoning fully off, so the cheap-cloud creative slot sends `low`. Sol
+omits the field so Credits keeps the catalog default. Terra and the
+`-pro` twins stay on the dropdown; they are not the saved default.
+
 ## Refreshing the OpenRouter model list
 
 The catalogue changes often. `scripts/otr_openrouter_refresh.py` pulls the

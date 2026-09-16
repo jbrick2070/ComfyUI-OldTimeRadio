@@ -1113,6 +1113,219 @@ def verify_replay_images(ledger: dict):
     return ledger, "image_done:replay", report
 
 
+def _pending_holds_portrait(pending, char_id) -> bool:
+    cid = str(char_id or "")
+    if not cid:
+        return False
+    for job in pending:
+        if str(job.get("kind") or "") != "portrait":
+            continue
+        if str(job.get("oid") or "") == cid or str(job.get("char_id") or "") == cid:
+            return True
+    return False
+
+
+def _render_still_pixels(job, ctx):
+    """Partner/local gen_fn -> pixels. Model refusal is a result, not a raise."""
+    gen_fn = ctx["gen_fn"]
+    try:
+        pixels = _coerce_pixels(
+            gen_fn(job["request"]),
+            min_bytes=ctx["handoff_min_bytes"],
+            wait_attempts=ctx["handoff_wait_attempts"],
+            wait_sleep_s=ctx["handoff_wait_sleep_s"],
+        )
+    except Exception as exc:  # noqa: BLE001 -- split refusal vs engine fault
+        if getattr(exc, "is_model_refusal", False):
+            return {"refusal": exc}
+        raise
+    return {
+        "pixels": pixels,
+        "content_hash": _pl.compute_portrait_hash(pixels),
+        "laplacian": _laplacian_variance(pixels),
+    }
+
+
+def _record_still_refusal(job, exc, ctx):
+    oid = job["oid"]
+    engine_id = job["engine_id"]
+    prompt = job["prompt"]
+    seed = job["seed"]
+    ctx["skip_evidence_by_oid"][oid] = {
+        "reason": "model_refusal", "role": job["role"], "engine_id": engine_id,
+        "prompt": prompt, "seed": seed, "detail": str(exc),
+    }
+    ctx["warnings"].append(
+        f"{oid}: '{engine_id}' MODEL REFUSAL -- no still for this "
+        f"object; the episode continues (operator 2026-08-22). "
+        f"prompt={prompt!r} seed={seed} ({exc})")
+    log.warning(
+        "[OTR_ImageGenDispatcher] MODEL REFUSAL on %s via '%s': %s\n"
+        "  prompt: %s\n  negative: %s\n  seed: %s\n"
+        "  The episode CONTINUES with no still for this object. This "
+        "prompt is recorded so the refusal can be diagnosed as seed- "
+        "or content-driven -- the previous hard-fail erased it.",
+        oid, engine_id, exc, prompt, job["effective_neg"], seed)
+
+
+def _commit_minted_still(job, pixels, content_hash, lap, ctx):
+    oid = job["oid"]
+    kind = job["kind"]
+    role = job["role"]
+    path = _pl.stamp_portrait(
+        ctx["ledger"], oid, pixels, output_dir=ctx["output_dir"],
+        require_cast_entry=(kind == "portrait" and oid in ctx["cast_ids"]))
+    try:
+        ep_path = _materialize_episode_copy(
+            str(path), ctx["ep_dir"], oid, content_hash)
+    except OSError as exc:
+        ctx["warnings"].append(
+            f"{oid}: episode materialization failed ({exc}); row points "
+            "at the pool copy (LOUD)")
+        ep_path = str(path)
+    image_id = f"img_{oid}_{content_hash[:12]}"
+    row = {
+        "image_id": image_id, "role": role, "object_id": oid,
+        "kind": kind,
+        "path": ep_path, "pool_path": str(path),
+        "engine_id": job["engine_id"], "engine_version": job["eng_version"],
+        "request_hash": job["key"], "portrait_content_hash": content_hash,
+        "content_hash": content_hash, "w": job["obj_w"], "h": job["obj_h"],
+        "prompt_hash": job["prompt_hash"],
+        "provenance": {"source": job["obj"].get("source", "")},
+        "derived_from_portrait_hash": job["anchor_hash"],
+        "portrait_anchor_mode": job["anchor_mode"],
+        "identity_seed_basis": job["seed_basis_used"],
+    }
+    row.update(job["banana_rcpt"])
+    row["source_context_hash"] = job["source_context_hash"]
+    row["source_rewrite"] = job["source_rewrite"]
+    if job["char_id"]:
+        row["char_id"] = job["char_id"]
+    if job["beat_id"]:
+        row["beat_id"] = job["beat_id"]
+    if job["radio_host_style"]:
+        row["radio_host_style"] = job["radio_host_style"]
+    if job["lettering_style"]:
+        row["lettering_style"] = job["lettering_style"]
+    if job["backdrop_family"]:
+        row["backdrop_family"] = job["backdrop_family"]
+    _msid = str(job["obj"].get("mesh_subject_id") or "")
+    if _msid:
+        row["mesh_subject_id"] = _msid
+    _vstyle = ctx["vstyle"]
+    if _vstyle is not None:
+        row["visual_style"] = str(getattr(_vstyle, "style_id", "") or "")
+    if lap:
+        row["laplacian"] = lap
+    ctx["visual_rows"].append({
+        "kind": kind, "object_id": oid, "role": role,
+        "source": job["source"], "beat_id": job["beat_id"],
+        "styled": bool(job["styled_now"]),
+        "already_styled": bool(ctx["style_cue"]) and not job["styled_now"],
+        "prompt_sha8": str(job["prompt_hash"] or "")[:8],
+        "negative": job["effective_neg"],
+        "negative_source": job["neg_source"],
+        "laplacian": lap,
+    })
+    ctx["images"].append(row)
+    ctx["ep_rows"].append(row)
+    ctx["cache_index"][job["key"]] = image_id
+    ctx["made"] += 1
+    ctx["report"].append(f"{oid}: generated -> {os.path.basename(ep_path)}")
+
+
+def _wrap_still_render_error(job, exc):
+    oid = job["oid"]
+    engine_id = job["engine_id"]
+    if isinstance(exc, ImageRenderError):
+        return exc
+    if isinstance(exc, _lease.LeaseTimeout):
+        return ImageRenderError(
+            f"{oid}: GPU lease timeout rendering '{engine_id}' ({exc}). "
+            f"NO FALLBACK.")
+    if isinstance(exc, ImageHandoffTimeout):
+        return ImageRenderError(
+            f"{oid}: image handoff from '{engine_id}' not ready ({exc}). "
+            f"NO FALLBACK.")
+    return ImageRenderError(
+        f"{oid}: image render with '{engine_id}' failed "
+        f"({type(exc).__name__}: {exc}). NO FALLBACK -- fix the "
+        f"engine or select a usable one.")
+
+
+def _mint_still_serial(job, ctx, *, take_lease):
+    lease = None
+    try:
+        if take_lease:
+            lease = _lease.acquire(
+                timeout_s=ctx["lease_timeout_s"], lockdir=ctx["lockdir"])
+        packed = _render_still_pixels(job, ctx)
+        if packed.get("refusal"):
+            _record_still_refusal(job, packed["refusal"], ctx)
+            return
+        _commit_minted_still(
+            job, packed["pixels"], packed["content_hash"],
+            packed["laplacian"], ctx)
+    except Exception as exc:  # noqa: BLE001
+        if getattr(exc, "is_model_refusal", False):
+            _record_still_refusal(job, exc, ctx)
+            return
+        wrapped = _wrap_still_render_error(job, exc)
+        if wrapped is exc:
+            raise
+        raise wrapped from exc
+    finally:
+        if lease is not None:
+            _lease.release(lease)
+    if take_lease and not _lease.wait_until_below_mb(
+            15000, attempts=3, sleep_s=0.0):
+        log.info("[OTR_ImageGenDispatcher] NVML re-probe inconclusive (CPU/no-NVML or busy)")
+
+
+def _flush_pending_cloud_stills(pending, ctx):
+    if not pending:
+        return
+    from ._otr_shared.cloud_fanout import (
+        cloud_fanout_workers, run_cloud_fanout, snapshot_prompt_id,
+    )
+    jobs = list(pending)
+    pending.clear()
+    workers = min(cloud_fanout_workers(), len(jobs))
+    log.warning(
+        "[OTR image] cloud fan-out: %d still(s), workers=%d; "
+        "assemble stays object order",
+        len(jobs), workers)
+    if workers <= 1:
+        for job in jobs:
+            _mint_still_serial(job, ctx, take_lease=False)
+        return
+    outcome = run_cloud_fanout(
+        jobs,
+        item_id=lambda j: str(j.get("oid") or ""),
+        execute=lambda j: _render_still_pixels(j, ctx),
+        workers=workers,
+        prompt_id=snapshot_prompt_id())
+    if outcome.stuck_ids and not outcome.errors:
+        raise ImageRenderError(
+            "cloud still fan-out stuck; stills never became ready: %s"
+            % outcome.stuck_ids)
+    for job in jobs:
+        oid = job["oid"]
+        if oid in outcome.errors:
+            raise _wrap_still_render_error(job, outcome.errors[oid]) from outcome.errors[oid]
+        packed = outcome.results.get(oid)
+        if packed is None:
+            raise ImageRenderError(
+                "cloud still fan-out never rendered %s" % oid)
+        if packed.get("refusal"):
+            _record_still_refusal(job, packed["refusal"], ctx)
+            continue
+        _commit_minted_still(
+            job, packed["pixels"], packed["content_hash"],
+            packed["laplacian"], ctx)
+
+
 def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                     gen_fn=None, output_dir=None, lockdir=None, lease_timeout_s=120.0,
                     handoff_min_bytes: int = _MIN_PNG_BYTES,
@@ -1317,6 +1530,29 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # canonical call the LTX 2.5 engine and the GGUF backend make in their preflight.
     # Nothing after the image stage requests an LLM slot, so there is no reload cost.
     _residue_freed = False
+    pending_cloud = []
+    ctx = {
+        "ledger": ledger,
+        "output_dir": output_dir,
+        "ep_dir": ep_dir,
+        "images": images,
+        "ep_rows": ep_rows,
+        "cache_index": cache_index,
+        "warnings": warnings,
+        "report": report,
+        "skip_evidence_by_oid": skip_evidence_by_oid,
+        "visual_rows": _visual_rows,
+        "gen_fn": gen_fn,
+        "handoff_min_bytes": handoff_min_bytes,
+        "handoff_wait_attempts": handoff_wait_attempts,
+        "handoff_wait_sleep_s": handoff_wait_sleep_s,
+        "lockdir": lockdir,
+        "lease_timeout_s": lease_timeout_s,
+        "cast_ids": cast_ids,
+        "style_cue": _style_cue,
+        "vstyle": _vstyle,
+        "made": 0,
+    }
     for obj in objects:
         if not isinstance(obj, dict):
             continue
@@ -1502,6 +1738,8 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
         # writes portrait_content_hash only on a fresh render, so on a cache HIT
         # the cast lookup returns None -- exactly where the anchor matters most.
         # reversed() so a stale row from an earlier image_revision cannot win.
+        if _pending_holds_portrait(pending_cloud, char_id):
+            _flush_pending_cloud_stills(pending_cloud, ctx)
         portrait_row = None
         if kind in ("scene_character", _cp.JUMP_STILL_KIND) and char_id:
             portrait_row = next(
@@ -1777,7 +2015,6 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
             "w": obj_w, "h": obj_h,
             "width": obj_w or None, "height": obj_h or None,
         }
-        lease = None
         cloud_image_engine = _is_cloud_image_engine(engine_id)
         if not cloud_image_engine and not _residue_freed:
             _residue_freed = True
@@ -1789,161 +2026,31 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
                 _residue.get("free_gb_after", float("nan")),
                 ",".join(_residue.get("steps_run", []) or []) or "-",
                 ",".join(_residue.get("steps_failed", []) or []) or "-")
-        try:
-            if not cloud_image_engine:
-                lease = _lease.acquire(timeout_s=lease_timeout_s, lockdir=lockdir)
-            pixels = _coerce_pixels(
-                gen_fn(request), min_bytes=handoff_min_bytes,
-                wait_attempts=handoff_wait_attempts, wait_sleep_s=handoff_wait_sleep_s,
-            )
-            content_hash = _pl.compute_portrait_hash(pixels)
-            # Style-spread telemetry: measured here because the pixels are
-            # already a decoded CPU uint8 array on this line (the hash above
-            # consumes the same object), so it costs one numpy pass and adds no
-            # device sync. Aggregated once AFTER the loop -- a spread computed
-            # mid-loop would warn before the episode's stills exist.
-            _lap = _laplacian_variance(pixels)
-            # portraits stamp the cast row (require_cast_entry for real cast);
-            # scene stills only write the content-addressed file (no cast row
-            # could ever exist for a beat).
-            path = _pl.stamp_portrait(
-                ledger, oid, pixels, output_dir=output_dir,
-                require_cast_entry=(kind == "portrait" and oid in cast_ids))
-        except _lease.LeaseTimeout as exc:
-            # NO FALLBACKS (operator 2026-06-18): hard-fail, never skip.
-            raise ImageRenderError(
-                f"{oid}: GPU lease timeout rendering '{engine_id}' ({exc}). "
-                f"NO FALLBACK.") from exc
-        except ImageHandoffTimeout as exc:
-            raise ImageRenderError(
-                f"{oid}: image handoff from '{engine_id}' not ready ({exc}). "
-                f"NO FALLBACK.") from exc
-        except ImageRenderError:
-            raise
-        except Exception as exc:  # noqa: BLE001 -- split by KIND, just below
-            if not getattr(exc, "is_model_refusal", False):
-                # NO FALLBACKS (operator 2026-06-18): a wrapper-node-missing /
-                # CUDA-OOM / decode failure HARD-FAILS the episode LOUD -- no
-                # skip, no radio-floor degrade, no silent flux substitution.
-                raise ImageRenderError(
-                    f"{oid}: image render with '{engine_id}' failed "
-                    f"({type(exc).__name__}: {exc}). NO FALLBACK -- fix the "
-                    f"engine or select a usable one.") from exc
-            # A MODEL REFUSAL IS NOT AN ENGINE FAILURE (operator 2026-08-22:
-            # "why is refusing card killing the episode, i dont think thats
-            # good feature" / "i didnt want any fail on this or that").
-            #
-            # The engine worked: it returned valid decoded pixels at the exact
-            # requested dimensions and the graph completed. The MODEL declined
-            # this one card. Hard-failing here destroyed an entire episode over
-            # one blemish -- and destroyed the evidence with it, because the
-            # refused card's prompt was never persisted anywhere, which is why
-            # the 2026-08-21 refusal still cannot be diagnosed as seed-vs-
-            # content. So this degrades LOUD and RECORDS THE PROMPT.
-            #
-            # This is NOT a fallback and does not weaken the 2026-06-18 rule:
-            # no engine is substituted, nothing is silent, and every real
-            # engine fault still hard-fails through the branch below. The beat
-            # simply has no still, which is a state the pipeline already has.
-            # RECORDED, not just logged. The completeness gate below reads this
-            # map: without an entry the target reports "no_row, no skip evidence
-            # recorded" and hard-fails the episode anyway -- which is how the
-            # first version of this fix was only HALF a fix.
-            skip_evidence_by_oid[oid] = {
-                "reason": "model_refusal", "role": role, "engine_id": engine_id,
-                "prompt": prompt, "seed": seed, "detail": str(exc),
-            }
-            warnings.append(
-                f"{oid}: '{engine_id}' MODEL REFUSAL -- no still for this "
-                f"object; the episode continues (operator 2026-08-22). "
-                f"prompt={prompt!r} seed={seed} ({exc})")
-            log.warning(
-                "[OTR_ImageGenDispatcher] MODEL REFUSAL on %s via '%s': %s\n"
-                "  prompt: %s\n  negative: %s\n  seed: %s\n"
-                "  The episode CONTINUES with no still for this object. This "
-                "prompt is recorded so the refusal can be diagnosed as seed- "
-                "or content-driven -- the previous hard-fail erased it.",
-                oid, engine_id, exc, prompt, _effective_neg, seed)
-            continue
-        finally:
-            if lease is not None:
-                _lease.release(lease)
-        # post-generation residency confirm (best-effort; gates the C->A handoff).
-        if (not cloud_image_engine
-                and not _lease.wait_until_below_mb(15000, attempts=3, sleep_s=0.0)):
-            log.info("[OTR_ImageGenDispatcher] NVML re-probe inconclusive (CPU/no-NVML or busy)")
-        image_id = f"img_{oid}_{content_hash[:12]}"
-        # Materialize the fresh render into the EPISODE stills dir (ST-3/W3);
-        # the ledger row's `path` is the EPISODE-LOCAL copy, `pool_path` the
-        # content-addressed global cache file.
-        try:
-            ep_path = _materialize_episode_copy(str(path), ep_dir, oid,
-                                                content_hash)
-        except OSError as exc:
-            warnings.append(
-                f"{oid}: episode materialization failed ({exc}); row points "
-                "at the pool copy (LOUD)")
-            ep_path = str(path)
-        row = {
-            "image_id": image_id, "role": role, "object_id": oid,
-            "kind": kind,
-            "path": ep_path, "pool_path": str(path),
-            "engine_id": engine_id, "engine_version": eng_version,
-            # portrait_content_hash is THIS row's own decoded-pixel hash on
-            # every kind, portrait or scene -- render_driver and the mesh cache
-            # read it under that name, so it is not renamed.
-            # derived_from_portrait_hash is the different thing: which
-            # character's portrait this scene still was anchored to.
-            "request_hash": key, "portrait_content_hash": content_hash,
-            "content_hash": content_hash, "w": obj_w, "h": obj_h,
-            "prompt_hash": prompt_hash, "provenance": {"source": obj.get("source", "")},
-            "derived_from_portrait_hash": anchor_hash,
-            "portrait_anchor_mode": anchor_mode,
-            "identity_seed_basis": seed_basis_used,
+        still_job = {
+            "oid": oid, "kind": kind, "role": role, "char_id": char_id,
+            "beat_id": beat_id, "engine_id": engine_id,
+            "eng_version": eng_version, "request": request, "key": key,
+            "anchor_hash": anchor_hash, "anchor_mode": anchor_mode,
+            "seed_basis_used": seed_basis_used, "prompt": prompt,
+            "seed": seed, "effective_neg": _effective_neg,
+            "neg_source": _neg_source, "styled_now": _styled_now,
+            "source": source, "banana_rcpt": banana_rcpt,
+            "source_context_hash": source_context_hash,
+            "source_rewrite": source_rewrite,
+            "radio_host_style": radio_host_style,
+            "lettering_style": lettering_style,
+            "backdrop_family": backdrop_family,
+            "obj": obj, "obj_w": obj_w, "obj_h": obj_h,
+            "prompt_hash": prompt_hash,
         }
-        # Banana receipt (six keys), on the fresh-generation row exactly as on
-        # the cache-hit row -- both are the durable ledger record.
-        row.update(banana_rcpt)
-        row["source_context_hash"] = source_context_hash
-        row["source_rewrite"] = source_rewrite
-        if char_id:
-            row["char_id"] = char_id
-        if beat_id:
-            row["beat_id"] = beat_id
-        if radio_host_style:
-            row["radio_host_style"] = radio_host_style
-        if lettering_style:
-            row["lettering_style"] = lettering_style
-        if backdrop_family:
-            row["backdrop_family"] = backdrop_family
-        # 3D image streams (2026-06-21): carry the mesh subject identity onto the
-        # row (additive) so the mesh cache keys on a STABLE per-subject id (the
-        # mesh_fodder file), not the per-beat still hash. Absent on non-3D rows.
-        _msid = str(obj.get("mesh_subject_id") or "")
-        if _msid:
-            row["mesh_subject_id"] = _msid
-        # Style attribution travels WITH the still: portrait rows carried no
-        # visual_style at all before this, so a still could not be traced back
-        # to the pack that shaped it.
-        if _vstyle is not None:
-            row["visual_style"] = str(getattr(_vstyle, "style_id", "") or "")
-        if _lap:
-            row["laplacian"] = _lap
-        _visual_rows.append({
-            "kind": kind, "object_id": oid, "role": role,
-            "source": source, "beat_id": beat_id,
-            "styled": bool(_styled_now),
-            "already_styled": bool(_style_cue) and not _styled_now,
-            "prompt_sha8": str(prompt_hash or "")[:8],
-            "negative": _effective_neg,
-            "negative_source": _neg_source,
-            "laplacian": _lap,
-        })
-        images.append(row)
-        ep_rows.append(row)
-        cache_index[key] = image_id
-        made += 1
-        report.append(f"{oid}: generated -> {os.path.basename(ep_path)}")
+        if cloud_image_engine:
+            pending_cloud.append(still_job)
+            continue
+        _flush_pending_cloud_stills(pending_cloud, ctx)
+        _mint_still_serial(still_job, ctx, take_lease=True)
+
+    _flush_pending_cloud_stills(pending_cloud, ctx)
+    made = ctx["made"]
 
     # ST-3 completion contract: the producer-owned target manifest is the
     # boundary between image generation and video. A generated object that was

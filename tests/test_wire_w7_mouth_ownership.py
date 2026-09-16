@@ -175,6 +175,36 @@ def test_a_CLOUD_AVATAR_on_a_character_beat_is_FINE():
         is_character_face=_is_character_face_beat(shot)) == mp.MOUTH_HUMAN
 
 
+def test_cloud_ltx25_audio_in_on_a_character_beat_is_a_FACE():
+    """Cloud LTX 2.5 A2V joins ``ltx_audio_in``: a character beat owns lips."""
+    from nodes._otr_video_engines.render_driver import _is_character_face_beat
+
+    name = "cloud_ltx25_audio_in"
+    if not vreg.is_registered(name):
+        pytest.skip("%s is not registered on this box" % name)
+    shot = {"role": "character_video", "engine_id": name}
+    assert _is_character_face_beat(shot) is True
+    assert mp.mouth_owner_for_beat(
+        engine_id=name, family=engine_family(name, ""),
+        role="character_video",
+        is_character_face=_is_character_face_beat(shot)) == mp.MOUTH_HUMAN
+
+
+def test_cloud_ltx25_foley_plus_does_not_owe_a_mouth():
+    """Foley is joint-AV, not audio-in. ShotLock must not ask who owns lips."""
+    name = "cloud_ltx25_foley_plus"
+    if not vreg.is_registered(name):
+        pytest.skip("%s is not registered on this box" % name)
+    assert mp.beat_owes_a_mouth(engine_family(name, "")) is False
+    from nodes._otr_video_engines.render_driver import _is_character_face_beat
+    shot = {"role": "character_video", "engine_id": name}
+    assert _is_character_face_beat(shot) is False
+    assert mp.mouth_owner_for_beat(
+        engine_id=name, family=engine_family(name, ""),
+        role="character_video",
+        is_character_face=_is_character_face_beat(shot)) == mp.MOUTH_NONE
+
+
 # ---------------------------------------------------------------------------
 # Ruling 3: one face per episode, and only in a single take
 # ---------------------------------------------------------------------------

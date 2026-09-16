@@ -355,13 +355,13 @@ def test_both_dropdowns_carry_their_sentinel_as_choice_zero():
     assert style_choices[1:] == list(ROLLS.eligible_style_ids())
 
 
-def test_the_shipped_defaults_are_still_concrete_ids_not_the_roll():
-    """Zero canonical-JSON diff: the saved graph's VALUES do not change."""
+def test_the_shipped_defaults_are_the_roll_commands():
+    """Canvas default matches every shipping JSON: Queue rolls a new show."""
     input_types = WRITER.OTR_LedgerScriptWriter.INPUT_TYPES()
     required = input_types["required"]
     optional = input_types["optional"]
-    assert required["source_bank"][1]["default"] == "scifi_news_pro"
-    assert optional["visual_style"][1]["default"] == "sci_fi_radio"
+    assert required["source_bank"][1]["default"] == ROLLS.BANK_SENTINEL
+    assert optional["visual_style"][1]["default"] == ROLLS.STYLE_SENTINEL
 
 
 def test_no_new_widget_was_added_for_either_roll():

@@ -55,6 +55,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
+| `cloud_ltx25_audio_in` | none | -- | key | key | key | key | key |
+| `cloud_ltx25_foley_plus` | none | -- | key | key | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_vidu_q2_pro_fast_720p` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_wan_i2v` | none | -- | key | key | key | key | key |
@@ -146,6 +148,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** | ? | ? |
+| `Qwen/Qwen3.5-4B:nf4` | **auto** | 8.7 GiB | fits | fits | **no** | ? | ? |
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |

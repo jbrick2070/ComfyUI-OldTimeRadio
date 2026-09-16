@@ -435,6 +435,8 @@ def _require_transformers_model_support(
 ) -> None:
     """Fail early when a selected model needs a newer Transformers build."""
     normalized = str(model_id or "").split(" ", 1)[0].strip()
+    from . import _otr_model_catalog as _otr_catalog
+    normalized = _otr_catalog.hf_weights_id(normalized)
     if normalized == "Qwen/Qwen3.5-4B":
         from transformers.models.auto.modeling_auto import (
             MODEL_FOR_CAUSAL_LM_MAPPING_NAMES,
@@ -886,6 +888,12 @@ def load_llm(
 
         from . import _otr_model_catalog as _otr_catalog
         from . import _otr_hf_env as _OTR_HF
+        _weights_id = _otr_catalog.hf_weights_id(_stripped_model_id)
+        _mismatch = _otr_catalog.quant_pick_mismatch(
+            _stripped_model_id, _policy.quant_policy
+        )
+        if _mismatch:
+            raise ModelLoaderError(_mismatch)
 
         # One canonical root precedes every discovery and snapshot operation.
         # request_slot supplies its captured root and pin; direct callers resolve
@@ -1096,10 +1104,10 @@ def load_llm(
         snapshot_path = None
         if _OTR_HF is not None:
             try:
-                snapshot_path = _OTR_HF.resolve_snapshot_dir(_stripped_model_id, hf_home=_hf_home_resolved)
+                snapshot_path = _OTR_HF.resolve_snapshot_dir(_weights_id, hf_home=_hf_home_resolved)
             except Exception as _snap_err:
                 _runtime_log(f"[StoryOrchestrator] snapshot resolve failed ({_snap_err}); using model_id fallback")
-        load_target = snapshot_path or _stripped_model_id
+        load_target = snapshot_path or _weights_id
         if snapshot_path:
             _runtime_log(f"[StoryOrchestrator] Loading from canonical snapshot: {snapshot_path}")
         else:
@@ -1130,7 +1138,7 @@ def load_llm(
         if not getattr(tokenizer, "chat_template", None) and _OTR_HF is not None:
             try:
                 _template_path = _OTR_HF.resolve_snapshot_file(
-                    _stripped_model_id,
+                    _weights_id,
                     "chat_template.jinja",
                     hf_home=_hf_home_resolved,
                 )
@@ -1964,6 +1972,12 @@ def request_slot(
         from . import _otr_hf_env as _otr_hf
         _hub_root = Path(_otr_hf.ensure_hf_home()) / "hub"
         normalized = _otr_catalog.validate_model_id(model_id, hub_root=_hub_root)
+
+    _mismatch = _otr_catalog.quant_pick_mismatch(
+        normalized, getattr(_policy, "quant_policy", "")
+    )
+    if _mismatch:
+        raise ModelLoaderError(_mismatch)
 
     # [OpenRouter S3] Remote branch (FC2 seam 1) -- the dispatch table is
     # otherwise dormant. A virtual catalog row carries

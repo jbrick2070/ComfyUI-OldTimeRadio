@@ -239,11 +239,12 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 
 </details>
 
-## unstated  --  8 experimental profile(s), 5 shipping
+## unstated  --  9 experimental profile(s), 6 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_cloud_deluxe_7act` | cloud_wan_i2v_audio | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
+| `otr_cloud_deluxe_7act` | cloud_ltx25_foley_plus | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
+| `otr_cloud_deluxe_audio_in_7act` | cloud_ltx25_audio_in | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | complete |
 | `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_7act` | cloud_vidu_q2_pro_fast_720p | elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |

@@ -596,7 +596,8 @@ def _director_option_value(node_type: str, widget: str, value: Any) -> Any:
 
 
 def _llm_option_value(node_type: str, widget: str, value: Any,
-                      schemas: Optional[dict]) -> Any:
+                      schemas: Optional[dict],
+                      quant_policy: Any = None) -> Any:
     """Write the EXACT live menu option for an LLM picker, badge included.
 
     The sibling of :func:`_director_option_value`. A profile stores the bare
@@ -604,6 +605,11 @@ def _llm_option_value(node_type: str, widget: str, value: Any,
     cost (``'google/gemma-4-12b-it (11.9 GB)'``). Storing the bare form would
     leave a saved graph carrying a value ComfyUI's own COMBO validation does not
     recognize, so resolve it to the live choice.
+
+    Qwen 3.5 has two identities. A profile still names the family
+    (``Qwen/Qwen3.5-4B``) plus ``quant_policy``; when Quant is supplied this
+    maps that pair onto the matching twin so an 8 GB graph saves the NF4
+    label and a Mac graph saves the full label.
 
     Falls through UNCHANGED whenever the choice list is unavailable or nothing
     matches -- a remote handle (``openrouter:slot-a``), an uncurated id with no
@@ -619,10 +625,12 @@ def _llm_option_value(node_type: str, widget: str, value: Any,
     type_def = spec[0] if isinstance(spec, (list, tuple)) and spec else None
     if not isinstance(type_def, (list, tuple)):
         return value
-    if value in type_def:
-        return value
-    from ._otr_model_catalog import _strip_label_suffix
+    from ._otr_model_catalog import _strip_label_suffix, resolve_pick_for_quant
     bare = _strip_label_suffix(value)
+    if quant_policy:
+        bare = resolve_pick_for_quant(bare, str(quant_policy))
+    if bare in type_def:
+        return bare
     for choice in type_def:
         if _strip_label_suffix(str(choice)) == bare:
             return choice
@@ -664,7 +672,10 @@ def apply_profile(workflow: dict, profile, mapping: Optional[dict] = None,
         for node_type, widget in entry["targets"]:
             node = _node_by_type(out, node_type)
             value = _director_option_value(node_type, widget, flat[dotted])
-            value = _llm_option_value(node_type, widget, value, schemas)
+            value = _llm_option_value(
+                node_type, widget, value, schemas,
+                quant_policy=flat.get("llm.quant_policy"),
+            )
             _patch_node_widget(node, widget, value, schemas)
             applied.append(f"{dotted} -> {node_type}.{widget} = {value!r}")
     log.info(

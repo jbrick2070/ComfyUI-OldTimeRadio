@@ -727,14 +727,19 @@ def test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finall
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     monkeypatch.setenv("OTR_AUDIO_CACHE_DIR", str(cache_dir))
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
 
+    import threading
     sentinel = RuntimeError("mid-loop generate_voice sentinel")
     call_count = {"n": 0}
+    _lock = threading.Lock()
 
     def _gen(text, voice_ref, delivery_vector, seed,
              *, disable_retry=False, resolved_model=None):
-        call_count["n"] += 1
-        if call_count["n"] == 3:
+        with _lock:
+            call_count["n"] += 1
+            n = call_count["n"]
+        if n == 3:
             raise sentinel
         return {
             "waveform": torch.zeros(1, 1, 16, dtype=torch.float32),
@@ -754,6 +759,8 @@ def test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finall
         f"expected the loop's sentinel to escape unchanged; got {excinfo.value!r}"
     )
     # We got as far as the 3rd generate_voice call (which raised).
+    # Cloud fan-out may have already requested later lines; the contract
+    # is stamps, not "later lines were never asked".
     assert call_count["n"] == 3, call_count
 
     with open(ledger_path, "r", encoding="utf-8") as fh:
@@ -770,7 +777,8 @@ def test_cache_on_multi_line_partial_exception_stamps_completed_lines_via_finall
         _rm = line.get("render_ms")
         assert isinstance(_rm, int) and _rm >= 0, (done_id, line)
 
-    # a3 raised, a4 + a5 never started -- no stamps land on any of them.
+    # a3 raised. a4 + a5 must not be stamped even if the cloud fan-out
+    # already requested them -- commit stays line order.
     for skipped_id in ("a3", "a4", "a5"):
         line = _stamp_from_ledger(after_ledger, skipped_id)
         assert line is not None, skipped_id

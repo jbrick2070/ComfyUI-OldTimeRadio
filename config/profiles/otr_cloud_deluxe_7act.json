@@ -1,6 +1,6 @@
 {
   "id": "otr_cloud_deluxe_7act",
-  "display_name": "Comfy Cloud 7-act deluxe -- OpenRouter ChatGPT writer, Wan I2V with audio-in (the live dropdown row cloud_wan_i2v_audio). Needs OPENROUTER_API_KEY and OTR_COMFY_API_KEY.",
+  "display_name": "Comfy Cloud 7-act deluxe FOLEY -- GPT 5.6 Sol creative + Luna tech (Comfy Credits), LTX 2.5 I2V generates its own bed and mixes 0.50 under the voices. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cpu",
@@ -8,9 +8,9 @@
   "toolchains": [],
   "allow_sidecars": false,
   "role_overrides": {
-    "announcer_visual": "cloud_wan_i2v_audio",
-    "music_visual": "cloud_wan_i2v_audio",
-    "character_visual": "cloud_wan_i2v_audio",
+    "announcer_visual": "cloud_ltx25_foley_plus",
+    "music_visual": "cloud_ltx25_foley_plus",
+    "character_visual": "cloud_ltx25_foley_plus",
     "announcer_image": "cloud_luma_photon_flash",
     "music_image": "cloud_luma_photon_flash",
     "character_image": "cloud_luma_photon_flash"
@@ -21,13 +21,13 @@
     "char_voice_engine": "elevenlabs",
     "announcer_voice_engine": "elevenlabs",
     "music_engine": "sonilo",
-    "video_render_engine": "cloud_wan_i2v_audio"
+    "video_render_engine": "cloud_ltx25_foley_plus"
   },
   "features": {
     "burn_captions": true,
     "caption_style": "sdh_standard",
     "act_count": "7",
-    "num_characters": 3
+    "num_characters": 4
   },
   "seed_policy": {
     "request_seed": 42,
@@ -42,12 +42,12 @@
     "vram_ceiling_gb": 0,
     "gguf_n_ctx": 2048,
     "gguf_quant": "Q4_K_M",
-    "creative_model": "openrouter:slot-a",
-    "technical_model": "openrouter:slot-b",
-    "openrouter_slot_a_model": "~openai/gpt-latest",
-    "openrouter_slot_b_model": "~openai/gpt-latest",
-    "comfy_slot_a_model": "(enable Comfy Credits)",
-    "comfy_slot_b_model": "(enable Comfy Credits)",
+    "creative_model": "comfy:slot-a",
+    "technical_model": "comfy:slot-b",
+    "openrouter_slot_a_model": "(enable OpenRouter)",
+    "openrouter_slot_b_model": "(enable OpenRouter)",
+    "comfy_slot_a_model": "openai/gpt-5.6-sol",
+    "comfy_slot_b_model": "openai/gpt-5.6-luna",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
     "lane_allowlist": [
@@ -80,12 +80,15 @@
   },
   "preflight": {
     "required_models": [],
-    "required_keys": ["OPENROUTER_API_KEY", "OTR_COMFY_API_KEY"]
+    "required_keys": ["OTR_COMFY_API_KEY"]
   },
   "launch": {
     "boot_contract": "cpu",
     "sage_attention": false,
     "extra_args": [],
-    "env": {}
+    "env": {
+      "OTR_ENABLE_COMFY_CREDITS": "1",
+      "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+    }
   }
 }

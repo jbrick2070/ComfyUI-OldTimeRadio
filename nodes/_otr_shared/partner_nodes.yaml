@@ -244,6 +244,66 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
+  cloud_ltx25_a2v:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/LTXV
+    class_name: Ltx25AudioToVideoNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_ltxv
+    inputs:
+      hidden:
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
+      optional:
+        image: IMAGE
+      required:
+        audio: AUDIO
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt: STRING
+        seed: INT
+    is_async: true
+    notes: LTX 2.5 Audio-to-Video; cloud_ltx25_audio_in feeds the beat audio. Not Foley.
+    provider_id: LTX
+    return_types:
+    - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
+  cloud_ltx25_i2v:
+    api_node: true
+    auth_hidden_present:
+    - auth_token_comfy_org
+    - api_key_comfy_org
+    category: partner/video/LTXV
+    class_name: Ltx25ImageToVideoNode
+    function: EXECUTE_NORMALIZED_ASYNC
+    import_path: comfy_api_nodes.nodes_ltxv
+    inputs:
+      hidden:
+        api_key_comfy_org:
+        auth_token_comfy_org:
+        comfy_usage_source:
+        unique_id:
+      optional:
+        last_frame: IMAGE
+      required:
+        image: IMAGE
+        model: COMFY_DYNAMICCOMBO_V3
+        prompt: STRING
+        seed: INT
+    is_async: true
+    notes: LTX 2.5 Image-to-Video; cloud_ltx25_foley_plus keeps generate_audio and harvests the native bed. Not LTX 3.0 -- that node is not on the installed partner catalog.
+    provider_id: LTX
+    return_types:
+    - VIDEO
+    seed_supported: true
+    selected_output: 0
+    status: OK
   cloud_nano_banana_2:
     api_node: true
     auth_hidden_present:

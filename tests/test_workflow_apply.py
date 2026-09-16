@@ -224,9 +224,10 @@ def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
 
 def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_copy):
     """Paid axis is act_count. All three cheap cloud-low graphs share
-    Grok 4.20 on Comfy Credits plus Vidu Q2 Pro Fast 720p (mute) and the
-    cheapest partner stack so credits scale with length, not model.
-    Deluxe/riches stays Wan audio-in and is not this test."""
+    Sonnet 5 creative + GPT 5.6 Luna tech on Comfy Credits plus Vidu Q2
+    Pro Fast 720p (mute) and the cheapest partner stack so credits scale
+    with length, not model. Deluxe/riches stays Wan audio-in and is not
+    this test."""
     expected_acts = {
         "otr_cloud_low_1act": "1",
         "otr_cloud_low": "3",
@@ -249,11 +250,15 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
         assert _widget_value(
             nodes_by_type, schemas, "OTR_LedgerScriptWriter",
             "comfy_slot_a_model"
-        ) == "x-ai/grok-4.20", pid
+        ) == "anthropic/claude-sonnet-5", pid
         assert _widget_value(
             nodes_by_type, schemas, "OTR_LedgerScriptWriter",
             "comfy_slot_b_model"
-        ) == "x-ai/grok-4.20", pid
+        ) == "openai/gpt-5.6-luna", pid
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+            "num_characters"
+        ) == (4 if pid.endswith("7act") else 3), pid
         assert _widget_value(
             nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
         ) == "elevenlabs"
@@ -275,9 +280,12 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
                 pid, widget)
 
 
-def test_apply_otr_cloud_deluxe_7act_is_chatgpt_and_wan_audio_in(
+def test_apply_otr_cloud_deluxe_7act_is_sol_and_ltx25_foley(
         schemas, master_copy):
-    """Riches SKU: OpenRouter ChatGPT writer, Wan I2V with audio-in."""
+    """Foley deluxe SKU: GPT 5.6 Sol creative + Luna tech, LTX 2.5 I2V bed.
+
+    OpenRouter widgets stay on the node (sentinel); the saved pick is Comfy.
+    """
     applied = wa.apply_profile(
         master_copy, "otr_cloud_deluxe_7act", schemas=schemas)
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
@@ -287,30 +295,63 @@ def test_apply_otr_cloud_deluxe_7act_is_chatgpt_and_wan_audio_in(
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "creative_writing_model"
-    ) == "openrouter:slot-a"
+    ) == "comfy:slot-a"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter", "technical_model"
-    ) == "openrouter:slot-b"
+    ) == "comfy:slot-b"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "comfy_slot_a_model"
+    ) == "openai/gpt-5.6-sol"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "comfy_slot_b_model"
+    ) == "openai/gpt-5.6-luna"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "num_characters"
+    ) == 4
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "openrouter_slot_a_model"
-    ) == "~openai/gpt-latest"
+    ) == "(enable OpenRouter)"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "openrouter_slot_b_model"
-    ) == "~openai/gpt-latest"
+    ) == "(enable OpenRouter)"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
-    ) == "cloud_wan_i2v_audio"
+    ) == "cloud_ltx25_foley_plus"
     for widget in (
         "announcer_video_model", "music_video_model", "character_video_model",
     ):
         assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", widget
-        ) == _director_video_label("cloud_wan_i2v_audio"), widget
+        ) == _director_video_label("cloud_ltx25_foley_plus"), widget
     assert _widget_value(
         nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
     ) == "cloud_luma_photon_flash"
+
+
+def test_apply_otr_cloud_deluxe_audio_in_7act_is_sol_and_ltx25_a2v(
+        schemas, master_copy):
+    """Audio-in deluxe SKU: same writers, LTX 2.5 Audio-to-Video."""
+    applied = wa.apply_profile(
+        master_copy, "otr_cloud_deluxe_audio_in_7act", schemas=schemas)
+    nodes_by_type = {n["type"]: n for n in applied["nodes"]}
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "comfy_slot_a_model"
+    ) == "openai/gpt-5.6-sol"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
+    ) == "cloud_ltx25_audio_in"
+    for widget in (
+        "announcer_video_model", "music_video_model", "character_video_model",
+    ):
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_VideoDirector", widget
+        ) == _director_video_label("cloud_ltx25_audio_in"), widget
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):

@@ -175,8 +175,12 @@ def resolve_auth(
 # ---------------------------------------------------------------------------
 
 _PROVIDER_ID_RE = re.compile(r"^[A-Z0-9_]+$")
-_DEFAULT_CONCURRENCY = 2
-_PROVIDER_DEFAULTS = {"KLING": 1}
+_DEFAULT_CONCURRENCY = 8
+#: Kling lipsync stays 1 -- that provider was measured to reject overlap.
+#: Every other cloud provider (Vidu, Luma, ElevenLabs, Sonilo, LTX, ...)
+#: shares the same overlap cap as the video fan-out. Serial partner waits
+#: are the thing we are not making people sit through.
+_PROVIDER_DEFAULTS = {"KLING": 1, "VIDU": 8}
 
 
 def normalize_provider_id(provider_id: str) -> str:

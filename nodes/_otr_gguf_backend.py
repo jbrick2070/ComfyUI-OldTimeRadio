@@ -338,7 +338,7 @@ three independent ways at once, all verified on this 8 GB box on 2026-09-06:
 
 So the row could not load, could not be repaired automatically, and could not
 tell the user why -- while sitting in the picker as a promise that it would
-work. `docs/LLM_PREFLIGHT_GUIDE.md` opens by calling exactly that shape of
+work. `apple/LLM_PREFLIGHT.md` opens by calling exactly that shape of
 entry the defect the guide exists to prevent.
 
 The reason to keep it is gone as well. The lane existed because llama.cpp was
