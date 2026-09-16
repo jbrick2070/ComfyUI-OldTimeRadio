@@ -41,6 +41,7 @@ from .cloud_media_backend import (
     CloudErrorCode,
     CloudMediaError,
     get_or_create_session,
+    is_auth_failure_message,
     is_wallet_empty_message,
 )
 from .cloud_media_canonical import PartnerResult, validate_partner_result
@@ -754,7 +755,7 @@ def _map_exception(exc: BaseException, node_key: str) -> CloudMediaError:
         return CloudMediaError(
             CloudErrorCode.BUDGET,
             f"{node_key}: wallet empty ({exc})")
-    if "unauthorized" in text or "401" in text or "forbidden" in text:
+    if is_auth_failure_message(text):
         return CloudMediaError(CloudErrorCode.AUTH, f"{node_key}: {exc}")
     return CloudMediaError(CloudErrorCode.PROVIDER_REJECTED,
                            f"{node_key}: {exc}")

@@ -397,6 +397,12 @@ def test_http_401_still_maps_to_auth():
     assert err.code is CloudErrorCode.AUTH
 
 
+def test_job_id_1401_is_not_auth():
+    err = invoke._map_exception(
+        RuntimeError("Failed on request 1401-abc"), "cloud_ltx25_i2v")
+    assert err.code is CloudErrorCode.PROVIDER_REJECTED
+
+
 def test_comfy_processing_interrupted_maps_to_interrupted():
     ProcessingInterrupted = type("ProcessingInterrupted", (Exception,), {})
     err = invoke._map_exception(

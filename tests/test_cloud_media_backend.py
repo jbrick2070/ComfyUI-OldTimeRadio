@@ -296,6 +296,10 @@ def test_is_cloud_budget_error_walks_cause_chain():
     assert not cmb.is_wallet_empty_message("HTTP 500 upstream")
     assert not cmb.is_wallet_empty_message("job 1402 payment pending")
     assert not cmb.is_wallet_empty_message("HTTP 401 Unauthorized")
+    assert cmb.is_auth_failure_message("HTTP 401 Unauthorized")
+    assert cmb.is_auth_failure_message("HTTP 401")
+    assert not cmb.is_auth_failure_message("Failed on request 1401-abc")
+    assert not cmb.is_auth_failure_message("HTTP 500 upstream")
 
 
 def test_error_codes_canonical_spelling():

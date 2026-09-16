@@ -82,6 +82,7 @@ __all__ = [
     "SESSION_SWEEP_MAX_AGE_S",
     "is_cloud_budget_error",
     "is_wallet_empty_message",
+    "is_auth_failure_message",
 ]
 
 # ---------------------------------------------------------------------------
@@ -129,6 +130,22 @@ def is_wallet_empty_message(text: str) -> bool:
     if "payment required" in blob or "insufficient credit" in blob:
         return True
     if re.search(r"\b402\b", blob):
+        return True
+    return False
+
+
+def is_auth_failure_message(text: str) -> bool:
+    """True when the provider refused the key, not the job.
+
+    ``401`` is a whole token so a job id containing 1401 does not map
+    AUTH. Wallet-empty (402) is a different matcher and must win first
+    at the call site -- a 402 body that also says unauthorized is still
+    an empty account.
+    """
+    blob = str(text or "").lower()
+    if "unauthorized" in blob or "forbidden" in blob:
+        return True
+    if re.search(r"\b401\b", blob):
         return True
     return False
 
