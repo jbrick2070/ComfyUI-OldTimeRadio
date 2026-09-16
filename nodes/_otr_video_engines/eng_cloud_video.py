@@ -368,6 +368,25 @@ def _est_usd() -> float:
         return 0.50
 
 
+#: Live 2026-09-16 Comfy invoice: ltx-2-5-fast 2s billed 78.45 credits
+#: (~$0.7845 at $0.01/credit) => $0.392/s. A flat $0.50 reserve on an
+#: 8s closer under-counts real spend by ~6x and lets a 5-act blow the
+#: wallet while the local cap still thinks it has headroom.
+_LTX25_EST_USD_PER_S = 0.40
+
+
+def ltx25_estimated_usd(duration_s: int, *, floor_usd: float | None = None) -> float:
+    """Reserve for one LTX 2.5 Fast/Pro partner clip."""
+    try:
+        per_s = float(otr_env.get(
+            "OTR_CLOUD_LTX25_EST_USD_PER_S", str(_LTX25_EST_USD_PER_S)))
+    except ValueError:
+        per_s = _LTX25_EST_USD_PER_S
+    if floor_usd is None:
+        floor_usd = _est_usd()
+    return max(float(floor_usd), float(per_s) * max(int(duration_s), 1))
+
+
 def _timeout_s() -> float:
     try:
         return float(otr_env.get("OTR_CLOUD_VIDEO_TIMEOUT_S", "900"))
@@ -582,16 +601,20 @@ class _CloudVideoBase:
             spec["target_frames"] = n
         return canonicalize_video(raw, spec)
 
+    def _estimated_usd(self, request) -> float:
+        return _est_usd()
+
     def render_clip(self, request, prepared):
         from .._otr_shared.cloud_media_invoke import invoke_partner_node
         inputs = self._partner_inputs(request)
+        est = self._estimated_usd(request)
         _LOG.warning(
             "[OTR video] CLOUD render: %s -> partner %s (est<=$%.2f, "
-            "timeout %.0fs, shot %s)", self.name, self.node_key, _est_usd(),
+            "timeout %.0fs, shot %s)", self.name, self.node_key, est,
             _timeout_s(), _req_get(request, "shot_id"))
         return invoke_partner_node(
             self.node_key, inputs,
-            timeout_s=_timeout_s(), estimated_usd=_est_usd())
+            timeout_s=_timeout_s(), estimated_usd=est)
 
     def canonicalize(self, raw, request, profile):
         from .._otr_shared.cloud_media_canonical import (
@@ -1210,14 +1233,21 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
         return (("24", "25", "50") if label == _LTX25_PRO_LABEL
                 else ("24", "25", "48", "50"))
 
-    def _partner_inputs(self, request):
+    def _i2v_duration(self, request) -> int:
         label = self._model_label()
         legal = self._duration_menu(label)
-        duration = _snap_ltx25_duration(
+        return _snap_ltx25_duration(
             self._duration_seconds(
                 request, env="OTR_CLOUD_LTX25_DURATION",
                 default=8, min_s=legal[0], max_s=legal[-1]),
             legal)
+
+    def _estimated_usd(self, request) -> float:
+        return ltx25_estimated_usd(self._i2v_duration(request))
+
+    def _partner_inputs(self, request):
+        label = self._model_label()
+        duration = self._i2v_duration(request)
         resolution = self._choice(
             "OTR_CLOUD_LTX25_RESOLUTION", _LTX25_FOLEY_RES_DEFAULT,
             _LTX25_I2V_RESOLUTIONS)
@@ -1334,6 +1364,12 @@ class CloudLtx25AudioInEngine(_CloudVideoBase):
                 "%s: unsupported LTX 2.5 A2V model %r; expected %r or %r"
                 % (self.name, label, _LTX25_FAST_LABEL, _LTX25_PRO_LABEL))
         return label
+
+    def _estimated_usd(self, request) -> float:
+        secs = self._duration_seconds(
+            request, env="OTR_CLOUD_LTX25_DURATION",
+            default=8, min_s=2, max_s=20)
+        return ltx25_estimated_usd(secs)
 
     def _partner_inputs(self, request):
         label = self._model_label()

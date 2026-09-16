@@ -537,6 +537,40 @@ def test_build_clip_manifest_beat_order_histogram_and_existence():
     assert m["clips"][0]["exists"] is True and m["clips"][1]["exists"] is False
 
 
+def test_build_clip_manifest_counts_budget_floor_as_sanctioned_gap():
+    from nodes._otr_shared import still_receipt as _receipt
+    result = {
+        "ledger": {"video": {
+            "video_revision": 1, "fps": 25,
+            "canonical_canvas": {"w": 1472, "h": 832},
+            "shots": [
+                {"shot_id": "shot_b001", "beat_id": "b001",
+                 "engine_id": "cloud_ltx25_foley_plus",
+                 "target_frame_count": 50},
+                rd._stamp_budget_floor_shot({
+                    "shot_id": "shot_b002", "beat_id": "b002",
+                    "engine_id": "cloud_ltx25_foley_plus",
+                    "target_frame_count": 50,
+                }),
+            ]}},
+        "clips": {
+            "shot_b001": {"engine_id": "cloud_ltx25_foley_plus",
+                          "frame_count": 50, "path": __file__},
+        },
+    }
+    m = rd.build_clip_manifest(result, episode_id="ep_budget")
+    assert m["clips"][0]["exists"] is True
+    assert m["clips"][0]["status"] == _receipt.STATUS_OK
+    assert m["clips"][1]["exists"] is False
+    assert m["clips"][1]["status"] == _receipt.STATUS_SANCTIONED_GAP
+    assert _receipt.is_sanctioned_gap(m["clips"][1])
+    _sanctioned = sum(1 for c in m["clips"] if _receipt.is_sanctioned_gap(c))
+    _delivered_n = sum(1 for c in m["clips"] if (c or {}).get("exists"))
+    _unaccounted = len(m["clips"]) - _delivered_n - _sanctioned
+    assert _unaccounted == 0
+    assert m["clip_count"] == 1
+
+
 def test_build_clip_manifest_positioned_timeline_uses_ledger_boundary():
     result = {
         "ledger": {

@@ -657,6 +657,33 @@ def test_generate_401_exhausted_reports_actual_attempts(comfy_on, monkeypatch):
         )
 
 
+def test_generate_402_does_not_retry_and_names_top_up(comfy_on, monkeypatch):
+    calls = {"n": 0}
+
+    def fake_post(*, url, bearer, payload, timeout_s):
+        calls["n"] += 1
+        return {
+            "status_code": 402,
+            "json": {"error": "Payment Required"},
+            "text": "Payment Required",
+        }
+
+    monkeypatch.setattr(occ, "_post_comfy_chat_completion", fake_post)
+    monkeypatch.setattr(occ.time, "sleep", lambda s: None)
+    occ.set_auth(api_key="key-abc")
+    backend = occ.ComfyCreditsBackend()
+    entry = backend.load(occ.SLOT_A_ID, types.SimpleNamespace(context_window=8192))
+    with pytest.raises(
+            occ.ComfyCreditsCallFailedError,
+            match="cloud.comfy.org") as ei:
+        backend.generate(
+            entry, [{"role": "user", "content": "hi"}], max_new_tokens=64,
+        )
+    assert calls["n"] == 1
+    assert "failed after 1 attempt" in str(ei.value)
+    assert "endpoint-config" in str(ei.value)
+
+
 def test_generate_500_still_stops_at_default_retries(comfy_on, monkeypatch):
     calls = {"n": 0}
 

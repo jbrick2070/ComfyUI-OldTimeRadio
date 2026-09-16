@@ -274,6 +274,17 @@ def test_ledger_appends_jsonl(tmp_path):
 # -- error taxonomy -------------------------------------------------------------
 
 
+def test_is_cloud_budget_error_walks_cause_chain():
+    budget = cmb.CloudMediaError(
+        cmb.CloudErrorCode.BUDGET, "reserve $0.5000")
+    wrap = RuntimeError("shot failed; fallbacks are disabled")
+    wrap.__cause__ = budget
+    assert cmb.is_cloud_budget_error(budget)
+    assert cmb.is_cloud_budget_error(wrap)
+    assert not cmb.is_cloud_budget_error(RuntimeError("timeout"))
+    assert not cmb.is_cloud_budget_error(None)
+
+
 def test_error_codes_canonical_spelling():
     expected = {
         "malformed_config", "unsupported_schema", "incompatible_profile",

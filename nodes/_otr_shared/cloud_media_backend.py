@@ -80,6 +80,7 @@ __all__ = [
     "normalize_provider_id",
     "resolve_cache_root",
     "SESSION_SWEEP_MAX_AGE_S",
+    "is_cloud_budget_error",
 ]
 
 # ---------------------------------------------------------------------------
@@ -112,6 +113,28 @@ class CloudMediaError(RuntimeError):
         if detail:
             msg += f" -- {detail}"
         super().__init__(msg)
+
+
+def is_cloud_budget_error(exc: BaseException | None) -> bool:
+    """True when this exception (or its cause chain) is a spend-cap refusal.
+
+    Live 2026-09-16: a 5-act Foley hit ``OTR_CLOUD_MEDIA_BUDGET_USD`` and
+    ``render_shot`` wrapped the ``CloudMediaError`` in ``RenderError``.
+    Callers that need to stop submitting more partner jobs have to see
+    through that wrap.
+    """
+    seen: set[int] = set()
+    cur: BaseException | None = exc
+    while cur is not None and id(cur) not in seen:
+        seen.add(id(cur))
+        code = getattr(cur, "code", None)
+        if code is CloudErrorCode.BUDGET or getattr(code, "value", None) == "budget":
+            return True
+        if "cloud media: budget" in str(cur):
+            return True
+        nxt = getattr(cur, "__cause__", None) or getattr(cur, "__context__", None)
+        cur = nxt if isinstance(nxt, BaseException) else None
+    return False
 
 
 # ---------------------------------------------------------------------------

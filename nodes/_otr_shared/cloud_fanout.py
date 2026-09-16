@@ -23,6 +23,7 @@ class FanoutOutcome:
     results: dict = field(default_factory=dict)
     errors: dict = field(default_factory=dict)
     stuck_ids: list = field(default_factory=list)
+    halted_ids: list = field(default_factory=list)
 
 
 def cloud_fanout_workers() -> int:
@@ -110,6 +111,7 @@ def run_cloud_fanout(
     results = {}
     errors = {}
     futs = {}
+    halt_submit = False
 
     def _ready():
         ready = []
@@ -123,7 +125,15 @@ def run_cloud_fanout(
     def _submit(pool):
         from .cloud_media_invoke import bind_prompt_id
 
+        if halt_submit:
+            return
         for item in _ready():
+            # Keep only n_workers in flight. Submitting the whole ready
+            # set at t=0 queues every remaining beat, so a spend-cap
+            # refusal cannot stop the rest (live 2026-09-16: hundreds of
+            # LTX reserves after $40).
+            if len(futs) >= n_workers:
+                break
             sid = _pid(item)
             if sid in submitted:
                 continue
@@ -152,7 +162,15 @@ def run_cloud_fanout(
                     finished_ok.add(sid)
                 except Exception as exc:  # noqa: BLE001 -- raise in caller order
                     errors[sid] = exc
+                    from .cloud_media_backend import is_cloud_budget_error
+                    if is_cloud_budget_error(exc):
+                        halt_submit = True
             _submit(pool)
 
-    stuck = [_pid(s) for s in pending]
-    return FanoutOutcome(results=results, errors=errors, stuck_ids=stuck)
+    leftover = [_pid(s) for s in pending]
+    if halt_submit:
+        return FanoutOutcome(
+            results=results, errors=errors, stuck_ids=[],
+            halted_ids=leftover)
+    return FanoutOutcome(
+        results=results, errors=errors, stuck_ids=leftover)

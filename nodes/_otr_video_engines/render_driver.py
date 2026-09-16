@@ -5429,6 +5429,39 @@ def _fanout_prompt_id():
     return snapshot_prompt_id()
 
 
+def _cloud_budget_floor_sid(sid, errors, halted_ids):
+    """True when this shot must not raise -- the spend cap stopped it.
+
+    Missing clips are floored by SilentComposite the same way a
+    sanctioned still-gap is. Paying for 70 LTX clips and then aborting
+    the episode before mux (live 2026-09-16) is the defect this covers.
+    """
+    from .._otr_shared.cloud_media_backend import is_cloud_budget_error
+    if sid in (halted_ids or ()):
+        return True
+    exc = (errors or {}).get(sid)
+    return exc is not None and is_cloud_budget_error(exc)
+
+
+def _stamp_budget_floor_shot(shot):
+    """Mark a spend-cap skip so the batch success predicate accounts it.
+
+    ``OTR_VideoRenderBatch`` treats only ``status=sanctioned_gap`` plus
+    delivered files as accounted. A floored shot left at ``status=ok``
+    with ``exists=False`` is an unexplained hole and ``report["ok"]``
+    stays False -- paid clips never reach obs. This reuses the gap
+    ACCOUNTING channel, not a claim the image model refused.
+    """
+    row = dict(shot or {})
+    row["status"] = _receipt.STATUS_SANCTIONED_GAP
+    row["budget_floor"] = True
+    return row
+
+
+def _shot_is_budget_floor(shot) -> bool:
+    return bool(isinstance(shot, dict) and shot.get("budget_floor"))
+
+
 def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
                         canvas, oom_engines, oom_shot_id, host_caps, profile,
                         prompt_id=None):
@@ -5655,6 +5688,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                 prompt_id=fanout_prompt_id)
             rendered = outcome.results
             errors = outcome.errors
+            halted = set(outcome.halted_ids or ())
             if outcome.stuck_ids and not errors:
                 raise RenderError(
                     "cloud fan-out stuck; shots never became ready: %s"
@@ -5669,6 +5703,16 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), shot.get("beat_id"))
                     new_shots.append(shot)
+                    continue
+                if _cloud_budget_floor_sid(sid, errors, halted):
+                    _LOG.error(
+                        "[OTR video] BUDGET floor shot %s -- "
+                        "OTR_CLOUD_MEDIA_BUDGET_USD refused a further reserve; "
+                        "the beat keeps its place and SilentComposite floors it. "
+                        "%s",
+                        sid,
+                        errors.get(sid) or "not submitted after spend-cap halt")
+                    new_shots.append(_stamp_budget_floor_shot(shot))
                     continue
                 if sid in errors:
                     raise errors[sid]
@@ -6963,7 +7007,8 @@ def build_clip_manifest(result, *, episode_id=""):
             # Stamped ONLY when the receipt says so; never inferred from the
             # missing file.
             "status": (_receipt.STATUS_SANCTIONED_GAP
-                       if bid in _gap_beats_for_manifest
+                       if (bid in _gap_beats_for_manifest
+                           or _shot_is_budget_floor(shot))
                        else _receipt.STATUS_OK),
             "role": str(shot.get("role") or ""),
             "family": clip.get("family") or shot.get("family") or "",

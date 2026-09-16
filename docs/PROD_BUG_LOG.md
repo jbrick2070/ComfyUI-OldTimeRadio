@@ -15296,3 +15296,49 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   turns a retryable blip into a lost paid episode.
 - confidence: HIGH (three live aborts + billed usage continuing + 200
   probe on the same key).
+
+## PBUG-20260916-02 -- $40 cloud-media cap plus all-ready fan-out dumps a 5-act Foley before mux
+- surfaced: LIVE overnight deluxe Foley 5-act on headless `--cpu` `:8000`,
+  2026-09-16 ~01:28-02:31. Episode
+  `pending_20260916_012842` / `signal_lost_the_extra_bowl_20260916_014937`.
+  Writer and stills billed; LTX Fast clips ran until
+  `OTR_CLOUD_MEDIA_BUDGET_USD=40`. Next queued deluxe audio-in 5-act then
+  died in 1.04s on Credits `HTTP 402 Payment Required`.
+- symptom: hundreds of
+  `CloudMediaError: reserve $0.5000 would take projected spend to $40.0560
+  > ceiling $40.0000; spent=$38.0560` on `cloud_ltx25_foley_plus`, then
+  `RenderError` on `shot_shot_001_b69` (`FailureKind.CRASH_BEFORE_LOAD`,
+  spent=$36.0560 -- concurrent reserve/release). Episode dir clips=0,
+  no mux, nothing in `otr/obs/`. Comfy invoice that UTC day showed
+  ltx-2-5-fast ~$84 (2s clip 78.45 credits).
+- root cause: three stacked defects. (1) Partner video reserved a flat
+  `$0.50` per clip even for 8s LTX (~$3.20 real). (2)
+  `run_cloud_fanout` submitted the entire ready set at t=0, so the first
+  spend-cap refusal could not stop the rest. (3) `render_shot` wraps the
+  budget error in `RenderError` with fallbacks disabled; the fan-out
+  commit loop raised the first ledger-order error instead of flooring
+  missing beats, so paid clips never persisted.
+- fix: **FIXED in the same change as this entry.** Fan-out keeps
+  `n_workers` in flight and maps leftover ids to `halted_ids` on a
+  budget error. `run_episode` stamps those shots `budget_floor` plus
+  `status=sanctioned_gap` so SilentComposite floors them and
+  `OTR_VideoRenderBatch` counts them as accounted (degraded, not an
+  unexplained hole). LTX Fast/Pro reserve
+  `max($0.50, $0.40/s * duration)`. Overnight `:8000` boot default
+  ceiling is `$300` (wallet 402 can still stop first). 402 names a
+  top-up at cloud.comfy.org and does not retry. Blast radius: cloud
+  partner fan-out + LTX estimate + Credits 402 text. Vidu/Kling/Luma
+  still use the flat `$0.50` estimate. Do not requeue until Credits are
+  topped up. Do not bump `pyproject.toml` while 2.1.5 is Pending.
+- verify idea: `test_run_cloud_fanout_halts_remaining_on_budget_error`,
+  `test_run_cloud_fanout_caps_in_flight_to_workers`,
+  `test_is_cloud_budget_error_walks_cause_chain`,
+  `test_cloud_budget_floor_sid_sees_wrapped_render_error`,
+  `test_ltx25_estimated_usd_scales_with_seconds`,
+  `test_generate_402_does_not_retry_and_names_top_up`,
+  `test_build_clip_manifest_counts_budget_floor_as_sanctioned_gap`. Live proof is a
+  deluxe Foley reaching `obs_publish OK` after a Credits top-up -- do
+  not spend that proof while the account is 402.
+- bible-worthy: yes -- a per-prompt spend cap that raises instead of
+  flooring burns paid clips and produces no obs artifact.
+- confidence: HIGH (live 5-act traceback + Comfy invoice + idle queue).

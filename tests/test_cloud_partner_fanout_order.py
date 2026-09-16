@@ -8,7 +8,10 @@ import pytest
 
 from nodes._otr_image_engines import registry as ireg
 from nodes._otr_shared import cloud_fanout as cf
+from nodes._otr_shared import cloud_media_backend as cmb
 from nodes._otr_shared import role_compat as rc
+from nodes._otr_video_engines import render_driver as rd
+from nodes._otr_video_engines.render_errors import RenderError
 from nodes import otr_image_gen_dispatcher as disp
 
 
@@ -50,6 +53,82 @@ def test_run_cloud_fanout_keeps_first_item_error_while_later_jobs_land():
     assert "b" in finish
     assert "first-failed" in str(out.errors["a"])
     assert "b" in out.results
+    assert out.halted_ids == []
+
+
+def test_run_cloud_fanout_caps_in_flight_to_workers():
+    inflight = {"n": 0, "peak": 0}
+    lock = threading.Lock()
+
+    def execute(item):
+        with lock:
+            inflight["n"] += 1
+            inflight["peak"] = max(inflight["peak"], inflight["n"])
+        time.sleep(0.04)
+        with lock:
+            inflight["n"] -= 1
+        return item
+
+    out = cf.run_cloud_fanout(
+        ["a", "b", "c", "d"], item_id=lambda x: x, execute=execute, workers=2)
+    assert inflight["peak"] <= 2, inflight
+    assert set(out.results) == {"a", "b", "c", "d"}
+    assert out.halted_ids == []
+
+
+def test_run_cloud_fanout_halts_remaining_on_budget_error():
+    started = []
+    lock = threading.Lock()
+
+    def execute(item):
+        with lock:
+            started.append(item)
+        if item == "a":
+            raise cmb.CloudMediaError(
+                cmb.CloudErrorCode.BUDGET, "reserve $0.5000")
+        return item
+
+    out = cf.run_cloud_fanout(
+        ["a", "b", "c"], item_id=lambda x: x, execute=execute, workers=1)
+    assert started == ["a"], started
+    assert "a" in out.errors
+    assert cmb.is_cloud_budget_error(out.errors["a"])
+    assert out.halted_ids == ["b", "c"]
+    assert out.stuck_ids == []
+    assert out.results == {}
+
+
+def test_run_cloud_fanout_workers_gt1_does_not_submit_after_budget():
+    started = []
+    lock = threading.Lock()
+
+    def execute(item):
+        with lock:
+            started.append(item)
+        if item == "a":
+            time.sleep(0.02)
+            raise cmb.CloudMediaError(
+                cmb.CloudErrorCode.BUDGET, "reserve $0.5000")
+        time.sleep(0.04)
+        return item
+
+    out = cf.run_cloud_fanout(
+        ["a", "b", "c", "d"], item_id=lambda x: x, execute=execute, workers=2)
+    assert "c" not in started and "d" not in started, started
+    assert set(out.halted_ids) == {"c", "d"}
+    assert "a" in out.errors
+    assert out.stuck_ids == []
+
+
+def test_cloud_budget_floor_sid_sees_wrapped_render_error():
+    inner = cmb.CloudMediaError(
+        cmb.CloudErrorCode.BUDGET, "reserve $0.5000")
+    wrap = RenderError("shot s1 engine failed")
+    wrap.__cause__ = inner
+    assert rd._cloud_budget_floor_sid("s1", {"s1": wrap}, [])
+    assert rd._cloud_budget_floor_sid("s2", {}, ["s2"])
+    assert not rd._cloud_budget_floor_sid(
+        "s3", {"s3": RuntimeError("boom")}, [])
 
 
 def _img_stub(**kw):

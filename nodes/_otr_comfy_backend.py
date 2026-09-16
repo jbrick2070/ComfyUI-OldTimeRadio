@@ -805,6 +805,14 @@ class ComfyCreditsBackend:
                 )
 
             last_err = f"HTTP {status}: {self._error_snippet(result)}"
+            if status == 402:
+                raise ComfyCreditsCallFailedError(
+                    f"Comfy Credits call to {slug} failed after {tries} "
+                    f"attempt(s): {last_err}. The Comfy account has no "
+                    f"credits left (HTTP 402 Payment Required). Top up at "
+                    f"cloud.comfy.org. This is not an endpoint-config error. "
+                    f"Aborting the run (no mid-episode fall-back to local)."
+                )
             cap = auth_retries if status in _AUTH_FLAKE_STATUS else max_retries
             if status in _RETRYABLE_STATUS and attempt < cap:
                 log.warning(

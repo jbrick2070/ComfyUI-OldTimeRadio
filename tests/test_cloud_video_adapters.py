@@ -843,3 +843,23 @@ def test_ltx25_audio_in_resolution_env_matches_payload(tmp_path, monkeypatch):
     ins = ecv.Ltx25AudioIn._partner_inputs(req)
     assert ins["model"]["resolution"] == "1080x1920"
 
+
+def test_ltx25_estimated_usd_scales_with_seconds(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_LTX25_EST_USD_PER_S", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_VIDEO_EST_USD", raising=False)
+    assert ecv.ltx25_estimated_usd(2) == pytest.approx(0.80)
+    assert ecv.ltx25_estimated_usd(8) == pytest.approx(3.20)
+    assert ecv.ltx25_estimated_usd(1) == pytest.approx(0.50)
+
+
+def test_ltx25_foley_estimated_usd_uses_snapped_duration(tmp_path, monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_LTX25_DURATION", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_LTX25_EST_USD_PER_S", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_VIDEO_EST_USD", raising=False)
+    req = _request(
+        tmp_path,
+        canvas={"w": 1920, "h": 1080, "fps": 25},
+        timing={"target_frame_count": 50},
+    )
+    assert ecv.Ltx25FoleyPlus._estimated_usd(req) == pytest.approx(0.80)
+
