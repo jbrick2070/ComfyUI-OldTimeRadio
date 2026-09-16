@@ -59,9 +59,9 @@ If Vidu or LTX is handed a *brown box* as the first frame, the moving picture st
 
 My Story is the listener's own idea, not a scraped feed. When nobody types one, the house idea is a toy playground:
 
-Two small orange toy boots, Stomp and Tiptoe, play with a tennis ball beside a hand-high slide and a white picket fence. Stomp is loud and kicks first. Tiptoe counts to three. They only agree on three. Rainbow smoke. Three plastic boxes, red green blue. A toy hairdryer that whirrs by itself. A candy bar bigger than both of them. A humming rainbow candy. They melt chocolate with the hairdryer's breath because the play stove is painted fire. They set out one bowl too many and carry it to Whiskers, the toy cat by the fence.
+Two small orange toy boots, Stomp and Tiptoe, play with a tennis ball beside a hand-high slide and a white picket fence. Stomp is loud and kicks first. Tiptoe counts to three. They only agree on three. Whiskers, a little toy cat, talks when he wants to, usually last. Rainbow smoke. Three plastic boxes, red green blue. A toy hairdryer that whirrs by itself. A candy bar bigger than both of them. A humming rainbow candy. They melt chocolate with the hairdryer's breath because the play stove is painted fire. They set out one bowl too many. Whiskers says that bowl is his.
 
-The cheap cloud 1-act asks for three speakers. Deluxe asks for four. Whiskers sitting with painted eyes shut and "never saying a word" is a detail that fights a four-person cast. That is the kind of devil that belongs in a script: not "character count mismatch," but a mute statue offered a microphone.
+The cheap cloud 1-act asks for three speakers. Deluxe asks for four. A house idea that told the cat never to speak used to fight that cast: the last act would refuse until Whiskers had a line, then the cleaner would spend Credits repairing statue-talk. The spec now lets him speak.
 
 Opening flavor, already proven on the local My Story 1-act *The Count of Three*: "Kick it! Kick it now!" / "Wait. We haven't counted yet. One... two... three. Now."
 

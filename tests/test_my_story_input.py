@@ -298,6 +298,20 @@ def test_blank_my_story_stamps_house_source_and_floors_the_idea(monkeypatch, cap
     assert "1 creative field(s)" not in caplog.text
 
 
+def test_house_idea_lets_whiskers_speak():
+    """A 1-act with three speakers cannot floor a mute statue cat.
+
+    Live 2026-09-15: my_story_act_1 refused because Whiskers had no
+    lines, then ledger_clean spent Credits rewriting statue talk.
+    """
+    idea = SI.DEFAULT_IDEA.lower()
+    assert "never says a word" not in idea
+    assert "toy cat statue" not in idea
+    assert "statues cannot move" not in idea
+    assert "whiskers talks" in idea
+    assert "he says the extra bowl is his" in idea
+
+
 def test_author_only_is_still_a_house_source(monkeypatch):
     """A name is attribution, not a story. Rewrite fidelity has nothing to keep."""
     from nodes import _otr_writer_inputs as WI, _otr_source_snapshot as SNAP
