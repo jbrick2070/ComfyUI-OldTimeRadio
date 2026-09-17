@@ -218,14 +218,12 @@ not reach the network. The error prints the exact `huggingface-cli download`
 command, and it is deliberately never run during a render -- a mid-render fetch
 once threw away a finished episode.
 
-**"announcer_voice_engine='bark' ... delivery mode is CONTENT_OWNED."** This
-one is about the writer's `source_bank`, not this page's `voice_bank` --
-confusing since both are called "bank." Sci-Fi News Pro (one of the six
-story-content banks on the writer node; see [BANKS.md](BANKS.md)) writes its
-own announcer lines and always keeps Kokoro reading them. Set
-`announcer_voice_engine` to anything but `bark` for that source, or pick a
-different `source_bank` for the episode -- changing this page's `voice_bank`
-does nothing for this error.
+**Source bank does not pick the TTS engine.** My Story, Sci-Fi News, Shakespeare,
+and the rest can all use Kokoro, Bark, Google TTS, or any other voice engine
+the Cast Lock + 4a/4b widgets name. Set those five widgets to the SAME engine
+or the agreement guard stops the render. `voice_bank` on Cast Lock is the
+voice *pool* (kokoro_builtin / bark_legacy / google_tts), not the writer's
+`source_bank`.
 
 **The voices are fine but the run took hours.** Check which engine and which
 device you are on. Bark on Apple Silicon and Bark on CPU are both far slower

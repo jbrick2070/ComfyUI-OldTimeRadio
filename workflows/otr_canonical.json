@@ -1213,16 +1213,6 @@
           "link": null
         },
         {
-          "localized_name": "voice_bank",
-          "name": "voice_bank",
-          "shape": 7,
-          "type": "COMBO",
-          "widget": {
-            "name": "voice_bank"
-          },
-          "link": null
-        },
-        {
           "localized_name": "cast_voice_policy",
           "name": "cast_voice_policy",
           "shape": 7,
@@ -1313,7 +1303,6 @@
         "Node name for S&R": "OTR_CastLock"
       },
       "widgets_values": [
-        "kokoro_builtin",
         "auto_registry",
         true,
         "kokoro",
@@ -1357,15 +1346,6 @@
           "shape": 7,
           "type": "STRING",
           "link": 290
-        },
-        {
-          "localized_name": "engine",
-          "name": "engine",
-          "type": "COMBO",
-          "widget": {
-            "name": "engine"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -1399,9 +1379,7 @@
       "properties": {
         "Node name for S&R": "OTR_BatchCharacterVoices"
       },
-      "widgets_values": [
-        "kokoro"
-      ],
+      "widgets_values": [],
       "color": "#173220",
       "bgcolor": "#3B3D42"
     },
@@ -1439,15 +1417,6 @@
           "shape": 7,
           "type": "STRING",
           "link": 244
-        },
-        {
-          "localized_name": "engine",
-          "name": "engine",
-          "type": "COMBO",
-          "widget": {
-            "name": "engine"
-          },
-          "link": null
         }
       ],
       "outputs": [
@@ -1481,9 +1450,7 @@
       "properties": {
         "Node name for S&R": "OTR_AnnouncerVoice"
       },
-      "widgets_values": [
-        "kokoro"
-      ],
+      "widgets_values": [],
       "color": "#173220",
       "bgcolor": "#3B3D42"
     },

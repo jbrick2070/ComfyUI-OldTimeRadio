@@ -358,11 +358,9 @@ def voice_input_types(role, fallback) -> dict:
     """The shared INPUT_TYPES for a v2 voice node (1a / 1b).
 
     forceInput sockets carry no widget; the only serialized widget is
-    ``engine`` (``stereo_policy`` is no longer surfaced -- single option
-    "mono_safe"; the ``generate()`` kwarg still defaults to "mono_safe"); there
+    ``engine`` (now REMOVED); there
     is no ``seed``-named widget and no ``model_id`` widget (CLAUDE.md rule 6).
     """
-    engines = build_engine_combo(role, fallback)
     return {
         "required": {
             "script_json": ("STRING", {
@@ -373,20 +371,6 @@ def voice_input_types(role, fallback) -> dict:
                     "Frozen v2 ledger JSON from OTR_LedgerFreezeCascade "
                     "(node 62 slot 1). Passed VERBATIM to the legacy engine on "
                     "the byte-identical batch path."
-                ),
-            }),
-            "engine": (engines, {
-                # NOT engines[0]: that is registry order, and it resolved to
-                # indextts2 -- noncommercial, and absent from an ordinary
-                # install. Kokoro is the documented one-click default on every
-                # platform and is what the shipped graph uses, so a dropped
-                # node now agrees with it. Falls back if a build lacks kokoro.
-                "default": "kokoro" if "kokoro" in engines else engines[0],
-                "tooltip": (
-                    "Which engine voices this role. It must agree with the "
-                    "matching engine on Cast Lock -- naming two different "
-                    "engines stops the render. Unusable "
-                    "selections fail closed with a named error at queue time."
                 ),
             }),
         },
@@ -1160,8 +1144,12 @@ class OTRVoiceNodeBase:
         return True
 
     # ------------------------------------------------------------------ #
-    def generate(self, script_json, engine, ledger_json="", gate_in="",
-                 stereo_policy="mono_safe"):
+    def generate(self, script_json, ledger_json="", gate_in="",
+                 stereo_policy="mono_safe", **kwargs):
+        # Swallow legacy 'engine' kwarg if present in old workflows
+        engine_kwarg = kwargs.get("engine")
+        if engine_kwarg:
+            log.debug("[%s] ignoring legacy engine widget %r", type(self).__name__, engine_kwarg)
         # CANONICAL REPLAY (campaign item 0): the frozen master carries every
         # take; nothing renders here. A typed empty AUDIO batch (nodes 3 and 7
         # do not consume it on replay) and an explicit done token.
@@ -1179,6 +1167,14 @@ class OTRVoiceNodeBase:
         from ._otr_audio_engines import (
             EngineUnusable, EngineUsabilityReason, assert_usable, get_engine,
         )
+
+        engine = str(_rmeta.get(f"{self.ROLE}_engine") or "auto")
+        if engine == "auto":
+            raise EngineUnusable(
+                "auto", self.ROLE, EngineUsabilityReason.MALFORMED_CONFIG,
+                f"OTR_CastLock did not stamp a concrete {self.ROLE}_engine (got 'auto'). "
+                f"You must run Cast Lock (or set a concrete engine on it) before rendering."
+            )
 
         render_log: list = []
         audio_out = None

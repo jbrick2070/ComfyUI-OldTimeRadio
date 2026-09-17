@@ -29,11 +29,12 @@ Flux stays gen 1; Lumina is an OPT-IN peer (``default_roles=()`` -- no model is
 "primary"). ``requires_flag`` is None -- the registry IS the menu, and
 ``OTR_ENABLE_LUMINA`` is vestigial, NOT a gate (pinned by
 ``tests/test_lumina_image_engine.py``, which deletes the var and still expects
-the engine usable). The fail-closed gate is the WEIGHTS FILE
-(``OTR_LUMINA_CKPT``): ``assert_usable``
-raises MISSING_MODEL until it points at the downloaded diffusion model (ABSENT/
-greyed, never a silent stub -- BUG-046). The TE + VAE loaders fail LOUD at render
-if their files are absent (the dispatcher catches it fail-closed -> radio floor).
+the engine usable). The fail-closed gate is the WEIGHTS FILE: ``assert_usable`` greys the engine
+until ``lumina_2_model_bf16.safetensors`` is in ``diffusion_models`` or
+``OTR_LUMINA_CKPT`` points at it. A 16 GB graph (or any still-consuming lane
+that picks this engine) fetches the ungated Comfy-Org split set on first use
+through ``_otr_visual_assets`` -- same path as z_image / sd15 / stable_audio_3.
+The TE + VAE loaders fail LOUD at render if their files are absent.
 
 Cold-import clean (V-12): module scope imports only the dep-free registry + the
 role vocabulary + stdlib. torch / comfy / the model are NEVER imported here -- the
@@ -71,7 +72,10 @@ CLIP_ENV = "OTR_LUMINA_CLIP"
 VAE_ENV = "OTR_LUMINA_VAE"
 _DEFAULT_CKPT = "lumina_2_model_bf16.safetensors"
 _DEFAULT_CLIP = "gemma_2_2b_fp16.safetensors"
-_DEFAULT_VAE = "lumina2_ae.safetensors"
+#: Hub split VAE is Flux ``ae.safetensors`` (same file z_image already
+#: allowlists). ``lumina2_ae.safetensors`` is a local rename on this box;
+#: ``OTR_LUMINA_VAE`` still honours that pin. New users fetch ``ae``.
+_DEFAULT_VAE = "ae.safetensors"
 
 #: The tag Lumina-2 was trained to split its system line from the user prompt on.
 PROMPT_START_TAG = "<Prompt Start>"
@@ -229,6 +233,40 @@ def _role_of(profile) -> str:
     if isinstance(profile, dict):
         return str(profile.get("role") or "")
     return str(getattr(profile, "role", "") or "")
+
+
+def _folder_file(category, token):
+    """Native ComfyUI path for ``token`` in ``category``, or None."""
+    try:
+        import folder_paths
+        path = folder_paths.get_full_path(category, token)
+    except Exception:  # noqa: BLE001 -- absent folder_paths in CPU tests
+        return None
+    if path and os.path.isfile(path) and os.path.getsize(path) > 0:
+        return path
+    return None
+
+
+def resolve_ckpt_name():
+    """UNET basename + whether it is verified on disk.
+
+    Shared by ``assert_usable`` and the visual-asset preflight so a missing
+    env var cannot grey the engine while the native folder already holds the
+    default file (the 2026-07-05 z_image landmine). An explicit
+    ``OTR_LUMINA_CKPT`` that does not resolve is NOT replaced with the default.
+    Returns ``(basename, verified)``.
+    """
+    env = otr_env.get(MODEL_ENV, "").strip()
+    if env:
+        token = os.path.basename(env)
+        if os.path.isfile(env) and os.path.getsize(env) > 0:
+            return token, True
+        if _folder_file("diffusion_models", token):
+            return token, True
+        return token, False
+    if _folder_file("diffusion_models", _DEFAULT_CKPT):
+        return _DEFAULT_CKPT, True
+    return _DEFAULT_CKPT, False
 
 
 @register
@@ -404,17 +442,21 @@ class LuminaImage2Engine:
 
     def assert_usable(self, host_caps, profile, request_template=None):
         """FAIL CLOSED until the Lumina-Image 2.0 diffusion model exists (BUG-046):
-        ABSENT/greyed, never a stub. The registry already gates on
-        ``requires_flag``; this is the deeper disk check (the WEIGHTS file). The
-        TE + VAE loaders fail LOUD at render if their files are absent."""
-        ckpt = otr_env.get(MODEL_ENV, "").strip()
-        if not ckpt or not os.path.isfile(ckpt):
+        ABSENT/greyed, never a stub. Shares ``resolve_ckpt_name`` with the
+        visual-asset preflight: a file in ``diffusion_models`` counts, not only
+        ``OTR_LUMINA_CKPT``. The TE + VAE loaders fail LOUD at render if their
+        files are absent; the preflight fetches the ungated Comfy-Org split
+        set when this engine is selected on a still-consuming lane."""
+        _name, verified = resolve_ckpt_name()
+        if not verified:
             raise EngineUnusable(
                 self.name, _role_of(profile),
                 EngineUsabilityReason.MISSING_MODEL,
-                f"lumina_image diffusion model not found; set {MODEL_ENV} to the "
-                f"downloaded lumina_2_model_bf16.safetensors path (and {CLIP_ENV}"
-                f"/{VAE_ENV} for the Gemma-2 TE + ae VAE)",
+                f"lumina_image diffusion model not found (resolved {_name!r}, not "
+                f"installed): the 16 GB graphs fetch "
+                f"Comfy-Org/Lumina_Image_2.0_Repackaged on first use, or drop "
+                f"{_DEFAULT_CKPT} in diffusion_models, or point {MODEL_ENV} at "
+                f"it (+ {CLIP_ENV} Gemma-2 TE / {VAE_ENV} Flux ae)",
                 kind="image",
             )
         return self.name

@@ -258,18 +258,6 @@ class CastLock:
                 }),
             },
             "optional": {
-                "voice_bank": (list(_VOICE_BANKS), {
-                    # Was _VOICE_BANKS[0] ("default"), which casts from the
-                    # chatterbox / indextts2 reference banks -- neither of which
-                    # an ordinary install has. The shipped graph uses
-                    # kokoro_builtin, so a dropped node now agrees with it.
-                    "default": "kokoro_builtin",
-                    "tooltip": (
-                        "Which pool the voices are cast from. kokoro_builtin "
-                        "needs nothing extra installed; the other banks expect "
-                        "their own engine to be present."
-                    ),
-                }),
                 "cast_voice_policy": (list(_CAST_POLICIES), {
                     # Matches the shipped graph.
                     "default": "auto_registry",
@@ -345,7 +333,7 @@ class CastLock:
     # calls actually cast, which is a casting decision and not a defaults
     # tidy-up. A saved graph is unaffected either way: every shipped graph
     # passes all three explicitly. Open row in GO_FORWARD.
-    def lock(self, script_json, voice_bank="default",
+    def lock(self, script_json, voice_bank=None,
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
              allow_voice_reuse=False, char_voice_engine="auto",
              announcer_voice_engine="auto", gate_in="",
@@ -411,6 +399,11 @@ class CastLock:
         # request that mode records `char_voice_engine="auto"` rather than
         # pinning a concrete engine into a ledger it promised not to re-cast.
         # Loading the bank here would silently change that stamp.
+        from ._otr_engine_profiles import voice_bank_for_engine
+        
+        char_bank = voice_bank or voice_bank_for_engine("char_voice", char_voice_engine)
+        ann_bank = voice_bank_for_engine("announcer_voice", announcer_voice_engine)
+
         bank_entries = None
         bank_unavailable_route_ids = None
         if cast_voice_policy == "auto_registry":
@@ -420,7 +413,7 @@ class CastLock:
             bank_unavailable_route_ids = unavailable_qualified_route_ids(
                 source_sha256=_bank_sha)
         target_engine, announcer_engine = self._stamp_voice_engine_selection(
-            led, voice_bank, char_voice_engine, announcer_voice_engine,
+            led, char_bank, ann_bank, char_voice_engine, announcer_voice_engine,
             bank_entries=bank_entries, voice_device=voice_device)
 
         # STEP 4 (plan 5.2): prove the policy route BEFORE either caster runs, so
@@ -431,12 +424,12 @@ class CastLock:
         # None here by design and the claim path loads its own only if a route is
         # actually selected -- which keeps the dormant case free of bank I/O.
         route_claims = self._resolve_route_claims(
-            voice_bank, target_engine, bank_entries=bank_entries, cast=cast,
+            char_bank, target_engine, bank_entries=bank_entries, cast=cast,
             bank_unavailable_route_ids=bank_unavailable_route_ids)
 
         if cast_voice_policy == "auto_registry":
             self._auto_registry(
-                led, cast, voice_bank, allow_voice_reuse, report,
+                led, cast, char_bank, allow_voice_reuse, report,
                 char_voice_engine=char_voice_engine,
                 announcer_voice_engine=announcer_voice_engine,
                 voice_device=voice_device,
@@ -444,7 +437,8 @@ class CastLock:
                 target_engine=target_engine,
                 announcer_engine=announcer_engine,
                 route_claims=route_claims,
-                bank_unavailable_route_ids=bank_unavailable_route_ids)
+                bank_unavailable_route_ids=bank_unavailable_route_ids,
+                ann_bank=ann_bank)
         else:
             # STEP 5 (plan 5.2): in preserve_ledger ONLY the claimed row changes.
             # Every other row keeps the bytes it arrived with -- that is the
@@ -600,47 +594,23 @@ class CastLock:
             announcer_voice_engine)
         content_owned = delivery_mode_for_meta(meta) == CONTENT_OWNED
 
-        # A content-owned lane builds its OWN cast rows and stamps their
-        # voice_preset in the lane runner; the writer's seeded picker never ran,
-        # so there is no sequence to replay and no num_characters_request to
-        # replay it with. Replaying anyway would fabricate a cast that was never
-        # rolled and overwrite the voices the lane chose. VERIFY what the lane
-        # assigned instead -- the Gate 1 invariants still run, so a content-owned
-        # lane can never ship duplicate or non-v2/ bark voices. A bark ANNOUNCER
-        # is explicitly OUT OF SCOPE for content-owned lanes today (2026-08-24) --
-        # `_otr_scifi_news_pro.py` calls `cast_pools.pick_announcer()` directly
-        # and stays on Kokoro regardless of `announcer_voice_engine` until that
-        # lane gets its own wiring, a deliberately separate follow-up.
+        # A content-owned lane builds its OWN character-cast rows; the writer's
+        # seeded picker never ran, so there is no sequence to replay. Replaying
+        # anyway would fabricate a cast that was never rolled. VERIFY what the
+        # lane assigned for characters -- Gate 1 still runs.
         #
-        # FAIL LOUD here rather than silently preserving the Kokoro row
-        # (kibitz r3, MUST-FIX, codex + cursor independently): the coordinated
-        # `slot_overrides.announcer_voice_engine` override reaches BOTH
-        # `OTR_CastLock` and `OTR_AnnouncerVoice` in one pass (widget_mapping.json),
-        # so a real acceptance leg or operator override that sets bark globally
-        # would otherwise sail through this lock() silently -- the report line
-        # said "not wired" but returned success -- and only crash minutes later
-        # at `eng_bark.py`'s Gate 3 (`bark requires a v2/* voice_preset; got
-        # 'bm_george'`), with no hint the actual cause was a content-owned lane.
-        # Refusing HERE, at the point the mismatch is knowable from pure
-        # metadata, is the same "refuse before the GPU work" discipline this
-        # file already uses elsewhere (see the STEP 1/2 ordering comment above).
-        if content_owned and announcer_engine == "bark":
-            from ._otr_voice_bank import VoiceCastingError
-
-            raise VoiceCastingError(
-                "announcer_voice_engine='bark' was requested but this ledger's "
-                "delivery mode is CONTENT_OWNED -- content-owned lanes "
-                "(e.g. scifi_news_pro) build their own announcer row via "
-                "cast_pools.pick_announcer() and always stay on Kokoro; a bark "
-                "announcer is not wired for content-owned lanes yet. Set "
-                "announcer_voice_engine to a non-bark engine for this ledger, "
-                "or route this bank through a lane that supports it."
-            )
+        # Source banks are NOT married to TTS engines (operator 2026-09-16).
+        # `pick_announcer()` may DEFAULT the announcer row to Kokoro; CastLock
+        # still honors `announcer_voice_engine` on every bank. A bark request
+        # stamps a v2/* preset here. Refusing used to crash a live My Story
+        # Bark listen at lock() after the writer finished.
         if content_owned:
             report.append(
-                "bark voices: content-owned lane owns its cast -- "
+                "bark voices: source bank owns character cast -- "
                 "voice_preset preserved (no writer replay)"
             )
+            if announcer_engine == "bark":
+                CastLock._assign_bark_announcer(cast, meta, report)
             _OTRCAST._assert_unique_bark_voices(cast)
             _OTRCAST._assert_voice_preset_invariant(cast)
             return
@@ -935,7 +905,8 @@ class CastLock:
                        target_engine=None,
                        announcer_engine=None,
                        route_claims=None,
-                       bank_unavailable_route_ids=None):
+                       bank_unavailable_route_ids=None,
+                       ann_bank=None):
         """Re-cast the registry rows.
 
         ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
@@ -991,8 +962,11 @@ class CastLock:
         # announcer_engine is the sentinel: the resolver never returns None for
         # it, while target_engine legitimately can be None (a preset-only bank).
         if announcer_engine is None:
+            if ann_bank is None:
+                from ._otr_engine_profiles import voice_bank_for_engine
+                ann_bank = voice_bank_for_engine("announcer_voice", announcer_voice_engine)
             target_engine, announcer_engine = self._stamp_voice_engine_selection(
-                led, voice_bank, char_voice_engine, announcer_voice_engine,
+                led, voice_bank, ann_bank, char_voice_engine, announcer_voice_engine,
                 bank_entries=bank_entries, voice_device=voice_device)
             if route_claims is None:
                 route_claims = self._resolve_route_claims(
@@ -1598,7 +1572,7 @@ class CastLock:
         return changed
 
     # ------------------------------------------------------------------ #
-    def _stamp_voice_engine_selection(self, led, voice_bank,
+    def _stamp_voice_engine_selection(self, led, voice_bank, ann_bank,
                                       char_voice_engine="auto",
                                       announcer_voice_engine="auto",
                                       bank_entries=None,

@@ -1,0 +1,15 @@
+set +e
+echo "=== dangling? ==="
+ls -l /workspace/runpod-slim/ComfyUI/.venv-py313/bin/python
+readlink -f /workspace/runpod-slim/ComfyUI/.venv-py313/bin/python
+ls -l /root/.local/share/uv/python/cpython-3.13-linux-x86_64-gnu/bin/python3.13
+echo "=== uv pythons ==="
+ls /root/.local/share/uv/python 2>/dev/null
+echo "=== venvs ==="
+ls -d /workspace/runpod-slim/ComfyUI/.venv* 2>/dev/null
+echo "=== torch pythons ==="
+find /root /workspace /opt /usr -name python3.13 -type f 2>/dev/null | head
+find /workspace -maxdepth 6 -name python -type f 2>/dev/null | head
+echo "=== try venv python ==="
+/workspace/runpod-slim/ComfyUI/.venv-py313/bin/python -c "import sys; print(sys.executable)"
+echo rc=$?

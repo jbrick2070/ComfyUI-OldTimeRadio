@@ -1,0 +1,7 @@
+$ErrorActionPreference = "Continue"
+Set-Location "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
+$env:PYTHONUTF8 = "1"
+$env:PYTHONIOENCODING = "utf-8"
+$env:OTR_ENABLE_COMFY_CREDITS = "1"
+$env:OTR_OBS_DIR = "C:\Users\jeffr\Documents\ComfyUI\output\otr\obs"
+powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\otr_shipping_set_legs.ps1" -Url "http://127.0.0.1:8000" -Graphs "otr_cloud_low_1act" -ActCount "1" -TimeoutSec 0 -ObsDir "C:\Users\jeffr\Documents\ComfyUI\output\otr\obs"

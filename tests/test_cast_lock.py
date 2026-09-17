@@ -394,7 +394,7 @@ def test_content_owned_lane_preserves_its_own_voices_without_replay():
     assert [row["voice_preset"] for row in cast] == [
         "bm_george", "v2/en_speaker_6", "v2/en_speaker_3",
     ]
-    assert any("content-owned" in line for line in report)
+    assert any("no writer replay" in line for line in report)
 
 
 def test_content_owned_lane_still_fails_on_colliding_bark_voices():
@@ -560,23 +560,27 @@ def test_bark_announcer_runs_under_auto_registry_too():
     assert not any("NOT cast" in line for line in out[2].splitlines())
 
 
-def test_bark_announcer_fails_loud_on_content_owned_ledger():
-    """kibitz r3 MUST-FIX (codex + cursor, independently). A coordinated
-    `slot_overrides.announcer_voice_engine=bark` reaches BOTH OTR_CastLock
-    and OTR_AnnouncerVoice in one pass -- if this ledger is content-owned
-    (scifi_news_pro builds its own announcer row and never wires bark),
-    silently preserving the Kokoro row would defer the failure to a
-    confusing crash minutes later at eng_bark.py's Gate 3. Must refuse HERE,
-    with a message that names the actual cause."""
-    from nodes._otr_voice_bank import VoiceCastingError
+@pytest.mark.parametrize("source_bank", ("scifi_news_pro", "my_story"))
+def test_bark_announcer_is_honored_on_every_source_bank(source_bank):
+    """Source banks do not gate TTS engines. pick_announcer() may default
+    the announcer to Kokoro; announcer_voice_engine=bark still stamps a
+    v2/* preset. Character presets the lane already chose stay put."""
     from nodes.cast_lock import CastLock
 
     cast = _content_owned_cast()
-    meta = {"source_bank": "scifi_news_pro", "episode_seed": 42}
+    char_presets = [row["voice_preset"] for row in cast if row["char_id"] != "announcer"]
+    report: list = []
+    CastLock._assign_bark_voices(
+        cast, {"source_bank": source_bank, "episode_seed": 42}, report,
+        announcer_voice_engine="bark")
 
-    with pytest.raises(VoiceCastingError, match="CONTENT_OWNED"):
-        CastLock._assign_bark_voices(cast, meta, [],
-                                     announcer_voice_engine="bark")
+    row = next(r for r in cast if r["char_id"] == "announcer")
+    assert str(row["voice_preset"]).startswith("v2/")
+    assert row["tts_model"] == "bark"
+    assert row["voice_engine"] == "bark"
+    assert [r["voice_preset"] for r in cast if r["char_id"] != "announcer"] == char_presets
+    assert any("announcer stamped" in line or "source bank owns" in line
+               for line in report)
 
 
 def test_bark_announcer_stamps_presentation_gender_from_delivered_preset():

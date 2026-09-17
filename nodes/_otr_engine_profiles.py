@@ -390,3 +390,31 @@ def assert_model_available(profile: EngineProfile) -> None:
             f"profile '{profile.profile_id}' model_path does not exist: "
             f"{profile.model_path}",
         )
+
+
+def voice_bank_for_engine(role: str, engine: str) -> str:
+    """Derives the required single bank name from the allow-list for a given engine.
+
+    Fails loud on unknown engine or empty allow-list. If the allow-list has multiple
+    entries, it returns the first one (the default/preferred bank for that engine).
+    """
+    resolver = require_resolver()
+    # "auto" for an engine delegates to the highest-ranked engine in the fallback ladder.
+    if engine == "auto":
+        chain = resolver.rank_chain(role)
+        if not chain:
+            raise EngineUnusable(
+                engine, role, EngineUsabilityReason.MALFORMED_CONFIG,
+                f"no fallback chain for role '{role}'",
+            )
+        profile = chain[0]
+    else:
+        profile = resolver.resolve_casting_plan(role=role, engine=engine)
+
+    if not profile.allowed_voice_banks:
+        raise EngineUnusable(
+            engine, role, EngineUsabilityReason.MALFORMED_CONFIG,
+            f"profile '{profile.profile_id}' has no allowed_voice_banks",
+        )
+    return profile.allowed_voice_banks[0]
+

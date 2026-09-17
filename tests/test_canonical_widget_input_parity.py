@@ -246,3 +246,19 @@ def test_the_wan_8gb_variant_still_carries_a_REAL_frame_ceiling():
         "the otr_8gb_wan graph should pin max_render_frames=%r to match "
         "config/profiles/otr_8gb_wan.json; got %r"
         % (expected, node["widgets_values"][idx]))
+
+@pytest.mark.parametrize(
+    "wf_path",
+    [Path("workflows/otr_canonical.json")] + list(Path("workflows/variants").glob("*.json")),
+    ids=lambda p: p.name
+)
+def test_voice_nodes_have_zero_widgets(wf_path):
+    """4a/4b no longer have widgets. Ensure their arrays are strictly empty."""
+    with open(wf_path, "r", encoding="utf-8") as fh:
+        data = json.load(fh)
+    for node in data.get("nodes", []):
+        if node.get("type") in ("OTR_BatchCharacterVoices", "OTR_AnnouncerVoice"):
+            assert node.get("widgets_values") == [], f"{node.get('type')} widgets_values must be strictly []"
+            winputs = [i for i in (node.get("inputs") or []) if i.get("widget")]
+            assert winputs == [], f"{node.get('type')} widget inputs must be strictly []"
+
