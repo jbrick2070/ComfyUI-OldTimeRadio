@@ -162,18 +162,15 @@ def test_session_sweep_evicts_stale(capsys, monkeypatch):
 # -- budget state machine -----------------------------------------------------
 
 
-def test_budget_unset_uses_default_safety_cap():
-    """Operator directive 2026-07-02: no hidden switch -- an unset budget
-    is the DEFAULT_BUDGET_USD safety cap, not a fail-closed off-switch."""
+def test_budget_unset_has_no_local_ceiling():
+    """Operator 2026-09-16: no fake USD cap. Unset means unlimited;
+    the wallet 402 is the stop. Explicit 0 remains spend-off."""
     import os
     os.environ.pop("OTR_CLOUD_MEDIA_BUDGET_USD", None)
     s = cmb.get_or_create_session("prompt-b0", hidden_api_key="k")
-    assert s.budget_ceiling_usd == cmb.DEFAULT_BUDGET_USD
-    rid = s.reserve(0.01)  # must NOT raise under the default cap
+    assert s.budget_ceiling_usd is None
+    rid = s.reserve(10_000.0)
     s.release(rid)
-    with pytest.raises(cmb.CloudMediaError) as ei:
-        s.reserve(cmb.DEFAULT_BUDGET_USD + 0.01)  # cap still ENFORCED
-    assert ei.value.code is cmb.CloudErrorCode.BUDGET
 
 
 def test_budget_explicit_zero_fails_closed():

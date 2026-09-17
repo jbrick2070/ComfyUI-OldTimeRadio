@@ -15381,3 +15381,40 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   on any multi-segment beat.
 - confidence: HIGH (live 1-act traceback + leftover 10s wav on disk +
   Agy HOLDS Fix A).
+
+## PBUG-20260916-04 -- a local USD media cap holes a published deluxe
+- surfaced: LIVE deluxe Foley 1-act on headless `--cpu` `:8000`,
+  2026-09-16 17:39-18:02. Prompt `3fda56a0-19cb-4e27-abde-ff322c4625d4`,
+  episode `signal_lost_the_fourth_bowl_20260916_174517`. House My Story,
+  recur_frac, Luma Photon Flash, ElevenLabs, Sonilo, LTX Foley.
+  `obs_publish OK` into
+  `otr/obs/the_fourth_bowl_20260916_174517_silent__rfrc__cltf__clum__elev__myst__cmsa__soni_final.mp4`
+  (213 MB, Foley mux 64/64). Boot had `OTR_CLOUD_MEDIA_BUDGET_USD=90`.
+- symptom: 13 leftover beats SilentComposite-floored as `budget`. First
+  refusal: `reserve $0.8000 would take projected spend to $90.3613 >
+  ceiling $90.0000; spent=$81.5613` on `shot_shot_001_b59`. The rest
+  were `not submitted after spend-cap halt`. Episode published
+  DEGRADED with a silent tail. Operator: we cannot have caps.
+- root cause: `CloudMediaSession` treated unset
+  `OTR_CLOUD_MEDIA_BUDGET_USD` as `DEFAULT_BUDGET_USD` ($300) and the
+  overnight boot injected $90/$300. That local ceiling is not the
+  wallet. Fan-out of 8 also stacked in-flight LTX reserve on top of
+  $81 spent, so the halt fired with clips still unrendered. Partner
+  402 remains a real stop.
+- fix: **FIXED in the same change as this entry.** Unset env = no
+  local ceiling (`budget_ceiling_usd is None`). Explicit `0` stays
+  spend-off. `cloud_fanout_workers()` unset default is 4. Overnight
+  `:8000` boot pops the budget env and pins fan-out 4. 402 still
+  floors leftover beats. Blast radius: cloud media session + fan-out
+  default. 5080/4060 local GPU paths untouched. Do not bump
+  `pyproject.toml` while 2.1.5 is Pending.
+- verify idea: `test_budget_unset_has_no_local_ceiling`,
+  `test_budget_explicit_zero_fails_closed`,
+  `test_cloud_fanout_unset_defaults_to_four`. Live proof is a 5-act
+  cheap-cloud sci-fi news + recur_frac on `:8000` reaching
+  `obs_publish OK` without a budget-floor tail.
+- bible-worthy: yes -- a local USD ceiling that is not the wallet
+  publishes a hole where the operator asked for the rest of the
+  episode.
+- confidence: HIGH (live 1-act obs_publish + spent=$81.56 vs $90 cap
+  + 13 budget-floor log lines).

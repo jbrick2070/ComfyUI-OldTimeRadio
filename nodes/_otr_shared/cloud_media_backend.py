@@ -16,13 +16,12 @@ table.
 
 Env surface (all read per session-create, never mutated mid-run):
   OTR_COMFY_API_KEY               auth precedence #1 (headless).
-  OTR_CLOUD_MEDIA_BUDGET_USD      per-run USD ceiling. UNSET = the
-                                  DEFAULT_BUDGET_USD safety cap (operator
-                                  directive 2026-07-02: the dropdown pick
-                                  IS the enable -- no hidden switch, so
-                                  the cap must not act as one). An
-                                  EXPLICIT 0 = every reserve fails closed
-                                  with `budget` (a deliberate spend-off).
+  OTR_CLOUD_MEDIA_BUDGET_USD      optional per-run USD ceiling. UNSET =
+                                  no local ceiling -- the wallet 402 is
+                                  the stop (operator 2026-09-16: do not
+                                  hole a published episode with a fake
+                                  cap). An EXPLICIT 0 = every reserve
+                                  fails closed with `budget` (spend-off).
 
 NOTE (operator directive 2026-07-02 evening): the OTR_ENABLE_COMFY_CLOUD_MEDIA
 opt-in flag was REMOVED -- same clean break as the OpenRouter lane's C6
@@ -70,7 +69,6 @@ __all__ = [
     "CostQuote",
     "ReservationState",
     "CloudMediaSession",
-    "DEFAULT_BUDGET_USD",
     "mute_ok_roles",
     "resolve_auth",
     "get_or_create_session",
@@ -308,11 +306,11 @@ def cloud_job_failure_code(exc: BaseException | None):
 def is_cloud_budget_error(exc: BaseException | None) -> bool:
     """True when this exception (or its cause chain) is a spend-cap refusal.
 
-    Live 2026-09-16: a 5-act Foley hit ``OTR_CLOUD_MEDIA_BUDGET_USD`` and
-    ``render_shot`` wrapped the ``CloudMediaError`` in ``RenderError``.
-    Callers that need to stop submitting more partner jobs have to see
-    through that wrap. A partner HTTP 402 is the same halt: the wallet
-    is empty, further reserves must not fire.
+    Live 2026-09-16: a local ``OTR_CLOUD_MEDIA_BUDGET_USD`` ceiling and a
+    partner HTTP 402 both refuse a further reserve. ``render_shot`` wraps
+    the ``CloudMediaError`` in ``RenderError``. Callers that need to stop
+    submitting more partner jobs have to see through that wrap. Unset
+    env means no local ceiling; 402 is then the only spend halt.
     """
     seen: set[int] = set()
     cur: BaseException | None = exc
@@ -335,14 +333,18 @@ def is_cloud_budget_error(exc: BaseException | None) -> bool:
 
 _TRUTHY = {"1", "true", "yes", "on"}
 
-#: Per-run USD safety cap when OTR_CLOUD_MEDIA_BUDGET_USD is unset.
-#: PRICING.md 2026-07-02 used $10 for a Kling-era episode envelope.
-#: Live 2026-09-16 deluxe Foley 5-act billed ~$84 of LTX Fast in one UTC
-#: day and died at a $40 boot ceiling; a full 5-act needs hundreds of
-#: seconds of LTX. $300 is one deluxe episode plus stills/TTS/music in
-#: the same prompt session. An explicit 0 is still spend-off. The wallet
-#: can 402 first.
-DEFAULT_BUDGET_USD = 300.0
+def _budget_ceiling_from_env():
+    """None = unlimited. Explicit 0 = spend-off. A number = a ceiling."""
+    raw = str(otr_env.get("OTR_CLOUD_MEDIA_BUDGET_USD", "") or "").strip()
+    if not raw:
+        return None
+    try:
+        return float(raw)
+    except ValueError:
+        raise CloudMediaError(
+            CloudErrorCode.MALFORMED_CONFIG,
+            f"OTR_CLOUD_MEDIA_BUDGET_USD={raw!r} is not a number",
+        )
 
 
 def mute_ok_roles() -> frozenset:
@@ -396,9 +398,9 @@ def resolve_auth(
 _PROVIDER_ID_RE = re.compile(r"^[A-Z0-9_]+$")
 _DEFAULT_CONCURRENCY = 8
 #: Kling lipsync stays 1 -- that provider was measured to reject overlap.
-#: Every other cloud provider (Vidu, Luma, ElevenLabs, Sonilo, LTX, ...)
-#: shares the same overlap cap as the video fan-out. Serial partner waits
-#: are the thing we are not making people sit through.
+#: This semaphore is HTTP overlap, not OTR_CLOUD_FANOUT (submit width,
+#: unset default 4). Others stay 8 so a later fan-out bump is not
+#: silently provider-clamped.
 _PROVIDER_DEFAULTS = {"KLING": 1, "VIDU": 8}
 
 
@@ -492,22 +494,10 @@ class CloudMediaSession:
         self.auth = auth
         self.episode_id: Optional[str] = None  # metadata, never the key
         self.created_at = time.time()
-        raw = otr_env.get("OTR_CLOUD_MEDIA_BUDGET_USD", "").strip()
         if budget_ceiling_usd is not None:
             self.budget_ceiling_usd = float(budget_ceiling_usd)
         else:
-            try:
-                # UNSET -> DEFAULT_BUDGET_USD safety cap (the dropdown pick is
-                # the enable; the cap must not be a hidden switch). EXPLICIT
-                # "0" -> 0.0 -> every reserve fails closed (deliberate
-                # spend-off remains available).
-                self.budget_ceiling_usd = (
-                    float(raw) if raw else DEFAULT_BUDGET_USD)
-            except ValueError:
-                raise CloudMediaError(
-                    CloudErrorCode.MALFORMED_CONFIG,
-                    f"OTR_CLOUD_MEDIA_BUDGET_USD={raw!r} is not a number",
-                )
+            self.budget_ceiling_usd = _budget_ceiling_from_env()
         self.cache_root = cache_root or resolve_cache_root()
         self._lock = threading.Lock()
         self._reservations: dict = {}
@@ -529,12 +519,13 @@ class CloudMediaSession:
                                   "negative cost estimate")
         with self._lock:
             projected = self._spent_usd + self._open_exposure_locked() + estimated_usd
-            if projected > self.budget_ceiling_usd:
+            ceiling = self.budget_ceiling_usd
+            if ceiling is not None and projected > ceiling:
                 raise CloudMediaError(
                     CloudErrorCode.BUDGET,
                     f"reserve ${estimated_usd:.4f} would take projected spend "
                     f"to ${projected:.4f} > ceiling "
-                    f"${self.budget_ceiling_usd:.4f} "
+                    f"${ceiling:.4f} "
                     f"(OTR_CLOUD_MEDIA_BUDGET_USD); spent="
                     f"${self._spent_usd:.4f}",
                 )

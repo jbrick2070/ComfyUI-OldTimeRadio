@@ -140,6 +140,12 @@ def test_cloud_fanout_knob_prefers_new_name(monkeypatch):
     assert cf.cloud_fanout_workers() == 3
 
 
+def test_cloud_fanout_unset_defaults_to_four(monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_FANOUT", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)
+    assert cf.cloud_fanout_workers() == 4
+
+
 def test_cloud_only_episode_fans_out_but_commits_in_ledger_order(
         stub_registry, monkeypatch):
     monkeypatch.delenv("OTR_CLOUD_VIDEO_FANOUT", raising=False)

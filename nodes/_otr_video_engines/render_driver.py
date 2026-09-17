@@ -5399,7 +5399,7 @@ def cloud_video_fanout_workers() -> int:
 
     Same knob as stills / TTS / music: ``OTR_CLOUD_FANOUT``, with the
     older ``OTR_CLOUD_VIDEO_FANOUT`` name still honored. Unset defaults
-    to 8. ``1`` (or less) forces the historical serial walk. Local-GPU
+    to 4. ``1`` (or less) forces the historical serial walk. Local-GPU
     episodes never consult this -- they cannot share VRAM.
     """
     from .._otr_shared.cloud_fanout import cloud_fanout_workers as _workers
@@ -6058,8 +6058,8 @@ def run_episode(ledger, *, oom_shot_id=None,
                 if _cloud_budget_floor_sid(sid, errors, halted):
                     _LOG.error(
                         "[OTR video] BUDGET floor shot %s -- "
-                        "local media cap or empty wallet refused a further "
-                        "reserve; the beat keeps its place and "
+                        "empty wallet or an explicit spend-off cap refused "
+                        "a further reserve; the beat keeps its place and "
                         "SilentComposite floors it. %s",
                         sid,
                         errors.get(sid) or "not submitted after spend-cap halt")
@@ -6296,7 +6296,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                     if _cloud_budget_floor_sid(sid, {sid: exc}, ()):
                         _LOG.error(
                             "[OTR video] BUDGET floor shot %s -- "
-                            "OTR_CLOUD_MEDIA_BUDGET_USD or empty wallet "
+                            "empty wallet or an explicit spend-off cap "
                             "refused a further reserve; SilentComposite "
                             "floors it. %s",
                             sid, exc)

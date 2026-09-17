@@ -31,8 +31,9 @@ def cloud_fanout_workers() -> int:
 
     ``OTR_CLOUD_FANOUT`` is the one knob. ``OTR_CLOUD_VIDEO_FANOUT`` is
     the older name and still wins if the new one is unset, so existing
-    launch.env pins keep working. Unset defaults to 8. ``1`` (or less)
-    is serial -- callers skip this helper.
+    launch.env pins keep working. Unset defaults to 4 (operator
+    2026-09-16: 8-wide Luma 429s and stacked LTX reserves). ``1`` (or
+    less) is serial -- callers skip this helper.
     """
     raw = str(otr_env.get("OTR_CLOUD_FANOUT", "") or "").strip()
     if not raw:
@@ -41,8 +42,8 @@ def cloud_fanout_workers() -> int:
         try:
             return int(raw)
         except ValueError:
-            return 8
-    return 8
+            return 4
+    return 4
 
 
 def snapshot_prompt_id():
