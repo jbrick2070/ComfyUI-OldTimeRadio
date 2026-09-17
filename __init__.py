@@ -90,30 +90,22 @@ try:
 except Exception as _hf_err:
     log.debug("[OldTimeRadio] HF_TOKEN bake-in skipped: %s", _hf_err)
 
-# 5. OTR output base pin (BUG-LOCAL-292) -- pin ONE output root so every OTR
-#    consumer of _otr_paths.comfy_output_dir() (portraits, the latest_ledger
-#    route, episode/obs dirs) resolves the SAME tree the ledger + video writers
-#    use. Those writers land under the NODE-RELATIVE ComfyUI output dir (the
-#    ComfyUI folder that contains this custom_nodes pack -- Documents\ComfyUI\
-#    output on this box). folder_paths.get_output_directory() can differ (the
-#    bundled install base under AppData), which is exactly what split portraits
-#    from the ledger. So pin OTR_OUTPUT_DIR (tier 1) to the node-relative output
-#    -- portable ("relative output/otr for everyone") and matching where
-#    episodes already live: output/otr/{episodes,obs}. Gated on folder_paths
-#    being importable so it ONLY fires inside the ComfyUI process; CLI/pytest
-#    get no pin (preserves test isolation + monkeypatch). Skipped when set.
+# 5. OTR output base pin -- pin ONE output root so every consumer of
+#    _otr_paths.comfy_output_dir() (portraits, ledger, episode/obs dirs)
+#    uses the SAME tree. The pin is ComfyUI's live output directory
+#    (folder_paths.get_output_directory), which honors --output-directory
+#    and Desktop remaps. A walk-up from this file is NOT used: Desktop
+#    can load the pack through an Installs junction, and abspath keeps
+#    that path, so the episode would miss <output>/otr/obs. Gated on
+#    folder_paths being importable so it ONLY fires inside the ComfyUI
+#    process; CLI/pytest get no pin (preserves test isolation). Skipped
+#    when the operator already set OTR_OUTPUT_DIR.
 if not otr_env.get("OTR_OUTPUT_DIR"):
     try:
-        import folder_paths  # presence == running inside the ComfyUI process
-        _ = folder_paths.get_output_directory  # touch attr; absence -> skip
-        _otr_out = os.path.join(
-            os.path.dirname(
-                os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            ),
-            "output",
-        )
-        otr_env.pin("OTR_OUTPUT_DIR", _otr_out)
-        log.info("[OldTimeRadio] OTR_OUTPUT_DIR pinned (node-relative): %s", _otr_out)
+        from .nodes._otr_paths import pin_output_dir_from_comfy
+        _otr_out = pin_output_dir_from_comfy()
+        if _otr_out:
+            log.info("[OldTimeRadio] OTR_OUTPUT_DIR pinned (ComfyUI output): %s", _otr_out)
     except Exception as _out_err:
         log.debug("[OldTimeRadio] OTR_OUTPUT_DIR pin skipped: %s", _out_err)
 

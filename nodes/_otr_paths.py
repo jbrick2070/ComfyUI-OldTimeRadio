@@ -119,6 +119,36 @@ def reject_remote_path(value, field: str) -> str:
 _REPO_WALKUP_OUTPUT = Path(__file__).resolve().parents[3] / "output"
 
 
+def pin_output_dir_from_comfy() -> Optional[str]:
+    """Pin ``OTR_OUTPUT_DIR`` to ComfyUI's live output root when unset.
+
+    Uses ``folder_paths.get_output_directory()`` so ``--output-directory``
+    and Desktop remaps win. A registry or git clone then publishes to
+    that install's ``output/otr/obs``. Does NOT walk up from this file:
+    Comfy Desktop can load the pack through a ``custom_nodes`` junction
+    under ``ComfyUI-Installs``, and ``os.path.abspath(__file__)`` keeps
+    that install path -- which is how a finished episode missed the
+    operator's ``Documents\\...\\output\\otr\\obs`` watch folder.
+
+    Returns the pinned path, or ``None`` when the operator already set
+    the knob, folder_paths is missing, or the API returned empty.
+    """
+    if (otr_env.get("OTR_OUTPUT_DIR") or "").strip():
+        return None
+    try:
+        import folder_paths  # type: ignore
+
+        api_dir = folder_paths.get_output_directory()
+    except Exception:
+        return None
+    text = str(api_dir or "").strip()
+    if not text:
+        return None
+    pinned = os.path.abspath(os.path.expanduser(text))
+    otr_env.pin("OTR_OUTPUT_DIR", pinned)
+    return pinned
+
+
 def comfy_output_dir() -> Path:
     """Return the ComfyUI output root.
 
@@ -838,6 +868,7 @@ def resolve_hf_model_path(repo_id: str) -> str:
 
 
 __all__ = [
+    "pin_output_dir_from_comfy",
     "comfy_output_dir",
     "comfy_input_dir",
     "comfy_models_dir",
