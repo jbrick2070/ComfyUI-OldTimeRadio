@@ -125,9 +125,9 @@ SHIPPING_SET = (
     "otr_cpu_low",
     "otr_cloud_low_1act",
     "otr_cloud_low",
-    "otr_cloud_low_7act",
-    "otr_cloud_deluxe_7act",
-    "otr_cloud_deluxe_audio_in_7act",
+    "otr_cloud_low_5act",
+    "otr_cloud_deluxe_3act",
+    "otr_cloud_deluxe_audio_in_3act",
 )
 
 class EmitRefused(RuntimeError):

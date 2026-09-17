@@ -476,9 +476,9 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 |---|---|---|---|---|---|---|---|---|
 | **low_1act** | `otr_cloud_low_1act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
 | **low** | `otr_cloud_low` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **low_7act** | `otr_cloud_low_7act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_7act** | `otr_cloud_deluxe_7act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_audio_in_7act** | `otr_cloud_deluxe_audio_in_7act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_luma_photon_flash | manual | nothing | shipping |
+| **low_5act** | `otr_cloud_low_5act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_3act** | `otr_cloud_deluxe_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_luma_photon_flash | manual | nothing | shipping |
 <!-- END GENERATED: tier-matrix -->
 
 Weights marked **auto** download themselves the first time you queue;

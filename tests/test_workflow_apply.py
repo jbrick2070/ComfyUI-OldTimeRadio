@@ -231,7 +231,7 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
     expected_acts = {
         "otr_cloud_low_1act": "1",
         "otr_cloud_low": "3",
-        "otr_cloud_low_7act": "7",
+        "otr_cloud_low_5act": "5",
     }
     for pid, acts in expected_acts.items():
         applied = wa.apply_profile(master_copy, pid, schemas=schemas)
@@ -258,7 +258,7 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
         assert _widget_value(
             nodes_by_type, schemas, "OTR_LedgerScriptWriter",
             "num_characters"
-        ) == (4 if pid.endswith("7act") else 3), pid
+        ) == 3, pid
         assert _widget_value(
             nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
         ) == "elevenlabs"
@@ -280,18 +280,18 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
                 pid, widget)
 
 
-def test_apply_otr_cloud_deluxe_7act_is_sol_and_ltx25_foley(
+def test_apply_otr_cloud_deluxe_3act_is_sol_and_ltx25_foley(
         schemas, master_copy):
     """Foley deluxe SKU: GPT 5.6 Sol creative + Luna tech, LTX 2.5 I2V bed.
 
     OpenRouter widgets stay on the node (sentinel); the saved pick is Comfy.
     """
     applied = wa.apply_profile(
-        master_copy, "otr_cloud_deluxe_7act", schemas=schemas)
+        master_copy, "otr_cloud_deluxe_3act", schemas=schemas)
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter", "act_count"
-    ) == "7"
+    ) == "3"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "creative_writing_model"
@@ -333,11 +333,11 @@ def test_apply_otr_cloud_deluxe_7act_is_sol_and_ltx25_foley(
     ) == "cloud_luma_photon_flash"
 
 
-def test_apply_otr_cloud_deluxe_audio_in_7act_is_sol_and_ltx25_a2v(
+def test_apply_otr_cloud_deluxe_audio_in_3act_is_sol_and_ltx25_a2v(
         schemas, master_copy):
     """Audio-in deluxe SKU: same writers, LTX 2.5 Audio-to-Video."""
     applied = wa.apply_profile(
-        master_copy, "otr_cloud_deluxe_audio_in_7act", schemas=schemas)
+        master_copy, "otr_cloud_deluxe_audio_in_3act", schemas=schemas)
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",

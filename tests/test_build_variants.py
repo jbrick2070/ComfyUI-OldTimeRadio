@@ -77,7 +77,7 @@ def test_semantic_hash_ignores_creative_flags_managed(canonical, schemas,
 
 def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
     # Lab cloud_lanes stays gated. The five shipping cloud SKUs
-    # (low_1act / low / low_7act / deluxe Foley / deluxe audio-in)
+    # (low_1act / low / low_5act / deluxe Foley / deluxe audio-in)
     # are not this contract.
     with pytest.raises(bv.EmitRefused, match="UNRATIFIED"):
         bv.build_variant("otr_cloud_lanes", schemas=schemas, mapping=mapping,
@@ -87,9 +87,9 @@ def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
 @pytest.mark.parametrize("profile_id", [
     "otr_cloud_low_1act",
     "otr_cloud_low",
-    "otr_cloud_low_7act",
-    "otr_cloud_deluxe_7act",
-    "otr_cloud_deluxe_audio_in_7act",
+    "otr_cloud_low_5act",
+    "otr_cloud_deluxe_3act",
+    "otr_cloud_deluxe_audio_in_3act",
 ])
 def test_build_variant_emits_shipping_cloud_skus(
         profile_id, canonical, schemas, mapping):
@@ -102,7 +102,7 @@ def test_build_variant_emits_shipping_cloud_skus(
     from nodes.otr_video_director import exact_menu_option_for
     director = next(n for n in variant["nodes"]
                     if n["type"] == "OTR_VideoDirector")
-    if profile_id.endswith("deluxe_audio_in_7act"):
+    if "deluxe_audio_in" in profile_id:
         engine = "cloud_ltx25_audio_in"
     elif "deluxe" in profile_id:
         engine = "cloud_ltx25_foley_plus"
@@ -121,11 +121,9 @@ def test_build_variant_emits_shipping_cloud_skus(
     )
     assert value(writer, "comfy_slot_a_model") == want_a
     assert value(writer, "comfy_slot_b_model") == "openai/gpt-5.6-luna"
-    want_cast = (
-        4 if profile_id.endswith("7act") else 3
-    )
+    want_cast = 4 if "deluxe" in profile_id else 3
     assert value(writer, "num_characters") == want_cast
-    if profile_id.endswith("deluxe_7act") or profile_id.endswith("deluxe_audio_in_7act"):
+    if "deluxe" in profile_id:
         assert "OPENROUTER_API_KEY" not in recipe
 
 

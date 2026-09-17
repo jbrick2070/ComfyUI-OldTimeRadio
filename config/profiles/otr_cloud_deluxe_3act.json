@@ -1,6 +1,6 @@
 {
-  "id": "otr_cloud_deluxe_audio_in_7act",
-  "display_name": "Comfy Cloud 7-act deluxe AUDIO-IN -- GPT 5.6 Sol creative + Luna tech (Comfy Credits), LTX 2.5 Audio-to-Video driven by the episode mix. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.",
+  "id": "otr_cloud_deluxe_3act",
+  "display_name": "Comfy Cloud 3-act deluxe FOLEY -- GPT 5.6 Sol creative + Luna tech (Comfy Credits), LTX 2.5 I2V generates its own bed and mixes 0.50 under the voices. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.",
   "status": "shipping",
   "platform": "any",
   "device_backend": "cpu",
@@ -8,9 +8,9 @@
   "toolchains": [],
   "allow_sidecars": false,
   "role_overrides": {
-    "announcer_visual": "cloud_ltx25_audio_in",
-    "music_visual": "cloud_ltx25_audio_in",
-    "character_visual": "cloud_ltx25_audio_in",
+    "announcer_visual": "cloud_ltx25_foley_plus",
+    "music_visual": "cloud_ltx25_foley_plus",
+    "character_visual": "cloud_ltx25_foley_plus",
     "announcer_image": "cloud_luma_photon_flash",
     "music_image": "cloud_luma_photon_flash",
     "character_image": "cloud_luma_photon_flash"
@@ -21,12 +21,12 @@
     "char_voice_engine": "elevenlabs",
     "announcer_voice_engine": "elevenlabs",
     "music_engine": "sonilo",
-    "video_render_engine": "cloud_ltx25_audio_in"
+    "video_render_engine": "cloud_ltx25_foley_plus"
   },
   "features": {
     "burn_captions": true,
     "caption_style": "sdh_standard",
-    "act_count": "7",
+    "act_count": "3",
     "num_characters": 4
   },
   "seed_policy": {

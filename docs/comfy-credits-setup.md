@@ -46,7 +46,7 @@ When the lane is disabled the pickers show **`(enable Comfy Credits)`** and the
 | creative (`comfy_slot_a_model`) | `anthropic/claude-sonnet-5` | Cheap-cloud story pass; native Sonnet 5 cannot turn reasoning off, so the lane sends `reasoning_effort=low` |
 | technical (`comfy_slot_b_model`) | `openai/gpt-5.6-luna` | JSON / bookkeeping with `reasoning_effort=none` on the OpenRouter proxy (Credits widget label `off`) |
 
-Shipping cheap Comfy Cloud graphs pin that pair (1-act / 3-act / 7-act). Deluxe pins `openai/gpt-5.6-sol` on creative and the same Luna on technical. The combo also lists Terra, the `-pro` twins, Grok 4.20, GPT-5.5, and Claude Opus 4.7 so older saved graphs still load. Do not add `~*-latest` aliases — Credits rejects them.
+Shipping cheap Comfy Cloud graphs pin that pair (1-act / 3-act / 5-act). Deluxe pins `openai/gpt-5.6-sol` on creative and the same Luna on technical. The combo also lists Terra, the `-pro` twins, Grok 4.20, GPT-5.5, and Claude Opus 4.7 so older saved graphs still load. Do not add `~*-latest` aliases — Credits rejects them.
 
 Override per slot without changing the pick via
 `OTR_COMFY_SLOT_A_DEFAULT` / `OTR_COMFY_SLOT_B_DEFAULT`. The full pinned catalog

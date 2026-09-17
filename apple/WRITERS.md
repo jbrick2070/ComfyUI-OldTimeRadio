@@ -17,7 +17,7 @@ fits its own tier. Which one depends on which graph you opened:
 | 16 GB Mac, canonical | **Qwen3.5-4B full** (`Qwen/Qwen3.5-4B`, Quant `none`) |
 | 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB) |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
-| Comfy Cloud deluxe (`otr_cloud_deluxe_7act`) | creative **GPT 5.6 Sol** (`openai/gpt-5.6-sol`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
+| Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **GPT 5.6 Sol** (`openai/gpt-5.6-sol`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 
 The Comfy Cloud graphs split the two slots on purpose -- cheap SKUs use
 Sonnet 5 to write and Luna for JSON; deluxe uses Sol to write and the same

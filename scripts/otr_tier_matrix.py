@@ -44,10 +44,11 @@ _ARCHES = (
 
 #: Tiers in reading order, named by what the episode is made of.
 _TIERS = ("low", "still", "video", "foley", "mime", "animatediff")
-#: Cloud rows: cheap length SKUs (Vidu Q2 mute) plus two deluxe 7-act
-#: variations (LTX 2.5 Foley, LTX 2.5 audio-in).
-_CLOUD_TIERS = ("low_1act", "low", "low_7act", "deluxe_7act",
-                "deluxe_audio_in_7act")
+#: Cloud rows: cheap length SKUs (Vidu Q2 mute, 1/3/5-act) plus two deluxe
+#: 3-act variations (LTX 2.5 Foley, LTX 2.5 audio-in). Nothing cloud ships
+#: longer than 5-act cheap or 3-act deluxe.
+_CLOUD_TIERS = ("low_1act", "low", "low_5act", "deluxe_3act",
+                "deluxe_audio_in_3act")
 
 # acts and chars were columns until 2026-09-13. All sixteen rows read 3 and 3,
 # and sat beside the word `shipping` -- while every qualification leg ran at ONE
