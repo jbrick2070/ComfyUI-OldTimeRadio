@@ -28,6 +28,8 @@ def _curated_picker_rest(slot):
     expected = [cat.OPENROUTER_ENABLE_SENTINEL, lead]
     expected += [mid for mid in cat.OPENROUTER_CURATED_ALIASES
                  if mid not in expected]
+    expected += [mid for mid in getattr(cat, "OPENROUTER_CURATED_UNTILDED_LATEST", ())
+                 if mid not in expected]
     expected += [mid for mid in cat.OPENROUTER_CURATED_ROUTERS
                  if mid not in expected]
     return expected
@@ -267,6 +269,8 @@ def test_slot_picker_shows_curated_set_when_enabled(enabled_cached):
     assert a[1] == orb.OPENROUTER_RECOMMENDED_CREATIVE_DEFAULT
     for slug in cat.OPENROUTER_CURATED_ALIASES:
         assert slug in a
+    for slug in cat.OPENROUTER_CURATED_UNTILDED_LATEST:
+        assert slug in a
     # Cache-only rows must NOT appear without FULL_CATALOG / narrowing.
     for cache_only in ("openai/gpt-4o", "x-ai/grok-2-mini"):
         assert cache_only not in a
@@ -366,6 +370,8 @@ def test_require_json_does_not_narrow_curated_aliases(enabled_cached, monkeypatc
     b = cat.openrouter_catalog_dropdown_choices("b")
     for slug in cat.OPENROUTER_CURATED_ALIASES:
         assert slug in b
+    for slug in cat.OPENROUTER_CURATED_UNTILDED_LATEST:
+        assert slug in b
 
 
 # --- allow / deny / provider filters ---------------------------------------
@@ -435,6 +441,8 @@ def test_default_view_is_exactly_sentinel_lead_and_curated_aliases(enabled_cache
     ):
         expected = [cat.OPENROUTER_ENABLE_SENTINEL, lead]
         expected += [mid for mid in cat.OPENROUTER_CURATED_ALIASES
+                     if mid not in expected]
+        expected += [mid for mid in getattr(cat, "OPENROUTER_CURATED_UNTILDED_LATEST", ())
                      if mid not in expected]
         # The auto-routers close the curated block (2026-08-10). Since BOTH
         # leads are now `openrouter/auto`, the de-duplication above is doing

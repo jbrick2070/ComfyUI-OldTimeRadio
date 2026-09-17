@@ -148,8 +148,9 @@ def test_r4_quota_40_40_20():
 def test_r5_voice_uniqueness():
     for seed in (1, 3, 11, 42):
         cast = _lock(seed, num=5)
-        bark = [r["voice_preset"] for r in cast if r.get("tts_model") == "bark"]
-        assert bark, "expected at least one Bark voice"
+        bark = [r["voice_preset"] for r in cast
+                if str(r.get("voice_preset") or "").startswith("v2/")]
+        assert bark, "expected at least one Bark voice after CastLock replay"
         assert len(bark) == len(set(bark)), f"duplicate Bark voice at seed {seed}: {bark}"
 
 

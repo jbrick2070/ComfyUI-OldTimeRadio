@@ -26,7 +26,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `animatediff15_lightning_video` | ComfyUI-AnimateDiff-Evolved |
 | `animatediff15_v3_haunted_video` | ComfyUI-AnimateDiff-Evolved |
 | `animatediff15_v3_stillin_lab_video` | ComfyUI-AnimateDiff-Evolved |
-| `flux2_klein` | ComfyUI-GGUF |
 | `ltx23_high_video` | ComfyUI-GGUF |
 | `ltx23_low_audio_in` | ComfyUI-GGUF |
 | `ltx25_high_foley_plus` | ComfyUI-GGUF |
@@ -93,8 +92,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `lumina_image` | **auto** | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
@@ -128,7 +126,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `elevenlabs` | none | -- | key | key | key | key | key |
+| `cloud_elevenlabs` | none | -- | key | key | key | key | key |
 | `google_lyria` | none | -- | key | key | key | key | key |
 | `google_tts` | none | -- | key | key | key | key | key |
 | `sonilo` | none | -- | key | key | key | key | key |
@@ -148,7 +146,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** | ? | ? |
-| `Qwen/Qwen3.5-4B:nf4` | **auto** | 8.7 GiB | fits | fits | **no** | ? | ? |
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
@@ -158,16 +155,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
 Two engines can share one group and still download different amounts, because they draw different files from it. **The size in section 2 is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- section 2 still has the figure.
-
-### flux2_klein &mdash; 10.2 GiB total
-
-Selected by: `flux2_klein`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `flux-2-klein-4b-Q4_K_M.gguf` | [`Latentiq/FLUX.2-klein-4B-GGUF`](https://huggingface.co/Latentiq/FLUX.2-klein-4B-GGUF) | `models/diffusion_models/` | 2.43 GiB | no |
-| `qwen_3_4b.safetensors` | [`Comfy-Org/flux2-klein`](https://huggingface.co/Comfy-Org/flux2-klein) | `models/text_encoders/` | 7.49 GiB | no |
-| `flux2-vae.safetensors` | [`Comfy-Org/flux2-dev`](https://huggingface.co/Comfy-Org/flux2-dev) | `models/vae/` | 0.31 GiB | no |
 
 ### h3_operator_only &mdash; 59.1 GiB total
 
@@ -254,7 +241,6 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 * `ideogram4_local`
 * `ltx23_high_video`
 * `ltx23_low_audio_in`
-* `lumina_image`
 * `mesh_stage`
 * `spandrel_esrgan`
 * `wan22_high_fast`

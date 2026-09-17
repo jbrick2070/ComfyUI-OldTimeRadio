@@ -70,3 +70,12 @@ def test_prestartup_uses_the_same_prestartup_guard_string():
     assert PRESTARTUP_GUARD in src
     assert "prestartup skipped" in src
     assert PACK_GUARD not in src
+
+
+def test_prestartup_clears_leaked_otr_test_mode_on_live_boot():
+    """Wiring: a live Comfy boot must unpin pytest's OTR_TEST_MODE.
+    A test that only calls the helper never proves the boot path."""
+    src = (REPO / "prestartup_script.py").read_text(encoding="utf-8")
+    assert "OTR_TEST_MODE" in src
+    assert "cleared leaked OTR_TEST_MODE=1" in src
+    assert 'environ.pop("OTR_TEST_MODE"' in src or "environ.pop('OTR_TEST_MODE'" in src

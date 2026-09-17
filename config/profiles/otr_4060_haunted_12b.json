@@ -11,9 +11,9 @@
         "announcer_visual": "animatediff15_v3_haunted_video",
         "music_visual": "animatediff15_v3_haunted_video",
         "character_visual": "animatediff15_v3_haunted_video",
-        "announcer_image": "flux2_klein",
-        "music_image": "flux2_klein",
-        "character_image": "flux2_klein"
+        "announcer_image": "lumina_image",
+        "music_image": "lumina_image",
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",

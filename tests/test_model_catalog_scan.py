@@ -386,10 +386,6 @@ def test_validator_strips_not_downloaded_suffix(empty_hub_root, monkeypatch):
             + catalog.NOT_DOWNLOADED_SUFFIX,
             catalog.TEST_TECHNICAL_LLM,
         ),
-        (
-            "unsloth/gemma-4-12b-it-GGUF" + catalog.LOCAL_GGUF_SUFFIX,
-            "unsloth/gemma-4-12b-it-GGUF",
-        ),
     ],
 )
 def test_validator_strips_local_display_suffixes(empty_hub_root, monkeypatch, label, expected):

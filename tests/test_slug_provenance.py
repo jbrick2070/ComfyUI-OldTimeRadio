@@ -366,12 +366,13 @@ ENGINE_COVERAGE = {
     "dia": "local", "indextts2": "local", "musicgen": "local",
     "stable_audio_3": "local", "stable_audio_music": "local",
     # --- audio: cloud engines ship concrete provider model ids ---------------
-    "elevenlabs": "collected", "google_tts": "collected",
+    "cloud_elevenlabs": "collected",
+    "google_tts": "collected",
     "google_lyria": "collected",
     "sonilo": "exempt",
     # --- image: local ---------------------------------------------------------
-    "z_image_turbo": "local", "flux_gen1": "local", "flux2_klein": "local",
-    "lumina_image": "local", "sd15": "local",
+    "z_image_turbo": "local", "flux_gen1": "local", "lumina_image": "local",
+    "sd15": "local",
     # ideogram4_local (2026-08-22): LOCAL weights on disk, no provider slug to
     # collect -- the four artifacts are resolved through folder_paths exactly
     # like the other local image engines.

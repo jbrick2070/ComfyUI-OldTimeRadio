@@ -99,6 +99,17 @@ def test_no_launcher_pins_an_episode_seed_outside_a_c7_branch(path):
         "2026-08-22):\n  %s" % "\n  ".join(offenders))
 
 
+def test_the_soak_launcher_clears_leaked_otr_test_mode():
+    """A parent pytest/agent shell can leak OTR_TEST_MODE=1 into the
+    detached server. That skip-path is what left mux pointing at a
+    stale pending_ wav after episode rename (2026-09-16)."""
+    launcher = ROOT / "scripts" / "_otr_soak_server_launch.cmd"
+    text = launcher.read_text(encoding="utf-8", errors="replace")
+    assert re.search(r"^\s*set\s+OTR_TEST_MODE=\s*$", text, re.M | re.I), (
+        "%s no longer clears OTR_TEST_MODE, so a leaked pytest value "
+        "would survive into a live server" % launcher.name)
+
+
 def test_the_soak_launcher_still_clears_the_seeds_in_its_production_branch():
     """The else branch is the thing that makes production random. If it ever
     disappears, an inherited value survives into the server."""

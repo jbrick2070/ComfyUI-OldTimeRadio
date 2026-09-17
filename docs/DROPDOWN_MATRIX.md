@@ -72,7 +72,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
-| `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `lumina_image` | **auto** | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
@@ -107,7 +106,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `elevenlabs` | none | -- | key | key | key | key | key |
+| `cloud_elevenlabs` | none | -- | key | key | key | key | key |
 | `google_lyria` | none | -- | key | key | key | key | key |
 | `google_tts` | none | -- | key | key | key | key | key |
 | `sonilo` | none | -- | key | key | key | key | key |
@@ -127,7 +126,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `google/gemma-4-E2B-it` | **auto** | 6.0 GiB | **proven** | **proven** | **OOM** | ? | ? |
 | `unsloth/Llama-3.2-3B-Instruct` | **auto** | 6.4 GiB | fits | fits | fits | ? | ? |
 | `Qwen/Qwen3.5-4B` | **auto** | 8.7 GiB | **proven** | **proven** | **proven** | ? | ? |
-| `Qwen/Qwen3.5-4B:nf4` | **auto** | 8.7 GiB | fits | fits | **no** | ? | ? |
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |

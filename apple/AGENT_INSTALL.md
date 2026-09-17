@@ -193,10 +193,10 @@ Each of these cost a real session before it was written down.
   `OTR_OUTPUT_DIR`, so a machine can publish somewhere other than ComfyUI's
   `--output-directory`. Take the truth from the server log's pinned line or from
   `obs_publish OK ->`.
-* **Do not pick a per-machine graph for the user.** The sixteen graphs under
+* **Do not pick a per-machine graph for the user.** The graphs under
   `workflows/variants/` are presets, and the canonical template in the menu is
-  the intended first run. Fifteen have a published episode behind them; the AMD
-  one is experimental and has none.
+  the intended first run. Shipping rows have a published episode behind them;
+  `otr_amd_still` is draft and has none.
 * **On Apple Silicon, read [MAC.md](MAC.md) before choosing anything heavier
   than the defaults.** An out-of-memory on unified memory can reboot the
   machine, not just the render. Some Desktop installs also need

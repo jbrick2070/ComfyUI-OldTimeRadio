@@ -75,9 +75,9 @@ def _led():
                                "character_b_wants": "ship the product",
                                "ending_change": "Hayes goes public"},
             "image_engines": {"by_role": {
-                "announcer_visual": {"flux2_klein": 5},
-                "character_video": {"flux2_klein": 5},
-                "music_visual": {"flux2_klein": 2}}, "image_revision": 1},
+                "announcer_visual": {"lumina_image": 5},
+                "character_video": {"lumina_image": 5},
+                "music_visual": {"lumina_image": 2}}, "image_revision": 1},
             "render_engines": {
                 "by_role": {"announcer_visual": {"humo": 2},
                             "music_visual": {"ltx_video": 1},
@@ -131,7 +131,6 @@ def _layout(**over):
 def test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference(tmp_path, monkeypatch, gender):
     from nodes import production_ledger as pl
     from nodes.cast_lock import CastLock
-    from nodes import _otr_voice_node_common as vnc
     saved = pl._CURRENT
     try:
         ledger = pl.new_ledger("credit_ref_contract", str(tmp_path))
@@ -148,11 +147,12 @@ def test_genderless_cast_wire_disk_render_and_credits_share_the_actual_reference
             durable = json.load(handle)
         assert wire["cast"] == durable["cast"] == ledger.data["cast"]
         row = durable["cast"][0]
-        assert row["gender"] == gender and row["voice_engine"] == "indextts2"
-        assert vnc._resolve_clone_ref_path(row["voice_engine"], row, 42)
+        assert row["gender"] == gender and row["voice_engine"] == "kokoro"
+        assert row.get("voice_ref_id")
+        assert not str(row.get("voice_preset") or "").startswith("v2/")
         layout = cr.build_credits_layout(durable, w=1920, h=1080, manifest={"clips": []})
         assert layout["col2"]["cast_rows"][0]["line"] == (
-            "indextts2 · " + row["voice_ref_id"])
+            "kokoro · " + row["voice_ref_id"])
     finally:
         with pl._LEDGER_LOCK:
             pl._CURRENT = saved
@@ -317,7 +317,7 @@ def test_models_block_video_family_and_image_and_music():
     lay = _layout()
     models = dict(lay["col1"])["models"]
     body = _flat(models)
-    assert "flux2_klein" in body                       # image engine
+    assert "lumina_image" in body                       # image engine
     assert "humo" in body and "wan_i2v" in body        # video engines per role
     assert "audio_driven_face" in _flat(models["video_rows"]) or \
         "audio-driven face" in body                    # family label (S-B)
@@ -795,7 +795,7 @@ def _spy_models(models, w=1920, h=1080):
 
 def _models_block(video_suffix=None, video_rows=None):
     return {"header": "MODELS", "tag": "GENERATIVE STACK", "img_rev": 1,
-            "vid_rev": 3, "image_rows": [("stills", "flux2_klein x5")],
+            "vid_rev": 3, "image_rows": [("stills", "lumina_image x5")],
             "video_rows": video_rows or [("music_visual", "ltx_8gb",
                                           "image-to-video")],
             "video_suffix": video_suffix or {},

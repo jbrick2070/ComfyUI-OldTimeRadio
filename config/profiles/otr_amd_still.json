@@ -8,8 +8,8 @@
     "toolchains": [],
     "allow_sidecars": false,
     "role_overrides": {
-        "announcer_visual": "viz_mxc_cpu",
-        "music_visual": "viz_mxc_cpu",
+        "announcer_visual": "still_motion",
+        "music_visual": "still_motion",
         "character_visual": "still_motion",
         "announcer_image": "z_image_turbo",
         "music_image": "z_image_turbo",

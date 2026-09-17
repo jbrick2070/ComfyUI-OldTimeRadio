@@ -56,13 +56,13 @@ def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
     code was right. It now states the shipped truth: both plans are fully
     automatic and both manual lists are EMPTY.
 
-    The two differ only in music: amd16 selects `stable_audio_3` (its own
-    fetch lane), amd8 selects `musicgen` (HF cache on first use, so no lane).
+    The two differ only in VRAM ceiling (and therefore z_image vs z_image_int8);
+    both select `musicgen` (HF cache on first use, so no music lane).
     """
     provision = _provisioner()
 
     assert provision.profile_lanes("otr_amd16_rocm") == {
-        "automatic": ["z_image", "stable_audio_3"],
+        "automatic": ["z_image"],
         "manual": [],
     }
     assert provision.profile_lanes("otr_amd8_rocm") == {
@@ -76,8 +76,9 @@ def test_amd_machine_selector_has_a_complete_dry_run_plan(capsys):
 
     assert provision.main(["--machine", "amd", "--list"]) == 0
     output = capsys.readouterr().out
-    assert "automatic    : none" in output
-    assert "manual tiers : flux2_klein" in output
+    assert "automatic    : z_image_int8" in output or "automatic    : z_image" in output
+    assert "manual tiers : none" in output
+    assert "flux2_klein" not in output
     assert "unrecognized video engine" not in output
 
 
@@ -166,10 +167,11 @@ def test_haunted_machine_paths_do_not_require_unconsumed_klein_weights(
 def test_mixed_role_plan_includes_every_video_and_rejects_unowned_images():
     provision = _provisioner()
 
-    assert provision.profile_lanes("otr_sbcov_5") == {
-        "automatic": ["wan_ti2v_gguf", "stable_audio_3"],
-        "manual": ["flux2_klein"],
-    }
+    # sbcov_5 pins wan + lumina_image; lumina has no provisioner lane.
+    with pytest.raises(
+            provision.ProvisionFailure,
+            match="unrecognized image engine"):
+        provision.profile_lanes("otr_sbcov_5")
     for profile_id, missing_image in (
         ("otr_soak_llmsweep_01", "flux_gen1"),
         ("otr_soak_llmsweep_02", "flux_gen1"),

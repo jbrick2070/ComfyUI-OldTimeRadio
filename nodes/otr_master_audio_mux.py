@@ -787,16 +787,26 @@ def _reresolve_master_audio(master_audio_path: str) -> str:
     (the same durable-ledger contract OTR_ShotLock uses for audio timing), never
     a newest-mtime sibling guess.
 
-    Returns the original path unchanged when it already exists, when disk state
-    is disabled (``OTR_TEST_MODE``), or when no exact-basename match is found --
-    in which case the caller fails closed. It NEVER points at a different audio
-    source: only the same basename under the renamed episode
-    ``audio`` dir is accepted, and ``mux_master_audio`` still asserts the output
-    is PCM-byte-identical to it.
+    Returns the original path unchanged when it already exists, when pytest
+    has ``OTR_TEST_MODE=1`` (so unit tests do not consult a leftover
+    singleton or walk the operator's live output tree), or when no
+    exact-basename match is found -- in which case the caller fails closed.
+    It NEVER points at a different audio source: only the same basename
+    under the renamed episode ``audio`` dir is accepted, and
+    ``mux_master_audio`` still asserts the output is PCM-byte-identical to it.
+
+    A live Comfy boot that inherited ``OTR_TEST_MODE=1`` from a pytest/agent
+    parent is NOT pytest: ``PYTEST_CURRENT_TEST`` is unset, so this still
+    follows the in-flight ledger. That leak is what left
+    ``pending_20260916_222011_master.wav`` invisible after the episode dir
+    was renamed, while the file sat under the final slug.
     """
     if not master_audio_path or os.path.isfile(master_audio_path):
         return master_audio_path
-    if otr_env.get("OTR_TEST_MODE") == "1":
+    if (
+        otr_env.get("OTR_TEST_MODE") == "1"
+        and otr_env.get("PYTEST_CURRENT_TEST")
+    ):
         return master_audio_path
     want = os.path.basename(master_audio_path)
     try:
@@ -1169,8 +1179,13 @@ def _assert_delivery_binding(intent, stem):
 #: already carried `_with_credits`; only this list lacked it.
 _PIPELINE_SUFFIXES = ("_silent_procgen_blended_captioned_with_credits",
                       "_procgen_blended_captioned_with_credits",
+                      # Compacted AD/credits path (no procgen blend). If this
+                      # sits after `_captioned_with_credits`, that shorter
+                      # match wins and `_silent` leaks into the obs title.
+                      "_silent_captioned_with_credits",
                       "_captioned_with_credits", "_procgen_blended",
-                      "_with_credits", "_captioned", "_blend", "_silent")
+                      "_with_credits", "_silent_captioned", "_captioned",
+                      "_blend", "_silent")
 
 #: Cap so a long title plus six fields cannot approach the Windows path limit.
 _OBS_NAME_MAX = 150

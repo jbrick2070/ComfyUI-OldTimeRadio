@@ -75,7 +75,7 @@ def test_launcher_hydrates_remote_llm_keys_before_python():
 
 
 def test_launcher_hydrates_image_engine_weight_paths_before_python():
-    """lumina_image and flux2_klein read an ABSOLUTE weights path out of the
+    """lumina_image reads an ABSOLUTE weights path out of the
     environment and fail CLOSED on it -- `os.getenv(...)` plus
     `os.path.isfile(...)` with no folder_paths fallback. The image dispatcher
     does not degrade either: a missing engine raises ImageRenderError
@@ -89,10 +89,11 @@ def test_launcher_hydrates_image_engine_weight_paths_before_python():
     """
     text = _LAUNCH_CMD.read_text(encoding="utf-8")
     main_index = text.index("main.py")
-    for key in ("OTR_LUMINA_CKPT", "OTR_FLUX2_KLEIN_CKPT"):
+    for key in ("OTR_LUMINA_CKPT",):
         key_index = text.index(f"GetEnvironmentVariable('{key}','User')")
         assert key_index < main_index, (
             f"{_LAUNCH_CMD.name}: {key} must be hydrated before python starts")
+    assert "OTR_FLUX2_KLEIN_CKPT" not in text
 
 
 # --- model-loader TF32 flip pinned ----------------------------------------

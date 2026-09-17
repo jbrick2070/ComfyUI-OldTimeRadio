@@ -2212,12 +2212,12 @@ def lock_cast(
             "char_id":               slot.char_id,
             "name":                  ens.name,
             "gender":                response.gender,
-            # Open-character voices are always drawn from the Bark
-            # pool (VOICE_PROFILES in config/cast_pools.py), so the
-            # tts_model is Bark by construction. Downstream consumers
-            # route on this field rather than pattern-matching the
-            # voice_preset prefix.
-            "tts_model":             "bark",
+            # CastLock owns the delivered engine. A kokoro / google_tts /
+            # elevenlabs graph must not credit Bark from a pending writer
+            # ledger that never reached lock(). voice_preset is already
+            # empty from cast_one_character (Sprint 2 a); tts_model stays
+            # empty until CastLock stamps the engine that will actually speak.
+            "tts_model":             "",
             "voice_preset":          response.voice_preset,
             # voice_params: None today (consumers fall back to their
             # defaults). Phase 2 expands the casting LLM call to ask
@@ -2486,7 +2486,10 @@ def _assert_unique_bark_voices(cast: List[dict]) -> None:
     for row in cast:
         if _row_is_announcer(row) and row.get("tts_model") != "bark":
             continue
-        bark_voices.append((row.get("char_id"), row.get("voice_preset")))
+        preset = str(row.get("voice_preset") or "").strip()
+        if not preset.startswith("v2/"):
+            continue
+        bark_voices.append((row.get("char_id"), preset))
     voices_only = [v for _, v in bark_voices]
     if len(set(voices_only)) != len(voices_only):
         # Build a precise duplicate report for the error message

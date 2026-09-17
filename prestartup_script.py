@@ -59,6 +59,17 @@ environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
 environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "0")
 
+# A pytest/agent parent shell can leak OTR_TEST_MODE=1 into a live Comfy
+# boot (Start-Process inherits the caller env). That skip-path disables
+# pending_ master-wav re-resolve and skips durable ledger stamps, so a
+# finished episode dies at mux looking at the stale pending_ path. Pytest
+# never runs this file; PYTEST_CURRENT_TEST is the belt if someone imports
+# it from a test helper.
+if environ.get("OTR_TEST_MODE") == "1" and "PYTEST_CURRENT_TEST" not in environ:
+    environ.pop("OTR_TEST_MODE", None)
+    print("[OldTimeRadio] prestartup: cleared leaked OTR_TEST_MODE=1 "
+          "(live Comfy must not inherit pytest test mode)")
+
 # DO NOT set HF_HUB_OFFLINE=1 or TRANSFORMERS_OFFLINE=1 here. Download
 # capability is wanted for future models; the mock above already kills the
 # offending background check.

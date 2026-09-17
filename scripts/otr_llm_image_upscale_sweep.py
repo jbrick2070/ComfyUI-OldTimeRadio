@@ -166,7 +166,7 @@ def _live_llm_rows() -> tuple:
 
 LLM_ROWS = _live_llm_rows()
 STILL_ENGINES = ("still_flat", "still_motion", "still_pan", "still_word")
-IMAGE_ENGINES = ("z_image_turbo", "flux_gen1", "flux2_klein",
+IMAGE_ENGINES = ("z_image_turbo", "flux_gen1",
                  "lumina_image", "ideogram4_local")
 ROLES = ("announcer", "music", "character")
 

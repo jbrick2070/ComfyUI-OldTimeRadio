@@ -73,11 +73,10 @@ def test_gemma_12b_owns_nf4():
 
 
 def test_video_and_image_gguf_weight_files_stay(tmp_path):
-    """Writer GGUF is gone. Foley / mime / Klein / LTX / Wan still name
+    """Writer GGUF is gone. Foley / mime / LTX / Wan still name
     their .gguf artifacts. Those filenames must not become writer rows;
     a writer dropdown pick of one is refused. Video loaders resolve the
     same files through folder_paths, not validate_model_id."""
-    from nodes._otr_image_engines.flux2_klein import _DEFAULT_CKPT
     from nodes._otr_video_engines.eng_wan_ti2v import (
         _TI2V_DEFAULT_CLIP,
         _TI2V_DEFAULT_UNET,
@@ -90,7 +89,6 @@ def test_video_and_image_gguf_weight_files_stay(tmp_path):
     artifacts = (
         LTX25_DIT_GGUF,
         LTX25_TEXT_ENCODER_GGUF,
-        _DEFAULT_CKPT,
         _TI2V_DEFAULT_UNET,
         _TI2V_DEFAULT_CLIP,
         "ltx-2.3-22b-dev-Q3_K_M.gguf",

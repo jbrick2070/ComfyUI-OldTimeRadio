@@ -48,6 +48,11 @@ def test_profile_voice_bank_is_allowed_by_its_char_engine(name, engine, bank):
     allowed = list(profile.allowed_voice_banks or [])
     if not allowed:
         return              # an engine with no bank restriction (cloud lanes)
+    if not bank:
+        # 2026-09-16: profiles no longer pin voice_bank. CastLock derives the
+        # bank from the engine, so an absent override is not the leftover
+        # default/kokoro trap this test was written to catch.
+        return
     assert bank in allowed, (
         "%s pairs voice_bank %r with char_voice_engine %r, but %s allows only %s -- "
         "CastLock raises VoiceCastingError for this profile at the first episode"

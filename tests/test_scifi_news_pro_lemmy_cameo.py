@@ -190,8 +190,12 @@ def test_no_two_characters_share_a_voice_on_a_cameo_episode():
                               ["SARAH", "LEMMY", "ELIAS"], _hit())
 
     _assert_unique_bark_voices(rows)      # raises if it ever double-allocates
-    presets = [r["voice_preset"] for r in rows if r["name"] != "ANNOUNCER"]
+    presets = [r["voice_preset"] for r in rows
+               if r["name"] != "ANNOUNCER" and r.get("voice_preset")]
     assert len(presets) == len(set(presets))
+    house = [r for r in rows if r["name"] not in ("ANNOUNCER", PRO.LEMMY_NAME)]
+    assert house
+    assert all(not str(r.get("voice_preset") or "").startswith("v2/") for r in house)
 
 
 def test_a_miss_assigns_voices_exactly_as_before():

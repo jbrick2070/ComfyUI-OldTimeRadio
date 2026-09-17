@@ -6,10 +6,9 @@ Covers:
   - same_gender_voice_ref_for_preset: deterministic lowest-id same-gender
     pick, engine-scoped, reject-skipping, fail-soft on no match.
   - CastingResponse.voice_preset now accepts a verbose (>80 char) id.
-  - CastLock STEP-3 fail-soft two-lane: a repaired character row (missing
-    voice_preset) gets a bark fallback AND, when a cloner engine resolves,
-    a same-gender voice_ref_id; rows that already carry a preset are
-    untouched (byte-safe).
+  - CastLock STEP-3 is fail-loud: a character row with neither voice_preset
+    nor voice_ref_id raises. A kokoro row that already has voice_ref_id is
+    voiced. Rows that already carry a preset are left untouched.
 
 Hermetic: no GPU, no network. The helper tests use a synthetic bank.
 """
@@ -96,8 +95,7 @@ def test_castlock_missing_preset_row_fails_loud():
         {"char_id": "c02", "name": "ALICE", "gender": "female"},  # no preset
     ]
     with pytest.raises(VoiceCastingError, match="no voice_preset"):
-        CastLock._resolve_character_voices_fail_soft(
-            cast, lines=[], voice_bank="default")
+        CastLock._resolve_character_voices_fail_soft(cast, lines=[])
 
 
 def test_castlock_two_lane_leaves_voiced_rows_untouched():
@@ -108,9 +106,27 @@ def test_castlock_two_lane_leaves_voiced_rows_untouched():
         {"char_id": "c02", "name": "BOB", "gender": "male",
          "voice_preset": "v2/en_speaker_5"},  # already voiced
     ]
-    CastLock._resolve_character_voices_fail_soft(
-        cast, lines=[], voice_bank="default")
+    CastLock._resolve_character_voices_fail_soft(cast, lines=[])
     bob = cast[1]
     # Untouched: preset preserved, no clone id force-stamped on a normal row.
     assert bob["voice_preset"] == "v2/en_speaker_5"
     assert "voice_ref_id" not in bob
+
+
+def test_castlock_voice_ref_id_only_is_resolvable():
+    """Kokoro stamps voice_ref_id and clears leftover v2/*. That row is voiced."""
+    from nodes.cast_lock import CastLock
+
+    cast = [
+        {"char_id": "c01", "name": "ANNOUNCER", "voice_preset": "bf_emma"},
+        {"char_id": "c02", "name": "ALICE", "gender": "female",
+         "voice_engine": "kokoro", "voice_ref_id": "bf_emma"},
+    ]
+    lines = [
+        {"line_id": "l001", "speaker_role": "character", "char_id": "c02",
+         "text": "Hello."},
+    ]
+    notes = CastLock._resolve_character_voices_fail_soft(cast, lines)
+    assert notes == []
+    assert "voice_preset" not in cast[1] or not cast[1].get("voice_preset")
+    assert cast[1]["voice_ref_id"] == "bf_emma"

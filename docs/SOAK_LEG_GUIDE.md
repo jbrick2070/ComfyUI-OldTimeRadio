@@ -160,14 +160,14 @@ rows with no visual distinction beyond the source file.
 
 * **Still/video (no video):** `still_flat`, `still_motion`, `still_pan`,
   `still_word` (+ `word_razzle`, a 5th word-display variant, if wanted).
-* **Local image models (5):** `z_image_turbo`, `flux_gen1`, `flux2_klein`,
+* **Local image models (4):** `z_image_turbo`, `flux_gen1`,
   `lumina_image`, `ideogram4_local`.
 * **Upscale (2, exhaustive):** `off`, `spandrel_esrgan`.
-* **Curated local LLM rows (7, per `docs/LLM_PREFLIGHT_GUIDE.md`):**
+* **Curated local LLM rows (per `apple/WRITERS.md`):**
   `mistralai/Mistral-Nemo-Instruct-2407`, `google/gemma-4-E2B-it`,
   `google/gemma-4-E4B-it`, `google/gemma-4-12b-it`,
-  `unsloth/gemma-4-12b-it-GGUF`, `unsloth/Qwen3-8B-GGUF`,
-  `google/gemma-2-2b-it`. Pass the FULL dropdown label including the size
+  `google/gemma-2-2b-it`, plus the two Qwen 3.5 identities. There is no
+  GGUF writer. Pass the FULL dropdown label including the size
   suffix to `--creative-model`/`--technical-model` (e.g.
   `'google/gemma-4-12b-it (11.9 GB)'`) -- `validate_model_id` resolves it.
 

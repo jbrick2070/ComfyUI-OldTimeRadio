@@ -179,7 +179,7 @@ If you were sent here looking for a way to turn GGUF back on: there is not one,
 and you do not need it.
 
 Video and image GGUF files are a different dropdown and they stay. Foley, mime,
-Klein, LTX, and Wan still load their `.gguf` UNets / encoders through those
+LTX, and Wan still load their `.gguf` UNets / encoders through those
 lanes. That is not a writer.
 
 ---

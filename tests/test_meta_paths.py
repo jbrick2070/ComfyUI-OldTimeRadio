@@ -323,7 +323,7 @@ class TestPublishedNameBindsTheEpisode:
     def test_the_watching_name_is_adopted(self, workspace):
         candidate = (workspace["otr_root"] / "obs" /
                      "the_test_episode_20260904_094319__anime__still_motion"
-                     "__flux2_klein__bark__media_archive_final.mp4")
+                     "__lumina_image__bark__media_archive_final.mp4")
         candidate.write_bytes(b"published")
         assert self._obs_final(workspace, candidate) == candidate.resolve()
 

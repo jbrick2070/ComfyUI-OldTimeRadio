@@ -61,7 +61,7 @@ def test_runpod_manual_recipes_carry_every_authoritative_manifest():
         encoding="utf-8"
     )
     assert set(provision.MANUAL_TIERS) == {
-        "ltx25", "humo_1_7b", "flux2_klein",
+        "ltx25", "humo_1_7b",
     }
     for tier_id, artifacts in provision.MANUAL_TIERS.items():
         assert artifacts, f"manual tier {tier_id} has no artifacts"

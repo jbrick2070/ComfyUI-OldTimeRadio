@@ -27,7 +27,6 @@ claims that one engine intrinsically consumes 100 GiB of RAM.
 | Goal | Starting hardware | Status |
 |---|---|---|
 | Default AnimateDiff episode path | 8 GB NVIDIA | Proven on the physical RTX 4060 for writer/video/voice/music; configured still-image lane was not invoked |
-| Klein still/image lane | 8 GB NVIDIA | Physical 4060 lab still rendered pre-fix, but took about 42 minutes and was not an OTR episode; fixed-card retest pending |
 | HuMo 14B | 16 GB+ NVIDIA and 32 GB+ host RAM | Proven on the physical RTX 5080; public pinned download |
 | LTX 2.5, shipped 1664x960 output | 32-48 GB NVIDIA and 100 GiB+ cgroup RAM | Use a 48 GB L40S first; 24 GB RTX 4090 exact tuple reached decode and GPU-OOMed |
 | MiniMax H3 | Authorized owned/offline NVIDIA hardware | Never put operator H3 weights on RunPod |
@@ -36,7 +35,6 @@ RTX 5090, RTX 4090, RTX 3090, and RTX 3080 Ti are useful physical-card
 candidates, not blanket compatibility claims. A card becomes proven only after
 a canonical episode publishes with a complete receipt. Eight GB is not a
 supported target for HuMo 14B, LTX 2.5, or a full H3 episode. It remains the
-proven floor for the default AnimateDiff episode path. Klein is physically
 lab-measured on 8 GB but remains an episode-unproven candidate: its first
 pre-fix still took about 42 minutes, and the post-residency-fix card retest is
 still pending.
@@ -268,36 +266,6 @@ fetch_exact () {
 }
 ```
 
-### Flux.2 Klein: manual public files for AMD and still-consuming profiles
-
-The AMD machine row and any still-consuming Klein profile name
-`flux2_klein` as a manual tier. The 8/12 GB NVIDIA rows expose Klein as an
-image selection, but their AnimateDiff video path accepts no init still, so
-the planner intentionally does not gate that proven episode path on these
-optional files. To qualify Klein itself, fetch these three public files
-(10,985,506,708 bytes total):
-
-```bash
-fetch_exact Latentiq/FLUX.2-klein-4B-GGUF \
-  4dc94114f28d56e7b63e7bb624a1c1f20353245b \
-  flux-2-klein-4b-Q4_K_M.gguf \
-  diffusion_models/flux-2-klein-4b-Q4_K_M.gguf \
-  2604311104 0b25d143c8469b342bc5af3bce92b783bf6b0636d285f7b2f75e38af63af9a15
-
-fetch_exact Comfy-Org/flux2-klein \
-  5f526678002e43af5551dadb73ce2e8c91b43afe \
-  split_files/text_encoders/qwen_3_4b.safetensors \
-  text_encoders/qwen_3_4b.safetensors \
-  8044982048 6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a
-
-fetch_exact Comfy-Org/flux2-dev \
-  ab9055628ea245000e610f2aa2c96f4746093546 \
-  split_files/vae/flux2-vae.safetensors \
-  vae/flux2-vae.safetensors \
-  336213556 d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5
-
-bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
-```
 
 ### HuMo 14B: automatic public lane
 
@@ -678,7 +646,7 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | A leg reports FAIL at EXACTLY the timeout you set | The runner's `--timeout` bounds the WATCHER, not the render | The log says so in as many words: `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE: the server reports 1 running`. The episode usually still publishes. This is a MEASUREMENT ("this lane needs more than N minutes here"), not a defect -- do not file it as one. Hit three times on 2026-09-03/04: wan_ti2v at 40 min (1 act) and 120 min (3 acts), fastwan_8gb at 40 min |
 | Two legs render at once and both crawl | A previous leg's PROMPT is still executing server-side | Killing the leg CLIENT never cancelled it. See the atlas row above on `/queue`; check `nvidia-smi` and load average before blaming the lane |
 | A lane fails instantly with `DEPENDENCY_MISSING` on a fresh pod | Provisioning fetched the lane's weights but not its extra tool | `mesh_stage` wants a pinned portable Blender (`OTR_BLENDER_*`); `ltx_video` wants weights the default provision does not pull. Both refuse loudly and correctly -- fetch the dependency or drop the lane from the sweep |
-| Every image lane resolves to `z_image_turbo` no matter which profile you pick | Only z_image is on the pod | flux2_klein, flux_gen1, lumina_image and ideogram4_local are the "manual public files" tiers and `otr_fetch_lane_weights.py` does not offer them. A profile naming one fails ADAPTER-level usability before a pixel renders. Image-model coverage is a SEPARATE download errand -- plan it before the sweep, not during |
+| Every image lane resolves to `z_image_turbo` no matter which profile you pick | Only z_image is on the pod | 
 
 ## 7A. Driving a pod from a second machine (2026-09-03)
 

@@ -56,6 +56,7 @@ def _shipped_concrete_ids() -> set[str]:
     # cannot see is precisely the second-list-that-must-agree defect the rest of
     # this suite exists to prevent.
     concrete.update(getattr(cat, "OPENROUTER_CURATED_ROUTERS", ()))
+    concrete.update(getattr(cat, "OPENROUTER_CURATED_UNTILDED_LATEST", ()))
     # Computed from the '~' prefix rather than a hand-kept list, so a future
     # alias-valued default (chunk B) does not demand a nonsensical date entry.
     return {mid for mid in concrete if not mid.startswith("~")}
@@ -65,6 +66,7 @@ def _all_shipped_ids() -> set[str]:
     ids = set(cat.OPENROUTER_CURATED_ALIASES) | _shipped_concrete_ids()
     ids.update(row["id"] for row in getattr(cat, "CURATED_CREATIVE_ROWS", ()))
     ids.update(getattr(cat, "OPENROUTER_CURATED_ROUTERS", ()))
+    ids.update(getattr(cat, "OPENROUTER_CURATED_UNTILDED_LATEST", ()))
     return ids
 
 
@@ -240,9 +242,23 @@ def test_curated_aliases_are_all_routing_pointers_and_unique():
     for slug in aliases:
         assert slug.startswith("~"), (
             f"{slug!r} is in the curated ROUTING-POINTER set but is not a "
-            f"'~...' pointer. A concrete id belongs in CURATED_CREATIVE_ROWS "
+            f"'~...' pointer. A concrete id belongs in "
+            f"OPENROUTER_CURATED_UNTILDED_LATEST or CURATED_CREATIVE_ROWS "
             f"with a verified-on date."
         )
+
+
+def test_openai_chat_latest_is_the_untitled_moving_alias_and_is_dated():
+    """Operator 2026-09-16: openai/gpt-chat-latest is OpenAI's own moving
+    ChatGPT Instant alias. It has no leading `~`. Keep it out of the `~`
+    pointer tuple, date it, and offer it in the dropdown."""
+    untitled = cat.OPENROUTER_CURATED_UNTILDED_LATEST
+    assert untitled == ("openai/gpt-chat-latest",)
+    assert "openai/gpt-chat-latest" not in cat.OPENROUTER_CURATED_ALIASES
+    assert cat.OPENROUTER_VERIFIED_ON_BY_ID["openai/gpt-chat-latest"] == "2026-09-16"
+    for slug in untitled:
+        assert not slug.startswith("~")
+        assert slug.endswith("-latest")
 
 
 def test_curated_pointer_spellings_are_pinned_literally():
@@ -257,7 +273,8 @@ def test_curated_pointer_spellings_are_pinned_literally():
     misspelled and the whole suite would stay green.
 
     Each spelling below was verified against live /api/v1/models -- the first
-    ten on 2026-08-07, the deepseek flash pointer on 2026-08-09.
+    ten on 2026-08-07, the deepseek flash pointer on 2026-08-09, the OpenAI
+    family / GLM / DeepSeek Pro+Flash pointers on 2026-09-16.
     """
     pinned = {
         "~anthropic/claude-opus-latest",
@@ -271,6 +288,14 @@ def test_curated_pointer_spellings_are_pinned_literally():
         "~moonshotai/kimi-latest",
         "~x-ai/grok-latest",
         "~deepseek/deepseek-v4-flash-latest",
+        "~openai/gpt-astra-latest",
+        "~openai/gpt-sol-latest",
+        "~openai/gpt-terra-latest",
+        "~openai/gpt-luna-latest",
+        "~z-ai/glm-latest",
+        "~z-ai/glm-flash-latest",
+        "~deepseek/deepseek-pro-latest",
+        "~deepseek/deepseek-flash-latest",
     }
     assert set(cat.OPENROUTER_CURATED_ALIASES) == pinned, (
         "The curated pointer set changed. That is allowed -- but update these "

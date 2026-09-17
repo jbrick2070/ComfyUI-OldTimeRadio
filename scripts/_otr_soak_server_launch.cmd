@@ -19,6 +19,10 @@ rem "SERVER DID NOT COME UP" failure. Desktop used to set this for us; the
 rem v2 install move dropped it. Force UTF-8 mode for stdio + filesystem.
 set PYTHONUTF8=1
 set PYTHONIOENCODING=utf-8
+rem A pytest/agent parent can leak OTR_TEST_MODE=1 into this cmd
+rem (Start-Process inherits). Live mux then will not follow a pending_
+rem rename and durable stamps skip disk. Always clear it here.
+set OTR_TEST_MODE=
 set CUBLAS_WORKSPACE_CONFIG=:4096:8
 set PYTHONHASHSEED=0
 set NVIDIA_TF32_OVERRIDE=0
@@ -77,7 +81,6 @@ rem A boot that inherits them already simply re-sets the same value.
 rem z_image_turbo is deliberately NOT here: it ranks and auto-discovers its own
 rem unet (z_image_turbo.py:197-249), so it needs no variable to survive.
 for /f "usebackq delims=" %%m in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_LUMINA_CKPT','User')"`) do set OTR_LUMINA_CKPT=%%m
-for /f "usebackq delims=" %%m in (`powershell -NoProfile -Command "[Environment]::GetEnvironmentVariable('OTR_FLUX2_KLEIN_CKPT','User')"`) do set OTR_FLUX2_KLEIN_CKPT=%%m
 rem OUTPUT UNIFICATION (operator directive 2026-06-09): even headless, ALL
 rem outputs -- episodes, portraits, finals, EVERYTHING -- land in the REAL
 rem output folder the operator watches. --output-directory pins ComfyUI's

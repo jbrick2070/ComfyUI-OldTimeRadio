@@ -173,7 +173,6 @@ because ComfyUI's loader really does run those as two phases. **On unified
 memory every artifact is charged as concurrently resident.** The two-phase
 split is a fiction there: `free_after_use` does not evict on MPS
 (PBUG-20260908-02 -- `wan_ti2v` logged `0 models unloaded.` immediately before
-the load that killed the machine; `flux2_klein` held a 7.67 GB encoder through
 sampling; `ltx_8gb` never attempted an unload at all). "offload device: cpu" is
 ComfyUI working as designed, and on unified memory host RAM IS the accelerator's
 memory, so the move frees nothing. Charging the sum is the conservative
@@ -200,7 +199,6 @@ lands, in either direction.
   `mesh_stage`. **Every other lane is unguarded** -- not blocked, just
   unchecked. The Lightning AnimateDiff lane has a guard of its own (below);
   its v3 siblings do not.
-* **It does not cover image engines at all.** `z_image_turbo`, `flux2_klein`,
   `lumina_image` and `flux_gen1` are on you.
 * It is a FLOOR: it weighs the files, not the activations, so it catches "the
   weights alone do not fit" and nothing subtler. `z_image_turbo` died in the
@@ -407,31 +405,6 @@ Its own docstring recommends `nvfp4` for low VRAM, which is useless on a Mac.
 There is no fourth option: the model is either too large, or quantised in a
 format Metal cannot execute. It is not CUDA-only; it is large.
 
-### `flux2_klein`: minted a clean still, has not finished an episode
-
-`flux-2-klein-4b-Q4_K_M.gguf` through `UnetLoaderGGUF` minted a clean 1472x832
-still on the first attempt -- coherent subject, correct style adherence, no
-green cast, no smearing. Receipt:
-`otr/episodes/signal_lost_the_dark_sea_beyond_the_glass_20260908_095959/stills/still_music_opening_001_d94b2a43c4e6.png`,
-20 steps, guidance 4.0, ~8 min per still. That settles the "K_M quants garble
-on Metal" concern in the good direction (section 11).
-
-What it does not settle: **no episode has published with it.** The run was
-killed when swap ate 14 GB of disk. The reason is PBUG-20260908-02 -- on Metal
-its 7.67 GB text encoder is NOT evicted before sampling, so the whole
-**10.99 GB** set is resident at once (an earlier draft of this guide quoted
-2.6 GB, which is only the first of three files):
-
-| file | size | source |
-| --- | --- | --- |
-| `flux-2-klein-4b-Q4_K_M.gguf` | 2.60 GB | manual -- `flux2_klein` sits in `scripts/otr_provision.py` `MANUAL_TIERS` |
-| `qwen_3_4b.safetensors` (text encoder) | 8.04 GB | manual |
-| `flux2-vae.safetensors` | 0.34 GB | manual |
-
-It ran, from swap, at 23.5 s/step. Its row is still `["cuda"]` because no
-episode has earned `mps`. `config/machine_classes.json` names Klein 4B as the
-Mac image ruling; on this 16 GB box `sd15` at 1.99 GB is the one that publishes.
-The punch list carries the open item.
 
 ### An image engine is INERT until a video lane consumes its still
 
@@ -1155,23 +1128,19 @@ this.
 
 **Be precise about what is proven here: the INSTALL and one STILL, not an
 episode.** The ComfyUI-GGUF pack is verified registered on this machine (six
-loader classes, boot clean, one added wheel); `flux2_klein` minted one clean
 still through it (section 4); **no GGUF lane has completed an episode on Apple
 Silicon in this repository.**
 
 **What GGUF buys you on a Mac.** Quantised weights are how the bigger lanes fit
-in unified memory at all. `flux2_klein` is 2.60 GB as a Q4 GGUF against 7.75 GB
 bf16; `wan_ti2v`'s shipped set is 9.37 GB GGUF against 21.2 GB in fp16, and the
 fp16 route is the one that took this machine down. So on this platform GGUF is
 not an optimisation, it is frequently the only version that can run.
 
 ### 11.0 K_M quants do NOT garble on Metal -- SETTLED 2026-09-08
 
-Commit `5f1b94b4` passed over `flux2_klein` for Apple Silicon partly because
 *"K_M quants garble on MPS"*, and city96's ComfyUI-GGUF issue #177 reports GREEN
 OUTPUT from `Q*_K` Flux weights on Metal. A web sweep judged #177 to predate a
 PyTorch MPS integer-operation fix and to be contradicted by later Flux-family
-GGUF runs. **Measured here, and the sweep was right** -- the Klein still in
 section 4 is the receipt.
 
 So a K_M quant is not a reason to avoid a lane on this platform. **The habit is
@@ -1225,7 +1194,6 @@ INCOMPLETE every time until git-lfs exists -- and moving the broken clone aside
 does not settle it, because the next run re-clones and fails again the same way.
 What you get by moving it aside is a ComfyUI that boots cleanly in the meantime,
 not a finished provision. The GGUF pack DOES land before that failure, which is
-why Klein and the Wan lanes are reachable without it.
 
 **And clean up after the failure, because it does not.** A failed checkout
 leaves a directory full of files with NO COMMITS -- `git log` says *"your current
@@ -1481,8 +1449,6 @@ for it.**
 | candidate | external evidence | here, on the 16 GB M4 |
 | --- | --- | --- |
 | **LTX-Video 0.9.8 distilled** | strong | **PROVEN** (section 5). Nothing further needed unless torch/ComfyUI move |
-| **FLUX.2 Klein 4B Q6** | strong -- an exact 16 GB completion exists | not tried; the Q4_K_M row below is the one in the registry |
-| **FLUX.2 Klein 4B Q4_K_M** | moderate -- no exact 16 GB report found | **minted a clean still** at ~8 min each, from swap; no episode (section 4). K_M garbling: settled, does not happen (section 11.0) |
 | **AnimateDiff-Evolved + SD1.5** | moderate on Metal (2023 completions); STRONG on cost -- 4.9 GB with SD1.5 fully resident on the 4060 | **PROVEN with the Lightning module** (section 7); the v3 golden recipe renders correctly and is ~45 min a beat. Use the PINNED commit, not `main` (below) |
 | CogVideoX-2B | anecdote -- one Mac walkthrough, no hardware named | unproven at this size, not in the registry |
 | Wan 2.1 Fun InP 1.3B | anecdote -- an exact M4/16 GB completion EXISTS | **Do not follow it as written:** it required `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0`, which REMOVES the MPS allocation ceiling. On a host where OOM reboots the machine, that setting is the opposite of a mitigation |
@@ -1554,7 +1520,6 @@ That covers every knob that binds: the loader-name and path overrides
 changed, you almost certainly set it on the wrong process.
 
 **`ENABLE_FLAG` constants gate nothing.** Some adapters still carry one --
-`flux2_klein.ENABLE_FLAG = "OTR_ENABLE_FLUX2_KLEIN"`, and `eng_wan_ti2v`'s
 docstring calls `OTR_ENABLE_WAN_TI2V` a "vestigial opt-in flag". Both adapters
 set `requires_flag = None`, `EngineUsabilityReason.GATED_BY_FLAG` is documented
 dead, and `tests/test_registry_is_the_menu_guard.py` asserts that no registered
@@ -1630,7 +1595,6 @@ so the trail is visible without interrupting the current answer.
 | 2026-09-07 | Apple Silicon has no local image engine | `z_image_turbo` executes on Metal and is blocked by RAM; the `["cuda"]` row was wrong in kind |
 | 2026-09-08 | no local image engine fits 16 GB; the visualizer lanes are the only fully-local video path | `sd15`, all four `still_*` lanes and `ltx_8gb` work. Conclusion had been drawn from one engine's failure (section 3) |
 | 2026-09-08 | a cloud image key is "the single highest-leverage addition for a Mac" because it unlocks the `still_*` lanes | `sd15` unlocks them locally and for free; a cloud key buys different-looking stills, not reachable ones |
-| 2026-09-08 | `flux2_klein` is 2.6 GB | 10.99 GB across three files; and on Metal the encoder is not evicted, so all of it is resident (section 4) |
 | 2026-09-08 | the all-LTX episode took "about 55 minutes" | 1:07:27 measured; the 55 was interpolated |
 | 2026-09-08 | the unified-memory guard charges the larger of encoder vs. the rest | on unified memory it charges every artifact, because eviction does not happen on MPS (section 2) |
 | 2026-09-08 | forcing SDPA attention on MPS makes every diffusion lane ~14x slower | ~1.15x end to end; the microbenchmark could not be reconciled with the step time it sat inside (PBUG-20260908-05) |

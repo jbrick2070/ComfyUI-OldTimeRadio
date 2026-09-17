@@ -13,7 +13,7 @@ means the lanes need no video weights.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | shipping |
+| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_motion | sd15 | none | nothing | shipping |
 | **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | shipping |
 | foley | _not built_ | | | | | | | |
 | mime | _not built_ | | | | | | | |
@@ -24,10 +24,10 @@ means the lanes need no video weights.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | shipping |
-| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | shipping |
-| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | shipping |
-| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | z_image_turbo | manual | ComfyUI-GGUF | shipping |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | still_motion | lumina_image | none | nothing | shipping |
+| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | lumina_image | manual | ComfyUI-GGUF | shipping |
+| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | lumina_image | manual | ComfyUI-GGUF | shipping |
+| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | lumina_image | manual | ComfyUI-GGUF | shipping |
 | **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
 ### Apple Silicon, 16 GB
@@ -46,7 +46,7 @@ means the lanes need no video weights.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | low | _not built_ | | | | | | | |
-| **still** | `otr_amd_still` | Qwen3.5-4B | none | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | draft |
+| **still** | `otr_amd_still` | Qwen3.5-4B | none | still_motion | z_image_turbo | none | nothing | draft |
 | video | _not built_ | | | | | | | |
 | foley | _not built_ | | | | | | | |
 | mime | _not built_ | | | | | | | |
@@ -70,5 +70,5 @@ means the lanes need no video weights.
 | **low_1act** | `otr_cloud_low_1act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
 | **low** | `otr_cloud_low` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
 | **low_5act** | `otr_cloud_low_5act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_3act** | `otr_cloud_deluxe_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_3act** | `otr_cloud_deluxe_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_flux_pro | manual | nothing | shipping |
+| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_flux_pro | manual | nothing | shipping |

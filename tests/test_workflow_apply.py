@@ -92,7 +92,7 @@ def _registry_engine_ids():
     # CAPABILITIES rows removed in C3), so neither contributed an engine id to
     # this sweep even while the files existed.
     from nodes._otr_image_engines import (  # noqa: F401
-        eng_cloud_image, flux2_klein, flux_gen1, lumina_image, z_image_turbo,
+        eng_cloud_image, flux_gen1, lumina_image, z_image_turbo,
     )
     return (set(vreg.all_engine_names()) | set(areg._REGISTRY)
             | set(ireg.all_engine_names()))

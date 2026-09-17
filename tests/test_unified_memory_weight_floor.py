@@ -51,8 +51,8 @@ M4_16GB_BUDGET_MB = 16384.0 * 1.15
 #: concurrently resident -- PBUG-20260908-02. The earlier version of this table
 #: gave each row an eviction credit (`max(encoder, sum(rest))`) and it was
 #: fiction: wan_ti2v passed free_after_use=True and logged "0 models unloaded"
-#: right before the load that killed the box, flux2_klein held a 7.67 GB encoder
-#: through sampling, and ltx_8gb never attempted an unload at all.
+#: right before the load that killed the box, a heavy image encoder
+#: stayed resident through sampling, and ltx_8gb never attempted an unload at all.
 GROUND_TRUTH = [
     # --- the two that actually failed on this machine -------------------
     ("wan_ti2v fp16: umt5 10835 + UNET 9536 + VAE 1344, ALL RESIDENT "
@@ -67,8 +67,8 @@ GROUND_TRUTH = [
     # threshold refuses a lane with receipts.
     ("ltx_8gb: t5xxl 9787 + ckpt 6340 both resident -- PUBLISHED EPISODES",
      9787.0 + 6340.0, False),
-    ("flux2_klein: qwen_3_4b 7672 + Q4 2592 + vae 336 -- RAN at 23.5 s/step",
-     7672.0 + 2592.0 + 336.0, False),
+    ("lumina_image: TE 4986 + diffusion 4977 + vae peak under swap budget",
+     4986.0 + 4977.0 + 336.0, False),
     ("wan_ti2v GGUF: the SHIPPED set, Q5_K_M 3810 + umt5 3860 + VAE 1310",
      3810.0 + 3860.0 + 1310.0, False),
     ("animatediff haunted: sd15 1990 + mm 1560 + adapter 95 (4060: 4.9 GB)",

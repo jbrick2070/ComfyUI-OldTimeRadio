@@ -1,6 +1,6 @@
 {
     "id": "otr_sbcov_2",
-    "display_name": "stills+bookends coverage (still_flat / flux2_klein / viz_mxc_cpu)",
+    "display_name": "stills+bookends coverage (still_flat / lumina_image / viz_mxc_cpu)",
     "status": "draft",
     "platform": "any",
     "device_backend": "cuda",
@@ -11,9 +11,9 @@
         "announcer_visual": "viz_mxc_cpu",
         "music_visual": "viz_mxc_cpu",
         "character_visual": "still_flat",
-        "announcer_image": "flux2_klein",
-        "music_image": "flux2_klein",
-        "character_image": "flux2_klein"
+        "announcer_image": "lumina_image",
+        "music_image": "lumina_image",
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",

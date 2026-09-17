@@ -120,7 +120,7 @@ GROUPS = {
     ],
     # HuMo -- wants OTR_HEADLESS_RESERVE_VRAM_GB + DISABLE_PINNED, so its own boot.
     "humo": [
-        ("otr_rot_humo_klein", "humo"),                 # flux2_klein
+        ("otr_rot_humo_lumina", "humo"),                # lumina_image
         ("otr_w45_humo_1_7b", "humo_1.7B"),
         ("otr_w45_humo_1_7b_169", "humo_1.7B_169"),
         ("otr_w45_humo_14b_169", "humo_14B_169"),

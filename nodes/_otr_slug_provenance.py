@@ -83,7 +83,7 @@ LANE_AUTHORITY: Dict[str, str] = {
     "comfy": "Comfy Cloud partner-node catalog (NOT OpenRouter -- presence "
              "there is a signal, not proof that Comfy serves it)",
     "comfy_image": "Comfy Cloud partner-node catalog (display names)",
-    "elevenlabs": "ElevenLabs GET /v1/models",
+    "cloud_elevenlabs": "ElevenLabs GET /v1/models",
     "google_api": "Google generativelanguage models.list",
     "google_image": "Google generativelanguage models.list, image-capable",
     "google_lyria": "Google generativelanguage models.list, music-capable",
@@ -149,9 +149,9 @@ SLUG_PROVENANCE: Dict[Tuple[str, str], ProvenanceRecord] = {
     # something no longer offered is the stale-entry defect in the other
     # direction (`test_provenance_carries_nothing_the_pack_no_longer_ships`).
 
-    # --- elevenlabs: its own endpoint was not fetched ------------------------
-    ("eleven_multilingual_v2", "elevenlabs"): _UNSET,
-    ("eleven_v3", "elevenlabs"):              _UNSET,
+    # --- cloud_elevenlabs: its own endpoint was not fetched ------------------------
+    ("eleven_multilingual_v2", "cloud_elevenlabs"): _UNSET,
+    ("eleven_v3", "cloud_elevenlabs"):              _UNSET,
 
     # --- comfy_image: display selectors, Comfy is the authority --------------
     # These four groups have no reachable catalog, so nothing can settle them
@@ -288,9 +288,9 @@ EVERGREEN_EXEMPTIONS: Dict[Tuple[str, str], str] = {
         "Google publishes no -latest pointer for music models (2026-08-10 catalog)",
 
     # --- ElevenLabs has no pointer convention at all -------------------------
-    ("eleven_multilingual_v2", "elevenlabs"):
+    ("eleven_multilingual_v2", "cloud_elevenlabs"):
         "ElevenLabs model ids are versioned families with no -latest alias",
-    ("eleven_v3", "elevenlabs"):
+    ("eleven_v3", "cloud_elevenlabs"):
         "ElevenLabs model ids are versioned families with no -latest alias",
 
     # --- Comfy partner catalog: authority is Comfy, and it is unverifiable

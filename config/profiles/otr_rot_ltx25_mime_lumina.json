@@ -1,6 +1,6 @@
 {
-    "id": "otr_rot_ltx25_video_klein",
-    "display_name": "LTX 2.5 Distilled Q3: silent video, 832x480x97 (5080-only) + flux2_klein (rotation)",
+    "id": "otr_rot_ltx25_mime_lumina",
+    "display_name": "LTX 2.5 Distilled Q3: MIME on character beats (5080-only; 1.00 foley / 0.00 master, per-window) + lumina_image (rotation)",
     "status": "draft",
     "platform": "any",
     "device_backend": "cuda",
@@ -10,17 +10,17 @@
     "role_overrides": {
         "announcer_visual": "ltx25_high_video",
         "music_visual": "ltx25_high_video",
-        "character_visual": "ltx25_high_video",
-        "announcer_image": "flux2_klein",
-        "music_image": "flux2_klein",
-        "character_image": "flux2_klein"
+        "character_visual": "ltx25_high_mime",
+        "announcer_image": "lumina_image",
+        "music_image": "lumina_image",
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",
         "char_voice_engine": "indextts2",
         "announcer_voice_engine": "kokoro",
         "music_engine": "stable_audio_3",
-        "video_render_engine": "ltx25_high_video"
+        "video_render_engine": "ltx25_high_mime"
     },
     "features": {
         "burn_captions": true,
@@ -39,8 +39,8 @@
         "vram_ceiling_gb": 14.5,
         "gguf_n_ctx": 4096,
         "gguf_quant": "Q8_0",
-        "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
-        "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
+        "creative_model": "google/gemma-4-12b-it",
+        "technical_model": "google/gemma-4-12b-it",
         "openrouter_slot_a_model": "(enable OpenRouter)",
         "openrouter_slot_b_model": "(enable OpenRouter)",
         "comfy_slot_a_model": "(enable Comfy Credits)",

@@ -275,11 +275,11 @@ def test_google_all_profile_dry_run_builds_prompt(
     assert writer["inputs"]["technical_model"] == "google_api:slot-b"
     assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
     assert writer["inputs"]["google_api_slot_b_model"] == "gemini-flash-lite-latest"
-    assert cast["inputs"]["voice_bank"] == "google_tts"
     assert cast["inputs"]["char_voice_engine"] == "google_tts"
     assert cast["inputs"]["announcer_voice_engine"] == "google_tts"
-    assert char_voice["inputs"]["engine"] == "google_tts"
-    assert announcer_voice["inputs"]["engine"] == "google_tts"
+    assert "engine" not in char_voice["inputs"]
+    assert "engine" not in announcer_voice["inputs"]
+    assert "voice_bank" not in cast["inputs"]
     assert music["inputs"]["engine"] == "google_lyria"
     video_label = _video_pick(video_engine)
     assert director["inputs"]["announcer_video_model"] == video_label

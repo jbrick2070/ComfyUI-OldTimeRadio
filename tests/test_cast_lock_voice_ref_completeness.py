@@ -120,7 +120,10 @@ def test_unspecified_gender_names_the_real_render_reference_without_changing_ide
              "voice_preset": "v2/en_speaker_1"},
             {"char_id": "c2", "name": "Mother", "gender": gender,
              "voice_preset": "v2/en_speaker_2"}]
-    out = CastLock().lock(script_json=_ledger(cast), cast_voice_policy="auto_registry")
+    out = CastLock().lock(
+        script_json=_ledger(cast),
+        cast_voice_policy="auto_registry",
+        char_voice_engine="indextts2")
     rows = json.loads(out[0])["cast"]
     assert rows[0]["voice_ref_id"] != rows[1]["voice_ref_id"]
     entries, _ = load_voice_bank()

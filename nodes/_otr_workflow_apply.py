@@ -606,10 +606,10 @@ def _llm_option_value(node_type: str, widget: str, value: Any,
     leave a saved graph carrying a value ComfyUI's own COMBO validation does not
     recognize, so resolve it to the live choice.
 
-    Qwen 3.5 has two identities. A profile still names the family
-    (``Qwen/Qwen3.5-4B``) plus ``quant_policy``; when Quant is supplied this
-    maps that pair onto the matching twin so an 8 GB graph saves the NF4
-    label and a Mac graph saves the full label.
+    Qwen 3.5 is one identity. A profile still names the family
+    (``Qwen/Qwen3.5-4B``) plus ``quant_policy``; Quant is baked from the
+    machine at load time. This maps the bare family onto the single live
+    COMBO label (badge included).
 
     Falls through UNCHANGED whenever the choice list is unavailable or nothing
     matches -- a remote handle (``openrouter:slot-a``), an uncurated id with no

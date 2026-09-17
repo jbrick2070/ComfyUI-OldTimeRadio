@@ -46,9 +46,9 @@ def test_canonical_ships_kokoro_on_both_voice_slots():
     data = json.loads((REPO / "workflows" / "otr_canonical.json").read_text(encoding="utf-8"))
     by_id = {n["id"]: n for n in data["nodes"]}
     assert by_id[80]["type"] == "OTR_CastLock"
-    assert by_id[80]["widgets_values"][0] == "kokoro_builtin"
-    assert by_id[80]["widgets_values"][3] == "kokoro" and by_id[80]["widgets_values"][4] == "kokoro"
-    assert by_id[81]["widgets_values"] == ["kokoro"] and by_id[82]["widgets_values"] == ["kokoro"]
+    assert by_id[80]["widgets_values"] == [
+        "auto_registry", True, "kokoro", "kokoro", "default"]
+    assert by_id[81]["widgets_values"] == [] and by_id[82]["widgets_values"] == []
 
 
 def test_the_boot_message_names_only_templates_that_ship():

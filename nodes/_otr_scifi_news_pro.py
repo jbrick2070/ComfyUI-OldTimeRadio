@@ -3855,8 +3855,11 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
                    decision=None) -> "list[dict]":
     """r3/M8: returns COMPLETE ledger cast rows (set_cast contract):
     python-prebaked ANNOUNCER c01 (kokoro) + characters c02.. in
-    first-appearance order (bark presets from the validated menu picks).
-    The LLM invents the person; Python picks the larynx.
+    first-appearance order. House-character larynx identity stays empty
+    until CastLock owns it -- a kokoro graph must not credit Bark from a
+    pending writer ledger. The menu still unique-checks timbre picks; those
+    ids are not written as v2/* presets. LEMMY keeps his writer-stage Bark
+    identity; CastLock clears it when the character engine is not Bark.
 
     On a cameo episode LEMMY is SYNTHESIZED here rather than looked up: the
     casting artifact never covered him, because the menu he would have been cast
@@ -3904,8 +3907,8 @@ def _assign_voices(casting: CastingVoices, menu: VoiceMenu,
             "name": cv.name,
             "character_description": cv.character_description,
             "gender": cv.gender,
-            "tts_model": "bark",
-            "voice_preset": entry.preset,
+            "tts_model": "",
+            "voice_preset": "",
             "voice_params": None,
         })
     return rows

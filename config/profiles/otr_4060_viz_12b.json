@@ -11,9 +11,9 @@
         "announcer_visual": "viz_camera",
         "music_visual": "viz_camera",
         "character_visual": "viz_camera",
-        "announcer_image": "flux2_klein",
-        "music_image": "flux2_klein",
-        "character_image": "flux2_klein"
+        "announcer_image": "lumina_image",
+        "music_image": "lumina_image",
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",

@@ -3,9 +3,9 @@
 Every beat of the episode shows something. The **image engine** is the model that
 draws that still picture; the video lane then takes the still and makes it move.
 
-Two engines are one-click: pick them and they fetch themselves. The other four
-local ones want files you download by hand, and one of those also wants another
-node pack. That is the only part of this page most people need.
+Two engines are one-click: pick them and they fetch themselves. The other three
+local ones want files you download by hand. That is the only part of this page
+most people need.
 
 And before any of it: **on the shipped canonical graph the image pick does
 nothing at all.** That is not a fault, and the section after next explains it.
@@ -57,7 +57,7 @@ paired with `z_image_turbo` fetches about 19 GiB before it can draw anything.
 
 ## The engines you can pick
 
-Thirteen, plus an escape hatch. The dropdown lists them by their plain id, which
+Twelve, plus an escape hatch. The dropdown lists them by their plain id, which
 is exactly what you see below.
 
 ### Local -- runs on your own machine
@@ -66,7 +66,6 @@ is exactly what you see below.
 |---|---|---|---|
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
 | `z_image_turbo` | 19.3 GiB | **yes** | The default in the 16 GB NVIDIA graphs. Eight steps a still, so it is quick once the weights are down -- but they are the largest download of any image engine here. |
-| `flux2_klein` | 10.2 GiB | no | FLUX.2 klein 4B. **Also needs the ComfyUI-GGUF node pack.** |
 | `lumina_image` | 10.4 GiB | no | Lumina-Image 2.0. |
 | `flux_gen1` | 13.0 GiB | no | FLUX.1-dev, the first engine this pack ever had. Its licence is non-commercial. |
 | `ideogram4_local` | 17.3 GiB | no | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. |
@@ -115,17 +114,7 @@ Only **`sd15`** and **`z_image_turbo`**. Pick either, and a node inside the grap
 fetches it at queue time -- no account, no token, no script to run. Nothing else
 does.
 
-The other four local engines stop the render and tell you the exact filename they
-want and the folder it belongs in. **That refusal is the install instruction.**
-It never quietly substitutes another model. [MACHINES.md](MACHINES.md) section 3
-has a file table for `flux2_klein` -- repository, folder, size. The other three
-(`lumina_image`, `flux_gen1`, `ideogram4_local`) ship no manifest at all, and
-section 3 says so; for those, the refusal message you get at queue time is the
-only place the filename and folder show up.
-
-`flux2_klein` needs one more thing that is not a download at all: the
-**ComfyUI-GGUF** node pack, installed into `custom_nodes/`. Without it the run
-stops naming a missing class rather than a missing file.
+The other three local engines (`lumina_image`, `flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
 
 [MACHINES.md](MACHINES.md) section 2 has the per-machine grid -- which of these
 has actually been run on 8 GB, on 16 GB, on a Mac, on CPU, and which will run out
@@ -158,11 +147,9 @@ Your role's video lane draws its own frames. See the second section -- this is
 correct behaviour, not a miss.
 
 **It stops and names a file.** You picked one of the four manual engines. For
-`flux2_klein`, [MACHINES.md](MACHINES.md) section 3 has the file, the repository,
 and the folder. For the other three, section 3 ships no manifest by design --
 the refusal message itself is the only place that information appears.
 
-**It stops and names a missing class.** You picked `flux2_klein` without
 ComfyUI-GGUF. Install the pack, restart ComfyUI, queue again.
 
 **A hosted pick failed partway through.** No credentials. Every hosted row --

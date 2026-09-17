@@ -66,8 +66,8 @@ def test_canonical_kept_local_slots_are_registered_or_cataloged(tmp_path, monkey
     ) == expected_default_llm
 
     audio_nodes = {
-        "char_voice": _widgets(_node(workflow, "OTR_BatchCharacterVoices"))["engine"],
-        "announcer_voice": _widgets(_node(workflow, "OTR_AnnouncerVoice"))["engine"],
+        "char_voice": _widgets(_node(workflow, "OTR_CastLock"))["char_voice_engine"],
+        "announcer_voice": _widgets(_node(workflow, "OTR_CastLock"))["announcer_voice_engine"],
         "music": _widgets(_node(workflow, "OTR_StableAudioTheme"))["engine"],
     }
     # NO ENGINE-CHOICE PIN (operator ruling 2026-09-05): "there should not be a

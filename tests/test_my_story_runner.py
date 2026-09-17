@@ -353,13 +353,19 @@ def test_the_music_cues_anchor_to_real_sentinel_rows(acts, breaks):
     def no_model(*args, **kwargs):
         pytest.fail("read-only freeze must not acquire a model")
     disposition = LFC.run_freeze_cascade(no_model, led)
-    assert disposition.verdict == "frozen_clean", disposition.gap_audit_pre
+    assert disposition.verdict in ("frozen_clean", "frozen_with_warns"), (
+        disposition.gap_audit_pre)
     assert disposition.gap_audit_pre.errors == []
-    assert disposition.gap_audit_pre.warnings == []
+    leftover = [
+        w for w in disposition.gap_audit_pre.warnings
+        if "assigned by OTR_CastLock post-freeze" not in w
+    ]
+    assert leftover == []
     assert led.data["lines"] == before_lines
     assert led.data["music"] == before_cues
     saved = json.loads(Path(led.path).read_text(encoding="utf-8"))
-    assert saved["meta"]["freeze_verdict"] == "frozen_clean"
+    assert saved["meta"]["freeze_verdict"] in (
+        "frozen_clean", "frozen_with_warns")
 
 
 def test_no_interstitial_cue_when_act_breaks_are_off():
@@ -382,11 +388,16 @@ def test_consecutive_lines_from_one_speaker_become_one_turn():
     assert all(a != b for a, b in zip(speakers, speakers[1:])), speakers
 
 
-def test_two_characters_never_share_a_voice():
+def test_writer_leaves_character_voice_identity_empty():
+    """CastLock owns the larynx. A pending My Story ledger must not already
+    credit Bark -- that leftover is what lime Stomp/Tiptoe/Whiskers showed."""
     slots = Slots()
     led, _ = _run(slots)
-    presets = [r["voice_preset"] for r in led.data["cast"]]
-    assert len(presets) == len(set(presets)), presets
+    spoken = [r for r in led.data["cast"] if r.get("name") != "ANNOUNCER"]
+    assert spoken
+    for row in spoken:
+        assert not str(row.get("voice_preset") or "").startswith("v2/"), row
+        assert row.get("tts_model") != "bark", row
 
 
 def test_the_authorship_receipt_validates_against_the_finished_rows():
@@ -527,11 +538,16 @@ def test_assembly_stops_when_an_incremental_save_fails(monkeypatch, failed_save,
     assert len(calls) == failed_save
 
 
-def test_actual_voice_allocation_exhaustion_names_the_character(monkeypatch):
+def test_writer_does_not_need_the_bark_pool_to_lock_a_cast(monkeypatch):
+    """CastLock owns larynx assignment. An empty Bark stock must not refuse
+    a My Story cast -- a kokoro graph never draws from that pool at the writer."""
     import random
     monkeypatch.setattr(MS._POOLS, "open_voice_pool", lambda taken: [])
-    with pytest.raises(MS.MyStoryCastError, match="character 1.*Ada"):
-        MS._assign_voices(MS.StoryTreatment(**_treatment()), random.Random(123))
+    rows = MS._assign_voices(MS.StoryTreatment(**_treatment()), random.Random(123))
+    spoken = [r for r in rows if r["name"] != "ANNOUNCER"]
+    assert spoken
+    assert all(not r.get("voice_preset") for r in spoken)
+    assert all(r.get("tts_model") in ("", None) for r in spoken)
 
 
 def test_exclusive_named_cast_can_exceed_the_requested_character_count():
@@ -742,16 +758,16 @@ def test_consecutive_speaker_lines_are_merged_without_losing_words():
     assert rows[0]["text"] == "Line 1 from Ada. Line 2 from Ada."
 
 
-def test_voice_assignment_forwards_the_accepted_age(monkeypatch):
+def test_writer_does_not_preassign_bark_voices(monkeypatch):
     import random
-    seen = []
-    real = MS._OTRCAST.python_assign_voice_preset
-    def assign(*a, **kw):
-        seen.append(kw.get("age_band"))
-        return real(*a, **kw)
-    monkeypatch.setattr(MS._OTRCAST, "python_assign_voice_preset", assign)
-    MS._assign_voices(MS.StoryTreatment(**_treatment()), random.Random(123))
-    assert seen == ["30s", "30s"]
+    def boom(*a, **kw):
+        raise AssertionError("writer must not assign bark presets")
+    monkeypatch.setattr(MS._OTRCAST, "python_assign_voice_preset", boom)
+    rows = MS._assign_voices(MS.StoryTreatment(**_treatment()), random.Random(123))
+    spoken = [r for r in rows if r["name"] != "ANNOUNCER"]
+    assert spoken
+    assert all(not r.get("voice_preset") for r in spoken)
+    assert all(r.get("tts_model") in ("", None) for r in spoken)
 
 
 def test_real_writer_routes_user_fields_to_a_clean_ledger_and_shared_tail(monkeypatch):

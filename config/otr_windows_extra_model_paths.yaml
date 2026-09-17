@@ -1,0 +1,14 @@
+# OTR Windows addendum -- extra_model_paths.yaml must name animatediff_models.
+#
+# WHY THIS EXISTS: a Comfy Desktop / extra_model_paths mapping that points
+# checkpoints and vae at C:\ComfyUI-Models still leaves AnimateDiff-Evolved
+# looking in <comfy>/models/animatediff_models. The motion module then sits
+# in the shared root and the lightning/haunted lanes report missing_model
+# (2026-09-17 ComfyUI (1) install). Same hole as the Mac addendum.
+#
+# Merge these two keys into the yaml that install already loads. Restart
+# ComfyUI after editing; folder_paths is built at boot.
+otr_windows_addendum:
+  base_path: 'C:/ComfyUI-Models'
+  animatediff_models: animatediff_models/
+  animatediff_motion_lora: loras/

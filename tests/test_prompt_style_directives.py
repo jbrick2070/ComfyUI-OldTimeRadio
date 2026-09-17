@@ -53,12 +53,8 @@ _OWNERS = {
     "fastwan_8gb": "nodes/_otr_video_engines/eng_fastwan_8gb.py",
     "humo": "nodes/_otr_video_engines/eng_humo.py",
     "minimax_h3": "nodes/_otr_video_engines/eng_minimax_h3.py",
-    # The three the RESEARCH doc never enumerated, added 2026-08-17 on the
-    # operator's scope call. Their directives are HIS drafts from public docs,
-    # explicitly "NOT yet validated", stored verbatim. `flux2_klein` is the one
-    # that matters most: `requires_flag = None`, so it is selectable as shipped
-    # while its two siblings are default-OFF opt-ins.
-    "flux2_klein": "nodes/_otr_image_engines/flux2_klein.py",
+    # Additional directives may land here from operator drafts; keep the map
+    # pointing at real files only.
 }
 
 #: The sibling that must NOT grow its own copy of the LTX family pair.
@@ -91,9 +87,9 @@ _LTX_POINTER_ONLY = "nodes/_otr_video_engines/eng_ltx_8gb.py"
 #: instruction to author scene content that must be absent.
 #: A mention of "negative" is allowed only alongside one of these. Two shapes
 #: qualify, and the SECOND was missed on the first pass: saying the channel has no
-#: effect, and PROHIBITING the writer from emitting one. The operator's own
-#: `flux2_klein` draft closes with "No tags, weights, or negatives" -- the strongest
-#: possible form of the strike -- and the first version of this guard would have
+#: effect, and PROHIBITING the writer from emitting one. Directives that close
+#: with "No tags, weights, or negatives" are the strongest form of the strike --
+#: and the first version of this guard would have
 #: rejected it for containing the word. A rule that fails maximum compliance is a
 #: broken rule, so the prohibition shapes are listed too.
 _NEGATIVE_HEDGES = (
@@ -367,35 +363,19 @@ def test_the_owner_map_still_points_at_real_files():
     missed") promised a completeness it does not deliver: it checks the TEN the
     RESEARCH doc enumerated and cannot discover an engine nobody listed.
 
-    A Sonnet QA pass found three registered local image engines outside the
-    RESEARCH doc's original ten -- `flux2_klein` (`requires_flag = None`, so it is
-    NOT gated and sits live in the menu), `hidream_i1` and `sd35_large`. **The
-    operator closed that scope call on 2026-08-17 and supplied all three
-    directives himself**, drafted from public docs and then validated in a v2
-    pass, taking the map to THIRTEEN. His three are stored verbatim; the
-    original ten remain driver-derived. Neither set is measured.
-
-    **TWELVE since 2026-08-26**, when the local Wan 14B (`wan_i2v`) was retired
-    on the operator's call -- it does not fit this card's 14.5 GiB envelope and
-    `wan_ti2v` (the 5B) covers the lane. Its directive was its own, not shared
-    with the 5B, so removing the row orphaned nothing.
-
-    **TEN since 2026-09-12.** `hidream_i1` and `sd35_large` were unregistered on
-    2026-06-29 and their MODULES were left on disk, unreachable, for ten weeks --
-    the half-removed state this repo's own orphan rule forbids. The files are
-    deleted now, so their rows had to go with them: this map asserts every path
-    still exists, and a row pointing at a deleted file is the map lying, which
-    is exactly what the assertion below is for.
+    A Sonnet QA pass found registered local image engines outside the
+    RESEARCH doc's original ten. `hidream_i1` and `sd35_large` were
+    unregistered on 2026-06-29 and their MODULES were left on disk, unreachable,
+    for ten weeks -- the half-removed state this repo's own orphan rule forbids.
+    The files are deleted now, so their rows had to go with them: this map
+    asserts every path still exists, and a row pointing at a deleted file is
+    the map lying, which is exactly what the assertion below is for.
     """
     for slug, rel_path in sorted(_OWNERS.items()):
         assert (_REPO / rel_path).is_file(), (
             "%s: %s no longer exists -- the overlay moved or the engine was "
             "renamed, and this map is now lying" % (slug, rel_path))
-    assert len(_OWNERS) == 10, (
-        "this map has %d. It was TEN (the RESEARCH doc's blocks), then THIRTEEN "
-        "after the operator's 2026-08-17 scope call added flux2_klein, "
-        "hidream_i1 and sd35_large, then TWELVE when wan_i2v was retired on "
-        "2026-08-26, and TEN again on 2026-09-12 when the hidream_i1 and "
-        "sd35_large modules were deleted. Adding or removing one is a deliberate "
-        "act, so update this count in the same commit -- this assertion firing "
-        "is the guard working, not a bug." % len(_OWNERS))
+    assert len(_OWNERS) == 9, (
+        "this map has %d. Update this count in the same commit when an owner "
+        "row is added or removed -- this assertion firing is the guard working, "
+        "not a bug." % len(_OWNERS))

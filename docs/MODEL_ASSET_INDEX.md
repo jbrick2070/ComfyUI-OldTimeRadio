@@ -59,7 +59,7 @@ Anything not listed there is a manual install -- see its row below.
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
 | `ghost_signal_stillin_lab` | 3 weight file(s) | manual download | - |
 | `google_omni_video` | nothing on disk | - | 2 profile(s) |
-| `google_veo_video` | nothing on disk | - | 3 profile(s) |
+| `google_veo_video` | nothing on disk | - | 2 profile(s) |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_INSTALL.md) | 3 profile(s) |
 | `ltx25` | **not declared in code -- verify** | - | - |
 | `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 7 profile(s) |
@@ -79,16 +79,16 @@ Anything not listed there is a manual install -- see its row below.
 |---|---|---|---|
 | `bark` | **not declared in code -- verify** | - | 2 profile(s) |
 | `chatterbox` | **a SEPARATE project + its own venv** | manual, see below | 2 profile(s) |
-| `cloud_elevenlabs` | nothing on disk | - | - |
+| `cloud_elevenlabs` | nothing on disk | - | 6 profile(s) |
 | `cloud_sonilo` | nothing on disk | - | - |
 | `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | 2 profile(s) |
-| `google_lyria` | nothing on disk | - | 4 profile(s) |
-| `google_tts` | nothing on disk | - | 4 profile(s) |
-| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 64 profile(s) |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 124 profile(s) |
+| `google_lyria` | nothing on disk | - | 2 profile(s) |
+| `google_tts` | nothing on disk | - | 2 profile(s) |
+| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 62 profile(s) |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 122 profile(s) |
 | `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 44 profile(s) |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
-| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 85 profile(s) |
+| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 83 profile(s) |
 
 ## Image engines (every shipped workflow picks one)
 
@@ -96,7 +96,6 @@ Anything not listed there is a manual install -- see its row below.
 |---|---|---|---|
 | `cloud_image` | nothing on disk | - | - |
 | `google_image` | nothing on disk | - | - |
-| `flux2_klein` | 3 weight file(s) | manual download | - |
 | `flux_gen1` | 1 weight file(s) | manual download | - |
 | `ideogram4_local` | 9 weight file(s) | manual download | - |
 | `lumina_image` | 3 weight file(s) | manual download | - |
@@ -260,12 +259,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `stable_audio_3_small_music_base.safetensors`
 - `t5gemma_b_b_ul2.safetensors`
 
-**`flux2_klein`** -- `nodes/_otr_image_engines/flux2_klein.py`
-
-- `flux-2-klein-4b-Q4_K_M.gguf`
-- `flux2-vae.safetensors`
-- `qwen_3_4b.safetensors`
-
 **`flux_gen1`** -- `nodes/_otr_image_engines/flux_gen1.py`
 
 - `flux1-dev-fp8.safetensors`
@@ -284,8 +277,8 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 
 **`lumina_image`** -- `nodes/_otr_image_engines/lumina_image.py`
 
+- `ae.safetensors`
 - `gemma_2_2b_fp16.safetensors`
-- `lumina2_ae.safetensors`
 - `lumina_2_model_bf16.safetensors`
 
 **`sd15`** -- `nodes/_otr_image_engines/sd15.py`

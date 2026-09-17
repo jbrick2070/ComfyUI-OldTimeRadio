@@ -447,10 +447,10 @@ def test_lock_cast_open_character_rows_carry_voice_params_none():
     assert open_row["voice_params"] is None
 
 
-def test_lock_cast_open_character_rows_carry_tts_model_bark():
-    """Every Python-assembled open-character row must stamp
-    tts_model="bark" since open characters are drawn from the Bark
-    VOICE_PROFILES pool by construction."""
+def test_lock_cast_open_character_rows_leave_tts_model_empty():
+    """Open-character rows must not credit Bark at the writer. CastLock
+    stamps the engine that will actually speak; a pending kokoro ledger
+    that never reached lock() must not already say tts_model=bark."""
     rng = random.Random("tts-model-open")
     gen = _make_canned_generate_fn([_desc_response(), _desc_response()])
     cast, _ = _OTRC.lock_cast(creative_fn=gen,
@@ -459,10 +459,12 @@ def test_lock_cast_open_character_rows_carry_tts_model_bark():
         rng=rng,
         force_lemmy=False,
     )
-    # cast[0] is ANNOUNCER (Kokoro), cast[1:] are open characters (Bark).
+    # cast[0] is ANNOUNCER (Kokoro). Open characters stay empty until CastLock.
     for row in cast[1:]:
-        assert row["tts_model"] == "bark", \
-            f"open character {row['name']!r} missing tts_model=bark: {row!r}"
+        assert row.get("tts_model") != "bark", \
+            f"open character {row['name']!r} still credits bark: {row!r}"
+        assert not str(row.get("voice_preset") or "").startswith("v2/"), \
+            f"open character {row['name']!r} still has a bark preset: {row!r}"
 
 
 def test_announcer_voice_is_kokoro_namespace_not_bark():

@@ -149,7 +149,7 @@ def test_IG3_1_the_three_slots_resolve_independently_and_verbatim():
     substitution, no leakage of the character pick into the named slots.
     """
     picks = {"announcer_image_model": "z_image_turbo",
-             "music_image_model": "flux2_klein",
+             "music_image_model": "lumina_image",
              "character_image_model": "lumina_image"}
     policy = {"image_models": dict(picks)}
     for role, slot in _SLOT_FOR_ROLE.items():

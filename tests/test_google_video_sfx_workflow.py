@@ -41,6 +41,48 @@ def test_master_audio_reresolve_uses_active_ledger_not_newest_sibling(
     assert not any(r.levelno >= 30 for r in caplog.records)
 
 
+def test_master_audio_reresolve_follows_rename_when_test_mode_leaked_outside_pytest(
+    tmp_path, monkeypatch, caplog,
+):
+    """Live Comfy can inherit OTR_TEST_MODE=1 from a pytest parent shell.
+    That must not skip pending_ re-resolve -- the 2026-09-16 Three Boxes
+    mux miss. Pytest itself still skips, via PYTEST_CURRENT_TEST.
+    """
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+    caplog.set_level("INFO")
+    episodes = tmp_path / "otr" / "episodes"
+    active_audio = episodes / "signal_lost_active" / "audio"
+    active_audio.mkdir(parents=True)
+    basename = "pending_123_master.wav"
+    active_master = active_audio / basename
+    active_master.write_bytes(b"active")
+    active_ledger = active_audio / "signal_lost_active_ledger.json"
+    active_ledger.write_text('{"episode_id":"signal_lost_active"}', encoding="utf-8")
+    stale = str(episodes / "pending_123" / "audio" / basename)
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path", lambda: active_ledger,
+    )
+
+    assert _reresolve_master_audio(stale) == str(active_master)
+    assert any("PATH RECONCILED" in r.message and r.levelname == "INFO"
+               for r in caplog.records)
+
+
+def test_master_audio_reresolve_skipped_under_pytest_test_mode(
+    tmp_path, monkeypatch,
+):
+    monkeypatch.setenv("OTR_TEST_MODE", "1")
+    monkeypatch.setenv("PYTEST_CURRENT_TEST", "tests/test_google_video_sfx_workflow.py")
+    stale = str(tmp_path / "pending" / "audio" / "pending_123_master.wav")
+    monkeypatch.setattr(
+        "nodes._otr_ledger.in_flight_ledger_path",
+        lambda: (_ for _ in ()).throw(AssertionError("pytest must not consult ledger")),
+    )
+
+    assert _reresolve_master_audio(stale) == stale
+
+
 def test_master_audio_reresolve_fails_closed_without_active_ledger(
     tmp_path, monkeypatch,
 ):

@@ -13,7 +13,7 @@
         "character_visual": "still_motion",
         "announcer_image": "z_image_turbo",
         "music_image": "flux_gen1",
-        "character_image": "flux2_klein"
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",

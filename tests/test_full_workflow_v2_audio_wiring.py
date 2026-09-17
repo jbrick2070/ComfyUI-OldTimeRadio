@@ -183,15 +183,13 @@ def test_widget_vectors_exact(by_id):
     character-engine controls disagree.
     """
     mapping = _new_class_mapping()
-    # S5 platform-portability (2026-07-10): OLD pin 5 widgets -> NEW pin 6
-    # (+voice_device appended at index 5; append-only, never inserted).
-    # 2026-09-02 (kokoro-onnx): voice_bank -> kokoro_builtin, char_voice_engine -> kokoro.
-    # 2026-09-14 (apple-clean): voice_device "cuda" -> "default" for cross-platform portability.
+    # 2026-09-16: CastLock dropped voice_bank. 4a/4b dropped engine. Saved
+    # engines stay kokoro; 4a/4b inherit the CastLock stamps.
+    # 2026-09-14 (apple-clean): voice_device "cuda" -> "default".
     assert by_id[80]["widgets_values"] == [
-        "kokoro_builtin", "auto_registry", True, "kokoro", "kokoro", "default"]
-
-    # BatchCharacterVoices (81): its own engine widget agrees with CastLock.
-    assert by_id[81]["widgets_values"] == ["kokoro"]
+        "auto_registry", True, "kokoro", "kokoro", "default"]
+    assert by_id[81]["widgets_values"] == []
+    assert by_id[82]["widgets_values"] == []
     # 83 (StableAudioTheme) joins 80/81 as a node whose SAVED engine is the
     # operator's pick, not the class-coded default. Operator ruling 2026-09-05:
     # "there should not be a guard for any of the dropdowns, big or small ...
@@ -203,7 +201,7 @@ def test_widget_vectors_exact(by_id):
     # appended 2026-09-15 per CLAUDE.md append-only rule; value "" = bank genre).
     assert len(by_id[83]["widgets_values"]) == 2, by_id[83]["widgets_values"]
     for key, nid in NEW_NODE_IDS.items():
-        if nid in (80, 81, 83):
+        if nid in (80, 81, 82, 83):
             continue
         assert by_id[nid]["widgets_values"] == _derive_widget_defaults(mapping[key])
 

@@ -1,6 +1,6 @@
 {
-    "id": "otr_rot_ltx25_mime_klein",
-    "display_name": "LTX 2.5 Distilled Q3: MIME on character beats (5080-only; 1.00 foley / 0.00 master, per-window) + flux2_klein (rotation)",
+    "id": "otr_rot_wan_lumina",
+    "display_name": "45-word run: wan_ti2v + lumina_image (rotation)",
     "status": "draft",
     "platform": "any",
     "device_backend": "cuda",
@@ -8,26 +8,26 @@
     "toolchains": [],
     "allow_sidecars": true,
     "role_overrides": {
-        "announcer_visual": "ltx25_high_video",
-        "music_visual": "ltx25_high_video",
-        "character_visual": "ltx25_high_mime",
-        "announcer_image": "flux2_klein",
-        "music_image": "flux2_klein",
-        "character_image": "flux2_klein"
+        "announcer_visual": "wan_ti2v",
+        "music_visual": "wan_ti2v",
+        "character_visual": "wan_ti2v",
+        "announcer_image": "lumina_image",
+        "music_image": "lumina_image",
+        "character_image": "lumina_image"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",
         "char_voice_engine": "indextts2",
         "announcer_voice_engine": "kokoro",
         "music_engine": "stable_audio_3",
-        "video_render_engine": "ltx25_high_mime"
+        "video_render_engine": "wan_ti2v"
     },
     "features": {
         "burn_captions": true,
         "caption_style": "sdh_standard"
     },
     "seed_policy": {
-        "request_seed": 43,
+        "request_seed": 42,
         "seed_mode": "request_hash",
         "cast_seed_env": null,
         "style_seed_env": null
@@ -39,8 +39,8 @@
         "vram_ceiling_gb": 14.5,
         "gguf_n_ctx": 4096,
         "gguf_quant": "Q8_0",
-        "creative_model": "google/gemma-4-12b-it",
-        "technical_model": "google/gemma-4-12b-it",
+        "creative_model": "mistralai/Mistral-Nemo-Instruct-2407",
+        "technical_model": "mistralai/Mistral-Nemo-Instruct-2407",
         "openrouter_slot_a_model": "(enable OpenRouter)",
         "openrouter_slot_b_model": "(enable OpenRouter)",
         "comfy_slot_a_model": "(enable Comfy Credits)",
@@ -80,8 +80,7 @@
         "required_keys": []
     },
     "launch": {
-        "boot_contract": "default",
-        "sage_attention": false,
+        "sage_attention": true,
         "extra_args": [],
         "env": {}
     }

@@ -420,7 +420,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_flat / viz_green / still_motion | sd15 | none | nothing | shipping |
+| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_motion | sd15 | none | nothing | shipping |
 | **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | shipping |
 | foley | _not built_ | | | | | | | |
 | mime | _not built_ | | | | | | | |
@@ -431,7 +431,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | lumina_image | none | nothing | shipping |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | still_motion | lumina_image | none | nothing | shipping |
 | **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | lumina_image | manual | ComfyUI-GGUF | shipping |
 | **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | lumina_image | manual | ComfyUI-GGUF | shipping |
 | **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | lumina_image | manual | ComfyUI-GGUF | shipping |
@@ -453,7 +453,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | low | _not built_ | | | | | | | |
-| **still** | `otr_amd_still` | Qwen3.5-4B | none | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | draft |
+| **still** | `otr_amd_still` | Qwen3.5-4B | none | still_motion | z_image_turbo | none | nothing | draft |
 | video | _not built_ | | | | | | | |
 | foley | _not built_ | | | | | | | |
 | mime | _not built_ | | | | | | | |
@@ -477,8 +477,8 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | **low_1act** | `otr_cloud_low_1act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
 | **low** | `otr_cloud_low` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
 | **low_5act** | `otr_cloud_low_5act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_3act** | `otr_cloud_deluxe_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | gpt-5.6-sol / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_luma_photon_flash | manual | nothing | shipping |
+| **deluxe_3act** | `otr_cloud_deluxe_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_flux_pro | manual | nothing | shipping |
+| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_flux_pro | manual | nothing | shipping |
 <!-- END GENERATED: tier-matrix -->
 
 Weights marked **auto** download themselves the first time you queue;
@@ -515,7 +515,7 @@ node packs, not Python packages, so `pip` cannot supply them. Install them into
 | If you select | Install |
 |---|---|
 | `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `animatediff15_lightning_video` -- including the three `otr_*_animatediff` graphs | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) |
-| `flux2_klein`, `ltx23_*`, `ltx25_*`, `wan22_*` | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md) |
+| `ltx23_*`, `ltx25_*`, `wan22_*` | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md) |
 
 If you pick one of these lanes without its pack, the render stops with an error
 that names the pack and its URL. The AnimateDiff lanes are also the one place
@@ -723,7 +723,7 @@ that actually failed in a real run get in.
 ## Licence and credits
 
 The pack is [MIT](LICENSE). It is built on ComfyUI and the open-weight LTX, Wan,
-HuMo, AnimateDiff, Z-Image-Turbo, Lumina, FLUX.2 Klein, Kokoro, Stable Audio,
+HuMo, AnimateDiff, Z-Image-Turbo, Lumina, Kokoro, Stable Audio,
 Qwen and Gemma ecosystems, plus the optional Chatterbox, Dia, Bark, MusicGen and
 IndexTTS2 engines -- thanks to all of their authors.
 

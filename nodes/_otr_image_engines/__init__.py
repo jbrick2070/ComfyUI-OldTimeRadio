@@ -106,15 +106,8 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
-# FLUX.2 Klein (FLUX-family, verify -- plus BUG-070 SageAttention at render time),
-# a model-agnostic image peer registered HONESTLY (commercial_clean per its real
-# license terms); greyed until its weights exist; own guard.
 # (SD 3.5 Large was UNREGISTERED 2026-06-29 (C3): a NotImplementedError dark
 # scaffold is no longer imported/selectable.)
-try:  # pragma: no cover - trivial guard
-    from . import flux2_klein as _flux2_klein  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
 
 # Ideogram 4 (LOCAL weights, 2026-08-22) -- the typography-first still engine for
 # the still_word card. OPT-IN (default_roles=()); z_image_turbo stays the shipped

@@ -106,7 +106,7 @@ def build_profile(row, matrix=None) -> dict:
             "music_image": image, "character_image": image,
         },
         "slot_overrides": {
-            "voice_bank": m.get("voice_bank"),
+            # voice_bank is no longer a CastLock widget (bank follows the engine).
             "cast_voice_policy": m.get("cast_voice_policy", "auto_registry"),
             "char_voice_engine": m.get("char_voice"),
             "announcer_voice_engine": m.get("announcer_voice"),

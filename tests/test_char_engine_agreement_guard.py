@@ -1,13 +1,8 @@
-"""The character-side twin of the announcer engine-agreement guard (kokoro-onnx
-r1, 2026-09-02).
+"""Character voices inherit CastLock's ledger stamp (2026-09-16).
 
-`OTR_CastLock` stamps `meta.char_voice_engine`; `OTR_BatchCharacterVoices` has its
-own `engine` widget; until now nothing compared them, so a graph with the two set
-differently rendered one engine while the ledger and the credits named the other.
-The guard lives in the shared per-line dispatch (`_otr_voice_node_common`) and is
-reached only when the ledger carries a character line (`speaker_role`), so these
-ledgers carry one. `auto` is stamped LITERALLY when CastLock resolved nothing (a
-preset bank under an auto request) and must never read as a disagreement.
+`OTR_BatchCharacterVoices` has no engine widget. A leftover `engine=` from an
+old canvas or a direct Python test must not override a concrete
+`meta.char_voice_engine` stamp. `auto` is not a concrete stamp.
 """
 from __future__ import annotations
 
@@ -22,7 +17,6 @@ import pytest
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
 from nodes._otr_audio_engines import eng_kokoro
-from nodes._otr_audio_engines.registry import EngineUnusable
 from nodes.batch_character_voices import BatchCharacterVoices
 
 
@@ -51,11 +45,12 @@ def _stub_kokoro(monkeypatch):
     monkeypatch.setattr(eng_kokoro, "_kokoro_voice_path", lambda v: __file__)
 
 
-def test_a_stamped_engine_that_disagrees_with_the_widget_fails_by_name(monkeypatch):
+def test_leftover_engine_arg_cannot_override_a_concrete_stamp(monkeypatch):
     _stub_kokoro(monkeypatch)
-    with pytest.raises(EngineUnusable, match="character-engine controls disagree") as exc:
-        BatchCharacterVoices().generate(script_json=_script("indextts2"), engine="kokoro")
-    assert "OTR_CastLock.char_voice_engine" in str(exc.value)
+    _audio, log_str, done = BatchCharacterVoices().generate(
+        script_json=_script("kokoro"), engine="chatterbox")
+    assert "controls disagree" not in log_str
+    assert done.startswith("char_voice:done")
 
 
 @pytest.mark.parametrize("stamped", ["auto", "kokoro", ""])

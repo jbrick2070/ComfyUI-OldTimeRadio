@@ -75,9 +75,10 @@ def test_input_types_widget_surface():
         assert spec is not None and spec[1].get("forceInput") is True, key
     # delivery_profile surface removed 2026-07-04 (widget-audit Batch 1); single
     # option "neutral" -- the lock() kwarg still defaults + is validated/stamped.
-    # S5 platform-portability (2026-07-10): voice_device appended at slot 5.
+    # 2026-09-16: voice_bank widget removed. Bank follows the concrete engine
+    # per role. voice_device stays last (append-only).
     assert _serialized_slots(it) == [
-        "voice_bank", "cast_voice_policy", "allow_voice_reuse",
+        "cast_voice_policy", "allow_voice_reuse",
         "char_voice_engine", "announcer_voice_engine", "voice_device",
     ]
     for name in ("ledger_json", "cast_lock_revision", "cast_report", "done"):
@@ -242,15 +243,16 @@ def test_auto_registry_stamps_voice_refs():
     from nodes.cast_lock import CastLock
 
     out = CastLock().lock(
-        script_json=_ledger(_CHAR_CAST), voice_bank="default",
+        script_json=_ledger(_CHAR_CAST),
         cast_voice_policy="auto_registry",
     )
     led = json.loads(out[0])
     cast = {e["char_id"]: e for e in led["cast"]}
-    # Characters get indextts2 references (the promoted rank-1 char_voice default).
+    # auto char engine resolves to kokoro; leftover voice_bank="default" follows
+    # the engine onto kokoro_builtin instead of crashing.
     for cid in ("c1", "c2"):
         assert cast[cid].get("voice_ref_id"), cid
-        assert cast[cid]["voice_engine"] == "indextts2"
+        assert cast[cid]["voice_engine"] == "kokoro"
         assert isinstance(cast[cid]["commercial_clean"], bool)
     # Distinct references (no reuse across the two characters).
     assert cast["c1"]["voice_ref_id"] != cast["c2"]["voice_ref_id"]
@@ -258,6 +260,56 @@ def test_auto_registry_stamps_voice_refs():
     # longer pinned to bm_george on every single episode).
     assert cast["a1"]["voice_ref_id"] in _KOKORO_ANNOUNCERS
     assert cast["a1"]["voice_engine"] == "kokoro"
+    for row in led["cast"]:
+        assert not str(row.get("voice_preset") or "").startswith("v2/"), row
+        assert row.get("tts_model") != "bark", row
+
+
+def test_kokoro_castlock_spoken_rows_have_no_bark_presets():
+    """Lime pending_20260917_051904 leftover: writer stamped Bark on
+    Stomp/Tiptoe/Whiskers, CastLock was supposed to overwrite. A kokoro
+    lock must not leave v2/* on spoken rows -- and must not remap those
+    presets as a silent fallback."""
+    from nodes.cast_lock import CastLock
+
+    cast = [
+        {"char_id": "c1", "name": "STOMP", "gender": "male",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_1"},
+        {"char_id": "c2", "name": "TIPTOE", "gender": "female",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_9"},
+        {"char_id": "c3", "name": "WHISKERS", "gender": "male",
+         "tts_model": "bark", "voice_preset": "v2/en_speaker_3"},
+        {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
+         "tts_model": "kokoro", "voice_preset": "bm_george"},
+    ]
+    lines = [
+        {"line_id": "l001", "speaker_role": "character", "char_id": "c1",
+         "text": "Stomp speaks."},
+        {"line_id": "l002", "speaker_role": "character", "char_id": "c2",
+         "text": "Tiptoe speaks."},
+        {"line_id": "l003", "speaker_role": "character", "char_id": "c3",
+         "text": "Whiskers speaks."},
+        {"line_id": "l004", "speaker_role": "announcer", "char_id": "a1",
+         "text": "Tonight, on Old Time Radio."},
+    ]
+    meta = {"source_bank": "my_story", "episode_seed": 42,
+            "cast_contract": {"cast_seed": 42}}
+    out = CastLock().lock(
+        script_json=_ledger_with_lines(cast, lines, meta=meta),
+        cast_voice_policy="auto_registry",
+        char_voice_engine="kokoro",
+        announcer_voice_engine="kokoro",
+    )
+    led = json.loads(out[0])
+    spoken_ids = {ln["char_id"] for ln in lines}
+    for row in led["cast"]:
+        if row.get("char_id") not in spoken_ids:
+            continue
+        preset = str(row.get("voice_preset") or "")
+        assert not preset.startswith("v2/"), row
+        assert str(row.get("tts_model") or "") != "bark", row
+        assert row.get("voice_engine") == "kokoro", row
+        assert row.get("voice_ref_id"), row
 
 
 def test_auto_registry_announcer_varies_across_episode_seeds():
@@ -295,7 +347,7 @@ def test_auto_registry_stamps_genderless_character_without_inventing_gender():
     out = CastLock().lock(script_json=_ledger(cast), cast_voice_policy="auto_registry")
     led = json.loads(out[0])
     row = led["cast"][0]
-    assert row["voice_ref_id"] and row["voice_engine"] == "indextts2"
+    assert row["voice_ref_id"] and row["voice_engine"] == "kokoro"
     assert not row.get("gender")
     assert row["voice_cast_fallback"] == "gender_unspecified"
     assert "gender-agnostic reference" in out[2]
@@ -306,6 +358,7 @@ def test_auto_registry_bark_legacy_preserves_characters():
 
     out = CastLock().lock(
         script_json=_ledger(_CHAR_CAST), voice_bank="bark_legacy",
+        char_voice_engine="bark",
         cast_voice_policy="auto_registry",
     )
     led = json.loads(out[0])

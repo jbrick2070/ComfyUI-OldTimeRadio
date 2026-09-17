@@ -156,15 +156,6 @@
       },
       "size_gb": 10.0
     },
-    "flux2_klein": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "proven",
-        "nv8": "proven"
-      },
-      "note": "Rendered a clean 1472x832 still on a 16 GB M4 (klein_run.log) but peaked at 22 GB and survived only on swap, at ~8 min a still, so mps is withheld from its declaration on purpose. sd15 is the practical Mac image engine.",
-      "size_gb": 11.0
-    },
     "flux_gen1": {
       "memory": {
         "mac16": "oom",

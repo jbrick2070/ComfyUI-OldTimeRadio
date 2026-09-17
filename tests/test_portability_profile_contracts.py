@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / "config" / "profiles"
 
 LTX_IDS = (
-    "otr_ltx25_foley_flux2klein",
+    "otr_ltx25_foley_lumina",
     "otr_ltx25_high_foley_plus",
     "otr_ltx25_high_mime",
     "otr_ltx25_high_video",
@@ -54,15 +54,18 @@ def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract():
         }
 
 
-def test_flux2_ltx_profile_adds_exact_still_recipe():
-    models = _profile("otr_ltx25_foley_flux2klein")["preflight"][
+def test_ltx_foley_lumina_profile_keeps_ltx_weights_only():
+    models = _profile("otr_ltx25_foley_lumina")["preflight"][
         "required_models"]
-    assert models[5:] == [
-        "flux-2-klein-4b-Q4_K_M.gguf",
-        "qwen_3_4b.safetensors",
-        "flux2-vae.safetensors",
+    assert "flux-2-klein-4b-Q4_K_M.gguf" not in models
+    assert models[:5] == [
+        "LTX-2.5-Distilled-Q3_K_M.gguf",
+        "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+        "ltx-2.5-video-vae-bf16.safetensors",
+        "ltx-2.5-audio-vae-bf16.safetensors",
+        "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
     ]
-    assert len(models) == len(set(models)) == 8
+    assert len(models) == len(set(models)) == 5
 
 
 def test_humo_14b_profiles_follow_engine_loader_order(monkeypatch):

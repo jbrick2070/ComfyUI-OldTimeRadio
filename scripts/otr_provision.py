@@ -174,38 +174,6 @@ MANUAL_TIERS = {
             "gated": False,
         },
     ],
-    "flux2_klein": [
-        {
-            "role": "4B Q4 DiT",
-            "repo": "Latentiq/FLUX.2-klein-4B-GGUF",
-            "revision": "4dc94114f28d56e7b63e7bb624a1c1f20353245b",
-            "path": "flux-2-klein-4b-Q4_K_M.gguf",
-            "destination": "diffusion_models/flux-2-klein-4b-Q4_K_M.gguf",
-            "bytes": 2_604_311_104,
-            "sha256": "0b25d143c8469b342bc5af3bce92b783bf6b0636d285f7b2f75e38af63af9a15",
-            "gated": False,
-        },
-        {
-            "role": "Qwen3-4B encoder",
-            "repo": "Comfy-Org/flux2-klein",
-            "revision": "5f526678002e43af5551dadb73ce2e8c91b43afe",
-            "path": "split_files/text_encoders/qwen_3_4b.safetensors",
-            "destination": "text_encoders/qwen_3_4b.safetensors",
-            "bytes": 8_044_982_048,
-            "sha256": "6c671498573ac2f7a5501502ccce8d2b08ea6ca2f661c458e708f36b36edfc5a",
-            "gated": False,
-        },
-        {
-            "role": "Flux2 VAE",
-            "repo": "Comfy-Org/flux2-dev",
-            "revision": "ab9055628ea245000e610f2aa2c96f4746093546",
-            "path": "split_files/vae/flux2-vae.safetensors",
-            "destination": "vae/flux2-vae.safetensors",
-            "bytes": 336_213_556,
-            "sha256": "d64f3a68e1cc4f9f4e29b6e0da38a0204fe9a49f2d4053f0ec1fa1ca02f9c4b5",
-            "gated": False,
-        },
-    ],
 }
 
 OPERATOR_ONLY_TIERS = {
@@ -1681,6 +1649,7 @@ NO_LANE_REASON = {
     "indextts2": "sidecar",
     # Hosted voice/music.
     "elevenlabs": "remote",
+    "cloud_elevenlabs": "remote",
     "google_tts": "remote",
     "google_lyria": "remote",
     "sonilo": "remote",
@@ -1776,8 +1745,6 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return None
         return UNROUTED
     if kind == "image":
-        if engine == "flux2_klein":
-            return Lane("flux2_klein", True)
         if engine == "z_image_turbo":
             return Lane("z_image_int8" if low_vram else "z_image", False)
         if engine in _REMOTE_NO_WEIGHT_IMAGE_ENGINES:

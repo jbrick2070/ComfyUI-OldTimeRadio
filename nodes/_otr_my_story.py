@@ -749,63 +749,28 @@ def _pass_frame(creative_fn, pack, bundle, treatment: StoryTreatment,
 # P4 -- voices (pure python, no model call)
 # ---------------------------------------------------------------------------
 
-def _nearest_timbre(text: str, fallback: str) -> str:
-    """Map the treatment's free-text timbre onto the shared vocabulary.
-
-    The voice picker ranks candidates by matching a timbre WORD against each
-    voice's short description, so an unmapped adjective simply ranks nothing.
-    Falling back to the rotating vocabulary keeps the ensemble varied instead
-    of collapsing every character onto one column.
-    """
-    words = str(text or "").lower()
-    for known in _OTRCAST._TIMBRE_VOCAB:
-        if known in words:
-            return known
-    return fallback
-
-
 def _assign_voices(treatment: StoryTreatment, rng: random.Random) -> "list[dict]":
     """Cast rows: announcer c01, then characters c02.. in treatment order.
 
-    The LLM invented the people; Python picks the larynx. Deterministic under
-    a fixed seed, and two characters never share a voice -- the pool is
-    narrowed before each pick and the result is asserted afterwards.
+    The LLM invented the people. CastLock owns the larynx -- a kokoro graph
+    must not leave Bark identities in a pending writer ledger. Character
+    ``tts_model`` / ``voice_preset`` stay empty until lock() stamps the
+    engine that will actually speak. The announcer row is still the Kokoro
+    pick_announcer() default; CastLock may re-stamp it.
     """
     announcer = dict(_POOLS.pick_announcer(rng))
     announcer["char_id"] = "c01"
     rows: "list[dict]" = [announcer]
-    taken: "set[str]" = {str(announcer.get("voice_preset") or "")}
     for i, member in enumerate(treatment.cast):
-        pool = _POOLS.open_voice_pool(set(taken))
-        if not pool:
-            raise MyStoryCastError(
-                "voices",
-                "the voice stock ran out at character %d (%s); no two "
-                "characters may share a voice"
-                % (i + 1, member.name),
-            )
-        slot = _OTRCAST.EnsembleSlot(
-            char_id="c%02d" % (i + 2),
-            name=member.name,
-            gender=member.gender,
-            timbre=_nearest_timbre(
-                member.timbre,
-                _OTRCAST._TIMBRE_VOCAB[i % len(_OTRCAST._TIMBRE_VOCAB)]),
-            role=_OTRCAST._ROLE_VOCAB[i % len(_OTRCAST._ROLE_VOCAB)],
-        )
-        preset = _OTRCAST.python_assign_voice_preset(
-            slot, available_voices=pool, rng=rng, age_band=member.age_band)
-        taken.add(preset)
         rows.append({
-            "char_id": slot.char_id,
+            "char_id": "c%02d" % (i + 2),
             "name": member.name,
             "character_description": member.character_description,
             "gender": member.gender,
-            "tts_model": "bark",
-            "voice_preset": preset,
+            "tts_model": "",
+            "voice_preset": "",
             "voice_params": None,
         })
-    _OTRCAST._assert_unique_bark_voices(rows)
     return rows
 
 

@@ -338,6 +338,7 @@ def test_a_bank_with_no_character_engine_is_reported_not_raised():
     break a legitimate bank choice because an unrelated engine is qualified --
     which it did, the first time the route went live."""
     out = CastLock().lock(script_json=_ledger(), voice_bank="bark_legacy",
+                          char_voice_engine="bark",
                           cast_voice_policy="auto_registry")
     led = json.loads(out[0])
     for entry in led["cast"]:
@@ -383,7 +384,8 @@ def test_the_route_survives_the_DURABLE_stamp(monkeypatch):
     monkeypatch.setattr(pl, "stamp_durable", spy)
     monkeypatch.setattr("nodes.cast_lock.stamp_durable", spy, raising=False)
 
-    CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")
+    CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry",
+                    char_voice_engine="indextts2")
 
     cast = (captured.get("sections") or {}).get("cast")
     assert cast, "the durable stamp received no cast section at all"
@@ -621,6 +623,7 @@ def test_a_bank_that_COULD_serve_the_route_but_resolves_no_engine_fails_closed(
                         staticmethod(lambda *a, **k: None))
     with pytest.raises(ROUTE.VoiceRouteError, match="no character voice engine"):
         CastLock().lock(script_json=_ledger(), voice_bank="default",
+                        char_voice_engine="indextts2",
                         cast_voice_policy="auto_registry")
 
 
@@ -636,8 +639,10 @@ def test_auto_registry_is_deterministic_with_the_live_route(monkeypatch):
     """
     monkeypatch.setattr("config.cast_pools.LEMMY_VOICE_POLICY",
                         _requalified_shipped_policy())
-    a = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
-    b = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")[0]
+    a = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry",
+                        char_voice_engine="indextts2")[0]
+    b = CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry",
+                        char_voice_engine="indextts2")[0]
     assert a == b
     # Lemmy is on the route; nobody else is.
     rows = {e["char_id"]: e for e in json.loads(a)["cast"]}
@@ -789,11 +794,13 @@ def test_auto_registry_pins_the_claimed_row_only(pin, allow_voice_reuse):
     """The canonical workflow ships allow_voice_reuse=true, so both are pinned."""
     baseline = json.loads(CastLock().lock(
         script_json=_ledger(), cast_voice_policy="auto_registry",
+        char_voice_engine="indextts2",
         allow_voice_reuse=allow_voice_reuse)[0])
 
     pin()
     led = json.loads(CastLock().lock(
         script_json=_ledger(), cast_voice_policy="auto_registry",
+        char_voice_engine="indextts2",
         allow_voice_reuse=allow_voice_reuse)[0])
 
     rows = {e["char_id"]: e for e in led["cast"]}
@@ -816,7 +823,8 @@ def test_auto_registry_pins_the_claimed_row_only(pin, allow_voice_reuse):
 def test_preserve_ledger_changes_only_the_claimed_row(pin):
     pin()
     led = json.loads(CastLock().lock(
-        script_json=_ledger(), cast_voice_policy="preserve_ledger")[0])
+        script_json=_ledger(), cast_voice_policy="preserve_ledger",
+        char_voice_engine="indextts2")[0])
     rows = {e["char_id"]: e for e in led["cast"]}
 
     assert rows["c02"]["voice_ref_id"] == PINNED_REF
@@ -838,7 +846,8 @@ def test_the_pin_beats_the_hybrid_llm_voice_fit(pin):
         },
     }
     led = json.loads(CastLock().lock(
-        script_json=_ledger(meta=meta), cast_voice_policy="auto_registry")[0])
+        script_json=_ledger(meta=meta), cast_voice_policy="auto_registry",
+        char_voice_engine="indextts2")[0])
     rows = {e["char_id"]: e for e in led["cast"]}
     assert rows["c02"]["voice_ref_id"] == PINNED_REF
     assert "hybrid" not in rows["c02"]["voice_cast_fallback"]
@@ -850,7 +859,8 @@ def test_a_genderless_claimed_row_is_still_pinned(pin):
     pin()
     cast = [{"char_id": "c02", "name": "LEMMY", "voice_preset": "v2/en_speaker_8"}]
     led = json.loads(CastLock().lock(
-        script_json=_ledger(cast), cast_voice_policy="auto_registry")[0])
+        script_json=_ledger(cast), cast_voice_policy="auto_registry",
+        char_voice_engine="indextts2")[0])
     assert led["cast"][0]["voice_ref_id"] == PINNED_REF
 
 
@@ -879,7 +889,8 @@ def test_an_episode_without_the_claimed_row_is_left_entirely_alone(pin):
 def test_a_failed_route_stops_the_lock(pin, tmp_path):
     pin(_receipt(tmp_path, status="rejected"))
     with pytest.raises(ROUTE.VoiceRouteError):
-        CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry")
+        CastLock().lock(script_json=_ledger(), cast_voice_policy="auto_registry",
+                        char_voice_engine="indextts2")
 
 
 # ---------------------------------------------------------------------------

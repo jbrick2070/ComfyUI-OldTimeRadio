@@ -165,7 +165,7 @@ IMAGE_GEN = {
     "cloud_luma_photon_flash": "clum",
     "cloud_nano_banana_2": "cnb2",
     "cloud_seedream_2": "csd2",
-    "flux2_klein": "fkln",
+
     "flux_gen1": "flg1",
     "google_image": "gimg",
     "ideo": "ideo",

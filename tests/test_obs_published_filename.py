@@ -78,6 +78,19 @@ def test_the_pipeline_suffix_tail_is_gone(monkeypatch):
         assert noise not in got, (noise, got)
 
 
+def test_compacted_silent_captioned_credits_does_not_leak_silent(monkeypatch):
+    """Live 16 GB AnimateDiff 1-acts land as `<id>_silent_captioned_with_credits`
+    (no procgen blend). Matching only `_captioned_with_credits` left `_silent`
+    in the obs title, so the watch folder looked like lab leftovers."""
+    _install(monkeypatch, _FULL)
+    compacted = ("signal_lost_the_weight_of_lead_20260917_014122"
+                 "_silent_captioned_with_credits_final.mp4")
+    got = mux._obs_basename(compacted)
+    assert "silent" not in got, got
+    assert got.startswith("the_weight_of_lead_20260917_014122__")
+    assert got.endswith("_final.mp4")
+
+
 def test_the_name_carries_every_choice_as_a_short_code(monkeypatch):
     """Operator ruling 2026-09-07: four characters (five for the writer).
 
