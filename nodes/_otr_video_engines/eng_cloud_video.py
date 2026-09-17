@@ -1285,6 +1285,7 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
         }
 
     def canonicalize(self, raw, request, profile):
+        from .._otr_shared.cloud_media_backend import CloudErrorCode
         from .._otr_shared.cloud_media_canonical import (
             validate_partner_result)
         from .foley_stems import (
@@ -1304,8 +1305,10 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
         # clip["path"] after that call. clip_id stays shot_id for trace.
         raw_stem = os.path.splitext(os.path.basename(raw_path))[0]
         if not raw_stem:
-            raise FoleyStemError(
+            stem_exc = FoleyStemError(
                 "cloud Foley harvest has no basename from %r" % raw_path)
+            stem_exc.code = CloudErrorCode.CORRUPT_OUTPUT
+            raise stem_exc
         harvest_tmp = os.path.join(str(dest_dir), raw_stem + ".src.wav")
         # Harvest the provider bed FIRST. Parent canonicalize_video writes a
         # sibling .canon.mp4 with -an; if that ever became an in-place strip
@@ -1325,7 +1328,17 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
             matched = conform_stem_to_frame_count(
                 arr, rate, int(clip["frame_count"]), int(clip["fps"] or 25))
             n_samples, n_ch = write_pcm16_wav(stem_path, matched, rate)
-        except FoleyStemError:
+        except FoleyStemError as stem_exc:
+            # THE PROVIDER WAS ALREADY PAID WHEN THIS FIRES. The clip came
+            # back, the harvest ran, and the bed turned out unusable -- so
+            # this is the provider delivering something this pipeline cannot
+            # use, which is exactly CORRUPT_OUTPUT. Stamping it is what lets
+            # the render driver's cloud floor SEE it: unstamped, it surfaced
+            # as a bare RenderError, the floor looked past it, and the episode
+            # died with every paid beat in it. Live 2026-09-16 on this engine
+            # (see the shot_b004.wav note above), which is why it is stamped
+            # here and not left to a prose guess one layer up.
+            stem_exc.code = CloudErrorCode.CORRUPT_OUTPUT
             raise
         finally:
             try:

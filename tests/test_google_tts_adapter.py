@@ -220,6 +220,62 @@ def test_prepare_text_uses_real_delivery_keys_and_stage_tag_allowlist():
     assert G._EMOTION_PREFIX_THRESHOLD == 0.15
 
 
+def test_carry_evidence_keeps_the_cloud_floor_stamp():
+    """THE WRAP THAT ERASED THE FLOOR.
+
+    generate_voice re-raises a redacted GoogleTTSError. If `code` is not
+    copied, and __cause__ is not set (the raise is outside the except),
+    cloud_line_floor_reason returns empty and a refused Google line dumps
+    the paid role.
+    """
+    from nodes._otr_shared.cloud_media_backend import CloudErrorCode
+    from nodes._otr_voice_node_common import cloud_line_floor_reason
+
+    inner = G.GoogleAPIError("google said no")
+    inner.code = CloudErrorCode.RETRYABLE_TRANSPORT
+    outer = G._carry_evidence(G.GoogleTTSError("wrapped"), inner)
+    assert outer.code is CloudErrorCode.RETRYABLE_TRANSPORT
+    assert outer.__cause__ is inner
+    assert cloud_line_floor_reason(outer) == "retryable_transport"
+
+
+def test_a_200_safety_block_is_floorable_through_generate_voice(monkeypatch):
+    """Gemini returns 200 + promptFeedback and no audio. That path never
+    called _attach_evidence; generate_voice then wrapped the empty-audio
+    error. The floor must still see CONTENT_REFUSED."""
+    from nodes._otr_shared.cloud_media_backend import CloudErrorCode
+    from nodes._otr_voice_node_common import cloud_line_floor_reason
+
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "KEY")
+
+    def _post(api_key, payload):
+        return {"promptFeedback": {"blockReason": "PROHIBITED_CONTENT"}}
+
+    monkeypatch.setattr(G, "_post_interaction", _post)
+    with pytest.raises(G.GoogleTTSError) as ei:
+        AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
+    assert ei.value.code is CloudErrorCode.CONTENT_REFUSED
+    assert cloud_line_floor_reason(ei.value) == "content_refused"
+
+
+def test_a_paid_empty_200_without_policy_is_corrupt_not_a_crash(monkeypatch):
+    from nodes._otr_shared.cloud_media_backend import CloudErrorCode
+    from nodes._otr_voice_node_common import cloud_line_floor_reason
+
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "KEY")
+
+    def _post(api_key, payload):
+        return {"status": "completed"}
+
+    monkeypatch.setattr(G, "_post_interaction", _post)
+    with pytest.raises(G.GoogleTTSError) as ei:
+        AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
+    assert ei.value.code is CloudErrorCode.CORRUPT_OUTPUT
+    assert cloud_line_floor_reason(ei.value) == "corrupt_output"
+
+
 def test_google_adapter_has_no_partner_or_local_engine_call_path():
     tree = ast.parse(SRC.read_text(encoding="utf-8"))
     forbidden = {

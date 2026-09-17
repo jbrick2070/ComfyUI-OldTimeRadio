@@ -879,8 +879,10 @@ def test_ltx25_foley_canonicalize_fails_closed_without_audio(
            "duration_s": None, "provider_job_id": "foley-silent",
            "raw_meta": {}}
     monkeypatch.setattr(fs, "durable_foley_dir", lambda: str(tmp_path))
-    with pytest.raises(FoleyStemError, match="no harvestable audio"):
+    with pytest.raises(FoleyStemError, match="no harvestable audio") as ei:
         ecv.Ltx25FoleyPlus.canonicalize(raw, _request(tmp_path), {})
+    # Unstamped, the cloud floor looks past this and the paid episode dies.
+    assert ei.value.code is CloudErrorCode.CORRUPT_OUTPUT
 
 
 def test_ltx25_audio_in_partner_inputs_send_audio_and_image(

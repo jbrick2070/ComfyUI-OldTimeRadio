@@ -781,6 +781,8 @@ def stamp_per_line_audio_meta(
     provider_model_id: str = "",
     voice_route_id: str = "",
     sample_rate: int = 0,
+    voice_floor: str = "",
+    voice_floor_words: int = 0,
 ) -> bool:
     """Stamp per-line audio render metadata. Wraps ``patch_line_fields``.
 
@@ -795,6 +797,21 @@ def stamp_per_line_audio_meta(
     per-line provenance for the FileAudioCache hit/miss on this line.
     ``_OPTIONAL_STRING_FIELDS`` in _otr_ledger_consumers recognizes them
     for the post-freeze null-shape audit.
+
+    New optional kwargs (audio floor, 2026-09-16): ``voice_floor`` names the
+    provider verdict behind a line the provider never delivered, and
+    ``voice_floor_words`` is the word count the substituted silence was sized
+    from. A floored row carries NO ``audio_sample_hash`` and NO
+    ``audio_sha256`` on purpose -- nothing was produced, and a hash would let a
+    reader believe a real take exists. ``generated_dur_s`` on such a row is an
+    ESTIMATE, and ``voice_floor`` is the flag that says so.
+
+    THESE ARE NAMED PARAMETERS BECAUSE THIS SIGNATURE IS KEYWORD-ONLY AND HAS
+    NO ``**kwargs``. An earlier draft of the floor stamped them anyway; the
+    resulting ``TypeError`` was swallowed by ``_persist_ledger_stamps``' broad
+    except, which then marked EVERY line in the role as failed -- so one
+    floored line destroyed the render evidence of every healthy line beside
+    it. Caught in review before it ever ran. Add a field here first.
 
     New optional kwargs (plan 5.3, 2026-08-10): ``voice_route_id`` names the
     qualified voice route this line actually rendered on -- empty on every
@@ -827,6 +844,12 @@ def stamp_per_line_audio_meta(
         fields["voice_route_id"] = str(voice_route_id)
     if int(sample_rate or 0) > 0:
         fields["sample_rate"] = int(sample_rate)
+    # Skip-when-empty like every field above: a healthy re-render of this line
+    # passes no voice_floor and must not be able to blank one, nor stamp one.
+    if voice_floor:
+        fields["voice_floor"] = str(voice_floor)
+    if int(voice_floor_words or 0) > 0:
+        fields["voice_floor_words"] = int(voice_floor_words)
     try:
         return patch_line_fields(ledger, line_id, fields)
     except Exception:  # noqa: BLE001

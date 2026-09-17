@@ -222,6 +222,10 @@ _OPTIONAL_STRING_FIELDS = (
     "music_cache_key",
     "video_clip_path",
     "tts_skip_reason",
+    # Audio floor, 2026-09-16: a provider-refused line keeps its slot as
+    # silence. The flag is what tells a reader generated_dur_s is an estimate
+    # and that no take exists. Skip-when-empty; never null.
+    "voice_floor",
     # S25/MG-3 (BUG-LOCAL-213). MusicGen parity field. The enum below
     # documents its legal values; NOTHING enforces them at runtime since
     # the post-freeze writeback auditor was deleted 2026-08-19.

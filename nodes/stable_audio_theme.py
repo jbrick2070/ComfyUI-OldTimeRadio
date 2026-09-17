@@ -52,6 +52,42 @@ _LEGACY_FIRST_FALLBACK = ("musicgen", "stable_audio_music")
 _CUE_SLOTS = ("opening", "closing")
 
 
+def cloud_cue_floor_reason(exc):
+    """The job-scoped cloud code behind a failed cue, or "".
+
+    Same rule as the voice, still and video funnels: only a STAMPED
+    job-scoped ``CloudErrorCode`` floors. An unstamped exception is an
+    ordinary crash and keeps failing LOUD.
+    """
+    try:
+        from ._otr_shared.cloud_media_backend import cloud_job_failure_code
+    except Exception:  # noqa: BLE001 -- classification is never fatal
+        return ""
+    code = cloud_job_failure_code(exc)
+    return code.value if code is not None else ""
+
+
+def floored_cue_silence(duration_s, rate):
+    """Silence the LENGTH the cue was asked for.
+
+    A music bed is the mildest of the four floors: unlike a voice line it
+    carries no words, and unlike a video beat it is not what the picture is
+    cut against. The cue keeps its requested duration so every downstream
+    placement, caption span and assembly offset lands exactly where it would
+    have -- the episode simply plays that stretch dry.
+
+    MODULE SCOPE ON PURPOSE. These were closures inside ``_render_clips``,
+    which made them untestable: the test written for this behaviour could not
+    import the real function, reimplemented its arithmetic inline, and
+    asserted that against itself -- a tautology that would have passed with
+    the floor deleted. A helper that cannot be reached by a test is a helper
+    with no coverage.
+    """
+    import torch
+    n = max(1, int(round(float(duration_s) * float(rate))))
+    return {"waveform": torch.zeros(1, 1, n), "sample_rate": int(rate)}
+
+
 class StableAudioTheme:
     """Generic theme-music node. Registered as ``OTR_StableAudioTheme``.
 
@@ -384,6 +420,7 @@ class StableAudioTheme:
             and len(cue_jobs) > 1
         )
         clips_by_id = {}
+        floored_cues = []
         if fan_ok:
             log_lines.append(
                 "music: cloud fan-out %d cue(s), workers=%d; assemble stays cue order"
@@ -400,15 +437,60 @@ class StableAudioTheme:
             for job in cue_jobs:
                 jid = job["job_id"]
                 if jid in outcome.errors:
+                    # A FAILED CUE COSTS ONE CUE, NOT THE EPISODE (operator
+                    # 2026-09-16). Every other cue in this wave is already
+                    # requested and already PAID FOR, and music has no cache at
+                    # all, so raising here re-bought every one on the next run
+                    # -- on top of every TTS line before it. Only a stamped
+                    # job-scoped verdict floors; an ordinary crash still fails
+                    # loud below.
+                    _why = cloud_cue_floor_reason(outcome.errors[jid])
+                    if _why:
+                        clips_by_id[jid] = floored_cue_silence(
+                            job["duration_s"], sr)
+                        floored_cues.append((jid, _why))
+                        log.error(
+                            "[OTR music] CUE FLOOR %s [%s] -- the provider "
+                            "returned no bed for this cue; %.2fs of silence "
+                            "holds its place so the episode still assembles. "
+                            "%s", jid, _why, float(job["duration_s"]),
+                            outcome.errors[jid])
+                        continue
                     raise outcome.errors[jid]
                 if jid not in outcome.results:
                     raise RuntimeError(
                         "cloud music fan-out never rendered cue %s" % jid)
                 clips_by_id[jid] = outcome.results[jid]
         else:
+            # THE SERIAL PATH FLOORS TOO (2026-09-16 review). `fan_ok` requires
+            # more than one cue, so an episode with a SINGLE cue -- an ordinary
+            # shape, not an edge case -- always came through here, where there
+            # was no try/except at all and `generate()` has only a `finally`.
+            # One refused bed therefore killed the whole render, TTS and all,
+            # on exactly the lane this work exists to protect.
             for job in cue_jobs:
-                clips_by_id[job["job_id"]] = _forward_one_music_cue(job)
+                jid = job["job_id"]
+                try:
+                    clips_by_id[jid] = _forward_one_music_cue(job)
+                except Exception as exc:  # noqa: BLE001 -- split verdict/crash
+                    _why = cloud_cue_floor_reason(exc)
+                    if not _why:
+                        raise
+                    clips_by_id[jid] = floored_cue_silence(
+                        job["duration_s"], sr)
+                    floored_cues.append((jid, _why))
+                    log.error(
+                        "[OTR music] CUE FLOOR %s [%s] -- the provider "
+                        "returned no bed for this cue; %.2fs of silence holds "
+                        "its place so the episode still assembles. %s",
+                        jid, _why, float(job["duration_s"]), exc)
 
+        if floored_cues:
+            log.error(
+                "[OTR music] %d of %d cue(s) FLOORED -- silence holds their "
+                "place and the episode still assembles. These cues have no "
+                "bed: %s", len(floored_cues), len(cue_jobs),
+                ", ".join("%s[%s]" % (cid, why) for cid, why in floored_cues))
         for job in cue_jobs:
             spec = job["spec"]
             engine_prompt = job["engine_prompt"]

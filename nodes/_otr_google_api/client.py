@@ -150,7 +150,70 @@ def _attach_evidence(exc: GoogleAPIError, *, status: int | None,
         kind, retryable = "http", False
     exc.failure_kind = kind
     exc.retryable = retryable
+    _stamp_cloud_code(exc, kind, response_json, raw_body)
     return exc
+
+
+#: Google's own failure kinds -> the canonical cloud taxonomy. The split that
+#: matters is job-scoped (floor ONE beat, keep the paid run) vs run-scoped
+#: (stop, because nothing will ever render).
+#:   auth          -> AUTH           run-scoped: the key is wrong for every call
+#:   quota         -> BUDGET         run-scoped AND halts: an exhausted project
+#:                                   quota refuses the next beat too, and
+#:                                   flooring 40 beats on it would publish a void
+#:   request_shape -> MALFORMED_CONFIG  run-scoped: a bad shape is bad every time
+#:   server        -> RETRYABLE_TRANSPORT  job-scoped: a 5xx is about this call
+#:   transport     -> RETRYABLE_TRANSPORT  job-scoped: same
+#:   http          -> PROVIDER_REJECTED    job-scoped: the provider said no
+_GOOGLE_KIND_TO_CLOUD_CODE = {
+    "auth": "AUTH",
+    "quota": "BUDGET",
+    "request_shape": "MALFORMED_CONFIG",
+    "server": "RETRYABLE_TRANSPORT",
+    "transport": "RETRYABLE_TRANSPORT",
+    "http": "PROVIDER_REJECTED",
+}
+
+
+def _stamp_cloud_code(exc, kind, response_json, raw_body) -> None:
+    """Make a Google failure legible to the shared cloud floor.
+
+    WHY THIS EXISTS. Google is a DIRECT BYO API lane -- it never passes through
+    ``invoke_partner_node``, which is where every partner failure gets its
+    ``CloudErrorCode``. So a Google engine could be correctly recognized as a
+    cloud engine by ``_is_cloud_video_engine`` and still not be floorable,
+    because ``cloud_job_failure_code`` reads a stamped code and Google stamped
+    none. One 5xx on one beat would take a whole paid episode down -- the
+    beat-40 defect on a lane that merely looked covered. Found 2026-09-16 when
+    the operator asked whether ALL cloud providers were resilient.
+
+    A CONTENT REFUSAL WINS OVER THE HTTP KIND. Google reports a safety block
+    inside the RESPONSE BODY, often on an otherwise ordinary status, so the
+    status alone would call it something else entirely. This reads the body's
+    own fields, which is the rule :func:`_attach_evidence` already states --
+    classify on fields, never on exception text.
+
+    Best-effort and never raises: a failure to classify a failure must not
+    replace the failure.
+    """
+    try:
+        from .._otr_shared.cloud_media_backend import (
+            CloudErrorCode, is_content_policy_message)
+        blob = ""
+        if response_json is not None:
+            try:
+                blob = json.dumps(response_json)
+            except Exception:  # noqa: BLE001 -- unserializable body
+                blob = str(response_json)
+        blob = "%s %s" % (blob, raw_body or "")
+        if is_content_policy_message(blob):
+            exc.code = CloudErrorCode.CONTENT_REFUSED
+            return
+        named = _GOOGLE_KIND_TO_CLOUD_CODE.get(str(kind or ""))
+        if named:
+            exc.code = getattr(CloudErrorCode, named)
+    except Exception:  # noqa: BLE001 -- classification is never fatal
+        pass
 
 
 def _classify_http_error(status: int, body: Any) -> GoogleAPIError:

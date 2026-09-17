@@ -11,6 +11,8 @@ No GPU, no model load. UTF-8, no BOM, ASCII-only, SFW.
 """
 from __future__ import annotations
 
+import pathlib
+
 import pytest
 
 from nodes._otr_shared import retry_taxonomy as rt
@@ -1340,3 +1342,189 @@ def test_a_missing_shot_with_no_floored_predecessor_still_raises():
     """The cascade branch must not become a blanket excuse for absence."""
     assert rd._floored_predecessor(
         {"shot_id": "s9", "starts_on_last_frame_of": "s8"}, {"s7"}) == ""
+
+
+def _gap_ledger(gap_beat, n=4):
+    """A cloud ledger whose beat ``gap_beat`` has a REFUSED required still."""
+    led = _cloud_ledger(refused_index=-1, n=n)
+    led.setdefault("images", {})["required_scene_targets"] = [{
+        "beat_id": gap_beat, "object_id": "obj_%s" % gap_beat,
+        "status": "sanctioned_gap",
+    }]
+    return led
+
+
+def test_a_still_gap_does_not_kill_the_run_through_its_chain_successor(
+        cloud_stub_registry, monkeypatch):
+    """THE HOLE THE FIRST CASCADE FIX LEFT OPEN.
+
+    A sanctioned still-gap beat is filtered out of ``work_shots`` and never
+    submitted, so it produces NO error. Its chain successor therefore never
+    becomes ready and comes back in ``stuck_ids`` beside an EMPTY error dict
+    -- which is precisely what the old ``if outcome.stuck_ids and not errors:
+    raise`` short-circuit fired on, before the commit walk could floor either
+    of them. A refused STILL killed a fully paid VIDEO run.
+    """
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    led = _gap_ledger("b1", n=4)
+    led["video"]["shots"][2]["starts_on_last_frame_of"] = "shot_0001"
+    out = rd.run_episode(led)
+    done = out["ledger"]["video"]["shots"]
+    assert [s["shot_id"] for s in done] == [
+        "shot_0000", "shot_0001", "shot_0002", "shot_0003"]
+    # The gapped beat keeps its place, and so does the successor it stranded.
+    assert done[2]["cloud_floor"] == "predecessor_floored"
+    # Every independent beat still rendered and committed.
+    assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
+    assert "shot_0001" not in out["clips"] and "shot_0002" not in out["clips"]
+
+
+def test_a_still_gap_cascade_is_floored_on_the_serial_walk_too(
+        cloud_stub_registry, monkeypatch):
+    """The serial branch could submit the successor, so it must ask first.
+
+    Rendering it would hand a chain segment an init frame that is a clip which
+    does not exist -- it would die inside render_beat_coverage with no stamp,
+    no floor, and the paid beats with it.
+    """
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "1")
+    monkeypatch.setenv("OTR_CLOUD_VIDEO_FANOUT", "1")
+    led = _gap_ledger("b1", n=4)
+    led["video"]["shots"][2]["starts_on_last_frame_of"] = "shot_0001"
+    assert rd._should_fanout_cloud_episode(led["video"], {"b1"}) is False
+    out = rd.run_episode(led)
+    done = out["ledger"]["video"]["shots"]
+    assert done[2]["cloud_floor"] == "predecessor_floored"
+    assert "shot_0000" in out["clips"] and "shot_0003" in out["clips"]
+    assert "shot_0002" not in out["clips"]
+
+
+def test_a_stuck_shot_with_no_floored_predecessor_still_raises_loud(
+        cloud_stub_registry, monkeypatch):
+    """Removing the short-circuit must not make every leftover survivable.
+
+    A shot that never became ready for a reason nobody floored is an
+    unexplained hole, and the walk must still fail LOUD -- now from the branch
+    that can name which shot.
+    """
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    led = _cloud_ledger(refused_index=-1, n=3)
+    # A predecessor that is not in this episode at all: nothing ever floors
+    # it, so shot_0002 can never become ready and nothing explains why.
+    led["video"]["shots"][2]["starts_on_last_frame_of"] = "shot_does_not_exist"
+    with pytest.raises(rd.RenderError) as ei:
+        rd.run_episode(led)
+    assert "shot_0002" in str(ei.value)
+
+
+def test_chain_order_inversion_is_caught_before_a_walk_begins():
+    """The invariant both cascades rest on, stated and enforced.
+
+    A successor listed AHEAD of its predecessor consults a floored-set that
+    does not contain it yet, so it would not cascade -- and one refusal would
+    take a paid episode down again through the door this machinery closed.
+    """
+    good = [
+        {"shot_id": "s0"},
+        {"shot_id": "s1", "starts_on_last_frame_of": "s0"},
+        {"shot_id": "s2", "starts_on_last_frame_of": "s1"},
+    ]
+    assert rd.assert_chain_order(good) is good
+    bad = [
+        {"shot_id": "s1", "starts_on_last_frame_of": "s0"},
+        {"shot_id": "s0"},
+    ]
+    with pytest.raises(rd.RenderError, match="chain order is inverted"):
+        rd.assert_chain_order(bad)
+    # A predecessor that is simply not in this episode is NOT an ordering
+    # fault -- the walk raises about it later, where it can say more.
+    rd.assert_chain_order([{"shot_id": "s1", "starts_on_last_frame_of": "gone"}])
+    # Empty / jump-only episodes are fine.
+    rd.assert_chain_order([])
+    rd.assert_chain_order([{"shot_id": "s0"}, {"shot_id": "s1"}])
+
+
+def test_run_episode_refuses_an_inverted_chain(cloud_stub_registry,
+                                               monkeypatch):
+    """It fires from run_episode, before either walk spends anything."""
+    monkeypatch.setenv("OTR_CLOUD_FANOUT", "4")
+    led = _cloud_ledger(refused_index=-1, n=3)
+    # shot_0000 chains from shot_0002, which the ledger lists LAST.
+    led["video"]["shots"][0]["starts_on_last_frame_of"] = "shot_0002"
+    with pytest.raises(rd.RenderError, match="chain order is inverted"):
+        rd.run_episode(led)
+
+
+def test_a_local_successor_of_a_floored_beat_is_never_stamped_cloud(caplog):
+    """A LOCAL engine never floors, even downstream of a cloud floor.
+
+    Caught in review 2026-09-16: `_floored_predecessor` has no engine gate, so
+    a local-engine beat that merely chained from a floored cloud beat was
+    stamped `cloud_floor="predecessor_floored"` and skipped -- a local shot
+    counted in the cloud-failure tally and silently dropped under NO FALLBACKS.
+    It is still unrenderable, so it must not be ATTEMPTED either; it fails
+    LOUD, which is what a local fault gets.
+    """
+    import logging
+    from nodes._otr_shared import cloud_media_backend as cmb
+    refused = cmb.CloudMediaError(
+        cmb.CloudErrorCode.CONTENT_REFUSED, "Content filtered")
+
+    cloud_shot = {"shot_id": "s0", "engine_id": "cloud_ltx25_foley_plus"}
+    local_next = {"shot_id": "s1", "engine_id": "humo",
+                  "starts_on_last_frame_of": "s0"}
+    # The predecessor itself floors, because it IS a cloud beat.
+    assert rd._cloud_floor_reason(
+        "s0", {"s0": refused}, cloud_shot) == "content_refused"
+    # The local successor is found as cascaded...
+    assert rd._floored_predecessor(local_next, {"s0"}) == "s0"
+    # ...but it is NOT a cloud engine, so it must never carry a cloud floor.
+    assert not rd._is_cloud_video_engine("humo")
+
+
+def test_a_paid_foley_assembly_fault_is_stamped_corrupt():
+    """assemble_beat_foley_segments runs AFTER the provider was paid.
+
+    Unstamped, those FoleyStemErrors sailed past the cloud floor and dumped
+    the episode. The helper must stamp them, and the assemble site must
+    raise through it.
+    """
+    from nodes._otr_shared.cloud_media_backend import (
+        CloudErrorCode, cloud_job_failure_code)
+    from nodes._otr_video_engines.foley_stems import FoleyStemError
+
+    err = FoleyStemError("assembled foley is 1 sample(s) for a beat of 25")
+    stamped = rd._cloud_output_fault(err, "cloud_ltx25_foley_plus")
+    assert cloud_job_failure_code(stamped) is CloudErrorCode.CORRUPT_OUTPUT
+    src = pathlib.Path(rd.__file__).read_text(encoding="utf-8")
+    assemble_at = src.find("assemble_beat_foley_segments")
+    wrap_at = src.find("_cloud_output_fault(stem_exc", assemble_at)
+    assert assemble_at > 0 and wrap_at > assemble_at, (
+        "assemble_beat_foley_segments is not raised through "
+        "_cloud_output_fault; a paid Foley concatenate still dumps the run")
+
+
+def test_report_cloud_floors_counts_still_gaps_and_budget_floors_too(caplog):
+    """The banner divided cloud floors by the WHOLE episode and undercounted.
+
+    Four still gaps plus two cloud floors in a 12-beat act is 50% holes; the
+    earlier draft reported 17%, stayed under the threshold, and said nothing.
+    """
+    import logging
+    from nodes._otr_shared import still_receipt as _receipt
+    shots = [{"shot_id": "ok%d" % i} for i in range(6)]
+    shots += [rd._stamp_cloud_floor_shot({"shot_id": "c%d" % i}, "timeout")
+              for i in range(2)]
+    shots += [rd._stamp_budget_floor_shot({"shot_id": "b0"})]
+    gap = {"shot_id": "g0", "status": _receipt.STATUS_SANCTIONED_GAP}
+    shots += [gap, dict(gap, shot_id="g1"), dict(gap, shot_id="g2")]
+    with caplog.at_level(logging.WARNING):
+        got = rd._report_cloud_floors(shots)
+    # 6 holes out of 12 beats = 50%, comfortably over the 25% threshold.
+    assert len(got) == 6, got
+    assert "SYSTEMIC CLOUD FAILURE" in caplog.text
+    # Each KIND is named separately, so the tally stays truthful.
+    assert "timeout: c0, c1" in caplog.text
+    assert "budget: b0" in caplog.text
+    assert "still_gap: g0, g1, g2" in caplog.text
+

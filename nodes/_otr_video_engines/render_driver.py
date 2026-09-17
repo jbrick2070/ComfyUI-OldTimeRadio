@@ -418,6 +418,35 @@ def out_of_memory_in_chain(exc):
     return False
 
 
+def _cloud_output_fault(exc, engine_id):
+    """Let the cloud floor SEE a fault found AFTER the provider was paid.
+
+    THE LAST DOOR THE BEAT-40 DUMP COULD STILL WALK THROUGH. Everything the
+    floor understands is stamped at the cloud INVOKE boundary -- the moment
+    the provider answers. These faults are found later, while turning that
+    answer into a usable clip: no path, an unreadable frame count, a count
+    that does not match the plan the audio was cut against, a Foley bed that
+    covers some segments of a beat and not others. By then the money is spent
+    and the clip exists -- and because they raise a bare ``RenderError`` with
+    no ``CloudErrorCode``, ``_cloud_floor_reason`` looked straight past them
+    and the episode died with every paid beat still in it. Not hypothetical:
+    ``eng_cloud_video.canonicalize`` carries a note about a live 2026-09-16
+    FoleyStemError on this exact engine.
+
+    ``CORRUPT_OUTPUT`` is the honest name -- the provider delivered something
+    this pipeline cannot use -- and it is already job-scoped, so the beat
+    floors and the episode goes on.
+
+    CLOUD ENGINES ONLY. The identical check on a LOCAL engine is a local bug
+    (our sampler, our ffmpeg, our plan arithmetic) and keeps failing LOUD:
+    there is nobody else to blame and nothing was paid for.
+    """
+    if _is_cloud_video_engine(str(engine_id or "")):
+        from .._otr_shared.cloud_media_backend import CloudErrorCode
+        exc.code = CloudErrorCode.CORRUPT_OUTPUT
+    return exc
+
+
 def _is_provider_content_refusal(exc):
     """True when this failure is a cloud provider's content-policy refusal.
 
@@ -429,6 +458,31 @@ def _is_provider_content_refusal(exc):
     except Exception:  # noqa: BLE001 -- classification must never itself raise
         return False
     return is_content_refusal(exc)
+
+
+#: Job-scoped cloud verdicts with an exact FailureKind counterpart. The other
+#: two (provider_rejected, orphaned_job) have no better name than the generic
+#: crash bucket, and inventing a flattering one would be worse than falling
+#: through honestly.
+_JOB_CODE_TO_KIND = {
+    "content_refused": "CONTENT_REFUSED",
+    "timeout": "TIMEOUT",
+    "corrupt_output": "CORRUPT_OUTPUT",
+    "retryable_transport": "TRANSIENT_IO",
+}
+
+
+def _job_scoped_failure_kind(exc):
+    """The FailureKind for a stamped job-scoped cloud verdict, or None."""
+    try:
+        from .._otr_shared.cloud_media_backend import cloud_job_failure_code
+    except Exception:  # noqa: BLE001 -- classification must never itself raise
+        return None
+    code = cloud_job_failure_code(exc)
+    if code is None:
+        return None
+    named = _JOB_CODE_TO_KIND.get(code.value)
+    return getattr(_rt.FailureKind, named) if named else None
 
 
 def classify_failure(exc):
@@ -448,6 +502,15 @@ def classify_failure(exc):
     # Walks the cause chain -- ``render_beat_coverage`` may have wrapped it.
     if _is_provider_content_refusal(exc):
         return _rt.FailureKind.CONTENT_REFUSED
+    # ...and the same courtesy for every OTHER job-scoped verdict. Naming only
+    # the refusal left the original defect half-closed: a cloud TIMEOUT or a
+    # corrupt delivery still came back as CRASH_BEFORE_LOAD, and render_shot
+    # bakes that name into the RenderError message before any floor reads the
+    # cause -- so the operator was still being told to "fix the engine or its
+    # inputs" about an engine that worked and a provider that did not deliver.
+    _job_kind = _job_scoped_failure_kind(exc)
+    if _job_kind is not None:
+        return _job_kind
     name = type(exc).__name__
     if name in ("EngineUnusable", "WrapperNodeMissing", "LookupError",
                 "KeyError", "FileNotFoundError", "FamilyInputGap"):
@@ -5025,10 +5088,10 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                              else max(peak_used, int(seg_used)))
             path = str((clip or {}).get("path") or "")
             if not path:
-                raise RenderError(
+                raise _cloud_output_fault(RenderError(
                     "shot %s segment %d rendered no clip path, so the beat "
                     "cannot be assembled. NO FALLBACK."
-                    % (shot.get("shot_id"), index))
+                    % (shot.get("shot_id"), index)), shot.get("engine_id"))
             # CHECK THE LENGTH HERE, where the message can still name the
             # segment (2026-07-26 QA panel). A short render otherwise surfaces
             # much later as an assembly count mismatch, which reads as an
@@ -5056,14 +5119,14 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             except (TypeError, ValueError):
                 got = None
             if got is None or got < 1:
-                raise RenderError(
+                raise _cloud_output_fault(RenderError(
                     "shot %s segment %d returned frame_count=%r, which is not a "
                     "length. The plan asked for %d frame(s) and the segment "
                     "cannot say what it produced, so the beat cannot be proven "
                     "against its own audio. NO FALLBACK -- an unreadable count "
                     "is a failed verification, not a zero."
                     % (shot.get("shot_id"), index, raw_count,
-                       int(segment.render_frames)))
+                       int(segment.render_frames))), shot.get("engine_id"))
             # NAME THE DIRECTION, AND DO NOT EXPLAIN A SHORTFALL THAT DID NOT
             # HAPPEN. This message read "assembling a SHORT segment would make
             # the beat drift" for both directions, and the first live firing
@@ -5079,13 +5142,14 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
             if got != planned:
                 delta = ("a surplus of %d" % (got - planned)) if got > planned \
                     else ("short by %d" % (planned - got))
-                raise RenderError(
+                raise _cloud_output_fault(RenderError(
                     "shot %s segment %d rendered %d frame(s) but its plan asked "
                     "for %d (%s). NO FALLBACK -- the plan's count is what this "
                     "segment's audio slice was cut against, so assembling a "
                     "segment of any other length makes the beat drift against "
                     "its own audio."
-                    % (shot.get("shot_id"), index, got, planned, delta))
+                    % (shot.get("shot_id"), index, got, planned, delta)),
+                    shot.get("engine_id"))
             visible = (int(segment.render_frames)
                        - int(segment.drop_head)
                        - int(segment.trim_tail))
@@ -5168,17 +5232,24 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
     foley_receipts = None
     if foley_rendered:
         if len(foley_rendered) != len(rendered):
-            raise RenderError(
+            raise _cloud_output_fault(RenderError(
                 "beat %s assembled %d video segment(s) but only %d foley "
                 "stem(s). NO PARTIAL BED -- a bed that appears under some "
                 "segments of one beat and not others is worse than none, and "
                 "every log would still read green"
-                % (beat_key, len(rendered), len(foley_rendered)))
-        foley_receipts = _foley.assemble_beat_foley_segments(
-            foley_rendered,
-            _foley.durable_foley_dir() / ("beat_%s_foley.wav" % beat_key),
-            expect_frames=int(plan.target_visible_frames),
-            fps=int((clip or {}).get("fps") or 25))
+                % (beat_key, len(rendered), len(foley_rendered))),
+                shot.get("engine_id"))
+        try:
+            foley_receipts = _foley.assemble_beat_foley_segments(
+                foley_rendered,
+                _foley.durable_foley_dir() / ("beat_%s_foley.wav" % beat_key),
+                expect_frames=int(plan.target_visible_frames),
+                fps=int((clip or {}).get("fps") or 25))
+        except _foley.FoleyStemError as stem_exc:
+            # THE PROVIDER WAS ALREADY PAID. The stems exist; the beat
+            # concatenate failed. Unstamped, this raised past the cloud
+            # floor and dumped every paid picture in the episode.
+            raise _cloud_output_fault(stem_exc, shot.get("engine_id"))
 
     beat_clip = dict(clip or {})
     beat_clip["path"] = assembled
@@ -5539,6 +5610,70 @@ def _shot_is_cloud_floor(shot) -> bool:
     return bool(isinstance(shot, dict) and shot.get("cloud_floor"))
 
 
+def assert_chain_order(shots):
+    """Every chain predecessor must appear BEFORE its successor. Raise if not.
+
+    THE INVARIANT BOTH CASCADES REST ON, and until now nobody stated it. The
+    fan-out and serial walks each make ONE forward pass and learn a beat was
+    floored only when they reach it, so a successor listed ahead of its
+    predecessor consults a floored-set that does not contain it yet. It would
+    then NOT cascade -- the fan-out walk would raise about the successor, and
+    the serial walk would hand ``render_beat_coverage`` an init frame that is
+    a clip which does not exist. Either way one refusal kills a paid episode
+    again, which is the whole defect this machinery exists to prevent.
+
+    ``starts_on_last_frame_of`` has NO producer in the tree today (grep says
+    so: only this module and its tests mention it), so the invariant currently
+    holds vacuously. That is exactly why it is worth pinning now -- a vacuous
+    invariant is free to check and impossible to debug once it breaks, and the
+    day a real sequencer starts stamping the field is the day it can break.
+
+    FAIL LOUD rather than re-sorting. A successor that precedes its
+    predecessor is a PLANNING fault: the timeline and the chain disagree, and
+    quietly reordering the episode's beats to paper over that would change the
+    show. The operator wants to hear about it.
+    """
+    position, preds = {}, {}
+    for index, shot in enumerate(shots or ()):
+        sid = str((shot or {}).get("shot_id") or "")
+        if sid:
+            position.setdefault(sid, index)
+            preds[sid] = tuple(str(p) for p in cloud_frame_predecessors(shot))
+
+    # A CYCLE IS NOT AN INVERSION, and they earn different words. In a cycle
+    # no ordering exists at all, so no amount of reordering saves it and
+    # nothing in it ever becomes ready -- which is precisely what the
+    # ready-queue used to report from much further downstream, after the pool
+    # had already been opened. Saying it here costs nothing and says it sooner.
+    for start in preds:
+        seen, cur = set(), start
+        while cur in preds and cur not in seen:
+            seen.add(cur)
+            chain = preds.get(cur) or ()
+            cur = chain[0] if chain else None
+        if cur is not None and cur in seen:
+            raise RenderError(
+                "cloud fan-out chain cycle through shot %s: it waits on %s "
+                "which waits back, so shot %s never became ready and no "
+                "ordering of the episode can fix it."
+                % (start, ", ".join(preds.get(start) or ()) or "(nothing)",
+                   start))
+
+    for index, shot in enumerate(shots or ()):
+        sid = str((shot or {}).get("shot_id") or "")
+        for pred in cloud_frame_predecessors(shot):
+            at = position.get(str(pred))
+            if at is not None and at > index:
+                raise RenderError(
+                    "chain order is inverted: shot %s (position %d) starts on "
+                    "the last frame of %s, which the ledger lists LATER at "
+                    "position %d. A successor must follow its predecessor, or "
+                    "a floored predecessor cannot be cascaded and one refusal "
+                    "takes the whole paid episode down."
+                    % (sid, index, pred, at))
+    return shots
+
+
 def _floored_predecessor(shot, floored_sids):
     """The floored beat this shot chains from, or "".
 
@@ -5609,12 +5744,24 @@ def _report_cloud_floors(shots):
     publishes as degraded, and the log says plainly that a quarter of the show
     never came back, and why.
     """
+    # COUNT EVERY HOLE, not just the cloud ones. An earlier draft counted only
+    # rows carrying ``cloud_floor`` while dividing by the WHOLE episode, so a
+    # 12-beat act with four still gaps and two cloud floors reported 17%
+    # instead of 50% -- under the threshold, banner silent, operator told
+    # nothing. A sanctioned still gap and a budget floor are holes in the
+    # delivered picture exactly as a cloud floor is; they are named separately
+    # so the reason tally stays truthful about which is which.
     floored, by_reason = [], {}
     for shot in (shots or ()):
-        if not _shot_is_cloud_floor(shot):
-            continue
         sid = str((shot or {}).get("shot_id") or "")
-        why = str((shot or {}).get("cloud_floor") or "")
+        if _shot_is_cloud_floor(shot):
+            why = str((shot or {}).get("cloud_floor") or "")
+        elif _shot_is_budget_floor(shot):
+            why = "budget"
+        elif _receipt.is_sanctioned_gap(shot):
+            why = "still_gap"
+        else:
+            continue
         floored.append(sid)
         by_reason.setdefault(why, []).append(sid)
     if not floored:
@@ -5818,6 +5965,9 @@ def run_episode(ledger, *, oom_shot_id=None,
         # Beats whose required still the image model REFUSED. Read once, not
         # per beat: the receipt is frozen by the time the render starts.
         _gap_beats = sanctioned_gap_beat_ids(ledger)
+        # Both walks below cascade a floored beat to its chain successors in a
+        # single forward pass, which is only sound while the list is ordered.
+        assert_chain_order(section["shots"])
         if _should_fanout_cloud_episode(section, _gap_beats):
             # CLOUD-ONLY FAN-OUT. Partner HTTP waits, not VRAM.
             # Predecessor-ready beats are requested in waves via
@@ -5867,13 +6017,32 @@ def run_episode(ledger, *, oom_shot_id=None,
             rendered = outcome.results
             errors = outcome.errors
             halted = set(outcome.halted_ids or ())
+            stuck = set(outcome.stuck_ids or ())
             # Every id floored below, so a CHAIN successor can see that the
             # frame it was going to start from is never going to exist.
             floored_sids = set()
-            if outcome.stuck_ids and not errors:
-                raise RenderError(
-                    "cloud fan-out stuck; shots never became ready: %s"
-                    % outcome.stuck_ids)
+            # NO SHORT-CIRCUIT HERE. This used to raise on any leftover when
+            # ``errors`` was empty, which is the shape a chain successor takes
+            # when its predecessor was a sanctioned STILL GAP: the predecessor
+            # is filtered out of ``work_shots`` above and never submitted, so
+            # it produces no error, the successor never becomes ready, and the
+            # pair came back as a stuck id beside an empty error dict -- raised
+            # on before the walk could floor either.
+            #
+            # HONESTY ABOUT SCOPE (2026-09-16 review): this is FORWARD
+            # INSURANCE, not a fix for the 57-minute render that was lost.
+            # ``starts_on_last_frame_of`` has NO production writer today --
+            # only this module reads it and only tests stamp it -- so no
+            # current ledger can build the chain described above. The run that
+            # was destroyed died on a plain refusal in a JUMP topology, which
+            # the per-beat floor already handles. This closes the door before
+            # a first-to-last engine opens it, and says so rather than
+            # claiming a save it did not make.
+            #
+            # Leftovers now go through the walk like everything else. A stuck
+            # shot with a floored predecessor is floored; a stuck shot with no
+            # explanation still raises below, from the branch that can say
+            # which shot and why.
             for shot in section["shots"]:
                 bid = str(shot.get("beat_id") or "")
                 sid = str(shot.get("shot_id") or "")
@@ -5913,6 +6082,14 @@ def run_episode(ledger, *, oom_shot_id=None,
                     raise errors[sid]
                 if sid not in rendered:
                     _pred = _floored_predecessor(shot, floored_sids)
+                    if _pred and not _is_cloud_video_engine(
+                            str(shot.get("engine_id") or "")):
+                        raise RenderError(
+                            "shot %s starts on the last frame of %s, which was "
+                            "floored, so that frame does not exist -- and %s "
+                            "is a LOCAL engine, which never floors. Fix the "
+                            "plan or the beat it chains from."
+                            % (sid, _pred, shot.get("engine_id")))
                     if _pred:
                         _LOG.error(
                             "[OTR video] CLOUD floor shot %s (beat %s) "
@@ -5927,6 +6104,21 @@ def run_episode(ledger, *, oom_shot_id=None,
                             shot, "predecessor_floored"))
                         floored_sids.add(sid)
                         continue
+                    # KEEP THE TWO DIAGNOSES APART. "Never became ready" is a
+                    # dependency fault -- a cycle, or a predecessor that is not
+                    # in this episode -- and the operator fixes it in the plan.
+                    # "Never rendered" is a pool fault and they fix it in the
+                    # engine. The old short-circuit above got the first message
+                    # right but fired on every leftover, including the ones
+                    # that simply chain from a floored beat; this says the same
+                    # thing to the shots that have actually earned it.
+                    if sid in stuck:
+                        raise RenderError(
+                            "cloud fan-out stuck; shot %s never became ready. "
+                            "It waits on %s, and none of those were rendered "
+                            "or floored." % (
+                                sid, ", ".join(cloud_frame_predecessors(shot))
+                                or "(nothing)"))
                     raise RenderError(
                         "cloud fan-out never rendered shot %s" % sid)
                 packed = rendered[sid]
@@ -5946,6 +6138,9 @@ def run_episode(ledger, *, oom_shot_id=None,
                 _last_engine = str(out_shot.get("engine_id") or "")
         else:
             cloud_spend_halt = False
+            # Ids floored on this branch, so a CHAIN successor can see that
+            # the frame it meant to start from is never going to exist.
+            _serial_floored = set()
             for shot in section["shots"]:
                 # A SANCTIONED GAP IS SKIPPED WHOLE, AND SKIPPED HERE (2026-08-28).
                 #
@@ -5973,6 +6168,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "The beat keeps its place in the timeline and is floored.",
                         shot.get("shot_id"), shot.get("beat_id"))
                     new_shots.append(shot)
+                    _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue
                 if cloud_spend_halt:
                     _LOG.error(
@@ -5980,6 +6176,44 @@ def run_episode(ledger, *, oom_shot_id=None,
                         "not submitted after spend-cap halt",
                         shot.get("shot_id"))
                     new_shots.append(_stamp_budget_floor_shot(shot))
+                    _serial_floored.add(str(shot.get("shot_id") or ""))
+                    continue
+                # THE CASCADE, ON THIS BRANCH TOO. The fan-out walk learns a
+                # successor is unrenderable because the pool never submitted
+                # it; here nothing stops us submitting it, so we have to ask
+                # first. Rendering it anyway would send a chain segment whose
+                # init frame is a clip that does not exist, and it would die
+                # inside render_beat_coverage with no stamp and no floor --
+                # taking the paid beats with it.
+                # ENGINE-GATED, like every other floor. Without this a LOCAL
+                # engine's beat that merely happens to chain from a floored
+                # cloud beat was stamped `cloud_floor` and skipped -- a local
+                # shot counted in the cloud-failure tally and silently dropped
+                # under a NO FALLBACKS directive. It is still unrenderable (its
+                # init frame does not exist), so it must not be ATTEMPTED
+                # either; it fails LOUD instead, which is what a local fault
+                # gets.
+                _pred = _floored_predecessor(shot, _serial_floored)
+                if _pred and not _is_cloud_video_engine(
+                        str(shot.get("engine_id") or "")):
+                    raise RenderError(
+                        "shot %s starts on the last frame of %s, which was "
+                        "floored, so that frame does not exist -- and %s is a "
+                        "LOCAL engine, which never floors. Fix the plan or the "
+                        "beat it chains from."
+                        % (shot.get("shot_id"), _pred,
+                           shot.get("engine_id")))
+                if _pred:
+                    _LOG.error(
+                        "[OTR video] CLOUD floor shot %s "
+                        "[predecessor_floored] -- %s It chains from %s, which "
+                        "was floored, so it is not attempted. The beat keeps "
+                        "its place and SilentComposite floors it.",
+                        shot.get("shot_id"),
+                        _cloud_floor_sentence("predecessor_floored"), _pred)
+                    new_shots.append(
+                        _stamp_cloud_floor_shot(shot, "predecessor_floored"))
+                    _serial_floored.add(str(shot.get("shot_id") or ""))
                     continue
                 # CS-3 inter-beat reclaim (2026-06-15): before a beat that loads a
                 # DIFFERENT engine than the one the prior beat left resident, drain the
@@ -6067,6 +6301,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                             "floors it. %s",
                             sid, exc)
                         new_shots.append(_stamp_budget_floor_shot(shot))
+                        _serial_floored.add(sid)
                         cloud_spend_halt = True
                         continue
                     _floor_why = _cloud_floor_reason(sid, {sid: exc}, shot)
@@ -6078,6 +6313,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                             _cloud_floor_sentence(_floor_why), exc)
                         new_shots.append(
                             _stamp_cloud_floor_shot(shot, _floor_why))
+                        _serial_floored.add(sid)
                         continue
                     raise
                 # NO FALLBACKS (2026-07-02): render_shot either returns a clip or

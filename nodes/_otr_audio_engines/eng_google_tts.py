@@ -186,7 +186,7 @@ def _interaction_payload(model: str, text: str, voice: str) -> dict:
 #: the outermost caller can still classify on FIELDS rather than on text.
 _EVIDENCE_FIELDS = (
     "http_status", "response_json", "raw_body", "retry_after_s",
-    "failure_kind", "retryable",
+    "failure_kind", "retryable", "code",
 )
 
 
@@ -196,10 +196,22 @@ def _carry_evidence(target: BaseException, source: BaseException) -> BaseExcepti
     Wrapping an exception in a redacted adapter error is correct -- losing the
     HTTP status while doing it is not. A caller that cannot tell a 403 from a
     content refusal will report an infrastructure failure as a safety refusal.
+
+    ``code`` is the cloud-floor stamp. Dropping it made every Google TTS
+    failure look like an ordinary crash: the shared client stamped the
+    inner ``GoogleAPIError``, this wrapper re-raised a bare
+    ``GoogleTTSError`` with no cause, and ``cloud_line_floor_reason``
+    returned empty -- one refused line dumped the paid role. Found 2026-09-16
+    on the uncommitted floor pass.
     """
     for field in _EVIDENCE_FIELDS:
         if hasattr(source, field):
             setattr(target, field, getattr(source, field))
+    if getattr(target, "__cause__", None) is None and source is not target:
+        try:
+            target.__cause__ = source
+        except Exception:  # noqa: BLE001 -- a wrap must still raise the wrap
+            pass
     return target
 
 
@@ -290,8 +302,10 @@ def _extract_audio_data(response: dict) -> dict:
     # this endpoint shape (`promptFeedback.blockReason`). Raising bare here
     # threw that away, so a genuine safety refusal reached callers as an
     # evidence-free error indistinguishable from an infrastructure hiccup.
-    # http_status stays None on purpose: absent a structured refusal code, a
-    # completed-but-empty response is UNKNOWN, never an inferred refusal.
+    # http_status stays None: this is a completed body, not an HTTP fault.
+    # The BODY decides the stamp -- policy fields are CONTENT_REFUSED; any
+    # other paid-but-empty delivery is CORRUPT_OUTPUT. Either is job-scoped
+    # so the voice floor can hold the slot. Unstamped, both dump the role.
     error = GoogleTTSError(
         "Google TTS response did not include audio data in output_audio, "
         "outputAudio, or steps[].content[]"
@@ -300,6 +314,19 @@ def _extract_audio_data(response: dict) -> dict:
     error.http_status = None
     error.failure_kind = "empty_response"
     error.retryable = False
+    try:
+        from .._otr_shared.cloud_media_backend import (
+            CloudErrorCode, is_content_policy_message)
+        try:
+            blob = json.dumps(response)
+        except Exception:  # noqa: BLE001 -- unserializable body
+            blob = str(response)
+        if is_content_policy_message(blob):
+            error.code = CloudErrorCode.CONTENT_REFUSED
+        else:
+            error.code = CloudErrorCode.CORRUPT_OUTPUT
+    except Exception:  # noqa: BLE001 -- classification is never fatal
+        pass
     raise error
 
 

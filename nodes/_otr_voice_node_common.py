@@ -775,6 +775,121 @@ def _forward_one_voice_line(adapter, engine, job):
         )
 
 
+#: Words per minute used ONLY to size the silence that holds a floored line's
+#: slot. It is an ESTIMATE for a line nobody rendered, never a measurement, and
+#: nothing downstream may treat it as timing truth -- the ledger stamp below
+#: marks the row floored so a reader can tell the two apart.
+FLOORED_LINE_WPM = 150.0
+
+#: Even a one-word line gets a beat of air, so the gap reads as a pause rather
+#: than a glitch.
+FLOORED_LINE_MIN_S = 0.6
+
+
+def cloud_line_floor_reason(exc):
+    """The job-scoped cloud code behind a failed line, or "".
+
+    Same rule as the video and still funnels: only a STAMPED job-scoped
+    ``CloudErrorCode`` floors. An unstamped exception is an ordinary crash and
+    keeps failing LOUD -- there is no prose fallback here either.
+    """
+    try:
+        from ._otr_shared.cloud_media_backend import cloud_job_failure_code
+    except Exception:  # noqa: BLE001 -- classification is never fatal
+        return ""
+    code = cloud_job_failure_code(exc)
+    return code.value if code is not None else ""
+
+
+def _floor_text(job):
+    """The words this line WOULD have spoken, for sizing its silence.
+
+    Prefers ``spoken_text`` on the job -- that is the delivery string the
+    walk already resolved, before any engine wrapper. ``ResolvedVoiceRequest``
+    has ``prepared_text``, not ``text`` / ``line_text``, and ``prepared`` is
+    what the ENGINE was handed (Google prefixes ``Say <style>: ``). Counting
+    either of those inflates the gap with words nobody would have spoken.
+    Returns "" rather than raising on any shape it does not recognize -- a
+    floor must never fail while handling a failure.
+    """
+    spoken = job.get("spoken_text")
+    if isinstance(spoken, str) and spoken.strip():
+        return spoken
+    request = job.get("request")
+    for attr in ("text", "line_text"):
+        value = getattr(request, attr, None)
+        if isinstance(value, str) and value.strip():
+            return value
+    if isinstance(request, dict):
+        value = request.get("text")
+        if isinstance(value, str) and value.strip():
+            return value
+    prepared = job.get("prepared")
+    return prepared if isinstance(prepared, str) else ""
+
+
+def floored_line_silence(text, sr):
+    """Silence the LENGTH of the line the provider never delivered.
+
+    WHY SILENCE AND NOT A DROPPED LINE. ``scene_sequencer`` consumes voice
+    clips POSITIONALLY and ``_verify_bus_clip_counts`` raises on any
+    consumed/provided mismatch -- "no silent tolerance". So a dropped line does
+    not save the episode, it just moves the crash downstream and loses the
+    paid lines anyway. A clip that holds the slot is the only shape that keeps
+    every positional contract intact.
+
+    OPERATOR RULING 2026-09-16, in their words: *"it's gonna be odd for TTS but
+    it's better than a waste of credits."* That is the trade this makes, and it
+    is a real trade -- the listener hears a pause where a line should be. It is
+    recorded loudly rather than hidden so the operator can re-render just that
+    line instead of the whole episode.
+    """
+    import torch
+    from ._otr_text_metrics import canonical_word_count
+    words = int(canonical_word_count(text) or 0)
+    seconds = max(FLOORED_LINE_MIN_S, (words / FLOORED_LINE_WPM) * 60.0)
+    samples = max(1, int(round(seconds * float(sr))))
+    return {"waveform": torch.zeros(1, 1, samples), "sample_rate": int(sr)}
+
+
+def _floor_voice_line(job, reason, *, role, clips, ledger_stamps, log_lines,
+                      sr, engine, log, floored, cache_stats):
+    """Hold a failed line's slot with silence and SAY SO."""
+    from ._otr_text_metrics import canonical_word_count
+    line_id = job["line_id"]
+    # SIZE IT FROM THE LINE, NOT THE PREPARED STRING. `prepared` is what the
+    # ENGINE was handed, and an engine with a delivery vector prefixes it --
+    # google_tts sends "Say <style>: <text>" -- so counting that inflates the
+    # gap with words nobody would have spoken. `_floor_text` prefers the
+    # request's own text and falls back only when there is none.
+    text = _floor_text(job)
+    audio = floored_line_silence(text, sr)
+    dur_s = float(audio["waveform"].shape[-1]) / float(sr or 1)
+    job["audio"] = audio
+    job["cache_status"] = "floored"
+    # The stamp is the durable record. ``voice_floor`` is the flag every
+    # downstream reader keys off; generated_dur_s is the ESTIMATE above, and
+    # there is deliberately NO audio_sample_hash -- nothing was produced, and a
+    # hash would let a reader believe a real take exists.
+    ledger_stamps.append((line_id, {
+        "tts_engine": engine,
+        "render_ms": 0,
+        "generated_dur_s": dur_s,
+        "sample_rate": int(sr),
+        "voice_floor": str(reason),
+        "voice_floor_words": int(canonical_word_count(text) or 0),
+    }))
+    floored.append((line_id, reason))
+    cache_stats["floored"] = int(cache_stats.get("floored", 0)) + 1
+    msg = (f"{role}: VOICE FLOOR line={line_id or job['occ']} [{reason}] -- the "
+           f"provider returned no audio for this line; {dur_s:.2f}s of silence "
+           f"holds its place so the episode still assembles. The line is NOT "
+           f"spoken.")
+    log_lines.append(msg)
+    log.error("[OTR voice] %s", msg)
+    clips.append(audio)
+
+
 def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                        ledger_stamps, log_lines, sr, engine, log):
     audio = job["audio"]
@@ -1583,6 +1698,7 @@ class OTRVoiceNodeBase:
                     "job_id": "%s:%s" % (line_id or "ln", occ),
                     "occ": occ,
                     "line_id": line_id,
+                    "spoken_text": text,
                     "prepared": prepared,
                     "voice_ref": voice_ref,
                     "delivery_vector": delivery_vector,
@@ -1641,18 +1757,49 @@ class OTRVoiceNodeBase:
                     if j["job_id"] in outcome.results:
                         j["audio"] = outcome.results[j["job_id"]]
             else:
+                # THE SERIAL PATH FLOORS TOO (2026-09-16 review). It used to
+                # `break` on the first failure, which left every later miss
+                # with no audio AND no entry in `outcome_errors` -- so the
+                # commit walk found nothing to floor and hit the "never
+                # rendered line" raise instead. The floor was therefore
+                # unreachable for all but the first failure whenever fan-out
+                # is throttled to one worker (OTR_CLOUD_FANOUT=1) or a role
+                # has a single missing line: ordinary configurations, not
+                # edge cases. Each line is attempted on its own now, and only
+                # a stamped job-scoped verdict is survivable -- an ordinary
+                # crash still stops the walk exactly as before.
                 for j in misses:
                     try:
                         j["audio"] = _forward_one_voice_line(adapter, engine, j)
                     except Exception as exc:  # noqa: BLE001 -- raise in line order
                         outcome_errors[j["job_id"]] = exc
-                        break
+                        if not cloud_line_floor_reason(exc):
+                            break
 
+            _floored_lines = []
             for j in line_jobs:
                 cache_status = j["cache_status"]
                 try:
-                    if j["job_id"] in outcome_errors:
-                        raise outcome_errors[j["job_id"]]
+                    _line_err = outcome_errors.get(j["job_id"])
+                    # A FAILED LINE COSTS ONE LINE, NOT THE WAVE (operator
+                    # 2026-09-16). Every other line in this fan-out is already
+                    # requested and already PAID FOR; raising here discarded
+                    # all of them, and with no cache on the cloud voice
+                    # profiles a re-run re-paid for every one. Only a stamped
+                    # job-scoped verdict floors -- an ordinary crash still
+                    # fails loud below.
+                    _floor_why = (cloud_line_floor_reason(_line_err)
+                                  if _line_err is not None else "")
+                    if _floor_why:
+                        _floor_voice_line(
+                            j, _floor_why, role=self.ROLE, clips=clips,
+                            ledger_stamps=ledger_stamps, log_lines=log_lines,
+                            sr=sr, engine=engine, log=log,
+                            floored=_floored_lines, cache_stats=cache_stats)
+                        cache_status = j["cache_status"]
+                        continue
+                    if _line_err is not None:
+                        raise _line_err
                     if j["audio"] is None:
                         raise RuntimeError(
                             "cloud TTS fan-out never rendered line %s"
@@ -1671,6 +1818,16 @@ class OTRVoiceNodeBase:
                         log_lines.append(j["_pobs"] + _pobs_tail)
                         log.info("[OTR voice P-OBS] %s%s", j["_pobs"], _pobs_tail)
 
+            if _floored_lines:
+                _n, _total = len(_floored_lines), max(1, len(line_jobs))
+                _tally = ", ".join("%s[%s]" % (lid or "?", why)
+                                   for lid, why in _floored_lines)
+                _msg = (
+                    f"{self.ROLE}: {_n} of {_total} line(s) FLOORED -- the "
+                    f"provider returned no audio and silence holds their "
+                    f"place. These lines are not spoken: {_tally}")
+                log_lines.append(_msg)
+                log.error("[OTR voice] %s", _msg)
             packed = pack_audio_batch(clips, sample_rate=sr, mono=mono)
             n = int(packed["waveform"].shape[0]) if packed["waveform"].numel() else 0
             log_lines.append(f"{self.ROLE}: packed {n} clips at {sr} Hz")
