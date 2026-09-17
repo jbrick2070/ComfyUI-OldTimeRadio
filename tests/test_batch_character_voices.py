@@ -91,10 +91,11 @@ def test_input_types_widget_vector_exact():
     all_keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "seed" not in all_keys, "no input may be named 'seed' (D)"
     assert "gate_in" in it.get("optional", {})
-    # Only engine serializes as a widget (forceInputs are sockets). stereo_policy
-    # surface removed 2026-07-04 (widget-audit Batch 1); single option "mono_safe"
-    # -- the generate() kwarg still defaults to "mono_safe".
-    assert _serialized_slots(it) == ["engine"]
+    # 2026-09-16: no serialized widget. Engine comes from CastLock's ledger
+    # stamp. stereo_policy surface removed 2026-07-04; generate() still
+    # defaults to "mono_safe".
+    assert _serialized_slots(it) == []
+    assert "engine" not in all_keys
     assert "done" in B.RETURN_NAMES
 
 
@@ -102,24 +103,18 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     from nodes.batch_character_voices import BatchCharacterVoices as B
 
     it = B.INPUT_TYPES()
-    engines = list(it["required"]["engine"][0])
-    # google_tts (direct BYO API, dropdown-opt-in) APPENDED after elevenlabs;
-    # index 0 stays the byte-identical indextts2.
-    assert engines == [
-        "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
+    keys = set(it.get("required", {})) | set(it.get("optional", {}))
+    assert "engine" not in keys
+    # Fallback combo still exists for a degraded profiles import (C-5).
+    assert list(B.LEGACY_FIRST_FALLBACK) == [
+        "indextts2", "chatterbox", "dia", "bark", "kokoro", "cloud_elevenlabs",
         "google_tts",
     ]
-    # THE ORDER ABOVE IS UNCHANGED -- index 0 is still indextts2, so anything
-    # depending on registry order is untouched. What changed on 2026-09-13 is
-    # the DEFAULT, which used to be engines[0] and therefore indextts2: a
-    # noncommercial engine an ordinary install does not even have. Kokoro is
-    # the documented one-click default on every platform and is what the
-    # shipped graph uses, so a dropped node now agrees with the graph.
-    assert it["required"]["engine"][1]["default"] == "kokoro"
-    # Order is stable across opt-in flags.
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
     monkeypatch.setenv("OTR_ENABLE_INDEXTTS2", "1")
-    assert list(B.INPUT_TYPES()["required"]["engine"][0]) == engines
+    it2 = B.INPUT_TYPES()
+    keys2 = set(it2.get("required", {})) | set(it2.get("optional", {}))
+    assert "engine" not in keys2
 
 
 def test_input_types_safe_with_bad_configs(monkeypatch):
@@ -131,19 +126,11 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
 
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
     it = B.INPUT_TYPES()  # must not raise (C-5)
-    engines = list(it["required"]["engine"][0])
-    # UPDATED 2026-08-16. This assertion used to pin a five-engine list, which
-    # is what the tuple had drifted to: elevenlabs and google_tts were appended
-    # to the profiles table and this hardcoded stand-in was never updated. The
-    # test was pinning the drift, so it had become the bug's bodyguard -- a
-    # degraded boot offered a dropdown that could not even represent a saved
-    # graph using either engine, and the test said that was correct.
-    #
-    # The fallback's job is to STAND IN for the profiles list when the profiles
-    # import raises, so equality with that list is the property worth pinning;
-    # tests/test_tts_voice_preflight_matrix.py holds the two equal directly.
+    keys = set(it.get("required", {})) | set(it.get("optional", {}))
+    assert "engine" not in keys
+    engines = list(B.LEGACY_FIRST_FALLBACK)
     assert engines == ["indextts2", "chatterbox", "dia", "bark", "kokoro",
-                       "elevenlabs", "google_tts"]  # hardcoded fallback
+                       "cloud_elevenlabs", "google_tts"]
     assert engines[0] == "indextts2", "index 0 is the byte-identical ENGINE"
     assert engines, "engine combo must never be empty (C-5)"
 

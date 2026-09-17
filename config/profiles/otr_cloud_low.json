@@ -17,8 +17,8 @@
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",
-        "char_voice_engine": "elevenlabs",
-        "announcer_voice_engine": "elevenlabs",
+        "char_voice_engine": "cloud_elevenlabs",
+        "announcer_voice_engine": "cloud_elevenlabs",
         "music_engine": "sonilo",
         "video_render_engine": "cloud_vidu_q2_pro_fast_720p"
     },

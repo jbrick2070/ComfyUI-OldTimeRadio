@@ -56,8 +56,8 @@ def _install_seams(monkeypatch, tmp_path, capture):
 
 
 def test_registered_as_elevenlabs():
-    eng = areg.get_engine("elevenlabs")
-    assert eng.name == "elevenlabs"
+    eng = areg.get_engine("cloud_elevenlabs")
+    assert eng.name == "cloud_elevenlabs"
     assert set(eng.roles) == {"char_voice", "announcer_voice"}
     # C1/C2: cloud voice is opt-in ONLY -- never a byte-identical default.
     assert eng.default_roles == ()
@@ -72,7 +72,7 @@ def test_cloud_voice_teardown_skips_local_cuda_cleanup(monkeypatch):
     import torch
     from nodes._otr_voice_node_common import OTRVoiceNodeBase
 
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     called = {"empty_cache": False}
     monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
     monkeypatch.setattr(
@@ -88,7 +88,7 @@ def test_voice_id_passed_straight_through_as_voice(monkeypatch, tmp_path):
     """C4: provider_voice_id (the id) IS the `voice` kwarg -- no selector node."""
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     out = eng.generate_voice("Signal lost. Stand by.", "EXAVITQu4vr4xnSDxMaL",
                              {"expressiveness": 0.8}, seed=7)
     assert cap["node_key"] == "cloud_elevenlabs_tts"
@@ -115,7 +115,7 @@ def test_emitted_kwargs_match_partner_inputs(monkeypatch, tmp_path):
     """The kwargs actually emitted == the declared _partner_inputs contract."""
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     eng.generate_voice("x", "vid123", None, seed=0)
     assert set(cap["inputs"]) == set(eng._partner_inputs(None))
 
@@ -123,7 +123,7 @@ def test_emitted_kwargs_match_partner_inputs(monkeypatch, tmp_path):
 def test_seed_is_reduced_to_partner_int_range(monkeypatch, tmp_path):
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     eng.generate_voice("x", "vid123", None, seed=2**31 + 13)
     assert cap["inputs"]["seed"] == 13
 
@@ -132,7 +132,7 @@ def test_eleven_v3_env_uses_partner_tts_shape(monkeypatch, tmp_path):
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
     monkeypatch.setenv("OTR_ELEVENLABS_MODEL_ID", "eleven_v3")
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     eng.generate_voice("x", "vid123", None, seed=0)
     assert cap["inputs"]["model"] == {
         "model": "eleven_v3",
@@ -145,7 +145,7 @@ def test_invalid_partner_model_env_fails_before_invoke(monkeypatch, tmp_path):
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
     monkeypatch.setenv("OTR_ELEVENLABS_MODEL_ID", "scribe_v2")
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     with pytest.raises(ValueError, match="unsupported model"):
         eng.generate_voice("x", "vid123", None, seed=0)
     assert "node_key" not in cap
@@ -155,7 +155,7 @@ def test_invalid_partner_output_format_env_fails_before_invoke(monkeypatch, tmp_
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
     monkeypatch.setenv("OTR_ELEVENLABS_OUTPUT_FORMAT", "mp3_44100_128")
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     with pytest.raises(ValueError, match="unsupported output_format"):
         eng.generate_voice("x", "vid123", None, seed=0)
     assert "node_key" not in cap
@@ -172,7 +172,7 @@ def test_cost_estimate_is_per_line_scale():
 def test_estimated_usd_is_forwarded_to_invoke(monkeypatch, tmp_path):
     cap = {}
     _install_seams(monkeypatch, tmp_path, cap)
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     text = "The rails are molten and the timetable is a lie."
     eng.generate_voice(text, "vid123", None, seed=1)
     assert cap["estimated_usd"] == pytest.approx(EL.estimate_tts_usd(text))
@@ -180,14 +180,14 @@ def test_estimated_usd_is_forwarded_to_invoke(monkeypatch, tmp_path):
 
 def test_blank_line_raises_no_fallback(monkeypatch, tmp_path):
     _install_seams(monkeypatch, tmp_path, {})
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     with pytest.raises(ValueError, match="blank line"):
         eng.generate_voice("   ", "vid123", None, seed=0)
 
 
 def test_missing_voice_id_raises_no_fallback(monkeypatch, tmp_path):
     _install_seams(monkeypatch, tmp_path, {})
-    eng = areg.get_engine("elevenlabs")
+    eng = areg.get_engine("cloud_elevenlabs")
     with pytest.raises(ValueError, match="no provider_voice_id"):
         eng.generate_voice("a real line", "", None, seed=0)
 

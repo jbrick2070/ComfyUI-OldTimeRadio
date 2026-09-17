@@ -1014,13 +1014,13 @@ LEMMY_VOICE_POLICY = {
         # question he can settle from the metadata without hearing a thing, so both
         # rows go on the listen page with their tags shown and neither is presented
         # as an audition arm.
-        "elevenlabs": {
+        "cloud_elevenlabs": {
             "route_id": "lemmy-elevenlabs-daniel-provisional-v1",
             "route_contract_version": 1,
-            "engine": "elevenlabs",
+            "engine": "cloud_elevenlabs",
             "voice_ref_id": "el_daniel",
             "provisional_receipt": {
-                "engine": "elevenlabs",
+                "engine": "cloud_elevenlabs",
                 "identity_kind": "provider_voice",
                 "identity_id": "el_daniel",
                 "provider": "elevenlabs",

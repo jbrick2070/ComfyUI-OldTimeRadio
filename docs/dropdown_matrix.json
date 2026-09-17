@@ -148,14 +148,6 @@
       },
       "size_gb": 6.0
     },
-    "elevenlabs": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": null
-    },
     "fastwan_8gb": {
       "memory": {
         "mac16": "no",
@@ -517,6 +509,14 @@
         "amd": "proven"
       },
       "size_gb": 19.3
+    },
+    "cloud_elevenlabs": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "size_gb": null
     }
   },
   "writers": {
@@ -553,7 +553,7 @@
         "nv16": "proven",
         "nv8": "proven"
       },
-      "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it. Recorded because a download-size projection puts it 4 GB BELOW Qwen and briefly had this table recommending it to Mac users as the safer pick."
+      "note": "LOOKS smaller than Qwen3.5-4B and MEASURES LARGER on Metal: ~10 GB at bf16 against Qwen's ~9, like for like (docs/MAC_LESSONS_LEARNED.md, 'Levers that do NOT work'). Its small catalog figure is an NF4 number and there is no Metal NF4 kernel, so no Mac ever gets it."
     },
     "google/gemma-4-E4B-it": {
       "memory": {
@@ -562,11 +562,6 @@
       }
     },
     "mistralai/Mistral-Nemo-Instruct-2407": {
-      "memory": {
-        "nv16": "proven"
-      }
-    },
-    "unsloth/gemma-4-12b-it-GGUF": {
       "memory": {
         "nv16": "proven"
       }

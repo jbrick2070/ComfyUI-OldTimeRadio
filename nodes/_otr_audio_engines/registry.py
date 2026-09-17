@@ -277,7 +277,7 @@ CAPABILITIES = {
     # Cloud engines (cloud-audio 2026-07-03): no local model/sidecar/GPU -- they
     # run on Comfy Cloud via invoke_partner_node, so every backend fits (the
     # "cost" is credits + auth, enforced at invoke, not VRAM).
-    "elevenlabs": {"required_toolchain": None, "requires_sidecar": False,
+    "cloud_elevenlabs": {"required_toolchain": None, "requires_sidecar": False,
                    "device_backends": ["cuda", "cpu", "mps"],
                    "requires_vendor": None,
                    "needs_fp8_te": False, "needs_fp4_te": False,

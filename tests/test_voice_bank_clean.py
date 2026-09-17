@@ -6,16 +6,23 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from nodes.cast_lock import CastLock, _VOICE_BANKS
+from nodes.cast_lock import CastLock
 
 
 def _entries(*engines):
     return [SimpleNamespace(engine=e) for e in engines]
 
 
-def test_default_clean_is_a_selectable_bank():
-    assert "default_clean" in _VOICE_BANKS
-    assert "default" in _VOICE_BANKS                 # personal-use default kept
+def test_default_clean_still_routes_through_the_engine_profiles():
+    """CastLock has no voice_bank widget. leftover lock(voice_bank=) ids
+    still have to name banks the chatterbox / indextts2 profiles allow."""
+    from nodes._otr_engine_profiles import require_resolver
+
+    resolver = require_resolver()
+    chatter = resolver.profile_for("char_voice", "chatterbox")
+    idx = resolver.profile_for("char_voice", "indextts2")
+    assert chatter is not None and "default_clean" in chatter.allowed_voice_banks
+    assert idx is not None and "default" in idx.allowed_voice_banks
 
 
 def test_default_clean_routes_to_chatterbox():
@@ -46,9 +53,9 @@ def test_default_clean_excludes_non_commercial_indextts2():
 
 def test_explicit_elevenlabs_routes_with_cloud_bank():
     eng = CastLock._resolve_char_engine(
-        "elevenlabs_cloud", _entries("indextts2", "elevenlabs"),
-        requested_engine="elevenlabs")
-    assert eng == "elevenlabs"
+        "elevenlabs_cloud", _entries("indextts2", "cloud_elevenlabs"),
+        requested_engine="cloud_elevenlabs")
+    assert eng == "cloud_elevenlabs"
 
 
 def test_explicit_google_tts_routes_with_google_bank():

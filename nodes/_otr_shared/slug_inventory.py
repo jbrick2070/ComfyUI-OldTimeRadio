@@ -118,8 +118,8 @@ def collect_inventory() -> List[InventoryRecord]:
 
     # --- engines ------------------------------------------------------------
     from .._otr_audio_engines import eng_cloud_elevenlabs as el
-    add("elevenlabs", "engine", "elevenlabs_tts",
-        el._SUPPORTED_MODELS, "elevenlabs", None)
+    add("cloud_elevenlabs", "engine", "elevenlabs_tts",
+        el._SUPPORTED_MODELS, "cloud_elevenlabs", None)
 
     from .._otr_audio_engines import eng_google_tts as gtts
     add("google_tts", "engine", "google_tts",

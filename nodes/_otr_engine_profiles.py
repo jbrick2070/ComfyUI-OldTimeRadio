@@ -53,17 +53,21 @@ _LEGACY_FIRST_ENGINES: Dict[str, tuple] = {
     # char_voice PROMOTED 2026-06-04: indextts2 (Path B oop_venv worker) is the
     # shipped default; chatterbox + dia (both Path B sidecars) + bark are
     # selectable. Index 0 stays indextts2 -> byte-identical default combo.
-    # elevenlabs (cloud, dropdown-opt-in) APPENDED 2026-07-03 -- index 0 stays the
-    # byte-identical default; a cloud pick is never automatic (C2).
+    # cloud_elevenlabs (Comfy Credits, dropdown-opt-in) APPENDED 2026-07-03 --
+    # index 0 stays the byte-identical default; a cloud pick is never automatic
+    # (C2). Renamed from ``elevenlabs`` so the CastLock label cannot be read as
+    # a local install.
     "char_voice": (
-        "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
+        "indextts2", "chatterbox", "dia", "bark", "kokoro", "cloud_elevenlabs",
         "google_tts",
     ),
     # bark APPENDED 2026-08-24 -- a second zero-setup engine for a fresh
     # install (voices baked into weights, no reference WAV to supply).
     # kokoro stays index 0 -- byte-identical default combo.
+    # google_tts stays LAST -- draft google_* only; never a CastLock default
+    # and never pinned by otr_cloud_* (Comfy Credits uses cloud_elevenlabs).
     "announcer_voice": (
-        "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts", "bark",
+        "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark", "google_tts",
     ),
     # music PROMOTED 2026-06-03: Stable Audio 3 (ComfyUI-native, no dep conflict,
     # render-proven) is index 0 = the shipped default; musicgen kept selectable.
@@ -395,21 +399,20 @@ def assert_model_available(profile: EngineProfile) -> None:
 def voice_bank_for_engine(role: str, engine: str) -> str:
     """Derives the required single bank name from the allow-list for a given engine.
 
-    Fails loud on unknown engine or empty allow-list. If the allow-list has multiple
-    entries, it returns the first one (the default/preferred bank for that engine).
+    Fails loud on unknown engine, on ``auto`` (not a YAML engine -- resolve
+    the dropdown to a concrete id first), or empty allow-list. If the
+    allow-list has multiple entries, it returns the first one (the
+    default/preferred bank for that engine).
     """
     resolver = require_resolver()
-    # "auto" for an engine delegates to the highest-ranked engine in the fallback ladder.
-    if engine == "auto":
-        chain = resolver.rank_chain(role)
-        if not chain:
-            raise EngineUnusable(
-                engine, role, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"no fallback chain for role '{role}'",
-            )
-        profile = chain[0]
-    else:
-        profile = resolver.resolve_casting_plan(role=role, engine=engine)
+    engine = str(engine or "").strip()
+    if not engine or engine == "auto":
+        raise EngineUnusable(
+            engine or "auto", role, EngineUsabilityReason.MALFORMED_CONFIG,
+            f"voice_bank_for_engine({role!r}) needs a concrete engine, not "
+            f"{engine or 'auto'!r}",
+        )
+    profile = resolver.resolve_casting_plan(role=role, engine=engine)
 
     if not profile.allowed_voice_banks:
         raise EngineUnusable(

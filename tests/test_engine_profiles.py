@@ -110,7 +110,10 @@ def test_legacy_first_engines_pure_and_legacy_first():
     assert EP.legacy_first_engines("music")[0] == "stable_audio_3"  # PROMOTED 2026-06-03
     assert EP.legacy_first_engines("char_voice")[-1] == "google_tts"
     assert "dia" in EP.legacy_first_engines("announcer_voice")
-    assert EP.legacy_first_engines("announcer_voice")[-1] == "bark"
+    assert EP.legacy_first_engines("announcer_voice")[-1] == "google_tts"
+    assert "cloud_elevenlabs" in EP.legacy_first_engines("char_voice")
+    assert EP.legacy_first_engines("char_voice").index("cloud_elevenlabs") < \
+        EP.legacy_first_engines("char_voice").index("google_tts")
     assert EP.legacy_first_engines("nonexistent_role") == []
 
 
@@ -123,6 +126,7 @@ def test_direct_api_profiles_are_explicit_selection_only():
     assert "google_tts" not in [p.engine for p in r.rank_chain("announcer_voice")]
     assert "google_lyria" not in [p.engine for p in r.rank_chain("music")]
     assert "elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
+    assert "cloud_elevenlabs" not in [p.engine for p in r.rank_chain("char_voice")]
 
 
 def _minimal_profile_row(**updates):

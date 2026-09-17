@@ -128,7 +128,7 @@ def test_the_two_cloud_rows_are_configured_and_NOT_rendered():
     both engines need an API key and spend money, and the root scope rule is
     100% local, no API keys, no paid services."""
     rows = POOLS.LEMMY_VOICE_POLICY["provisional_native_routes"]
-    for engine in ("google_tts", "elevenlabs"):
+    for engine in ("google_tts", "cloud_elevenlabs"):
         receipt = rows[engine]["provisional_receipt"]
         assert receipt["state"] == "configured_unrendered"
         assert receipt["identity_kind"] == "provider_voice"
@@ -210,21 +210,21 @@ def test_a_provider_engine_may_not_take_the_reference_wav():
     """`rights.scope` is only ever read as a non-blank string, so a route whose
     scope said "cloud engines only" would validate exactly like one that said the
     opposite. The enforcement is a list."""
-    record = _provisional("elevenlabs", PROVIDER_REF, "local_wav")
-    problems = POOLS.provisional_route_problems(record, engine="elevenlabs")
+    record = _provisional("cloud_elevenlabs", PROVIDER_REF, "local_wav")
+    problems = POOLS.provisional_route_problems(record, engine="cloud_elevenlabs")
     assert any("local clone engines only" in p for p in problems), problems
 
 
 def test_no_provider_engine_is_on_the_clone_allowlist():
-    assert not ({"elevenlabs", "google_tts"}
+    assert not ({"cloud_elevenlabs", "google_tts"}
                 & POOLS.PROVISIONAL_LOCAL_CLONE_ENGINES)
 
 
 def test_a_provider_route_needs_its_provider_fields():
-    record = _provisional("elevenlabs", PROVIDER_REF, "provider_voice",
+    record = _provisional("cloud_elevenlabs", PROVIDER_REF, "provider_voice",
                           state="configured_unrendered")
     del record["provisional_receipt"]["provider_voice_id"]
-    problems = POOLS.provisional_route_problems(record, engine="elevenlabs")
+    problems = POOLS.provisional_route_problems(record, engine="cloud_elevenlabs")
     assert any("provider_voice_id is missing" in p for p in problems), problems
 
 
@@ -265,7 +265,7 @@ def test_a_resolved_claim_HAS_NO_voice_route_ATTRIBUTE(bank):
 @pytest.mark.parametrize("engine,ref,kind", [
     ("chatterbox", CLONE_REF, "local_wav"),
     ("kokoro", KOKORO_REF, "bank_voice_id"),
-    ("elevenlabs", PROVIDER_REF, "provider_voice"),
+    ("cloud_elevenlabs", PROVIDER_REF, "provider_voice"),
 ])
 def test_all_three_identity_kinds_resolve(bank, engine, ref, kind):
     """Three kinds, three code paths: a WAV path, a `.pt` named by bank id, and a
@@ -349,10 +349,10 @@ def test_reference_bytes_that_do_not_match_the_bank_degrade(bank, tmp_path):
 
 
 def test_a_provider_id_that_disagrees_with_the_bank_degrades(bank):
-    record = _provisional("elevenlabs", PROVIDER_REF, "provider_voice",
+    record = _provisional("cloud_elevenlabs", PROVIDER_REF, "provider_voice",
                           state="configured_unrendered",
                           provider_voice_id="some-other-voice-id")
-    result = _resolve(_policy({"elevenlabs": record}), "elevenlabs", bank)
+    result = _resolve(_policy({"cloud_elevenlabs": record}), "cloud_elevenlabs", bank)
     assert isinstance(result, ROUTE.ProvisionalRouteDegradation)
     assert result.reason_code == "provider_identity_mismatch"
 
@@ -552,7 +552,7 @@ def test_a_provisional_row_re_locked_QUALIFIED_drops_its_old_identity(
     cast = json.loads(json.dumps(CAST))
     cast[1].update({
         "voice_ref_id": PROVIDER_REF,
-        "voice_engine": "elevenlabs",
+        "voice_engine": "cloud_elevenlabs",
         "provider_voice_id": PROVIDER_VOICE_ID,
         ROUTE.CAST_ROW_TIER_FIELD: ROUTE.ROUTE_TIER_PROVISIONAL,
         ROUTE.CAST_ROW_ROUTE_ID_FIELD: "lemmy-elevenlabs-daniel-provisional-v1",
@@ -581,7 +581,7 @@ def test_a_row_the_caster_never_reaches_is_left_EXACTLY_as_it_arrived(pin_provis
     cast = json.loads(json.dumps(CAST))
     cast[1].update({
         "voice_ref_id": PROVIDER_REF,
-        "voice_engine": "elevenlabs",
+        "voice_engine": "cloud_elevenlabs",
         "provider_voice_id": PROVIDER_VOICE_ID,
         ROUTE.CAST_ROW_TIER_FIELD: ROUTE.ROUTE_TIER_PROVISIONAL,
         ROUTE.CAST_ROW_ROUTE_ID_FIELD: "lemmy-elevenlabs-daniel-provisional-v1",
@@ -589,6 +589,7 @@ def test_a_row_the_caster_never_reaches_is_left_EXACTLY_as_it_arrived(pin_provis
     before = json.loads(json.dumps(cast[1]))
     pin_provisional({"chatterbox": _provisional("chatterbox", CLONE_REF, "local_wav")})
     out = CastLock().lock(script_json=_ledger(cast=cast), voice_bank="bark_legacy",
+                          char_voice_engine="bark",
                           cast_voice_policy="auto_registry")[0]
     after = _rows(out)["c02"]
     for field, value in before.items():
@@ -703,7 +704,7 @@ def test_a_cloud_identity_never_touches_the_network():
     """A provider voice contributes its id and nothing else. No fetch, and no
     cloud URI treated as a file to hash."""
     from nodes._otr_voice_node_common import _provisional_identity_fingerprint
-    answer = _provisional_identity_fingerprint("elevenlabs", PROVIDER_REF)
+    answer = _provisional_identity_fingerprint("cloud_elevenlabs", PROVIDER_REF)
     assert answer == "provider:%s" % PROVIDER_VOICE_ID
 
 
@@ -861,9 +862,9 @@ def test_family_bank_voice_id_reaches_voice_ref_id(pin_provisional):
 
 
 def test_family_provider_voice_reaches_provider_voice_id(pin_provisional):
-    row = _locked_lemmy(pin_provisional, "elevenlabs", PROVIDER_REF,
+    row = _locked_lemmy(pin_provisional, "cloud_elevenlabs", PROVIDER_REF,
                         "provider_voice", "elevenlabs_cloud")
-    ref_field, voice_ref = _dispatch_identity("elevenlabs", row)
+    ref_field, voice_ref = _dispatch_identity("cloud_elevenlabs", row)
     assert ref_field == "provider_voice_id"
     assert voice_ref == PROVIDER_VOICE_ID
     assert row["provider_voice_id"] == PROVIDER_VOICE_ID
@@ -872,7 +873,7 @@ def test_family_provider_voice_reaches_provider_voice_id(pin_provisional):
 @pytest.mark.parametrize("engine,ref,kind,voice_bank", [
     ("chatterbox", CLONE_REF, "local_wav", "default_clean"),
     ("kokoro", KOKORO_REF, "bank_voice_id", "kokoro_builtin"),
-    ("elevenlabs", PROVIDER_REF, "provider_voice", "elevenlabs_cloud"),
+    ("cloud_elevenlabs", PROVIDER_REF, "provider_voice", "elevenlabs_cloud"),
 ])
 def test_no_family_stamps_a_route_and_none_of_them_RAISES(
         pin_provisional, engine, ref, kind, voice_bank):

@@ -15,11 +15,13 @@ Casting (I-4): the new caster runs on its own seeded RNG, disjoint from the
 legacy cast RNG. ``preserve_ledger`` (default) re-casts nothing; ``auto_registry``
 assigns references from the selected voice bank.
 
-E.4: the surfaced widgets are exactly ``voice_bank`` / ``cast_voice_policy`` /
+E.4: the surfaced widgets are exactly ``cast_voice_policy`` /
 ``allow_voice_reuse`` / ``char_voice_engine`` / ``announcer_voice_engine`` --
-``delivery_profile`` is no longer surfaced (single option "neutral" in v2; the
-``lock()`` kwarg still defaults to "neutral" and is validated + stamped) -- no
-``voice_engine_mode``, ``deterministic_inference`` or ``model_id`` widget.
+the bank follows the engine per role (no ``voice_bank`` widget), and 4a/4b
+inherit the stamped engines. ``delivery_profile`` is no longer surfaced
+(single option "neutral" in v2; the ``lock()`` kwarg still defaults to
+"neutral" and is validated + stamped) -- no ``voice_engine_mode``,
+``deterministic_inference`` or ``model_id`` widget.
 Import-time is side-effect-free (C-5). UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -61,22 +63,25 @@ def _lemmy_voice_policy():
             return {}
     return getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
 
-# Voice-bank ids the operator picks from the OTR_CastLock dropdown. The bank id
-# does NOT filter the per-ref bank (assign_voice_for_slot scores by gender/timbre/
-# role/age, engine-restricted); it gates which char ENGINE _resolve_char_engine
-# selects, via each engine profile's allowed_voice_banks. "default_clean" routes
-# the cast to the COMMERCIAL-CLEAN cloner (chatterbox MIT, then dia Apache) and
-# EXCLUDES the non-commercial indextts2 -- the release-safe cast (2026-06-18
-# voice-engine roundtable). "default" is unchanged (indextts2 first = quality).
-_VOICE_BANKS = ("default", "default_clean", "bark_legacy", "kokoro_builtin",
-                "elevenlabs_cloud", "google_tts")
+# Leftover ``lock(voice_bank=...)`` kwargs still exist for old callers.
+# The bank is not a CastLock widget; ``_bank_following_engine`` derives it
+# from each engine profile's ``allowed_voice_banks``.
 _CAST_POLICIES = ("preserve_ledger", "auto_registry")
 _CHAR_VOICE_ENGINES = (
-    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro", "elevenlabs",
-    "google_tts")
+    "auto", "indextts2", "chatterbox", "dia", "bark", "kokoro",
+    "cloud_elevenlabs", "google_tts")
 _ANNOUNCER_VOICE_ENGINES = (
-    "auto", "kokoro", "chatterbox", "dia", "elevenlabs", "google_tts", "bark")
+    "auto", "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark",
+    "google_tts")
+# google_tts stays last in the COMBO (draft google_* profiles need it) but is
+# never a CastLock default and must not be pinned by any otr_cloud_* profile.
+_VOICE_ENGINE_RESOLVE_EXTRA = frozenset()
+# Old graphs/profiles stored ``elevenlabs``; that id was always the Comfy
+# Credits partner adapter, never a local install. Normalize so the dropdown
+# label stays ``cloud_elevenlabs`` without bricking saved widgets.
+_VOICE_ENGINE_ALIASES = {"elevenlabs": "cloud_elevenlabs"}
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
+_DEFAULT_CHAR_ENGINE = "kokoro"
 
 
 @dataclass(frozen=True)
@@ -168,6 +173,25 @@ def _is_announcer_entry(entry: dict) -> bool:
     name = str(entry.get("name") or "").strip().upper()
     role = str(entry.get("speaker_role") or entry.get("role") or "").strip().lower()
     return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
+
+
+def _is_bark_namespace_preset(preset) -> bool:
+    """Bark's live identity namespace. Do not treat this as a kokoro id."""
+    return str(preset or "").strip().startswith("v2/")
+
+
+def _row_has_resolvable_voice(row) -> bool:
+    """A spoken row is voiced once it has a preset OR a bank reference.
+
+    CastLock auto_registry stamps ``voice_ref_id`` for kokoro / google_tts /
+    elevenlabs and clears leftover Bark ``voice_preset``. Requiring only
+    ``voice_preset`` would fail-loud on a correctly stamped kokoro row.
+    """
+    if not isinstance(row, dict):
+        return False
+    preset = str(row.get("voice_preset") or "").strip()
+    ref = str(row.get("voice_ref_id") or "").strip()
+    return bool(preset or ref)
 
 
 def _profile_role_for_entry(entry: dict) -> str:
@@ -279,19 +303,17 @@ class CastLock:
                 "char_voice_engine": (list(_CHAR_VOICE_ENGINES), {
                     "default": "auto",
                     "tooltip": (
-                        "Which engine speaks the characters. Leave it on auto "
-                        "and it follows voice_bank. If you set it explicitly, "
-                        "set `engine` on Character Voices to match -- naming "
-                        "two different engines stops the render."
+                        "Which engine speaks the characters. auto keeps the "
+                        "shipped Kokoro voice. Character Voices inherits this "
+                        "stamp -- there is no second engine dropdown."
                     ),
                 }),
                 "announcer_voice_engine": (list(_ANNOUNCER_VOICE_ENGINES), {
                     "default": "auto",
                     "tooltip": (
                         "Which engine reads the announcer. auto keeps the "
-                        "shipped Kokoro voice. If you set it explicitly, set "
-                        "`engine` on Announcer Voice to match -- naming two "
-                        "different engines stops the render."
+                        "shipped Kokoro voice. Announcer Voice inherits this "
+                        "stamp -- there is no second engine dropdown."
                     ),
                 }),
                 "gate_in": ("STRING", {
@@ -324,15 +346,10 @@ class CastLock:
         return True
 
     # ------------------------------------------------------------------ #
-    # THE SIGNATURE DELIBERATELY DISAGREES WITH INPUT_TYPES, and the reason is
-    # recorded rather than silently tolerated (2026-09-13). INPUT_TYPES now
-    # defaults voice_bank=kokoro_builtin / auto_registry / reuse=True to match
-    # the shipped graph, which is what a node dropped on a canvas gets. These
-    # KEYWORD defaults serve DIRECT Python callers, and twelve tests encode
-    # real casting behaviour against them -- aligning them changes what those
-    # calls actually cast, which is a casting decision and not a defaults
-    # tidy-up. A saved graph is unaffected either way: every shipped graph
-    # passes all three explicitly. Open row in GO_FORWARD.
+    # voice_bank is no longer a widget. The kwarg stays for direct Python
+    # callers and for an explicit override; Comfy graphs omit it, so the
+    # default MUST be None -- a leftover "default" string would force the
+    # indextts2 bank onto a Kokoro dropdown (VoiceCastingError).
     def lock(self, script_json, voice_bank=None,
              cast_voice_policy="preserve_ledger", delivery_profile="neutral",
              allow_voice_reuse=False, char_voice_engine="auto",
@@ -379,6 +396,16 @@ class CastLock:
         # the CastLock-owned meta is stamped after casting, as before.
         meta["cast_lock_revision"] = revision
 
+        # Concrete engines FIRST, then banks. `auto` is not a YAML engine --
+        # `voice_bank_for_engine("char_voice", "auto")` would climb rank_chain
+        # and land on indextts2/default, which is the opposite of the shipped
+        # Kokoro dropdown. 4a/4b inherit these stamps; they have no engine widget.
+        char_voice_engine = str(char_voice_engine or "auto").strip() or "auto"
+        if char_voice_engine == "auto":
+            char_voice_engine = _DEFAULT_CHAR_ENGINE
+        announcer_voice_engine = self._resolve_announcer_engine(
+            announcer_voice_engine)
+
         # Sprint 2 (a): CastLock OWNS bark voice casting. The writer no longer
         # stamps voice_preset -- it persists cast_seed in meta.cast_contract and
         # CastLock replays the deterministic picker (byte-identical) and stamps
@@ -387,22 +414,18 @@ class CastLock:
         # governs the clip-engine voice bank, not bark casting).
         self._assign_bark_voices(
             cast, meta, report,
-            announcer_voice_engine=announcer_voice_engine)
+            announcer_voice_engine=announcer_voice_engine,
+            char_voice_engine=char_voice_engine)
 
         # STEP 2 (plan 5.2): resolve the bank and stamp the engine metadata ONCE,
         # for BOTH modes, before any route is looked at. It used to happen inside
         # each branch, which meant a route could not be proved against the engine
         # that was going to render it -- the agreement check needs the engine in
         # hand first.
-        #
-        # preserve_ledger deliberately passes bank_entries=None: with an `auto`
-        # request that mode records `char_voice_engine="auto"` rather than
-        # pinning a concrete engine into a ledger it promised not to re-cast.
-        # Loading the bank here would silently change that stamp.
-        from ._otr_engine_profiles import voice_bank_for_engine
-        
-        char_bank = voice_bank or voice_bank_for_engine("char_voice", char_voice_engine)
-        ann_bank = voice_bank_for_engine("announcer_voice", announcer_voice_engine)
+        char_bank = self._bank_following_engine(
+            "char_voice", char_voice_engine, voice_bank)
+        ann_bank = self._bank_following_engine(
+            "announcer_voice", announcer_voice_engine)
 
         bank_entries = None
         bank_unavailable_route_ids = None
@@ -456,7 +479,7 @@ class CastLock:
         meta["cast_voice_policy"] = cast_voice_policy
         meta["delivery_profile_id"] = delivery_profile
         meta["delivery_profile_version"] = DELIVERY_PROFILE_VERSION
-        meta["voice_bank_id"] = voice_bank
+        meta["voice_bank_id"] = char_bank
 
         # STEP 3 (NO-FALLBACK rip, operator 2026-07-03): node-80 OUTPUT voice
         # resolution. The cast presets have now been assigned (replay + optional
@@ -468,7 +491,7 @@ class CastLock:
         # re-routing a mis-stamped announcer line (a routing correction, not a
         # fallback). Runs UNCONDITIONALLY, independent of cast_seed.
         for _note in self._resolve_character_voices_fail_soft(
-            cast, led.get("lines") or [], voice_bank=voice_bank
+            cast, led.get("lines") or []
         ):
             log.warning("[CastLock] announcer reroute: %s", _note)
             report.append(f"announcer reroute: {_note}")
@@ -551,12 +574,17 @@ class CastLock:
     # ------------------------------------------------------------------ #
     @staticmethod
     def _assign_bark_voices(cast, meta, report,
-                             announcer_voice_engine="auto") -> None:
+                             announcer_voice_engine="auto",
+                             char_voice_engine="bark") -> None:
         """Sprint 2 (a): stamp bark voice_preset onto the cast by REPLAYING the
-        writer's deterministic picker. Also owns the ANNOUNCER's bark preset
-        (2026-08-24) when Bark is the resolved announcer engine -- CastLock is
-        the established Bark-casting owner for characters, so the announcer
-        joins the same owner rather than gaining a second one.
+        writer's deterministic picker -- ONLY when the character engine is
+        Bark. A kokoro / google_tts / elevenlabs request must not re-inject
+        v2/* identities the writer left empty. Also owns the ANNOUNCER's bark
+        preset (2026-08-24) when Bark is the resolved announcer engine.
+
+        Direct helper callers default ``char_voice_engine="bark"`` so replay
+        parity tests keep exercising the Bark owner. ``lock()`` always passes
+        the resolved concrete engine.
 
         The writer persists ``cast_seed`` (OS-entropy per episode) in
         ``meta.cast_contract`` and no longer stamps voice_preset itself.
@@ -592,7 +620,22 @@ class CastLock:
 
         announcer_engine = CastLock._resolve_announcer_engine(
             announcer_voice_engine)
+        char_engine = str(char_voice_engine or "bark").strip() or "bark"
+        if char_engine == "auto":
+            char_engine = _DEFAULT_CHAR_ENGINE
         content_owned = delivery_mode_for_meta(meta) == CONTENT_OWNED
+
+        if char_engine != "bark":
+            # Do not replay or preserve Bark character identity on a
+            # non-Bark request. Gate 1's v2/* contract is Bark-only.
+            report.append(
+                f"bark voices: skipped character replay "
+                f"(char_voice_engine={char_engine})"
+            )
+            if announcer_engine == "bark":
+                CastLock._assign_bark_announcer(cast, meta, report)
+                _OTRCAST._assert_unique_bark_voices(cast)
+            return
 
         # A content-owned lane builds its OWN character-cast rows; the writer's
         # seeded picker never ran, so there is no sequence to replay. Replaying
@@ -791,7 +834,7 @@ class CastLock:
 
     # ------------------------------------------------------------------ #
     @staticmethod
-    def _resolve_character_voices_fail_soft(cast, lines, voice_bank="default") -> list:
+    def _resolve_character_voices_fail_soft(cast, lines) -> list:
         """STEP 3 (NO-FALLBACK rip, operator 2026-07-03): guarantee every
         speaker_role='character' line reaches node-81 with a resolvable voice, or
         FAIL LOUD. The name is retained for the call site; behavior is now fail-loud.
@@ -829,24 +872,24 @@ class CastLock:
 
         notes: list = []
 
-        # (1) FAIL LOUD: every non-ANNOUNCER character cast row MUST carry a voice
-        # identity by now (replay + optional auto_registry stamped it). A row with
-        # none is a casting defect -- raise, never synthesize a fallback identity.
+        # (1) FAIL LOUD: every non-ANNOUNCER character cast row MUST carry a
+        # resolvable voice identity by now (replay and/or auto_registry).
+        # voice_ref_id counts: kokoro rows clear leftover v2/* and speak from
+        # the bank reference. A row with neither is a casting defect -- raise,
+        # never synthesize a fallback identity.
         for row in char_rows:
-            preset = row.get("voice_preset")
-            if isinstance(preset, str) and preset.strip():
+            if _row_has_resolvable_voice(row):
                 continue
             cid = str(row.get("char_id") or "")
             raise VoiceCastingError(
                 f"character cast row {cid!r} reached CastLock with no voice_preset "
-                f"-- casting must assign one. NO synthesized fallback identity "
-                f"(no-fallback rip)."
+                f"or voice_ref_id -- casting must assign one. NO synthesized "
+                f"fallback identity (no-fallback rip)."
             )
 
         voiced_char_ids = sorted(
             str(r.get("char_id") or "") for r in char_rows
-            if isinstance(r.get("voice_preset"), str)
-            and str(r.get("voice_preset")).strip()
+            if _row_has_resolvable_voice(r)
         )
 
         # (2 KEPT: routing) + (3 FAIL LOUD: orphan) over character LINES.
@@ -857,8 +900,7 @@ class CastLock:
                 continue
             cid = str(ln.get("char_id") or "")
             row = rows_by_id.get(cid)
-            preset = (row or {}).get("voice_preset")
-            if isinstance(preset, str) and preset.strip():
+            if _row_has_resolvable_voice(row):
                 continue  # resolves fine
             lid = ln.get("line_id")
             is_ann = cid in announcer_ids or (
@@ -961,10 +1003,22 @@ class CastLock:
         # stamped and still verified -- only this dead read is gone.
         # announcer_engine is the sentinel: the resolver never returns None for
         # it, while target_engine legitimately can be None (a preset-only bank).
+        # Direct callers still pass the default "auto"; lock() already resolved.
+        # voice_bank_for_engine rejects "auto" (it is not a YAML engine).
+        char_voice_engine = str(char_voice_engine or "auto").strip() or "auto"
+        if char_voice_engine == "auto":
+            char_voice_engine = _DEFAULT_CHAR_ENGINE
+        announcer_voice_engine = self._resolve_announcer_engine(
+            announcer_voice_engine)
+        # Direct callers still pass the old CastLock widget default "default".
+        # Banks follow the concrete engine; a leftover id kokoro does not own
+        # must not raise (MACHINE_MATRIX 2026-08-31).
+        voice_bank = self._bank_following_engine(
+            "char_voice", char_voice_engine, voice_bank)
         if announcer_engine is None:
             if ann_bank is None:
-                from ._otr_engine_profiles import voice_bank_for_engine
-                ann_bank = voice_bank_for_engine("announcer_voice", announcer_voice_engine)
+                ann_bank = self._bank_following_engine(
+                    "announcer_voice", announcer_voice_engine)
             target_engine, announcer_engine = self._stamp_voice_engine_selection(
                 led, voice_bank, ann_bank, char_voice_engine, announcer_voice_engine,
                 bank_entries=bank_entries, voice_device=voice_device)
@@ -1614,18 +1668,17 @@ class CastLock:
         meta["voice_device"] = _dev
 
         requested = str(char_voice_engine or "auto").strip() or "auto"
-        target_engine = None
-        if requested == "auto" and bank_entries is None:
-            meta["char_voice_engine"] = "auto"
+        if requested == "auto":
+            requested = _DEFAULT_CHAR_ENGINE
+        if bank_entries is None:
+            # preserve_ledger: do not re-cast and do not load the bank just to
+            # write a stamp. 4a inherits this concrete engine.
+            target_engine = None
+            meta["char_voice_engine"] = requested
         else:
-            if bank_entries is None:
-                from ._otr_voice_bank import load_voice_bank
-                bank_entries, _bank_sha = load_voice_bank()
             target_engine = self._resolve_char_engine(
                 voice_bank, bank_entries, requested)
-            meta["char_voice_engine"] = (
-                target_engine or ("auto" if requested == "auto" else requested)
-            )
+            meta["char_voice_engine"] = target_engine or requested
 
         announcer_engine = self._resolve_announcer_engine(
             announcer_voice_engine)
@@ -1644,8 +1697,13 @@ class CastLock:
         """
         entry["voice_ref_id"] = ref.voice_ref_id
         entry["voice_engine"] = ref.engine
+        entry["tts_model"] = str(getattr(ref, "engine", "") or "")
         entry["commercial_clean"] = _delivered_commercial_clean(entry, ref)
         entry["voice_cast_fallback"] = fallback
+        # Do NOT clear writer-stage ``voice_preset`` here. That field is Bark's
+        # identity, owned upstream by ``lemmy_row()``; ``_TIER_SWITCH_CLEARED_FIELDS``
+        # deliberately omits it so provisional/qualified delivery can keep the
+        # frozen Bark preset beside the stamped bank ref (2026-08-16 acceptance).
         # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
         # DELIVERED voice presents as, taken from the reference actually chosen
         # rather than from the row's label. Stamped HERE because this is the one
@@ -1670,15 +1728,41 @@ class CastLock:
             entry["provider_voice_id"] = pvid
 
     @staticmethod
+    def _bank_following_engine(role, engine, requested_bank=None):
+        """Engine owns the bank. A leftover or mismatched id is replaced.
+
+        Comfy graphs no longer pass ``voice_bank``. Direct callers and
+        ``_auto_registry`` tests still hand the old widget default ``default``,
+        which kokoro does not own -- that pairing used to raise at CastLock
+        twelve minutes into a leg. Derive the engine's first allowed bank
+        instead of failing closed on a widget that no longer exists.
+        """
+        from ._otr_engine_profiles import require_resolver, voice_bank_for_engine
+        derived = voice_bank_for_engine(role, engine)
+        bank = str(requested_bank or "").strip()
+        if not bank:
+            return derived
+        prof = require_resolver().profile_for(role, engine)
+        if prof is not None and bank not in prof.allowed_voice_banks:
+            return derived
+        return bank
+
+    @staticmethod
+    def _normalize_voice_engine(requested_engine: str) -> str:
+        requested = str(requested_engine or "auto").strip() or "auto"
+        return _VOICE_ENGINE_ALIASES.get(requested, requested)
+
+    @staticmethod
     def _resolve_announcer_engine(requested_engine="auto") -> str:
-        requested = str(requested_engine or "auto").strip()
+        requested = CastLock._normalize_voice_engine(requested_engine)
         if requested == "auto":
             return _DEFAULT_ANNOUNCER_ENGINE
-        if requested not in _ANNOUNCER_VOICE_ENGINES:
+        allowed = set(_ANNOUNCER_VOICE_ENGINES) | _VOICE_ENGINE_RESOLVE_EXTRA
+        if requested not in allowed:
             from ._otr_voice_bank import VoiceCastingError
             raise VoiceCastingError(
                 f"unsupported announcer_voice_engine {requested!r}; expected "
-                f"one of {_ANNOUNCER_VOICE_ENGINES}")
+                f"one of {tuple(sorted(allowed))}")
         return requested
 
     @staticmethod
@@ -1693,12 +1777,13 @@ class CastLock:
 
             resolver = load_resolver()
             engines_with_refs = {e.engine for e in bank_entries}
-            requested = str(requested_engine or "auto").strip()
+            requested = CastLock._normalize_voice_engine(requested_engine)
             if requested != "auto":
-                if requested not in _CHAR_VOICE_ENGINES:
+                allowed = set(_CHAR_VOICE_ENGINES) | _VOICE_ENGINE_RESOLVE_EXTRA
+                if requested not in allowed:
                     raise VoiceCastingError(
                         f"unsupported char_voice_engine {requested!r}; expected "
-                        f"one of {_CHAR_VOICE_ENGINES}")
+                        f"one of {tuple(sorted(allowed))}")
                 if resolver is not None:
                     prof = resolver.profile_for("char_voice", requested)
                     if prof is None:

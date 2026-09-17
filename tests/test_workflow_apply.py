@@ -184,23 +184,15 @@ def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
 
     assert _widget_value(
-        nodes_by_type, schemas, "OTR_CastLock", "voice_bank"
-    ) == "elevenlabs_cloud"
-    assert _widget_value(
         nodes_by_type, schemas, "OTR_CastLock", "cast_voice_policy"
     ) == "auto_registry"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
-    ) == "elevenlabs"
+    ) == "cloud_elevenlabs"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_CastLock", "announcer_voice_engine"
-    ) == "elevenlabs"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_BatchCharacterVoices", "engine"
-    ) == "elevenlabs"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_AnnouncerVoice", "engine"
-    ) == "elevenlabs"
+    ) == "cloud_elevenlabs"
+    # 4a/4b have no engine widget; CastLock stamps are the routing.
     assert _widget_value(
         nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
     ) == "sonilo"
@@ -261,7 +253,10 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
         ) == 3, pid
         assert _widget_value(
             nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
-        ) == "elevenlabs"
+        ) == "cloud_elevenlabs"
+        assert _widget_value(
+            nodes_by_type, schemas, "OTR_CastLock", "announcer_voice_engine"
+        ) == "cloud_elevenlabs"
         assert _widget_value(
             nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
         ) == "sonilo"
@@ -280,9 +275,9 @@ def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_
                 pid, widget)
 
 
-def test_apply_otr_cloud_deluxe_3act_is_sol_and_ltx25_foley(
+def test_apply_otr_cloud_deluxe_3act_is_sonnet_luna_and_ltx25_foley(
         schemas, master_copy):
-    """Foley deluxe SKU: GPT 5.6 Sol creative + Luna tech, LTX 2.5 I2V bed.
+    """Foley deluxe SKU: Sonnet 5 + Luna (same writers as cheap cloud), LTX 2.5 I2V bed.
 
     OpenRouter widgets stay on the node (sentinel); the saved pick is Comfy.
     """
@@ -302,7 +297,7 @@ def test_apply_otr_cloud_deluxe_3act_is_sol_and_ltx25_foley(
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "comfy_slot_a_model"
-    ) == "openai/gpt-5.6-sol"
+    ) == "anthropic/claude-sonnet-5"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "comfy_slot_b_model"
@@ -330,19 +325,23 @@ def test_apply_otr_cloud_deluxe_3act_is_sol_and_ltx25_foley(
         ) == _director_video_label("cloud_ltx25_foley_plus"), widget
     assert _widget_value(
         nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
-    ) == "cloud_luma_photon_flash"
+    ) == "cloud_flux_pro"
 
 
-def test_apply_otr_cloud_deluxe_audio_in_3act_is_sol_and_ltx25_a2v(
+def test_apply_otr_cloud_deluxe_audio_in_3act_is_sonnet_luna_and_ltx25_a2v(
         schemas, master_copy):
-    """Audio-in deluxe SKU: same writers, LTX 2.5 Audio-to-Video."""
+    """Audio-in deluxe SKU: Sonnet 5 + Luna, LTX 2.5 Audio-to-Video."""
     applied = wa.apply_profile(
         master_copy, "otr_cloud_deluxe_audio_in_3act", schemas=schemas)
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     assert _widget_value(
         nodes_by_type, schemas, "OTR_LedgerScriptWriter",
         "comfy_slot_a_model"
-    ) == "openai/gpt-5.6-sol"
+    ) == "anthropic/claude-sonnet-5"
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_LedgerScriptWriter",
+        "comfy_slot_b_model"
+    ) == "openai/gpt-5.6-luna"
     assert _widget_value(
         nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
     ) == "cloud_ltx25_audio_in"
@@ -352,6 +351,9 @@ def test_apply_otr_cloud_deluxe_audio_in_3act_is_sol_and_ltx25_a2v(
         assert _widget_value(
             nodes_by_type, schemas, "OTR_VideoDirector", widget
         ) == _director_video_label("cloud_ltx25_audio_in"), widget
+    assert _widget_value(
+        nodes_by_type, schemas, "OTR_VideoDirector", "character_image_model"
+    ) == "cloud_flux_pro"
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):

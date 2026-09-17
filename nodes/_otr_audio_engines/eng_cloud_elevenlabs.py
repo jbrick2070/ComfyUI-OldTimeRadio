@@ -130,9 +130,9 @@ def _partner_seed(seed) -> int:
 
 @register
 class ElevenLabsCloudVoice(AudioEngineAdapter):
-    """Registered as ``elevenlabs``. Cloud TTS char + announcer voice."""
+    """Registered as ``cloud_elevenlabs``. Comfy Credits TTS -- not local."""
 
-    name = "elevenlabs"
+    name = "cloud_elevenlabs"
     roles = ("char_voice", "announcer_voice")
     default_roles = ()                    # dropdown-opt-in; NEVER a default (C1/C2)
     commercial_clean = True               # library voices, ToS-clean (S2 pool)

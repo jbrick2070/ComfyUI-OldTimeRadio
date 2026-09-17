@@ -84,9 +84,11 @@ def test_input_types_widget_vector_exact():
     all_keys = set(it.get("required", {})) | set(it.get("optional", {}))
     assert "seed" not in all_keys
     assert "gate_in" in it.get("optional", {})
-    # stereo_policy surface removed 2026-07-04 (widget-audit Batch 1); single
-    # option "mono_safe" -- the generate() kwarg still defaults to "mono_safe".
-    assert _serialized_slots(it) == ["engine"]
+    # 2026-09-16: no serialized widget. Engine comes from CastLock's ledger
+    # stamp. stereo_policy surface removed 2026-07-04; generate() still
+    # defaults to "mono_safe".
+    assert _serialized_slots(it) == []
+    assert "engine" not in all_keys
     assert "done" in A.RETURN_NAMES
 
 
@@ -94,15 +96,15 @@ def test_engine_dropdown_legacy_first_and_stable(monkeypatch):
     from nodes.announcer_voice import AnnouncerVoice as A
 
     it = A.INPUT_TYPES()
-    engines = list(it["required"]["engine"][0])
-    # Dia joins the local Path-B announcer lane; external providers stay after
-    # local engines and index 0 remains the byte-identical kokoro. Bark
-    # (2026-08-24) is appended last -- a second zero-setup engine, opt-in.
-    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs",
-                       "google_tts", "bark"]
-    assert it["required"]["engine"][1]["default"] == "kokoro"
+    keys = set(it.get("required", {})) | set(it.get("optional", {}))
+    assert "engine" not in keys
+    assert list(A.LEGACY_FIRST_FALLBACK) == [
+        "kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark", "google_tts",
+    ]
     monkeypatch.setenv("OTR_ENABLE_CHATTERBOX", "1")
-    assert list(A.INPUT_TYPES()["required"]["engine"][0]) == engines
+    it2 = A.INPUT_TYPES()
+    keys2 = set(it2.get("required", {})) | set(it2.get("optional", {}))
+    assert "engine" not in keys2
 
 
 def test_input_types_safe_with_bad_configs(monkeypatch):
@@ -113,13 +115,12 @@ def test_input_types_safe_with_bad_configs(monkeypatch):
         raise RuntimeError("profiles unavailable")
 
     monkeypatch.setattr(ep, "legacy_first_engines", _boom)
-    engines = list(A.INPUT_TYPES()["required"]["engine"][0])
-    # UPDATED 2026-08-16, same drift as the character node: elevenlabs and
-    # google_tts were appended to the profiles table and this hardcoded stand-in
-    # was never updated, so the assertion had become the bug's bodyguard.
-    # tests/test_tts_voice_preflight_matrix.py now holds the two lists equal.
-    assert engines == ["kokoro", "chatterbox", "dia", "elevenlabs",
-                       "google_tts", "bark"]
+    it = A.INPUT_TYPES()  # must not raise (C-5)
+    keys = set(it.get("required", {})) | set(it.get("optional", {}))
+    assert "engine" not in keys
+    engines = list(A.LEGACY_FIRST_FALLBACK)
+    assert engines == ["kokoro", "chatterbox", "dia", "cloud_elevenlabs", "bark",
+                       "google_tts"]
     assert engines[0] == "kokoro", "index 0 is the byte-identical default"
     assert engines
 
@@ -219,33 +220,27 @@ def test_bark_now_serves_the_announcer_role():
     assert "announcer_voice" in REGISTRY.get_engine("bark").roles
 
 
-def test_cross_widget_announcer_engine_mismatch_fails_loud():
-    """kibitz r3 MUST-FIX (cursor), corrected in r4 (codex caught a
-    false-positive in the first cut -- see the module-level guard's own
-    comment). OTR_CastLock.announcer_voice_engine and this node's own
-    'engine' widget are two INDEPENDENTLY settable controls -- if CastLock
-    resolved bark (meta.announcer_voice_engine="bark", which it stamps
-    unconditionally for every cast_voice_policy) but this widget still says
-    kokoro, eng_kokoro would receive an empty voice_ref_id (bark stamping
-    clears it) and silently fall back to its own per-episode seeded pick --
-    a real, audible wrong voice while credits still say bark. Must refuse
-    before any engine loads, naming both engines. Compares against
-    meta.announcer_voice_engine, NEVER the row's own voice_engine/tts_model
-    -- see test_cross_widget_agreement_is_silent_when_engines_match for why."""
-    from nodes._otr_audio_engines import EngineUnusable, EngineUsabilityReason
+def test_leftover_engine_arg_cannot_override_a_concrete_stamp(monkeypatch):
+    """4b has no engine widget. A leftover ``engine=`` must not override a
+    concrete CastLock stamp, and must not raise the old cross-widget disagree
+    (the leftover is ignored, the stamp wins).
+    """
     from nodes.announcer_voice import AnnouncerVoice
 
+    calls = []
+    _stub_kokoro_generate_voice(monkeypatch, calls)
     script = json.dumps({
         "lines": [{"line_id": "a1", "speaker_role": "announcer",
                    "text": "hello", "char_id": "announcer"}],
         "cast": [{"char_id": "announcer", "name": "ANNOUNCER",
-                  "voice_preset": "v2/en_speaker_0"}],
-        "meta": {"announcer_voice_engine": "bark"},
+                  "voice_preset": "bm_george", "voice_ref_id": "bm_george"}],
+        "meta": {"announcer_voice_engine": "kokoro", "episode_seed": 7},
     })
-    with pytest.raises(EngineUnusable) as exc:
-        AnnouncerVoice().generate(script_json=script, engine="kokoro")
-    assert exc.value.reason is EngineUsabilityReason.MALFORMED_CONFIG
-    assert "bark" in str(exc.value) and "kokoro" in str(exc.value)
+    audio, log_str, done = AnnouncerVoice().generate(
+        script_json=script, engine="chatterbox")
+    assert "controls disagree" not in log_str
+    assert done.startswith("announcer:done")
+    assert len(calls) == 1
 
 
 def test_cross_widget_agreement_is_silent_when_engines_match(monkeypatch):

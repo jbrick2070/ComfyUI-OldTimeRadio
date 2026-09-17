@@ -51,8 +51,9 @@ def test_all_pod_shell_owners_have_valid_bash_syntax():
     [
         ("cpu_floor", ["--cpu"]),
         ("otr_cloud_low", ["--cpu"]),
-        ("otr_cloud_hq", ["--cpu"]),
         ("otr_cloud_lanes", ["--cpu"]),
+        ("otr_cloud_deluxe_3act", ["--cpu"]),
+        ("otr_cloud_deluxe_audio_in_3act", ["--cpu"]),
         ("otr_w45_ltx25_video", []),
         ("otr_w45_humo", ["--reserve-vram", "2.921", "--disable-pinned-memory"]),
         ("otr_w45_minimax_h3_video", ["--reserve-vram", "12", "--disable-pinned-memory"]),

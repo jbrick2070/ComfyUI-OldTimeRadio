@@ -41,7 +41,7 @@ class BatchCharacterVoices(OTRVoiceNodeBase):
     # thing it stands in for is not a fallback; it is a second, worse answer.
     # Held equal by `tests/test_tts_voice_preflight_matrix.py`.
     LEGACY_FIRST_FALLBACK = ("indextts2", "chatterbox", "dia", "bark", "kokoro",
-                             "elevenlabs", "google_tts")
+                             "cloud_elevenlabs", "google_tts")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

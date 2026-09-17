@@ -1,6 +1,6 @@
 {
     "id": "otr_cloud_deluxe_3act",
-    "display_name": "Comfy Cloud 3-act deluxe FOLEY -- GPT 5.6 Sol creative + Luna tech (Comfy Credits), LTX 2.5 I2V generates its own bed and mixes 0.50 under the voices. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.",
+    "display_name": "Comfy Cloud 3-act deluxe FOLEY -- Sonnet 5 creative + GPT 5.6 Luna tech (Comfy Credits), LTX 2.5 I2V generates its own bed and mixes 0.50 under the voices. Flux Pro stills. OpenRouter stays on the picker. Needs OTR_COMFY_API_KEY.",
     "status": "shipping",
     "platform": "any",
     "device_backend": "cpu",
@@ -11,14 +11,14 @@
         "announcer_visual": "cloud_ltx25_foley_plus",
         "music_visual": "cloud_ltx25_foley_plus",
         "character_visual": "cloud_ltx25_foley_plus",
-        "announcer_image": "cloud_luma_photon_flash",
-        "music_image": "cloud_luma_photon_flash",
-        "character_image": "cloud_luma_photon_flash"
+        "announcer_image": "cloud_flux_pro",
+        "music_image": "cloud_flux_pro",
+        "character_image": "cloud_flux_pro"
     },
     "slot_overrides": {
         "cast_voice_policy": "auto_registry",
-        "char_voice_engine": "elevenlabs",
-        "announcer_voice_engine": "elevenlabs",
+        "char_voice_engine": "cloud_elevenlabs",
+        "announcer_voice_engine": "cloud_elevenlabs",
         "music_engine": "sonilo",
         "video_render_engine": "cloud_ltx25_foley_plus"
     },
@@ -45,7 +45,7 @@
         "technical_model": "comfy:slot-b",
         "openrouter_slot_a_model": "(enable OpenRouter)",
         "openrouter_slot_b_model": "(enable OpenRouter)",
-        "comfy_slot_a_model": "openai/gpt-5.6-sol",
+        "comfy_slot_a_model": "anthropic/claude-sonnet-5",
         "comfy_slot_b_model": "openai/gpt-5.6-luna",
         "google_api_slot_a_model": "(select Google API model)",
         "google_api_slot_b_model": "(select Google API model)",

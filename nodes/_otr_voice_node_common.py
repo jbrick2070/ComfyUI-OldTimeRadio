@@ -218,16 +218,19 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
 
 
 def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
-    """The provider voice_id for a CLOUD voice engine (e.g. elevenlabs) + cast row
-    when CastLock stamped none -- i.e. the operator changed only the VOICE ENGINE
-    and left the CastLock voice_bank on a LOCAL bank (so the cast carries a local
-    voice_ref_id, not a provider id). Resolve a gender-matched voice from the
-    ENGINE's OWN pool here, the SAME deterministic per-character CASTING the
-    clone-ref path does -- so the voice engine is the SINGLE knob (parity with how
-    every LOCAL engine already shares the default bank). This is casting a REAL
-    per-character voice, NOT a fallback: no voice is inherited from another
-    character/engine, and an engine with NO pool still yields None -> the adapter
-    fails loud. Never raises."""
+    """The provider voice_id for a CLOUD voice engine (e.g. cloud_elevenlabs)
+    + cast row when CastLock stamped none -- i.e. the operator changed only the
+    VOICE ENGINE and left the CastLock voice_bank on a LOCAL bank (so the cast
+    carries a local voice_ref_id, not a provider id). Resolve a gender-matched
+    voice from the ENGINE's OWN pool here, the SAME deterministic per-character
+    CASTING the clone-ref path does -- so the voice engine is the SINGLE knob
+    (parity with how every LOCAL engine already shares the default bank). This
+    is casting a REAL per-character voice, NOT a fallback: no voice is inherited
+    from another character/engine, and an engine with NO pool still yields None
+    -> the adapter fails loud. Never raises."""
+    # Legacy widget value ``elevenlabs`` was always the Comfy Credits adapter.
+    if engine == "elevenlabs":
+        engine = "cloud_elevenlabs"
     # Google TTS has a stricter voice-quality/no-fallback contract: CastLock must
     # stamp the exact provider_voice_id so announcer separation and gender-aware
     # assignment have already been enforced. Do not invent one at render time.
@@ -357,9 +360,9 @@ def _voice_device_from_ledger(ledger_json, script_json="") -> str:
 def voice_input_types(role, fallback) -> dict:
     """The shared INPUT_TYPES for a v2 voice node (1a / 1b).
 
-    forceInput sockets carry no widget; the only serialized widget is
-    ``engine`` (now REMOVED); there
-    is no ``seed``-named widget and no ``model_id`` widget (CLAUDE.md rule 6).
+    forceInput sockets only -- Character Voices and Announcer Voice inherit
+    the engine from CastLock's ledger stamp. There is no serialized widget,
+    no ``seed``-named widget and no ``model_id`` widget (CLAUDE.md rule 6).
     """
     return {
         "required": {
@@ -1027,6 +1030,14 @@ class OTRVoiceNodeBase:
           missing reference is the Bug Bible unavailable-input rule: rerun and
           let the render path fail loudly, rather than quietly reusing audio.
         """
+        if not engine:
+            try:
+                payload = json.loads(ledger_json or script_json or "{}") or {}
+                engine = str(
+                    (payload.get("meta") or {}).get(f"{cls.ROLE}_engine") or ""
+                )
+            except (ValueError, TypeError):
+                engine = ""
         try:
             from ._otr_engine_profiles import require_resolver
 
@@ -1146,10 +1157,6 @@ class OTRVoiceNodeBase:
     # ------------------------------------------------------------------ #
     def generate(self, script_json, ledger_json="", gate_in="",
                  stereo_policy="mono_safe", **kwargs):
-        # Swallow legacy 'engine' kwarg if present in old workflows
-        engine_kwarg = kwargs.get("engine")
-        if engine_kwarg:
-            log.debug("[%s] ignoring legacy engine widget %r", type(self).__name__, engine_kwarg)
         # CANONICAL REPLAY (campaign item 0): the frozen master carries every
         # take; nothing renders here. A typed empty AUDIO batch (nodes 3 and 7
         # do not consume it on replay) and an explicit done token.
@@ -1168,12 +1175,30 @@ class OTRVoiceNodeBase:
             EngineUnusable, EngineUsabilityReason, assert_usable, get_engine,
         )
 
-        engine = str(_rmeta.get(f"{self.ROLE}_engine") or "auto")
+        # CastLock stamps the engine. 4a/4b have no engine widget. A leftover
+        # `engine=` from an unsaved old canvas or a direct Python test must not
+        # override a concrete ledger stamp (sticky leftover google_tts vs
+        # CastLock kokoro). Direct tests with no CastLock stamp may still pass
+        # engine= as the only selector.
+        stamped = str(_rmeta.get(f"{self.ROLE}_engine") or "").strip()
+        leftover = str(kwargs.get("engine") or "").strip()
+        if stamped and stamped != "auto":
+            engine = stamped
+            if leftover and leftover != engine:
+                log.debug(
+                    "[%s] ignoring leftover engine=%r; ledger has %r",
+                    type(self).__name__, leftover, engine,
+                )
+        elif leftover:
+            engine = leftover
+        else:
+            engine = "auto"
         if engine == "auto":
             raise EngineUnusable(
                 "auto", self.ROLE, EngineUsabilityReason.MALFORMED_CONFIG,
-                f"OTR_CastLock did not stamp a concrete {self.ROLE}_engine (got 'auto'). "
-                f"You must run Cast Lock (or set a concrete engine on it) before rendering."
+                f"OTR_CastLock did not stamp a concrete {self.ROLE}_engine "
+                f"(got 'auto'). Set char/announcer engine on Cast Lock "
+                f"before rendering.",
             )
 
         render_log: list = []
@@ -1271,14 +1296,14 @@ class OTRVoiceNodeBase:
 
         # Cross-widget announcer-engine agreement (2026-08-24, kibitz r3
         # MUST-FIX, corrected in r4 after codex caught a false-positive).
-        # `OTR_CastLock.announcer_voice_engine` and this node's own `engine`
-        # widget are two INDEPENDENTLY settable controls -- nothing else
-        # checks they agree. A mismatch is not just cosmetic: CastLock's bark
-        # stamp CLEARS `voice_ref_id` (bark has no bank identity), so if this
-        # widget still reads 'kokoro' while CastLock resolved bark, eng_kokoro
-        # receives an empty voice_ref and silently falls back to its own
-        # per-episode seeded pick -- a real, audible, WRONG voice speaks the
-        # line while the ledger and credits still say 'bark'.
+        # 4b has no engine widget. CastLock's ``announcer_voice_engine`` stamp
+        # is the authority; a leftover ``engine=`` on generate() must not
+        # silently render a different engine. A mismatch is not just cosmetic:
+        # CastLock's bark stamp CLEARS ``voice_ref_id`` (bark has no bank
+        # identity), so if this node still rendered kokoro while CastLock
+        # resolved bark, eng_kokoro would receive an empty voice_ref and
+        # silently fall back to its own per-episode seeded pick -- a real,
+        # audible, WRONG voice while the ledger and credits still say bark.
         #
         # COMPARE AGAINST `meta["announcer_voice_engine"]`, NEVER the row's
         # own `voice_engine`/`tts_model` field. `_stamp_voice_engine_
@@ -1299,17 +1324,17 @@ class OTRVoiceNodeBase:
                     engine, self.ROLE,
                     EngineUsabilityReason.MALFORMED_CONFIG,
                     f"OTR_CastLock resolved announcer_voice_engine="
-                    f"{stamped!r} but this node's own 'engine' widget is "
-                    f"{engine!r} -- the two announcer-engine controls "
-                    f"disagree. Set both OTR_CastLock.announcer_voice_engine "
-                    f"and this node's 'engine' widget to the same value.",
+                    f"{stamped!r} but this node is rendering with engine="
+                    f"{engine!r} -- CastLock's stamp and the leftover "
+                    f"engine argument disagree. 4b has no engine widget; "
+                    f"set OTR_CastLock.announcer_voice_engine to the "
+                    f"engine that should speak.",
                 )
         elif self.ROLE == "char_voice":
             # The character-side twin of the guard above (2026-09-02, kokoro-onnx
-            # r1): CastLock stamps char_voice_engine and this node carries its own
-            # 'engine' widget; nothing compared them, so a graph with the two set
-            # differently rendered one engine while the ledger and credits named
-            # the other. "auto" is stamped LITERALLY when CastLock resolved nothing
+            # r1). 4a has no engine widget. CastLock stamps char_voice_engine;
+            # a leftover generate() engine= must not render a different one.
+            # "auto" is stamped LITERALLY when CastLock resolved nothing
             # (a preset bank under an auto request -- cast_lock.py
             # _stamp_voice_engine_selection), so it is never a disagreement.
             stamped = str(meta.get("char_voice_engine") or "")
@@ -1318,10 +1343,11 @@ class OTRVoiceNodeBase:
                     engine, self.ROLE,
                     EngineUsabilityReason.MALFORMED_CONFIG,
                     f"OTR_CastLock resolved char_voice_engine={stamped!r} but "
-                    f"this node's own 'engine' widget is {engine!r} -- the two "
-                    f"character-engine controls disagree. Set both "
-                    f"OTR_CastLock.char_voice_engine and this node's 'engine' "
-                    f"widget to the same value.",
+                    f"this node is rendering with engine={engine!r} -- "
+                    f"CastLock's stamp and the leftover engine argument "
+                    f"disagree. 4a has no engine widget; set "
+                    f"OTR_CastLock.char_voice_engine to the engine that "
+                    f"should speak.",
                 )
 
         episode_seed = coerce_int_seed(meta.get("episode_seed"))

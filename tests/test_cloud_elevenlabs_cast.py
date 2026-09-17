@@ -46,7 +46,7 @@ _STOCK_ELEVENLABS_PARTNER_VOICES = {
 
 def test_bank_has_elevenlabs_pool_with_provider_ids():
     entries, _sha = load_voice_bank()
-    el = [e for e in entries if e.engine == "elevenlabs"]
+    el = [e for e in entries if e.engine == "cloud_elevenlabs"]
     assert el, "no elevenlabs voice rows in the bank"
     assert all(e.provider_voice_id for e in el), \
         "every elevenlabs row must carry a provider_voice_id"
@@ -57,7 +57,7 @@ def test_bank_has_elevenlabs_pool_with_provider_ids():
 
 def test_bank_matches_stock_partner_voice_catalog():
     entries, _sha = load_voice_bank()
-    el = [e for e in entries if e.engine == "elevenlabs"]
+    el = [e for e in entries if e.engine == "cloud_elevenlabs"]
     by_provider = {e.provider_voice_id: e for e in el}
     assert set(by_provider) == set(_STOCK_ELEVENLABS_PARTNER_VOICES)
     for provider_id, (voice_ref_id, gender, accent) in _STOCK_ELEVENLABS_PARTNER_VOICES.items():
@@ -65,7 +65,7 @@ def test_bank_matches_stock_partner_voice_catalog():
         assert entry.voice_ref_id == voice_ref_id
         assert entry.gender == gender
         assert accent in entry.timbre
-        assert entry.ref_path == "cloud:elevenlabs:%s" % provider_id
+        assert entry.ref_path == "cloud:cloud_elevenlabs:%s" % provider_id
         assert entry.ref_sha256 == "cloud"
 
 
@@ -73,7 +73,7 @@ def test_elevenlabs_announcer_pool_has_castable_provider_ids():
     entries, _sha = load_voice_bank()
     announcers = [
         e for e in entries
-        if e.engine == "elevenlabs" and "announcer_voice" in e.roles
+        if e.engine == "cloud_elevenlabs" and "announcer_voice" in e.roles
     ]
     assert len(announcers) >= 3
     assert all(e.provider_voice_id for e in announcers)
@@ -93,10 +93,13 @@ def test_elevenlabs_cloud_bank_stamps_provider_voice_id():
         {"char_id": "c03", "name": "DOLPH", "gender": "male"},
         {"name": "ANNOUNCER", "speaker_role": "announcer", "char_id": "announcer"},
     ]
-    CastLock()._auto_registry(_led(), cast, "elevenlabs_cloud", False, [])
+    CastLock()._auto_registry(
+        _led(), cast, "elevenlabs_cloud", False, [],
+        char_voice_engine="cloud_elevenlabs",
+        announcer_voice_engine="cloud_elevenlabs")
     chars = [e for e in cast if e.get("name") != "ANNOUNCER"]
     for e in chars:
-        assert e.get("voice_engine") == "elevenlabs", (e.get("name"), e)
+        assert e.get("voice_engine") == "cloud_elevenlabs", (e.get("name"), e)
         assert e.get("provider_voice_id"), \
             "%s got no provider_voice_id -> adapter would fail loud" % e.get("name")
     # deterministic + gender-appropriate id assigned (no bare fail-loud)
@@ -114,15 +117,15 @@ def test_explicit_elevenlabs_voice_engines_stamp_characters_and_announcer():
     report = []
     CastLock()._auto_registry(
         led, cast, "elevenlabs_cloud", False, report,
-        char_voice_engine="elevenlabs",
-        announcer_voice_engine="elevenlabs")
+        char_voice_engine="cloud_elevenlabs",
+        announcer_voice_engine="cloud_elevenlabs")
     by_id = {e["char_id"]: e for e in cast}
-    assert by_id["c02"]["voice_engine"] == "elevenlabs"
+    assert by_id["c02"]["voice_engine"] == "cloud_elevenlabs"
     assert by_id["c02"]["provider_voice_id"]
-    assert by_id["announcer"]["voice_engine"] == "elevenlabs"
+    assert by_id["announcer"]["voice_engine"] == "cloud_elevenlabs"
     assert by_id["announcer"]["provider_voice_id"]
-    assert led["meta"]["char_voice_engine"] == "elevenlabs"
-    assert led["meta"]["announcer_voice_engine"] == "elevenlabs"
+    assert led["meta"]["char_voice_engine"] == "cloud_elevenlabs"
+    assert led["meta"]["announcer_voice_engine"] == "cloud_elevenlabs"
 
 
 def test_preserve_ledger_stamps_explicit_elevenlabs_voice_engines():
@@ -146,14 +149,14 @@ def test_preserve_ledger_stamps_explicit_elevenlabs_voice_engines():
         voice_bank="elevenlabs_cloud",
         cast_voice_policy="preserve_ledger",
         allow_voice_reuse=False,
-        char_voice_engine="elevenlabs",
-        announcer_voice_engine="elevenlabs",
+        char_voice_engine="cloud_elevenlabs",
+        announcer_voice_engine="cloud_elevenlabs",
     )
     out = json.loads(ledger_json)
     assert "preserve_ledger" in report
     assert out["meta"]["voice_bank_id"] == "elevenlabs_cloud"
-    assert out["meta"]["char_voice_engine"] == "elevenlabs"
-    assert out["meta"]["announcer_voice_engine"] == "elevenlabs"
+    assert out["meta"]["char_voice_engine"] == "cloud_elevenlabs"
+    assert out["meta"]["announcer_voice_engine"] == "cloud_elevenlabs"
 
 
 def test_explicit_elevenlabs_rejects_incompatible_voice_bank():

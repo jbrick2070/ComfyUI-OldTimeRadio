@@ -41,8 +41,8 @@ class AnnouncerVoice(OTRVoiceNodeBase):
     # updated, so a degraded boot offered a dropdown that could not represent a
     # saved graph using either. Held equal by
     # `tests/test_tts_voice_preflight_matrix.py`.
-    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia", "elevenlabs",
-                             "google_tts", "bark")
+    LEGACY_FIRST_FALLBACK = ("kokoro", "chatterbox", "dia", "cloud_elevenlabs",
+                             "bark", "google_tts")
 
     CATEGORY = "OldTimeRadio/v2/audio"
     FUNCTION = "generate"

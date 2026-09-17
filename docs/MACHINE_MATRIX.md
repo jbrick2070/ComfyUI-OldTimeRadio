@@ -257,8 +257,9 @@ Video engines they select: `cloud_wan_i2v_audio`, `google_veo_video`, `still_mot
 | profile | video | voice |
 |---|---|---|
 | `cpu_floor` | still_motion | - |
-| `otr_cloud_hq` | google_veo_video | google_tts |
-| `otr_cloud_lanes` | cloud_wan_i2v_audio | elevenlabs |
+| `otr_cloud_deluxe_3act` | cloud_ltx25_foley_plus | cloud_elevenlabs |
+| `otr_cloud_deluxe_audio_in_3act` | cloud_ltx25_audio_in | cloud_elevenlabs |
+| `otr_cloud_lanes` | cloud_wan_i2v_audio | cloud_elevenlabs |
 
 </details>
 

@@ -320,7 +320,7 @@ profiles:
   # cast entry (C3), resolved from the elevenlabs_cloud bank (S2 pool). ---
   - profile_id: char_elevenlabs_cloud_v1
     role: char_voice
-    engine: elevenlabs
+    engine: cloud_elevenlabs
     commercial_clean: true          # library premade voices, ToS-clean (S2 pool)
     model_path: ""
     default_params: {stability: 0.5}
@@ -341,7 +341,7 @@ profiles:
 
   - profile_id: announcer_elevenlabs_cloud_v1
     role: announcer_voice
-    engine: elevenlabs
+    engine: cloud_elevenlabs
     commercial_clean: true
     model_path: ""
     default_params: {stability: 0.5}

@@ -186,7 +186,8 @@ TTS = {
     "kokoro": "koko",
     "chatterbox": "chat",
     "dia": "dia",
-    "elevenlabs": "elev",
+    "cloud_elevenlabs": "elev",
+    "elevenlabs": "elev",  # legacy alias; engine id is cloud_elevenlabs
     "google_tts": "gtts",
     "bark": "bark",
     "indextts2": "idx2",

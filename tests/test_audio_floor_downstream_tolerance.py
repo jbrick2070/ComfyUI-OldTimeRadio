@@ -217,10 +217,10 @@ def test_a_healthy_re_render_cannot_blank_or_invent_a_voice_floor(tmp_path):
     import json
     from nodes._otr_ledger import stamp_per_line_audio_meta
     led = {"lines": [{"line_id": "L1", "text": "hi", "voice_floor": "timeout"}]}
-    stamp_per_line_audio_meta(led, "L1", tts_engine="elevenlabs")
+    stamp_per_line_audio_meta(led, "L1", tts_engine="cloud_elevenlabs")
     assert led["lines"][0]["voice_floor"] == "timeout", "must not be blanked"
     led2 = {"lines": [{"line_id": "L1", "text": "hi"}]}
-    stamp_per_line_audio_meta(led2, "L1", tts_engine="elevenlabs")
+    stamp_per_line_audio_meta(led2, "L1", tts_engine="cloud_elevenlabs")
     assert "voice_floor" not in led2["lines"][0], "must not be invented"
 
 

@@ -1,11 +1,12 @@
 """Macbeth II.ii cloud-safety probe -- the ``macbeth_probe`` ratify gate.
 
-Both cloud profiles (``otr_cloud_low``, ``otr_cloud_hq``) carry a
-``ratify_before_emit`` line that reads "one deliberately violent adaptation
-beat sent through Gemini TTS + <video engine> to verify no safety refusal
-before committing an episode". That gate cannot be discharged from mocked
-tests: the whole point is proving the REAL cloud filters do not refuse violent
-Shakespeare mid-episode.
+Both cheap cloud profiles (``otr_cloud_low`` and the 1/5-act siblings) and the
+two deluxe graphs carry Comfy Credits partner stacks. An older
+``ratify_before_emit`` line on a retired ``otr_cloud_hq`` Google draft used to
+read "one deliberately violent adaptation beat sent through Gemini TTS +
+<video engine> to verify no safety refusal before committing an episode". That
+gate cannot be discharged from mocked tests: the whole point is proving the
+REAL cloud filters do not refuse violent Shakespeare mid-episode.
 
 This harness sends ONE beat -- Macbeth II.ii, immediately post-Duncan-murder --
 through the four cloud arms the two profiles use, and reports a grounded

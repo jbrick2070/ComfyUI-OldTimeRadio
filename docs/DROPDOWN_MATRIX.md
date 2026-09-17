@@ -73,7 +73,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 |---|---|---|---|---|---|---|---|
 | `sd15` | **auto** | 2.0 GiB | fits | **proven** | **proven** | ? | too slow |
 | `flux2_klein` | manual | 10.2 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `lumina_image` | manual | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `lumina_image` | **auto** | 10.4 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `flux_gen1` | manual | 13.0 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `ideogram4_local` | manual | 17.3 GiB | **no** | **proven** | not offered | not offered | not offered |
 | `z_image_turbo` | **auto** | 19.3 GiB | **proven** | **proven** | not offered | **proven** | not offered |
