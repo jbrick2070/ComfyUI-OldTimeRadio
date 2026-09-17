@@ -319,3 +319,14 @@ workflows/*__ORIGINAL_*.json
 # _tmp_openrouter.secret was sitting untracked and unignored in a PUBLIC repo.
 *.secret
 _tmp_*.secret
+
+# Session scratch is disposable by definition -- probes, one-shot launchers and
+# queue pokers named for the pod, episode or port they were aimed at. 200 of
+# them had been TRACKED and pushed, and `.comfyignore` had no rule for them, so
+# every registry install received the lot: 54 files calling urlopen, 33 reading
+# os.environ, 17 spawning subprocess -- scanner surface contributed by files no
+# installer can run. Every one was pinned to a dead episode slug, a released
+# pod IP or an operator-only install path, so none of them could be re-run
+# anyway. Write the next probe, run it, let it be ignored.
+_tmp_*
+scripts/_tmp_*

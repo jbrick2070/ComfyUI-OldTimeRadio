@@ -251,3 +251,14 @@ assets/
 # canvas, which only works because this pattern is deliberately .md-only.
 # Never widen it to workflows/variants/.
 workflows/variants/*.md
+
+# 2026-09-17: session scratch, and it is the second line of defence -- the
+# header above is right that untracked files never ship, which is exactly why
+# nobody noticed that 200 `_tmp_*` probes were TRACKED and riding into every
+# bundle. They contributed 54 urlopen, 33 os.environ and 17 subprocess files to
+# the scanned surface while being unrunnable by any installer (each one pinned
+# to a dead episode slug, a released pod IP or an operator-only path). They are
+# `git rm`'d and `.gitignore`d now; this line means a future force-add cannot
+# put them back in the zip.
+_tmp_*
+scripts/_tmp_*

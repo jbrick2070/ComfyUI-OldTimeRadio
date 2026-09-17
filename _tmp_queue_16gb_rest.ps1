@@ -1,5 +1,0 @@
-$ErrorActionPreference = "Continue"
-Set-Location "C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio"
-$env:PYTHONUTF8 = "1"
-$env:PYTHONIOENCODING = "utf-8"
-powershell -NoProfile -ExecutionPolicy Bypass -File "scripts\otr_shipping_set_legs.ps1" -Url "http://127.0.0.1:8188" -Graphs "otr_16gb_still,otr_16gb_animatediff,otr_16gb_video,otr_16gb_foley,otr_16gb_mime" -ActCount "1" -SourceBank "my_story" -TimeoutSec 9000 -ObsDir "C:\Users\jeffr\Documents\ComfyUI\output\otr\obs"
