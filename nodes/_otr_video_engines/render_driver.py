@@ -1345,11 +1345,12 @@ def jump_segment_still_path(ledger, shot, segment_index):
     re-creating the held-frame degradation chunks 3-6 exist to remove, with the
     correct stills sitting unused on disk and nothing in the log to say so.
 
-    ONE AUTHORITY. The id comes off the durable stamp ShotLock minted, and the
-    PATH comes off the still spine's own receipt -- the record the spine wrote
-    when it proved that exact object id was materialized. Not a second lookup
-    that happens to agree: the same fact, read once. If the spine did not prove
-    it, this raises rather than substituting anything.
+    ONE AUTHORITY. The id comes off the durable stamp ShotLock minted. The
+    PATH is the same object id, first on the still-spine receipt, then on
+    ``required_scene_targets`` when the receipt was not copied onto the
+    wire ledger (Copper Taste local QA). That is the same fact, not a
+    different still. A missing path for that id still raises; the beat
+    still is never substituted.
 
     ``segment_index`` 0 returns ``None``: segment 0 renders from the beat's own
     scene still, which every existing branch already resolves.
@@ -1425,8 +1426,8 @@ def jump_segment_still_path(ledger, shot, segment_index):
             "cut is the held-frame degradation this build removes."
             % (shot.get("shot_id"), index))
     object_id = str(request.get("object_id") or "")
-    receipt = (((ledger or {}).get("images") or {}).get("still_spine_receipt")
-               or {})
+    images_sec = (ledger or {}).get("images") or {}
+    receipt = images_sec.get("still_spine_receipt") or {}
     for entry in receipt.get("validated") or ():
         if not isinstance(entry, dict):
             continue
@@ -1441,12 +1442,24 @@ def jump_segment_still_path(ledger, shot, segment_index):
             # proven, two entries later.
             continue
         return path
+
+    for entry in images_sec.get("required_scene_targets") or ():
+        if not isinstance(entry, dict):
+            continue
+        if str(entry.get("object_id") or "") != object_id:
+            continue
+        path = str(entry.get("materialized_path") or entry.get("path") or "")
+        if path:
+            return path
+
     raise RenderError(
         "shot %s segment %d needs jump-segment still %s, which the still-spine "
-        "receipt does not carry a materialized path for. The spine runs BEFORE "
-        "any render and refuses a shot whose segment stills are missing, so "
-        "reaching here means the receipt was rebuilt, replayed or bypassed. NO "
-        "FALLBACK." % (shot.get("shot_id"), index, object_id or "<missing>"))
+        "receipt does not carry a materialized path for (required_scene_targets "
+        "also missed that object id). The spine runs BEFORE any render and "
+        "refuses a shot whose segment stills are missing, so reaching here "
+        "means both records were rebuilt, replayed or bypassed. NO FALLBACK "
+        "to the beat's still."
+        % (shot.get("shot_id"), index, object_id or "<missing>"))
 
 
 def segment_render_frames(shot, segment_index):
@@ -7576,6 +7589,13 @@ def build_clip_manifest(result, *, episode_id=""):
             "delivered_native_frame_count":
                 clip.get("delivered_native_frame_count"),
             "segments": _segment_receipt_projection(clip.get("segments")),
+            # WHY THIS BEAT WAS FLOORED (2026-09-17). Present-key-only: a
+            # delivered beat must not grow null floor keys. Copied from the
+            # shot row so ``meta.render_engines`` can name the reason without
+            # depending on a later ledger rewrite of ``video.shots``.
+            **{k: shot[k] for k in (
+                "cloud_floor", "content_floor", "budget_floor")
+               if isinstance(shot, dict) and k in shot and shot.get(k)},
         }
         # C1 (textured-hero 3D PoC): a mesh_stage DIRECTORY clip is a textured
         # turntable mesh on a TRANSPARENT background -- it composites over a

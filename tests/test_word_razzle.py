@@ -13,6 +13,7 @@ import pytest
 
 from nodes import otr_video_director as vd
 from nodes._otr_video_engines import eng_cloud_video as ecv
+from nodes._otr_video_engines import frame_contract as fc
 from nodes._otr_video_engines import registry as vreg
 
 
@@ -120,13 +121,52 @@ def test_duration_derives_from_timing_and_clamps(tmp_path):
     assert long == 8
 
 
-def test_env_overrides(tmp_path, monkeypatch):
+def test_eight_second_segment_auto_drops_default_1080p_to_720p(tmp_path,
+                                                               monkeypatch):
+    """Copper Taste root cause: 1080p + 8s is illegal on PixverseImageToVideoNode.
+    Soft default must not send that combo."""
+    monkeypatch.delenv("OTR_CLOUD_PIXVERSE_QUALITY", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_PIXVERSE_DURATION", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_PIXVERSE_MOTION", raising=False)
+    ins = ecv.WordRazzle._partner_inputs(
+        _request(tmp_path, timing={"target_frame_count": 200}))
+    assert ins["duration_seconds"] == 8
+    assert ins["quality"] == "720p"
+    assert ins["motion_mode"] == "normal"
+
+
+def test_five_second_segment_keeps_default_1080p(tmp_path, monkeypatch):
+    monkeypatch.delenv("OTR_CLOUD_PIXVERSE_QUALITY", raising=False)
+    monkeypatch.delenv("OTR_CLOUD_PIXVERSE_DURATION", raising=False)
+    ins = ecv.WordRazzle._partner_inputs(_request(tmp_path))
+    assert ins["duration_seconds"] == 5
+    assert ins["quality"] == "1080p"
+
+
+def test_explicit_1080p_with_eight_second_segment_REFUSES(tmp_path,
+                                                          monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_PIXVERSE_QUALITY", "1080p")
+    with pytest.raises(fc.ContractEnvConflict, match="1080p supports 5s"):
+        ecv.WordRazzle._partner_inputs(
+            _request(tmp_path, timing={"target_frame_count": 200}))
+
+
+def test_fast_motion_with_eight_second_segment_REFUSES(tmp_path, monkeypatch):
     monkeypatch.setenv("OTR_CLOUD_PIXVERSE_MOTION", "fast")
+    monkeypatch.setenv("OTR_CLOUD_PIXVERSE_QUALITY", "720p")
+    with pytest.raises(fc.ContractEnvConflict, match="fast supports 5s"):
+        ecv.WordRazzle._partner_inputs(
+            _request(tmp_path, timing={"target_frame_count": 200}))
+
+
+def test_env_overrides(tmp_path, monkeypatch):
+    monkeypatch.setenv("OTR_CLOUD_PIXVERSE_MOTION", "normal")
     monkeypatch.setenv("OTR_CLOUD_PIXVERSE_QUALITY", "720p")
     monkeypatch.setenv("OTR_CLOUD_PIXVERSE_DURATION", "8")
     monkeypatch.setenv("OTR_CLOUD_RAZZLE_MOTION_PROMPT", "custom motion clause")
-    ins = ecv.WordRazzle._partner_inputs(_request(tmp_path))
-    assert ins["motion_mode"] == "fast"
+    ins = ecv.WordRazzle._partner_inputs(
+        _request(tmp_path, timing={"target_frame_count": 200}))
+    assert ins["motion_mode"] == "normal"
     assert ins["quality"] == "720p"
     assert ins["duration_seconds"] == 8
     assert ins["prompt"].startswith("custom motion clause")

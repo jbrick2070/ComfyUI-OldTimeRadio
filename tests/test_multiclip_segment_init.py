@@ -128,6 +128,42 @@ def test_a_missing_receipt_entirely_is_TERMINAL():
         rd.jump_segment_still_path(ledger, shot, 1)
 
 
+def test_required_scene_targets_recover_the_SAME_object_id_when_receipt_missing():
+    """Copper Taste local QA: the wire ledger can omit still_spine_receipt
+    after validate_and_repair_still_spine already wrote paths onto
+    required_scene_targets. Same object_id only -- never the beat still."""
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    oid = cp.jump_still_object_id("b001", 1)
+    ledger["images"].pop("still_spine_receipt")
+    ledger["images"]["required_scene_targets"] = [
+        {"object_id": "scene_character_b001",
+         "path": "/stills/beat_scene.png"},
+        {"object_id": oid,
+         "materialized_path": "/stills/from_targets_seg1.png"},
+        {"object_id": cp.jump_still_object_id("b001", 2),
+         "path": "/stills/from_targets_seg2.png"},
+    ]
+    assert rd.jump_segment_still_path(ledger, shot, 1) == (
+        "/stills/from_targets_seg1.png")
+    assert rd.jump_segment_still_path(ledger, shot, 2) == (
+        "/stills/from_targets_seg2.png")
+
+
+def test_required_scene_targets_do_not_hand_a_DIFFERENT_object_id():
+    ledger = _ledger()
+    shot = ledger["video"]["shots"][0]
+    ledger["images"].pop("still_spine_receipt")
+    ledger["images"]["required_scene_targets"] = [
+        {"object_id": "scene_character_b001",
+         "path": "/stills/beat_scene.png"},
+        {"object_id": cp.jump_still_object_id("b001", 2),
+         "path": "/stills/from_targets_seg2.png"},
+    ]
+    with pytest.raises(rd.RenderError, match="required_scene_targets"):
+        rd.jump_segment_still_path(ledger, shot, 1)
+
+
 # ---------------------------------------------------------------------------
 # THE DIFFERENTIAL -- what the old lookup would have done
 # ---------------------------------------------------------------------------

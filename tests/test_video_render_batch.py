@@ -37,7 +37,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes.otr_video_render_batch import (  # noqa: E402
-    _build_render_engines_payload, _clip_delivered_motion)
+    OTRVideoRenderBatch, _build_render_engines_payload,
+    _clip_delivered_motion, _stamp_floored_video_shots)
 from nodes import otr_credits_roll as cr  # noqa: E402
 
 
@@ -47,6 +48,11 @@ from nodes import otr_credits_roll as cr  # noqa: E402
 _PAYLOAD_KEYS = {"histogram", "video_revision", "by_role", "vram_peak_mb",
                  "per_clip", "by_engine", "sanctioned_gap_count",
                  "sanctioned_gap_shot_ids",
+                 # Added 2026-09-17: each sanctioned gap carries WHY it was
+                 # floored (cloud_floor / budget / still_gap), same order as
+                 # sanctioned_gap_shot_ids -- Copper Taste lost this and the
+                 # credits looked empty for word_razzle with no root cause.
+                 "sanctioned_gap_reasons",
                  # Added 2026-08-28 with the sanction/absence split: an
                  # undelivered beat with no sanction is a FAULT and is
                  # reported under its own name, never folded into the gap
@@ -140,6 +146,89 @@ def test_an_all_gap_episode_still_reports_its_gaps():
     assert p["sanctioned_gap_count"] == 3
     assert p["sanctioned_gap_shot_ids"] == [
         "shot_music_opening_001", "shot_body_001", "shot_music_closing_001"]
+    # Default gap fixture has no cloud_floor/budget_floor -> still_gap.
+    assert p["sanctioned_gap_reasons"] == [
+        {"shot_id": "shot_music_opening_001", "beat_id": "",
+         "role": "music_visual", "planned_engine": "still_flat",
+         "reason": "still_gap"},
+        {"shot_id": "shot_body_001", "beat_id": "",
+         "role": "character_visual", "planned_engine": "ltx_8gb",
+         "reason": "still_gap"},
+        {"shot_id": "shot_music_closing_001", "beat_id": "",
+         "role": "music_visual", "planned_engine": "still_flat",
+         "reason": "still_gap"},
+    ]
+
+
+def test_sanctioned_gap_reasons_name_cloud_and_budget_floors():
+    """Copper Taste lost the Pixverse floor reason; the receipt must keep it."""
+    p = _payload(
+        _gap("shot_b001", "word_razzle", role="announcer_visual",
+             beat_id="b001", cloud_floor="timeout"),
+        _gap("shot_b006", "word_razzle", role="announcer_visual",
+             beat_id="b006", budget_floor=True),
+        _delivered("shot_b002", "still_motion", role="character_video"),
+        engine_histogram={"still_motion": 1}, video_revision=1)
+    assert p["sanctioned_gap_shot_ids"] == ["shot_b001", "shot_b006"]
+    assert p["sanctioned_gap_reasons"] == [
+        {"shot_id": "shot_b001", "beat_id": "b001",
+         "role": "announcer_visual", "planned_engine": "word_razzle",
+         "reason": "timeout"},
+        {"shot_id": "shot_b006", "beat_id": "b006",
+         "role": "announcer_visual", "planned_engine": "word_razzle",
+         "reason": "budget"},
+    ]
+    assert "announcer_visual" not in p["by_role"]
+    assert p["by_role"] == {"character_video": {"still_motion": 1}}
+
+
+def test_shot_row_accepts_cloud_floor_fields():
+    from nodes._otr_video_engines.schemas import ShotRow
+    row = ShotRow(
+        shot_id="shot_b001", cloud_floor="content_refused",
+        content_floor=True, budget_floor=False, status="sanctioned_gap")
+    assert row.cloud_floor == "content_refused"
+    assert row.content_floor is True
+    assert row.status == "sanctioned_gap"
+
+
+def test_floored_video_stamp_is_after_persist_and_is_not_swallowed():
+    """Composer QA 2026-09-17: the first draft wrapped stamp_durable in
+    ``except Exception`` BEFORE persist, so a stamp miss both hid the
+    Copper Taste reason and risked leaving paid clips in tmp if we later
+    made it loud. Persist first; then stamp with no swallow."""
+    import inspect
+    src = inspect.getsource(OTRVideoRenderBatch._render_episode)
+    persist_at = src.find("persist_episode_clips")
+    stamp_at = src.find("_stamp_floored_video_shots")
+    assert persist_at != -1 and stamp_at != -1
+    assert persist_at < stamp_at
+    between = src[persist_at:stamp_at]
+    assert "except Exception" not in between
+    assert "except Exception" not in src[stamp_at:stamp_at + 80]
+
+
+def test_floored_video_stamp_is_loud_on_save_miss(monkeypatch):
+    from nodes.production_ledger import LedgerStampError
+
+    seen = {}
+
+    def _boom(**kwargs):
+        seen.update(kwargs)
+        raise LedgerStampError("save returned None")
+
+    monkeypatch.setattr(
+        "nodes.production_ledger.stamp_durable", _boom)
+    ep = {"ledger": {"video": {
+        "roles_effective": {"announcer_visual": "word_razzle"},
+        "shots": [{"shot_id": "shot_b001", "cloud_floor": "timeout"}],
+    }}}
+    import pytest
+    with pytest.raises(LedgerStampError, match="save returned None"):
+        _stamp_floored_video_shots(ep)
+    assert seen["source"] == "video_render_batch_floored_shots"
+    assert seen["sections"]["video"]["roles_effective"]["announcer_visual"] == (
+        "word_razzle")
 
 
 def test_an_all_gap_payload_is_not_empty_so_the_credits_roll_cannot_raise():

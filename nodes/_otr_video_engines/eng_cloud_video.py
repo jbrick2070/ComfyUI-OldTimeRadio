@@ -1108,10 +1108,27 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         prompt = f"{motion}. {beat}".strip().rstrip(".") if beat else motion
         return append_visual_safety_clause(prompt)
 
+    def _derived_duration_seconds(self, request) -> int | None:
+        """Menu bucket from the segment plan, or None when timing is absent."""
+        canvas = _req_get(request, "canvas") or {}
+        c_get = canvas.get if isinstance(canvas, dict) else (
+            lambda k, d=None: getattr(canvas, k, d))
+        fps = int(c_get("fps", 25) or 25) or 25
+        timing = _req_get(request, "timing") or {}
+        t_get = timing.get if isinstance(timing, dict) else (
+            lambda k, d=None: getattr(timing, k, d))
+        n = int(t_get("target_frame_count", 0) or 0)
+        if n <= 0:
+            return None
+        secs = int(round(n / float(fps)))
+        return 8 if secs > 5 else 5
+
     def _duration_seconds(self, request) -> int:
         """The provider duration (seconds). Derived from the beat's frame
         target (timing.target_frame_count / fps) and clamped to Pixverse's
-        supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides."""
+        supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides
+        only when it AGREES with that segment bucket."""
+        derived = self._derived_duration_seconds(request)
         env = otr_env.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
         if env:
             # THE ENV MAY NOT LEAVE THE MENU (chunk 7b, 2026-07-26). This
@@ -1139,28 +1156,73 @@ class CloudWordRazzleEngine(_CloudVideoBase):
                     "partitioned over those lengths. NO FALLBACK."
                     % (self.name, secs, legal,
                        type(self).frame_contract.discrete_frames, _RAZZLE_FPS))
+            # COPPER TASTE (2026-09-17): a pin that DISAGREES with the segment
+            # asked for the wrong length, paid for a short clip, then floored
+            # got!=planned. The pin may only confirm the plan's bucket.
+            if derived is not None and secs != derived:
+                raise _fc.ContractEnvConflict(
+                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%d disagrees with this "
+                    "segment's plan (%d s from timing). The coverage plan "
+                    "already partitioned over 5s/8s clips. NO FALLBACK."
+                    % (self.name, secs, derived))
             return secs
-        canvas = _req_get(request, "canvas") or {}
-        c_get = canvas.get if isinstance(canvas, dict) else (
-            lambda k, d=None: getattr(canvas, k, d))
-        fps = int(c_get("fps", 25) or 25) or 25
-        timing = _req_get(request, "timing") or {}
-        t_get = timing.get if isinstance(timing, dict) else (
-            lambda k, d=None: getattr(timing, k, d))
-        n = int(t_get("target_frame_count", 0) or 0)
-        secs = int(round(n / fps)) if n else 5
-        return 8 if secs > 5 else 5
+        return derived if derived is not None else 5
+
+    def _quality_for_duration(self, duration_s: int) -> str:
+        """PixverseImageToVideoNode quality that can serve ``duration_s``.
+
+        Non-V6 Pixverse API law: 1080p does not support 8 seconds (and
+        ``motion_mode=fast`` is 5s-only). Copper Taste 2026-09-17 billed two
+        invoke_ok jobs after asking duration_seconds=8 with the default
+        quality=1080p; both partner clips were ~5.37s / 161 frames, and
+        canonicalize against the 200-frame plan returned 134 -- assembly
+        floored got!=planned as CORRUPT_OUTPUT. Auto-downgrade the soft
+        default; an explicit 1080p env pin with an 8s segment refuses loud.
+        """
+        legal = ("360p", "540p", "720p", "1080p")
+        env_q = otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "").strip()
+        quality = env_q or "1080p"
+        if quality not in legal:
+            raise _fc.ContractEnvConflict(
+                "%s: OTR_CLOUD_PIXVERSE_QUALITY=%r is not on Pixverse's "
+                "menu %s. NO FALLBACK." % (self.name, quality, list(legal)))
+        if int(duration_s) >= 8 and quality == "1080p":
+            if env_q:
+                raise _fc.ContractEnvConflict(
+                    "%s: OTR_CLOUD_PIXVERSE_QUALITY=1080p cannot pair with "
+                    "duration_seconds=%d on PixverseImageToVideoNode -- "
+                    "1080p supports 5s only. Set quality to 720p (or lower), "
+                    "or leave the env unset so 8s segments auto-use 720p. "
+                    "NO FALLBACK." % (self.name, int(duration_s)))
+            return "720p"
+        return quality
+
+    def _motion_mode_for_duration(self, duration_s: int) -> str:
+        """``fast`` is 5s-only on PixverseImageToVideoNode."""
+        legal = ("normal", "fast")
+        motion = otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "").strip() or "normal"
+        if motion not in legal:
+            raise _fc.ContractEnvConflict(
+                "%s: OTR_CLOUD_PIXVERSE_MOTION=%r is not on Pixverse's "
+                "menu %s. NO FALLBACK." % (self.name, motion, list(legal)))
+        if motion == "fast" and int(duration_s) >= 8:
+            raise _fc.ContractEnvConflict(
+                "%s: OTR_CLOUD_PIXVERSE_MOTION=fast cannot pair with "
+                "duration_seconds=%d -- fast supports 5s only. NO FALLBACK."
+                % (self.name, int(duration_s)))
+        return motion
 
     def _partner_inputs(self, request):
+        duration_s = self._duration_seconds(request)
         return {
             "image": self._init_image_input(request),
             "prompt": self._razzle_prompt(request),
             "negative_prompt": visual_safety_negative(
                 otr_env.get(_RAZZLE_NEG_ENV, "").strip()
                 or _RAZZLE_NEG_DEFAULT),
-            "motion_mode": otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "normal"),
-            "quality": otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "1080p"),
-            "duration_seconds": self._duration_seconds(request),
+            "motion_mode": self._motion_mode_for_duration(duration_s),
+            "quality": self._quality_for_duration(duration_s),
+            "duration_seconds": duration_s,
             "seed": self._seed(request),
         }
 

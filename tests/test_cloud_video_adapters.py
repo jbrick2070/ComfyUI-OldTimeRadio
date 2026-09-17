@@ -705,6 +705,48 @@ def test_canonicalize_video_caps_fps_resample_surplus_to_the_plan(tmp_path):
     assert abs(float(asset.duration_s) - 1.0) < 1e-6
 
 
+def _make_short_25fps(tmp_path, *, frames: int) -> Path:
+    """Exact N-frame 25 fps clip -- used to prove shortfall pad / refuse."""
+    out = tmp_path / ("provider_%df.mp4" % frames)
+    duration_s = frames / 25.0
+    cmd = [
+        _FFMPEG, "-v", "error", "-y",
+        "-f", "lavfi", "-i",
+        f"testsrc=size=128x72:rate=25:duration={duration_s}",
+        "-an", "-frames:v", str(frames),
+        "-c:v", "libx264", "-pix_fmt", "yuv420p", str(out),
+    ]
+    subprocess.run(cmd, check=True, capture_output=True, timeout=120)
+    return out
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_canonicalize_video_pads_small_shortfall_to_the_plan(tmp_path):
+    src = _make_short_25fps(tmp_path, frames=23)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "job-pad",
+           "raw_meta": {}}
+    asset = canonicalize_video(
+        raw, {"w": 320, "h": 192, "fps": 25, "target_frames": 25})
+    assert asset.frame_count == 25
+    assert _nb_frames(asset.path) == 25
+    assert abs(float(asset.duration_s) - 1.0) < 1e-6
+
+
+@pytest.mark.skipif(not _FFMPEG, reason="ffmpeg not on PATH")
+def test_canonicalize_video_REFUSES_a_large_shortfall(tmp_path):
+    """Copper Taste shape: 134 vs plan 200 must not be papered over."""
+    from nodes._otr_shared.cloud_media_backend import CloudMediaError
+
+    src = _make_short_25fps(tmp_path, frames=20)
+    raw = {"path": str(src), "content_type": "video/mp4",
+           "duration_s": None, "provider_job_id": "job-short",
+           "raw_meta": {}}
+    with pytest.raises(CloudMediaError, match="short by"):
+        canonicalize_video(
+            raw, {"w": 320, "h": 192, "fps": 25, "target_frames": 25})
+
+
 def _pix_fmt(path: Path) -> str:
     probe = subprocess.run(
         ["ffprobe", "-v", "error", "-select_streams", "v:0",

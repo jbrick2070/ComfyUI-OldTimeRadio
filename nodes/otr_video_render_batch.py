@@ -212,6 +212,11 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
     # Undelivered WITHOUT a sanction: a real fault, kept apart so the success
     # predicate can tell a refused beat from a broken one.
     unsanctioned_gap_shot_ids: list = []
+    # WHY each sanctioned gap was floored (2026-09-17). Copper Taste stamped
+    # the shot ids and dropped the reason -- credits looked empty for razzle
+    # and the ledger had no ``cloud_floor`` left to read. Same length/order
+    # as ``sanctioned_gap_shot_ids``.
+    sanctioned_gap_reasons: list = []
     for clip in (manifest or {}).get("clips") or []:
         if not _clip_delivered_motion(clip):
             # The beat is a real fact about the episode, so it leaves this loop
@@ -234,7 +239,21 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
             # episode report itself publishable-degraded, which is precisely
             # the laundering this control path exists to prevent.
             if _receipt.is_sanctioned_gap(clip):
-                sanctioned_gap_shot_ids.append(str(clip.get("shot_id") or "?"))
+                sid = str(clip.get("shot_id") or "?")
+                sanctioned_gap_shot_ids.append(sid)
+                if clip.get("budget_floor"):
+                    why = "budget"
+                elif clip.get("cloud_floor"):
+                    why = str(clip.get("cloud_floor") or "cloud")
+                else:
+                    why = "still_gap"
+                sanctioned_gap_reasons.append({
+                    "shot_id": sid,
+                    "beat_id": str(clip.get("beat_id") or ""),
+                    "role": str(clip.get("role") or ""),
+                    "planned_engine": str(clip.get("engine_id") or ""),
+                    "reason": why,
+                })
             else:
                 unsanctioned_gap_shot_ids.append(
                     str(clip.get("shot_id") or "?"))
@@ -292,6 +311,7 @@ def _build_render_engines_payload(manifest, vram_peak_mb):
         # auditing a refusal needs to tell those apart.
         "sanctioned_gap_count": len(sanctioned_gap_shot_ids),
         "sanctioned_gap_shot_ids": sanctioned_gap_shot_ids,
+        "sanctioned_gap_reasons": sanctioned_gap_reasons,
         "unsanctioned_gap_count": len(unsanctioned_gap_shot_ids),
         "unsanctioned_gap_shot_ids": unsanctioned_gap_shot_ids,
     }
@@ -318,6 +338,27 @@ def _stamp_render_engines_meta(manifest, vram_peak_mb):
     stamp_durable(
         meta_updates={"render_engines": payload},
         source="video_render_batch",
+    )
+
+
+def _stamp_floored_video_shots(ep):
+    """Copy floored ``video.shots`` from the wire-copy episode onto the
+    singleton. ``run_episode`` mutates that copy only; Copper Taste lost
+    every ``cloud_floor`` for exactly that reason.
+
+    LOUD, same contract as :func:`_stamp_render_engines_meta`. Call AFTER
+    ``persist_episode_clips`` so a stamp failure cannot strand paid files
+    in the swept tmp tier. Do not wrap the caller in ``except Exception``.
+    """
+    video = ((ep.get("ledger") or {}).get("video")
+             if isinstance(ep, dict) else None)
+    if not isinstance(video, dict) or not video.get("shots"):
+        return
+    from .production_ledger import stamp_durable
+
+    stamp_durable(
+        sections={"video": video},
+        source="video_render_batch_floored_shots",
     )
 
 
@@ -672,6 +713,11 @@ class OTRVideoRenderBatch:
             ),
         )
         _rd.persist_episode_clips(ep, manifest_episode_id)
+        # Floored ``video.shots`` after persist: paid clips are already
+        # durable, so a loud LedgerStampError cannot hide a paid file in tmp.
+        # Wholesale-replaces the singleton ``video`` section with the same
+        # object run_episode mutated (roles_effective stays on that object).
+        _stamp_floored_video_shots(ep)
         manifest = _rd.build_clip_manifest(ep, episode_id=manifest_episode_id)
         # Round 5 F2 (warn-only): the per-beat brief-composed prompts must
         # actually DIFFER -- an all-equal sha set means the beat clauses never

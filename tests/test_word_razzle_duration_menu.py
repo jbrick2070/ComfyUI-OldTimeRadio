@@ -61,11 +61,22 @@ def test_the_menu_matches_the_declared_contract():
     assert sorted(d // 25 for d in contract.discrete_frames) == [5, 8]
 
 
-@pytest.mark.parametrize("secs", [5, 8])
-def test_an_on_menu_pin_is_honoured(secs, monkeypatch):
-    """The knob still works for the values the provider actually serves."""
+@pytest.mark.parametrize("secs,frames", [(5, 125), (8, 200)])
+def test_an_on_menu_pin_matching_the_segment_is_honoured(secs, frames,
+                                                         monkeypatch):
+    """The knob still works when it confirms the coverage plan's bucket."""
     monkeypatch.setenv("OTR_CLOUD_PIXVERSE_DURATION", str(secs))
-    assert _engine()._duration_seconds(_request()) == secs
+    assert _engine()._duration_seconds(_request(frames)) == secs
+
+
+@pytest.mark.parametrize("secs,frames", [(5, 200), (8, 125)])
+def test_an_on_menu_pin_disagreeing_with_the_segment_REFUSES(secs, frames,
+                                                             monkeypatch):
+    """Copper Taste class: pin 5s against an 8s segment (or the reverse)
+    paid for the wrong length and floored got!=planned. Refuse before invoke."""
+    monkeypatch.setenv("OTR_CLOUD_PIXVERSE_DURATION", str(secs))
+    with pytest.raises(fc.ContractEnvConflict, match="disagrees with this"):
+        _engine()._duration_seconds(_request(frames))
 
 
 @pytest.mark.parametrize("secs", [1, 4, 6, 7, 9, 20, 300])

@@ -123,7 +123,12 @@ def canonical_clip_frame_count(asset: CanonicalAsset) -> int:
 
 
 #: bumped on ANY output-contract change (DS R3 S-2: simple integers).
-CANONICALIZER_VERSION = 4
+CANONICALIZER_VERSION = 5
+
+#: Max frames canonicalize may clone onto the TAIL to meet ``target_frames``.
+#: At 25 fps this is 160 ms -- enough for provider/fps-resample jitter, not
+#: enough to paper over a wrong duration bucket (e.g. 5s billed for an 8s plan).
+VIDEO_FRAME_SHORTFALL_SLACK = 4
 
 #: RESOLVED (cloud-audio S0/C8, 2026-07-03): the local lane's real loudness
 #: handling is scene_sequencer's per-segment RMS leveling (NOT a LUFS
@@ -425,6 +430,48 @@ def _count_output_frames(path: str) -> int | None:
     return n if n > 0 else None
 
 
+def _h264_tv_args() -> list[str]:
+    return [
+        "-c:v", "libx264", "-preset", "medium", "-crf", "18",
+        "-pix_fmt", "yuv420p",
+        "-colorspace", "bt709", "-color_primaries", "bt709",
+        "-color_trc", "bt709", "-color_range", "tv",
+        "-movflags", "+faststart",
+    ]
+
+
+def _pad_clone_tail_to_target(path: Path, *, target_frames: int, fps: int,
+                              ffmpeg_bin: str, shortfall: int) -> Path:
+    """Clone the last frame onto the TAIL until ``target_frames`` pictures.
+
+    Only called when ``shortfall`` is already inside
+    ``VIDEO_FRAME_SHORTFALL_SLACK``. Replaces ``path`` in place.
+    """
+    pad_s = float(shortfall) / float(fps)
+    tmp = path.with_suffix(".pad.mp4")
+    cmd = [ffmpeg_bin, "-v", "error", "-y", "-i", str(path), "-an",
+           "-vf", "tpad=stop_mode=clone:stop_duration=%.6f" % pad_s,
+           "-frames:v", str(int(target_frames))]
+    cmd.extend(_h264_tv_args())
+    cmd.append(str(tmp))
+    try:
+        res = otr_proc.run(cmd, capture_output=True, text=True, timeout=600)
+        if res.returncode != 0:
+            raise RuntimeError(res.stderr.strip()[-300:])
+    except CloudMediaError:
+        raise
+    except Exception as exc:
+        raise CloudMediaError(
+            CloudErrorCode.CORRUPT_OUTPUT,
+            f"ffmpeg shortfall pad failed for {path}: {exc}")
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+    tmp.replace(path)
+    return path
+
+
 def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> CanonicalAsset:
     """S3 (2026-07-02). Conform a provider clip to the ROLE contract:
 
@@ -449,7 +496,9 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
     filter -- the ``allow_tail_trim`` the cloud adapters already declare.
     A billed N-second provider clip (and the fps resample onto the 25 fps
     canvas) routinely emits two extra frames; without the cap those frames
-    fail the plan-vs-output proof at assembly."""
+    fail the plan-vs-output proof at assembly. A shortfall of at most
+    ``VIDEO_FRAME_SHORTFALL_SLACK`` frames is filled by cloning the last
+    picture; a larger shortfall fails closed (wrong duration bucket)."""
     import hashlib
     validated = validate_partner_result(dict(raw))
     src = Path(validated["path"])
@@ -495,12 +544,8 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
            "-vf", vf]
     if target_frames > 0:
         cmd.extend(["-frames:v", str(target_frames)])
-    cmd.extend(["-c:v", "libx264", "-preset", "medium", "-crf", "18",
-                "-pix_fmt", "yuv420p",
-                "-colorspace", "bt709", "-color_primaries", "bt709",
-                "-color_trc", "bt709", "-color_range", "tv",
-                "-movflags", "+faststart",
-                str(out_path)])
+    cmd.extend(_h264_tv_args())
+    cmd.append(str(out_path))
     try:
         res = otr_proc.run(cmd, capture_output=True, text=True, timeout=600)
         if res.returncode != 0:
@@ -516,14 +561,6 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
             CloudErrorCode.CORRUPT_OUTPUT,
             f"audio strip FAILED: canonical {out_path} still carries "
             f"{len(post['audio'])} audio stream(s)")
-    sha = hashlib.sha256()
-    with open(out_path, "rb") as fh:
-        for chunk in iter(lambda: fh.read(1 << 20), b""):
-            sha.update(chunk)
-    warnings = ()
-    if probe["audio"]:
-        warnings = (f"provider audio stripped ({len(probe['audio'])} "
-                    f"stream(s); strip proof: 0 in output)",)
     v0 = (post.get("video") or [{}])[0]
     got_fmt = v0.get("pix_fmt")
     if got_fmt != "yuv420p":
@@ -548,12 +585,44 @@ def canonicalize_video(raw: PartnerResult, request: dict, session=None) -> Canon
                 CloudErrorCode.CORRUPT_OUTPUT,
                 f"canonical {out_path} kept {counted} frame(s) after "
                 f"-frames:v {target_frames}")
+        if counted is not None and counted < target_frames:
+            shortfall = target_frames - counted
+            if shortfall > VIDEO_FRAME_SHORTFALL_SLACK:
+                raise CloudMediaError(
+                    CloudErrorCode.CORRUPT_OUTPUT,
+                    f"canonical {out_path} short by {shortfall} frame(s) "
+                    f"against plan {target_frames} (got {counted}; slack "
+                    f"{VIDEO_FRAME_SHORTFALL_SLACK}). NO FALLBACK -- a "
+                    f"wrong duration bucket must not be papered over.")
+            _pad_clone_tail_to_target(
+                out_path, target_frames=target_frames, fps=fps,
+                ffmpeg_bin=ffmpeg_bin, shortfall=shortfall)
+            counted = _count_output_frames(str(out_path))
+            if counted != target_frames:
+                raise CloudMediaError(
+                    CloudErrorCode.CORRUPT_OUTPUT,
+                    f"canonical {out_path} still short after pad "
+                    f"(got {counted}, plan {target_frames})")
+            post = _ffprobe_streams(str(out_path))
+            if post["audio"]:
+                raise CloudMediaError(
+                    CloudErrorCode.CORRUPT_OUTPUT,
+                    f"audio strip FAILED after pad: canonical {out_path} "
+                    f"still carries {len(post['audio'])} audio stream(s)")
         kept = counted if counted is not None else target_frames
         frame_count = kept
         if counted is None or counted == target_frames:
             # Stamp the plan's duration so round(duration*fps) cannot
             # revive a container-header surplus of a couple of frames.
             duration_s = float(kept) / float(fps)
+    sha = hashlib.sha256()
+    with open(out_path, "rb") as fh:
+        for chunk in iter(lambda: fh.read(1 << 20), b""):
+            sha.update(chunk)
+    warnings = ()
+    if probe["audio"]:
+        warnings = (f"provider audio stripped ({len(probe['audio'])} "
+                    f"stream(s); strip proof: 0 in output)",)
     return CanonicalAsset(
         path=out_path,
         sha256=sha.hexdigest(),
