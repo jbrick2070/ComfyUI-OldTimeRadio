@@ -3,9 +3,8 @@
 Catches structural drift that the per-commit B1d..B5 tests don't
 defend against. Six tests:
 
-1. test_request_slot_uses_check_vram_fit_pre_download   -- regression
-   for the B1d hotfix: VRAMFitFailedError must fire BEFORE
-   snapshot_download for an oversize model.
+1. test_request_slot_uses_check_vram_fit_pre_download   -- FAIL estimate
+   is consulted before snapshot_download, but the load is still attempted.
 2. test_no_legacy_model_id_meta_key_in_writer           -- AST scan
    asserts the writer never emits a legacy `model_id` meta key in
    any meta dict literal.
@@ -67,13 +66,11 @@ _MODEL_WIDGET_KEYS = frozenset({
 
 
 def test_request_slot_uses_check_vram_fit_pre_download(monkeypatch):
-    """B1d regression: when an oversize model is picked, request_slot
-    must raise VRAMFitFailedError BEFORE snapshot_download or any
-    network/disk pre-flight work fires.
+    """VRAM-fit is still consulted before download, but FAIL no longer
+    refuses the load. Hugging Face auto-download is allowed to run.
     """
     from nodes import _otr_model_catalog as catalog
     from nodes import _otr_model_loader as loader
-    from nodes._otr_model_inputs import VRAMFitFailedError
 
     # Reset loader cache so the assertion is clean.
     loader.LLM_CACHE.update(
@@ -81,26 +78,35 @@ def test_request_slot_uses_check_vram_fit_pre_download(monkeypatch):
     )
 
     download_calls: list[str] = []
+    fit_calls: list[str] = []
 
     def counting_auto_download(repo_id, **kw):
         download_calls.append(repo_id)
         return f"/fake/snapshot/{repo_id}"
 
-    # Force HF_TOKEN to exist so the validator admits the
-    # gated-curated repo (Mistral-Nemo etc.); we're not testing the
-    # gating path.
+    real_fit = catalog.check_vram_fit
+
+    def counting_fit(model_id, context_cap, **kw):
+        fit_calls.append(model_id)
+        return real_fit(model_id, context_cap, **kw)
+
     monkeypatch.setenv("HF_TOKEN", "fake-token")
     monkeypatch.setattr(
         catalog, "auto_download_if_missing", counting_auto_download,
     )
-
-    with pytest.raises(VRAMFitFailedError):
-        loader.request_slot("creative", catalog.TEST_OVERSIZED_LLM)
-
-    assert download_calls == [], (
-        "VRAMFitFailedError must fire before auto_download_if_missing; "
-        f"saw download calls: {download_calls}"
+    monkeypatch.setattr(catalog, "check_vram_fit", counting_fit)
+    monkeypatch.setattr(
+        loader, "_require_transformers_model_support", lambda mid: None,
     )
+    monkeypatch.setattr(
+        loader, "load_llm",
+        lambda mid, **kw: {"model_id": mid, "model": object(), "context_cap": 4096},
+    )
+
+    entry = loader.request_slot("creative", catalog.TEST_OVERSIZED_LLM)
+    assert entry["model_id"] == catalog.TEST_OVERSIZED_LLM
+    assert catalog.TEST_OVERSIZED_LLM in fit_calls
+    assert download_calls == [catalog.TEST_OVERSIZED_LLM]
 
 
 # ---------------------------------------------------------------------------

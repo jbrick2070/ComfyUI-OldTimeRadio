@@ -15,7 +15,7 @@ fits its own tier. Which one depends on which graph you opened:
 |---|---|
 | 8 GB NVIDIA, AMD, CPU | **Qwen3.5-4B NF4** (`Qwen/Qwen3.5-4B:nf4`) |
 | 16 GB Mac, canonical | **Qwen3.5-4B full** (`Qwen/Qwen3.5-4B`, Quant `none`) |
-| 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB) |
+| 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB) + Quant `bnb_nf4` |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **GPT 5.6 Sol** (`openai/gpt-5.6-sol`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 
@@ -34,7 +34,10 @@ The 16 GB+
 NVIDIA graphs -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
 instead; leaving those two slots alone is still a good answer there, but it
 means a roughly 24 GB download the first time you Queue, not the 8.7 GB one
-described below.
+described below. That 12B identity is NF4 baked into `google/gemma-4-12b-it`
+-- there is no other 12B variant and no second Quant knob. It is the only
+Gemma 4 12B in the catalog and in every shipping graph that uses it. Mac and
+AMD stay on Qwen.
 
 ---
 
@@ -57,10 +60,11 @@ headroom for a larger creative one.
 
 ---
 
-## The eight
+## The list you see
 
-This is the whole list, exactly as the dropdown spells it. You can still pick
-any of them -- the two Qwen identities are what the pack *ships*, not a lock.
+This is the advertised list, exactly as the dropdown spells it. You can still
+pick any of them -- the two Qwen identities are what the pack *ships* on 8 GB,
+and `google/gemma-4-12b-it` is what the 16 GB NVIDIA graphs *ship*.
 
 | What the dropdown says | Download | Licence | Worth knowing |
 |---|---|---|---|
@@ -68,12 +72,12 @@ any of them -- the two Qwen identities are what the pack *ships*, not a lock.
 | `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)` | 8.7 GB | Apache 2.0 | **The full pick.** Canonical and the Mac graphs save this with Quant `none`. No `nv8` -- unquantized it does not fit an 8 GB card. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
 | `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA graphs ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
-| `google/gemma-4-E2B-it (6.0 GB, mac16-tight nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | The smallest ungated writer. Proven on both NVIDIA sizes. **Do not pick it on a Mac** -- see below. |
+| `google/gemma-4-E2B-it (6.0 GB, nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | Compact technical-slot option. Loads the native text decoder (PBUG-20260906-07). OOM on a 16 GB Mac -- do not pick it there. |
 | `google/gemma-4-E4B-it (9.0 GB, mac16-tight nv8 nv16 nv24)` | 9.0 GB | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
-| `google/gemma-4-12b-it (23.9 GB, nv16 nv24)` | 23.9 GB | Apache 2.0 | What the 16 GB NVIDIA graphs ship with. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
+| `google/gemma-4-12b-it (23.9 GB, nv16 nv24)` | 23.9 GB | Apache 2.0 | What the ordinary 16 GB NVIDIA graphs ship with. NF4 is baked into the pick -- there is no other 12B variant, so you do not also change Quant. Canonical stays Qwen; switch this row and it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
 | `google/gemma-2-2b-it (5.2 GB, gated mac16 nv8 nv16 nv24)` | 5.2 GB | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
-Seven of the eight download themselves. The eighth is the gated one.
+The local rows download themselves except the gated Gemma 2 pick, which still needs a Hugging Face login.
 
 If your dropdown also shows `openrouter:`, `comfy:` or `google_api:` entries,
 those are the optional paid cloud writers -- see [CLOUD.md](CLOUD.md). They are
@@ -103,10 +107,9 @@ tags instead of one number.
 
 ### The Mac exception, and it is the expensive one
 
-`google/gemma-4-E2B-it` looks like the safe Mac pick -- 6.0 GB, smaller than the
-default's 8.7. It is not. Measured like for like on Apple Silicon it is *larger*
-than Qwen3.5-4B, and the recorded result of running it on a 16 GB Mac is out of
-memory. On a Mac that is a hard reboot, not a failed render.
+The recorded result of running `google/gemma-4-E2B-it` on a 16 GB Mac is out of
+memory. On a Mac that is a hard reboot, not a failed render. Leave it off a
+Mac graph even though the dropdown still lists it.
 
 **On a Mac, use the default.** `Qwen/Qwen3.5-4B` is what the Mac graphs ship
 with and what every episode published on an M4 used.
@@ -175,15 +178,20 @@ themselves, and measured faster than the GGUF lane had been anyway.
 If you were sent here looking for a way to turn GGUF back on: there is not one,
 and you do not need it.
 
+Video and image GGUF files are a different dropdown and they stay. Foley, mime,
+Klein, LTX, and Wan still load their `.gguf` UNets / encoders through those
+lanes. That is not a writer.
+
 ---
 
 ## When it goes wrong
 
 In the order these actually happen.
 
-**"VRAMFitFailedError ... estimated N GB peak resident vs M GB ceiling -- pick a
-smaller model".** You chose a writer bigger than the graph's ceiling for your
-card. It refuses *before* downloading, which is the point -- nothing is wasted.
+**"VRAM-fit estimate FAIL ... estimated N GB peak resident vs M GB ceiling".**
+A recommendation in the log, not a hard refusal. The load still attempts; a
+real OOM is the authority. On NVIDIA, an oversized NF4 pick may retry with
+CPU overflow after that runtime failure.
 Pick a model whose label carries your machine's tag. The ceiling itself is the
 `llm_vram_ceiling_gb` widget, and raising it does not create memory; it only
 moves where the failure happens.
@@ -230,7 +238,7 @@ which ones fit on paper -- is in [MACHINES.md](MACHINES.md) section 2.
 
 ## A model that is not in this list
 
-The eight rows above are the curated set. You can run a different Hugging Face
+The rows above are the curated advertised set. You can run a different Hugging Face
 causal LM without editing this pack: put a complete snapshot in the cache,
 restart ComfyUI, pick it. That is allowed. It is not the same as what the pack
 ships. Shipping a new row in the dropdown is a catalog change and wants the

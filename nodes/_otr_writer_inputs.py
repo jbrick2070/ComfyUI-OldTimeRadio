@@ -242,10 +242,10 @@ def _resolve_inputs(
     # point. Default both inputs to _otr_model_catalog.DEFAULT_LLM so an empty widget
     # value (e.g. an old workflow with shorter widgets_values vector)
     # still produces a usable id.
-    creative_writing_model = _otr_model_catalog._strip_label_suffix(
+    creative_writing_model = _otr_model_catalog._canonical_qwen_id(
         str(creative_writing_model or _otr_model_catalog.DEFAULT_LLM)
     )
-    technical_model = _otr_model_catalog._strip_label_suffix(
+    technical_model = _otr_model_catalog._canonical_qwen_id(
         str(technical_model or _otr_model_catalog.DEFAULT_LLM)
     )
 
@@ -629,6 +629,19 @@ def _resolve_inputs(
                 _selected_source_ref, verbatim_receipt.get("reason"),
             )
 
+    resolved_device = _OTR_DEVICE_OPTIONS.resolve_device(
+        llm_device, fallback="cuda",
+    )
+    cre_q = _otr_model_catalog.effective_quant_policy(
+        creative_writing_model, str(llm_quant_policy),
+        device=resolved_device,
+    )
+    tec_q = _otr_model_catalog.effective_quant_policy(
+        technical_model, str(llm_quant_policy),
+        device=resolved_device,
+    )
+    baked_quant = cre_q if cre_q == tec_q else str(llm_quant_policy)
+
     return {
         "news_seed":            news_seed,
         "news_article":         news_article,
@@ -650,9 +663,9 @@ def _resolve_inputs(
             # and a FROZEN policy must only ever hold a concrete device, since
             # it carries into cache_key(). These two constructions are meant to
             # be byte-identical, so they resolve identically.
-            device=_OTR_DEVICE_OPTIONS.resolve_device(llm_device, fallback="cuda"),
+            device=resolved_device,
             attn_impl=str(llm_attn_impl),
-            quant_policy=str(llm_quant_policy),
+            quant_policy=baked_quant,
             vram_ceiling_gb=float(llm_vram_ceiling_gb),
             gguf_n_ctx=int(gguf_n_ctx),
             gguf_quant=str(gguf_quant),

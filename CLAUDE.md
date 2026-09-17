@@ -39,8 +39,11 @@
   rounds). Not a scoped tail, not one round, not a continuation receipt; a partial campaign
   may never be reported as a full arc. **Invoke the PLUGIN skill by name:
   `kibitz-plugin:kibitz`** -- `anthropic-skills:kibitz` is the older duplicate and is not what
-  the operator asked for. Panel is driver-aware: Claude drives from Cowork, so **Codex +
-  Antigravity** review and you do NOT launch a second `claude -p` lane against your own family.
+  the operator asked for. Panel is driver-aware: exclude your own family. Claude drives from
+  Cowork, so **Codex + Antigravity** review and you do NOT launch a second `claude -p`.
+  Cursor drives (Composer / Grok windows), so **Composer QA + agy** review and you do NOT
+  launch `cursor-agent -p` against yourself. Codex drives, so cursor-agent / agy / Composer
+  -- not `codex exec` as the only reader of its own diff.
   Use the ComfyUI profile overlay already in the repo, `.kibitz/comfyui.local.md` (written
   2026-07-11 -- regenerate with `kibitz/scripts/comfyui_profile.py` if the tree has moved past
   it). You still write the code-grounded `driver_anchor.md` FIRST and remain the sole judge:
@@ -76,11 +79,28 @@
   Operator: *"you can update claude.md so that we do 1 cli review as needed for all
   coding."* Before pushing a code change, run it past ONE local CLI lane. Not an
   arc, not a panel -- one reader, every time.
-  * **The lanes, all authenticated on the Mac:** `cursor-agent -p --force "<prompt>"`
-    (all-round, and the one that has actually caught things), `codex exec
-    --dangerously-bypass-approvals-and-sandbox "<prompt>"` (deep second opinion),
-    `agy -p='<prompt>' --dangerously-skip-permissions` (quick QA -- note the prompt
-    MUST be attached to `-p=` or the flag is consumed as the prompt).
+  * **The lanes:** `cursor-agent -p --force "<prompt>"` (all-round, the one that
+    has actually caught things -- **only when Cursor is NOT the driver**),
+    `codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"` (deep
+    second opinion -- **only when Codex is NOT the driver**),
+    `agy -p='<prompt>' --dangerously-skip-permissions` (quick QA -- note the
+    prompt MUST be attached to `-p=` or the flag is consumed as the prompt).
+    **An available internal subagent of a DIFFERENT model family is a valid
+    reviewer** (Composer QA from a Cursor Grok driver, and the reverse).
+  * **DRIVER-AWARE -- NEVER REVIEW YOUR OWN FAMILY (operator 2026-09-17 --
+    hard, after a Cursor window launched `cursor-agent -p` as its "CLI
+    review").** Same mechanism as the kibitz panel's "do not launch a second
+    `claude -p`". A same-family CLI is a self-review wearing a different
+    binary; the 09-07 defects were caught by a reader with no memory of
+    having written the code, which this is not.
+    - **Cursor driver (Composer / Grok in this IDE):** spawn **Composer QA**
+      (Task, Composer, briefed to REFUTE, ground against the real Windows
+      files). If a CLI lane is needed, send it to **agy** (or Codex). Never
+      `cursor-agent`.
+    - **Claude Cowork driver:** Codex + Antigravity / cursor-agent / agy.
+      Never a second `claude -p`.
+    - **Codex driver:** cursor-agent / agy / Composer. Never `codex exec` as
+      the only reader of its own diff.
   * **WHY THIS RULE EXISTS, measured the day it was written.** Two defects shipped
     that day, both from this window, and NEITHER was catchable by the checks the
     author ran:

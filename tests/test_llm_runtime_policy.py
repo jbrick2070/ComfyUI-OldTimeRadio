@@ -352,7 +352,9 @@ def test_resolve_inputs_builds_baseline_policy_by_default():
     resolved = _resolve_inputs(custom_premise="test premise")
     pol = resolved["llm_policy"]
     assert isinstance(pol, lp.LLMRuntimePolicy)
-    assert pol == lp.BASELINE_POLICY
+    # One Qwen identity: default device is cuda, which bakes NF4. That is
+    # also the LLMRuntimePolicy() baseline, so a fresh node matches it.
+    assert pol == lp.LLMRuntimePolicy()
 
 
 def test_resolve_inputs_threads_explicit_policy_fields():
@@ -468,9 +470,11 @@ def _gguf_load_config(repo, n_ctx=4096, quant="Q8_0"):
 @_skip_no_gguf_row
 def test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier():
     """Real registry arithmetic, no fixture and no stub. The ceiling this
-    repo ships (14.5) must keep admitting the GGUF writer it ships, and the
-    8 GB tier's 6.8 must refuse it. If the first flips, the default workflow
-    is broken; if the second flips, the tier ceiling is decorative again."""
+    repo ships (14.5) must keep PASS-estimating the GGUF writer it ships,
+    and the 8 GB tier's 6.8 must FAIL-estimate it. FAIL is a
+    recommendation, not a request_slot raise. If the first flips, the
+    default workflow is priced wrong; if the second flips, the tier
+    ceiling is decorative again."""
     from nodes import _otr_model_catalog as cat
 
     admitted = cat.check_vram_fit(_GEMMA_GGUF, 4096, ceiling_gb=14.5)
@@ -486,13 +490,8 @@ def test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier():
 def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
     monkeypatch, clean_llm_cache,
 ):
-    """THE A1 case. Load under the 16 GB ceiling, then ask for the same
-    model under the 8 GB tier's ceiling at the SAME load identity. Because
-    GGUFLoadConfig.reuse_key() excludes the ceiling, the second request used
-    to be served from the resident singleton and the stricter policy never
-    applied to anything."""
-    from nodes._otr_model_inputs import VRAMFitFailedError
-
+    """Dormant. Writer GGUF_ROWS is empty on purpose. Do not restore a
+    writer row to make this run. Video GGUF files are unrelated."""
     backend = _CountingBackend()
     monkeypatch.setattr(
         "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend)
@@ -503,15 +502,12 @@ def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
     assert backend.loads == [_GEMMA_GGUF]
     assert ml.LLM_CACHE.get("model_id") == _GEMMA_GGUF  # genuinely resident
 
-    strict = lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER)
-    with pytest.raises(VRAMFitFailedError) as excinfo:
-        ml.request_slot("technical", _GEMMA_GGUF, policy=strict,
-                        load_config=load_config)
-    message = str(excinfo.value)
-    assert _GEMMA_GGUF in message
-    assert "ceiling" in message
-    assert "6.8 GB ceiling" in message
-    # Refused, not quietly served from the resident entry.
+    reused = ml.request_slot(
+        "technical", _GEMMA_GGUF,
+        policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
+        load_config=load_config,
+    )
+    assert reused["model_id"] == _GEMMA_GGUF
     assert backend.loads == [_GEMMA_GGUF]
 
 
@@ -519,23 +515,19 @@ def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
 def test_gguf_fresh_load_consults_the_policy_ceiling(
     monkeypatch, clean_llm_cache,
 ):
-    """Not only the reuse path. With nothing resident, the GGUF lane reached
-    its backend without the POLICY ceiling ever being consulted: the lane's
-    own preflight measures PHYSICAL free VRAM, which a 16 GB card passes for
-    an 8 GB tier's model. A physical probe cannot enforce a tier."""
-    from nodes._otr_model_inputs import VRAMFitFailedError
-
+    """Dormant. Writer GGUF_ROWS is empty on purpose. Do not restore a
+    writer row to make this run."""
     backend = _CountingBackend()
     monkeypatch.setattr(
         "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend)
 
-    with pytest.raises(VRAMFitFailedError, match="ceiling"):
-        ml.request_slot(
-            "technical", _GEMMA_GGUF,
-            policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
-            load_config=_gguf_load_config(_GEMMA_GGUF),
-        )
-    assert backend.loads == []  # refused BEFORE the backend was touched
+    entry = ml.request_slot(
+        "technical", _GEMMA_GGUF,
+        policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
+        load_config=_gguf_load_config(_GEMMA_GGUF),
+    )
+    assert entry["model_id"] == _GEMMA_GGUF
+    assert backend.loads == [_GEMMA_GGUF]
 
 
 @_skip_no_gguf_row
@@ -575,12 +567,10 @@ def test_remote_lane_is_exempt_from_the_ceiling(monkeypatch, clean_llm_cache):
 def test_transformers_cache_hit_cannot_inherit_a_permissive_ceiling(
     monkeypatch, clean_llm_cache,
 ):
-    """The same defect on the other local lane: the transformers cache hit
-    also returned above the gate, and LLMRuntimePolicy.cache_key() excludes
-    the ceiling, so a stricter request reused a permissively-admitted
-    model."""
+    """Ceiling is telemetry, not a reuse killer. A model already resident
+    under a 16 GB policy may serve an 8 GB-ceiling request of the same
+    load identity -- the estimator must not evict a working runtime."""
     from nodes import _otr_model_catalog as cat
-    from nodes._otr_model_inputs import VRAMFitFailedError
 
     loads = []
     monkeypatch.setattr(cat, "auto_download_if_missing",
@@ -597,11 +587,11 @@ def test_transformers_cache_hit_cannot_inherit_a_permissive_ceiling(
     ml.request_slot("creative", _GEMMA_HF, policy=lp.LLMRuntimePolicy())
     assert loads == [_GEMMA_HF]
 
-    with pytest.raises(VRAMFitFailedError, match="ceiling"):
-        ml.request_slot(
-            "creative", _GEMMA_HF,
-            policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
-        )
+    reused = ml.request_slot(
+        "creative", _GEMMA_HF,
+        policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
+    )
+    assert reused["model_id"] == _GEMMA_HF
     assert loads == [_GEMMA_HF]
 
 

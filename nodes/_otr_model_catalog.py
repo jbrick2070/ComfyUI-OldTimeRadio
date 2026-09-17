@@ -69,11 +69,10 @@ a complete one-act episode end to end (obs_publish OK, 32m34s) on that card.
 Mistral-Nemo remains in the catalog and remains selectable; it is simply no
 longer what you get by accident.
 
-THE DROPDOWN HAS TWO QWEN IDENTITIES (2026-09-15). One Hugging Face snapshot
-cannot honestly wear both ``nv8`` (the NF4 load) and Quant ``none`` (the Mac /
-canonical load). This constant is the FULL pick; :data:`DEFAULT_LLM_NF4` is
-the 4-bit pick. A user can still choose Gemma, Llama, a cache-discovered
-CausalLM, or a cloud slot -- that is not the same as what the pack ships.
+ONE QWEN IDENTITY (2026-09-17). NVIDIA loads NF4; Mac / CPU load full.
+Quant is baked from the machine -- there is no second Qwen dropdown and
+the Quant widget is not a setting people have to flip. :data:`DEFAULT_LLM_NF4`
+is a retired spelling that still validates onto this row.
 
 ALSO FIXES A LATENT MISMATCH. Every curated dropdown label is
 ``repo_id + vram_badge_for(repo_id)``, so the option list holds
@@ -85,10 +84,9 @@ here is correct; what was wrong was pointing it at a row an 8 GB user cannot run
 """
 
 DEFAULT_LLM_NF4 = "Qwen/Qwen3.5-4B:nf4"
-"""The NF4 twin of :data:`DEFAULT_LLM`. Same Hugging Face weights; the ``:nf4``
-suffix survives ``_strip_label_suffix`` so the picker cannot collapse it into
-the full row. Fresh writer nodes default here, matching
-``llm_quant_policy`` ``bnb_nf4``.
+"""Retired spelling of :data:`DEFAULT_LLM`. Saved 8 GB graphs still carry
+this string; validate remaps it onto the one Qwen row. It is not in the
+COMBO.
 """
 
 TEST_TECHNICAL_LLM = "google/gemma-4-E2B-it"
@@ -196,7 +194,9 @@ class CuratedModel:
     # When non-empty, this pick OWNS Quant. The Quant widget must match
     # or request_slot fails loud. Empty means the widget still decides
     # (Gemma, Llama, cache-discovered ids -- anything a user picks).
-    implied_quant_policy: Literal["", "none", "bnb_nf4", "bnb_8bit"] = ""
+    implied_quant_policy: Literal[
+        "", "none", "bnb_nf4", "bnb_8bit", "platform"
+    ] = ""
 
 
 CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
@@ -207,17 +207,16 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         vram_fit_tier="WARN",
         # Official shards: 9,319,828,096 bytes / 2**30. Disk, not VRAM.
         approx_safetensors_gb=8.68,
-        notes="FULL / unquantized identity of the official Apache-2.0 ungated "
-        "Qwen3.5 4B writer. Canonical and the Mac graphs save this pick with "
-        "Quant none. The NF4 twin is Qwen/Qwen3.5-4B:nf4 -- same weights, "
-        "different Quant. THINKING template, suppressed -- read from the "
-        "published chat_template.jinja 2026-09-06: with add_generation_prompt "
-        "it emits a closed '<think>\\n\\n</think>' envelope when "
-        "enable_thinking is false and an OPEN '<think>' otherwise, so "
-        "chat_template_kwargs must reach every generate call or the model is "
-        "forced to reason (see test_chat_template_kwargs_wired). Two shards, "
-        "9,319,828,096 bytes. Finished episodes exist on 16 GB Mac (quant "
-        "none) and, via the NF4 twin, on 8 GB and 16 GB NVIDIA.",
+        notes="The one Qwen 3.5 4B writer. NVIDIA loads NF4 (fits 8 GB); "
+        "Mac / CPU load full (no Metal NF4). Quant is baked from the "
+        "device -- not a second dropdown. THINKING template, suppressed -- "
+        "read from the published chat_template.jinja 2026-09-06: with "
+        "add_generation_prompt it emits a closed '<think>\\n\\n</think>' "
+        "envelope when enable_thinking is false and an OPEN '<think>' "
+        "otherwise, so chat_template_kwargs must reach every generate call "
+        "or the model is forced to reason (see test_chat_template_kwargs_wired). "
+        "Two shards, 9,319,828,096 bytes. Finished episodes exist on 8 GB "
+        "NVIDIA, 16 GB NVIDIA, and 16 GB Mac.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
@@ -229,28 +228,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         # (conversion_mapping.py: "qwen3_5_text" -> language_model/model), so
         # OTR supplies no key_mapping of its own here.
         text_only_load="native_text_decoder",
-        implied_quant_policy="none",
-    ),
-    CuratedModel(
-        repo_id="Qwen/Qwen3.5-4B:nf4",
-        requires_auth=False,
-        loader_backend="transformers_multimodal_text_only",
-        vram_fit_tier="WARN",
-        approx_safetensors_gb=8.68,
-        notes="NF4 identity of Qwen3.5 4B. Same Hugging Face snapshot as "
-        "Qwen/Qwen3.5-4B; the :nf4 suffix is the dropdown identity so this "
-        "pick can wear nv8 without lying about Quant none. 8 GB NVIDIA "
-        "graphs and a freshly dropped writer node save this pick with "
-        "bnb_nf4. No mac16 tag -- bitsandbytes is not a Metal path.",
-        prompt_profile="modern",
-        chat_template_kind="transformers_default",
-        stop_tokens=(),
-        context_window=8192,
-        license="apache_2_0",
-        license_audit_status="mit_equivalent",
-        text_only_load="native_text_decoder",
-        hf_repo_id="Qwen/Qwen3.5-4B",
-        implied_quant_policy="bnb_nf4",
+        implied_quant_policy="platform",
     ),
     CuratedModel(
         repo_id="unsloth/Llama-3.2-3B-Instruct",
@@ -353,14 +331,17 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         notes="Official Gemma4Unified in-process Transformers text lane "
         "(transformers>=5.10.4). Fully offline from the canonical HF cache; "
         "NF4 measured at 7.15 GiB allocated / 7.29 GiB peak on the 16 GB "
-        "RTX 5080, including coherent prose and LMFE-constrained JSON. No "
-        "LoRA, Ollama, llama.cpp, sidecar, or port.",
+        "RTX 5080, including coherent prose and LMFE-constrained JSON. The "
+        "only Gemma 4 12B: NF4 is baked into the pick, not a second Quant "
+        "knob. No GGUF / full / NVFP4 twin. No LoRA, Ollama, llama.cpp, "
+        "sidecar, or port.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
         context_window=8192,
         license="apache_2_0",
         license_audit_status="mit_equivalent",
+        implied_quant_policy="bnb_nf4",
     ),
     CuratedModel(
         repo_id="google/gemma-2-2b-it",
@@ -400,7 +381,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
     # removed. The curated set now also includes the official Gemma 4 12B HF
-    # row restored in 2026-07; the optional GGUF peer remains a separate lane.
+    # row restored in 2026-07. The GGUF writer peer is not a catalog row.
     # 2026-05-24: gemma-2-2b-it added as the smallest technical-slot
     # pick (BUG-LOCAL-262). Gemma-2's chat template rejects the system
     # role; the generate path normalizes system messages before
@@ -558,75 +539,17 @@ def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
-def _gguf_native_virtual_rows() -> tuple[CuratedModel, ...]:
-    """Project every ``_otr_gguf_backend.GGUF_ROWS`` registry row into a
-    visible catalog peer.
-
-    The visible handle is the actual GGUF repository id so the dropdown reads
-    like a peer to the other Gemma rows. The loader resolves the local file
-    from C:\\ComfyUI-Models by default.
-
-    Guards ONLY the optional backend IMPORT (llama-cpp is an optional dep). A
-    registry-VALIDATION error (a malformed GGUF_ROWS row) PROPAGATES so a bad
-    row fails startup/tests loudly instead of silently deleting the lane.
-    ``approx_safetensors_gb`` is DERIVED from the row's pinned bytes; an
-    unpinned row projects 0.0 (= UNKNOWN, never a guessed estimate).
-    """
-    try:
-        from . import _otr_gguf_backend as _gguf
-    except ImportError:  # optional-dep safe -- backend module unavailable
-        return ()
-    rows: list[CuratedModel] = []
-    for row in _gguf.GGUF_ROWS:
-        if row.repo_id == _gguf.ROW_ID:
-            notes = (
-                "Gemma 4 12B Q8_0 GGUF via in-process llama-cpp-python. "
-                "Default file: C:\\ComfyUI-Models\\LLM\\converted\\"
-                "gemma-4-12b-it\\gemma-4-12b-it-Q8_0.gguf. No Ollama, no "
-                "sidecar, no port."
-            )
-        else:
-            notes = (
-                f"{row.repo_id} GGUF via in-process llama-cpp-python "
-                f"(local subdir {row.subdir}). No Ollama, no sidecar, no port."
-            )
-        rows.append(CuratedModel(
-            repo_id=row.repo_id,
-            requires_auth=row.requires_auth,
-            loader_backend=_gguf.GGUF_BACKEND_KEY,
-            vram_fit_tier=row.vram_fit_tier,
-            approx_safetensors_gb=row.approx_artifact_gb(),
-            notes=notes,
-            prompt_profile="modern",
-            chat_template_kind="transformers_default",
-            stop_tokens=row.stop_tokens,
-            context_window=row.context_window,
-            license=row.license,
-            license_audit_status=row.license_audit_status,
-            provider="gguf_native",
-        ))
-    return tuple(rows)
-
-
-def _curated_with_gguf_native_peer() -> tuple[CuratedModel, ...]:
-    """Static curated rows plus the always-visible Gemma 4 12B GGUF peer.
-
-    Keep the 12B GGUF row beside the native Gemma 4 rows in dropdown order
-    instead of appending it after unrelated remote slots.
-    """
-    gguf_rows = _gguf_native_virtual_rows()
-    if not gguf_rows:
-        return CURATED_LLM_MODELS
-    out: list[CuratedModel] = []
-    inserted = False
-    for row in CURATED_LLM_MODELS:
-        out.append(row)
-        if row.repo_id == "google/gemma-4-12b-it":
-            out.extend(gguf_rows)
-            inserted = True
-    if not inserted:
-        out.extend(gguf_rows)
-    return tuple(out)
+def _is_gguf_writer_id(model_id: str) -> bool:
+    """Writer GGUF handles are retired. Image/video GGUF artifacts are unrelated."""
+    raw = _strip_label_suffix(model_id).lower() if isinstance(model_id, str) else ""
+    if not raw:
+        return False
+    return (
+        raw.endswith("-gguf")
+        or raw.endswith(".gguf")
+        or "/gguf" in raw
+        or raw.endswith("_gguf")
+    )
 
 
 def _active_curated_models() -> tuple[CuratedModel, ...]:
@@ -638,9 +561,10 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
     Static license/audit tests iterate CURATED_LLM_MODELS directly, so
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
-    keyed off the real gated set."""
+    keyed off the real gated set. Writer GGUF is not a catalog row --
+    GGUF_ROWS staying empty is not enough; this list never injects one."""
     return (
-        _curated_with_gguf_native_peer()
+        CURATED_LLM_MODELS
         + _openrouter_virtual_rows()
         + _comfy_virtual_rows()
         + _google_api_virtual_rows()
@@ -648,19 +572,26 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
 
 
 def _by_repo_id() -> dict[str, CuratedModel]:
-    return {m.repo_id: m for m in _active_curated_models()}
+    mapping = {m.repo_id: m for m in _active_curated_models()}
+    qwen = mapping.get(DEFAULT_LLM)
+    if qwen is not None:
+        mapping[DEFAULT_LLM_NF4] = qwen
+    return mapping
+
+
+def _canonical_qwen_id(model_id: str) -> str:
+    """Retired ``:nf4`` spelling maps onto the one Qwen row."""
+    bare = _strip_label_suffix(model_id) if isinstance(model_id, str) else ""
+    if bare == DEFAULT_LLM_NF4:
+        return DEFAULT_LLM
+    return bare
 
 
 def hf_weights_id(model_id: str) -> str:
-    """The Hugging Face repo that actually holds this pick's snapshot.
-
-    Dropdown twins (``Qwen/Qwen3.5-4B:nf4``) keep a distinct catalog id so
-    ``_strip_label_suffix`` cannot collapse them; download and
-    ``from_pretrained`` still need the real ``org/name``.
-    """
+    """The Hugging Face repo that actually holds this pick's snapshot."""
     if not isinstance(model_id, str) or not model_id.strip():
         return ""
-    bare = _strip_label_suffix(model_id)
+    bare = _canonical_qwen_id(model_id)
     row = _by_repo_id().get(bare)
     if row is None:
         return bare
@@ -668,24 +599,32 @@ def hf_weights_id(model_id: str) -> str:
     return named or row.repo_id
 
 
+def _implied_quant_twins(model_id: str) -> tuple:
+    """Curated local rows that share weights and each own a Quant."""
+    bare = _strip_label_suffix(model_id) if isinstance(model_id, str) else ""
+    if not bare:
+        return ()
+    weights = hf_weights_id(bare)
+    return tuple(
+        m for m in _active_curated_models()
+        if getattr(m, "provider", "local") == "local"
+        and hf_weights_id(m.repo_id) == weights
+        and (getattr(m, "implied_quant_policy", "") or "")
+    )
+
+
 def resolve_pick_for_quant(model_id: str, quant_policy: str) -> str:
     """When a family has implied-quant twins, return the twin matching Quant.
 
     Profiles still store the family id ``Qwen/Qwen3.5-4B`` plus a separate
     ``quant_policy``. The applier composes those two fields into one pick.
-    A user pick that is not part of a twin family is returned unchanged --
-    Gemma, Llama, cache-discovered CausalLMs, cloud slots stay the user's.
+    A Gemma, Llama, cache-discovered CausalLM, or cloud slot that is not
+    part of a twin family is returned unchanged.
     """
     bare = _strip_label_suffix(model_id) if isinstance(model_id, str) else ""
     if not bare or not quant_policy:
         return bare
-    weights = hf_weights_id(bare)
-    twins = [
-        m for m in _active_curated_models()
-        if getattr(m, "provider", "local") == "local"
-        and hf_weights_id(m.repo_id) == weights
-        and (getattr(m, "implied_quant_policy", "") or "")
-    ]
+    twins = _implied_quant_twins(bare)
     if not twins:
         return bare
     for m in twins:
@@ -694,25 +633,37 @@ def resolve_pick_for_quant(model_id: str, quant_policy: str) -> str:
     return bare
 
 
-def quant_pick_mismatch(model_id: str, quant_policy: str) -> str | None:
-    """Reason string when the pick owns Quant and the widget disagrees.
+def effective_quant_policy(
+    model_id: str, quant_policy: str, *, device: str = "",
+) -> str:
+    """Quant the pick actually loads.
 
-    None means the widget still decides (uncurated ids, Gemma, Llama) or
-    the pick and Quant already agree.
+    Qwen is one COMBO identity: NVIDIA/cuda -> NF4, Mac/CPU -> full.
+    Gemma 4 12B bakes NF4. A leftover Quant widget is ignored.
     """
+    widget = str(quant_policy or "")
     if not isinstance(model_id, str) or not model_id:
-        return None
-    row = _by_repo_id().get(_strip_label_suffix(model_id))
+        return widget
+    row = _by_repo_id().get(_canonical_qwen_id(model_id))
     implied = getattr(row, "implied_quant_policy", "") or ""
-    if not implied:
-        return None
-    if str(quant_policy) == implied:
-        return None
-    return (
-        f"writer pick {row.repo_id!r} is the {implied} load; Quant is "
-        f"{quant_policy!r}. Pick the matching Qwen 3.5 entry or change "
-        "Quant to match -- the pick owns the load, it does not guess."
-    )
+    if implied == "platform":
+        return (
+            "bnb_nf4"
+            if str(device or "").lower().startswith("cuda")
+            else "none"
+        )
+    if implied:
+        return implied
+    return widget
+
+
+def quant_pick_mismatch(model_id: str, quant_policy: str) -> str | None:
+    """Always None: implied-quant picks bake Quant instead of crashing.
+
+    Kept as the request_slot / load_llm seam so a future family can fail
+    loud again without rewiring callers.
+    """
+    return None
 
 
 def text_only_load_mode(model_id: str) -> str:
@@ -864,20 +815,6 @@ def _snapshot_is_causal_lm(snapshot_path: str | None) -> bool:
     if not isinstance(archs, list):
         return False
     return any(isinstance(a, str) and a.endswith("ForCausalLM") for a in archs)
-
-
-def _gguf_native_row_on_disk(repo_id: str) -> bool:
-    """Side-effect-free GGUF presence probe for dropdown metadata: True iff
-    ANY registered artifact for ``repo_id`` resolves to a regular non-zero
-    file. The dropdown has no quant context, so any materialized quant counts."""
-    try:
-        from . import _otr_gguf_backend as _gguf
-    except ImportError:  # keep INPUT_TYPES import-safe (optional dep)
-        return False
-    try:
-        return _gguf.gguf_native_row_on_disk(repo_id)
-    except Exception:  # noqa: BLE001 -- keep INPUT_TYPES import-safe
-        return False
 
 
 # Weight-file suffixes that mark a materialized (loadable) transformers
@@ -1053,9 +990,11 @@ def build_dropdown_choices(
     active = _active_curated_models()
     for m in active:
         provider = getattr(m, "provider", "local")
-        if provider == "gguf_native":
-            on_disk = _gguf_native_row_on_disk(m.repo_id)
-        elif provider != "local":
+        if provider == "gguf_native" or _is_gguf_writer_id(m.repo_id):
+            continue
+        if m.repo_id == DEFAULT_LLM_NF4:
+            continue
+        if provider != "local":
             # Remote lane (OpenRouter / Comfy Credits / Google API): listed
             # so a saved graph's handle stays a live combo choice. generate()
             # still fails closed without the matching key.
@@ -1071,6 +1010,8 @@ def build_dropdown_choices(
         if repo_id in curated_ids:
             continue
         if not result.on_disk:
+            continue
+        if _is_gguf_writer_id(repo_id):
             continue
         # The HF cache mixes every model type OTR downloads, so a non-curated
         # cache hit is not necessarily a text-generation LLM. Admit it only if
@@ -1117,12 +1058,10 @@ def default_llm_option() -> str:
 def fresh_llm_option() -> str:
     """The exact COMBO label a newly dropped writer node should save.
 
-    Canonical keeps :func:`default_llm_option` (full Qwen + Quant none).
-    A fresh node defaults ``llm_quant_policy`` to ``bnb_nf4``, so its
-    combo default is the NF4 twin -- otherwise the pick and Quant lie
-    about each other the moment the node hits the canvas.
+    Same one Qwen as canonical. NVIDIA bakes NF4; Mac bakes full. There
+    is no second Qwen identity in the picker.
     """
-    return DEFAULT_LLM_NF4 + vram_badge_for(DEFAULT_LLM_NF4)
+    return DEFAULT_LLM + vram_badge_for(DEFAULT_LLM)
 
 
 # ---------------------------------------------------------------------------
@@ -1267,10 +1206,11 @@ def _filter_catalog_models(models: list[dict], *, slot: str) -> list[dict]:
 #       change; only one can be looked up. That is a narrower difference than
 #       "unbudgetable" claimed, and it is not zero.
 #
-# Verified against live /api/v1/models on 2026-08-09: all eleven are listed.
-# They are offered even when the disk cache is cold, because a cold cache must
-# not hide the curated set -- see openrouter_catalog_dropdown_choices for the
-# two states where the block is skipped.
+# Verified against OpenRouter Latest pages on 2026-09-16. Keep the leading
+# `~` -- that is the moving-alias marker. They are offered even when the disk
+# cache is cold, because a cold cache must not hide the curated set -- see
+# openrouter_catalog_dropdown_choices for the two states where the block is
+# skipped. APPEND only: a mid-list insert would reorder COMBO choices.
 OPENROUTER_CURATED_ALIASES = (
     "~anthropic/claude-opus-latest",
     "~openai/gpt-latest",
@@ -1294,6 +1234,22 @@ OPENROUTER_CURATED_ALIASES = (
     # in the whole catalog -- its cheapest SKU is the likeliest on the board to
     # be retired. Paying 2.6x of almost nothing buys out an entire failure class.
     "~deepseek/deepseek-v4-flash-latest",
+    # 2026-09-16: OpenAI family Latest aliases + GLM/DeepSeek Pro/Flash.
+    "~openai/gpt-astra-latest",
+    "~openai/gpt-sol-latest",
+    "~openai/gpt-terra-latest",
+    "~openai/gpt-luna-latest",
+    "~z-ai/glm-latest",
+    "~z-ai/glm-flash-latest",
+    "~deepseek/deepseek-pro-latest",
+    "~deepseek/deepseek-flash-latest",
+)
+
+# OpenAI's own moving ChatGPT Instant alias. No leading `~` -- that is the
+# published OpenRouter id. Dated like any other untitled pin. Offered in the
+# curated dropdown block; never a recommended default.
+OPENROUTER_CURATED_UNTILDED_LATEST: tuple[str, ...] = (
+    "openai/gpt-chat-latest",
 )
 
 #: Every CONCRETE (non-alias) OpenRouter id this pack ships, mapped to the date
@@ -1360,6 +1316,7 @@ OPENROUTER_VERIFIED_ON_BY_ID: dict[str, str] = {
     # slug this pack does not offer.
     "openrouter/auto": "2026-08-10",
     "openrouter/auto-beta": "2026-08-10",
+    "openai/gpt-chat-latest": "2026-09-16",
 }
 
 
@@ -1381,7 +1338,8 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
            if a cold cache or a filter would otherwise hide it.
         2. favorites -- OTR_OPENROUTER_FAVORITES, in operator order, cache-gated
         3. OPENROUTER_CURATED_ALIASES -- the `~family-latest` routing aliases
-        4. the full filtered catalog, alphabetically, ONLY under explicit
+        4. OPENROUTER_CURATED_UNTILDED_LATEST -- OpenAI Chat Latest (no `~`)
+        5. the full filtered catalog, alphabetically, ONLY under explicit
            narrowing or OTR_OPENROUTER_FULL_CATALOG=1
     Enabled but empty/cold cache -> the same curated block as the default
     warm view, plus EMPTY_CACHE_SENTINEL so the operator is pointed at a
@@ -1443,6 +1401,8 @@ def openrouter_catalog_dropdown_choices(slot: str) -> list[str]:
 
     if not explicit_narrowing:
         for mid in OPENROUTER_CURATED_ALIASES:
+            _add(mid)
+        for mid in OPENROUTER_CURATED_UNTILDED_LATEST:
             _add(mid)
         # The auto-routers, LAST in the curated block so a router is never what
         # the eye lands on first. Same default-view-only rule as the aliases:
@@ -1870,7 +1830,12 @@ def validate_model_id(
         raise UnknownModelError(
             _unknown_recovery_hint(repr(model_id), "model_id is not a string", hub_root=hub_root)
         )
-    normalized = _strip_label_suffix(model_id)
+    normalized = _canonical_qwen_id(_strip_label_suffix(model_id))
+    if _is_gguf_writer_id(normalized):
+        raise UnknownModelError(
+            f"{normalized!r} is a retired GGUF writer. Use "
+            f"'google/gemma-4-12b-it' (NF4 is baked into that pick)."
+        )
     reason = _structural_reject(normalized)
     if reason is not None:
         raise UnknownModelError(_unknown_recovery_hint(normalized, reason, hub_root=hub_root))
@@ -2185,8 +2150,9 @@ def check_vram_fit(
                  Load proceeds with a logged caution.
       UNKNOWN -- uncurated and we can't reliably parse param count /
                  dtype. Load proceeds; rely on the runtime OOM safety net.
-      FAIL    -- estimated >= 1.5x ceiling. Only the clearly-oversized
-                 case (e.g. Llama-3-70B at ~42 GB resident). Caller raises.
+      FAIL    -- estimated >= 1.5x ceiling. Qualification / recommendation
+                 only (e.g. Llama-3-70B at ~42 GB resident). The loader
+                 still attempts the runtime load; it does not raise.
 
     Honest note: HF config.json has no standardized num_parameters
     field. UNKNOWN is the expected verdict for most uncurated arbitrary
@@ -2363,14 +2329,20 @@ def auto_download_if_missing(
     huggingface_hub.snapshot_download) and `_hf_api` (object with
     model_info() method) to drive tests without network calls.
     """
-    # EXECUTION path -- use the Hub-aware resolver so a cached
-    # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).
     from ._otr_hf_auth import resolve_hf_token_runtime as resolve_hf_token
     from ._otr_model_inputs import (
         GatedModelError,
         InsufficientDiskSpaceError,
         UnknownModelError,
     )
+
+    # EXECUTION path -- use the Hub-aware resolver so a cached
+    # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).
+    if isinstance(repo_id, str) and _is_gguf_writer_id(_strip_label_suffix(repo_id)):
+        raise UnknownModelError(
+            f"{repo_id!r} is a retired GGUF writer. Use "
+            "'google/gemma-4-12b-it' (NF4 is baked into that pick)."
+        )
 
     # B1d: local-cache short-circuit FIRST. If the snapshot is already on
     # disk, return the path immediately. This also makes a cached gated
@@ -2590,6 +2562,7 @@ __all__ = [
     "fresh_llm_option",
     "hf_weights_id",
     "resolve_pick_for_quant",
+    "effective_quant_policy",
     "quant_pick_mismatch",
     "openrouter_catalog_dropdown_choices",
     "OPENROUTER_ENABLE_SENTINEL",

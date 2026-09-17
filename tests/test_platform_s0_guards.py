@@ -57,30 +57,27 @@ def test_plan_max_memory_is_none_off_cuda(model_id):
 
 
 def test_plan_max_memory_cuda_branches_unchanged():
-    """On CUDA, for an ACTUALLY QUANTIZED load, the plan is byte-identical
-    to the pre-S0 behaviour -- these budgets were always sized for NF4."""
+    """On CUDA the first-try plan is still None on every card.
+
+    2026-09-06 removed the size-tag GPU caps. 2026-09-17 did not bring
+    them back: CPU overflow is a retry after a real runtime OOM, not a
+    first-try max_memory dict. The 16 GB flagship path still pins
+    device_map={"": 0} in load_llm, independent of this helper.
+    """
     assert ml._plan_max_memory("anything", 16.0, cuda_available=True,
-                               quant_policy="bnb_nf4") == {
-        0: "13.5GiB", "cpu": "32GiB"}
+                               quant_policy="bnb_nf4") is None
     assert ml._plan_max_memory("google/gemma-2-2b-it", 8.0,
                                cuda_available=True,
-                               quant_policy="bnb_nf4") == {
-        0: "3.2GiB", "cpu": "32GiB"}
-    # NB: ids ENDING in "2b" (e.g. "foo-12b") hit the 2b branch -- that is
-    # the pre-S0 tag semantics, preserved verbatim. A 9b id exercises the
-    # mid branch cleanly.
+                               quant_policy="bnb_nf4") is None
     assert ml._plan_max_memory("google/gemma-2-9b-it", 8.0,
                                cuda_available=True,
-                               quant_policy="bnb_nf4") == {
-        0: "6.8GiB", "cpu": "32GiB"}
+                               quant_policy="bnb_nf4") is None
     assert ml._plan_max_memory("some/tiny-model", 8.0,
                                cuda_available=True,
                                quant_policy="bnb_nf4") is None
-    # 8-bit is the other genuinely-quantized policy; same budgets apply.
     assert ml._plan_max_memory("google/gemma-2-9b-it", 8.0,
                                cuda_available=True,
-                               quant_policy="bnb_8bit") == {
-        0: "6.8GiB", "cpu": "32GiB"}
+                               quant_policy="bnb_8bit") is None
 
 
 @pytest.mark.parametrize(("model_id", "total_vram"), [
@@ -230,15 +227,18 @@ def test_cpu_floor_profile_is_runnable_on_cpu():
     prof = cp.load_profile("cpu_floor")
     avail = cp.availability(prof, areg.CAPABILITIES)
     assert avail["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
-    for slot in ("char_voice_engine", "announcer_voice_engine",
-                 "music_engine"):
+    for slot in ("announcer_voice_engine", "music_engine"):
         eng = prof["slot_overrides"][slot]
         assert avail.get(eng) == cp.REASON_OK, (slot, eng)
-    assert prof["slot_overrides"]["char_voice_engine"] == "kokoro"
-    # kokoro casts from its preset bank only (char_kokoro_v1 allows exactly
-    # kokoro_builtin); "default" with kokoro is the VoiceCastingError that
-    # tests/test_profile_bank_matches_char_engine.py guards against.
-    assert prof["slot_overrides"]["voice_bank"] == "kokoro_builtin"
+    assert prof["slot_overrides"]["announcer_voice_engine"] == "kokoro"
+    # Banks follow engine. CastLock has no voice_bank widget; kokoro
+    # derives kokoro_builtin. A leftover "default" pin is the
+    # VoiceCastingError tests/test_profile_bank_matches_char_engine.py
+    # used to catch.
+    assert "voice_bank" not in prof["slot_overrides"]
+    char_eng = str(prof["slot_overrides"].get("char_voice_engine") or "kokoro")
+    assert char_eng == "kokoro"
+    assert avail.get(char_eng) == cp.REASON_OK
     # Post-ship audit (2026-07-10): the IMAGE roles must be overridden too
     # -- inheriting canonical's cuda-only z_image_turbo shipped a GPU
     # engine on the no-GPU tier. Every image override must fit cpu.

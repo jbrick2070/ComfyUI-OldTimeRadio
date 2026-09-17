@@ -1,0 +1,15 @@
+---
+description: Node INPUT_TYPES and widgets must land in canonical JSON in the same change
+globs: nodes/**/*.py
+alwaysApply: false
+---
+
+# Node + widget lockstep
+
+A change to `INPUT_TYPES`, a socket, or a widget is dead until `workflows/otr_canonical.json` is updated in the same change.
+
+- APPEND new optional widgets at the END of `widgets_values`. Never insert mid-list.
+- A widget converted to an input keeps its value slot AND gains an `inputs` entry with `"widget": {"name": ...}`.
+- After `INPUT_TYPES` edits, run widget/link regression: `test_widget_value_alignment.py`, `test_canonical_widget_input_parity.py`, `test_workflow_link_target_indexes.py`.
+- Then `python scripts/build_variants.py --all` and `--check`. Do not hand-edit variant JSONs.
+- Do not edit `_otr_model_catalog.py` unless the task is the catalog.

@@ -39,6 +39,7 @@ story_orchestrator only.
 """
 from __future__ import annotations
 
+import dataclasses
 import logging
 import os
 import threading
@@ -551,8 +552,101 @@ def _plan_max_memory(
     contracts they encoded -- no CUDA-keyed plan on a CUDA-less host, and no
     4-bit-sized cap on an unquantized load -- are both satisfied by returning
     ``None`` unconditionally.
+
+    CPU overflow is NOT planned here. A first try with no ``device_map`` lets
+    bitsandbytes place on one device (the 16 GB Gemma 12B NF4 path, and the
+    8 GB Qwen NF4 path that already fits). Overflow is a RETRY after the
+    runtime itself reports accelerator exhaustion -- see
+    ``_cpu_overflow_max_memory`` / ``_is_memory_placement_failure``.
     """
     return None
+
+
+def _cpu_overflow_max_memory(total_vram: float) -> dict:
+    """Physical GPU budget plus a RAM overflow lane. Not a size-tag guess.
+
+    Used only after the underlying loader failed to place on the accelerator.
+    Disk is omitted: OTR does not support disk offload.
+    """
+    gpu = max(1.0, float(total_vram) if total_vram else 1.0)
+    return {0: f"{gpu:.2f}GiB", "cpu": "64GiB"}
+
+
+def _is_memory_placement_failure(exc: BaseException) -> bool:
+    """True when the runtime refused or ran out of accelerator memory.
+
+    This is the loader's own exception after it attempted placement -- not a
+    catalog estimate, not a hardware-tier guess.
+    """
+    if type(exc).__name__ in {"OutOfMemoryError", "CUDAOutOfMemoryError"}:
+        return True
+    msg = str(exc).lower()
+    return any(
+        needle in msg
+        for needle in (
+            "dispatched on the cpu",
+            "dispatched on the disk",
+            "out of memory",
+            "exceed allowed memory",
+            "cuda error: out of memory",
+        )
+    )
+
+
+def _summarize_hf_device_map(model) -> dict[str, Any]:
+    """Truthful post-load placement. An empty map means single-device residency."""
+    dmap = getattr(model, "hf_device_map", None)
+    if not isinstance(dmap, dict) or not dmap:
+        dev = getattr(model, "device", None)
+        return {
+            "mode": "single",
+            "device": str(dev) if dev is not None else "",
+            "cpu_modules": False,
+            "disk_modules": False,
+            "n_modules": 0,
+        }
+    values = [str(v) for v in dmap.values()]
+    cpu_n = sum(1 for v in values if v == "cpu")
+    disk_n = sum(1 for v in values if v == "disk")
+    return {
+        "mode": "hf_device_map",
+        "n_modules": len(dmap),
+        "cpu_modules": cpu_n > 0,
+        "disk_modules": disk_n > 0,
+        "cpu_module_count": cpu_n,
+        "devices": tuple(sorted(set(values))),
+    }
+
+
+def _record_load_placement(
+    model, *, total_vram, quant_policy, actual_quant, cpu_overflow,
+) -> dict[str, Any]:
+    """Log truthful post-load placement. Called from the load_llm return dict."""
+    placement = _summarize_hf_device_map(model)
+    peak_gb = 0.0
+    try:
+        import torch
+        if torch.cuda.is_available():
+            peak_gb = torch.cuda.max_memory_allocated() / (1024 ** 3)
+    except Exception:  # noqa: BLE001 -- telemetry must not fail the load
+        peak_gb = 0.0
+    cpu_used = bool(placement.get("cpu_modules") or cpu_overflow)
+    disk_used = bool(placement.get("disk_modules"))
+    log.info(
+        "[StoryOrchestrator] placement=%s requested_quant=%s "
+        "actual_quantized=%s peak_accelerator_gb=%.2f physical_vram_gb=%.2f "
+        "cpu_overflow=%s disk_offload=%s",
+        placement, quant_policy, actual_quant, peak_gb,
+        float(total_vram or 0.0), cpu_used, disk_used,
+    )
+    return {
+        "placement": placement,
+        "cpu_offload": cpu_used,
+        "disk_offload": disk_used,
+        "peak_accelerator_gb": peak_gb,
+        "physical_vram_gb": float(total_vram or 0.0),
+    }
+
 
 def _bug098_scan_linear4bit_devices(model) -> tuple[int, list[str]]:
     """Model-local BUG-LOCAL-098 check: for every ``bitsandbytes.Linear4bit``
@@ -814,6 +908,25 @@ def _apply_matmul_precision_policy() -> None:
         torch.set_float32_matmul_precision('high')
 
 
+def _policy_with_baked_quant(policy: Any, model_id: str) -> Any:
+    """One Qwen / Gemma pick bakes Quant into the load.
+
+    NVIDIA Qwen and Gemma 12B load NF4. Mac Qwen loads full. A leftover
+    Quant widget is ignored.
+    """
+    from . import _otr_model_catalog as _otr_catalog
+
+    if policy is None:
+        return policy
+    current = getattr(policy, "quant_policy", "")
+    baked = _otr_catalog.effective_quant_policy(
+        model_id, current, device=getattr(policy, "device", ""),
+    )
+    if baked == current:
+        return policy
+    return dataclasses.replace(policy, quant_policy=baked)
+
+
 # ---------------------------------------------------------------------------
 # load_llm -- wraps tuple return into dict
 # ---------------------------------------------------------------------------
@@ -878,6 +991,10 @@ def load_llm(
         # over the legacy `device` kwarg: one source of truth.
         from ._otr_shared.llm_policy import BASELINE_POLICY
         _policy = policy if policy is not None else BASELINE_POLICY
+
+        from . import _otr_model_catalog as _otr_catalog
+        from . import _otr_hf_env as _OTR_HF
+        _policy = _policy_with_baked_quant(_policy, _stripped_model_id)
         device = _policy.device
 
         # S1: quantization is an EXPLICIT policy field. The legacy tag
@@ -886,8 +1003,6 @@ def load_llm(
         # production id was NF4, which is exactly the policy default.
         requested_quantized = _policy.quant_policy in ("bnb_nf4", "bnb_8bit")
 
-        from . import _otr_model_catalog as _otr_catalog
-        from . import _otr_hf_env as _OTR_HF
         _weights_id = _otr_catalog.hf_weights_id(_stripped_model_id)
         _mismatch = _otr_catalog.quant_pick_mismatch(
             _stripped_model_id, _policy.quant_policy
@@ -1257,6 +1372,7 @@ def load_llm(
                     f"{'OTR' if 'key_mapping' in _init_kwargs else 'transformers registry'}"
                 )
 
+            _nf4_cpu_overflow = False
             try:
                 if _native_text_row:
                     model, _native_info = AutoModelForCausalLM.from_pretrained(
@@ -1279,21 +1395,25 @@ def load_llm(
                         config=_init_config,
                         **_init_kwargs,
                     )
-            except ValueError as _dispatch_err:
+            except (ValueError, RuntimeError) as _dispatch_err:
                 # Operator directive 2026-08-29: guards do not kill a render;
                 # an OOM is the only killer. bnb-4bit's validate_environment
                 # REFUSES a load whose device_map plans any CPU module unless
                 # fp32 CPU offload is explicitly permitted -- so a 12B NF4 on
-                # an 8 GB card died on a REFUSAL, not on memory. The 8-bit
-                # branch above already passes llm_int8_enable_fp32_cpu_offload
-                # (the flag covers 4-bit too, despite the int8 name); extend
-                # the same permission here as a LOUD one-shot retry. Resolve
-                # placement before conversion so CPU modules stay unquantized
-                # at load_dtype, while GPU modules use NF4. The flag's int8
-                # name does not guarantee CPU fp32 in the bnb4 implementation.
-                # Anything but this exact refusal re-raises.
-                if not (needs_4bit
-                        and "dispatched on the cpu" in str(_dispatch_err).lower()):
+                # an 8 GB card died on a REFUSAL, not on memory.
+                #
+                # 2026-09-17: the 8 GB Gemma 12B NF4 path never reached that
+                # refusal. Hugging Face auto-download / from_pretrained ran,
+                # then Accelerate raised RuntimeError "Allocation on device 0
+                # would exceed allowed memory" (PyTorch user-supplied memory
+                # fraction). That is a REAL runtime failure, not a catalog
+                # estimate -- but the previous handler only caught ValueError
+                # "dispatched on the cpu", so the OOM was wrapped as
+                # load_llm failed and CPU overflow never ran. Catch the
+                # runtime's own memory-placement exceptions and retry with
+                # an explicit CPU RAM lane. Disk stays disabled. Unrelated
+                # ValueError / RuntimeError still re-raises.
+                if not (needs_4bit and _is_memory_placement_failure(_dispatch_err)):
                     raise
                 log.warning(
                     "[StoryOrchestrator] %s exceeds the GPU budget for a full "
@@ -1304,6 +1424,14 @@ def load_llm(
                 _runtime_log(
                     f"[StoryOrchestrator] NF4 CPU-offload retry active for "
                     f"{_stripped_model_id} (loud degradation, not a kill)")
+                _nf4_cpu_overflow = True
+                try:
+                    import gc as _retry_gc
+                    _retry_gc.collect()
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                except Exception:  # noqa: BLE001 -- best-effort reclaim
+                    pass
                 # BUG-LOCAL-098: fresh BitsAndBytesConfig for the retry --
                 # transformers mutates the instance during from_pretrained.
                 _offload_quant = BitsAndBytesConfig(
@@ -1333,10 +1461,14 @@ def load_llm(
                     _runtime_log(
                         "[StoryOrchestrator] E4B NF4 CPU-offload retry uses the "
                         "native text decoder with strict checkpoint coverage")
+                _retry_max_memory = common_kwargs.get("max_memory")
+                if not (isinstance(_retry_max_memory, dict) and "cpu" in _retry_max_memory):
+                    _retry_max_memory = _cpu_overflow_max_memory(total_vram)
+                _retry_kwargs["max_memory"] = _retry_max_memory
                 _retry_kwargs["device_map"] = _plan_nf4_cpu_offload(
                     _retry_config,
                     load_dtype=load_dtype,
-                    max_memory=common_kwargs.get("max_memory"),
+                    max_memory=_retry_max_memory,
                     attn_impl=attn_impl,
                 )
                 _runtime_log(
@@ -1411,9 +1543,17 @@ def load_llm(
                     f"linear4bit_count={_bug098_linear4bit_count} "
                     f"is_loaded_in_4bit={_bug098_is_loaded_in_4bit} "
                     f"materialized_on_cuda={_bug098_materialized} "
+                    f"cpu_overflow={_nf4_cpu_overflow} "
                     f"vram_delta={_bug098_delta_gib:.2f}GiB (telemetry only)"
                 )
-                if not _bug098_module_signal or not _bug098_materialized:
+                # Silent fp16 fallback is still a hard fail. CPU-resident
+                # Linear4bit after an explicit overflow retry is mixed
+                # placement, not that fallback -- log it, do not kill the load.
+                _bug098_silent_fp16 = not _bug098_module_signal
+                _bug098_unexpected_cpu = (
+                    bool(_bug098_off_cuda) and not _nf4_cpu_overflow
+                )
+                if _bug098_silent_fp16 or _bug098_unexpected_cpu:
                     try:
                         model.cpu()
                     except Exception:  # noqa: BLE001
@@ -1500,6 +1640,17 @@ def load_llm(
             "native_context_capacity": _capacity.native_capacity,
             "context_pin": _context_pin,
             "vram_priced_ctx": None,  # native HF admission prices weights only
+            "placement": (p := _record_load_placement(
+                model,
+                total_vram=total_vram,
+                quant_policy=_policy.quant_policy,
+                actual_quant=actual_quant,
+                cpu_overflow=locals().get("_nf4_cpu_overflow"),
+            ))["placement"],
+            "cpu_offload": p["cpu_offload"],
+            "disk_offload": p["disk_offload"],
+            "peak_accelerator_gb": p["peak_accelerator_gb"],
+            "physical_vram_gb": p["physical_vram_gb"],
         }
     except ModelLoaderError:
         raise
@@ -1803,7 +1954,6 @@ def _assert_policy_admits_vram(
     probe cannot enforce a tier ceiling on a card that is larger than it.
     """
     from . import _otr_model_catalog as _otr_catalog
-    from ._otr_model_inputs import VRAMFitFailedError
 
     if policy.vram_ceiling_gb <= 0:
         log.info(
@@ -1836,15 +1986,21 @@ def _assert_policy_admits_vram(
         gguf_quant=getattr(policy, "gguf_quant", None),
     )
 
-    # FAIL escalates BEFORE any cache reuse, network or disk work. A 70B pick
-    # on a 16 GB card must not trigger snapshot_download or a disk-space
-    # pre-check pass; both waste minutes on a doomed-to-OOM load.
+    # FAIL is a recommendation, not a capability refusal. Hugging Face auto-
+    # download of gemma-4-12b-it already proved the estimator is not the
+    # runtime: the snapshot loads, then Accelerate/PyTorch decides. A 70B
+    # pick may still OOM -- that OOM is the authority. Do not convert the
+    # 1.5x ceiling arithmetic into VRAMFitFailedError.
     if fit_verdict.tier == "FAIL":
-        raise VRAMFitFailedError(
-            f"VRAMFitFailedError: {model_id!r}: {fit_verdict.reason}. "
-            f"ctx_cap={ctx_verdict.tier}@{ctx_verdict.value}",
-            estimated_gb=fit_verdict.estimated_gb,
-            ceiling_gb=fit_verdict.ceiling_gb,
+        log.warning(
+            "[Selector] VRAM-fit estimate FAIL (recommendation only; "
+            "attempting the load): %s ctx_cap=%s@%d estimated=%.1f GB "
+            "ceiling=%.1f GB",
+            fit_verdict.reason,
+            ctx_verdict.tier,
+            ctx_verdict.value,
+            fit_verdict.estimated_gb,
+            fit_verdict.ceiling_gb,
         )
 
     # Combined caution log (everything below PASS/PASS).
@@ -1913,12 +2069,10 @@ def request_slot(
       2. Lane backstop, then the REMOTE dispatch (zero local VRAM; returns).
       3. resolve_context_cap(model_id) -> tiered ContextCapVerdict.
       4. _assert_policy_admits_vram -> check_vram_fit against the POLICY
-         ceiling; FAIL raises VRAMFitFailedError. Steps 3-4 run for every
-         LOCAL lane and run BEFORE every cache read below, because the
-         ceiling is deliberately absent from both reuse keys -- so a
-         cache hit would otherwise inherit the ceiling of whichever
-         request loaded the model first. It also still fires before
-         auto_download, so a 70B-on-16GB pick triggers no network pull.
+         ceiling. FAIL is logged as a recommendation; the load is still
+         attempted. The runtime's own exception is the authority. Steps 3-4
+         still run before every cache read so telemetry sees the request's
+         ceiling even when reuse wins.
       5. GGUF dispatch: reuse on load identity, else load. Returns.
       6. Transformers cache hit (same model_id + same policy cache_key)
          -> return entry; a mismatched cache_key is a teardown, never
@@ -1973,6 +2127,13 @@ def request_slot(
         _hub_root = Path(_otr_hf.ensure_hf_home()) / "hub"
         normalized = _otr_catalog.validate_model_id(model_id, hub_root=_hub_root)
 
+    if isinstance(normalized, str) and _otr_catalog._is_gguf_writer_id(normalized):
+        raise ModelLoaderError(
+            f"{normalized!r} is a retired GGUF writer. Use "
+            "'google/gemma-4-12b-it' (NF4 is baked into that pick)."
+        )
+
+    _policy = _policy_with_baked_quant(_policy, normalized)
     _mismatch = _otr_catalog.quant_pick_mismatch(
         normalized, getattr(_policy, "quant_policy", "")
     )

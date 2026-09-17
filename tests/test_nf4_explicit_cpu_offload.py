@@ -24,6 +24,18 @@ def production_function(name):
     return namespace[name]
 
 
+def _dispatch_retry_handler(handler):
+    if handler.name != "_dispatch_err":
+        return False
+    node = handler.type
+    if isinstance(node, ast.Name) and node.id == "ValueError":
+        return True
+    if isinstance(node, ast.Tuple):
+        names = [elt.id for elt in node.elts if isinstance(elt, ast.Name)]
+        return "ValueError" in names and "RuntimeError" in names
+    return False
+
+
 class ExplicitOffloadTests(unittest.TestCase):
     def setUp(self):
         self.events = []
@@ -99,8 +111,7 @@ class ExplicitOffloadTests(unittest.TestCase):
         """Execute the actual production try/retry boundary, not a replica."""
         load = next(n for n in TREE.body if isinstance(n, ast.FunctionDef) and n.name == "load_llm")
         boundary = next(n for n in ast.walk(load) if isinstance(n, ast.Try) and any(
-            isinstance(h.type, ast.Name) and h.type.id == "ValueError" and h.name == "_dispatch_err"
-            for h in n.handlers))
+            _dispatch_retry_handler(h) for h in n.handlers))
         calls = []
         plans = []
         initial_quant = object()
@@ -124,6 +135,9 @@ class ExplicitOffloadTests(unittest.TestCase):
               "BitsAndBytesConfig": lambda **kw: kw, "torch": SimpleNamespace(bfloat16="bf16"),
               "_plan_nf4_cpu_offload": planner, "_runtime_log": lambda *a: None,
               "log": SimpleNamespace(warning=lambda *a: None),
+              "_is_memory_placement_failure": production_function("_is_memory_placement_failure"),
+              "_cpu_overflow_max_memory": production_function("_cpu_overflow_max_memory"),
+              "total_vram": 8.0,
               # PBUG-20260906-07: "test-model" is not a curated native-text
               # row, so it takes the composite path -- the parent config and
               # a plain copy of common_kwargs, i.e. exactly what this test
@@ -180,6 +194,31 @@ class ExplicitOffloadTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "dispatched on the CPU"):
             exec(code, ns)
         self.assertEqual(plans, [])
+
+        ns["needs_4bit"] = True
+        calls.clear()
+        plans.clear()
+        common.clear()
+        common["quantization_config"] = initial_quant
+
+        def oom_then_ok(*args, **kwargs):
+            calls.append(kwargs)
+            if len(calls) == 1:
+                raise RuntimeError(
+                    "Allocation on device 0 would exceed allowed memory. "
+                    "(out of memory)\nCurrently allocated     : 15.91 GiB\n"
+                    "Device limit            : 8.00 GiB\n"
+                    "PyTorch limit (set by user-supplied memory fraction)"
+                )
+            return token_model
+
+        ns["AutoModelForCausalLM"] = SimpleNamespace(from_pretrained=oom_then_ok)
+        run()
+        self.assertEqual(len(calls), 2)
+        self.assertEqual(calls[1]["device_map"], self.placement)
+        self.assertEqual(calls[1]["max_memory"], {0: "8.00GiB", "cpu": "64GiB"})
+        self.assertTrue(calls[1]["quantization_config"]["llm_int8_enable_fp32_cpu_offload"])
+        self.assertEqual(len(plans), 1)
 
     def test_8gb_and_5080_budget_and_device_selection_stay_hardware_scoped(self):
         """Run the real selection branches for NF4, without importing a GPU stack."""

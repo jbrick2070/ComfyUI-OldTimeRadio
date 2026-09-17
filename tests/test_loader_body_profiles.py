@@ -179,7 +179,9 @@ def test_load_llm_returns_cache_entry_dict_shape():
         if isinstance(key_node, ast.Constant) and isinstance(key_node.value, str):
             keys.add(key_node.value)
     expected = {"model", "tokenizer", "model_id", "device", "quantized", "context_cap",
-                "context_capacity_source", "native_context_capacity", "context_pin", "vram_priced_ctx"}
+                "context_capacity_source", "native_context_capacity", "context_pin",
+                "vram_priced_ctx", "placement", "cpu_offload", "disk_offload",
+                "peak_accelerator_gb", "physical_vram_gb"}
     assert keys == expected, (
         f"cache_entry keys drifted from the documented contract. "
         f"Expected {sorted(expected)}, got {sorted(keys)}."

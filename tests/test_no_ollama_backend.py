@@ -62,9 +62,5 @@ def test_hf_and_gguf_gemma_12b_rows_are_explicit_peers():
     assert hf_row.requires_auth is False
     assert hf_row.vram_fit_tier == "PASS"
     assert hf_row.context_window == 8192
-    if not ggf.GGUF_ROWS:
-        assert "unsloth/gemma-4-12b-it-GGUF" not in ids
-        return
-    gguf_row = ids["unsloth/gemma-4-12b-it-GGUF"]
-    assert gguf_row.loader_backend == "gguf_native"
-    assert gguf_row.provider == "gguf_native"
+    assert "unsloth/gemma-4-12b-it-GGUF" not in ids
+    assert not ggf.GGUF_ROWS

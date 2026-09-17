@@ -5,12 +5,10 @@ inside llama_init_from_model, reproduced at n_gpu_layers=0 -- so the fault is
 in the CPU backend and no GPU avoids it. 0.3.33 loads and generates, and the
 two builds were confirmed byte-identical across two machines by SHA-256.
 
-THE LANE NO LONGER SHIPS A WRITER ROW (operator directive 2026-09-06, recorded
-at nodes/_otr_gguf_backend.py: `GGUF_ROWS = ()`). `_gguf_native_virtual_rows()`
-returns nothing and no *-GGUF model reaches the writer dropdown. The reason is
-the AUTO-DOWNLOAD: a GGUF row pulls multi-GB weights on its own initiative,
-which is the pack reaching for the network and the disk without the user having
-chosen it.
+THE LANE NO LONGER SHIPS A WRITER ROW (operator directive 2026-09-06,
+hardened 2026-09-17). `GGUF_ROWS = ()`, the catalog does not inject a
+peer, and `validate_model_id` rejects `*-GGUF` / `*.gguf` writer ids.
+No *-GGUF model reaches the writer dropdown.
 
 So the two README assertions that used to live here are GONE. bd106b06
 deleted that README section on purpose, and re-adding it would document an

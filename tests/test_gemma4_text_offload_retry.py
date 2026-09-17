@@ -30,7 +30,8 @@ def stdlib_import(name, globals=None, locals=None, fromlist=(), level=0):
 def production_namespace():
     tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
     names = ("ModelLoaderError", "_e4b_text_offload_config",
-             "_validate_e4b_text_loading_info")
+             "_validate_e4b_text_loading_info",
+             "_is_memory_placement_failure", "_cpu_overflow_max_memory")
     nodes = []
     for name in names:
         matches = [node for node in tree.body
@@ -43,12 +44,23 @@ def production_namespace():
     return tree, namespace
 
 
+def _dispatch_retry_handler(handler):
+    if handler.name != "_dispatch_err":
+        return False
+    node = handler.type
+    if isinstance(node, ast.Name) and node.id == "ValueError":
+        return True
+    if isinstance(node, ast.Tuple):
+        return any(isinstance(elt, ast.Name) and elt.id == "ValueError"
+                   for elt in node.elts)
+    return False
+
+
 def real_retry_boundary(tree):
     load = next(node for node in tree.body
                 if isinstance(node, ast.FunctionDef) and node.name == "load_llm")
     matches = [node for node in ast.walk(load) if isinstance(node, ast.Try) and any(
-        isinstance(handler.type, ast.Name) and handler.type.id == "ValueError"
-        and handler.name == "_dispatch_err" for handler in node.handlers)]
+        _dispatch_retry_handler(handler) for handler in node.handlers)]
     if len(matches) != 1:
         raise AssertionError("Expected one real NF4 dispatch-refusal retry boundary")
     return compile(ast.Module(body=matches, type_ignores=[]), str(SOURCE), "exec")
@@ -275,6 +287,7 @@ class E4BRetryBoundaryTests(unittest.TestCase):
             "_init_config": self.config,
             "_init_kwargs": dict(self.common),
             "_validate_native_text_loading_info": native_validate,
+            "total_vram": 8.0,
         })
 
     def execute(self):
@@ -382,7 +395,7 @@ class E4BRetryBoundaryTests(unittest.TestCase):
         self.assertEqual(self.validation_calls, [])
 
     def test_other_first_load_errors_propagate_without_retry(self):
-        for error in (ValueError("unrelated config failure"), RuntimeError("CUDA out of memory"),
+        for error in (ValueError("unrelated config failure"),
                       OSError("checkpoint unreadable")):
             self.calls.clear()
             self.failure = error
@@ -392,6 +405,17 @@ class E4BRetryBoundaryTests(unittest.TestCase):
             self.assertEqual(len(self.calls), 1)
             self.assertEqual(self.plans, [])
             self.assertEqual(self.validation_calls, [])
+
+    def test_cuda_oom_retries_with_cpu_overflow(self):
+        """The 8 GB Gemma NF4 failure is a RuntimeError from Accelerate, not
+        ValueError dispatched-on-cpu. That must retry, not wrap as load_llm
+        failed before overflow is attempted."""
+        self.failure = RuntimeError(
+            "Allocation on device 0 would exceed allowed memory. (out of memory)"
+        )
+        self.execute()
+        self.assertEqual(len(self.calls), 2)
+        self.assertEqual(len(self.plans), 1)
 
     def test_invalid_text_config_stops_before_planning_or_second_load(self):
         self.config.text_config.tie_word_embeddings = False

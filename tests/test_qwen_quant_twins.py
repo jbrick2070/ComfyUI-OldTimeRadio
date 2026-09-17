@@ -1,9 +1,7 @@
-"""Two Qwen 3.5 dropdown identities -- NF4 vs full -- must stay honest.
+"""One Qwen identity -- Quant is baked from the machine, not a twin.
 
-A single Hugging Face snapshot cannot wear both ``nv8`` (the NF4 load) and
-Quant ``none`` (canonical / Mac). The picker therefore carries two ids that
-survive ``_strip_label_suffix``. Users can still pick Gemma, Llama, a
-cache-discovered CausalLM, or a cloud slot; those rows do not own Quant.
+NVIDIA/cuda loads NF4; Mac/CPU loads full. The retired ``:nf4`` spelling
+still validates onto the same row. Gemma 4 12B bakes NF4 with one identity.
 """
 from __future__ import annotations
 
@@ -11,76 +9,98 @@ import pytest
 
 from nodes import _otr_model_catalog as catalog
 from nodes._otr_loader_backends import chat_template_kwargs
-from nodes._otr_model_loader import ModelLoaderError, request_slot
+from nodes._otr_model_loader import request_slot
 from nodes._otr_shared import llm_policy as lp
 from nodes._otr_workflow_apply import _llm_option_value
 
 
-def test_the_two_qwen_ids_do_not_collapse_under_strip():
+def test_retired_nf4_spelling_collapses_to_the_one_qwen():
     full = catalog.DEFAULT_LLM
     nf4 = catalog.DEFAULT_LLM_NF4
     assert full != nf4
-    assert catalog._strip_label_suffix(full + catalog.vram_badge_for(full)) == full
-    assert catalog._strip_label_suffix(nf4 + catalog.vram_badge_for(nf4)) == nf4
+    assert catalog._canonical_qwen_id(nf4) == full
+    assert catalog._canonical_qwen_id(nf4 + catalog.vram_badge_for(full)) == full
     assert catalog.hf_weights_id(full) == "Qwen/Qwen3.5-4B"
     assert catalog.hf_weights_id(nf4) == "Qwen/Qwen3.5-4B"
 
 
-def test_fit_tags_tell_the_truth():
-    full_tags = catalog.fit_tags_for(catalog.DEFAULT_LLM)
-    nf4_tags = catalog.fit_tags_for(catalog.DEFAULT_LLM_NF4)
-    assert "nv8" not in full_tags
-    assert "mac16-tight" in full_tags or "mac16" in full_tags
-    assert "nv16" in full_tags and "nv24" in full_tags
-    assert "nv8" in nf4_tags
-    assert "nv16" in nf4_tags and "nv24" in nf4_tags
-    assert not any(t.startswith("mac16") for t in nf4_tags)
+def test_one_qwen_fit_tags_cover_nv8_and_mac():
+    tags = catalog.fit_tags_for(catalog.DEFAULT_LLM)
+    assert "nv8" in tags
+    assert "nv16" in tags and "nv24" in tags
+    assert "mac16-tight" in tags or "mac16" in tags
+    # Retired :nf4 spelling aliases onto the same curated row.
+    assert catalog.fit_tags_for(catalog.DEFAULT_LLM_NF4) == tags
 
 
-def test_resident_estimate_follows_the_pick():
-    full = catalog._estimate_resident_gb(catalog.DEFAULT_LLM)
-    nf4 = catalog._estimate_resident_gb(catalog.DEFAULT_LLM_NF4)
-    assert full == pytest.approx(8.68, abs=0.05)
-    assert nf4 == pytest.approx(4.34, abs=0.05)
+def test_resident_estimate_is_the_nf4_half_for_platform_qwen():
+    est = catalog._estimate_resident_gb(catalog.DEFAULT_LLM)
+    assert est == pytest.approx(4.34, abs=0.05)
+    assert catalog._estimate_resident_gb(catalog.DEFAULT_LLM_NF4) == est
 
 
-def test_resolve_pick_for_quant_maps_the_family_not_gemma():
+def test_resolve_pick_keeps_the_one_qwen_for_any_quant_widget():
     assert catalog.resolve_pick_for_quant(
-        catalog.DEFAULT_LLM, "bnb_nf4"
-    ) == catalog.DEFAULT_LLM_NF4
-    assert catalog.resolve_pick_for_quant(
-        catalog.DEFAULT_LLM_NF4, "none"
+        catalog.DEFAULT_LLM, "bnb_nf4",
     ) == catalog.DEFAULT_LLM
     assert catalog.resolve_pick_for_quant(
-        "google/gemma-4-12b-it", "bnb_nf4"
+        catalog.DEFAULT_LLM, "none",
+    ) == catalog.DEFAULT_LLM
+    assert catalog.resolve_pick_for_quant(
+        "google/gemma-4-12b-it", "bnb_nf4",
     ) == "google/gemma-4-12b-it"
 
 
-def test_mismatch_fails_loud_only_when_the_pick_owns_quant():
-    assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM, "bnb_nf4")
-    assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM_NF4, "none")
+def test_mismatch_does_not_crash_a_leftover_quant_widget():
+    assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM, "bnb_nf4") is None
+    assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM_NF4, "none") is None
     assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM, "none") is None
-    assert catalog.quant_pick_mismatch(catalog.DEFAULT_LLM_NF4, "bnb_nf4") is None
     assert catalog.quant_pick_mismatch("google/gemma-4-12b-it", "none") is None
 
 
-def test_chat_template_kwargs_fire_for_both_identities():
+def test_platform_and_gemma_bake_quant_from_the_pick():
+    assert catalog.effective_quant_policy(
+        "google/gemma-4-12b-it", "none",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        "google/gemma-4-12b-it (23.9 GB, nv16 nv24)", "none",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        "google/gemma-4-12b-it", "bnb_8bit",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "none", device="cuda",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "bnb_nf4", device="cuda",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM_NF4, "none", device="cuda",
+    ) == "bnb_nf4"
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "bnb_nf4", device="cpu",
+    ) == "none"
+    assert catalog.effective_quant_policy(
+        catalog.DEFAULT_LLM, "none", device="mps",
+    ) == "none"
+
+
+def test_chat_template_kwargs_fire_for_the_one_qwen():
     assert chat_template_kwargs(catalog.DEFAULT_LLM) == {"enable_thinking": False}
-    assert chat_template_kwargs(catalog.DEFAULT_LLM_NF4) == {"enable_thinking": False}
-    assert chat_template_kwargs(catalog.DEFAULT_LLM_NF4 + catalog.vram_badge_for(
-        catalog.DEFAULT_LLM_NF4
-    )) == {"enable_thinking": False}
+    assert chat_template_kwargs(catalog.DEFAULT_LLM_NF4) == {
+        "enable_thinking": False,
+    }
     assert chat_template_kwargs("google/gemma-4-12b-it") == {}
 
 
-def test_fresh_node_default_is_the_nf4_pick():
-    assert catalog.fresh_llm_option().startswith(catalog.DEFAULT_LLM_NF4 + " (")
-    assert catalog.default_llm_option().startswith(catalog.DEFAULT_LLM + " (")
-    assert "nv8" not in catalog.default_llm_option()
+def test_fresh_and_default_llm_options_are_the_one_qwen():
+    assert catalog.fresh_llm_option() == catalog.default_llm_option()
+    assert catalog.fresh_llm_option().startswith(catalog.DEFAULT_LLM + " (")
     assert "nv8" in catalog.fresh_llm_option()
+    assert catalog.DEFAULT_LLM_NF4 not in catalog.dropdown_choices()
 
 
-def test_applier_composes_profile_family_plus_quant():
+def test_applier_keeps_the_one_qwen_for_any_profile_quant():
     schemas = {
         "OTR_LedgerScriptWriter": {
             "input": {
@@ -107,18 +127,54 @@ def test_applier_composes_profile_family_plus_quant():
         schemas,
         quant_policy="none",
     )
-    assert catalog._strip_label_suffix(nf4_label) == catalog.DEFAULT_LLM_NF4
+    assert catalog._strip_label_suffix(nf4_label) == catalog.DEFAULT_LLM
     assert catalog._strip_label_suffix(full_label) == catalog.DEFAULT_LLM
 
 
-def test_request_slot_refuses_full_pick_with_nf4_quant(monkeypatch):
-    def forbidden(*args, **kwargs):
-        raise AssertionError("mismatch must fail before load")
+@pytest.mark.parametrize(
+    "model_id,stale,baked",
+    [
+        ("google/gemma-4-12b-it", "none", "bnb_nf4"),
+        (catalog.DEFAULT_LLM_NF4, "none", "bnb_nf4"),
+        (catalog.DEFAULT_LLM, "none", "bnb_nf4"),
+        (catalog.DEFAULT_LLM, "bnb_nf4", "bnb_nf4"),
+    ],
+)
+def test_request_slot_bakes_quant_from_the_pick(monkeypatch, model_id, stale, baked):
+    from nodes import _otr_model_loader as loader
 
-    monkeypatch.setattr("nodes._otr_model_loader.load_llm", forbidden)
-    with pytest.raises(ModelLoaderError, match="owns the load|matching Qwen"):
-        request_slot(
+    seen = {}
+
+    def capture_load(mid, **kwargs):
+        seen["model_id"] = mid
+        seen["policy"] = kwargs.get("policy")
+        return {
+            "model": object(),
+            "tokenizer": object(),
+            "model_id": mid,
+        }
+
+    monkeypatch.setattr(loader, "load_llm", capture_load)
+    monkeypatch.setattr(
+        loader, "_require_transformers_model_support", lambda *_a, **_k: None,
+    )
+    monkeypatch.setattr(
+        catalog, "auto_download_if_missing", lambda *_a, **_k: None,
+    )
+    loader.LLM_CACHE.update({
+        "model_id": None, "slot": None, "cache_entry": None,
+    })
+    try:
+        entry = request_slot(
             "creative",
-            catalog.DEFAULT_LLM,
-            policy=lp.LLMRuntimePolicy(vram_ceiling_gb=0),
+            model_id,
+            policy=lp.LLMRuntimePolicy(vram_ceiling_gb=0, quant_policy=stale),
         )
+    finally:
+        loader.LLM_CACHE.update({
+            "model_id": None, "slot": None, "cache_entry": None,
+        })
+    assert entry["model_id"] == catalog._canonical_qwen_id(
+        catalog._strip_label_suffix(model_id),
+    )
+    assert seen["policy"].quant_policy == baked

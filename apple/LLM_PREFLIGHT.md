@@ -44,10 +44,10 @@ ceiling for your hardware.
 5. **An uncurated id has no fit tags.** Curated labels look like
    `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)`. A cache-discovered id is
    the bare `org/name`. Do not infer tags for it.
-6. **Set Quant yourself** unless you picked one of the two Qwen identities.
-   Those two own Quant: NF4 is `bnb_nf4`, full is `none`. A mismatch fails
-   loud on purpose. Every other pick still uses the Quant widget -- Gemma,
-   Llama, your cache folder, a cloud handle.
+6. **Set Quant yourself** unless you picked a row that owns it. The two
+   Qwen identities own Quant (NF4 is `bnb_nf4`, full is `none`). Gemma 4
+   12B also owns `bnb_nf4`. A mismatch fails loud on purpose. Llama,
+   Gemma-2, your cache folder, and cloud handles still use the Quant widget.
 7. **Keep both writer slots on the same id** unless you mean to swap two
    models in and out of VRAM all run.
 8. **The technical slot has to emit JSON the pipeline can parse.** Beautiful
@@ -130,12 +130,13 @@ weights.
 `license_audit_status` on anything the canonical graph binds must be
 `mit_equivalent`.
 
-### Do not add a GGUF writer because a transformers twin exists
+### Do not add a GGUF writer
 
-The writer GGUF registry is empty for that reason. If you only have a GGUF
-on disk and no Hugging Face snapshot, that is your machine -- cache a
-CausalLM or pick what is already in the list. Do not restore `GGUF_ROWS` to
-document a second copy of Qwen.
+The writer GGUF identity is gone from the catalog, the COMBO,
+`validate_model_id`, auto-download, and `request_slot`. Restoring
+`GGUF_ROWS` does not put one back. If you only have a GGUF on disk and no
+Hugging Face snapshot, cache a CausalLM or pick what is already in the
+list. Video-engine GGUF UNets are a different dropdown.
 
 ### If it becomes a shipped default
 

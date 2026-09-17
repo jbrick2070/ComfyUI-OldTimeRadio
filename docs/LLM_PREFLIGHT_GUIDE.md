@@ -9,5 +9,5 @@ add-your-own pages:
 the field contract, and the split between "a user can pick anything" and
 "what this pack ships" are there.
 
-Do not restore a GGUF writer path here. Writer `GGUF_ROWS` is empty because a
-transformers twin exists. Video-engine GGUF is a different dropdown.
+Do not restore a GGUF writer path here. Writer GGUF ids are rejected in
+the catalog. Video-engine GGUF is a different dropdown.

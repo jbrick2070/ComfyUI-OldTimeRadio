@@ -1,0 +1,18 @@
+---
+description: OTR review routing — match depth to design, one CLI/contrarian, two-strikes panel
+alwaysApply: true
+---
+
+# Review routing
+
+Is there a design choice with more than one defensible answer?
+
+- **YES** (new capability, schema/ledger, canonical workflow, reasonable disagreement) -> full four-round kibitz (`kibitz-plugin:kibitz`) BEFORE code. Unsure = YES.
+- **NO** (grep-and-fix, rename, wiring conformance, one right answer) -> no arc. One independent reviewer on the finished diff is enough if it returns clean and you ground it against the real files.
+- **Floor on every coding change:** one independent reviewer before push. A self-review does not count.
+- **This window is Cursor.** Do not run `cursor-agent -p` as that reviewer -- same family. Spawn **Composer QA** (Task, Composer, briefed to REFUTE). If a CLI lane is needed, send it to **agy** (`agy -p='...' --dangerously-skip-permissions`) or `codex exec`. Ground the result against the real files. Operator 2026-09-17; also in `CLAUDE.md`.
+- Every round ends with a contrarian briefed to REFUTE. Default REFUTED when ungrounded.
+- Two strikes: if the same bug survives two of your fixes, panel before a third attempt.
+- File-grounded reviewers from a **different** family than the driver. Do not spend Fable on mechanical diffs.
+- A missing reviewer never blocks the work — substitute and say who actually ran.
+- After adding a function, grep `nodes/` for a production caller. No caller = wire it now or write the waiting row.

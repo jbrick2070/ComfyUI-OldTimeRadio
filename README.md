@@ -431,10 +431,10 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
 | **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | z_image_turbo | none | nothing | shipping |
-| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | z_image_turbo | manual | ComfyUI-GGUF | shipping |
-| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | z_image_turbo | manual | ComfyUI-GGUF | shipping |
-| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | z_image_turbo | manual | ComfyUI-GGUF | shipping |
+| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_cpu / still_motion | lumina_image | none | nothing | shipping |
+| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | lumina_image | manual | ComfyUI-GGUF | shipping |
+| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | lumina_image | manual | ComfyUI-GGUF | shipping |
+| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | lumina_image | manual | ComfyUI-GGUF | shipping |
 | **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
 ### Apple Silicon, 16 GB
@@ -494,9 +494,9 @@ hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
 has published 11 documented full OTR episodes through this pack; the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
-ComfyUI started in `--cpu` mode, the card present and unused. `draft` is the one
-mark left, on the AMD graph, and it means what it says: cut from the same source
-as the rest, with no receipts. What each machine class runs, engine by engine,
+ComfyUI started in `--cpu` mode, the card present and unused. `draft` means
+cut from the same source with no receipts: the AMD stills graph. What each
+machine class runs, engine by engine,
 is in [apple/MACHINES.md](apple/MACHINES.md).
 
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a

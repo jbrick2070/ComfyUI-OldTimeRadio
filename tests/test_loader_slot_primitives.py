@@ -15,7 +15,6 @@ import pytest
 
 from nodes import _otr_model_catalog as catalog
 from nodes import _otr_model_loader as loader
-from nodes._otr_model_inputs import VRAMFitFailedError
 
 
 # ---------------------------------------------------------------------------
@@ -340,9 +339,9 @@ def test_request_slot_rejects_unknown_slot_name():
 
 def test_request_slot_creative_loads_default_llm():
     entry = loader.request_slot("creative", catalog.DEFAULT_LLM_NF4)
-    assert entry["model_id"] == catalog.DEFAULT_LLM_NF4
+    assert entry["model_id"] == catalog.DEFAULT_LLM
     assert loader.LLM_CACHE["slot"] == "creative"
-    assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM_NF4
+    assert loader.LLM_CACHE["model_id"] == catalog.DEFAULT_LLM
 
 
 def test_request_slot_uses_ported_body():
@@ -623,13 +622,11 @@ def test_load_failure_cleanup_does_not_tear_down_a_foreign_live_entry(monkeypatc
     assert loader.LLM_CACHE.get("model_id") == "test/foreign-model"
 
 
-def test_request_slot_oversized_fails_before_download(monkeypatch):
-    """B1d: VRAMFitFailedError must fire BEFORE auto_download_if_missing
-    so a 70B-on-16GB pick never triggers a network pull or disk-space
-    pre-check pass on a doomed-to-OOM load. Asserts both the exception
-    type and the order-of-operations (download never called).
-    """
+def test_request_slot_oversized_still_attempts_the_load(monkeypatch):
+    """B1d inverted 2026-09-17: a FAIL VRAM estimate must not block
+    auto_download or load_llm. The runtime is the authority."""
     download_calls: list[str] = []
+    load_calls: list[str] = []
 
     def counting_auto_download(repo_id, **kw):
         download_calls.append(repo_id)
@@ -638,12 +635,17 @@ def test_request_slot_oversized_fails_before_download(monkeypatch):
     monkeypatch.setattr(
         catalog, "auto_download_if_missing", counting_auto_download
     )
+    monkeypatch.setattr(
+        loader, "_require_transformers_model_support", lambda mid: None,
+    )
 
-    with pytest.raises(VRAMFitFailedError) as exc:
-        loader.request_slot("creative", catalog.TEST_OVERSIZED_LLM)
+    def _fake_load_llm(mid, **kwargs):
+        load_calls.append(mid)
+        return {"model_id": mid, "model": object(), "context_cap": 4096}
 
-    # FAIL fired before any download / disk-space pre-check.
-    assert download_calls == []
-    # SPECIAL pins TEST_OVERSIZED_LLM at 42 GB resident.
-    assert exc.value.estimated_gb >= 30
-    assert "pick a smaller model" in str(exc.value).lower()
+    monkeypatch.setattr(loader, "load_llm", _fake_load_llm)
+
+    entry = loader.request_slot("creative", catalog.TEST_OVERSIZED_LLM)
+    assert entry["model_id"] == catalog.TEST_OVERSIZED_LLM
+    assert download_calls == [catalog.TEST_OVERSIZED_LLM]
+    assert load_calls == [catalog.TEST_OVERSIZED_LLM]

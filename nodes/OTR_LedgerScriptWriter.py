@@ -516,6 +516,19 @@ def _preflight_llm_selection(
     """
     from . import _otr_gguf_backend as _gguf
 
+    resolved_device = _OTR_DEVICE_OPTIONS.resolve_device(
+        llm_device, fallback="cuda",
+    )
+    cre_q = _otr_model_catalog.effective_quant_policy(
+        str(creative_writing_model), str(llm_quant_policy),
+        device=resolved_device,
+    )
+    tec_q = _otr_model_catalog.effective_quant_policy(
+        str(technical_model), str(llm_quant_policy),
+        device=resolved_device,
+    )
+    baked_quant = cre_q if cre_q == tec_q else str(llm_quant_policy)
+
     policy = _llm_policy.LLMRuntimePolicy(
         # RESOLVED BEFORE THE POLICY IS BUILT, and the order matters
         # (2026-09-12). The widget may now say "default" or "gpu:N" -- ComfyUI's
@@ -525,9 +538,9 @@ def _preflight_llm_selection(
         # "default" there would let two physically different devices collide
         # under one key and silently reuse a resident model across them.
         # Resolving here keeps the policy honest and the ledger truthful.
-        device=_OTR_DEVICE_OPTIONS.resolve_device(llm_device, fallback="cuda"),
+        device=resolved_device,
         attn_impl=str(llm_attn_impl),
-        quant_policy=str(llm_quant_policy),
+        quant_policy=baked_quant,
         vram_ceiling_gb=float(llm_vram_ceiling_gb),
         gguf_n_ctx=int(gguf_n_ctx),
         gguf_quant=str(gguf_quant),

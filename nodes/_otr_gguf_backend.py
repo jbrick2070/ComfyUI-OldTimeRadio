@@ -317,12 +317,15 @@ class GGUFRow:
 # sha=None slot onto every gemma quant here, which silently discarded any
 # sha the table might carry (A6).
 GGUF_ROWS: tuple[GGUFRow, ...] = ()
-"""NO GGUF WRITER ROWS SHIP. Operator directive 2026-09-06.
+"""NO GGUF WRITER ROWS SHIP. Operator directive 2026-09-06, hardened
+2026-09-17: the writer GGUF identity is also gone from the catalog,
+the COMBO, validate_model_id, auto_download, and request_slot. Restoring
+this tuple does not put a GGUF back in the picker.
 
 The lane's machinery is retained -- GGUFRow, the registry validators and
 `_models_root` (which the video and audio engines import for path resolution,
-nothing to do with LLMs) -- but no row is offered, so `gguf_native` peers no
-longer reach the writer dropdown.
+nothing to do with LLMs) -- but no writer row is offered. Image/video GGUF
+weight files (Foley, mime, Klein, LTX, Wan) do not live in this tuple.
 
 WHY, in the operator's framing: "think about the friction for the average
 user", and "the less friction we have in LLMs the better". A GGUF writer row

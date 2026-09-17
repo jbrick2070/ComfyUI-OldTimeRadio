@@ -30,6 +30,18 @@ HELPERS = (
 )
 
 
+def _dispatch_retry_handler(handler):
+    if handler.name != "_dispatch_err":
+        return False
+    node = handler.type
+    if isinstance(node, ast.Name) and node.id == "ValueError":
+        return True
+    if isinstance(node, ast.Tuple):
+        return any(isinstance(elt, ast.Name) and elt.id == "ValueError"
+                   for elt in node.elts)
+    return False
+
+
 def stdlib_import(name, *args, **kwargs):
     """Allow only the stdlib copy this module actually needs."""
     if name.split(".")[0] not in {"copy"}:
@@ -194,7 +206,7 @@ class CatalogOptInTests(unittest.TestCase):
             if row.text_only_load == "native_text_decoder")
         self.assertEqual(
             opted,
-            ["Qwen/Qwen3.5-4B", "Qwen/Qwen3.5-4B:nf4", "google/gemma-4-E2B-it"],
+            ["Qwen/Qwen3.5-4B", "google/gemma-4-E2B-it"],
         )
 
     def test_the_16gb_canonical_writer_is_not_opted_in(self):
@@ -247,8 +259,7 @@ class NativeTextBoundaryTests(unittest.TestCase):
         load = next(n for n in TREE.body
                     if isinstance(n, ast.FunctionDef) and n.name == "load_llm")
         boundary = [n for n in ast.walk(load) if isinstance(n, ast.Try) and any(
-            isinstance(h.type, ast.Name) and h.type.id == "ValueError"
-            and h.name == "_dispatch_err" for h in n.handlers)]
+            _dispatch_retry_handler(h) for h in n.handlers)]
         self.assertEqual(
             len(boundary), 1, "expected exactly one dispatch-refusal boundary")
         self.code = compile(
@@ -297,6 +308,16 @@ class NativeTextBoundaryTests(unittest.TestCase):
             "_native_text_row": True,
             "_init_config": self.text_config,
             "_init_kwargs": self.init_kwargs,
+            "_is_memory_placement_failure": lambda exc: (
+                "dispatched on the cpu" in str(exc).lower()
+                or "out of memory" in str(exc).lower()
+                or "exceed allowed memory" in str(exc).lower()
+            ),
+            "_cpu_overflow_max_memory": lambda vram: {
+                0: f"{max(1.0, float(vram) if vram else 1.0):.2f}GiB",
+                "cpu": "64GiB",
+            },
+            "total_vram": 8.0,
         }
 
     def test_initial_load_uses_the_text_config_and_validates_coverage(self):

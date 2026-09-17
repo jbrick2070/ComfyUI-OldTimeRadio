@@ -54,13 +54,12 @@ class InsufficientDiskSpaceError(RuntimeError):
 
 
 class VRAMFitFailedError(RuntimeError):
-    """Raised by request_slot when check_vram_fit returns a FAIL verdict
-    (e.g. 70B-on-16GB). The model would OOM at load; the user gets a
-    pre-load failure with estimated-vs-ceiling reason instead of an
-    opaque CUDA error at first generation token.
+    """Historical admission error for a check_vram_fit FAIL verdict.
 
-    Carries verdict + reason; callers can str() it for the recovery
-    message or inspect .estimated_gb / .ceiling_gb attributes if needed.
+    2026-09-17: request_slot no longer raises this. A FAIL estimate is a
+    recommendation / qualification signal, not a capability refusal. The
+    class remains so older tests and log greps still resolve, and so a
+    caller that constructs it by hand keeps a stable type.
     """
 
     def __init__(self, message: str, *, estimated_gb: float = 0.0, ceiling_gb: float = 0.0):
