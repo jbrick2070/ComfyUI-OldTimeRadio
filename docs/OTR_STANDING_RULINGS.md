@@ -22,6 +22,49 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-18 -- every lane is eligible for the episode language
+
+Operator, on learning that only the inline writer had been wired and that the
+seven non-English rows refused `shakespeare` and `public_domain`: *"every lane
+should be eligible for language, that was my mistake"*; on the fidelity lanes,
+*"if it is an English source, translation is necessary ... I said I didn't
+want translate but we have to"*; on My Story, *"it can write the story in the
+native language from the My Story prompt in English"*; on SciFi News Pro,
+*"all it has to say is: based on this news story, write spine and dialogue in
+ZZ language. The story itself is not translated, only the new story."*
+
+What that fixes, lane by lane:
+
+- **Original / inline banks, My Story, SciFi News Pro, media_archive** --
+  AUTHOR natively. The row's `writer_instruction` leads the system message of
+  every pass whose output is spoken or displayed (composer, exchange, repairs,
+  title fallback; My Story treatment, acts, frame and its source-rewrite
+  fidelity pass; SciFi pitch, treatment, script, closing news read, spoken
+  cast labels). Internal receipts -- My Story interpretation, SciFi dossier
+  extraction, voice casting, judges, act summaries -- stay as they are.
+  A source the listener typed, or a news story, is not translated; the new
+  story is written in the language.
+- **Shakespeare / Public Domain** -- the author's own passages are English
+  and no model authors them, so "eligible" means TRANSLATION of the verbatim
+  passage into the episode language. This is the one place the older "never
+  translate an English draft" line does not apply, and it is a separate code
+  row (see GO_FORWARD). Until it lands the two banks keep their exclusion.
+- English and `Off` stay byte-identical on every seam. Captions stay
+  `line.text`. `ANNOUNCER` stays the identity key. No caption-language widget.
+
+Parked idea from the same exchange: native-language science feeds for SciFi
+News Pro (*"even better if we can find some foreign RSS feeds"*). A section-1
+fork, not a code row.
+
+## 2026-09-17 -- 1080 is Lanczos on the standard OTR composite
+
+Operator: basic plus standard. True 1080 is the standard OTR file, via
+ffmpeg Lanczos on `OTR_SilentComposite` (`upscale_engine=off`, canvas
+1920x1080). Every shipping graph already publishes that. Do not generate
+Veo at 1080p or 4K. Do not add a third upscale engine. ESRGAN stays the
+opt-in model. After the render is done, Basic is the cheap generate;
+Standard is the Lanczos 1920x1080 episode. See `apple/UPSCALERS.md`.
+
 ## 2026-09-17 -- story and music are closed; public graphs go non-GGUF; test wave last
 
 Operator: *"DUMP THAT IM FINE WITH THE STORY AS IS MUSIC AS IT IS ITS GREAT

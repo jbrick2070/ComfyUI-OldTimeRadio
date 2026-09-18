@@ -1,3 +1,57 @@
+## 2026-09-18 -- CODE 1 closed: character lines author natively on every lane
+
+Did: Landed the native-authoring pile in three commits on `main`. Pile B
+  first (My Story alias `set_line_text_metrics`, music-pin test, working
+  gate script + test; staged by alias-only hunk so the lane wiring in the
+  same file stayed out of it). Then pile A: the row-owned
+  `writer_instruction` leads the SYSTEM message of every production call
+  whose output is spoken or displayed -- inline writer (composer + retry,
+  exchange, cast-coverage repair, ledger-clean F2 / stage-business, cleanup
+  title), My Story (treatment, acts, frame, source-rewrite fidelity pass),
+  SciFi News Pro (pitch, treatment, script, closing read, spoken cast
+  labels). Internal receipts untouched. New leaves in
+  `_otr_episode_languages`: `native_authoring_instruction`,
+  `title_language_instruction`, `lead_system`. English/Off byte-identical.
+  Then this docs chunk: standing ruling 2026-09-18 (every lane eligible;
+  English-source lanes translate; My Story authors natively from an English
+  prompt; SciFi's news source is not translated), GO_FORWARD rows.
+  Operator rulings this window, in his words: *"every lane should be
+  eligible for language, that was my mistake"*; *"if it is an English
+  source translation is necessary"*; *"you be the main judge"* on the
+  Shakespeare panel, Grok via CLI as the contrarian.
+Found in review, not by the author: BOTH round-1 refuters (cursor-agent,
+  Sonnet 5) flagged that the two dispatched lanes never read `canon_header`
+  and still authored English. That is why the pile grew from 14 files to
+  20. The review law earned its keep again.
+Carried forward (non-blocking, from round 2): My Story's Python fallback
+  appends the ENGLISH `attribution_sentence` when the native outro does not
+  carry it verbatim (`_otr_my_story.py` frame step) -- decide whether the
+  credit is spoken in the episode language. SciFi's `_FABLE2_FORMAT_EXAMPLE`
+  few-shot stays English (a shape example). Writer `led.save()` at ~3904 can
+  rebind `led.data` between the language stamp and lane dispatch; content
+  round-trips, identity does not -- worth one look, outside this diff.
+Current step: GO_FORWARD CODE 1 is now Shakespeare / Public Domain
+  translation (design has two or three answers: translate the planned
+  passage before the verbatim executor at `OTR_LedgerScriptWriter.py:5612`,
+  perform at the line seam with a relaxed verbatim gate, or vendor a
+  public-domain TRANSLATION as the source text so the lane stays verbatim
+  -- operator: *"somewhere there is a public domain Shakespeare translation
+  for each"*). A research inventory of PD translations per language is
+  running. Then `cuda:1`.
+Next: write the code-grounded anchor, Grok (`cursor-grok-4.6-high-fast`
+  via cursor-agent) refutes, Claude judges. No code on that row before the
+  round. Suite: 671 passed across the 23 affected test files; full chunk
+  gate not run this window (last SET 34/16052 at `90e75d33`). Bug Bible not
+  re-run; no new admissible PBUG (the defect was found by review, not a
+  live artifact -- the two live episodes cited in the plan doc are the
+  evidence for the ORIGINAL row).
+Models: driver Claude Fable 5.1. Round 1: cursor-agent (composer lane) +
+  Sonnet 5, both REFUTE, both HELD on the inline seams and both found the
+  dispatched-lane gap. Round 2 on the lane delta: cursor-agent + Sonnet 5,
+  both HOLDS / MUST-FIX: none. No kibitz arc (one verifiable answer once
+  the ruling landed).
+Commits: three chunks, this docs commit last -- see `git log`.
+
 ## 2026-09-18 -- HEAD 3bae04bf +handoff (main) -- PLANNER (Cursor Grok hands the week to Opus)
 
 Did: This Cursor Grok window did not land CODE. It cleaned GO_FORWARD

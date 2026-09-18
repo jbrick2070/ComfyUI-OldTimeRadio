@@ -70,6 +70,16 @@ the row into section 2, or cuts it.
   already points at `/main/`. One click. His.
 * **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged. Manager still
   serves 2.1.4. The API gives no reason. His Discord, not a code change.
+* **My Story credit line on a native episode.** The frame pass is told to
+  include the English `attribution_sentence` verbatim; if the native outro
+  does not carry it byte-for-byte, Python appends the English sentence. Speak
+  the credit in the episode language, or keep the byline English as a
+  credit. His call; one small edit either way.
+* **Native-language science feeds for SciFi News Pro.** Today the lane reads
+  the English science feed and authors the new story natively (standing
+  ruling 2026-09-18). A feed in the episode language would give it native
+  source material too. Which feeds, and whether the dossier extraction stays
+  English, is his call before any code.
 
 ## 2. CODE -- already decided, do these in order
 
@@ -77,46 +87,30 @@ Crash-class and ledger-identity first. Each row is one commit on `main`. Do
 not start a row below while one above is red. Do not start a row whose
 answer is still sitting in section 1.
 
-**This checkout is dirty.** Two uncommitted piles plus one unpushed
-closed-row draft. Do not `git add .`. Do not rewrite a draft that is
-already on disk. Composer QA then Sonnet before every push.
+**This checkout still carries the Google/cloud sidequest pile** (not a row
+here). Do not `git add .`. Composer QA then Sonnet before every push.
 
-**Working gate (seconds):** `scripts/otr_working_gate.py` (on disk, not
-on origin). **Chunk gate (~10 min):** full `pytest tests`, once the row
-is green. Commands live in [known-failures](known-failures.md). Those
-gates are not the test wave.
+**Working gate (seconds):** `scripts/otr_working_gate.py`. **Chunk gate
+(~10 min):** full `pytest tests`, once the row is green. Commands live in
+[known-failures](known-failures.md). Those gates are not the test wave.
 
-### 1. Native character lines still come out English
+### 1. Shakespeare and Public Domain on a non-English row
 
-**Decided:** author in the selected language at the generation seam. Do not
-translate an English draft. Do not add a caption-language widget. Captions
-stay `line.text`. English and `Off` stay byte-identical. `ANNOUNCER` stays
-the identity key.
+**Decided 2026-09-18 (standing ruling): the verbatim passage is TRANSLATED
+into the episode language.** The author's lines are English and no model
+authors them, so native authoring cannot reach them; the exclusion in
+`config/episode_languages.json` (`source_bank_exclusions`) stays until this
+lands. The other four banks already author natively.
 
-A non-English `episode_language` already stamps the ledger, casts Kokoro,
-and paints captions from the spoken text. The character author can still
-write English, so the captions are honest English on a native episode.
+Design has more than one answer, so it gets a panel before code: translate
+the planned passage BEFORE the verbatim gate (so `row_is_verbatim` and the
+fidelity checks compare against the translated passage), or have the
+composer perform the source passage in the language at the line seam and
+relax the verbatim gate for non-English only. English stays byte-identical
+either way. Verify: a Spanish Shakespeare one-act whose character rows are
+all Spanish; English Shakespeare fixtures unchanged.
 
-Wire the existing row `writer_instruction` onto every production call that
-can replace spoken text: per-line composer (character **system** message),
-grouped exchange, cast-coverage repair, ledger-clean F2 and stage-business
-repair, and the cleanup title fallback.
-
-**Draft is already in this working tree.** Finish, QA, and push those
-named files. Do not mix the Google pile into this commit. Plan (also
-untracked): `docs/2026-09-18-multilingual-native-dialogue-plan.md`.
-Verify: focused line-composer / exchange / clean-stage / writer tests;
-English prompt fixtures do not drift.
-
-### 2. My Story alias metrics and the working gate never reached origin
-
-**Decided 2026-09-17 and documented as closed; the code is still only
-local.** `SpokenLine` alias promotion must call `set_line_text_metrics`.
-Music brief pin: `compose_music_prompt` -> `resolve_setting_terms` ->
-`spoken_term(t)`. Land `scripts/otr_working_gate.py` and
-`tests/test_working_gate_script.py` with that chunk. Named files only.
-
-### 3. A `cuda:1` voice stamp silently becomes card zero
+### 2. A `cuda:1` voice stamp silently becomes card zero
 
 **Decided:** round-trip `cuda:1`, or fail loud. Do not pick a card by guessing.
 
