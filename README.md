@@ -463,7 +463,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
-| **low** | `otr_cpu_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
+| **low** | `otr_cpu_low` | claude-sonnet-5 / gpt-5.6-luna | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
 | still | _not built_ | | | | | | | |
 | video | _not built_ | | | | | | | |
 | foley | _not built_ | | | | | | | |

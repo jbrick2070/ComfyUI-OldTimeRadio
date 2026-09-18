@@ -1,9 +1,7 @@
-"""Shipping graphs keep the live small Qwen; only 16 GB NVIDIA pins 12B.
+"""Shipping writer pins: small Qwen locally, 12B on 16 GB NVIDIA, cloud on CPU.
 
-The 2026-09-17 Qwen move already landed on the shipping set. This file
-stops that split from rotting back to a stale Qwen2.5 / GGUF 2507 id, and
-keeps draft cpu_floor on a cloud writer instead of a local 4B it cannot
-load.
+Stops a stale Qwen2.5 / GGUF 2507 id from returning, and keeps the
+shipping CPU graph on Sonnet 5 + Luna instead of a local 4B.
 """
 from __future__ import annotations
 
@@ -54,7 +52,7 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
         if pid.startswith("otr_16gb_"):
             assert creative == BIG, pid
             assert technical == BIG, pid
-        elif pid.startswith("otr_cloud_"):
+        elif pid.startswith("otr_cloud_") or pid == "otr_cpu_low":
             assert creative == "comfy:slot-a", pid
             assert technical == "comfy:slot-b", pid
         else:
@@ -62,14 +60,15 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
             assert technical == SMALL, pid
 
 
-def test_cpu_floor_is_cloud_writer_not_local_qwen():
-    """Operator 2026-09-17: floor cannot run the 4B; use a cloud LLM."""
-    llm = _profile("cpu_floor")["llm"]
+def test_shipping_cpu_graph_uses_sonnet_and_luna():
+    """The graph people open is otr_cpu_low. Lab leftovers are not this pin."""
+    llm = _profile("otr_cpu_low")["llm"]
     assert llm["creative_model"] == "comfy:slot-a"
     assert llm["technical_model"] == "comfy:slot-b"
-    assert "transformers" not in llm["lane_allowlist"]
+    assert llm["comfy_slot_a_model"] == "anthropic/claude-sonnet-5"
+    assert llm["comfy_slot_b_model"] == "openai/gpt-5.6-luna"
     assert "comfy_credits" in llm["lane_allowlist"]
-    keys = list((_profile("cpu_floor").get("preflight") or {}).get("required_keys") or [])
+    keys = list((_profile("otr_cpu_low").get("preflight") or {}).get("required_keys") or [])
     assert "OTR_COMFY_API_KEY" in keys
 
 
@@ -77,13 +76,16 @@ def test_shipping_variant_widgets_carry_the_live_label():
     """Saved graphs must store the live COMBO label, not a stale bare id."""
     qwen_label = default_llm_option()
     for pid in bv.SHIPPING_SET:
-        if pid.startswith("otr_cloud_"):
-            continue
         path = os.path.join(_REPO, "workflows", "variants", f"{pid}.json")
         with open(path, encoding="utf-8") as fh:
             blob = json.load(fh)
         text = json.dumps(blob)
-        if pid.startswith("otr_16gb_"):
+        if pid.startswith("otr_cloud_") or pid == "otr_cpu_low":
+            assert "comfy:slot-a" in text, pid
+            assert "anthropic/claude-sonnet-5" in text, pid
+            assert "openai/gpt-5.6-luna" in text, pid
+            assert SMALL not in text, pid
+        elif pid.startswith("otr_16gb_"):
             assert BIG in text, pid
             assert SMALL not in text, pid
         else:

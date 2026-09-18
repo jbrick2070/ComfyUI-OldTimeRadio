@@ -324,9 +324,9 @@ on A5. Lab / soak recipes that exist to exercise `wan_ti2v`,
 `fastwan_8gb`, `ltx_video`, `ltx_audio_in`, or GGUF `ltx25_*` keep the
 lane -- do not "repair" them by pretending they are something else.
 
-**Writer half of the same ruling:** shipping 8 GB / Mac / AMD / `otr_cpu_low`
-already name `Qwen/Qwen3.5-4B`. Draft `cpu_floor` is the cloud-writer CPU
-path (`comfy:slot-a` / `comfy:slot-b`); it does not get a local 4B.
+**Writer half of the same ruling:** shipping 8 GB / Mac / AMD already name
+`Qwen/Qwen3.5-4B`. Shipping `otr_cpu_low` writes through Comfy Credits
+(Sonnet 5 + Luna), same pair as the cheap cloud graphs.
 
 ### C7. The widget tier -- verified plan, nothing built
 

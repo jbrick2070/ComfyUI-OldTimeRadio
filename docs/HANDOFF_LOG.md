@@ -1,12 +1,9 @@
-## 2026-09-17 -- cpu_floor is the cloud-writer CPU; local Qwen stays otr_cpu_low
+## 2026-09-17 -- shipping CPU graph writes Sonnet 5 + Luna
 
-Did: Operator said the floor cannot run Qwen -- use a cloud LLM and call it
-  a day. Draft `cpu_floor` now stamps `comfy:slot-a` / `comfy:slot-b` (same
-  Sonnet 5 + GPT 5.6 Luna pair as the cheap cloud graphs), keeps
-  `transformers` off the allowlist, and requires `OTR_COMFY_API_KEY` plus
-  the existing Google image key. Shipping `otr_cpu_low` is untouched (the
-  proven local 4B). Shipping 8 GB / Mac / AMD stay small Qwen; only 16 GB
-  NVIDIA pins Gemma 12B. No badge fan-out. C4 cut.
+Did: Operator wanted Qwen off `otr_cpu_low` and Sonnet + Luna on it. That
+  is the graph people open. Lab leftover `cpu_floor` already had the same
+  cloud pair; it is not a user graph. Shipping 8 GB / Mac / AMD stay small
+  Qwen; only 16 GB NVIDIA pins Gemma 12B. No badge fan-out.
 Current step: A5 still waits on the 16 GB GGUF video/foley/mime hole.
   ltx_8gb and AnimateDiff later.
 Next: do not add transformers to cpu_floor; do not invent cpu_plus_qwen.
