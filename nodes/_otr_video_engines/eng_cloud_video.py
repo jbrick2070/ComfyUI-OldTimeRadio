@@ -544,6 +544,10 @@ class _CloudVideoBase:
     def unload(self) -> None:
         return None
 
+    def cloud_selectors(self):
+        from .._otr_shared.cloud_slug_preflight import default_partner_selectors
+        return default_partner_selectors(self.node_key)
+
     # ---- render lifecycle -------------------------------------------------
     def assert_usable(self, host_caps, profile, request_template=None):
         # NO enable-flag check (operator directive 2026-07-02): the dropdown
@@ -815,6 +819,12 @@ class CloudKlingAvatarEngine(_CloudVideoBase):
                 f"expected one of {_KLING_MODES} or known aliases")
         return mode
 
+    def cloud_selectors(self):
+        raw = otr_env.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
+        folded = raw.lower()
+        mode = _KLING_MODE_ALIASES.get(folded, folded)
+        return {self.node_key: {"mode": (mode,)}}
+
     def _partner_inputs(self, request):
         prompt, prompt_meta = _condition_kling_avatar_prompt(
             str(_req_get(request, "text_prompt") or ""))
@@ -1019,6 +1029,14 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
     #: S1 per-model still plan (Shape A base).
     still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
+    def cloud_selectors(self):
+        movement = self._movement_amplitude()
+        return {self.node_key: {
+            "model": (_VIDU_Q2_MODEL,),
+            "resolution": (_VIDU_Q2_RESOLUTION,),
+            "movement_amplitude": (movement,),
+        }}
+
     def _movement_amplitude(self) -> str:
         """MEDIUM, on the vendor's own guidance -- see `_VIDU_Q2_MOVEMENT`."""
         return self._choice(
@@ -1105,6 +1123,16 @@ class CloudWordRazzleEngine(_CloudVideoBase):
     #: minted by an image engine upstream (still_word / any scene still), so
     #: the plan matches the standard scene-spine shape.
     still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
+
+    def cloud_selectors(self):
+        quality = otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "").strip() or "1080p"
+        motion = otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "").strip() or "normal"
+        qualities = (quality, "720p") if quality == "1080p" else (quality,)
+        return {self.node_key: {
+            "quality": qualities,
+            "motion_mode": (motion,),
+            "duration_seconds": ("5", "8"),
+        }}
 
     def _razzle_prompt(self, request) -> str:
         """The raised motion clause LEADS (env-overridable); the beat's own

@@ -61,9 +61,15 @@ class VisualAssetValidatorTests(unittest.TestCase):
         validation.validate_workflow_contract = validate_contract
         assets = ModuleType("_asset_validator_seam.nodes._otr_visual_assets")
         assets.ensure_prompt_visual_assets = ensure_assets
+        shared = ModuleType("_asset_validator_seam.nodes._otr_shared")
+        shared.__path__ = []
+        preflight = ModuleType(
+            "_asset_validator_seam.nodes._otr_shared.cloud_slug_preflight")
+        preflight.ensure_prompt_cloud_slugs = lambda prompt, unique_id: None
         self.import_stubs = patch.dict(sys.modules, {
             package.__name__: package, nodes.__name__: nodes,
             validation.__name__: validation, assets.__name__: assets,
+            shared.__name__: shared, preflight.__name__: preflight,
         })
         self.import_stubs.start()
         self.addCleanup(self.import_stubs.stop)
@@ -72,7 +78,12 @@ class VisualAssetValidatorTests(unittest.TestCase):
                    and node.name in {"INPUT_TYPES", "IS_CHANGED", "validate"}]
         isolated_class = ast.ClassDef(name="OTR_WorkflowValidator", bases=[],
                                      keywords=[], body=methods, decorator_list=[])
-        module = ast.fix_missing_locations(ast.Module(body=[isolated_class], type_ignores=[]))
+        helper = next(
+            node for node in TREE.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "_queue_time_readiness_gates")
+        module = ast.fix_missing_locations(ast.Module(
+            body=[helper, isolated_class], type_ignores=[]))
         namespace = {
             "__package__": "_asset_validator_seam.nodes",
             "_DEFAULT_WORKFLOW_PATH": ROOT / "workflows" / "otr_canonical.json",

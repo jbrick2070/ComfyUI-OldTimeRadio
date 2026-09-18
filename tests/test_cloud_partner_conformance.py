@@ -76,7 +76,7 @@ def _fixture_request(tmp_path):
     import numpy as np
     import soundfile as sf
     png = tmp_path / "init.png"
-    Image.new("RGB", (64, 48), (180, 90, 30)).save(str(png))
+    Image.new("RGB", (320, 320), (180, 90, 30)).save(str(png))
     wav = tmp_path / "voice.wav"
     t = np.linspace(0, 1.0, 16000, dtype="float32")
     sf.write(str(wav), (0.2 * np.sin(2 * 3.14159 * 220 * t)), 16000)

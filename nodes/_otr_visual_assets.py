@@ -253,6 +253,36 @@ def _proven_no_still(engine_id, consumes_still) -> bool:
         return False
 
 
+def walk_gate_consumers(prompt, unique_id):
+    """Transitive ``gate_in`` walk from this validator (PBUG-20260907-02).
+
+    Reachability starts at THIS validator and follows gate edges only, so
+    another validator's subgraph stays unreachable. No source-slot constraint:
+    audio hops pass the gate on output slot 2.
+    """
+    scoped = []
+    if unique_id is None or not str(unique_id).strip():
+        return scoped
+    if not isinstance(prompt, dict) or not prompt:
+        return scoped
+    seen_ids = set()
+    reachable = {str(unique_id)}
+    pending = True
+    while pending:
+        pending = False
+        for node_id, node in prompt.items():
+            if not isinstance(node, dict) or node_id in seen_ids:
+                continue
+            gate = (node.get("inputs") or {}).get("gate_in")
+            if (isinstance(gate, (list, tuple)) and len(gate) == 2
+                    and str(gate[0]) in reachable):
+                seen_ids.add(node_id)
+                reachable.add(str(node_id))
+                scoped.append(node)
+                pending = True
+    return scoped
+
+
 def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
                 consumes_still=None, role_video_slots=None):
     """Inspect only this validator's direct gate consumers in the LIVE prompt.
@@ -267,51 +297,7 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
         return result
     if not isinstance(prompt, dict) or not prompt:
         raise VisualAssetError("visual asset preflight requires the live queued prompt")
-    # THE GATE CHAIN IS WALKED TRANSITIVELY, not one hop (PBUG-20260907-02).
-    #
-    # This used to collect only nodes whose `gate_in` named THIS validator
-    # directly, and the audio branch is two hops away:
-    #
-    #     validator -> BatchCharacterVoices -> AnnouncerVoice -> StableAudioTheme
-    #
-    # so the music engine was never read and `stable_audio_3` was never planned.
-    # Selecting it therefore killed the render 5m40s in, after the whole script
-    # had been written, with "SA3 checkpoint not found ... fetch it first" -- the
-    # licence-clean music engine was unusable on every card while musicgen
-    # (CC-BY-NC) was the only thing that worked.
-    #
-    # THE REPLAY ISOLATION THE DOCSTRING PROTECTS IS UNCHANGED. Reachability
-    # still starts at THIS validator and follows gate edges only, so another
-    # validator's subgraph remains unreachable -- a frozen replay bundle's live
-    # widgets still cannot trigger a download. Widening from one hop to N hops
-    # along the same edges does not cross that boundary; it just stops losing
-    # the far end of our own chain.
-    scoped = []
-    seen_ids = set()
-    reachable = {str(unique_id)}
-    pending = True
-    while pending:
-        pending = False
-        for node_id, node in prompt.items():
-            if not isinstance(node, dict) or node_id in seen_ids:
-                continue
-            gate = (node.get("inputs") or {}).get("gate_in")
-            # NO SOURCE-SLOT CONSTRAINT, and that is deliberate. The old code
-            # required `gate[1] == 0`, which happens to be true for the
-            # validator's single output and is FALSE for every chain hop: the
-            # audio nodes pass their gate on from output slot 2, so
-            # `gate_in` reads ['81', 2] and ['82', 2]. Requiring slot 0 rejected
-            # exactly the hops this walk exists to follow, and the first cut of
-            # this fix still logged "READY engines=ltx_8gb,z_image_turbo" with
-            # the graph correctly wired. The API prompt keys inputs by NAME, so
-            # `gate_in` is already unambiguous -- which output slot happens to
-            # carry the gate is the source node's business, not ours.
-            if (isinstance(gate, (list, tuple)) and len(gate) == 2
-                    and str(gate[0]) in reachable):
-                seen_ids.add(node_id)
-                reachable.add(str(node_id))
-                scoped.append(node)
-                pending = True  # its own consumers may now be reachable
+    scoped = walk_gate_consumers(prompt, unique_id)
     writers = [n for n in scoped if n.get("class_type") == "OTR_LedgerScriptWriter"]
     replay = [bool(_literal(n.get("inputs") or {}, "replay_from", "")) for n in writers]
     if any(replay):

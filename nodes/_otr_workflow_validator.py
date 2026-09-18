@@ -59,6 +59,14 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
+def _queue_time_readiness_gates(prompt, unique_id):
+    """$0 cloud-slug refusal first, then local weight downloads."""
+    from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
+    from ._otr_visual_assets import ensure_prompt_visual_assets
+    ensure_prompt_cloud_slugs(prompt, unique_id)
+    ensure_prompt_visual_assets(prompt, unique_id)
+
+
 def _resolve_workflow_path(path: str) -> Path:
     """GATE B S2 code-defect fix (2026-06-11, spec section 2 'verified ground
     truth'): non-empty RELATIVE paths used to resolve against the process CWD
@@ -649,8 +657,7 @@ class WorkflowValidator:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))
             log.info(msg)
-            from ._otr_visual_assets import ensure_prompt_visual_assets
-            ensure_prompt_visual_assets(prompt, unique_id)
+            _queue_time_readiness_gates(prompt, unique_id)
             return (msg,)
 
         from ._workflow_validation import validate_workflow_contract
@@ -718,8 +725,7 @@ class WorkflowValidator:
             + (f" | {stamp_msg}" if stamp_msg else "")
         )
         log.info(msg)
-        from ._otr_visual_assets import ensure_prompt_visual_assets
-        ensure_prompt_visual_assets(prompt, unique_id)
+        _queue_time_readiness_gates(prompt, unique_id)
         return (msg,)
 
 

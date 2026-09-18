@@ -220,7 +220,11 @@ class GoogleLyriaMusic(AudioEngineAdapter):
     interface = "clip"
     sample_rate = SAMPLE_RATE
     native = False
+    cloud_catalog = "google"
     fixed_provider_duration_s = FIXED_CLIP_DURATION_S
+
+    def cloud_selectors(self):
+        return {self.name: {"model": (_selected_model(),)}}
 
     def generate_clip(self, prompt, duration_s, seed, *,
                       placement="", negative_prompt=""):  # noqa: ARG002

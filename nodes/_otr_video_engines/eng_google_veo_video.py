@@ -536,7 +536,11 @@ class GoogleVeoVideoEngine:
     invocability_reason = ""
     native = False
     provider_side = True
+    cloud_catalog = "google"
     strict_text_only = False
+
+    def cloud_selectors(self):
+        return {self.name: {"model": (_selected_model(),)}}
     accepts_audio_ref = False
     accepts_base_clip_ref = False
     accepts_init_image = True

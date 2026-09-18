@@ -150,6 +150,15 @@ class ElevenLabsCloudVoice(AudioEngineAdapter):
     # row's declared inputs. The names are static (same for every line).
     node_key = _PARTNER_ROW
 
+    def cloud_selectors(self):
+        model_id = str(otr_env.get("OTR_ELEVENLABS_MODEL_ID") or _DEFAULT_MODEL_ID).strip()
+        norm = str(otr_env.get("OTR_ELEVENLABS_TEXT_NORMALIZATION")
+                   or _DEFAULT_APPLY_TEXT_NORM).strip()
+        return {self.node_key: {
+            "model": (model_id,),
+            "apply_text_normalization": (norm,),
+        }}
+
     def _partner_inputs(self, request=None):
         return ("voice", "text", "stability", "apply_text_normalization",
                 "model", "language_code", "seed", "output_format")

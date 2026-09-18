@@ -429,7 +429,12 @@ class GoogleTTSVoice(AudioEngineAdapter):
     interface = "per_line"
     sample_rate = _SAMPLE_RATE
     native = False
+    cloud_catalog = "google"
     requires_voice_ref = False
+
+    def cloud_selectors(self):
+        model = _selected_model()
+        return {self.name: {"model": _models_to_try(model, allow_retry=True)}}
     voice_ref_field = "provider_voice_id"
     voice_ref_kind = "provider_voice_id"
     missing_ref_fallback = None

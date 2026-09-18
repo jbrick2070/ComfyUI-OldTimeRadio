@@ -99,6 +99,10 @@ class SoniloCloudMusic:
     # row's declared inputs. The names are static (same for every cue).
     node_key = _PARTNER_ROW
 
+    def cloud_selectors(self):
+        from .._otr_shared.cloud_slug_preflight import default_partner_selectors
+        return default_partner_selectors(self.node_key)
+
     def _partner_inputs(self, request=None):
         return ("prompt", "duration", "seed")
 

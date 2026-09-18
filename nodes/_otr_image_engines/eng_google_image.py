@@ -270,6 +270,10 @@ class GoogleImageEngine:
     requires_flag = None
     required_inputs = ("text_prompt",)
     native = False
+    cloud_catalog = "google"
+
+    def cloud_selectors(self):
+        return {self.name: {"model": (_selected_model(),)}}
 
     #: DECLARED, not inherited from the dispatcher's fallback. The still cache
     #: key is (role, object_id, prompt_hash, seed, engine_id, engine_version)

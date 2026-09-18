@@ -257,6 +257,10 @@ class _CloudImageBase:
     def unload(self) -> None:
         return None
 
+    def cloud_selectors(self):
+        from .._otr_shared.cloud_slug_preflight import default_partner_selectors
+        return default_partner_selectors(self.node_key)
+
     def teardown(self, prepared) -> None:
         return None
 
@@ -383,6 +387,14 @@ class CloudNanoBanana2ImageEngine(_CloudImageBase):
     node_key = "cloud_nano_banana_2"
     est_usd_env = "OTR_CLOUD_NANO_BANANA_EST_USD"
     est_usd_default = 0.04
+
+    def cloud_selectors(self):
+        from .._otr_shared.cloud_model_ids import resolve_model_id
+        modalities = otr_env.get("OTR_CLOUD_NANO_MODALITIES", "").strip() or "IMAGE"
+        return {self.node_key: {
+            "model": (resolve_model_id(self.node_key),),
+            "response_modalities": (modalities.upper(),),
+        }}
 
     def _partner_inputs(self, request):
         # pinned required: model DYNAMICCOMBO_V3, prompt STRING,
@@ -523,6 +535,15 @@ class CloudLumaPhotonFlashImageEngine(_CloudImageBase):
     est_usd_env = "OTR_CLOUD_LUMA_PHOTON_FLASH_EST_USD"
     est_usd_default = 0.0027
 
+    def cloud_selectors(self):
+        model = otr_env.get("OTR_CLOUD_LUMA_PHOTON_MODEL", "").strip() or "photon-flash-1"
+        aspect = otr_env.get("OTR_CLOUD_LUMA_PHOTON_ASPECT", "").strip()
+        aspects = (aspect,) if aspect else _LUMA_PHOTON_ASPECTS
+        return {self.node_key: {
+            "model": (model,),
+            "aspect_ratio": aspects,
+        }}
+
     def _partner_inputs(self, request):
         # pinned required: aspect_ratio COMBO, model COMBO, prompt STRING,
         # seed INT, style_image_weight FLOAT. No image refs are emitted here:
@@ -581,6 +602,16 @@ class CloudIdeoImageEngine(_CloudImageBase):
 
     def _est_usd(self) -> float:
         return _ideogram_est_usd()
+
+    def cloud_selectors(self):
+        speed = _ideogram_speed()
+        env_res = otr_env.get("OTR_CLOUD_IDEOGRAM_RESOLUTION", "").strip()
+        resolutions = (env_res,) if env_res else (
+            "1440x2560 (9:16)", "2560x1440 (16:9)", "2048x2048 (1:1)")
+        return {self.node_key: {
+            "rendering_speed": (speed,),
+            "resolution": resolutions,
+        }}
 
     def _partner_inputs(self, request):
         # pinned required: prompt STRING, rendering_speed COMBO,
