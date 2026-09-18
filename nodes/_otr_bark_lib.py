@@ -146,8 +146,9 @@ def _load_bark(model_id="suno/bark", device=None):
         _d = str(device).strip().lower()
         if not _d:
             # An empty stamp is not a device. Unreachable through the ledger
-            # (CastLock admits only cuda|cpu|mps) but reachable by any caller
-            # that bypasses it, and `.to("")` is a confusing failure to debug.
+            # (`_voice_device_from_ledger` skips an empty stamp and raises on
+            # a malformed one) but reachable by any caller that bypasses it,
+            # and `.to("")` is a confusing failure to debug.
             device = None
             _d = ""
         if _d.startswith("cuda") and not torch.cuda.is_available():
@@ -234,8 +235,11 @@ def _load_bark(model_id="suno/bark", device=None):
             # Load to target device (CUDA or CPU fallback).
             # On CUDA: Use device_map for direct CUDA load (avoids CPU intermediate state)
             # On CPU: Standard load with dtype=torch.float32 (CPU doesn't support float16 well)
+            # Branch on the KIND: a second card arrives as "cuda:1" and is
+            # still CUDA; a bare "cuda" pins card 0 exactly as before.
+            _kind = str(device).split(":", 1)[0]
             device_map = f"{device}:0" if device == "cuda" else device
-            dtype = torch.float16 if device == "cuda" else torch.float32
+            dtype = torch.float16 if _kind == "cuda" else torch.float32
 
             try:
                 model = BarkModel.from_pretrained(

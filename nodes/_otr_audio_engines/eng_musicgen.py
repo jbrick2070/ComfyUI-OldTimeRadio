@@ -83,7 +83,8 @@ class MusicGenEngine:
         # baseline). The cuda->cpu waterfall is deleted -- a device the host
         # cannot provide fails LOUD at .to(device).
         device = getattr(self, "requested_device", None) or "cuda"
-        dtype = torch.float16 if device == "cuda" else torch.float32
+        # Branch on the KIND: a second card is stamped "cuda:1" and is still CUDA.
+        dtype = torch.float16 if device.split(":", 1)[0] == "cuda" else torch.float32
         self._processor = AutoProcessor.from_pretrained(
             self.model_id, cache_dir=cache_dir,
         )

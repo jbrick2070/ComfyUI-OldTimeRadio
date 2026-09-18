@@ -75,8 +75,9 @@ def main():
         # an unavailable device fails LOUD in from_pretrained.
         import argparse
         _ap = argparse.ArgumentParser()
-        _ap.add_argument("--device", default="cuda",
-                         choices=("cuda", "cpu", "mps"))
+        # No `choices`: the ledger stamp may be "cuda:1" or any kind core
+        # resolved, and from_pretrained is the loud failure for a bad one.
+        _ap.add_argument("--device", default="cuda")
         _args, _ = _ap.parse_known_args()
 
         import torch  # noqa: F401  (surfaces a venv/torch problem as a clean error)

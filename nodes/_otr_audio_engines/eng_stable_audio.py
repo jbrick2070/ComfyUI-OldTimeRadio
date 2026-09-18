@@ -134,7 +134,8 @@ class StableAudioMusicEngine:
         # chatterbox by name). No probe, no fallback: an unavailable
         # device fails loud downstream.
         dev = getattr(self, "requested_device", None) or "cuda"
-        if dev == "cuda":
+        # Branch on the KIND: a second card is stamped "cuda:1" and is still CUDA.
+        if dev.split(":", 1)[0] == "cuda":
             torch.cuda.manual_seed_all(seed)
         kwargs = supported_kwargs(
             generate_diffusion_cond,

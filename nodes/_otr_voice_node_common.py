@@ -20,6 +20,7 @@ import gc
 import json
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -339,11 +340,28 @@ def build_engine_combo(role, fallback) -> list:
     return engines
 
 
+#: A resolved torch device as the ledger records it: a kind (cuda, cpu, mps,
+#: xpu, npu, ...) with an optional ordinal. Core resolves the dropdown for
+#: CastLock, so the stamp is never a dropdown WORD -- ``default`` and ``gpu:N``
+#: on a ledger mean the stamp skipped ``resolve_device`` and must not be
+#: guessed into a card.
+_VOICE_DEVICE_STAMP = re.compile(r"^[a-z][a-z0-9_]*(:\d+)?$")
+_UNRESOLVED_DEVICE_OPTION = re.compile(r"^(default|gpu(:\d+)?)$")
+
+
 def _voice_device_from_ledger(ledger_json, script_json="") -> str:
     """The explicit voice device from the CastLock ledger stamp
     (``meta.voice_device``, S4). Falls back to the script ledger's meta,
-    then the nv50 baseline ``cuda``. NEVER probes hardware -- the stamp is
-    the single source of truth; a wrong device fails loud at the adapter."""
+    then the nv50 baseline ``cuda`` when NO ledger carries a stamp.
+
+    The stamp round-trips as written, ordinal included: CastLock records
+    what ``resolve_device`` returned, and ``cuda:1`` is a real card, not a
+    spelling of ``cuda``. Any resolved device kind core can name passes
+    through untouched -- a device the host lacks fails loud at the adapter.
+    An unresolved dropdown word or a malformed stamp raises here: this
+    function NEVER probes hardware and never guesses a card, because the
+    silent answer used to be card zero.
+    """
     import json as _json
 
     for raw in (ledger_json, script_json):
@@ -353,11 +371,19 @@ def _voice_device_from_ledger(ledger_json, script_json="") -> str:
             led = _json.loads(raw)
         except (ValueError, TypeError):
             continue
-        if isinstance(led, dict):
-            dev = ((led.get("meta") or {}).get("voice_device") or "")
-            dev = str(dev).strip().lower()
-            if dev in ("cuda", "cpu", "mps"):
-                return dev
+        if not isinstance(led, dict):
+            continue
+        stamped = (led.get("meta") or {}).get("voice_device")
+        dev = str(stamped or "").strip().lower()
+        if not dev:
+            continue
+        if _VOICE_DEVICE_STAMP.match(dev) and not _UNRESOLVED_DEVICE_OPTION.match(dev):
+            return dev
+        raise ValueError(
+            f"meta.voice_device {stamped!r} is not a resolved device "
+            "(cuda, cuda:N, cpu, mps, or another kind core resolved). The "
+            "stamp is the single source of truth and is never resolved to a "
+            "guessed card.")
     return "cuda"
 
 
