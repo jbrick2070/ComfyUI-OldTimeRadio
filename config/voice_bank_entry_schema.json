@@ -78,6 +78,11 @@
     "speaker_id": {
       "type": "string",
       "description": "ADDITIVE, declarative: the real human behind this reference, when two rows are two different recordings of ONE person (e.g. a narrator's plain and grandfatherly takes, which live in two files and so cannot collide on ref_path). Rows sharing a speaker_id can never both be cast in one episode while reuse is disabled. Empty/absent means the reference is its own speaker."
+    },
+    "languages": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "ADDITIVE ISO codes this reference may speak (2026-09-18 multilingual one-switch). Absent or empty = [\"en\"]. NEVER derived from a voice-id prefix. The eligibility helper is the only reader."
     }
   }
 }

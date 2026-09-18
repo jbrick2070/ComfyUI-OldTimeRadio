@@ -4389,6 +4389,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         lemmy_force = resolved["lemmy_force"]
         with slot_scheduler.helper_context("lock_cast"):
             cast_rows, cast_meta = _OTRCAST.lock_cast(
+                language_iso=_EPLANG.iso_from_meta(meta),
                 creative_fn=creative_generate_fn,
                 # On the verbatim lane the EXECUTABLE size: the passage's own
                 # speakers, so the pool can never invent a name and voice

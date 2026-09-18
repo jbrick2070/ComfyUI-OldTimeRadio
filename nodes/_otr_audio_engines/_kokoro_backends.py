@@ -267,10 +267,13 @@ def _remove_stale_npz(voices_dir: str, keep: str) -> None:
 class TorchKokoroBackend:
     """The pre-2026-09-02 synthesis path, moved verbatim.
 
-    ``load`` builds ``KPipeline`` exactly as the engine did: lang_code 'b'
-    (British), the EXPLICIT device from the CastLock ledger stamp (S4 -- a device
-    the host cannot provide fails LOUD in KPipeline, never a silent downgrade),
-    ``repo_id`` only when this kokoro build accepts it (0.7.x does not).
+    ``load`` builds ``KPipeline`` with the episode's lang_code (British ``b``
+    on English; ``e``/``p``/``i``/``f``/``h``/``j``/``z`` on the other admitted
+    rows). Cache identity is ``(lang_code, device)`` -- a language change
+    rebuilds. The EXPLICIT device comes from the CastLock ledger stamp (S4 -- a
+    device the host cannot provide fails LOUD in KPipeline, never a silent
+    downgrade). ``repo_id`` only when this kokoro build accepts it (0.7.x does
+    not).
     ``synthesize`` is ONE pipeline call over the full line with
     ``split_pattern=r"\\n+"`` -- pre-splitting would change the call shape and the
     bytes.
@@ -278,8 +281,9 @@ class TorchKokoroBackend:
 
     name = "torch"
 
-    def __init__(self, device: str):
+    def __init__(self, device: str, lang_code: str = "b"):
         self.device = device
+        self.lang_code = str(lang_code or "b").strip() or "b"
         self._pipeline = None
 
     def load(self) -> None:
@@ -289,7 +293,7 @@ class TorchKokoroBackend:
 
         from kokoro import KPipeline
 
-        kwargs = {"lang_code": "b", "device": self.device}
+        kwargs = {"lang_code": self.lang_code, "device": self.device}
         try:
             if "repo_id" in inspect.signature(KPipeline.__init__).parameters:
                 kwargs["repo_id"] = "hexgrad/Kokoro-82M"

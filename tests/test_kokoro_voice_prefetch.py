@@ -173,7 +173,7 @@ def test_a_settled_install_fetches_nothing(monkeypatch, tmp_path):
     network, so the download function is detonated."""
     voices = tmp_path / PRE._KOKORO_MODEL_SUBDIR / "voices"
     voices.mkdir(parents=True)
-    for voice in PRE.ENGLISH_VOICES:
+    for voice in PRE.admitted_kokoro_voices():
         (voices / f"{voice}.pt").write_bytes(b"x")
     monkeypatch.setattr(PRE, "_models_dir", lambda: str(tmp_path))
 
@@ -200,7 +200,7 @@ def test_only_the_missing_voices_are_fetched(monkeypatch, tmp_path):
 
     missing = PRE.missing_voices(str(voices))
 
-    assert len(missing) == len(PRE.ENGLISH_VOICES) - len(present)
+    assert len(missing) == len(PRE.admitted_kokoro_voices()) - len(present)
     for voice in present:
         assert voice not in missing
 
@@ -226,7 +226,7 @@ def test_a_fetched_voice_is_COPIED_not_symlinked(monkeypatch, tmp_path):
     receipt = PRE.prefetch_kokoro_voices()
     landed = tmp_path / PRE._KOKORO_MODEL_SUBDIR / "voices" / "bf_alice.pt"
 
-    assert receipt["fetched"] == len(PRE.ENGLISH_VOICES)
+    assert receipt["fetched"] == len(PRE.admitted_kokoro_voices())
     assert landed.is_file() and not landed.is_symlink()
     assert landed.read_bytes() == b"voice-bytes"
 

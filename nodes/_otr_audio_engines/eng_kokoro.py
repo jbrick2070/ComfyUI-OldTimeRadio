@@ -96,7 +96,8 @@ def _kokoro_onnx_model_path() -> str:
     return os.path.join(_kokoro_model_dir(), _KOKORO_ONNX_REL_PATH)
 
 
-def _pick_announcer_voice(episode_seed, voice_override="random") -> str:
+def _pick_announcer_voice(episode_seed, voice_override="random",
+                          language="en") -> str:
     """One voice per episode, drawn the SAME way the voice bank draws it.
 
     This used to run its own formula -- Random(f"{seed}_kokoro_announcer") --
@@ -105,18 +106,24 @@ def _pick_announcer_voice(episode_seed, voice_override="random") -> str:
     render opens another, which is precisely the defect the shared
     gender-agnostic selector was extracted to end on the character side.
 
-    Delegates to the bank so there is ONE draw. The local formula survives only
-    as the fallback for a bank that cannot be loaded at all -- an engine must
-    still be able to speak.
+    Delegates to the bank so there is ONE draw. The local English formula
+    survives only as the fallback for a bank that cannot be loaded at all --
+    and ONLY on English. A non-English ledger must never render the British
+    announcer pool (the English trapdoor).
     """
     if voice_override and voice_override != "random":
         return voice_override
     from .._otr_voice_bank import (
         VoiceBankError, VoiceCastingError, announcer_voice_ref,
     )
+    iso = str(language or "en").strip() or "en"
     try:
-        return announcer_voice_ref("kokoro", episode_seed=episode_seed).voice_ref_id
+        return announcer_voice_ref(
+            "kokoro", episode_seed=episode_seed, language=iso,
+        ).voice_ref_id
     except (VoiceBankError, VoiceCastingError):
+        if iso != "en":
+            raise
         # ONLY the bank's own typed contracts fall back -- a genuinely absent or
         # unservable bank, where an engine must still be able to speak. A bare
         # `except Exception` here would recreate the very divergence this
@@ -160,7 +167,10 @@ class KokoroEngine:
     def __init__(self):
         self._backend = None
         self._backend_name = None
+        self._backend_key = None
         self._episode_voice = None
+        self._lang_code = "b"
+        self._language_iso = "en"
 
     # ------------------------------------------------------------------ #
     def _role(self) -> str:
@@ -180,7 +190,12 @@ class KokoroEngine:
         from .registry import EngineUsabilityReason
 
         episode_seed = "" if not meta else str(meta.get("episode_seed") or "")
-        voice_id = _pick_announcer_voice(episode_seed)
+        from .. import _otr_episode_languages as _EPLANG
+        self._language_iso = _EPLANG.iso_from_meta(meta if meta else {})
+        cfg = _EPLANG.kokoro_config(meta if meta else {})
+        self._lang_code = str(cfg.get("lang_code") or "b").strip() or "b"
+        voice_id = _pick_announcer_voice(
+            episode_seed, language=self._language_iso)
         self._episode_voice = voice_id
         path = _kokoro_voice_path(voice_id)
         if not os.path.exists(path):
@@ -216,9 +231,12 @@ class KokoroEngine:
 
     # ------------------------------------------------------------------ #
     def load(self):
-        """Select and load the backend (re-evaluated whenever nothing is loaded)."""
-        if self._backend is not None:
-            return
+        """Select and load the backend. Cache identity is (backend, lang, device).
+
+        A language change rebuilds the pipeline. Non-English is torch-first:
+        kokoro-onnx only documents English locales, so ONNX is never guessed
+        for a Spanish / Hindi / CJK row.
+        """
         from . import _kokoro_backends as _kb
         from .registry import EngineUsabilityReason
 
@@ -232,11 +250,34 @@ class KokoroEngine:
                       else EngineUsabilityReason.MISSING_MODEL)
             raise self._unusable(reason, str(exc)) from exc
 
+        lang = getattr(self, "_lang_code", None) or "b"
+        if lang not in ("a", "b") and name == "onnx":
+            if _spec_present("kokoro"):
+                name = "torch"
+                log.info(
+                    "[OTR.kokoro] non-English lang_code=%s forces torch "
+                    "(ONNX locale is not guessed)", lang)
+            else:
+                raise self._unusable(
+                    EngineUsabilityReason.MISSING_MODEL,
+                    "kokoro non-English speech needs the torch kokoro package "
+                    "(lang_code %r); kokoro-onnx is English-only on this pack"
+                    % lang)
+
         device = getattr(self, "requested_device", None) or "cuda"
+        cache_key = (name, lang, device)
+        if self._backend is not None and self._backend_key == cache_key:
+            return
+        if self._backend is not None:
+            self._backend.close()
+            self._backend = None
+            self._backend_name = None
+            self._backend_key = None
+
         if name == "torch":
-            backend = _kb.TorchKokoroBackend(device)
+            backend = _kb.TorchKokoroBackend(device, lang_code=lang)
             backend.load()          # KPipeline errors stay as they were (S4: loud)
-            log.info("[OTR.kokoro] backend=torch device=%s", device)
+            log.info("[OTR.kokoro] backend=torch device=%s lang=%s", device, lang)
         else:
             model_path = _kokoro_onnx_model_path()
             if not os.path.exists(model_path):
@@ -261,10 +302,12 @@ class KokoroEngine:
                 ",".join(backend.providers_active), backend.threads, model_path, device)
         self._backend = backend
         self._backend_name = name
+        self._backend_key = cache_key
 
     def unload(self):
         backend, self._backend = self._backend, None
         self._backend_name = None
+        self._backend_key = None
         self._episode_voice = None
         if backend is not None:
             backend.close()         # never raises

@@ -75,11 +75,10 @@ KOKORO_ONNX_FILENAME = "onnx/model.onnx"
 #: prefetch test pins the two equal.
 _KOKORO_ONNX_REL_PATH = os.path.join("onnx", "model.onnx")
 
-#: ENGLISH ONLY, and deliberately so. The repo ships 54 voices; 26 of them are
-#: Spanish, French, Italian, Hindi, Japanese, Portuguese and Chinese, which
-#: this show has no use for. Fetching the 28 English ones costs ~15 MB against
-#: a 327 MB model -- about 4%, i.e. noise -- while fetching all 54 would be
-#: ~28 MB of which half is dead weight.
+#: ENGLISH FIRST -- the 28 British+American ids the show has always fetched.
+#: 2026-09-18: admitted non-English Kokoro rows add their .pt list beside
+#: these. ``admitted_kokoro_voices()`` is the fetch set; ENGLISH_VOICES stays
+#: the English constant tests and the announcer pool pin against.
 #:
 #: WHY NOT JUST THE FOUR ANNOUNCER VOICES: two characters never share a voice
 #: (`_assert_unique_bark_voices` and the casting validator's `taken` set both
@@ -226,11 +225,32 @@ def prefetch_kokoro_onnx_model(*, force: bool = False) -> "dict":
     return receipt
 
 
-def missing_voices(voices_dir: str) -> "list[str]":
-    """Which English voices are not on disk yet. Pure; no network, no I/O
-    beyond `os.path.exists`, so the common case (everything present) costs
-    28 stat calls and returns."""
-    return [v for v in ENGLISH_VOICES
+def admitted_kokoro_voices() -> "tuple[str, ...]":
+    """English ids plus every admitted language row's kokoro.voices list."""
+    wanted = list(ENGLISH_VOICES)
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat prestartup load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        rows, _by_label, _by_iso = _EPLANG.load_registry()
+        for row in rows:
+            if not getattr(row, "admitted", False):
+                continue
+            voices = ((row.engines or {}).get("kokoro") or {}).get("voices") or []
+            for voice in voices:
+                name = str(voice or "").strip()
+                if name and name not in wanted:
+                    wanted.append(name)
+    except Exception:  # noqa: BLE001 -- prefetch must never raise
+        return tuple(wanted)
+    return tuple(wanted)
+
+
+def missing_voices(voices_dir: str, voices=None) -> "list[str]":
+    """Which admitted voices are not on disk yet. Pure; no network."""
+    wanted = tuple(voices) if voices is not None else admitted_kokoro_voices()
+    return [v for v in wanted
             if not os.path.exists(os.path.join(voices_dir, f"{v}.pt"))]
 
 
@@ -262,7 +282,7 @@ def prefetch_kokoro_voices(*, force: bool = False) -> "dict":
         receipt["reason"] = "OTR_SKIP_KOKORO_PREFETCH=1"
         return receipt
 
-    wanted = ENGLISH_VOICES if force else missing_voices(voices_dir)
+    wanted = admitted_kokoro_voices() if force else missing_voices(voices_dir)
     receipt["attempted"] = len(wanted)
     if not wanted:
         return receipt          # the ordinary case after first boot

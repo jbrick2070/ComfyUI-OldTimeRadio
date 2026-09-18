@@ -238,6 +238,11 @@ class VoiceBankEntry:
     # Smith has a plain and a grandfatherly take in two different files, so
     # without this one narrator can be cast as two characters in one episode.
     speaker_id: str = ""
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18). Additive. Absent or empty
+    # means English -- never derived from an `ef_` / `jf_` voice-id prefix.
+    # A Spanish row that forgot this field would silently join the English
+    # pool; stamp it.
+    languages: Tuple[str, ...] = ()
 
 
 # --------------------------------------------------------------------------- #
@@ -317,6 +322,7 @@ def _entry_from_dict(d: dict) -> VoiceBankEntry:
         style_tags=tuple(str(t) for t in (d.get("style_tags") or [])),
         provider_voice_id=str(d.get("provider_voice_id") or ""),   # C3
         speaker_id=str(d.get("speaker_id") or ""),
+        languages=tuple(str(x) for x in (d.get("languages") or []) if str(x).strip()),
     )
 
 
@@ -554,6 +560,31 @@ def _entry_is_used(entry: VoiceBankEntry, used: set) -> bool:
     return bool(voice_ref_usage_keys(entry) & used)
 
 
+def entry_languages(entry) -> Tuple[str, ...]:
+    """ISO codes this reference may speak.
+
+    Absent / empty is English. The id prefix is NEVER consulted -- an
+    ``ef_dora`` row that forgot ``languages`` is English until someone stamps
+    the field, which is the defect the admission test is there to catch.
+    """
+    langs = tuple(
+        str(x).strip() for x in (getattr(entry, "languages", ()) or ())
+        if str(x).strip()
+    )
+    return langs or ("en",)
+
+
+def voice_speaks_language(entry, language: str) -> bool:
+    """THE eligibility helper. One function, every selection path."""
+    iso = str(language or "en").strip() or "en"
+    return iso in entry_languages(entry)
+
+
+def filter_voices_for_language(entries, language: str):
+    """Keep only references that speak ``language``."""
+    return [e for e in entries if voice_speaks_language(e, language)]
+
+
 def assign_voice_for_slot(
     *,
     role: str,
@@ -568,6 +599,7 @@ def assign_voice_for_slot(
     used_voice_ref_ids=None,
     require_commercial_clean: bool = False,
     bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
+    language: str = "en",
 ) -> VoiceBankEntry:
     """Assign exactly one voice reference to a slot (deterministic, fail-closed).
 
@@ -585,7 +617,8 @@ def assign_voice_for_slot(
     # pre-filter -- never a score reweight). Un-audited entries (empty tier)
     # pass untouched, so the un-audited bank behaves exactly as before.
     candidates = [e for e in entries
-                  if e.engine == engine and e.quality_tier != "reject"]
+                  if e.engine == engine and e.quality_tier != "reject"
+                  and voice_speaks_language(e, language)]
     # A RESERVED IDENTITY IS NOT IN THE POOL (operator 2026-08-17: "Lemmy should
     # only be Lemmy, not some random character -- Lemmy stays in the box unless
     # Lemmy is called upon").
@@ -612,7 +645,8 @@ def assign_voice_for_slot(
         candidates = [e for e in candidates if e.commercial_clean is True]
     if not candidates:
         raise VoiceCastingError(
-            f"no voice references for engine {engine!r} "
+            f"naming pool size: no voice references for engine {engine!r} "
+            f"language {str(language or 'en')!r} "
             f"(role {role!r}, char_id {char_id!r})"
         )
 
@@ -759,6 +793,7 @@ def _seeded_announcer_gender(engine: str, episode_seed) -> str:
 def gender_agnostic_fallback_ref(
     bank: Tuple[VoiceBankEntry, ...], *, engine: str, char_id: str,
     episode_seed=0, role: str = "char_voice", used=None,
+    language: str = "en",
 ) -> Optional[VoiceBankEntry]:
     """The reference an UNCASTABLE row actually renders with, or None.
 
@@ -804,7 +839,8 @@ def gender_agnostic_fallback_ref(
     def _eligible(entry) -> bool:
         return (entry.engine == engine
                 and entry.voice_ref_id not in reserved
-                and getattr(entry, "quality_tier", "") != "reject")
+                and getattr(entry, "quality_tier", "") != "reject"
+                and voice_speaks_language(entry, language))
 
     role_cands = [e for e in bank if _eligible(e) and role in e.roles]
     cands = sorted(
@@ -823,6 +859,7 @@ def gender_agnostic_fallback_ref(
 
 def _seeded_preferred_announcer_voice_ref(
     bank: Tuple[VoiceBankEntry, ...], *, engine: str, episode_seed=0,
+    language: str = "en",
 ) -> VoiceBankEntry:
     """Deterministic preferred-announcer selection for engines with a curated
     announcer pool.
@@ -836,10 +873,12 @@ def _seeded_preferred_announcer_voice_ref(
         if e.engine == engine
         and "announcer_voice" in e.roles
         and e.quality_tier != "reject"
+        and voice_speaks_language(e, language)
     ]
     if not cands:
         raise VoiceCastingError(
-            f"no announcer voice reference for engine {engine!r}")
+            f"naming pool size: no announcer voice reference for engine "
+            f"{engine!r} language {str(language or 'en')!r}")
     preferred = [e for e in cands if "preferred_announcer" in e.style_tags]
     pool = preferred or cands
     by_gender = {}
@@ -873,7 +912,7 @@ def _seeded_preferred_announcer_voice_ref(
 
 def announcer_voice_ref(
     engine: str, bank: Optional[Tuple[VoiceBankEntry, ...]] = None,
-    episode_seed=0,
+    episode_seed=0, language: str = "en",
 ) -> VoiceBankEntry:
     """The announcer reference for ``engine`` (E.1). Raise if none.
 
@@ -885,13 +924,17 @@ def announcer_voice_ref(
     entries = bank if bank is not None else load_voice_bank()[0]
     if engine in _SEEDED_ANNOUNCER_ENGINES:
         return _seeded_preferred_announcer_voice_ref(
-            entries, engine=engine, episode_seed=episode_seed)
+            entries, engine=engine, episode_seed=episode_seed,
+            language=language)
     cands = sorted(
-        [e for e in entries if e.engine == engine and "announcer_voice" in e.roles],
+        [e for e in entries
+         if e.engine == engine and "announcer_voice" in e.roles
+         and voice_speaks_language(e, language)],
         key=lambda e: e.voice_ref_id,
     )
     if not cands:
         raise VoiceCastingError(
-            f"no announcer voice reference for engine {engine!r}"
+            f"naming pool size: no announcer voice reference for engine "
+            f"{engine!r} language {str(language or 'en')!r}"
         )
     return cands[0]

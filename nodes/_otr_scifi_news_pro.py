@@ -4822,9 +4822,11 @@ def run_scifi_news_pro_episode(
     # speaker set equal the cast rows. A cameo injected after the script is
     # written cannot pass that gate, so the only place the decision can live is
     # in front of the prompts that produce the script.
+    from . import _otr_episode_languages as _EPLANG
     cameo = _OTRCAST.resolve_lemmy_cameo(
         getattr(source_bank_row, "source_bank_id", ""),
         resolved.get("lemmy_force"),
+        language_iso=_EPLANG.iso_from_meta(meta),
     )
     meta["lemmy_roll_receipt"] = cameo.to_meta()
     # DURABLE, not best-effort: the receipt is the only record that the roll was

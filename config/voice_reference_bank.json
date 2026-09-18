@@ -2538,6 +2538,539 @@
       "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
       "ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5fe603b672cdfc47c712a60db2",
       "commercial_clean": true
+    },
+    {
+      "voice_ref_id": "ef_dora",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/ef_dora.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "es"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "em_alex",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/em_alex.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "es"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "em_santa",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/em_santa.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "es"
+      ]
+    },
+    {
+      "voice_ref_id": "pf_dora",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/pf_dora.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "pt"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "pm_alex",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/pm_alex.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "pt"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "pm_santa",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/pm_santa.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "pt"
+      ]
+    },
+    {
+      "voice_ref_id": "if_sara",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/if_sara.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "it"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "im_nicola",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/im_nicola.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "it"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "ff_siwis",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/ff_siwis.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "fr"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "hf_alpha",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/hf_alpha.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "hi"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "hf_beta",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/hf_beta.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "hi"
+      ]
+    },
+    {
+      "voice_ref_id": "hm_omega",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/hm_omega.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "hi"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "hm_psi",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/hm_psi.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "hi"
+      ]
+    },
+    {
+      "voice_ref_id": "jf_alpha",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/jf_alpha.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "ja"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "jf_gongitsune",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/jf_gongitsune.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "ja"
+      ]
+    },
+    {
+      "voice_ref_id": "jf_nezumi",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/jf_nezumi.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "ja"
+      ]
+    },
+    {
+      "voice_ref_id": "jf_tebukuro",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/jf_tebukuro.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "ja"
+      ]
+    },
+    {
+      "voice_ref_id": "jm_kumo",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/jm_kumo.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "ja"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "zf_xiaobei",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zf_xiaobei.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "zf_xiaoni",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zf_xiaoni.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "voice_ref_id": "zf_xiaoxiao",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zf_xiaoxiao.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "voice_ref_id": "zf_xiaoyi",
+      "engine": "kokoro",
+      "gender": "female",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zf_xiaoyi.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "voice_ref_id": "zm_yunjian",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zm_yunjian.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ],
+      "style_tags": [
+        "preferred_announcer"
+      ]
+    },
+    {
+      "voice_ref_id": "zm_yunxi",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zm_yunxi.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "voice_ref_id": "zm_yunxia",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zm_yunxia.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
+    },
+    {
+      "voice_ref_id": "zm_yunyang",
+      "engine": "kokoro",
+      "gender": "male",
+      "timbre": [
+        "clear"
+      ],
+      "roles": [
+        "announcer_voice",
+        "char_voice"
+      ],
+      "age_band": "adult",
+      "ref_path": "models/TTS/KokoroTTS/voices/zm_yunyang.pt",
+      "ref_sha256": "pending",
+      "commercial_clean": true,
+      "languages": [
+        "zh"
+      ]
     }
   ]
 }

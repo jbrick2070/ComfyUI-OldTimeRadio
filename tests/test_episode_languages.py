@@ -206,6 +206,7 @@ def test_english_credits_match_today_credits_roll_literals():
     assert row.credits["story_spine_header"] == "[ STORY SPINE ]"
     assert row.credits["premise_label"] == "Premise:"
     assert row.credits["subject_label"] == "Subject:"
+    assert row.credits["writer_llm_header"] == "[ WRITER / LLM CONFIG ]"
     assert row.credits["origin_hud"] == "ORIGIN"
     assert row.credits["more_hud"] == "+%d MORE"
 

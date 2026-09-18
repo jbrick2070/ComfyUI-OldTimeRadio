@@ -24,7 +24,7 @@ from nodes._otr_kokoro_voice_prefetch import ENGLISH_VOICES
 from nodes._otr_scifi_news_pro import MAX_SPEAKING_CAST as _PRO_MAX_CAST
 from nodes._otr_voice_bank import (
     VoiceCastingError, announcer_voice_ref, assign_voice_for_slot,
-    gender_agnostic_fallback_ref, load_voice_bank,
+    entry_languages, gender_agnostic_fallback_ref, load_voice_bank,
 )
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -50,16 +50,22 @@ def _kokoro_entries():
 
 def test_bank_and_prefetch_name_the_same_kokoro_voices():
     _, ko = _kokoro_entries()
-    bank_ids = {e.voice_ref_id for e in ko}
-    assert bank_ids == set(ENGLISH_VOICES), (
-        "voice bank / prefetch drift -- only in bank: %s; only in prefetch: %s"
-        % (sorted(bank_ids - set(ENGLISH_VOICES)),
-           sorted(set(ENGLISH_VOICES) - bank_ids)))
+    english_ids = {e.voice_ref_id for e in ko if "en" in entry_languages(e)}
+    other_ids = {e.voice_ref_id for e in ko if "en" not in entry_languages(e)}
+    assert english_ids == set(ENGLISH_VOICES), (
+        "English voice bank / prefetch drift -- only in bank: %s; only in prefetch: %s"
+        % (sorted(english_ids - set(ENGLISH_VOICES)),
+           sorted(set(ENGLISH_VOICES) - english_ids)))
+    assert other_ids, "admitted non-English Kokoro voices must sit in the bank"
+    from nodes._otr_kokoro_voice_prefetch import admitted_kokoro_voices
+    assert {e.voice_ref_id for e in ko} <= set(admitted_kokoro_voices())
     for e in ko:
         assert e.gender in ("male", "female"), (e.voice_ref_id, e.gender)
         assert "char_voice" in e.roles, "%s cannot serve characters" % e.voice_ref_id
         assert e.ref_path.replace("\\", "/").endswith(
             "voices/%s.pt" % e.voice_ref_id), (e.voice_ref_id, e.ref_path)
+        if e.voice_ref_id not in ENGLISH_VOICES:
+            assert "en" not in entry_languages(e), e.voice_ref_id
 
 
 @pytest.mark.parametrize("bank_id", _bank_ids())

@@ -46,6 +46,33 @@ log = logging.getLogger("OTR")
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
+def _episode_language_iso(meta) -> str:
+    from . import _otr_episode_languages as _EPLANG
+    return _EPLANG.iso_from_meta(meta if isinstance(meta, dict) else {})
+
+
+def _require_language_engines(meta, char_engine, announcer_engine) -> str:
+    """Non-English rows admit only the engines listed on the row. English
+    is unchanged -- bark / indextts / the rest still run."""
+    from . import _otr_episode_languages as _EPLANG
+    iso = _EPLANG.iso_from_meta(meta if isinstance(meta, dict) else {})
+    if iso == _EPLANG.ENGLISH_ISO:
+        return iso
+    row = _EPLANG.row_from_meta(meta)
+    admitted = set(row.engines or {})
+    for engine in (char_engine, announcer_engine):
+        eng = str(engine or "").strip()
+        if not eng or eng == "auto":
+            continue
+        if eng not in admitted:
+            raise ValueError(
+                "OTR_CastLock: engine %r is not admitted on a %s episode "
+                "(row engines: %s). Kokoro is the dance leader day 1."
+                % (eng, row.label, sorted(admitted)))
+    _EPLANG.assert_readiness_extras(row)
+    return iso
+
+
 def _lemmy_voice_policy():
     """The character voice policy, or ``{}`` if the pack cannot be imported.
 
@@ -406,16 +433,20 @@ class CastLock:
         announcer_voice_engine = self._resolve_announcer_engine(
             announcer_voice_engine)
 
+        language_iso = _require_language_engines(
+            meta, char_voice_engine, announcer_voice_engine)
+
         # Sprint 2 (a): CastLock OWNS bark voice casting. The writer no longer
         # stamps voice_preset -- it persists cast_seed in meta.cast_contract and
         # CastLock replays the deterministic picker (byte-identical) and stamps
         # the bark voices here, then runs the relocated voice invariants (Gate 1,
         # formerly in lock_cast). Runs regardless of cast_voice_policy (the policy
         # governs the clip-engine voice bank, not bark casting).
-        self._assign_bark_voices(
-            cast, meta, report,
-            announcer_voice_engine=announcer_voice_engine,
-            char_voice_engine=char_voice_engine)
+        if language_iso == "en":
+            self._assign_bark_voices(
+                cast, meta, report,
+                announcer_voice_engine=announcer_voice_engine,
+                char_voice_engine=char_voice_engine)
 
         # STEP 2 (plan 5.2): resolve the bank and stamp the engine metadata ONCE,
         # for BOTH modes, before any route is looked at. It used to happen inside
@@ -461,7 +492,8 @@ class CastLock:
                 announcer_engine=announcer_engine,
                 route_claims=route_claims,
                 bank_unavailable_route_ids=bank_unavailable_route_ids,
-                ann_bank=ann_bank)
+                ann_bank=ann_bank,
+                language=language_iso)
         else:
             # STEP 5 (plan 5.2): in preserve_ledger ONLY the claimed row changes.
             # Every other row keeps the bytes it arrived with -- that is the
@@ -948,7 +980,8 @@ class CastLock:
                        announcer_engine=None,
                        route_claims=None,
                        bank_unavailable_route_ids=None,
-                       ann_bank=None):
+                       ann_bank=None,
+                       language="en"):
         """Re-cast the registry rows.
 
         ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
@@ -960,10 +993,12 @@ class CastLock:
         from ._otr_voice_bank import (
             CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
             announcer_voice_ref, assign_voice_for_slot,
-            gender_agnostic_fallback_ref, load_voice_bank,
+            filter_voices_for_language, gender_agnostic_fallback_ref,
+            load_voice_bank, voice_speaks_language,
             unavailable_qualified_route_ids as resolve_unavailable_route_ids,
             voice_ref_usage_keys,
         )
+        language = str(language or "en").strip() or "en"
         from ._otr_voice_node_common import coerce_int_seed
 
         if bank_entries is None:
@@ -1058,6 +1093,20 @@ class CastLock:
                 f"reference engine; character voices preserved"
             )
 
+        if target_engine and bank_entries is not None:
+            lang_pool = filter_voices_for_language(
+                [e for e in bank_entries if e.engine == target_engine],
+                language)
+            if not lang_pool:
+                raise VoiceCastingError(
+                    "naming pool size: no %r voices for engine %r"
+                    % (language, target_engine))
+            n_slots = sum(1 for e in cast if isinstance(e, dict))
+            if len({e.voice_ref_id for e in lang_pool}) < n_slots:
+                # Thin rows (French 1, Italian 2): reuse in-pool, never borrow
+                # English. The ladder still prefers unused voices first.
+                allow_voice_reuse = True
+
         announcer_ref = None
         has_announcer = any(
             isinstance(entry, dict) and _is_announcer_entry(entry)
@@ -1065,7 +1114,8 @@ class CastLock:
         )
         if has_announcer and announcer_engine in _SEEDED_ANNOUNCER_ENGINES:
             announcer_ref = announcer_voice_ref(
-                announcer_engine, bank=bank_entries, episode_seed=episode_seed)
+                announcer_engine, bank=bank_entries, episode_seed=episode_seed,
+                language=language)
 
         used: set = set()
         def _mark_used(ref) -> None:
@@ -1145,7 +1195,7 @@ class CastLock:
                 try:
                     ref = announcer_ref or announcer_voice_ref(
                         announcer_engine, bank=bank_entries,
-                        episode_seed=episode_seed)
+                        episode_seed=episode_seed, language=language)
                     _stamp_row(entry, ref)
                     announcer_clean = _delivered_commercial_clean(entry, ref)
                     gated += 0 if announcer_clean else 1
@@ -1168,8 +1218,10 @@ class CastLock:
             # only changes other rows' draws when reuse is off, so marking
             # unconditionally is free there and correct here: a pinned reference
             # is spoken for either way.
-            if policy_claim is not None and _ROUTE.cast_row_matches_policy(
-                    entry, policy_claim.character_key):
+            if (policy_claim is not None
+                    and _ROUTE.cast_row_matches_policy(
+                        entry, policy_claim.character_key)
+                    and voice_speaks_language(policy_claim.bank_entry, language)):
                 _stamp_row(entry, policy_claim.bank_entry,
                            fallback="policy_route")
                 entry["voice_route"] = dict(policy_claim.voice_route)
@@ -1193,8 +1245,11 @@ class CastLock:
             # proved", and the voice node raises on any non-empty one whose
             # status is not `qualified`. Writing it here would kill every render
             # on these engines.
-            if provisional_claim is not None and _ROUTE.cast_row_matches_policy(
-                    entry, provisional_claim.character_key):
+            if (provisional_claim is not None
+                    and _ROUTE.cast_row_matches_policy(
+                        entry, provisional_claim.character_key)
+                    and voice_speaks_language(
+                        provisional_claim.bank_entry, language)):
                 _stamp_row(entry, provisional_claim.bank_entry,
                            fallback="provisional_route")
                 _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_PROVISIONAL,
@@ -1266,6 +1321,7 @@ class CastLock:
                     allow_voice_reuse=allow_voice_reuse,
                     used_voice_ref_ids=used,
                     bank=bank_entries,
+                    language=language,
                 )
             except VoiceCastingError as exc:
                 if target_engine == "google_tts":
@@ -1281,6 +1337,7 @@ class CastLock:
                 fallback_ref = gender_agnostic_fallback_ref(
                     bank_entries, engine=target_engine, char_id=char_id,
                     episode_seed=episode_seed, role="char_voice", used=used,
+                    language=language,
                 )
                 if fallback_ref is None:
                     report.append(f"  {char_id}: NOT cast -- {exc}")
@@ -1700,10 +1757,16 @@ class CastLock:
         entry["tts_model"] = str(getattr(ref, "engine", "") or "")
         entry["commercial_clean"] = _delivered_commercial_clean(entry, ref)
         entry["voice_cast_fallback"] = fallback
-        # Do NOT clear writer-stage ``voice_preset`` here. That field is Bark's
-        # identity, owned upstream by ``lemmy_row()``; ``_TIER_SWITCH_CLEARED_FIELDS``
-        # deliberately omits it so provisional/qualified delivery can keep the
-        # frozen Bark preset beside the stamped bank ref (2026-08-16 acceptance).
+        # A kokoro / google / elevenlabs stamp must not keep a leftover Bark
+        # ``v2/`` preset. Lime 20260917 left Stomp/Tiptoe/Whiskers speaking
+        # kokoro while the ledger still named Bark, and the two CastLock
+        # tests that pin this were red at HEAD. Bark's own identity stays:
+        # when the stamped engine IS bark, ``voice_preset`` is the spoken
+        # id and is left alone (Lemmy's frozen v2/* beside a bark row).
+        if str(getattr(ref, "engine", "") or "") != "bark":
+            leftover = str(entry.get("voice_preset") or "")
+            if leftover.startswith("v2/"):
+                entry["voice_preset"] = ""
         # presentation_gender (item 8 chunk 4, 2026-08-06): the gender the
         # DELIVERED voice presents as, taken from the reference actually chosen
         # rather than from the row's label. Stamped HERE because this is the one

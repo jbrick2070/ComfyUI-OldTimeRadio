@@ -281,6 +281,12 @@ def test_the_credits_layout_carries_the_chrome_and_the_language_header():
     assert 'chrome = _credits_chrome(meta)' in src
     assert '"chrome": dict(chrome),' in src
     assert '"language_header": str(meta.get("language_header") or ""),' in src
+    assert '"font_policy": _credits_font_policy(meta),' in src
+    assert 'lang_header = str(layout.get("language_header") or "").strip()' in src
+    assert '"writer_llm_header", "[ WRITER / LLM CONFIG ]"' in src
+    # origin_hud / more_hud wait for a HUD drawer; do not invent one here.
+    # Brand / status tags stay English day 1 (SIGNAL LOST, EPISODE TREATMENT,
+    # GENERATIVE STACK, DELIVERED VOICE, diagnostic flavor).
     # No audience header is left as a literal in the layout builder.
     for gone in ('"header": "MODELS"', '"header": "[ STORY SPINE ]"',
                  '"header": "[ SYSTEM ]"', '("Premise:",', '("Subject:",'):

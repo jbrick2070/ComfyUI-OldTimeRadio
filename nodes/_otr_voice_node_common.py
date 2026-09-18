@@ -141,7 +141,8 @@ def _provisional_identity_fingerprint(engine, voice_ref_id):
     return digest
 
 
-def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
+def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice",
+                            language="en"):
     """Best-effort on-disk reference WAV for a cloning engine + cast row, or None.
 
     preserve_ledger does not stamp a clip ref, and CastLock stamps only
@@ -190,6 +191,7 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
                     timbre=tuple(cast.get("timbre") or ()),
                     age_band=str(cast.get("age_band") or ""),
                     episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+                    language=language,
                 )
             except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
                 entry = None
@@ -211,13 +213,14 @@ def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice"):
             from ._otr_voice_bank import gender_agnostic_fallback_ref
             entry = gender_agnostic_fallback_ref(
                 bank, engine=engine, char_id=str(cast.get("char_id") or ""),
-                episode_seed=episode_seed, role=role,
+                episode_seed=episode_seed, role=role, language=language,
             )
     path = _resolve_ref_to_disk(getattr(entry, "ref_path", "") or "")
     return path if (path and os.path.exists(path)) else None
 
 
-def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
+def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice",
+                               language="en"):
     """The provider voice_id for a CLOUD voice engine (e.g. cloud_elevenlabs)
     + cast row when CastLock stamped none -- i.e. the operator changed only the
     VOICE ENGINE and left the CastLock voice_bank on a LOCAL bank (so the cast
@@ -270,6 +273,7 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
                     timbre=tuple(cast.get("timbre") or ()),
                     age_band=str(cast.get("age_band") or ""),
                     episode_seed=episode_seed, allow_voice_reuse=True, bank=bank,
+                    language=language,
                 )
             except Exception:  # noqa: BLE001 -- gender unservable; gender-agnostic below
                 entry = None
@@ -285,7 +289,7 @@ def _resolve_provider_voice_id(engine, cast, episode_seed, role="char_voice"):
             from ._otr_voice_bank import gender_agnostic_fallback_ref
             entry = gender_agnostic_fallback_ref(
                 bank, engine=engine, char_id=str(cast.get("char_id") or ""),
-                episode_seed=episode_seed, role=role,
+                episode_seed=episode_seed, role=role, language=language,
             )
     return getattr(entry, "provider_voice_id", "") or None
 
@@ -445,7 +449,16 @@ def _audio_cache_dir_for(meta: dict) -> str:
     return ""
 
 
-def _resolve_voice_ref_early(adapter, engine, cast, episode_seed, role, voice_ref):
+def _voice_language_iso(meta=None) -> str:
+    try:
+        from . import _otr_episode_languages as _EPLANG
+        return _EPLANG.iso_from_meta(meta if isinstance(meta, dict) else {})
+    except Exception:
+        return "en"
+
+
+def _resolve_voice_ref_early(adapter, engine, cast, episode_seed, role, voice_ref,
+                             language="en"):
     """Consolidate the branches at ``_render_per_line:566-591`` into ONE call
     returning ``(voice_ref_for_call, id_for_key)``.
 
@@ -459,9 +472,11 @@ def _resolve_voice_ref_early(adapter, engine, cast, episode_seed, role, voice_re
         if not (_disk and os.path.exists(_disk)):
             voice_ref = None
     if _engine_requires_voice_ref(adapter) and not voice_ref:
-        voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=role)
+        voice_ref = _resolve_clone_ref_path(
+            engine, cast, episode_seed, role=role, language=language)
     if ref_field == "provider_voice_id" and not voice_ref:
-        voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=role)
+        voice_ref = _resolve_provider_voice_id(
+            engine, cast, episode_seed, role=role, language=language)
     id_for_key = str(voice_ref or (cast or {}).get("voice_ref_id") or "")
     return voice_ref, id_for_key
 
@@ -1539,6 +1554,7 @@ class OTRVoiceNodeBase:
                 if cache_enabled:
                     voice_ref, id_for_key = _resolve_voice_ref_early(
                         adapter, engine, cast, episode_seed, self.ROLE, voice_ref,
+                        language=_voice_language_iso(meta),
                     )
                     adapter_identity = adapter.identity_params(resolved_voice_ref=id_for_key)
                     provider_model_id_stamp = str(adapter_identity.get("model", ""))
@@ -1618,7 +1634,9 @@ class OTRVoiceNodeBase:
                         # clone engine clones a REAL voice for THIS character. If none
                         # resolves, we FAIL LOUD below (no-fallback rip 2026-07-03) -- a
                         # cloning engine NEVER silently renders on bark.
-                        voice_ref = _resolve_clone_ref_path(engine, cast, episode_seed, role=self.ROLE)
+                        voice_ref = _resolve_clone_ref_path(
+                            engine, cast, episode_seed, role=self.ROLE,
+                            language=_voice_language_iso(meta))
                     # ONE-KNOB (2026-07-04): a cloud PROVIDER-voice engine (voice_ref_field
                     # == "provider_voice_id", e.g. elevenlabs) whose cast row has NO provider
                     # id -- the operator changed only the VOICE ENGINE and left CastLock's
@@ -1628,7 +1646,9 @@ class OTRVoiceNodeBase:
                     # CastLock never has to be touched. A missing pool -> None -> the adapter
                     # still fails loud (no silent inherit of another voice).
                     if getattr(adapter, "voice_ref_field", "") == "provider_voice_id" and not voice_ref:
-                        voice_ref = _resolve_provider_voice_id(engine, cast, episode_seed, role=self.ROLE)
+                        voice_ref = _resolve_provider_voice_id(
+                            engine, cast, episode_seed, role=self.ROLE,
+                            language=_voice_language_iso(meta))
                 # PHASE TWO of the per-line context: G1's per-engine external
                 # seed, now that the reference this character will actually be
                 # cloned from is resolved on BOTH paths [QA-5]. Profiles that

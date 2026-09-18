@@ -64,6 +64,7 @@ title card or a Spanish Flux prompt.
 | SDH captions (dialogue body + speaker labels) | Native | They burn ledger text; ledger is native |
 | Credits hero title + audience chrome | Native | The challenge -- see below |
 | Credits machine receipts (VRAM, CUDA, model ids, seeds) | English ids | Serial numbers, not show voice |
+| Credits brand / status tags (`SIGNAL LOST`, `EPISODE TREATMENT`, `GENERATIVE STACK`, `DELIVERED VOICE`, diagnostic flavor) | English | Not on `_REQUIRED_CREDITS`. Day 1 leaves them. Do not invent a second chrome table. |
 | Lemmy | English only | Non-English bypasses him |
 
 **Title, credits, and captions in the native language is the challenge.**
@@ -351,12 +352,14 @@ or mixed-language episodes. A visual-prompt language dropdown. A second caption
 language dropdown. A requirements tax on English installs. A Google-lane edit.
 A Bark multilingual revival. Klingon. Esperanto.
 
-## BUILD STATUS -- 2026-09-18, rows 1-3 landed
+## BUILD STATUS -- 2026-09-18, rows 1-7 coded; row 8 is live proof
 
-Rows 1, 2 and 3 of the go-forward below are BUILT AND WIRED. Rows 4-8 are not
-started, and each says below what it is waiting for. Nothing here has been
-proven on air: no episode was rendered in any language by this pass, so nothing
-reached `otr/obs/`.
+Rows 1-7 of the go-forward below are BUILT AND WIRED. Bark leftover `v2/`
+clears on a non-bark stamp. Voice `languages[]` filters every selection
+path. Caption wrap/font follow the row (Nirmala / YaHei; Hindi grapheme
+and CJK char wrap). Credits paint `language_header` and pick a script
+face from `font_policy`. Row 8 live `otr/obs/` legs are the remaining
+proof. Nothing here has been proven on air yet.
 
 | Landed | Where | Proof |
 |---|---|---|
@@ -378,20 +381,14 @@ roughly forty places -- cast partition, speaker resolution, markup parsing, the
 voice-coverage audit -- so the native name is a DISPLAY substitution at the one
 surface that paints it. Renaming the key is a systemic break for a cosmetic win.
 
-**Row 4 is waiting on a RED BASELINE, not on a design.** `test_cast_lock.py::
-test_auto_registry_stamps_voice_refs` and
-`test_kokoro_castlock_spoken_rows_have_no_bark_presets` fail at HEAD in a clean
-worktree: a Bark `v2/` preset survives onto a kokoro row. That is the same voice
-path row 4 must filter by `languages[]`, and layering a language filter under a
-broken preset path would make two defects share one symptom. Fix the preset
-defect first, then wire the filter.
+**Row 4 leftover Bark `v2/` is cleared** on a non-bark `_stamp`. The two
+CastLock pins (`test_auto_registry_stamps_voice_refs`,
+`test_kokoro_castlock_spoken_rows_have_no_bark_presets`) are the contract.
 
-**Row 7's policy ids exist and are pinned; the reader does not.** Every row
-carries its `font_policy` / `wrap_policy` / `cps_policy`
-(`devanagari` + `unicode_grapheme`, `cjk` + `cjk_chars`) and
-`tests/test_episode_languages.py` pins them, but `_otr_captions` still wraps
-every row with `wrap_words`. The five Latin rows are correct today; Hindi and
-CJK are not, and the row says so rather than pretending the ids are wired.
+**Row 7 wrap/font are wired.** `_otr_captions.wrap_text` honors `word_split` /
+`unicode_grapheme` / `cjk_chars`. ASS SDH + TITLE faces follow `font_policy`.
+Credits `_load_font` prepends Nirmala / YaHei on those rows and still
+degrades to the English walk, then PIL bitmap, rather than refusing.
 
 ## Staged go-forward (day 1 = all eight Kokoro languages)
 

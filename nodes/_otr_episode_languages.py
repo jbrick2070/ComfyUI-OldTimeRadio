@@ -49,6 +49,8 @@ __all__ = [
     "title_instruction",
     "validate_registry",
     "writer_language_instruction",
+    "assert_readiness_extras",
+    "readiness_extra_ok",
 ]
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -77,6 +79,10 @@ _REQUIRED_CREDITS = (
     "models_header", "production_ledger_header", "cast_voices_header",
     "story_spine_header", "premise_label", "subject_label",
     "classified_transcript_header", "system_header", "writer_llm_header",
+    # origin_hud / more_hud are reserved for a HUD drawer that does not
+    # exist yet. Painting them on today's card would add English pixels
+    # the live roll never showed. credits_text still owns the strings so
+    # a later drawer does not invent a second translation.
     "origin_hud", "more_hud",
 )
 _REQUIRED_CAPTIONS = ("font_policy", "wrap_policy", "cps_policy")
@@ -447,6 +453,43 @@ def kokoro_config(row_or_meta, *, path: str = None) -> dict:
         raise EpisodeLanguageError(
             "row %r does not list the kokoro engine" % row.label)
     return config
+
+
+def readiness_extra_ok(token: str) -> bool:
+    """True when a CastLock readiness extra is importable on THIS box.
+
+    ``misaki[ja]`` / ``misaki[zh]`` are never an English-install tax: English
+    rows list no extras, so this is not called on the default path.
+    """
+    extra = str(token or "").strip()
+    if not extra:
+        return True
+    if extra.startswith("misaki[") and extra.endswith("]"):
+        sub = extra[7:-1].strip()
+        if not sub:
+            return False
+        import importlib.util
+        if importlib.util.find_spec("misaki") is None:
+            return False
+        if importlib.util.find_spec("misaki.%s" % sub) is not None:
+            return True
+        try:
+            __import__("misaki")
+            import misaki
+            return hasattr(misaki, sub)
+        except Exception:
+            return False
+    return False
+
+
+def assert_readiness_extras(row: LanguageRow) -> None:
+    """Fail closed when this box cannot serve the row's extras."""
+    for extra in row.admission.get("readiness_extras") or []:
+        if not readiness_extra_ok(extra):
+            raise EpisodeLanguageError(
+                "language %s needs readiness extra %s on this box "
+                "(CastLock extra, never an English-install tax)"
+                % (row.label, extra))
 
 
 # --------------------------------------------------------------------------- #

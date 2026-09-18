@@ -1225,6 +1225,7 @@ CONTENT_OWNED_CONTRACT_FORBIDDEN_KEYS = frozenset({
 #: here.
 LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION = "source_fidelity_exclusion"
 LEMMY_POLICY_OPERATOR_CAMEO = "operator_cameo"
+LEMMY_POLICY_LANGUAGE_EXCLUSION = "language_exclusion"
 
 LEMMY_KNOB_NATURAL_ROLL = "natural_roll"
 LEMMY_KNOB_FORCED_INCLUDE = "forced_include"
@@ -1273,7 +1274,8 @@ class LemmyCameoDecision:
         }
 
 
-def resolve_lemmy_cameo(source_bank_id, force_lemmy) -> LemmyCameoDecision:
+def resolve_lemmy_cameo(source_bank_id, force_lemmy,
+                       language_iso=None) -> LemmyCameoDecision:
     """Decide the cameo once, before any authoring.
 
     Called EXACTLY ONCE per episode at runner entry. It must be early because
@@ -1283,9 +1285,11 @@ def resolve_lemmy_cameo(source_bank_id, force_lemmy) -> LemmyCameoDecision:
     cast.
 
     ``roll_lemmy()`` is called in exactly one branch and nowhere else, so the
-    ~11% OS-entropy roll happens once or not at all. Exclusion OUTRANKS the
-    operator knob: a fidelity lane refuses the cameo even when the operator
-    forced it, because the source's cast is the point of that lane.
+    ~11% OS-entropy roll happens once or not at all. Precedence: fidelity
+    first (English byte-identical), then language, then the knob. A non-English
+    iso bypasses the cameo. ``Off`` never arrives here as an iso -- callers
+    pass ``iso_from_meta``, which floors an unstamped ledger to English.
+    Language stays OUT of ``replay_voice_assignment``.
     """
     if force_lemmy is None:
         knob_state = LEMMY_KNOB_NATURAL_ROLL
@@ -1302,6 +1306,20 @@ def resolve_lemmy_cameo(source_bank_id, force_lemmy) -> LemmyCameoDecision:
         return LemmyCameoDecision(
             lemmy_hit=False,
             lemmy_policy=LEMMY_POLICY_SOURCE_FIDELITY_EXCLUSION,
+            knob_state=knob_state,
+            source_bank_id=bank_id,
+            roll_executed=False,
+        )
+
+    iso = str(language_iso or "").strip().lower()
+    if iso and iso != "en":
+        if force_lemmy:
+            log.info(
+                "[OTR] Lemmy language_exclusion: always-include ignored for "
+                "iso=%s (knob was not a natural roll)", iso)
+        return LemmyCameoDecision(
+            lemmy_hit=False,
+            lemmy_policy=LEMMY_POLICY_LANGUAGE_EXCLUSION,
             knob_state=knob_state,
             source_bank_id=bank_id,
             roll_executed=False,
@@ -1887,6 +1905,7 @@ def lock_cast(
     source_bank_id: str | None = None,
     source_character_genders: Optional[Mapping[str, Mapping[str, str]]] = None,
     upstream_identity_names: Optional[List[str]] = None,
+    language_iso: str | None = None,
 ) -> tuple[List[dict], dict]:
     """Build the full locked cast for an episode. Returns
     (cast_rows, meta).
@@ -1992,7 +2011,8 @@ def lock_cast(
     # between the cast rows and the receipt. This is the same shape the
     # dispatched `scifi_news_pro` lane already uses, and the chunk B build
     # contract asked for on BOTH lanes; only that one lane ever got it.
-    lemmy_decision = resolve_lemmy_cameo(source_bank_id, force_lemmy)
+    lemmy_decision = resolve_lemmy_cameo(
+        source_bank_id, force_lemmy, language_iso=language_iso)
 
     pre_locked, open_slots, lemmy_hit = assemble_pre_locked_rows(
         num_characters=num_characters,

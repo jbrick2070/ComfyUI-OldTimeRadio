@@ -39,7 +39,7 @@
         "subject_label": "Subject:",
         "classified_transcript_header": "[ CLASSIFIED TRANSCRIPT ]",
         "system_header": "[ SYSTEM ]",
-        "writer_llm_header": "[ WRITER-LLM-CONFIG ]",
+        "writer_llm_header": "[ WRITER / LLM CONFIG ]",
         "origin_hud": "ORIGIN",
         "more_hud": "+%d MORE"
       },

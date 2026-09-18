@@ -452,5 +452,12 @@ def test_exact_exception_is_safe_in_preserve_ledger_mode(tmp_path, monkeypatch):
         script_json=ledger, cast_voice_policy="preserve_ledger")[0])
     lemmy = locked["cast"][0]
 
-    assert lemmy["voice_preset"] == "v2/en_speaker_8"
+    # The portable exception must not prove a qualified route. A non-bark
+    # stamp (provisional or otherwise) clears leftover v2/* so the ledger
+    # does not credit Bark for a voice nobody heard (Lime 20260917).
     assert "voice_route" not in lemmy
+    engine = str(lemmy.get("voice_engine") or "")
+    if engine and engine != "bark":
+        assert not str(lemmy.get("voice_preset") or "").startswith("v2/")
+    else:
+        assert lemmy["voice_preset"] == "v2/en_speaker_8"

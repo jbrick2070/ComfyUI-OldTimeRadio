@@ -358,7 +358,7 @@ def test_the_kokoro_announcer_pools_have_not_drifted():
     """
     from config import cast_pools
     from nodes._otr_audio_engines import eng_kokoro
-    from nodes._otr_voice_bank import load_voice_bank
+    from nodes._otr_voice_bank import load_voice_bank, voice_speaks_language
 
     presets = [voice_id for voice_id, _label in cast_pools.ANNOUNCER_PRESETS]
     assert presets == list(eng_kokoro.ANNOUNCER_VOICE_POOL), (
@@ -367,10 +367,14 @@ def test_the_kokoro_announcer_pools_have_not_drifted():
         "engine no longer agree on which voices exist")
 
     entries, _ = load_voice_bank()
+    # English owners only. Non-English Kokoro rows also carry
+    # announcer_voice so a Spanish episode can draw ef_dora; they are
+    # a different pool and must not join this equality.
     bank_announcers = sorted(
         e.voice_ref_id for e in entries
         if e.engine == "kokoro" and "announcer_voice" in tuple(e.roles or ())
-        and e.quality_tier != "reject")
+        and e.quality_tier != "reject"
+        and voice_speaks_language(e, "en"))
     assert bank_announcers == sorted(presets), (
         "the voice bank's kokoro announcer_voice rows %s do not match the "
         "curated pool %s -- the third owner has drifted"
@@ -459,14 +463,16 @@ def test_every_curated_announcer_is_actually_DRAW_ELIGIBLE():
     voice-pool-staleness class again.
     """
     from config import cast_pools
-    from nodes._otr_voice_bank import announcer_voice_ref, load_voice_bank
+    from nodes._otr_voice_bank import (
+        announcer_voice_ref, load_voice_bank, voice_speaks_language)
 
     entries, _ = load_voice_bank()
     curated = {vid for vid, _label in cast_pools.ANNOUNCER_PRESETS}
     tagged = {
         e.voice_ref_id for e in entries
         if e.engine == "kokoro" and "announcer_voice" in tuple(e.roles or ())
-        and "preferred_announcer" in tuple(e.style_tags or ())}
+        and "preferred_announcer" in tuple(e.style_tags or ())
+        and voice_speaks_language(e, "en")}
     assert tagged == curated, (
         "curated announcers that are not preferred_announcer-tagged can never "
         "be drawn: %s" % sorted(curated - tagged))

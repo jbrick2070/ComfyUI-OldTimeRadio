@@ -157,13 +157,34 @@ def _credits_chrome(meta) -> dict:
     except ImportError:  # pragma: no cover -- flat/standalone load
         import _otr_episode_languages as _EPLANG  # type: ignore
     try:
-        return dict(_EPLANG.row_from_meta(meta).credits)
+        return {
+            key: _EPLANG.credits_text(meta, key)
+            for key in _EPLANG._REQUIRED_CREDITS
+        }
     except Exception as exc:  # noqa: BLE001
         log.warning(
             "[OTR_CreditsRoll] episode-language chrome unavailable (%s); "
             "printing the English headers", exc,
         )
-        return dict(_EPLANG.row_by_label(_EPLANG.ENGLISH_LABEL).credits)
+        english = _EPLANG.row_by_label(_EPLANG.ENGLISH_LABEL)
+        return {key: english.credits[key] for key in _EPLANG._REQUIRED_CREDITS}
+
+
+def _credits_font_policy(meta) -> str:
+    """Row-owned face family for the painted card. Latin keeps today's
+    monospace walk; Hindi / CJK prepend a script face so the hero title
+    does not tofu. Missing row -> latin, never a refused episode."""
+    try:
+        from . import _otr_episode_languages as _EPLANG
+    except ImportError:  # pragma: no cover -- flat/standalone load
+        import _otr_episode_languages as _EPLANG  # type: ignore
+    try:
+        raw = str(
+            (_EPLANG.row_from_meta(meta).captions or {}).get("font_policy")
+            or "").strip()
+        return raw or "latin_arial"
+    except Exception:  # noqa: BLE001
+        return "latin_arial"
 
 
 # _story_style_receipt (and its _STORY_STYLE_STATUS_SCAFFOLD_OFF constant) were
@@ -639,6 +660,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         # audience watching in it. Absent -- Off, or a pre-feature ledger -- and
         # the card prints nothing extra, exactly as it always did.
         "language_header": str(meta.get("language_header") or ""),
+        "font_policy": _credits_font_policy(meta),
         "footer_l": "Made with OTR v2 — 100%% generated",
         "footer_c": ">> voices from the CastLock final stamp — "
                     "delivered, not planned.",
@@ -654,11 +676,54 @@ def _today() -> str:
 # PIL rendering
 # =========================================================================== #
 _FONT_CACHE: dict = {}
+_ACTIVE_FONT_POLICY = "latin_arial"
+
+
+def _use_credits_font_policy(layout) -> str:
+    """Pin the face walk for one render. Latin is the default so a
+    caller that never stamps ``font_policy`` stays on today's walk."""
+    global _ACTIVE_FONT_POLICY
+    raw = ""
+    if isinstance(layout, dict):
+        raw = str(layout.get("font_policy") or "").strip()
+    _ACTIVE_FONT_POLICY = raw or "latin_arial"
+    return _ACTIVE_FONT_POLICY
+
+
+def _credits_script_font_paths(fd: str, policy: str) -> list:
+    """OS faces that can actually paint the row's script. Tried BEFORE
+    the English monospace list so Hindi / CJK titles do not tofu, and
+    AFTER ``OTR_CREDITS_FONT`` so the operator override still wins."""
+    if policy == "devanagari":
+        return [
+            os.path.join(fd, "Nirmala.ttf"),
+            os.path.join(fd, "nirmala.ttf"),
+            os.path.join(fd, "NirmalaUI.ttf"),
+            os.path.join(fd, "mangal.ttf"),
+            "/usr/share/fonts/truetype/lohit-devanagari/Lohit-Devanagari.ttf",
+            "/usr/share/fonts/truetype/noto/NotoSansDevanagari-Regular.ttf",
+            "/System/Library/Fonts/Supplemental/Devanagari Sangam MN.ttc",
+        ]
+    if policy == "cjk":
+        return [
+            os.path.join(fd, "msyh.ttc"),
+            os.path.join(fd, "msyhl.ttc"),
+            os.path.join(fd, "msyhbd.ttc"),
+            os.path.join(fd, "simhei.ttf"),
+            os.path.join(fd, "simsun.ttc"),
+            os.path.join(fd, "YuGothM.ttc"),
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/System/Library/Fonts/PingFang.ttc",
+            "/System/Library/Fonts/STHeiti Light.ttc",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+        ]
+    return []
 
 
 def _load_font(pt: int):
-    """Resolve a monospace truetype at ``pt`` via absolute font paths (bare
-    names do not resolve reliably). Cached.
+    """Resolve a truetype at ``pt`` via absolute font paths (bare
+    names do not resolve reliably). Cached. Latin keeps the historical
+    monospace walk so an English card is byte-identical.
 
     DEGRADES rather than raising when nothing resolves (operator ruling
     2026-09-11): *"don't assume people have fonts installed. I'm open to some
@@ -680,7 +745,9 @@ def _load_font(pt: int):
     the box rather than discover it silently.
     """
     from PIL import ImageFont
-    key = int(pt)
+    policy = str(_ACTIVE_FONT_POLICY or "latin_arial").strip() or "latin_arial"
+    size = int(pt)
+    key = (size, policy)
     if key in _FONT_CACHE:
         return _FONT_CACHE[key]
     fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
@@ -691,23 +758,27 @@ def _load_font(pt: int):
     # that already resolve, and the difference between a credits tail and a
     # CreditsDataError on Apple Silicon, which ships no DejaVu and no consola.
     explicit = otr_env.get("OTR_CREDITS_FONT", "").strip()
-    candidates = ([explicit] if explicit else []) + [
-        os.path.join(fd, "JetBrainsMono-Bold.ttf"),
-        os.path.join(fd, "consola.ttf"),
-        os.path.join(fd, "cour.ttf"),
-        os.path.join(fd, "lucon.ttf"),
-        "JetBrainsMono-Bold.ttf", "consola.ttf", "cour.ttf",
-        "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-        "DejaVuSansMono.ttf",
-        "/System/Library/Fonts/Menlo.ttc",
-        "/System/Library/Fonts/Monaco.ttf",
-        "/System/Library/Fonts/Supplemental/Courier New Bold.ttf",
-        "/Library/Fonts/Courier New Bold.ttf",
-    ]
+    candidates = (
+        ([explicit] if explicit else [])
+        + _credits_script_font_paths(fd, policy)
+        + [
+            os.path.join(fd, "JetBrainsMono-Bold.ttf"),
+            os.path.join(fd, "consola.ttf"),
+            os.path.join(fd, "cour.ttf"),
+            os.path.join(fd, "lucon.ttf"),
+            "JetBrainsMono-Bold.ttf", "consola.ttf", "cour.ttf",
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "DejaVuSansMono.ttf",
+            "/System/Library/Fonts/Menlo.ttc",
+            "/System/Library/Fonts/Monaco.ttf",
+            "/System/Library/Fonts/Supplemental/Courier New Bold.ttf",
+            "/Library/Fonts/Courier New Bold.ttf",
+        ]
+    )
     for path in candidates:
         try:
-            f = ImageFont.truetype(path, key)
+            f = ImageFont.truetype(path, size)
             _FONT_CACHE[key] = f
             return f
         except Exception:  # noqa: BLE001
@@ -877,6 +948,7 @@ def render_static_base(layout: dict, w: int, h: int):
     scanlines). Column 3 is left as background; the scroll canvas overlays it.
     Returns a PIL RGBA image (w x h)."""
     from PIL import Image, ImageDraw, ImageFilter
+    _use_credits_font_policy(layout)
     sx = h / _REF_H
 
     # --- radial background ---
@@ -1111,6 +1183,11 @@ def _flow_col1(d, x, top, layout, w, h, note_lines, gaps=1.0):
             y + (_fh(fs) - _fh(ft))), layout["subtitle_tag"],
            fill=_rgba(_GREEN, _A_TAG), font=ft)
     y += _fh(fs) + _gap(6)
+    lang_header = str(layout.get("language_header") or "").strip()
+    if lang_header:
+        flh = _load_font(_sc(_PT_TAG, h))
+        d.text((x, y), lang_header, fill=_rgba(_GREEN, _A_TAG), font=flh)
+        y += _fh(flh) + _gap(6)
     ffine = _load_font(_sc(_PT_FOOTER, h))
     # Clamped: bank + style + resolution + date can exceed the column on the
     # narrow shipped canvases (QA-measured overflow at 720p/480p worst pairs).
@@ -1289,8 +1366,11 @@ def _draw_col2(d, x, top, layout, w, h):
     y += _sc(12, h)
     d.line([(x, y), (x + int(_COL2_W * sx), y)], fill=_rgba(_GREEN, 40), width=1)
     y += _sc(18, h)
-    y = _draw_grid(d, x, y, "[ WRITER / LLM CONFIG ]", col2["writer_grid"], h,
-                   label_w=_sc(150, h))
+    y = _draw_grid(
+        d, x, y,
+        (layout.get("chrome") or {}).get(
+            "writer_llm_header", "[ WRITER / LLM CONFIG ]"),
+        col2["writer_grid"], h, label_w=_sc(150, h))
     return y
 
 
@@ -1615,6 +1695,7 @@ def render_credits_clip(layout: dict, backdrop_path: str, out_path: str,
     """Render the SILENT credits console clip: static base (cols 1-2) + the
     scrolling col-3 canvas, over the LOOPED darkened backdrop, with a fade in/out.
     Returns the clip duration (== declared credits tail). RAISES on any failure."""
+    _use_credits_font_policy(layout)
     base_img = render_static_base(layout, w, h)
     scroll_img = render_scroll_canvas(layout["col3_flow"],
                                       _sc(_COL3_W, h), h)
