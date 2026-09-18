@@ -323,14 +323,30 @@ def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
     assert calls == ["misaki.zh"]
 
 
-@pytest.mark.parametrize("label", [l for l in ADMITTED_LABELS if l != "English"])
-def test_fidelity_banks_excluded_on_every_non_english_row(label):
-    excl = el.row_by_label(label).admission["source_bank_exclusions"]
-    assert "shakespeare" in excl and "public_domain" in excl, label
+@pytest.mark.parametrize("label", ADMITTED_LABELS)
+def test_no_row_excludes_any_bank(label):
+    """Every lane is eligible for the episode language (operator 2026-09-18)."""
+    assert el.row_by_label(label).admission["source_bank_exclusions"] == [], label
 
 
-def test_english_row_excludes_no_bank():
-    assert el.row_by_label("English").admission["source_bank_exclusions"] == []
+_SPOKEN_CREDIT_KEYS = (
+    "coda_public_domain_us", "coda_cc0", "coda_research_only", "coda_synthetic",
+    "coda_named_public_domain_us", "coda_named_cc0", "coda_named_research_only",
+    "coda_licensed_named", "attribution_named", "attribution_anonymous",
+)
+
+
+@pytest.mark.parametrize("label", ADMITTED_LABELS)
+def test_every_row_authors_its_spoken_credit_sentences(label):
+    """The announcer's Python-owned sentences are row data, never translated."""
+    spoken = el.row_by_label(label).spoken
+    for key in _SPOKEN_CREDIT_KEYS:
+        assert spoken[key].strip(), (label, key)
+    for key in ("coda_named_public_domain_us", "coda_named_cc0",
+                "coda_named_research_only", "coda_licensed_named"):
+        assert "{work_title}" in spoken[key] and "{author}" in spoken[key], (label, key)
+    assert "{name}" in spoken["attribution_named"], label
+    assert "{" not in spoken["attribution_anonymous"], label
 
 
 @pytest.mark.parametrize("label", ADMITTED_LABELS)

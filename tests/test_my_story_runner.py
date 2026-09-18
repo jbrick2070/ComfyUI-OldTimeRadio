@@ -1650,3 +1650,19 @@ def test_the_runner_hands_the_rule_to_the_spoken_passes_only():
     assert "language_instruction = _EPLANG.native_authoring_instruction(meta)" in src
     assert src.count("language_instruction=language_instruction") == 3
     assert "language_instruction" not in inspect.getsource(MS._pass_interpret)
+
+
+def test_a_native_episode_speaks_its_attribution_in_the_episode_language():
+    """The Python-owned credit is row data: the frame fallback appends the
+    Spanish sentence, never the English one, on a Spanish episode."""
+    slots = Slots(author="Ada Byron")
+    led, _ = _run(slots, author="Ada Byron", episode_language="es")
+    spanish = "La historia de esta noche es de Ada Byron."
+    story = led.data["meta"]["my_story"]
+    # The canned frame carries the English sentence as MODEL text, so the
+    # Python fallback fires and appends the row's own sentence to the outro.
+    assert story["frame"]["announcer_outro"][-1] == spanish
+    assert story["attribution"]["sentence"] == spanish
+    spoken = [row["text"] for row in led.data["lines"]]
+    assert spanish in spoken
+    assert spoken.count(spanish) == 1

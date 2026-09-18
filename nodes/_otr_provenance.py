@@ -38,7 +38,10 @@ cleared for. Pure; never raises. Self-contained. UTF-8 no BOM, SFW.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict
+
+log = logging.getLogger("OTR")
 
 __all__ = [
     "normalize_provenance",
@@ -126,13 +129,48 @@ _LICENSED_NAMED_CODA = "Tonight's scene was drawn from {author}'s {work_title}."
 _LICENSED_STATUSES = frozenset({"licensed_commercial", "licensed_noncommercial"})
 
 
-def spoken_coda_line(provenance: Any, identity: Any = None) -> str:
+#: The registry key each English template above lives under, so a row can
+#: carry its own authored sentence and English stays byte-identical.
+_CODA_KEY_BY_STATUS = {status: "coda_" + status for status in _CODA_BY_STATUS}
+_NAMED_CODA_KEY_BY_STATUS = {
+    status: "coda_named_" + status for status in _NAMED_CODA_BY_STATUS}
+_LICENSED_NAMED_CODA_KEY = "coda_licensed_named"
+
+
+def _row_spoken(episode_meta: Any) -> dict:
+    """The episode row's ``spoken`` block, or {} when unreadable.
+
+    Fail-soft on purpose: a spoken credit degrades to its English sentence
+    rather than costing the episode its coda.
+    """
+    if episode_meta is None:
+        return {}
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        return dict(_EPLANG.row_from_meta(episode_meta).spoken)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[provenance] episode-language spoken block unavailable (%s); "
+            "using the English sentence", exc)
+        return {}
+
+
+def spoken_coda_line(provenance: Any, identity: Any = None, *,
+                     episode_meta: Any = None) -> str:
     """A short spoken acknowledgement for the announcer coda.
 
     ``identity`` is an optional :class:`_otr_source_identity.SourceIdentity`.
     WITHOUT it this returns exactly what it always returned, so every existing
     caller and test is unaffected; WITH it the sentence names the work and its
     author.
+
+    ``episode_meta`` selects the episode language's own authored sentence
+    from the registry row's ``spoken`` block. The English row carries these
+    exact templates, and no meta means the English templates, so every
+    existing caller is byte-identical.
 
     THE 2026-08-05 LICENSED-SOURCE RULING IS SUPERSEDED FOR AUTHOR AND WORK
     (operator, 2026-08-15). That ruling stopped the announcer reciting a
@@ -148,19 +186,21 @@ def spoken_coda_line(provenance: Any, identity: Any = None) -> str:
     """
     prov = provenance if isinstance(provenance, dict) else {}
     status = str(prov.get("status") or "")
+    spoken = _row_spoken(episode_meta)
 
     work_title = str(getattr(identity, "work_title", "") or "").strip()
     author = str(getattr(identity, "author", "") or "").strip()
     if work_title and author:
         if status in _LICENSED_STATUSES:
-            return _LICENSED_NAMED_CODA.format(
-                work_title=work_title, author=author)
+            template = spoken.get(_LICENSED_NAMED_CODA_KEY) or _LICENSED_NAMED_CODA
+            return template.format(work_title=work_title, author=author)
         template = _NAMED_CODA_BY_STATUS.get(status)
         if template:
+            template = spoken.get(_NAMED_CODA_KEY_BY_STATUS[status]) or template
             return template.format(work_title=work_title, author=author)
 
     if status in _CODA_BY_STATUS:
-        return _CODA_BY_STATUS[status]
+        return spoken.get(_CODA_KEY_BY_STATUS[status]) or _CODA_BY_STATUS[status]
     # A LICENSED SOURCE GETS NO SPOKEN LINE (operator ruling 2026-08-05):
     # "I get it, thanks to Folger, but they didn't write it -- Shakespeare did."
     #

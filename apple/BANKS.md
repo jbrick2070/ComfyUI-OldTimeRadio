@@ -31,18 +31,12 @@ selecting it does nothing. It is there to tell you the door exists --
 
 ### Language compatibility
 
-English can use every bank. Spanish, Portuguese, Italian, French, Hindi,
-Japanese and Mandarin can use `original`, `my_story`, `media_archive` and
-`scifi_news_pro`.
-
-Those seven rows refuse `shakespeare` and `public_domain` before loading a
-model. Both are fidelity lanes that perform the source author's own words; they
-cannot also be translation lanes.
-
-The current roll chooses a bank before that language check. For an unattended
-non-English run, pin one of the four supported banks above. A roll that draws a
-fidelity bank refuses cleanly rather than substituting another bank. The full
-one-switch behaviour is in [MULTILINGUAL.md](MULTILINGUAL.md).
+Every bank works on every language row. `original`, `my_story`,
+`media_archive`, `scifi_news_pro` and `public_domain` are authored in the
+language; `shakespeare` performs its selected passage translated, speakers and
+cut unchanged, and records both hashes on the ledger. A roll on a non-English
+row may draw any bank. The full one-switch behaviour is in
+[MULTILINGUAL.md](MULTILINGUAL.md).
 
 ---
 

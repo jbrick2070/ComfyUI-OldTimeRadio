@@ -77,6 +77,11 @@ _REQUIRED_SPOKEN = (
     "reserved_announcer_name", "sign_on_greeting", "station_id_open",
     "tonight_label", "station_id_close", "sign_off_greeting", "work_line_prefix",
     "open_on_prefix",
+    # Python-owned sentences the announcer SPEAKS: the provenance coda and
+    # My Story's attribution. Authored per row; never translated at runtime.
+    "coda_public_domain_us", "coda_cc0", "coda_research_only", "coda_synthetic",
+    "coda_named_public_domain_us", "coda_named_cc0", "coda_named_research_only",
+    "coda_licensed_named", "attribution_named", "attribution_anonymous",
 )
 _REQUIRED_CREDITS = (
     "models_header", "production_ledger_header", "cast_voices_header",
@@ -502,11 +507,14 @@ def assert_readiness_extras(row: LanguageRow) -> None:
 
 
 def check_source_bank_admission(row: Optional[LanguageRow], source_bank_id) -> None:
-    """Fail loud when a fidelity bank meets a language that cannot carry it.
+    """Fail loud when a row's ``source_bank_exclusions`` names this bank.
 
-    The verbatim lanes (shakespeare, public_domain) perform the author's own
-    words; a verbatim lane cannot also be a translation lane. Called at the
-    writer BEFORE any LLM call, so the refusal costs nothing.
+    Every lane is eligible for the episode language (operator, 2026-09-18):
+    the generative banks author natively and the verbatim lane translates its
+    passage. The exclusion list is therefore empty on every shipped row and
+    exists as a data-driven gate for a bank that genuinely cannot carry a
+    language yet. Called at the writer BEFORE any LLM call, so a refusal
+    costs nothing.
 
     ``None`` (``Off``) admits everything -- Off is today's path.
     """
@@ -518,9 +526,9 @@ def check_source_bank_admission(row: Optional[LanguageRow], source_bank_id) -> N
     excluded = row.admission.get("source_bank_exclusions") or []
     if bank_id in excluded:
         raise EpisodeLanguageError(
-            "source_bank %r cannot be authored in %s (%s): that lane performs "
-            "the author's own words, and a verbatim lane cannot also be a "
-            "translation. Pick English, or pick another source bank."
+            "source_bank %r is not admitted in %s (%s): the language row lists "
+            "it under source_bank_exclusions. Pick English, or pick another "
+            "source bank."
             % (bank_id, row.label, row.iso))
 
 

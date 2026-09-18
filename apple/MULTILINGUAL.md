@@ -114,21 +114,21 @@ Use only the line for the language you need.
 
 ## Source banks and music
 
-English can use every source bank. The seven non-English rows refuse
-`shakespeare` and `public_domain`: those lanes carry the source author's own
-words and cannot also be translation lanes.
+Every source bank works on every language row.
 
-Use one of these for a non-English episode:
-
-- `original`
-- `my_story`
-- `media_archive`
-- `scifi_news_pro`
-
-The current `roll (any eligible bank)` command rolls before the language
-fidelity check. A non-English roll can therefore draw `shakespeare` or
-`public_domain` and refuse before spending on a model. Pin one of the four rows
-above for an unattended non-English run.
+- `original`, `my_story`, `media_archive` and `scifi_news_pro` are AUTHORED in
+  the language: the writer is told to write natively and never hands the model
+  an English draft. A My Story prompt typed in English still yields a native
+  episode; SciFi News Pro keeps its news source as published and writes the new
+  story natively.
+- `shakespeare` performs its passage TRANSLATED: the selected passage is
+  translated once, in order, speakers and cut unchanged, and then performed
+  verbatim exactly as the English lane performs Folger's text. The ledger's
+  `verbatim_passage.translation` receipt carries both hashes.
+- `public_domain` adapts natively through the same writer seams.
+- The announcer's spoken credit line (the source acknowledgement, and the My
+  Story attribution) is authored per row in `config/episode_languages.json`
+  under `spoken`, so it is never a translation either.
 
 Language does not choose the music. The source bank does. If eight language
 tests all pin `original`, all eight correctly ask for salsa conjunto. To hear
@@ -177,16 +177,20 @@ Copy the closest existing row. Every row needs:
 - `admitted`, `native_header` and `row_revision`;
 - `authoring`: `spoken_name`, `writer_instruction`, `visual_prompt_iso`,
   `title_instruction`;
-- `spoken`: all eight station/announcer strings carried by the English row;
+- `spoken`: every station/announcer string carried by the English row --
+  the eight chrome strings plus the ten spoken credit sentences (the
+  provenance coda templates and the two My Story attribution templates,
+  with their `{work_title}` / `{author}` / `{name}` placeholders);
 - `credits`: every heading and label carried by the English row;
 - `captions`: `font_policy`, `wrap_policy`, `cps_policy`;
 - `engines.kokoro`: `lang_code` and a non-empty `voices` list;
 - `admission`: `source_bank_exclusions`, `readiness_extras`,
   `min_voice_count`.
 
-Use `visual_prompt_iso: "en"` for the current feature. For a non-English row,
-start with `["shakespeare", "public_domain"]` as the source exclusions unless
-you have designed and proven a source-faithful native lane.
+Use `visual_prompt_iso: "en"` for the current feature. Leave
+`source_bank_exclusions` empty: every bank is eligible on every row (the
+verbatim lane translates its passage). The list exists only for a bank that
+genuinely cannot carry a language yet.
 
 Choose the caption policy by script:
 

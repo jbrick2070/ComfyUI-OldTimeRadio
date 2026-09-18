@@ -28,7 +28,17 @@
         "station_id_close": "This has been SIGNAL LOST",
         "sign_off_greeting": "Good night",
         "work_line_prefix": "a scene from ",
-        "open_on_prefix": "We open on "
+        "open_on_prefix": "We open on ",
+        "coda_public_domain_us": "Tonight's tale was adapted from a work in the public domain.",
+        "coda_cc0": "Tonight's tale was adapted from a work dedicated to the public domain.",
+        "coda_research_only": "Tonight's tale draws on a source cleared for research use only.",
+        "coda_synthetic": "Tonight's tale was an original work, created for this broadcast.",
+        "coda_named_public_domain_us": "Tonight's tale was adapted from {work_title}, by {author}.",
+        "coda_named_cc0": "Tonight's tale was adapted from {work_title}, by {author}, a work dedicated to the public domain.",
+        "coda_named_research_only": "Tonight's tale draws on {work_title}, by {author}, a source cleared for research use only.",
+        "coda_licensed_named": "Tonight's scene was drawn from {author}'s {work_title}.",
+        "attribution_named": "Tonight's story is by {name}.",
+        "attribution_anonymous": "Tonight's story comes from one of our listeners."
       },
       "credits": {
         "models_header": "MODELS",
@@ -89,7 +99,17 @@
         "station_id_close": "Esto ha sido SIGNAL LOST",
         "sign_off_greeting": "Buenas noches",
         "work_line_prefix": "una escena de ",
-        "open_on_prefix": "Abrimos en "
+        "open_on_prefix": "Abrimos en ",
+        "coda_public_domain_us": "El relato de esta noche fue adaptado de una obra de dominio público.",
+        "coda_cc0": "El relato de esta noche fue adaptado de una obra cedida al dominio público.",
+        "coda_research_only": "El relato de esta noche se basa en una fuente autorizada solo para uso de investigación.",
+        "coda_synthetic": "El relato de esta noche fue una obra original, creada para esta emisión.",
+        "coda_named_public_domain_us": "El relato de esta noche fue adaptado de {work_title}, de {author}.",
+        "coda_named_cc0": "El relato de esta noche fue adaptado de {work_title}, de {author}, una obra cedida al dominio público.",
+        "coda_named_research_only": "El relato de esta noche se basa en {work_title}, de {author}, una fuente autorizada solo para uso de investigación.",
+        "coda_licensed_named": "La escena de esta noche fue tomada de {work_title}, de {author}.",
+        "attribution_named": "La historia de esta noche es de {name}.",
+        "attribution_anonymous": "La historia de esta noche viene de uno de nuestros oyentes."
       },
       "credits": {
         "models_header": "MODELOS",
@@ -116,7 +136,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": [],
         "min_voice_count": 3
       }
@@ -142,7 +162,17 @@
         "station_id_close": "Isto foi SIGNAL LOST",
         "sign_off_greeting": "Boa noite",
         "work_line_prefix": "uma cena de ",
-        "open_on_prefix": "Abrimos em "
+        "open_on_prefix": "Abrimos em ",
+        "coda_public_domain_us": "A história desta noite foi adaptada de uma obra em domínio público.",
+        "coda_cc0": "A história desta noite foi adaptada de uma obra dedicada ao domínio público.",
+        "coda_research_only": "A história desta noite se baseia em uma fonte liberada apenas para uso em pesquisa.",
+        "coda_synthetic": "A história desta noite foi uma obra original, criada para esta transmissão.",
+        "coda_named_public_domain_us": "A história desta noite foi adaptada de {work_title}, de {author}.",
+        "coda_named_cc0": "A história desta noite foi adaptada de {work_title}, de {author}, uma obra dedicada ao domínio público.",
+        "coda_named_research_only": "A história desta noite se baseia em {work_title}, de {author}, uma fonte liberada apenas para uso em pesquisa.",
+        "coda_licensed_named": "A cena desta noite foi tirada de {work_title}, de {author}.",
+        "attribution_named": "A história desta noite é de {name}.",
+        "attribution_anonymous": "A história desta noite vem de um dos nossos ouvintes."
       },
       "credits": {
         "models_header": "MODELOS",
@@ -169,7 +199,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": [],
         "min_voice_count": 3
       }
@@ -195,7 +225,17 @@
         "station_id_close": "Questa è stata SIGNAL LOST",
         "sign_off_greeting": "Buonanotte",
         "work_line_prefix": "una scena da ",
-        "open_on_prefix": "Si apre su "
+        "open_on_prefix": "Si apre su ",
+        "coda_public_domain_us": "Il racconto di stasera è stato adattato da un'opera di pubblico dominio.",
+        "coda_cc0": "Il racconto di stasera è stato adattato da un'opera dedicata al pubblico dominio.",
+        "coda_research_only": "Il racconto di stasera si basa su una fonte autorizzata solo per uso di ricerca.",
+        "coda_synthetic": "Il racconto di stasera è stato un'opera originale, creata per questa trasmissione.",
+        "coda_named_public_domain_us": "Il racconto di stasera è stato adattato da {work_title}, di {author}.",
+        "coda_named_cc0": "Il racconto di stasera è stato adattato da {work_title}, di {author}, un'opera dedicata al pubblico dominio.",
+        "coda_named_research_only": "Il racconto di stasera si basa su {work_title}, di {author}, una fonte autorizzata solo per uso di ricerca.",
+        "coda_licensed_named": "La scena di stasera è tratta da {work_title}, di {author}.",
+        "attribution_named": "La storia di stasera è di {name}.",
+        "attribution_anonymous": "La storia di stasera viene da uno dei nostri ascoltatori."
       },
       "credits": {
         "models_header": "MODELLI",
@@ -222,7 +262,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": [],
         "min_voice_count": 2
       }
@@ -248,7 +288,17 @@
         "station_id_close": "C'était SIGNAL LOST",
         "sign_off_greeting": "Bonne nuit",
         "work_line_prefix": "une scène de ",
-        "open_on_prefix": "Nous ouvrons sur "
+        "open_on_prefix": "Nous ouvrons sur ",
+        "coda_public_domain_us": "Le récit de ce soir a été adapté d'une œuvre du domaine public.",
+        "coda_cc0": "Le récit de ce soir a été adapté d'une œuvre versée au domaine public.",
+        "coda_research_only": "Le récit de ce soir s'appuie sur une source réservée à la recherche.",
+        "coda_synthetic": "Le récit de ce soir était une œuvre originale, créée pour cette émission.",
+        "coda_named_public_domain_us": "Le récit de ce soir a été adapté de {work_title}, de {author}.",
+        "coda_named_cc0": "Le récit de ce soir a été adapté de {work_title}, de {author}, une œuvre versée au domaine public.",
+        "coda_named_research_only": "Le récit de ce soir s'appuie sur {work_title}, de {author}, une source réservée à la recherche.",
+        "coda_licensed_named": "La scène de ce soir est tirée de {work_title}, de {author}.",
+        "attribution_named": "L'histoire de ce soir est de {name}.",
+        "attribution_anonymous": "L'histoire de ce soir nous vient de l'un de nos auditeurs."
       },
       "credits": {
         "models_header": "MODÈLES",
@@ -275,7 +325,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": [],
         "min_voice_count": 1
       }
@@ -301,7 +351,17 @@
         "station_id_close": "यह रहा SIGNAL LOST",
         "sign_off_greeting": "शुभ रात्रि",
         "work_line_prefix": "एक दृश्य — ",
-        "open_on_prefix": "हम खुलते हैं — "
+        "open_on_prefix": "हम खुलते हैं — ",
+        "coda_public_domain_us": "आज रात की कहानी सार्वजनिक क्षेत्र की एक रचना से रूपांतरित की गई है।",
+        "coda_cc0": "आज रात की कहानी सार्वजनिक क्षेत्र को समर्पित एक रचना से रूपांतरित की गई है।",
+        "coda_research_only": "आज रात की कहानी केवल शोध उपयोग के लिए स्वीकृत स्रोत पर आधारित है।",
+        "coda_synthetic": "आज रात की कहानी एक मौलिक रचना थी, इसी प्रसारण के लिए रची गई।",
+        "coda_named_public_domain_us": "आज रात की कहानी {author} की {work_title} से रूपांतरित की गई है।",
+        "coda_named_cc0": "आज रात की कहानी {author} की {work_title} से रूपांतरित की गई है, जो सार्वजनिक क्षेत्र को समर्पित रचना है।",
+        "coda_named_research_only": "आज रात की कहानी {author} की {work_title} पर आधारित है, जो केवल शोध उपयोग के लिए स्वीकृत स्रोत है।",
+        "coda_licensed_named": "आज रात का दृश्य {author} की {work_title} से लिया गया है।",
+        "attribution_named": "आज रात की कहानी {name} की है।",
+        "attribution_anonymous": "आज रात की कहानी हमारे एक श्रोता की ओर से आई है।"
       },
       "credits": {
         "models_header": "मॉडल",
@@ -328,7 +388,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": [],
         "min_voice_count": 3
       }
@@ -354,7 +414,17 @@
         "station_id_close": "SIGNAL LOST でした",
         "sign_off_greeting": "おやすみなさい",
         "work_line_prefix": "一場面：",
-        "open_on_prefix": "幕開けは"
+        "open_on_prefix": "幕開けは",
+        "coda_public_domain_us": "今夜の物語は、パブリックドメインの作品を脚色したものです。",
+        "coda_cc0": "今夜の物語は、パブリックドメインに捧げられた作品を脚色したものです。",
+        "coda_research_only": "今夜の物語は、研究目的にのみ許可された資料に基づいています。",
+        "coda_synthetic": "今夜の物語は、この放送のために作られたオリジナル作品でした。",
+        "coda_named_public_domain_us": "今夜の物語は、{author}の『{work_title}』を脚色したものです。",
+        "coda_named_cc0": "今夜の物語は、{author}の『{work_title}』を脚色したものです。パブリックドメインに捧げられた作品です。",
+        "coda_named_research_only": "今夜の物語は、{author}の『{work_title}』に基づいています。研究目的にのみ許可された資料です。",
+        "coda_licensed_named": "今夜の一場面は、{author}の『{work_title}』から取られました。",
+        "attribution_named": "今夜の物語は、{name}の作です。",
+        "attribution_anonymous": "今夜の物語は、リスナーのお一人から寄せられました。"
       },
       "credits": {
         "models_header": "モデル",
@@ -381,7 +451,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": ["misaki[ja]"],
         "min_voice_count": 3
       }
@@ -407,7 +477,17 @@
         "station_id_close": "以上是 SIGNAL LOST",
         "sign_off_greeting": "晚安",
         "work_line_prefix": "一场戏：",
-        "open_on_prefix": "开场："
+        "open_on_prefix": "开场：",
+        "coda_public_domain_us": "今晚的故事改编自一部公有领域作品。",
+        "coda_cc0": "今晚的故事改编自一部献给公有领域的作品。",
+        "coda_research_only": "今晚的故事取材于一份仅限研究使用的资料。",
+        "coda_synthetic": "今晚的故事是为本次播出创作的原创作品。",
+        "coda_named_public_domain_us": "今晚的故事改编自{author}的《{work_title}》。",
+        "coda_named_cc0": "今晚的故事改编自{author}的《{work_title}》，这是一部献给公有领域的作品。",
+        "coda_named_research_only": "今晚的故事取材于{author}的《{work_title}》，这是一份仅限研究使用的资料。",
+        "coda_licensed_named": "今晚的这场戏取自{author}的《{work_title}》。",
+        "attribution_named": "今晚的故事由{name}创作。",
+        "attribution_anonymous": "今晚的故事来自我们的一位听众。"
       },
       "credits": {
         "models_header": "模型",
@@ -437,7 +517,7 @@
         }
       },
       "admission": {
-        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "source_bank_exclusions": [],
         "readiness_extras": ["misaki[zh]"],
         "min_voice_count": 3
       }

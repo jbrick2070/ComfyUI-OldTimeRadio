@@ -468,17 +468,40 @@ ANONYMOUS_CREDIT = (
 )
 
 
-def attribution_sentence(author: str) -> str:
+def _attribution_templates(episode_meta: Any) -> tuple[str, str]:
+    """(named, anonymous) templates from the episode row, English otherwise.
+
+    Fail-soft: an unreadable registry costs the sentence its language, never
+    the episode its credit.
+    """
+    named, anonymous = "Tonight's story is by {name}.", ANONYMOUS_ATTRIBUTION
+    if episode_meta is None:
+        return named, anonymous
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        spoken = _EPLANG.row_from_meta(episode_meta).spoken
+        return (str(spoken.get("attribution_named") or named),
+                str(spoken.get("attribution_anonymous") or anonymous))
+    except Exception:  # noqa: BLE001
+        return named, anonymous
+
+
+def attribution_sentence(author: str, *, episode_meta: Any = None) -> str:
     """The spoken attribution line. Python owns this, not the model.
 
     Authored here so the name reaches the microphone exactly as it was typed:
     a model asked to "mention the author" will paraphrase, and a paraphrased
-    name is the wrong name.
+    name is the wrong name. ``episode_meta`` picks the episode language's own
+    authored template; English and no meta are byte-identical.
     """
     name = str(author or "").strip()
+    named, anonymous = _attribution_templates(episode_meta)
     if not name:
-        return ANONYMOUS_ATTRIBUTION
-    return "Tonight's story is by %s." % name
+        return anonymous
+    return named.format(name=name)
 
 
 def credits_source_line(author: str) -> str:
@@ -489,12 +512,12 @@ def credits_source_line(author: str) -> str:
     return "a story by %s, produced by machine for this broadcast" % name
 
 
-def attribution_receipt(author: str) -> dict:
+def attribution_receipt(author: str, *, episode_meta: Any = None) -> dict:
     """What the ledger records about attribution, including its absence."""
     name = str(author or "").strip()
     return {
         "author": name,
-        "sentence": attribution_sentence(name),
+        "sentence": attribution_sentence(name, episode_meta=episode_meta),
         "credits_source_line": credits_source_line(name),
         "source": "story_author widget" if name else "none supplied",
     }

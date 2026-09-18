@@ -3326,17 +3326,18 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             visual_style)
         _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
         # ------------------------------------------------------------------ #
-        # THE FIDELITY GATE -- the first point the bank id is authoritative,
+        # THE ADMISSION GATE -- the first point the bank id is authoritative,
         # and still BEFORE the LLM preflight, the scaffold env mutation and
-        # _resolve_inputs. Shakespeare and Public Domain perform the author's
-        # own words; a verbatim lane cannot also be a translation lane, so the
-        # combination refuses here rather than spending a model on an episode
-        # that could only be wrong.
+        # _resolve_inputs. Every lane is eligible for the episode language
+        # (operator, 2026-09-18): the generative banks author natively and the
+        # verbatim lane translates its passage further down. The gate stays
+        # as DATA on the language row (`source_bank_exclusions`, empty on
+        # every shipped row) so a bank that genuinely cannot carry a language
+        # refuses here rather than spending a model on it.
         #
-        # PRECEDENCE, stated because an unstated order is the defect: fidelity
+        # PRECEDENCE, stated because an unstated order is the defect: admission
         # first (this gate, which keeps English byte-identical), then language,
-        # then the Lemmy knob. The exclusions are DATA on the language row --
-        # the banks never learn about ISO codes.
+        # then the Lemmy knob. The banks never learn about ISO codes.
         # ------------------------------------------------------------------ #
         _EPLANG.check_source_bank_admission(
             _language_row,
@@ -3769,6 +3770,32 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         _verbatim_plan = resolved.get("verbatim_plan")
         if resolved.get("verbatim_receipt"):
             meta["verbatim_passage"] = dict(resolved["verbatim_receipt"])
+        # THE PASSAGE IS TRANSLATED ON A NON-ENGLISH ROW (operator ruling
+        # 2026-09-18: "if it is an English source, translation is necessary").
+        # Texts only -- speakers, cut and order are the plan's -- so the
+        # executor below and the outline's verbatim_texts both read the
+        # translation. Guarded on the EMPTY instruction, not the stamp:
+        # English stamps `en` and must stay byte-identical. Loud on failure;
+        # an English verbatim row on a native episode is the defect itself.
+        if _verbatim_plan is not None:
+            _vt_instruction = _EPLANG.native_authoring_instruction(meta)
+            if _vt_instruction:
+                try:
+                    from . import _otr_verbatim_translation as _OTRVT
+                except ImportError:  # pragma: no cover -- flat load
+                    import _otr_verbatim_translation as _OTRVT  # type: ignore
+                _verbatim_plan, _vt_receipt = _OTRVT.translate_plan(
+                    _verbatim_plan,
+                    language_instruction=_vt_instruction,
+                    creative_fn=creative_generate_fn,
+                    iso=_EPLANG.iso_from_meta(meta),
+                    model_id=str(resolved.get("creative_writing_model") or ""),
+                )
+                meta.setdefault("verbatim_passage", {})["translation"] = _vt_receipt
+                log.info(
+                    "[OTR_LedgerScriptWriter] verbatim passage translated into "
+                    "%s: %d entries in %d call(s)", _vt_receipt["iso"],
+                    _vt_receipt["entries"], _vt_receipt["batches"])
         # kibitz r2-r4 provenance: any bank whose defaults define
         # credits_source_line gets it stamped (data-driven -- the
         # original_radio row always defines it, so its credits line is
@@ -3793,7 +3820,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         if _story_bundle is not None:
             _story_author_name = _story_bundle.normalized.author
             meta["story_attribution"] = _otr_story_input.attribution_receipt(
-                _story_author_name)
+                _story_author_name, episode_meta=meta)
             meta["credits_source_line"] = _otr_story_input.credits_source_line(
                 _story_author_name)
         # v4 P1(viii): opt-in source-provenance normalizer. Map source_rights ->
@@ -3843,7 +3870,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # twice and give this branch its own copy to drift from.
             meta["source_identity"] = _identity.as_receipt()
             meta["provenance_coda_line"] = _OTRPROV.spoken_coda_line(
-                _prov, _identity)
+                _prov, _identity, episode_meta=meta)
             if _identity.is_degraded:
                 log.warning(
                     "[OTR_LedgerScriptWriter] the closing announcer could not "

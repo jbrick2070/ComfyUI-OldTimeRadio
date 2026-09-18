@@ -79,14 +79,24 @@ def test_the_widget_is_on_the_creative_whitelist_in_both_mirrors():
 
 @pytest.mark.parametrize("label", NON_ENGLISH)
 @pytest.mark.parametrize("bank", FIDELITY_BANKS)
-def test_a_fidelity_bank_refuses_on_every_non_english_row(label, bank):
-    row = el.row_by_label(label)
+def test_a_fidelity_bank_is_admitted_on_every_non_english_row(label, bank):
+    """Every lane is eligible (operator 2026-09-18): the verbatim lane
+    translates its passage, the prose adaptation lane authors natively."""
+    el.check_source_bank_admission(el.row_by_label(label), bank)
+
+
+def test_the_admission_gate_still_refuses_a_row_that_lists_a_bank():
+    """The gate is data: an exclusion on a row is honoured and names both."""
+    row = el.row_by_label("Spanish")
+    fenced = row._replace(admission={**row.admission,
+                                     "source_bank_exclusions": ["shakespeare"]})
     with pytest.raises(el.EpisodeLanguageError) as caught:
-        el.check_source_bank_admission(row, bank)
+        el.check_source_bank_admission(fenced, "shakespeare")
     message = str(caught.value)
-    assert bank in message and label in message
+    assert "shakespeare" in message and "Spanish" in message
     # The refusal must say what to do instead, not merely that it refused.
     assert "English" in message
+    el.check_source_bank_admission(fenced, "public_domain")
 
 
 @pytest.mark.parametrize("bank", FIDELITY_BANKS)

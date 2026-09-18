@@ -1189,7 +1189,7 @@ def run_my_story_episode(
             )
 
         # --- P3 frame --------------------------------------------------------
-        attribution = _SI.attribution_sentence(author)
+        attribution = _SI.attribution_sentence(author, episode_meta=meta)
         inter_wanted = _interstitial_count(len(acts), include_act_breaks)
         with _helper_ctx(slot_scheduler, "my_story_frame"):
             frame = _pass_frame(creative_fn, pack, bundle, treatment,
@@ -1203,7 +1203,7 @@ def run_my_story_episode(
         if _norm_ws(attribution) not in _norm_ws(spoken_frame):
             frame.announcer_outro.append(attribution)
         story["frame"] = frame.model_dump(mode="json")
-        story["attribution"] = _SI.attribution_receipt(author)
+        story["attribution"] = _SI.attribution_receipt(author, episode_meta=meta)
 
         # --- P4 voices (no model call) ---------------------------------------
         cast_rows = _assign_voices(treatment, rng)
