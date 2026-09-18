@@ -98,8 +98,8 @@ checkpoint was reachable. Follow the video section's rules 1 and 2.
 
 The add-your-own page is [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md) -- same job as
 this file's engine sections, for a language model. You can pick anything the
-dropdown will take. What the pack ships is Qwen 3.5 transformers with two
-honest identities (NF4 vs full), not a GGUF writer.
+dropdown will take. What the pack ships is Qwen 3.5 as one transformers
+row (NVIDIA NF4, Mac / CPU full), not a GGUF writer.
 
 There is still no preflight matrix test. Schema tests that must stay green
 against the real catalog:

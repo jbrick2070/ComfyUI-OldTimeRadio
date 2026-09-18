@@ -38,6 +38,16 @@
   WE FIXED IT." Do not reopen techno/house cue wording, tempo-error A/Bs,
   groove-prompt order, or the music-lottery seed hunt. IndexTTS2 hang is a
   hang-timeout, not prompt-craft, and stays a separate row.
+- **EVERY CODE CHANGE GETS COMPOSER QA BEFORE THE PUSH (operator
+  directive 2026-09-17 -- hard).** Operator: "thats my law any code
+  change always get a composer qa." Cursor driver: spawn Composer QA
+  (Task, Composer, briefed to REFUTE) on the finished diff. Do not
+  `git push` until it returns HOLDS / MUST-FIX: none. Then Sonnet
+  (Task, `claude-sonnet-5-thinking-max`, REFUTE) until HOLDS. A
+  self-review does not count. Do not push first and QA after. This
+  supersedes the older "Sonnet 5 QA is enough" / "one finished-diff
+  review is enough" / "one CLI lane" floors below for every coding
+  change.
 - **NO WORD-COUNT CHASING (operator directive 2026-08-03).** "We never chase word count."
   The target words value is a REQUEST, not a gate: no refusals, no hard caps, no shunts. The
   manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only
@@ -76,11 +86,13 @@
     outright, and corrected the driver's own execution-order claim.
   * **NO -- one verifiable right answer: wiring conformance, a grep-and-fix, a stale comment,
     a rename, an `/object_info` check, a deterministic edit** -> NO arc. An arc pressure-tests
-    DESIGN; there is nothing to pressure-test. Sonnet 5 QA on the finished diff before the
-    push is the correct and sufficient gate.
-  * **ONE CLEAN FINISHED-DIFF REVIEW IS ENOUGH (operator directive 2026-08-20).** Run one
-    independent reviewer after code. If it returns clean and the driver grounds that result
-    against the real files, STOP reviewing and move to tests/live proof. Add another reviewer
+    DESIGN; there is nothing to pressure-test. Still run Composer QA
+    (then Sonnet) before the push -- the 2026-09-17 law above. The
+    thing you skip is the four-round arc, not Composer.
+  * **ONE CLEAN FINISHED-DIFF REVIEW IS ENOUGH (operator directive 2026-08-20 --
+    amended 2026-09-17).** Do not multiply reviewers past Composer-then-Sonnet
+    when both HOLD. If Composer HOLDS and Sonnet HOLDS, STOP reviewing and
+    move to tests/live proof. Add another reviewer
     only when the first reports a blocker, two reviewers disagree, a material claim remains
     unverifiable, or the two-strikes rule below fires. An available internal subagent is a
     valid reviewer; do not wait on or multiply CLI/cloud lanes merely to increase the count.

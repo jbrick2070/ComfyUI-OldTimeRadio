@@ -6,9 +6,8 @@ Two different jobs share this page. Do not mix them up.
 Face causal LM of your own, choose Gemma or Llama from the list, use a cloud
 slot if you have a key. The picker is open. Nothing here locks you to Qwen.
 
-**What this pack ships:** Qwen 3.5 4B as transformers, with **two honest
-dropdown identities** -- NF4 for NVIDIA 8 GB graphs and a freshly dropped
-node, full precision for canonical and Mac. The 16 GB NVIDIA graphs still
+**What this pack ships:** Qwen 3.5 4B as one transformers dropdown row.
+NVIDIA bakes NF4; Mac and CPU load full. The 16 GB NVIDIA graphs still
 ship `google/gemma-4-12b-it`. There is no GGUF writer in the shipped catalog
 (`GGUF_ROWS` is empty on purpose: a transformers twin already exists). Video
 engines may still load a GGUF UNet; that is a different dropdown.
@@ -42,12 +41,11 @@ ceiling for your hardware.
 4. **Restart ComfyUI.** `INPUT_TYPES` runs at registration. A download that
    finished while the server was up is invisible until then.
 5. **An uncurated id has no fit tags.** Curated labels look like
-   `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)`. A cache-discovered id is
+   `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)`. A cache-discovered id is
    the bare `org/name`. Do not infer tags for it.
-6. **Set Quant yourself** unless you picked a row that owns it. The two
-   Qwen identities own Quant (NF4 is `bnb_nf4`, full is `none`). Gemma 4
-   12B also owns `bnb_nf4`. A mismatch fails loud on purpose. Llama,
-   Gemma-2, your cache folder, and cloud handles still use the Quant widget.
+6. **Quant is baked on the rows that own it.** The one Qwen loads NF4 on
+   NVIDIA and full on Mac / CPU. Gemma 4 12B owns `bnb_nf4`. Llama,
+   Gemma-2, a cache folder, and cloud handles still use the Quant widget.
 7. **Keep both writer slots on the same id** unless you mean to swap two
    models in and out of VRAM all run.
 8. **The technical slot has to emit JSON the pipeline can parse.** Beautiful
@@ -67,9 +65,9 @@ This is a catalog row, not an adapter. One `CuratedModel(...)` in
 `CURATED_LLM_MODELS` inside `nodes/_otr_model_catalog.py`.
 
 `repo_id` is unique in the dropdown. Two rows may share one Hugging Face
-snapshot only through `hf_repo_id` plus `implied_quant_policy` -- that is how
-the two Qwen identities work. Do not invent a second HF repo for the same
-weights.
+snapshot only through `hf_repo_id` plus `implied_quant_policy`. Qwen itself
+is one row (`implied_quant_policy="platform"`). Do not invent a second HF
+repo for the same weights.
 
 ### The seven gates
 
@@ -87,9 +85,10 @@ tier owes the user is honesty at the moment of choosing -- the badge number
 and truthful `notes` -- not absence. Ripping a row is an explicit decision
 about a specific model. UNKNOWN / FAIL do not ship.
 
-**Gate 3 -- it loads under the Quant the pick claims.** NF4 for the NVIDIA
-twin, `none` for the full twin. Watch resident VRAM, not the file size. An
-unquantized load must not inherit a ceiling sized for 4-bit.
+**Gate 3 -- it loads under the Quant the pick claims.** For Qwen that is
+platform policy: NF4 on NVIDIA, `none` on Mac / CPU -- one picker row, not
+two. Watch resident VRAM, not the file size. An unquantized load must not
+inherit a ceiling sized for 4-bit.
 
 **Gate 4 -- it generates free-form prose.**
 
@@ -101,7 +100,7 @@ actually binds a schema.
 **Gate 6 -- the chat template accepts the roles OTR sends.** OTR sends a
 system + user pair. Gemma-2 rejects the system role; the generate path
 already folds that. Qwen 3.5 4B needs `enable_thinking=False` on every
-generate call -- both identities, because they share one Hugging Face repo.
+generate call -- one Hugging Face repo, one picker row.
 
 **Gate 7 -- the context window is the file's truth.** Declare what the
 artifact supports, not what a model card claims. KV cache is not free.
@@ -110,9 +109,9 @@ artifact supports, not what a model card claims. KV cache is not free.
 
 | Field | Meaning |
 |---|---|
-| `repo_id` | Dropdown identity. Hugging Face `org/name`, or `org/name:nf4` for a Quant twin. |
-| `hf_repo_id` | Real Hugging Face repo when `repo_id` is a twin. Empty means `repo_id` is the HF id. |
-| `implied_quant_policy` | When set (`none` / `bnb_nf4`), the pick owns Quant. Empty means the widget still decides. |
+| `repo_id` | Dropdown identity. Hugging Face `org/name`. A `:nf4` suffix is a retired alias for validation only -- it is not a COMBO row. |
+| `hf_repo_id` | Real Hugging Face repo when `repo_id` is an alias. Empty means `repo_id` is the HF id. |
+| `implied_quant_policy` | When set (`none` / `bnb_nf4` / `platform`), the pick owns Quant. `platform` is what Qwen uses (NF4 on NVIDIA, full elsewhere). Empty means the widget still decides. |
 | `requires_auth` | Whether Hugging Face actually gates it. Measure it; do not copy the previous row. |
 | `loader_backend` | Dispatch key. `transformers_safetensors` for an ordinary causal LM. |
 | `vram_fit_tier` | Honesty at choose-time. |
@@ -141,8 +140,8 @@ list. Video-engine GGUF UNets are a different dropdown.
 ### If it becomes a shipped default
 
 The badge string is part of the saved widget value. Update `DEFAULT_LLM` /
-`default_llm_option()` (canonical, full Qwen) or `fresh_llm_option()` (a
-newly dropped node, NF4 Qwen), the writer `widgets_values` on
+`default_llm_option()` and `fresh_llm_option()` together -- they are the
+same one Qwen label -- then the writer `widgets_values` on
 `workflows/otr_canonical.json` (never a bare repo id), then
 `python scripts/build_variants.py --all` and `--check`. Edit
 [WRITERS.md](WRITERS.md) in the same change. Do not hand-edit the variant

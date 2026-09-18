@@ -108,9 +108,9 @@ This is not an engine. There is no `@register` and no adapter file.
 **You can pick anything the dropdown will take.** Cache a CausalLM, choose
 Gemma, use a cloud slot. That is not the same as what the pack ships.
 
-**What the pack ships:** Qwen 3.5 as transformers, two honest dropdown
-identities (NF4 vs full). There is no GGUF writer row; a transformers twin
-already exists.
+**What the pack ships:** Qwen 3.5 as one transformers dropdown row
+(NVIDIA NF4, Mac / CPU full). There is no GGUF writer row; a transformers
+twin already exists.
 
 The full checklist -- on-machine cache path, catalog row, seven gates -- is
 [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to
