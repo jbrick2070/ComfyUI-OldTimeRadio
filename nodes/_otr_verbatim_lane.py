@@ -77,16 +77,37 @@ GATE_KEY = "verbatim_passage"
 NON_VERBATIM_CREDIT_PREFIX = "freely adapted from"
 
 
-def non_verbatim_credit_line(existing: str) -> str:
+def non_verbatim_credit_line(existing: str, *, episode_meta: Any = None) -> str:
     """The printed credit for a verbatim bank that could not perform its
     source verbatim. ``printed_credit_line`` writes "adapted from <work>
-    (<terms>)"; this makes it "freely adapted from ...". Never raises."""
+    (<terms>)"; this makes it "freely adapted from ...". Never raises.
+
+    The prefix it recognises and the "freely" wrapping are the episode
+    row's ``credits`` templates, so a Spanish credit is wrapped in Spanish.
+    No meta means the English row, byte-identical to before.
+    """
     line = str(existing or "").strip()
-    if line.lower().startswith("adapted from"):
-        return f"freely {line}"
-    if line:
-        return f"{NON_VERBATIM_CREDIT_PREFIX} the source; {line}"
-    return f"{NON_VERBATIM_CREDIT_PREFIX} the source"
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        t = _EPLANG.credits_or_english(episode_meta)
+        # Containment, not a prefix test: Hindi and Japanese put the source
+        # BEFORE the verb, so "adapted from" is not always the first word.
+        marker = str(t["credit_adapted_prefix"]).lower()
+        if line and marker in line.lower():
+            return t["credit_freely"].format(line=line)
+        if line:
+            return t["credit_freely_source_with"].format(line=line)
+        return t["credit_freely_source"]
+    except Exception as exc:  # noqa: BLE001 -- a printed credit never fails a roll
+        log.warning("[verbatim_lane] credits templates unavailable (%s)", exc)
+        if line.lower().startswith("adapted from"):
+            return f"freely {line}"
+        if line:
+            return f"{NON_VERBATIM_CREDIT_PREFIX} the source; {line}"
+        return f"{NON_VERBATIM_CREDIT_PREFIX} the source"
 
 
 def bank_is_verbatim(bank_row: Any) -> bool:

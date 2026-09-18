@@ -22,8 +22,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 from typing import Any, NamedTuple, Optional
+
+log = logging.getLogger("OTR")
 
 __all__ = [
     "OFF_LABEL",
@@ -33,6 +36,7 @@ __all__ = [
     "LanguageResolution",
     "REGISTRY_PATH",
     "check_source_bank_admission",
+    "credits_or_english",
     "credits_text",
     "dropdown_choices",
     "iso_from_meta",
@@ -92,6 +96,17 @@ _REQUIRED_CREDITS = (
     # the live roll never showed. credits_text still owns the strings so
     # a later drawer does not invent a second translation.
     "origin_hud", "more_hud",
+    # The printed SOURCE line and its labels (operator 2026-09-18: printed
+    # credits are row data; per-bank sentences live in banks.json by iso).
+    "source_label", "source_intercept_label",
+    "credit_adapted_from", "credit_adapted_generic", "credit_adapted_plain",
+    "tag_public_domain", "tag_cc0",
+    "credit_research_only", "credit_research_only_generic",
+    "credit_licensed", "credit_used_under", "credit_synthetic",
+    "credit_adapted_prefix", "credit_freely", "credit_freely_source_with",
+    "credit_freely_source",
+    "credit_story_by", "credit_story_anonymous",
+    "credit_models_used", "credit_models_none",
 )
 _REQUIRED_CAPTIONS = ("font_policy", "wrap_policy", "cps_policy")
 _REQUIRED_ADMISSION = (
@@ -445,6 +460,33 @@ def credits_text(meta, key: str, *, path: str = None) -> str:
     except KeyError:
         raise EpisodeLanguageError(
             "row %r has no credits.%s" % (row.label, key)) from None
+
+
+def credits_or_english(meta) -> dict:
+    """The row's ``credits`` block, or the English row's when ``meta`` is
+    None or unreadable.
+
+    Fail-soft on purpose: a printed credit degrades to its English sentence
+    rather than costing the episode its credits roll. ``None`` means the
+    English block outright, so every caller without a ledger is
+    byte-identical.
+    """
+    try:
+        english = dict(row_by_label(ENGLISH_LABEL).credits)
+    except Exception as exc:  # noqa: BLE001 -- an unreadable registry
+        log.warning(
+            "[episode_languages] registry unreadable (%s); no credits "
+            "templates -- callers keep their English literals", exc)
+        return {}
+    if meta is None:
+        return english
+    try:
+        return dict(row_from_meta(meta).credits)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[episode_languages] credits block unavailable (%s); using the "
+            "English row", exc)
+        return english
 
 
 def kokoro_config(row_or_meta, *, path: str = None) -> dict:

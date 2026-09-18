@@ -543,9 +543,20 @@ def _stamp_model_call_provenance(meta, slot_scheduler):
             receipt[bucket].append(model)
     meta["model_call_provenance"] = receipt
     if meta.get("source_bank") == "original":
-        meta["credits_source_line"] = "Story generation models used: " + (
-            ", ".join(receipt["generation_models"]) or "none recorded"
-        )
+        _models = ", ".join(receipt["generation_models"])
+        try:
+            try:
+                from . import _otr_episode_languages as _EPLANG_CREDITS
+            except ImportError:  # pragma: no cover -- flat/standalone load
+                import _otr_episode_languages as _EPLANG_CREDITS  # type: ignore
+            _credits = _EPLANG_CREDITS.credits_or_english(meta)
+            meta["credits_source_line"] = _credits["credit_models_used"].format(
+                models=_models or _credits["credit_models_none"])
+        except Exception as exc:  # noqa: BLE001 -- a printed credit never fails a run
+            log.warning("[writer_tail] credits templates unavailable (%s); "
+                        "printing the English line", exc)
+            meta["credits_source_line"] = "Story generation models used: " + (
+                _models or "none recorded")
 
 
 def _stamp_final_slot_telemetry(

@@ -504,12 +504,29 @@ def attribution_sentence(author: str, *, episode_meta: Any = None) -> str:
     return named.format(name=name)
 
 
-def credits_source_line(author: str) -> str:
-    """The printed credit for the closing crawl."""
+def credits_source_line(author: str, *, episode_meta: Any = None) -> str:
+    """The printed credit for the closing crawl, in the episode's language.
+
+    Templates are the row's ``credits`` block; English and no meta are
+    byte-identical to the old sentences.
+    """
     name = str(author or "").strip()
+    named = "a story by {name}, produced by machine for this broadcast"
+    anonymous = ANONYMOUS_CREDIT
+    if episode_meta is not None:
+        try:
+            try:
+                from . import _otr_episode_languages as _EPLANG
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_episode_languages as _EPLANG  # type: ignore
+            t = _EPLANG.credits_or_english(episode_meta)
+            named = str(t.get("credit_story_by") or named)
+            anonymous = str(t.get("credit_story_anonymous") or anonymous)
+        except Exception:  # noqa: BLE001 -- a printed credit never fails a roll
+            pass
     if not name:
-        return ANONYMOUS_CREDIT
-    return "a story by %s, produced by machine for this broadcast" % name
+        return anonymous
+    return named.format(name=name)
 
 
 def attribution_receipt(author: str, *, episode_meta: Any = None) -> dict:
@@ -518,7 +535,7 @@ def attribution_receipt(author: str, *, episode_meta: Any = None) -> dict:
     return {
         "author": name,
         "sentence": attribution_sentence(name, episode_meta=episode_meta),
-        "credits_source_line": credits_source_line(name),
+        "credits_source_line": credits_source_line(name, episode_meta=episode_meta),
         "source": "story_author widget" if name else "none supplied",
     }
 

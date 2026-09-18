@@ -166,8 +166,21 @@ def _credits_chrome(meta) -> dict:
             "[OTR_CreditsRoll] episode-language chrome unavailable (%s); "
             "printing the English headers", exc,
         )
+    try:
         english = _EPLANG.row_by_label(_EPLANG.ENGLISH_LABEL)
         return {key: english.credits[key] for key in _EPLANG._REQUIRED_CREDITS}
+    except Exception as exc:  # noqa: BLE001 -- the registry itself is unreadable
+        # A LABEL MAY NEVER BLOCK A PUBLISH. With no registry at all, print
+        # the key names as plain labels rather than refuse the episode.
+        log.warning(
+            "[OTR_CreditsRoll] language registry unreadable (%s); printing "
+            "plain key labels", exc,
+        )
+        return {
+            key: key.replace("_header", "").replace("_label", "")
+                    .replace("_", " ").upper()
+            for key in _EPLANG._REQUIRED_CREDITS
+        }
 
 
 def _credits_font_policy(meta) -> str:
@@ -585,12 +598,14 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     _key_terms = news.get("key_terms")
     if isinstance(_key_terms, (list, tuple)) and _key_terms:
         flow.append(("intercept",
-                     {"text": ">> SOURCE INTERCEPT: %s"
-                              % " · ".join(str(t) for t in _key_terms[:8])}))
+                     {"text": ">> %s: %s" % (
+                         chrome["source_intercept_label"],
+                         " · ".join(str(t) for t in _key_terms[:8]))}))
     elif news.get("script_brief"):
         # Legacy ledgers without key_terms keep the old read.
         flow.append(("intercept",
-                     {"text": ">> SOURCE INTERCEPT: %s" % news["script_brief"]}))
+                     {"text": ">> %s: %s" % (chrome["source_intercept_label"],
+                                              news["script_brief"])}))
 
     # SOURCE line (kibitz r2-r4, printed-layer provenance): rendered when
     # the writer stamped meta["credits_source_line"] from the bank row's
@@ -600,7 +615,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     # (science et al.) are byte-identical.
     _src_line = str(meta.get("credits_source_line") or "")
     if _src_line:
-        flow.append(("intercept", {"text": ">> SOURCE: %s" % _src_line}))
+        flow.append(("intercept", {"text": ">> %s: %s" % (chrome["source_label"], _src_line)}))
 
     # NON-COMMERCIAL NOTICE (2026-08-07). The writer has stamped
     # meta["noncommercial_notice"] since the provenance work

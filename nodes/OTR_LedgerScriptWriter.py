@@ -3802,11 +3802,17 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # UNCONDITIONAL for that lane; science defines none and stays
         # byte-identical). The credits roll renders the stamp when
         # present -- no bank branch in the credits code.
-        _credits_line = str(
-            (_source_bank_row.defaults or {}).get("credits_source_line")
-            or ""
-        )
+        # BANK-BY-LANGUAGE MATRIX (operator 2026-09-18): a bank's default line
+        # is English data; `credits_source_line_<iso>` beside it is the same
+        # sentence in each admitted language (scalar keys, because bank
+        # defaults are scalar-checked). English and a missing entry read the
+        # default, byte-identical.
+        _bank_defaults = _source_bank_row.defaults or {}
+        _credits_line = str(_bank_defaults.get("credits_source_line") or "")
         if _credits_line:
+            _credits_line = str(
+                _bank_defaults.get("credits_source_line_" + _EPLANG.iso_from_meta(meta))
+                or _credits_line)
             meta["credits_source_line"] = _credits_line
         # ATTRIBUTION, AND IT HAS TO BE STAMPED HERE -- AFTER the bank-default
         # credit above, never at the top of D.1 with the other stamps. That
@@ -3822,7 +3828,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             meta["story_attribution"] = _otr_story_input.attribution_receipt(
                 _story_author_name, episode_meta=meta)
             meta["credits_source_line"] = _otr_story_input.credits_source_line(
-                _story_author_name)
+                _story_author_name, episode_meta=meta)
         # v4 P1(viii): opt-in source-provenance normalizer. Map source_rights ->
         # one normalized record; stamp the spoken coda line + fill
         # credits_source_line when the bank default did not. A research_only
@@ -3881,7 +3887,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     _identity.author,
                 )
             if not str(meta.get("credits_source_line") or "").strip():
-                _pc = _OTRPROV.printed_credit_line(_prov)
+                _pc = _OTRPROV.printed_credit_line(_prov, episode_meta=meta)
                 if _pc:
                     meta["credits_source_line"] = _pc
             # A bank that performs its source verbatim but could not (a
@@ -3895,7 +3901,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 except ImportError:  # pragma: no cover -- flat load
                     import _otr_verbatim_lane as _OTRVL  # type: ignore
                 meta["credits_source_line"] = _OTRVL.non_verbatim_credit_line(
-                    str(meta.get("credits_source_line") or ""))
+                    str(meta.get("credits_source_line") or ""), episode_meta=meta)
             # A NON-COMMERCIAL SOURCE HAS TO REACH A HUMAN (2026-08-04).
             # commercial_use_allowed was already validated, carried and
             # normalized -- and shown to nobody. An operator publishing a
