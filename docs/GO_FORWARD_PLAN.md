@@ -97,18 +97,25 @@ here). Do not `git add .`. Composer QA then Sonnet before every push.
 ### 1. Shakespeare and Public Domain on a non-English row
 
 **Decided 2026-09-18 (standing ruling): the verbatim passage is TRANSLATED
-into the episode language.** The author's lines are English and no model
-authors them, so native authoring cannot reach them; the exclusion in
-`config/episode_languages.json` (`source_bank_exclusions`) stays until this
-lands. The other four banks already author natively.
+into the episode language.** Design settled by one panel round (Grok
+refuted, Claude judged):
+[judgment](2026-09-18-fidelity-lane-translation/judgment.md). In short:
+translate the plan's entry TEXTS (speakers copied, structural validation
+only, batched for the 2048 floor, loud on failure) right after the plan is
+read so both the executor and the outline's `verbatim_texts` see the
+translation; move the spoken coda fact and My Story's attribution sentence
+into each row's `spoken` block the way `work_frame_sentence` already works;
+then lift `source_bank_exclusions` on all seven rows and rewrite the
+admission text. Public Domain needs only the spoken-block change and the
+lift. English byte-identical throughout.
 
-Design has more than one answer, so it gets a panel before code: translate
-the planned passage BEFORE the verbatim gate (so `row_is_verbatim` and the
-fidelity checks compare against the translated passage), or have the
-composer perform the source passage in the language at the line seam and
-relax the verbatim gate for non-English only. English stays byte-identical
-either way. Verify: a Spanish Shakespeare one-act whose character rows are
-all Spanish; English Shakespeare fixtures unchanged.
+Verify: the tests listed in the judgment; a Spanish Shakespeare one-act
+whose character rows are all Spanish and whose coda is Spanish is the live
+proof, and it waits for the test wave like everything else.
+
+Vendored public-domain translations (French and Italian are complete on
+Wikisource) are a separate data row behind his scope word -- see the
+inventory and the Gemini prompt in the same folder.
 
 ### 2. A `cuda:1` voice stamp silently becomes card zero
 
