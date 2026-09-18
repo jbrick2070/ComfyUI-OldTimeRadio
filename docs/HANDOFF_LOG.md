@@ -1,3 +1,22 @@
+## 2026-09-18 -- GO_FORWARD reads decide, then code, then test
+
+Did: Operator asked to optimize the plan for scoping and decision first,
+  coding second, testing third. The work rows did not change. Open forks
+  (A1, A5, gallery, pre-push hook, delete `v2.0-alpha`, flagged registry
+  versions) are now section 1. The two decided bug fixes (native
+  character authoring, then `cuda:1`) are section 2. The four-machine
+  wave is section 3 and still waits until 1 and 2 are empty. Held rows
+  are an "already scoped" list, not an open fork, so they do not block
+  the wave. A new row with more than one answer goes in section 1 even
+  if it looks like a bug.
+Current step: open forks wait for his word. Decided CODE is still
+  native authoring, then `cuda:1` -- those two do not wait on A1/A5.
+Next: the already-decided native-authoring code row, unless he is
+  answering a section-1 fork.
+Models: planner write; no panel (order of the same queue, not a new
+  design).
+Commits: this docs chunk.
+
 ## 2026-09-18 -- GO_FORWARD trimmed to the two remaining bug-fix rows
 
 Did: Operator asked for a clean go-forward that only keeps work that
