@@ -94,36 +94,23 @@ here). Do not `git add .`. Composer QA then Sonnet before every push.
 (~10 min):** full `pytest tests`, once the row is green. Commands live in
 [known-failures](known-failures.md). Those gates are not the test wave.
 
-### 1. Shakespeare and Public Domain on a non-English row
+### 1. Printed credit lines stay English on a native episode
 
-**Decided 2026-09-18 (standing ruling): the verbatim passage is TRANSLATED
-into the episode language.** Design settled by one panel round (Grok
-refuted, Claude judged):
-[judgment](2026-09-18-fidelity-lane-translation/judgment.md). In short:
-translate the plan's entry TEXTS (speakers copied, structural validation
-only, batched for the 2048 floor, loud on failure) right after the plan is
-read so both the executor and the outline's `verbatim_texts` see the
-translation; move the spoken coda fact and My Story's attribution sentence
-into each row's `spoken` block the way `work_frame_sentence` already works;
-then lift `source_bank_exclusions` on all seven rows and rewrite the
-admission text. Public Domain needs only the spoken-block change and the
-lift. English byte-identical throughout.
-
-Verify: the tests listed in the judgment; a Spanish Shakespeare one-act
-whose character rows are all Spanish and whose coda is Spanish is the live
-proof, and it waits for the test wave like everything else.
+**Decided (judgment, 2026-09-18): row data, like the spoken credits.** The
+SPOKEN credits (provenance coda, My Story attribution) are row data now.
+The PRINTED ones are still Python English on the credits roll:
+`_otr_provenance.printed_credit_line`, `_otr_story_input.credits_source_line`
+/ `ANONYMOUS_CREDIT`, `_otr_verbatim_lane.non_verbatim_credit_line`, and the
+writer tail's "Story generation models used:" line. Add `credits`
+templates per row and read them with an `episode_meta` kw, keeping the
+`adapted from` prefix that `non_verbatim_credit_line` string-matches.
+English byte-identical. Verify: every row formats every template; English
+outputs equal today's strings; the credits-roll tests stay green.
 
 Vendored public-domain translations (French and Italian are complete on
-Wikisource) are a separate data row behind his scope word -- see the
-inventory and the Gemini prompt in the same folder.
-
-### 2. A `cuda:1` voice stamp silently becomes card zero
-
-**Decided:** round-trip `cuda:1`, or fail loud. Do not pick a card by guessing.
-
-`nodes/_otr_voice_node_common.py` `_voice_device_from_ledger` accepts only
-`cuda` / `cpu` / `mps`. An ordinal stamp falls through and loads on card 0.
-Verify: a voice-device test for the ordinal; existing audio wiring tests stay green.
+Wikisource) are a separate data row behind his scope word -- see
+[the inventory](2026-09-18-fidelity-lane-translation/pd_translation_inventory.md)
+and the Gemini prompt in the same folder.
 
 ## 3. TEST -- only after 1 and 2 are empty
 

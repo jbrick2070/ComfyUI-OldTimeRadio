@@ -88,10 +88,12 @@ attempts, source_sha256, text_sha256}`; `raw_sha256` (English file) stays.
 `spoken_coda_line` and `attribution_sentence` take `episode_meta` and read
 `spoken_chrome`. English rows carry today's exact strings (byte-identical).
 Printed credit lines (`printed_credit_line`, `credits_source_line`,
-`ANONYMOUS_CREDIT`, `writer_tail` "Story generation models used:") get
-`credits` block templates in the same change, keeping the `adapted from`
-prefix coupling intact. `noncommercial_notice` is an operator warning and
-stays English.
+`ANONYMOUS_CREDIT`, `non_verbatim_credit_line`, `writer_tail` "Story
+generation models used:") get `credits` block templates as a FOLLOW-ON
+CODE row (scoped out of the first commit by the judge: they are on-screen
+credits, not spoken or captioned text, and the spoken defect is the one
+the operator saw). Keep the `adapted from` prefix coupling intact.
+`noncommercial_notice` is an operator warning and stays English.
 
 **Public Domain:** no new mechanism -- the composer seam is native; with D
 in place, lift the exclusion.

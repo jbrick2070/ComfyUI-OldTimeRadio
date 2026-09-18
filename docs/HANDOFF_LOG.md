@@ -1,3 +1,35 @@
+## 2026-09-18 -- Shakespeare translates its passage; every lane admitted; cuda:1 round-trips
+
+Did: Two code chunks on `main`. (1) Fidelity lanes: new
+  `nodes/_otr_verbatim_translation.py` translates the planned passage's
+  entry TEXTS (speakers and cut copied, batched under 120 source words
+  for the 2048 floor, explicit output budget, structural validation,
+  RuntimeError on an exhausted batch) right after the writer reads the
+  plan and only when the row's native instruction is non-empty; the
+  executor and the outline's `verbatim_texts` both read the translated
+  plan; receipt at `meta.verbatim_passage.translation`. The announcer's
+  spoken credits (provenance coda, My Story attribution) became row data:
+  ten `spoken` keys authored on every language row, read via a kw-only
+  `episode_meta` on `spoken_coda_line` / `attribution_sentence`; English
+  row strings equal the old constants. `source_bank_exclusions` emptied on
+  all seven rows; admission text rewritten; `apple/MULTILINGUAL.md`
+  updated. (2) `_voice_device_from_ledger` round-trips `cuda:N` and raises
+  on an unrecognised stamp; no stamp keeps `cuda`.
+Design: one Grok round (`cursor-grok-4.6-high-fast` via cursor-agent)
+  refuted the anchor; seven of ten claims grounded and folded --
+  `docs/2026-09-18-fidelity-lane-translation/judgment.md`. Printed credit
+  lines were scoped OUT by the judge and are the one CODE row left.
+Current step: GO_FORWARD section 2 holds one small row (printed credits).
+  Section 1 forks wait for his word; the four-machine wave waits on both.
+Next: printed-credits row, then nothing coded until he answers a fork.
+  Live proof of a Spanish Shakespeare one-act belongs to the test wave.
+  Gemini deep-research prompt handed to the operator for the vendored
+  public-domain translations (fr/it complete; pt/zh/ja/hi thin).
+Models: driver Claude Fable 5.1. Fidelity diff: cursor-agent + Sonnet 5,
+  REFUTE. cuda:1 diff: cursor-agent + Sonnet 5, REFUTE. Rosters and
+  verdicts in the commit messages.
+Commits: two code chunks then this docs chunk -- see `git log`.
+
 ## 2026-09-18 -- CODE 1 closed: character lines author natively on every lane
 
 Did: Landed the native-authoring pile in three commits on `main`. Pile B
