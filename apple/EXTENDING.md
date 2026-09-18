@@ -1,11 +1,14 @@
 # Adding to OTR
 
-Three things you can add: an **engine** (a way of rendering video, images, speech,
-music or an upscale), a **source bank** (a place stories come from), and a
-**writer LLM** (the model that writes the script). They are different jobs.
+Four things you can add: an **engine** (a way of rendering video, images, speech,
+music or an upscale), a **source bank** (a place stories come from), a
+**writer LLM** (the model that writes the script), and an **episode language**
+(a registry row that binds writing, voices, captions and credits). They are
+different jobs.
 Engines are a Python file in this repo. A source bank can be a folder of your
 own that this repo never sees. A writer LLM is either a snapshot in your
-Hugging Face cache, or a curated row in the catalog.
+Hugging Face cache, or a curated row in the catalog. A language is data only
+when Kokoro already has a real code and voice set for it.
 
 Read the one page first. Then [PREFLIGHT.md](PREFLIGHT.md) is the checklist that
 says whether what you built will actually work. The writer page is
@@ -51,6 +54,10 @@ says whether what you built will actually work. The writer page is
 
 - **Green tests are not a lane.** The proof is one real render through
   `workflows/otr_canonical.json` that lands a file in `otr/obs/`.
+
+- **A language row is not a translation engine.** It asks the writer to author
+  natively and filters voices, captions and credits. The full registry and
+  add-your-own checklist are in [MULTILINGUAL.md](MULTILINGUAL.md).
 
 - **Removing is the same job as adding, done atomically** — registry row, module,
   pipeline entries, tests, and a grep that returns exactly the survivors you
@@ -115,6 +122,23 @@ twin already exists.
 The full checklist -- on-machine cache path, catalog row, seven gates -- is
 [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to
 read the badge, is [WRITERS.md](WRITERS.md).
+
+---
+
+## Adding an episode language
+
+This is not a writer LLM and not a voice engine. If Kokoro already serves the
+language, add one complete row to `config/episode_languages.json`, add the
+matching language-stamped Kokoro voices to
+`config/voice_reference_bank.json`, run the admission and painter tests, then
+publish one canonical episode to `otr/obs/`.
+
+The row appears in the writer dropdown automatically; no workflow JSON edit is
+needed. Missing translated chrome, duplicate ids/codes, missing tokenizer
+extras and empty voice pools all fail closed.
+
+[MULTILINGUAL.md](MULTILINGUAL.md) has the required keys, caption policies,
+Python-version boundary, source-bank restrictions and live-proof checklist.
 
 ---
 

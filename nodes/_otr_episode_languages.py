@@ -456,10 +456,14 @@ def kokoro_config(row_or_meta, *, path: str = None) -> dict:
 
 
 def readiness_extra_ok(token: str) -> bool:
-    """True when a CastLock readiness extra is importable on THIS box.
+    """True when a CastLock readiness extra fully imports on THIS box.
 
     ``misaki[ja]`` / ``misaki[zh]`` are never an English-install tax: English
     rows list no extras, so this is not called on the default path.
+
+    A module spec is not readiness. ``misaki.ja`` can have a discoverable file
+    while importing it raises because ``pyopenjtalk`` is absent. Import the
+    selected adapter so its transitive contract is exercised before TTS.
     """
     extra = str(token or "").strip()
     if not extra:
@@ -468,15 +472,10 @@ def readiness_extra_ok(token: str) -> bool:
         sub = extra[7:-1].strip()
         if not sub:
             return False
-        import importlib.util
-        if importlib.util.find_spec("misaki") is None:
-            return False
-        if importlib.util.find_spec("misaki.%s" % sub) is not None:
-            return True
+        import importlib
         try:
-            __import__("misaki")
-            import misaki
-            return hasattr(misaki, sub)
+            importlib.import_module("misaki.%s" % sub)
+            return True
         except Exception:
             return False
     return False
@@ -488,8 +487,10 @@ def assert_readiness_extras(row: LanguageRow) -> None:
         if not readiness_extra_ok(extra):
             raise EpisodeLanguageError(
                 "language %s needs readiness extra %s on this box "
-                "(CastLock extra, never an English-install tax)"
-                % (row.label, extra))
+                "(CastLock extra, never an English-install tax). Install it "
+                "outside the render with this ComfyUI Python: "
+                "python -m pip install %r"
+                % (row.label, extra, extra))
 
 
 # --------------------------------------------------------------------------- #

@@ -297,7 +297,9 @@ def episode_from_log(log_path: Path, after: float) -> Path | None:
     except OSError:
         return None
     seen = []
-    for match in re.finditer(r"episodes[\\/]([A-Za-z0-9_\-]+_\d{8}_\d{6})", text):
+    pattern = re.compile(
+        r"episodes[\\/]([^\\/\r\n]+_\d{8}_\d{6})(?=[\\/\r\n]|$)")
+    for match in pattern.finditer(text):
         name = match.group(1)
         if name not in seen:
             seen.append(name)

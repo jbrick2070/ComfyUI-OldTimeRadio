@@ -4,6 +4,12 @@ Every episode starts as a script, and a language model running on your own
 machine writes it. Two dropdowns on the **OTR_LedgerScriptWriter** node choose
 which one: `creative_writing_model` and `technical_model`.
 
+`episode_language` is a separate control on that node. It asks the creative
+model to author natively; it does not translate an English draft afterwards.
+Language adherence therefore still depends on the selected writer. If that
+model leaks an English line, the voice performs that English text and the
+caption remains English. See [MULTILINGUAL.md](MULTILINGUAL.md).
+
 This is the largest download in the pack and usually the longest part of a run.
 It is also the one choice where picking a model your machine cannot hold costs
 you the whole episode.

@@ -54,13 +54,20 @@ instead.**
 
 The Python version decides the voice backend, and this is not a preference:
 
-* **3.10, 3.11, 3.12** -> the torch `kokoro` package
-  (`requirements.txt` pins it to `python_version < "3.13"`).
+* **3.10, 3.11, 3.12** -> the torch `kokoro` package and all eight admitted
+  episode languages (`requirements.txt` pins it to
+  `python_version < "3.13"`).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
-  CPU, about six times faster than realtime. Same voices.
+  CPU, about six times faster than realtime. This is the English path;
+  non-English rows require the torch backend above.
 * **3.14** -> **no kokoro backend is packaged yet.** The pack still installs;
-  the user must switch the two voice dropdowns on `OTR_CastLock` to `bark`.
-  Say so plainly rather than letting them hit it at render time.
+  an English user can switch the voice controls to Bark. Non-English episodes
+  are unavailable because day-one multilingual rows admit Kokoro only. Say so
+  plainly rather than letting them hit it at render time.
+
+For a multilingual install, also read [MULTILINGUAL.md](MULTILINGUAL.md);
+Japanese and Mandarin have language-specific readiness extras that are not an
+English-install tax.
 
 ### 1. Install the pack
 

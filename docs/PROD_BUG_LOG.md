@@ -15418,3 +15418,96 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   episode.
 - confidence: HIGH (live 1-act obs_publish + spent=$81.56 vs $90 cap
   + 13 budget-floor log lines).
+
+## PBUG-20260918-01 -- Japanese readiness accepts a module file whose transitive G2P dependency is absent
+- surfaced: LIVE canonical one-act Japanese leg on headless `:8000`,
+  2026-09-18. Prompt `a9416f74-2794-4a46-afb9-d19b722ecbd6`,
+  episode workspace `pending_20260918_100203`. The writer completed in
+  Japanese mode and CastLock selected `jf_gongitsune` / `jm_kumo`, then
+  `OTR_BatchCharacterVoices` raised after 345.41 seconds. Nothing published
+  to `otr/obs/`.
+- symptom: `ModuleNotFoundError: No module named 'pyopenjtalk'` from
+  `misaki.ja` while Kokoro constructed `KPipeline(lang_code='j')`.
+  `admission.readiness_extras` correctly named `misaki[ja]`, but the
+  readiness gate had already returned true.
+- root cause: `readiness_extra_ok` treated
+  `find_spec("misaki.ja") is not None` as executable readiness and returned
+  without importing the adapter. A discoverable Python file says nothing
+  about its transitive imports; this install had `misaki.ja` but not
+  `pyopenjtalk`.
+- fix: **FIXED in the same change as this entry.** The selected
+  `misaki.<language>` adapter must import completely. Any import failure
+  returns false, and CastLock names the exact optional extra install
+  (`misaki[ja]` / `misaki[zh]`) before TTS. `misaki[ja]` was installed into
+  the real ComfyUI Python for the live rerun; it added `pyopenjtalk`,
+  `fugashi`, `jaconv`, `mojimoji` and `unidic`.
+- verify idea: `test_readiness_extra_imports_transitive_contract` forces
+  the exact missing-`pyopenjtalk` shape; the positive twin proves a fully
+  importable adapter. Live proof is the Japanese random-bank rerun reaching
+  `obs_publish OK`.
+- bible-worthy: covered by Bible `12.143`: package/source presence is not
+  executable compatibility; exercise the real import contract.
+- confidence: HIGH (live traceback, exact installed-package delta, focused
+  regression).
+
+## PBUG-20260918-02 -- native episode directory publishes, but the canonical API receipt cannot name it
+- surfaced: two LIVE canonical one-act legs on headless `:8000`,
+  2026-09-18. Hindi prompt
+  `4bd07b8f-199b-4f2c-b687-c65ea016f898` published
+  `_-_-_secrets_in_the_dark_20260918_095850...mp4` (10,503,869 bytes).
+  Mandarin prompt `8fd8e3ad-ad3d-4c8a-b1f4-48c92b775c50` published
+  `_contest_for_the_locket_20260918_101411...mp4` (14,173,585 bytes).
+  Both logged `RESULT SUCCESS` / `obs_publish OK`, but the runner printed no
+  `EPISODE episodes/...` and the matrix marked both failed.
+- symptom: the durable directories were
+  `signal_lost_अधकर_म_गपनय_secrets_in_the_dark_20260918_095850` and
+  `signal_lost_项链之争_contest_for_the_locket_20260918_101411`. The same
+  receipt helper that names Latin-title episodes returned `None`.
+- root cause: `episode_of_prompt` searched raw JSON text with
+  `[A-Za-z0-9_-]+`. Native directory characters were outside that class and
+  could also appear as `\uXXXX` escapes in the wire JSON. The media path was
+  correct; only the proof reader was ASCII-bound.
+- fix: **FIXED in the same change as this entry.** Decode the history JSON,
+  recursively inspect every string (still independent of which node reports
+  it), and capture any path segment ending in the canonical timestamp. The
+  matcher excludes path separators rather than excluding Unicode.
+- verify idea: `test_episode_of_prompt_names_native_episode_paths` covers
+  Devanagari on a Windows path and Mandarin on a forward-slash path. The
+  fixed helper also read both live prompt histories back by id and returned
+  the exact durable episode names.
+- bible-worthy: covered by the existing path/receipt principle: a
+  user-authored identifier must not be narrowed to ASCII by a downstream
+  observer. No new media-path rule is needed.
+- confidence: HIGH (two live publishes plus direct same-history readback).
+- follow-up same day (Sonnet QA): `scripts/otr_music_ab.py` carried the same
+  `[A-Za-z0-9_-]+` episode matcher against the canonical runner's output.
+  It now uses the same separator-bounded Unicode segment rule, covered by
+  `test_the_log_binder_accepts_a_native_episode_name`.
+
+## PBUG-20260918-03 -- Devanagari title loses its vowel marks in the durable episode id
+- surfaced: LIVE Hindi canonical one-act publication on headless `:8000`,
+  prompt `4bd07b8f-199b-4f2c-b687-c65ea016f898`, 2026-09-18. The writer
+  titled it `अंधकार में गोपनीय" (Secrets in the Dark)`; `obs_publish OK`
+  landed a 10,503,869-byte MP4.
+- symptom: the durable episode directory became
+  `signal_lost_अधकर_म_गपनय_secrets_in_the_dark_20260918_095850`.
+  Devanagari vowel signs and other marks disappeared from every native word.
+  The title card/ledger retained the authored title; the path did not.
+- root cause: `video_engine.py` kept filename characters only when
+  `str.isalnum()` was true. Python correctly classifies Devanagari vowel
+  signs, virama and anusvara as Unicode marks rather than letters/numbers,
+  so the sanitizer deleted them. Its 40-codepoint slice could also split a
+  retained base from a following mark.
+- fix: **FIXED in the same change as this entry.** Normalize the title to NFC,
+  keep an attached Unicode mark with its retained base, and truncate only
+  between base-plus-mark clusters. English punctuation/space collapsing,
+  lowercase, underscore and `untitled` behaviour remain unchanged.
+- verify idea: `tests/test_unicode_episode_slug.py` pins the live Devanagari
+  phrase, English compatibility, whole-cluster truncation and a CJK title.
+  Live proof is the Hindi random-bank rerun producing an intact native
+  directory id and reaching `obs_publish OK`.
+- bible-worthy: covered by Bible `12.160`'s established rule that title
+  transformations retain combining marks and split only between display
+  clusters; this applies the same contract to the durable filename surface.
+- confidence: HIGH (live artifact reproduces the exact `isalnum` deletion;
+  focused executable regression).

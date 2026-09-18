@@ -361,19 +361,39 @@ def episode_of_prompt(prompt_id: str) -> str | None:
 
     Best-effort and never raises: a leg that cannot name its episode is
     still a leg, and this runs after the render is already terminal. The
-    scan is over the raw history text rather than a known output slot on
-    purpose -- which node reports the path has changed twice, the id
-    format has not.
+    scan walks every string in the decoded history rather than a known output
+    slot on purpose -- which node reports the path has changed twice, the id
+    format has not. Decoding first matters for multilingual titles: raw JSON
+    may spell a native path as ``\\uXXXX`` escapes, and the old ASCII-only
+    expression could not name a successfully published Hindi or CJK episode.
     """
     try:
         import requests
-        raw = requests.get(f"{COMFYUI_URL}/history/{prompt_id}", timeout=20).text
+        response = requests.get(
+            f"{COMFYUI_URL}/history/{prompt_id}", timeout=20)
+        response.raise_for_status()
+        history = response.json()
     except Exception:  # noqa: BLE001 -- naming the episode is never fatal
         return None
+
+    def _strings(value):
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                yield from _strings(key)
+                yield from _strings(item)
+        elif isinstance(value, (list, tuple)):
+            for item in value:
+                yield from _strings(item)
+
     names = []
-    for match in re.finditer(r"episodes[\\/]+([A-Za-z0-9_\-]+_\d{8}_\d{6})", raw):
-        if match.group(1) not in names:
-            names.append(match.group(1))
+    pattern = re.compile(
+        r"(?:^|[\\/])episodes[\\/]+([^\\/]+_\d{8}_\d{6})(?=[\\/]|$)")
+    for text in _strings(history):
+        for match in pattern.finditer(text):
+            if match.group(1) not in names:
+                names.append(match.group(1))
     return names[-1] if names else None
 
 

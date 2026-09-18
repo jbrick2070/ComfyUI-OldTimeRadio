@@ -18,6 +18,7 @@ import subprocess
 import sys
 
 import pytest
+import requests
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -147,6 +148,36 @@ def test_runner_accepts_an_explicit_desktop_comfyui_url(tmp_path, monkeypatch):
     assert "comfy_url=http://127.0.0.1:8188" in out
     assert canonical.COMFYUI_URL == "http://127.0.0.1:8188"
     assert otr_api.COMFYUI_URL == "http://127.0.0.1:8188"
+
+
+@pytest.mark.parametrize("episode,path", [
+    (
+        "signal_lost_अंधकार_में_गोपनीय_20260918_095850",
+        r"C:\ComfyUI\output\otr\episodes"
+        r"\signal_lost_अंधकार_में_गोपनीय_20260918_095850\audio\master.wav",
+    ),
+    (
+        "signal_lost_项链之争_contest_for_the_locket_20260918_101411",
+        "otr/episodes/signal_lost_项链之争_contest_for_the_locket_"
+        "20260918_101411/clips/beat.mp4",
+    ),
+])
+def test_episode_of_prompt_names_native_episode_paths(
+        monkeypatch, episode, path):
+    class _Response:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return {
+                "native-title-prompt": {
+                    "prompt": [0, "native-title-prompt", {}, {}],
+                    "outputs": {"81": {"files": [{"path": path}]}},
+                }
+            }
+
+    monkeypatch.setattr(requests, "get", lambda *_a, **_k: _Response())
+    assert canonical.episode_of_prompt("native-title-prompt") == episode
 
 
 def test_runner_rejects_machine_and_profile_as_competing_selectors():

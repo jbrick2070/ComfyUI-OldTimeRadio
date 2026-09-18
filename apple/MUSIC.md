@@ -74,6 +74,13 @@ Leave it blank and My Story gets the house sound, a 1940s radio drama orchestra.
 | `shakespeare` | Elizabethan consort music -- viols, recorders, lute |
 | `my_story` | **Yours**, from `music_style`. Blank means the house orchestra. |
 
+Episode language does not change this table. If a multilingual test pins
+`source_bank=original` for every language, every episode correctly asks for
+salsa conjunto. To test varied stories and scores, vary the source bank among
+the rows that language admits. [MULTILINGUAL.md](MULTILINGUAL.md) lists the
+non-English set and explains why the two source-faithful adaptation banks
+refuse translation.
+
 Shakespeare is the one chosen by the source's date rather than declared
 outright, so a very old or very new source shifts the ensemble -- baroque
 chamber, Romantic chamber, the radio orchestra, a 1960s instrumental combo.

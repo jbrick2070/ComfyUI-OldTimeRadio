@@ -33,6 +33,13 @@ from; pictures to watch while you listen;
 burned captions and a credit roll. One workflow, one press of **Queue**, and a
 finished `.mp4` lands in your output folder.
 
+One `episode_language` switch now carries the show through English, Spanish,
+Portuguese, Italian, French, Hindi, Japanese or Mandarin: native authoring
+instruction, Kokoro casting, caption labels/wrapping/fonts and audience-facing
+credits. Captions mirror the written line rather than translating it, so writer
+language adherence still matters. See
+[apple/MULTILINGUAL.md](apple/MULTILINGUAL.md).
+
 Every model runs on your own machine: no account, no API key, no paid service,
 on NVIDIA cards and on Apple Silicon. Two of the five story banks read public
 RSS feeds when they come up, so a default run reaches the internet for tonight's
@@ -72,10 +79,11 @@ python -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 
 **Run that `pip install` with ComfyUI's own Python, not a system one** -- this
 is the most common way an install fails, and it fails much later, as nodes that
-quietly refuse to load. Python 3.10 through 3.13 are fine; 3.14 has no Kokoro
-voice build yet. `main` is the branch: it is the default and the only one
-that moves. An older clone of `main` from before 2026-09-13 is a v1.7 tree and
-wants re-cloning rather than pulling.
+quietly refuse to load. Python 3.10 through 3.13 are fine for English;
+multilingual Kokoro needs the torch path on 3.10 through 3.12. Python 3.14 has
+no Kokoro voice build yet. `main` is the branch: it is the default and the only
+one that moves. An older clone of `main` from before 2026-09-13 is a v1.7 tree
+and wants re-cloning rather than pulling.
 
 **2. Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
@@ -188,6 +196,7 @@ folder name is historical; the guides cover every platform.)
 | [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | The same install, written for an AI coding agent to run. Optional. |
 | [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
 | [apple/BANKS.md](apple/BANKS.md) | The six source banks. This is the control that decides what kind of episode you get. |
+| [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) | The one episode-language switch, captions, Kokoro voices, and adding a language of your own. |
 | [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
 
 | Choosing what it uses | |
@@ -209,7 +218,7 @@ folder name is historical; the guides cover every platform.)
 
 | Adding to it | |
 |---|---|
-| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, a source bank, or a writer LLM of your own. |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, source bank, writer LLM, or episode language of your own. |
 | [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | The seven gates for adding a writer LLM. You can pick anything; this is also what the pack ships. |
 | [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will actually work. |
 
@@ -621,11 +630,11 @@ language model bigger than your card's ceiling. Pick a smaller one.
 If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 
 **`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
-3.12 run Kokoro on torch; 3.13 runs the same voices through `kokoro-onnx` on the
-CPU; 3.14 has no Kokoro build yet and is refused. The message names the exact pip
-line. Or open **OTR_CastLock** and switch both voice engines to `bark`, which
-installs everywhere -- except on a 16 GB Mac, where bark is a memory hazard;
-stay on Python 3.12 or 3.13 there and keep Kokoro.
+3.12 run Kokoro on torch and serve all eight admitted languages. Python 3.13
+runs English through `kokoro-onnx` on the CPU; non-English rows do not use that
+backend. Python 3.14 has no Kokoro build yet and is refused. The message names
+the exact pip line. An English episode can use Bark instead, except on a 16 GB
+Mac where Bark is a memory hazard. Non-English rows admit Kokoro only.
 
 **A gated model returns HTTP 401.** The LTX 2.5 weights and `gemma-2-2b-it` need a
 licence click on Hugging Face plus a login; every default weight is ungated.

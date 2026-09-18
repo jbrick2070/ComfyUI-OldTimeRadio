@@ -76,6 +76,20 @@ Enforced by `tests/test_tts_voice_preflight_matrix.py`.
 5. **Qualification still requires a person.** No code path promotes a voice route
    to qualified on its own, and that is deliberate.
 
+## Episode language row
+
+An episode language is a registry extension, not a voice engine. It must bind
+one complete row across writer instructions, spoken chrome, credits, caption
+font/wrap policy, source exclusions and a real Kokoro voice pool. Voice
+eligibility comes only from each bank entry's explicit `languages` list; a
+prefix is never evidence.
+
+Run the focused registry/writer/voice/painter suite, the full regression and
+the shared Bug Bible regression. Qualification still ends with a canonical
+one-act episode in `otr/obs/`, followed by an inspection of native text,
+glyphs and voices. The complete checklist is
+[MULTILINGUAL.md](MULTILINGUAL.md).
+
 ## Music engine
 
 **There is no preflight and no gate for music.** Five adapters declare

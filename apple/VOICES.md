@@ -13,9 +13,14 @@ episode used.
 
 ---
 
+Multilingual episodes use those same controls. Kokoro now carries eight
+language rows; [MULTILINGUAL.md](MULTILINGUAL.md) names the voices, source-bank
+limits, captions and Python-version boundary.
+
 ## Bank versus engine
 
-A **bank** is a set of voices: Kokoro's twenty-eight built-in English voices,
+A **bank** is a set of voices: Kokoro's fifty-four built-in voices across eight
+languages,
 Bark's ten speaker presets, a shelf of reference recordings for the cloning
 engines, or a hosted provider's catalogue.
 
@@ -35,7 +40,7 @@ separate dropdowns and can hold different values.
 
 | Engine | What it is | How you get it | Size | Where it runs |
 |---|---|---|---|---|
-| **`kokoro`** | Twenty-eight preset English voices, British and American. The shipped default. | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines |
+| **`kokoro`** | Fifty-four preset voices: 28 English and 26 across Spanish, Portuguese, Italian, French, Hindi, Japanese and Mandarin. The shipped default. | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; non-English needs Python 3.10-3.12 |
 | **`bark`** | Ten preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
 | **`chatterbox`** | Clones a voice from a reference recording you supply | Its own Windows installer | 3.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`dia`** | Clones a voice from a reference recording you supply | Its own Windows installer | 6.0 GiB | 16 GB+ NVIDIA, Windows |
@@ -56,6 +61,11 @@ the exact number depends on which Python build ComfyUI is running: about 6x
 on ComfyUI Desktop and the portable build (Python 3.13, Kokoro's `kokoro-onnx`
 backend) and about 8x on a from-source install (Python 3.12, Kokoro's `torch`
 backend). Either way, voices are not what makes those runs long.
+
+The Python 3.13 ONNX backend is the English path. Non-English rows use the torch
+Kokoro pipeline and therefore require Python 3.10 through 3.12. Japanese and
+Mandarin also check their `misaki[ja]` / `misaki[zh]` readiness extras when
+selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ### The three cloning engines need two things, not one
 
@@ -102,7 +112,7 @@ and only those.
 
 | Bank | The voices | Character engines | Announcer engines |
 |---|---|---|---|
-| **`kokoro_builtin`** *(shipped)* | Kokoro's 28 English voices | `kokoro` | `kokoro` |
+| **`kokoro_builtin`** *(shipped)* | Kokoro's 54 voices, filtered by episode language before casting | `kokoro` | `kokoro` |
 | **`bark_legacy`** | Bark's 10 speaker presets | `bark` | `bark` |
 | **`default`** | The reference recordings for the cloning engines | `indextts2`, `chatterbox`, `dia` | `chatterbox`, `dia` |
 | **`default_clean`** | The same recordings, minus IndexTTS2 | `chatterbox`, `dia` | `dia` |
@@ -116,14 +126,13 @@ one with the better voices.
 
 ### What the caster actually does with a bank
 
-Characters are cast one at a time, gender-matched first. **But gender is not
-a guarantee.** When a gender's column in the bank runs out of untaken voices,
-the caster does not stop the render -- it falls back to a voice from the
-whole pool, any gender, and keeps going. That fallback is deliberate (a
-voiced character beats a hard cast failure), and it is exactly what happens
-once a cast draws more of one gender than the bank can serve. `google_tts` is
-the one engine that refuses instead of falling back; every other engine takes
-the fallback voice and continues.
+Characters are cast one at a time, language-filtered first and gender-matched
+second. **But gender is not a guarantee.** When a gender's column in the
+eligible language pool runs out of untaken voices, the caster does not stop the
+render -- it falls back to another voice from that same language, any gender,
+and keeps going. It never crosses into English to fill a thin French, Italian
+or other non-English pool. `google_tts` is the one engine that refuses instead
+of using the gender-blind fallback.
 
 `allow_voice_reuse` (on by default) controls something narrower: whether two
 characters can share an already-used, gender-matching voice before the
@@ -132,16 +141,19 @@ step, but it does **not** make the render stop when a gender's voices are
 genuinely gone -- the render still reaches the same gender-blind fallback,
 just without the reuse step first.
 
-So bank size is the real backstop, not a code guarantee. This matters most on
+So the language pool's size is the real backstop, not a code guarantee. This matters most on
 `bark_legacy`, which has ten presets -- six male, four female -- so a cast
 with more than four women will draw at least one male-column voice for a
-female character. Kokoro's twenty-eight (thirteen male, fifteen female) do
-not run out in practice.
+female character. Kokoro's twenty-eight English voices (thirteen male, fifteen
+female) do not run out in practice. French has one admitted voice and Italian
+has two, so reuse inside those languages is expected.
 
 The **announcer is one voice for the whole episode**, drawn by the episode's
-own seed from a curated four-voice British pool: `bm_george`, `bm_fable`,
-`bf_emma`, `bf_lily`. Two are male and two female, so the narrator's gender
-lands roughly evenly across episodes and never changes mid-show.
+own seed. English draws from a curated four-voice British pool: `bm_george`,
+`bm_fable`, `bf_emma`, `bf_lily`. Two are male and two female, so the
+narrator's gender lands roughly evenly across English episodes and never
+changes mid-show. Non-English episodes draw an announcer only from their
+selected language row.
 
 ---
 
@@ -167,6 +179,9 @@ Change one and not the other and the render stops with *"the two
 character-engine controls disagree"* (or the announcer twin of it), naming both
 values. This guard exists because without it the ledger and the credits said one
 engine while a different one was actually speaking.
+
+For a non-English episode, all four values in the table must be `kokoro`.
+Cast Lock rejects every other day-one combination before speech begins.
 
 Note the asymmetry in `auto`:
 

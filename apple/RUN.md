@@ -66,6 +66,7 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
 | `visual_style` | How it looks — ships on *roll*, which picks any of the ten. |
 | `creativity` | `balanced` by default. |
+| `episode_language` | One switch for writing, Kokoro casting, caption labels/wrapping/fonts, and audience-facing credits. See [MULTILINGUAL.md](MULTILINGUAL.md). |
 
 **There is no ONE seed for the episode.** The two director nodes each carry
 a `seed_mode` and a `request_seed` widget for their own lane, but there is no
@@ -77,6 +78,25 @@ Two of those ship on **roll** on purpose: the canonical is meant to hand you a
 different show each time you press Queue. Pin them when you want to compare two
 runs, because a rolled bank and a rolled style change more than anything else you
 could adjust.
+
+## Making a multilingual episode
+
+Set `episode_language` on **OTR_LedgerScriptWriter**. The admitted rows are
+English, Spanish, Portuguese, Italian, French, Hindi, Japanese and Mandarin.
+Keep both voice engines on **Kokoro**; non-English rows refuse other engines
+rather than borrowing an English voice.
+
+For a non-English run, pin `source_bank` to `original`, `my_story`,
+`media_archive` or `scifi_news_pro`. Shakespeare and Public Domain preserve
+their source author's own words and therefore refuse a translation request.
+The default bank roll can draw one of those fidelity lanes, so pinning a
+supported bank is the reliable unattended path.
+
+Captions are native when the written line is native. They are not a separate
+translation track: an English line leaked by the writer remains English in the
+caption and may sound accented when performed by a non-English Kokoro voice.
+The complete behaviour, Python-version limits and add-your-own-language recipe
+are in [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ## Writing your own story
 

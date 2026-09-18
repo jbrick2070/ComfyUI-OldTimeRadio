@@ -73,9 +73,11 @@ selects, so that half costs you nothing extra.
 
 ## Python and voices
 
-3.12 or earlier runs Kokoro on torch; 3.13 runs it through `kokoro-onnx` on the
-CPU automatically; 3.14 has no Kokoro build and is refused rather than half
-working. Details in [INSTALL.md](INSTALL.md) section 5.
+3.12 or earlier runs Kokoro on torch and is the multilingual path. 3.13 runs
+English through `kokoro-onnx` on the CPU automatically; this pack does not use
+that backend for non-English rows. 3.14 has no Kokoro build and is refused
+rather than half working. Details in [INSTALL.md](INSTALL.md) section 5 and
+[MULTILINGUAL.md](MULTILINGUAL.md).
 
 Kokoro is the shipped voice on every platform. The cloning engines need a
 Windows-only installer and are not available here.

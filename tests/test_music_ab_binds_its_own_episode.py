@@ -159,6 +159,18 @@ def test_the_log_named_episode_still_has_to_be_fresh(tmp_path, monkeypatch):
     assert AB.episode_from_log(log, time.time() - 60) is None
 
 
+def test_the_log_binder_accepts_a_native_episode_name(tmp_path, monkeypatch):
+    monkeypatch.setattr(AB, "EPISODES", tmp_path)
+    name = "signal_lost_अंधकार_में_गोपनीय_20260918_095850"
+    episode = _episode(tmp_path, name)
+    log = tmp_path / "native.log"
+    log.write_text(
+        "[canonical-api] EPISODE episodes/%s\n" % name,
+        encoding="utf-8",
+    )
+    assert AB.episode_from_log(log, time.time() - 60) == episode
+
+
 # --------------------------------------------------------------------------- #
 # codex r2: four holes in the bindings above, each of which let an episode pass
 # --------------------------------------------------------------------------- #

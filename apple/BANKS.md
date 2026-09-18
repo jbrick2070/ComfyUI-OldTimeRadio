@@ -29,6 +29,21 @@ than a bank. It is deliberately not runnable and never comes up on a roll;
 selecting it does nothing. It is there to tell you the door exists --
 [apple/EXTENDING.md](EXTENDING.md) is how you walk through it.
 
+### Language compatibility
+
+English can use every bank. Spanish, Portuguese, Italian, French, Hindi,
+Japanese and Mandarin can use `original`, `my_story`, `media_archive` and
+`scifi_news_pro`.
+
+Those seven rows refuse `shakespeare` and `public_domain` before loading a
+model. Both are fidelity lanes that perform the source author's own words; they
+cannot also be translation lanes.
+
+The current roll chooses a bank before that language check. For an unattended
+non-English run, pin one of the four supported banks above. A roll that draws a
+fidelity bank refuses cleanly rather than substituting another bank. The full
+one-switch behaviour is in [MULTILINGUAL.md](MULTILINGUAL.md).
+
 ---
 
 ## The two that need something from you

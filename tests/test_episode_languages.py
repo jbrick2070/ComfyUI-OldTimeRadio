@@ -7,6 +7,7 @@ Mandarin``. Registry-only coverage: no Comfy tree, no writer widget.
 from __future__ import annotations
 
 import copy
+import importlib
 import json
 from pathlib import Path
 
@@ -288,6 +289,38 @@ def test_caption_paint_policies_per_row(label, font, wrap, cps):
 ])
 def test_readiness_extras_are_not_an_english_install_tax(label, extras):
     assert el.row_by_label(label).admission["readiness_extras"] == extras
+
+
+@pytest.mark.parametrize("label,extra,module_name,dependency", [
+    ("Japanese", "misaki[ja]", "misaki.ja", "pyopenjtalk"),
+    ("Mandarin", "misaki[zh]", "misaki.zh", "ordered_set"),
+])
+def test_readiness_extra_imports_transitive_contract(
+        monkeypatch, label, extra, module_name, dependency):
+    """A discoverable adapter is not usable when a transitive import is absent."""
+    calls = []
+
+    def _missing_dependency(requested_module):
+        calls.append(requested_module)
+        raise ModuleNotFoundError("No module named %r" % dependency)
+
+    monkeypatch.setattr(importlib, "import_module", _missing_dependency)
+    assert el.readiness_extra_ok(extra) is False
+    assert calls == [module_name]
+    with pytest.raises(el.EpisodeLanguageError, match=r"misaki\["):
+        el.assert_readiness_extras(el.row_by_label(label))
+
+
+def test_readiness_extra_accepts_a_fully_importable_adapter(monkeypatch):
+    calls = []
+
+    def _available(module_name):
+        calls.append(module_name)
+        return object()
+
+    monkeypatch.setattr(importlib, "import_module", _available)
+    assert el.readiness_extra_ok("misaki[zh]") is True
+    assert calls == ["misaki.zh"]
 
 
 @pytest.mark.parametrize("label", [l for l in ADMITTED_LABELS if l != "English"])

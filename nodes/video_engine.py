@@ -29,6 +29,7 @@ import re as _re
 import sys
 import threading
 import time as _time
+import unicodedata
 
 import numpy as np
 import torch
@@ -92,6 +93,42 @@ _WARNED_BITMAP_FALLBACK = False
 _FONT_PATH = None
 _FONT_PATH_KEY = object()          # a sentinel no real key can equal
 _FONT_LOCK = threading.Lock()
+
+
+def _safe_episode_title_slug(episode_title, max_chars=40):
+    """Filesystem-safe Unicode title without splitting combining sequences.
+
+    ``str.isalnum`` keeps letters but rejects Devanagari vowel signs and other
+    combining marks. Preserve a mark only when it follows a retained base, then
+    truncate on a whole base-plus-marks cluster so the durable episode id does
+    not lose part of a native word.
+    """
+    normalized = unicodedata.normalize(
+        "NFC", str(episode_title or ""))
+    kept = []
+    for char in normalized:
+        category = unicodedata.category(char)
+        if char.isalnum() or char in "_ ":
+            kept.append(char)
+        elif category.startswith("M") and kept and kept[-1] not in "_ ":
+            kept.append(char)
+    safe = _re.sub(r"\s+", " ", "".join(kept)).strip()
+    safe = _re.sub(r"_+", "_", safe.replace(" ", "_").lower()).strip("_")
+    if not safe:
+        return "untitled"
+
+    clusters = []
+    for char in safe:
+        if unicodedata.category(char).startswith("M") and clusters:
+            clusters[-1] += char
+        else:
+            clusters.append(char)
+    out = ""
+    for cluster in clusters:
+        if len(out) + len(cluster) > int(max_chars):
+            break
+        out += cluster
+    return out.strip("_") or "untitled"
 
 
 def _mono_font_families():
@@ -2170,26 +2207,21 @@ class SignalLostVideoRenderer:
 
         # BUG-LOCAL-110 Layer 1 (2026-05-05, round-robin verified): slug
         # cleanup. Pipeline:
-        #   1. drop punctuation (alnum + "_" + " " kept)
+        #   1. drop punctuation (alnum + attached Unicode marks + "_" + " " kept)
         #   2. collapse runs of whitespace to a single space FIRST -- this
         #      prevents titles like "Signal Lost - The Crystal!" from
         #      becoming "signal_lost__the_crystal" (the strip-of-punct
         #      leaves a double space between "Lost" and "The" which then
         #      becomes a double underscore on `replace(" ", "_")`).
         #      Round-robin (Gemini + NVIDIA) caught this; ChatGPT missed it.
-        #   3. underscore-ize, lowercase, truncate to 40
+        #   3. underscore-ize, lowercase, truncate to 40 whole grapheme-ish
+        #      clusters (never cut a base from its combining marks)
         #   4. collapse any remaining underscore runs and strip both ends
         #      again (truncation can leave a trailing "_" if char 40 was
         #      a separator)
         #   5. fall back to "untitled" if the result is empty so we never
         #      emit `signal_lost__<ts>.mp4` (double underscore).
-        safe_title = "".join(
-            c if c.isalnum() or c in "_ " else ""
-            for c in str(episode_title or "")
-        )
-        safe_title = _re.sub(r"\s+", " ", safe_title).strip()
-        safe_title = safe_title.replace(" ", "_").lower()[:40]
-        safe_title = _re.sub(r"_+", "_", safe_title).strip("_") or "untitled"
+        safe_title = _safe_episode_title_slug(episode_title)
         out_path = os.path.join(out_dir, f"signal_lost_{safe_title}_{ts}.mp4")
 
         # -- 5. Build frame generator ---------------------------------
