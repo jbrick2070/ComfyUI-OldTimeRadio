@@ -22,6 +22,27 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-17 -- story and music are closed; public graphs go non-GGUF; test wave last
+
+Operator: *"DUMP THAT IM FINE WITH THE STORY AS IS MUSIC AS IT IS ITS GREAT
+WE FIXED IT"*; *"GGUFS DONT AUTO INSTALL SO I AM TRYING A FULL NON GGUF
+STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
+*"TEST WAVE AFTER CODING"*.
+
+* Do not reopen story-quality, writer-model, or music prompt-craft. The
+  scripts and the music path are accepted. Tempo/groove/lottery rows are
+  archive, not work.
+* Public / shipping graphs stay off GGUF. GGUF does not auto-install (pack
+  + files). Lab recipes that exist to exercise a GGUF lane may keep it.
+* The four-machine test wave stays after sections 1 and 2 are empty. Do not
+  freeze a wave head to settle a coding row.
+* Official non-GGUF LTX 2.5 exists (`Lightricks/LTX-2.5` safetensors,
+  native Comfy T2V/I2V/FLF2V with synced audio). This 5080 box already
+  has the INT8 pack on disk. Local `ltx25_*` still loads GGUF. The public
+  hole is `otr_16gb_video` / `otr_16gb_foley` / `otr_16gb_mime`. Cloud
+  deluxe already ships `cloud_ltx25_foley_plus`. Pick among those before
+  writing a native adapter.
+
 ---
 
 ## HOW TO TALK TO THE OPERATOR (standing, 2026-08-17 -- read before your first reply)

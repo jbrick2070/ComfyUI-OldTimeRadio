@@ -33,6 +33,11 @@
   changing between beats, voice-pool staleness, and any structural or ledger fault. Fixing
   "Malvolio speaks with a woman's voice" is a bug fix; rewriting Malvolio's dialogue to be
   better is not.
+- **MUSIC IS DONE. STOP CHASING IT (operator directive 2026-09-17 -- hard).**
+  Operator: "DUMP THAT IM FINE WITH THE STORY AS IS MUSIC AS IT IS ITS GREAT
+  WE FIXED IT." Do not reopen techno/house cue wording, tempo-error A/Bs,
+  groove-prompt order, or the music-lottery seed hunt. IndexTTS2 hang is a
+  hang-timeout, not prompt-craft, and stays a separate row.
 - **NO WORD-COUNT CHASING (operator directive 2026-08-03).** "We never chase word count."
   The target words value is a REQUEST, not a gate: no refusals, no hard caps, no shunts. The
   manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only

@@ -1,3 +1,21 @@
+## 2026-09-17 -- HEAD 73508d89 +handoff (main) -- PLANNER (dump story/music chase; official LTX 2.5 safetensors found)
+
+Did: Operator dumped story-quality and music prompt-craft. Official non-GGUF
+  LTX 2.5 exists (`Lightricks/LTX-2.5`, native Comfy I2V with synced audio).
+  This 5080 box already has the INT8 pack on disk. Local `ltx25_*` still
+  loads GGUF. Public GGUF hole is three shipping graphs: `otr_16gb_video`,
+  `otr_16gb_foley`, `otr_16gb_mime`. Cloud deluxe already ships
+  `cloud_ltx25_foley_plus`. A5 is the pick (cloud / native safetensors /
+  drop those three). Test wave stays after coding. C1 cut (those writers
+  already Qwen 4B + NF4). Music-chase rows moved to GO_FORWARD_ARCHIVE.
+Current step: A5 -- he picks the foley/mime path. Do not start a native
+  adapter until that lands. Next mechanical CODE if he wants reliability
+  instead: C4 add `transformers` to `cpu_floor`.
+Next: wait for the A5 pick, or take C4. No test wave.
+Models: driver only; no panel (plan write + measurement, not a new adapter).
+Commits: the docs commit on top of `73508d89`. The sha above is the last
+  CODE head; the last is this handoff commit.
+
 ## 2026-09-13 -- HEAD 910df1d5 +handoff (main) -- CODER (v2 promoted to main; three releases; a widget audit and the defect it hid)
 
 Did: **v2 PROMOTED.** `main` is the default and working branch, `v2.0-alpha`

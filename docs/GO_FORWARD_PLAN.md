@@ -238,27 +238,57 @@ guards added 2026-09-13 (`test_widget_schema_order_matches_live_input_types`,
 that updates the class and not the graphs, or that lands a value on its
 neighbour.
 
+### A5. Foley / mime without GGUF -- official LTX 2.5 safetensors exist; pick the path
+
+**Operator 2026-09-17:** GGUFs do not auto-install, so the public stage is
+non-GGUF; he wants a foley/mime substitute that is not the patched
+ComfyUI-GGUF `ltx25_*` stack.
+
+**What is true today (measured 2026-09-17, not a guess):**
+
+* Local `ltx25_foley_plus` / `ltx25_mime` / `ltx25_video` still load
+  `UnetLoaderGGUF` + `CLIPLoaderGGUF` (`eng_ltx25.py`) and a Gemma-4 12B
+  GGUF patch. That is the friction he is leaving.
+* **Official non-GGUF weights exist now.** `Lightricks/LTX-2.5` on Hugging
+  Face is a split safetensors pack. Comfy's own tutorial
+  (docs.comfy.org/tutorials/video/ltx/ltx-2-5) ships native T2V / I2V /
+  FLF2V templates. I2V generates picture **and** synced audio -- that is
+  the foley/mime job. Distilled Comfy INT8 DiT + Gemma-4 TE + video/audio
+  VAEs. **No ComfyUI-GGUF pack.** `ComfyUI-LTXVideo` is already installed
+  next to this pack.
+* **This 5080 box already has the official INT8 pack on disk** under
+  `C:\ComfyUI-Models`:
+  `ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors`
+  (21.5 GB), `gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors`
+  (15.4 GB), video + audio VAEs, spatial upscaler. The GGUF twins are
+  still beside them. Official NVFP4 distilled exists on HF; it is **not**
+  on this disk today.
+* The HF repo is **gated** (license click). That is not "drop a file and
+  Queue" for a stranger, but it is a different friction than a third-party
+  GGUF loader pack.
+* Those files will not sit resident on 16 GB (INT8 DiT + TE alone is
+  ~37 GB). A local native lane on this card needs offload, the conv VAE,
+  or the NVFP4 distilled transformer -- not a naive load of both INT8
+  files.
+* **Cloud LTX 2.5 is already wired** as `cloud_ltx25_foley_plus` and
+  `cloud_ltx25_audio_in` (partner `ltx/ltx-2-5-t2v` Fast/Pro, Comfy
+  Credits, zero local weights). `otr_cloud_deluxe_3act` already ships
+  that foley lane. That is a working public substitute today if the spend
+  is acceptable.
+* **The public GGUF hole is three shipping graphs, not forty-eight.**
+  Measured against `SHIPPING_SET` 2026-09-17: only `otr_16gb_video`
+  (`ltx25_high_video`), `otr_16gb_foley` (`ltx25_foley_plus`), and
+  `otr_16gb_mime` (`ltx25_mime`) still name a GGUF video engine. 8 GB
+  haunted / still / `ltx_8gb` / AnimateDiff do not.
+
+**The fork, and it is his:** ship foley/mime as the **cloud** pair (already
+built), or build a **native safetensors** local lane (new adapter, official
+Comfy nodes, gated download, offload or NVFP4 on this 16 GB card), or keep
+the GGUF stack as lab-only and drop those three graphs from the public set
+(8 GB foley is already retired). Do not start the native adapter until
+this pick lands.
+
 ## 2. CODE -- the design is settled, build it
-
-### C1. Five shipped profiles cannot load their own configured writer
-
-Measured with the real gate on 2026-09-12: `8gb_lite`, `otr_8gb_wan`,
-`otr_8gb_ltx`, `otr_8gb_fastwan` and `otr_4060_12b_gguf_offload` all pair
-`creative_model: google/gemma-4-12b-it` with `vram_ceiling_gb: 6.8` and
-`quant_policy: none`. `check_vram_fit` returns **FAIL at 11.95 GB against 6.8,
-a 1.76x ratio**, and a FAIL verdict is what `request_slot` raises on.
-
-**The cause is a lane that no longer exists, not five bad sizing choices.**
-`GGUF_ROWS` in `nodes/_otr_gguf_backend.py` is **EMPTY** -- measured, and
-`gguf_row_for_repo` raises for every id -- so the 12B has no quantized route
-today and every one of these profiles prices as `provider: local`, i.e. the
-bf16 transformers lane. `otr_4060_12b_gguf_offload` is named for the exact
-mechanism that is gone. Same root cause explains a contradiction in the
-generated writer table, which still marks `google/gemma-4-12b-it` **proven** on
-8 GB NVIDIA at a 23.9 GiB download: that receipt was earned through the GGUF
-lane before it was emptied. So the choice is to restore a GGUF row for the 12B
-or to move these five profiles to a writer that fits unquantized -- and the
-receipt in the writer table needs whichever answer is picked recorded against it.
 
 ### C2. `machine_classes.json` is missing the `ltx_8gb` receipt that `dropdown_matrix.json` spends
 
@@ -269,61 +299,22 @@ RTX A4500 20 GB and the Mac mini M4. `docs/4060_DRILL_LOG.md` around lines
 probably to add the row rather than to retract the verdict. Two hand-curated
 files feed two generated docs and nothing enforces agreement between them.
 
-### C6. NO SHIPPED JSON MAY NEED GGUF -- and 48 recipes currently do
+### C6. Full non-GGUF public stage (widened 2026-09-17)
 
-**Operator ruling, 2026-09-12:** *"GGUF is empty because it doesn't auto
-download, so we don't ship to the public any JSON with GGUF because it's high
-friction if possible."* This is broader than the 2026-09-06 directive that
-emptied `GGUF_ROWS`: that one removed the GGUF WRITER, this one covers every
-GGUF weight in a graph we hand someone.
+**Operator 2026-09-12:** no public JSON that needs GGUF. **Widened
+2026-09-17:** he is running a **full non-GGUF stage** because GGUFs do not
+auto-install. Klein is already gone (`259d1faa`). Shipping 8 GB stills are
+`sd15`.
 
-**Measured across all 118 recipes: 48 select at least one GGUF-dependent
-engine.**
+**What still names GGUF in the public set (measured 2026-09-17):** only
+`otr_16gb_video`, `otr_16gb_foley`, and `otr_16gb_mime`. Those three wait
+on A5. Lab / soak recipes that exist to exercise `wan_ti2v`,
+`fastwan_8gb`, `ltx_video`, `ltx_audio_in`, or GGUF `ltx25_*` keep the
+lane -- do not "repair" them by pretending they are something else.
 
-| engine | recipes | why it is GGUF |
-|---|---|---|
-| `flux2_klein` | 32 | its DiT is a 2.6 GB GGUF file through `UnetLoaderGGUF` |
-| `wan_ti2v` | 8 | GGUF DiT + GGUF umt5 encoder |
-| `ltx_video` | 4 | GGUF UNET |
-| `ltx_audio_in` | 3 | GGUF UNET, and NVML-gated besides |
-| `fastwan_8gb` | 3 | a `wan_ti2v` subclass |
-| `minimax_h3_video` | 2 | operator-only tier |
-| the three `ltx25_*` lanes | 1 each | GGUF + a patched ComfyUI-GGUF |
-
-**EVERY 8 GB RECIPE NAMES `flux2_klein`**, including `otr_nvidia_8gb_haunted`,
-the one with eleven published episodes behind it. It is INERT there -- all four
-of the 4060's clean-room receipts show the image shortcode as `none`, because
-the haunted video lane mints no still -- but a shipped graph that names a
-pack-dependent engine is a trap set for the first person who switches a video
-lane.
-
-**THE PRECEDENT IS SIX DAYS OLD AND IS THE SAME REASONING.** `b1f372a9` moved
-both AMD recipes off `flux2_klein` and onto `z_image_turbo` for exactly this,
-titled "Make the AMD tiers installable with nothing extra". The 8 GB set never
-got the same pass.
-
-**TWO CANDIDATES, and the choice is his because it is a friction-versus-receipt
-trade:**
-
-| | nv8 verdict | download | pack | note |
-|---|---|---|---|---|
-| `z_image_turbo` | **proven** | 19.3 GB | none | what AMD was moved to |
-| `sd15` | fits | **2.0 GB** | none | auto-downloads since tonight; proven on Mac |
-
-`sd15` is 17 GB lighter and is the lower-friction answer his ruling points at;
-`z_image_turbo` is the one with an 8 GB receipt. Either removes the pack.
-
-**WHAT CANNOT BE FIXED BY AN IMAGE SWAP, and must be said plainly:**
-`otr_8gb_wan` and `otr_8gb_fastwan` are GGUF at their CORE -- their video lane
-is the GGUF Wan stack. Making them ship-clean means changing what they are, not
-retouching a dropdown. The same is true of every `ltx25_*` and `ltx_video`
-recipe. Those are candidates for "not part of the public set" rather than for
-repair.
-
-**NOT SWEPT ON MY OWN INITIATIVE.** Scoped the way the kokoro ruling was: the
-SHIPPING set gets the rule, and a soak or rotation recipe whose entire purpose
-is to exercise `wan_ti2v` or `ltx25` keeps it, because changing those deletes
-the test.
+**Writer half of the same ruling:** C1's five 8 GB profiles already moved
+to `Qwen/Qwen3.5-4B` + `bnb_nf4`. The leftover empty-lane is C4
+(`cpu_floor` still excludes `transformers` while naming that 4B).
 
 ### C7. The widget tier -- verified plan, nothing built
 
@@ -456,14 +447,16 @@ README's cheapest-setups table, and it is the same shape as `sd15` was.
 
 ### C4. `cpu_floor` has no local writer it is allowed to use
 
-Measured 2026-09-12. It is the ONLY profile whose `lane_allowlist` excludes
-`transformers` -- it permits `gguf`, `openrouter`, `comfy_credits`,
-`google_api`. Its `creative_model` is `unsloth/Llama-3.2-3B-Instruct`, a
-transformers row. And `GGUF_ROWS` is empty, so its one local lane offers nothing.
-A CPU-only user therefore has no local route at all: the two that remain are
-paid. Either restore a GGUF row, or add `transformers` to that allowlist and let
-the 3B run on CPU. Same empty-lane fact is what makes C1's five profiles fail, so
-the two rows probably share one answer.
+Measured 2026-09-12, still true 2026-09-17. It is the ONLY profile whose
+`lane_allowlist` excludes `transformers` -- it permits `gguf`,
+`openrouter`, `comfy_credits`, `google_api`. Its `creative_model` is now
+`Qwen/Qwen3.5-4B`, a transformers row. `GGUF_ROWS` is empty, so its one
+named local lane offers nothing. A CPU-only user therefore has no local
+route at all: the two that remain are paid. The non-GGUF answer is add
+`transformers` to that allowlist and let the 4B run on CPU. C1's five
+8 GB profiles already made that move. This draft profile is the leftover.
+`tests/test_capability_profiles.py` currently asserts
+`"transformers" not in` the allowlist -- that pin flips with the fix.
 
 ### C5. Small, named, and each takes minutes
 
@@ -576,6 +569,13 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
 
 ### Waiting on his ear, and nothing else
 
+* **CUT 2026-09-17 -- story and music prompt-craft.** Operator: the story
+  is fine as it is; the music is great, it is fixed. Do not reopen writer
+  quality, techno/house cue wording, tempo-error A/Bs, or the music-lottery
+  seed hunt. The long 2026-09-12 ear write-up moved to
+  [GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md) under that date. IndexTTS2
+  hang (below) is a hang-timeout, not prompt-craft, and stays.
+
 * **The IndexTTS2 hang fix is WRITTEN AND HELD, because shipping it demotes
   Lemmy.** Both protocol reads in `nodes/_otr_audio_engines/eng_indextts2.py`
   are bare `proc.stdout.readline()` with no timeout, on the shipped default
@@ -598,187 +598,6 @@ gone from this file by its own rule; the receipt in HANDOFF_LOG carries them.
   re-audition Lemmy", or "hold it". The trade is a certain loss of a cameo he
   likes against protection from a rare hang. The patch is reconstructible in
   minutes from the sibling engines; nothing else is waiting on it.
-
-* **The techno and house cues, re-rendered.** He judged `3_media_archive`
-  (jazz) and `4_original` (salsa) RIGHT, and `1_scifi_news` (Detroit techno)
-  and `2_public_domain` (Chicago house) WRONG -- *"supposed to be techno whats
-  wrong??"* and *"supposed to be house very wrong"*. Three sustained-music
-  instructions were reaching a dance cue: a pad closing both electronic
-  palettes, the neutral floor word "atmospheric" LEADING the row, and an
-  orchestral per-cue arc ("a rising overture", "resolving to a warm held
-  chord") that was appended OUTSIDE the guard already written to keep
-  orchestral language off a rhythmic palette. All three are fixed and the fix
-  is scoped by a new `Palette.groove_arc` flag to exactly the two banks he
-  rejected -- **jazz and salsa compose byte-identically to what he approved**,
-  because his ear on shipped output outranks a tidier rule (codex refuted the
-  wider blast radius and was right). **Unblocks with a listen to the new
-  cues in `otr/obs/`.**
-* **Whether the causal story is actually right.** Codex's standing objection,
-  folded rather than argued with: the operator's verdict is on OUTPUT and the
-  diagnosis is a reading of the PROMPT, with no seed-matched A/B between them.
-  The untested competitors are the checkpoint (post-trained SA3 ignores cfg and
-  negatives) and the sampler. The comments say hypothesis, not fact. **Unblocks
-  with the same listen.**
-* **SETTLED 2026-09-12 -- the anime checkpoint is IN.** His verdict on
-  `the_clanking_chains_20260912_153041__anim__stfl__sd15__...` was one word:
-  *"perfect"*. `Counterfeit-V3.0_fp16.safetensors` is fetched, the anime pack
-  names it, and the server log records `[sd15] minted still 768x432 ...
-  ckpt=Counterfeit-V3.0_fp16.safetensors` with `OTR_SD15_CKPT` unset -- so the
-  name came from the pack through the style resolver. **His ear has ruled;
-  this row does not get re-asked and the lane is not benched again.**
-  The one thing left is bookkeeping, not a question: `config/profiles/
-  otr_sd15_stills.json` is still `status: "draft"` because it was written
-  minutes before the leg. It wants a couple more episodes on other styles
-  before it claims `shipping`, and it is NOT edited while the wave head is
-  frozen.
-
-* **HIS EAR CALIBRATED THE METRIC, 2026-09-12, and this is the most useful
-  thing in this file.** Two `public_domain` episodes, the SAME bank, a
-  BYTE-IDENTICAL composed prompt, opposite verdicts:
-
-  | episode | opening cue | tempo error vs the 122 BPM asked for | his words |
-  |---|---|---|---|
-  | `the_clanking_chains_153041` | 0.42 / 123.0 BPM | **1.0** | *"perfect music"* |
-  | `firelight_skepticism_151426` | 0.29 / 156.6 BPM | **34.6** | *"just house chords no rhythm"* |
-
-  **TEMPO ERROR is the discriminator, and onset periodicity is not.** The two
-  differ 35-fold on tempo error and only 0.42 vs 0.29 on periodicity -- a gap
-  far too small to have predicted his verdict. Any future guard, bench or
-  A/B on groove cues binds to |measured BPM - requested BPM|, never to a
-  periodicity floor.
-
-  **It also means the wording is exonerated twice over.** Those two cues asked
-  for the same thing in the same words and one was perfect. The variable is the
-  render, not the prompt -- so the fix is a recipe or a re-roll, not more
-  prompt-craft.
-
-  **A FALSIFIABLE PREDICTION, left here on purpose:**
-  `shadows_on_the_catwalk_144526` measures 0.74 / 120.2, i.e. **1.8 BPM off**.
-  If tempo error really is the thing his ear tracks, he should like that one
-  too. If he does not, this calibration is wrong and the row reopens.
-
-* **CUT 2026-09-12: the anime checkpoint does NOT go to the AnimateDiff lanes,
-  and this row is closed, not deferred.** His words: *"lets stop chasing the
-  anime things, we can leave it in there if it['s] coded, I don't want to spend
-  any more time chasing before release."*
-
-  **What SHIPS is what he already approved:** the pack checkpoint reaches the
-  STILL engine only (`nodes/_otr_image_engines/sd15.py`), which he judged
-  *"perfect"*. That stays exactly as it is.
-
-  **What is CUT:** extending it to `eng_ghost_signal.py` and the other SD1.5
-  motion lanes, where `GHOST_CHECKPOINT_NAME` stays the pinned base checkpoint.
-  A design panel on it was STOPPED mid-run on his word. Do not restart it, do
-  not "just try" the constant swap, and do not re-raise this before release --
-  he noticed the limitation himself and cut it himself, which is the strongest
-  form this ruling can take.
-
-  For a future reader who wonders why it looked easy: it was not. That swap is a
-  RECIPE BUMP -- `GHOST_RECIPE_RECEIPT` would have to be repointed or every
-  receipt already on disk stops being interpretable -- and the lane runs a LIVE
-  negative at `GHOST_CFG = 8.0` specifically because the lettering defense needs
-  real unconditional conditioning, which is the documented reason an AnimateLCM
-  checkpoint was refused once before.
-
-* **KNOWN ISSUE, PARKED FOR AFTER RELEASE: music cues are a lottery, and the
-  prompt is not the lever.** He reported two on 2026-09-12 -- a closing cue that
-  "is like 2 seconds" and an opening that is "just house chords no rhythm,
-  maybe one slight beat". Both are real. A 19-agent panel settled the cause and
-  the answer is the same for both: **an under-constrained prompt hands the
-  outcome to the seed.** Recorded here so nobody pays for this analysis twice.
-
-  **The driver's first framing was WRONG and the panel corrected it.** It read
-  four bad closings, all on the authored `scifi_news_pro` lane, and concluded
-  "authored rows are broken". There are SIX authored closings on disk and the
-  sample omitted the two that render at 100%. Worse, within the authored group
-  the supposed cause runs BACKWARDS: 20 chars -> 100%, 27 -> 100%, 25 -> 48%,
-  45 -> 65%, 45 -> 77%, 48 -> 35%. "Soft, contemplative piano" (48%) and "A
-  soft, somber piano melody" (100%) are near-identical asks with opposite
-  outcomes. And the complained episode's OWN opening is also authored
-  ("Detroit techno, 128 BPM", no arc, no tail) and renders at 94% -- a control
-  inside the very episode that kills the missing-arc theory.
-
-  **What the panel PROVED cannot be the cause**, each grounded in the file:
-  * There is NO length-to-duration coupling anywhere.
-    `eng_stable_audio_3.py:209` computes `seconds_total = max(context_s,
-    dur * 3.0)` with no prompt term; `:392` builds the latent from `dur` alone;
-    sampler, scheduler, steps and denoise are env constants at `:378-385`.
-  * A short prompt cannot shorten any tensor. `model_base.py:895-902` pads
-    cross-attention to a fixed 256 slots plus the seconds token, all attended.
-  * The one prompt-derived path, `_sa3_clip_window`'s "outro"/"opening" text
-    fallback, is dead TWICE: `stable_audio_theme.py:331` always passes a real
-    placement, and `StableAudio3` never reads `seconds_start` at all -- the
-    receipt itself records `seconds_start_read_by_model: false`.
-  * Post-processing is clean: `_ceiling_the_cue` is a peak limiter at -1.0
-    dBFS, no fade, and the receipts show peak -1.03 / -1.00.
-
-  **The real shape:** composed closings measure 71-100%, mean ~96%, because a
-  composed row names instruments, mood, an idiom carrying a BPM, an arc and the
-  tail, leaving the sampler almost nothing to choose. Authored closings measure
-  35-100%, mean ~71% -- the same distribution with a much worse floor. It is a
-  VARIANCE difference, not a deterministic one.
-
-  **THE CHEAP TEST, already designed, ~6 minutes, no episode leg.** Call
-  `generate_clip` directly on the exact shipped closing spec at 8 seeds and
-  measure audible fraction. A 35-100% spread on one text confirms seed noise
-  and closes it; a tight cluster near 35% means the text IS deterministic and
-  the hunt moves to arm B (same text plus the arc and tail).
-
-  **NOT RUN, on his instruction:** *"I don't want to spend any more time chasing
-  before release."* This row is for after.
-
-* **RULED 2026-09-12: no auto-fetch row for the anime checkpoint.** His words:
-  *"I don't think we will set an auto fetch file because it's so specialised."*
-  Correct, and it settles the last open question on that feature: a 4.24 GB
-  download for one style most users never pick is the wrong default. The
-  checkpoint stays OPT-IN, which is exactly what already ships -- present means
-  the anime pack uses it, absent means the stock model, and nothing fails
-  either way. Documented in the README as opt-in. **This feature is DONE.**
-
-* **THE GROOVE DEFECT IS FOUND, IT IS ONE LINE, AND IT IS THE DRIVER'S OWN BUG
-  FROM 2026-09-12.** A 26-agent panel refuted the driver's seed-variance theory
-  by measurement and found the real cause. **Awaiting his go/no-go only because
-  it touches the render path and the wave head is frozen.**
-
-  **NOT the seed.** Same prompt, different seeds, ruled `small_base` arm: pulse
-  spread 0.016 (house) / 0.065 (techno), tempo never missed, 6 of 6 locked.
-  A variable with a range of 0.065 cannot produce the shipped range of 0.78.
-  Renders are exactly reproducible -- 18 cross-boot pairs agree on every
-  recorded digit of seven metrics -- so a retry-on-tempo guard would be
-  strictly wasteful: re-rolling the seed at a fixed prompt buys ~0.065 of pulse
-  for a whole extra render.
-
-  **The driver's premise was FALSE.** It claimed the two contrasting episodes
-  had byte-identical prompts. They have different prompt hashes. What differs is
-  the brief-mined MOOD WORDS, and they sit IN FRONT of the tempo instruction:
-
-  | lead words | tempo | pulse | his verdict |
-  |---|---|---|---|
-  | suspenseful, **driving**, dark | 120.2 | 0.74 | -- |
-  | tension, ominous, **frantic** | 123.0 | 0.42 | *"perfect music"* |
-  | ominous, suspenseful, eerie | 156.6 | 0.29 | *"no beats, maybe one slight beat"* |
-
-  The two that locked lead with a MOTION word. The one that failed is pure
-  texture. `nodes/_otr_music_prompt.py::compose_music_prompt` appends
-  `mood_terms` BEFORE `palette.idiom`, so three atmosphere words stand in front
-  of "Chicago house at 122 BPM".
-
-  **This is the exact failure the module's own docstring already names** for the
-  neutral "atmospheric" default -- and the 2026-09-12 fix only skipped the
-  DEFAULT, leaving a real brief's mood words leading on a groove bank. Half a
-  fix.
-
-  **THE FIX, one line:** on a `groove_arc` palette, append `palette.idiom`
-  FIRST and the mood terms after it, so the genre and its BPM lead. Nothing else
-  changes; sustained banks keep today's order exactly.
-
-  **ALSO FOUND, a real bug in a bench tool:** `scripts/music_model_bench.py:295`
-  derives the seed from the index into the FILTERED family list while the
-  filename records only the family and a k-index, so the same filename means
-  different seeds between a smoke run and a full run. That invalidates the
-  determinism control cited in
-  `docs/2026-09-12-music-model-bench/driver_anchor.md:94-96`. The conclusion
-  there survives on other evidence; the cited proof does not.
 
 * **THE SHIPPING SET HE WANTS, stated 2026-09-12, and it is CURATION not
   construction.** His words: *"we will have three NVIDIA eight gigabyte JSONs
@@ -934,6 +753,9 @@ operator-parked casting/adaptation ideas, OTR-Lite after v2, and the release
 runway.
 
 ## 6. And when all of this is done -- it is time to TEST. Hurrah.
+
+**Operator 2026-09-17 confirmed:** *"TEST WAVE AFTER CODING."* Same gate
+as 2026-09-12. Do not freeze a wave head to settle a row above.
 
 When sections 1 and 2 are empty, the waiting is over and the fun part starts.
 Freeze ONE hash, write it into the `WAVE HEAD:` line of
