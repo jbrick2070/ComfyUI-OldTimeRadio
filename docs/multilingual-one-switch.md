@@ -352,14 +352,19 @@ or mixed-language episodes. A visual-prompt language dropdown. A second caption
 language dropdown. A requirements tax on English installs. A Google-lane edit.
 A Bark multilingual revival. Klingon. Esperanto.
 
-## BUILD STATUS -- 2026-09-18, rows 1-7 coded; row 8 is live proof
+## BUILD STATUS -- 2026-09-18, rows 1-7 coded; row 8 EN+ES published
 
 Rows 1-7 of the go-forward below are BUILT AND WIRED. Bark leftover `v2/`
 clears on a non-bark stamp. Voice `languages[]` filters every selection
 path. Caption wrap/font follow the row (Nirmala / YaHei; Hindi grapheme
 and CJK char wrap). Credits paint `language_header` and pick a script
-face from `font_policy`. Row 8 live `otr/obs/` legs are the remaining
-proof. Nothing here has been proven on air yet.
+face from `font_policy`. Row 8 English and Spanish 1-act still legs
+published to `otr/obs/` on `de3a7c9e` (English
+`moonlights_revelation_20260918_043418`; Spanish
+`el_reloj_inquieto_20260918_044528`, stamp `es` / `Español`, Kokoro
+`ef_dora` + `em_santa`). Remaining row 8: short 1-act smokes for the
+other six languages, plus the Shakespeare / public_domain / Bark /
+forced-Lemmy negatives.
 
 | Landed | Where | Proof |
 |---|---|---|
