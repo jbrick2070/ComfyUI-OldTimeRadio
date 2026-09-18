@@ -115,10 +115,7 @@ def test_build_variant_emits_shipping_cloud_skus(
     writer = next(n for n in variant["nodes"]
                   if n["type"] == "OTR_LedgerScriptWriter")
     assert value(writer, "creative_writing_model") == "comfy:slot-a"
-    want_a = (
-        "openai/gpt-5.6-sol" if "deluxe" in profile_id
-        else "anthropic/claude-sonnet-5"
-    )
+    want_a = "anthropic/claude-sonnet-5"
     assert value(writer, "comfy_slot_a_model") == want_a
     assert value(writer, "comfy_slot_b_model") == "openai/gpt-5.6-luna"
     want_cast = 4 if "deluxe" in profile_id else 3

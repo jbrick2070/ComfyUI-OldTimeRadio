@@ -159,6 +159,11 @@ def test_v2_llm_section_matches_runtime_policy_enums():
     assert pol.device == "cpu"
     assert pol.vram_ceiling_gb == 0
     assert "transformers" not in pol.lane_allowlist
+    assert "comfy_credits" in pol.lane_allowlist
+    assert prof["llm"]["creative_model"] == "comfy:slot-a"
+    assert prof["llm"]["technical_model"] == "comfy:slot-b"
+    assert prof["llm"]["comfy_slot_a_model"] == "anthropic/claude-sonnet-5"
+    assert prof["llm"]["comfy_slot_b_model"] == "openai/gpt-5.6-luna"
 
 
 def test_v2_mapping_declares_exempt_widget_names():

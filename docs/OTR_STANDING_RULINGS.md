@@ -44,6 +44,11 @@ STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
   GiB with CPU TE). The public hole is `otr_16gb_video` /
   `otr_16gb_foley` / `otr_16gb_mime`. Cloud deluxe already ships
   `cloud_ltx25_foley_plus`.
+* Two CPU writer paths, named honestly. Shipping `otr_cpu_low` is the
+  free local Qwen 4B graph (proven 2026-09-13). Draft `cpu_floor` uses a
+  cloud LLM (`comfy:slot-a` / `comfy:slot-b`) and keeps `transformers`
+  off the allowlist -- do not put Qwen on the floor. Download-state
+  badges stay ripped; do not open a badge fan-out.
 
 ---
 

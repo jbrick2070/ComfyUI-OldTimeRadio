@@ -324,9 +324,9 @@ on A5. Lab / soak recipes that exist to exercise `wan_ti2v`,
 `fastwan_8gb`, `ltx_video`, `ltx_audio_in`, or GGUF `ltx25_*` keep the
 lane -- do not "repair" them by pretending they are something else.
 
-**Writer half of the same ruling:** C1's five 8 GB profiles already moved
-to `Qwen/Qwen3.5-4B` + `bnb_nf4`. The leftover empty-lane is C4
-(`cpu_floor` still excludes `transformers` while naming that 4B).
+**Writer half of the same ruling:** shipping 8 GB / Mac / AMD / `otr_cpu_low`
+already name `Qwen/Qwen3.5-4B`. Draft `cpu_floor` is the cloud-writer CPU
+path (`comfy:slot-a` / `comfy:slot-b`); it does not get a local 4B.
 
 ### C7. The widget tier -- verified plan, nothing built
 
@@ -456,19 +456,6 @@ hit, and a filename with no source is not an install instruction.
 
 `spandrel_esrgan`'s 67 MB upscale model is the one remaining hand-fetch in the
 README's cheapest-setups table, and it is the same shape as `sd15` was.
-
-### C4. `cpu_floor` has no local writer it is allowed to use
-
-Measured 2026-09-12, still true 2026-09-17. It is the ONLY profile whose
-`lane_allowlist` excludes `transformers` -- it permits `gguf`,
-`openrouter`, `comfy_credits`, `google_api`. Its `creative_model` is now
-`Qwen/Qwen3.5-4B`, a transformers row. `GGUF_ROWS` is empty, so its one
-named local lane offers nothing. A CPU-only user therefore has no local
-route at all: the two that remain are paid. The non-GGUF answer is add
-`transformers` to that allowlist and let the 4B run on CPU. C1's five
-8 GB profiles already made that move. This draft profile is the leftover.
-`tests/test_capability_profiles.py` currently asserts
-`"transformers" not in` the allowlist -- that pin flips with the fix.
 
 ### C5. Small, named, and each takes minutes
 

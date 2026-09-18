@@ -1,3 +1,18 @@
+## 2026-09-17 -- cpu_floor is the cloud-writer CPU; local Qwen stays otr_cpu_low
+
+Did: Operator said the floor cannot run Qwen -- use a cloud LLM and call it
+  a day. Draft `cpu_floor` now stamps `comfy:slot-a` / `comfy:slot-b` (same
+  Sonnet 5 + GPT 5.6 Luna pair as the cheap cloud graphs), keeps
+  `transformers` off the allowlist, and requires `OTR_COMFY_API_KEY` plus
+  the existing Google image key. Shipping `otr_cpu_low` is untouched (the
+  proven local 4B). Shipping 8 GB / Mac / AMD stay small Qwen; only 16 GB
+  NVIDIA pins Gemma 12B. No badge fan-out. C4 cut.
+Current step: A5 still waits on the 16 GB GGUF video/foley/mime hole.
+  ltx_8gb and AnimateDiff later.
+Next: do not add transformers to cpu_floor; do not invent cpu_plus_qwen.
+Models: Composer QA then Sonnet on this diff.
+Commits: this chunk.
+
 ## 2026-09-17 -- HEAD 73508d89 +handoff (main) -- PLANNER (dump story/music chase; official LTX 2.5 safetensors found)
 
 Did: Operator dumped story-quality and music prompt-craft. Official non-GGUF
