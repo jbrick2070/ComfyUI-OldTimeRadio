@@ -266,10 +266,24 @@ ComfyUI-GGUF `ltx25_*` stack.
 * The HF repo is **gated** (license click). That is not "drop a file and
   Queue" for a stranger, but it is a different friction than a third-party
   GGUF loader pack.
-* Those files will not sit resident on 16 GB (INT8 DiT + TE alone is
-  ~37 GB). A local native lane on this card needs offload, the conv VAE,
-  or the NVFP4 distilled transformer -- not a naive load of both INT8
-  files.
+* **Measured 2026-09-17: official non-GGUF does not fit 16 GB, even
+  with the encoder on CPU.** This card is 16303 MiB (~15.92 GiB);
+  OTR's working ceiling is 14.5. On-disk official distilled INT8 DiT
+  is **20.027 GiB** (`ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors`).
+  Official NVFP4 DiT (HF, not on this disk) is **17.433 GiB**
+  (`18721548408` bytes). Either file is larger than the card before
+  activations. The locked GGUF recipe's sampling peak is
+  **9.80 DiT + 3.20 act + 1.48 alloc = 14.48 GiB**, TE and VAEs already
+  at zero. Swap only the DiT to official INT8 and keep that same
+  CPU-TE / unload-VAE hygiene: **24.71 GiB, ~10.2 over the clamp**.
+  Official INT8 Gemma-4 TE is another **14.324 GiB** file (the GGUF Q5
+  TE is 8.86 and still spiked encode to ~15.8 GiB until it was pinned
+  to CPU). Video VAE 1.371 + audio VAE 0.340 + spatial upscaler 0.927
+  = 2.638 GiB more if they ever sit with the DiT. Optional prompt
+  enhancer `gemma4_e2b_it_bf16` is 9.573 GiB and is not required for
+  foley. There is no official safetensors combo that stays under 16 GB
+  including the tensors it needs. The 16 GB local path remains the
+  Q3 GGUF DiT.
 * **Cloud LTX 2.5 is already wired** as `cloud_ltx25_foley_plus` and
   `cloud_ltx25_audio_in` (partner `ltx/ltx-2-5-t2v` Fast/Pro, Comfy
   Credits, zero local weights). `otr_cloud_deluxe_3act` already ships
@@ -281,12 +295,10 @@ ComfyUI-GGUF `ltx25_*` stack.
   `otr_16gb_mime` (`ltx25_mime`) still name a GGUF video engine. 8 GB
   haunted / still / `ltx_8gb` / AnimateDiff do not.
 
-**The fork, and it is his:** ship foley/mime as the **cloud** pair (already
-built), or build a **native safetensors** local lane (new adapter, official
-Comfy nodes, gated download, offload or NVFP4 on this 16 GB card), or keep
-the GGUF stack as lab-only and drop those three graphs from the public set
-(8 GB foley is already retired). Do not start the native adapter until
-this pick lands.
+**Do not build a native official-safetensors lane for this 16 GB box.**
+The files exist; they do not fit. Public foley/mime either stay on the
+Q3 GGUF stack (lab / those three shipping graphs) or use the already
+wired cloud pair. That is not a VRAM question any more.
 
 ## 2. CODE -- the design is settled, build it
 

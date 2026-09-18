@@ -38,10 +38,12 @@ STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
   freeze a wave head to settle a coding row.
 * Official non-GGUF LTX 2.5 exists (`Lightricks/LTX-2.5` safetensors,
   native Comfy T2V/I2V/FLF2V with synced audio). This 5080 box already
-  has the INT8 pack on disk. Local `ltx25_*` still loads GGUF. The public
-  hole is `otr_16gb_video` / `otr_16gb_foley` / `otr_16gb_mime`. Cloud
-  deluxe already ships `cloud_ltx25_foley_plus`. Pick among those before
-  writing a native adapter.
+  has the INT8 pack on disk. **It does not fit 16 GB:** official INT8
+  DiT is 20.027 GiB on disk, official NVFP4 DiT is 17.433 GiB, card is
+  15.92 GiB. Local `ltx25_*` stays on the Q3 GGUF DiT (lab peak 14.48
+  GiB with CPU TE). The public hole is `otr_16gb_video` /
+  `otr_16gb_foley` / `otr_16gb_mime`. Cloud deluxe already ships
+  `cloud_ltx25_foley_plus`.
 
 ---
 
