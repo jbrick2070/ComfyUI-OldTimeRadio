@@ -119,6 +119,24 @@ def _language_marks(led) -> "tuple[str, str]":
         return "", ""
 
 
+def _font_policy_for(led) -> str:
+    """The row's ``captions.font_policy`` (``latin_arial`` / ``devanagari`` /
+    ``cjk``), or ``latin_arial`` for English, Off, legacy or unreadable."""
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        meta = (led or {}).get("meta") if isinstance(led, dict) else None
+        if not isinstance(meta, dict) or not str(meta.get("episode_language") or "").strip():
+            return "latin_arial"
+        policy = str(
+            (_EPLANG.row_from_meta(meta).captions or {}).get("font_policy") or "")
+        return policy.strip() or "latin_arial"
+    except Exception:  # noqa: BLE001 -- a face never breaks the render
+        return "latin_arial"
+
+
 def _safe_episode_title_slug(episode_title, max_chars=40):
     """Filesystem-safe Unicode title without splitting combining sequences.
 
@@ -333,14 +351,106 @@ def _mono_font_path():
     return _FONT_PATH
 
 
-def _load_font(size):
+#: Face policies this module knows how to resolve. Anything else is a
+#: registry typo or a row from a newer build, and is announced rather than
+#: silently drawn in the Latin face -- see `_load_font`.
+KNOWN_FONT_POLICIES = ("latin_arial", "devanagari", "cjk")
+
+_SCRIPT_FONT_PATH: dict = {}
+_SCRIPT_FONT_KEY = None
+_WARNED_FONT_POLICIES: set = set()
+
+
+def _script_font_key():
+    """The configuration the script walk's answer depends on."""
+    return (otr_env.get("WINDIR") or "").strip()
+
+
+def _script_font_path(policy: str):
+    """The first OS face that can paint ``policy`` (devanagari / cjk), or
+    None. Reuses the credits roll's candidate walk so the card and the roll
+    agree on the face; resolved once per CONFIGURATION.
+
+    KEYED, NEVER LATCHED, for the reason `_mono_font_path` is keyed: ComfyUI
+    runs prompts back to back in one process, and a "have we tried yet" flag
+    turns one miss into a miss for the life of the server. A miss IS cached
+    -- the walk is expensive -- but it is dropped the moment the key changes,
+    and a font that fails to OPEN later evicts its entry rather than latching
+    None (see `_load_font`).
+    """
+    global _SCRIPT_FONT_KEY
+    key = _script_font_key()
+    if key != _SCRIPT_FONT_KEY:
+        _SCRIPT_FONT_PATH.clear()
+        _SCRIPT_FONT_KEY = key
+    if policy in _SCRIPT_FONT_PATH:
+        return _SCRIPT_FONT_PATH[policy]
+    found = None
+    try:
+        try:
+            from .otr_credits_roll import _credits_script_font_paths
+        except ImportError:  # pragma: no cover -- flat load
+            from otr_credits_roll import _credits_script_font_paths  # type: ignore
+        fd = os.path.join(otr_env.get("WINDIR", r"C:\Windows"), "Fonts")
+        for candidate in _credits_script_font_paths(fd, policy):
+            try:
+                ImageFont.truetype(candidate, 12)
+                found = candidate
+                break
+            except OSError:
+                continue
+    except Exception as exc:  # noqa: BLE001 -- a face never breaks the render
+        log.warning("OTR: script font walk for %r failed (%s); using the "
+                    "monospace face", policy, exc)
+    if found is None and policy in ("devanagari", "cjk"):
+        log.warning("OTR: no %s-capable font found; the hero card and HUD "
+                    "will draw the title with the monospace face", policy)
+    _SCRIPT_FONT_PATH[policy] = found
+    return found
+
+
+def _load_font(size, policy="latin_arial"):
     """Load the host monospace face at ``size``. Cached per size.
+
+    ``policy`` is the language row's ``captions.font_policy``: for
+    ``devanagari`` / ``cjk`` a script-capable face is tried FIRST so a native
+    title does not tofu on the card or the HUD; ``latin_arial`` (the default)
+    is byte-identical to the historical monospace walk.
 
     The per-size cache is checked AFTER `_mono_font_path`, never before, so a
     configuration change drops it in the same breath as the path. Checking it
     first is what let a stale font object outlive the override that built it.
     """
     global _WARNED_BITMAP_FALLBACK
+    policy = str(policy or "latin_arial").strip() or "latin_arial"
+    if policy not in KNOWN_FONT_POLICIES and policy not in _WARNED_FONT_POLICIES:
+        # A registry typo must not be indistinguishable from `latin_arial`
+        # in the log. Announced once per value, then drawn in the Latin face.
+        _WARNED_FONT_POLICIES.add(policy)
+        log.warning(
+            "OTR: unknown captions.font_policy %r (known: %s); drawing the "
+            "title with the monospace face. A native title in a non-Latin "
+            "script will tofu until the row is corrected.",
+            policy, ", ".join(KNOWN_FONT_POLICIES))
+    if policy in ("devanagari", "cjk"):
+        script_path = _script_font_path(policy)
+        if script_path:
+            key = (policy, size)
+            if key not in _FONT_CACHE:
+                try:
+                    _FONT_CACHE[key] = ImageFont.truetype(script_path, size)
+                except OSError as exc:
+                    # EVICT, never latch None: a file lock or a momentary I/O
+                    # error would otherwise downgrade every later render of
+                    # this script for the life of the process, silently.
+                    _SCRIPT_FONT_PATH.pop(policy, None)
+                    log.warning(
+                        "OTR: %s face %r failed to open at size %d (%s); "
+                        "using the monospace face for this draw and "
+                        "re-resolving on the next one.",
+                        policy, script_path, size, exc)
+            if key in _FONT_CACHE:
+                return _FONT_CACHE[key]
     path = _mono_font_path()               # may invalidate _FONT_CACHE
     if size in _FONT_CACHE:
         return _FONT_CACHE[size]
@@ -673,13 +783,16 @@ class _CRTRenderer:
     """
 
     def __init__(self, w, h, title, volume, freqs, waves, fps, timing=None,
-                 card_label=""):
+                 card_label="", font_policy="latin_arial"):
         self.w = w
         self.h = h
         self.title = title
         # Shown on the HERO CARD only ("EL MAPA PROHIBIDO · SPANISH"); the
         # quoted ident HUD and the scramble seed keep the plain title.
         self.card_label = str(card_label or "").strip()
+        # The row's captions.font_policy: a Hindi or CJK title needs a face
+        # that has its glyphs, on the HUD and the card alike.
+        self.font_policy = str(font_policy or "latin_arial").strip() or "latin_arial"
         self.fps = int(fps) if fps else 24
 
         # -- Audio arrays (convert lists -> np FIRST; the EMA precompute and
@@ -694,9 +807,9 @@ class _CRTRenderer:
         # Fonts
         self._title_size = max(14, h // 30)
         self._hero_size_max = max(28, h // 12)  # 2-3x f_title (#1 spec ceiling)
-        self.f_title = _load_font(self._title_size)
-        self.f_sub   = _load_font(max(12, h // 38))
-        self.f_small = _load_font(max(9, h // 72))
+        self.f_title = _load_font(self._title_size, self.font_policy)
+        self.f_sub   = _load_font(max(12, h // 38), self.font_policy)
+        self.f_small = _load_font(max(9, h // 72), self.font_policy)
 
         # Pre-build scan-line overlay (RGBA)
         self._scanlines = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -1040,7 +1153,7 @@ class _CRTRenderer:
         floor = max(16, self.h // 40)
         size = self._hero_size_max
         while True:
-            font = _load_font(size)
+            font = _load_font(size, self.font_policy)
             lines = self._wrap_words(draw, title, font, max_w)
             tw = max((self._tw(draw, ln, font) for ln in lines), default=0)
             th = sum(self._th(draw, ln, font) for ln in lines)
@@ -1070,14 +1183,14 @@ class _CRTRenderer:
         the ident.
         """
         def measure_text(text, size):
-            font = _load_font(max(8, int(size)))
+            font = _load_font(max(8, int(size)), self.font_policy)
             return (self._tw(draw, text, font), self._th(draw, text or "M", font))
 
         def fit_hero(title, size=None):
             if size is None:
                 font, lines, resolved = self._fit_hero(draw, title)
                 return (lines, resolved)
-            font = _load_font(max(8, int(size)))
+            font = _load_font(max(8, int(size)), self.font_policy)
             return (self._wrap_words(draw, title, font, int(self.w * 0.8)),
                     int(size))
 
@@ -1215,7 +1328,7 @@ class _CRTRenderer:
         if in_dock and dock_frames > 0:
             d = min(1.0, max(0.0, (fi - me) / dock_frames))
             cur_size = int(round(hero_size + (self._title_size - hero_size) * d))
-            font = _load_font(max(8, cur_size))
+            font = _load_font(max(8, cur_size), self.font_policy)
             lines = self._wrap_words(draw, title, font, int(self.w * 0.8))
             shown = lines  # fully decoded while docking
         else:
@@ -2272,7 +2385,8 @@ class SignalLostVideoRenderer:
         # episode ("EL MAPA PROHIBIDO · SPANISH") -- the card only, never the
         # quoted HUD that rides every frame. English is byte-identical.
         renderer = _CRTRenderer(W, H, episode_title, volume, freqs, waves, fps,
-                                timing=_title_timing, card_label=lang_label)
+                                timing=_title_timing, card_label=lang_label,
+                                font_policy=_font_policy_for(led))
         total_encode_frames = total_frames
 
         # -- Hero title-card plan for the DOWNSTREAM burn ------------------

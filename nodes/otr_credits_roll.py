@@ -711,6 +711,14 @@ def _credits_script_font_paths(fd: str, policy: str) -> list:
     AFTER ``OTR_CREDITS_FONT`` so the operator override still wins."""
     if policy == "devanagari":
         return [
+            # Windows 10/11 ship Nirmala UI as a COLLECTION (Nirmala.ttc,
+            # index 0 = Regular); the .ttf spellings are older installs.
+            # Measured 2026-09-18: without the .ttc the walk missed the
+            # face and the hero measured in Consolas while ASS burned
+            # Nirmala UI.
+            os.path.join(fd, "Nirmala.ttc"),
+            os.path.join(fd, "nirmala.ttc"),
+            os.path.join(fd, "NirmalaUI.ttc"),
             os.path.join(fd, "Nirmala.ttf"),
             os.path.join(fd, "nirmala.ttf"),
             os.path.join(fd, "NirmalaUI.ttf"),
