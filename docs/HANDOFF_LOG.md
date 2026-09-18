@@ -1,3 +1,32 @@
+## 2026-09-18 -- HEAD 3bae04bf +handoff (main) -- PLANNER (Cursor Grok hands the week to Opus)
+
+Did: This Cursor Grok window did not land CODE. It cleaned GO_FORWARD
+  to bug-fix rows only (`7111e529`), then reordered it decide / code /
+  test (`5160da85`). Last CODE head remains `3bae04bf` (readiness,
+  native episode paths, PBUG-20260918-01..03). Three docs commits sit
+  on top of that after this handoff lands; the sha above is the last
+  CODE head, not this commit. Suite was not run (docs-only). Bug Bible
+  was not re-run; no new admissible PBUG this window. Box is NOT
+  clean: two Comfy `main.py --port 8000` processes (PIDs 17084 and
+  47576), VRAM 3483 MiB, Get-NetTCPConnection did not show a listener.
+  Selective CIM reset before any headless run; never a blanket python
+  kill.
+Current step: CODE 1 native character authoring. Draft is already on
+  this dirty checkout and is not on origin.
+Next: Opus takes the week. First action is the native-authoring pile
+  already on disk -- QA, named-file commit, push. Do not rewrite from
+  scratch. Do not `git add .`. Do not mix the Google/cloud pile into
+  that commit. Then the unpushed 2026-09-17 My Story / working-gate
+  draft. Then `cuda:1`. Live multilingual reruns and the four-machine
+  wave stay after coding. Section 1 forks wait for his word.
+Models: Cursor Grok 4.6 planner only. No Composer QA and no Sonnet
+  this window (docs). No kibitz this window. Prior native-authoring
+  kibitz was a scoped tail, not a full arc, and Codex sat out on
+  quota.
+Commits: `7111e529`, `5160da85`. The handoff commit itself lands ON
+  TOP of these and is not listed here -- see the kickoff line for the
+  real head.
+
 ## 2026-09-18 -- GO_FORWARD reads decide, then code, then test
 
 Did: Operator asked to optimize the plan for scoping and decision first,

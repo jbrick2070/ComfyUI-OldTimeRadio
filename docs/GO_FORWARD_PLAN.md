@@ -77,9 +77,14 @@ Crash-class and ledger-identity first. Each row is one commit on `main`. Do
 not start a row below while one above is red. Do not start a row whose
 answer is still sitting in section 1.
 
-**Working gate (seconds):** `scripts/otr_working_gate.py`. **Chunk gate
-(~10 min):** full `pytest tests`, once the row is green. Commands live in
-[known-failures](known-failures.md). Those gates are not the test wave.
+**This checkout is dirty.** Two uncommitted piles plus one unpushed
+closed-row draft. Do not `git add .`. Do not rewrite a draft that is
+already on disk. Composer QA then Sonnet before every push.
+
+**Working gate (seconds):** `scripts/otr_working_gate.py` (on disk, not
+on origin). **Chunk gate (~10 min):** full `pytest tests`, once the row
+is green. Commands live in [known-failures](known-failures.md). Those
+gates are not the test wave.
 
 ### 1. Native character lines still come out English
 
@@ -97,11 +102,21 @@ can replace spoken text: per-line composer (character **system** message),
 grouped exchange, cast-coverage repair, ledger-clean F2 and stage-business
 repair, and the cleanup title fallback.
 
-Plan: [2026-09-18-multilingual-native-dialogue-plan](2026-09-18-multilingual-native-dialogue-plan.md).
+**Draft is already in this working tree.** Finish, QA, and push those
+named files. Do not mix the Google pile into this commit. Plan (also
+untracked): `docs/2026-09-18-multilingual-native-dialogue-plan.md`.
 Verify: focused line-composer / exchange / clean-stage / writer tests;
 English prompt fixtures do not drift.
 
-### 2. A `cuda:1` voice stamp silently becomes card zero
+### 2. My Story alias metrics and the working gate never reached origin
+
+**Decided 2026-09-17 and documented as closed; the code is still only
+local.** `SpokenLine` alias promotion must call `set_line_text_metrics`.
+Music brief pin: `compose_music_prompt` -> `resolve_setting_terms` ->
+`spoken_term(t)`. Land `scripts/otr_working_gate.py` and
+`tests/test_working_gate_script.py` with that chunk. Named files only.
+
+### 3. A `cuda:1` voice stamp silently becomes card zero
 
 **Decided:** round-trip `cuda:1`, or fail loud. Do not pick a card by guessing.
 
