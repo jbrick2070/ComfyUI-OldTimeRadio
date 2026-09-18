@@ -33,7 +33,7 @@ cannot run and why / **UNTESTED**.
 | `bark` | TTS | cuda,cpu,**mps** | **PASS on mps -- declaration FIXED 2026-09-07** | measured 2026-09-07: mps 40.8 s / flatness 0.070 / 4.6 s audio; cpu 27.8 s / 0.064 / 3.0 s. Structured speech both ways. The registry row now carries `mps` (fixed on this measurement); it previously omitted it AND `_otr_bark_lib.py` hardcoded `"cuda" if torch.cuda.is_available() else "cpu"` -- **the exact `cuda ... else cpu` pattern the original MPS audit was looking for**, and a real one. Note mps is not FASTER here (roughly a wash per second of audio), so the win is correctness of the declaration, not speed |
 | `viz_green` / `viz_mxc_cpu` / `viz_camera` | video | cuda,cpu,mps | **PASS** | all three render; `viz_camera` is the operator's preference |
 | `viz_mxc_mandala` | video | cuda,cpu,mps | **BLOCKED** | needs `pycairo`, which has no macOS wheel and needs libcairo headers. Declaration is right, the canonical was wrong to select it (PBUG-20260907-10) |
-| `word_razzle` | video | cuda,cpu,mps | UNTESTED | cheap, no weights |
+| `razzle_ltx_8gb` | video | cuda,cpu,mps | UNTESTED | local kinetic sibling of retired cloud `word_razzle`; same LTX 0.9.8 weights as `ltx_8gb` |
 | `still_motion` / `still_flat` / `still_pan` / `still_word` | video | cuda,cpu,mps | **ALL FOUR PASS** (2026-09-08) | this row said BLOCKED (upstream) -- "they CONSUME a still and every local image engine is `[cuda]`, only reachable with a cloud image key". `sd15` removed that block. `still_motion` published at 00:55 (`__arch__stmo__`), the other three at 04:28 (`__cart__stwo__`); every still minted locally on Metal. See MAC_PORTABILITY_GUIDE section 9 |
 
 ## Tier 2 -- low-VRAM video, the real gap

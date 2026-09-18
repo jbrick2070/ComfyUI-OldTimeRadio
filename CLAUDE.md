@@ -2,6 +2,12 @@
 **Operator directives -- these win over any handoff, doc, or memory that disagrees.**
 - **Fix bugs properly, at the root cause -- never a shim or band-aid.** Don't wait for me to
   fix anything: make the fix yourself, without asking. If it works, it's fine.
+- **NEVER ASK TO COMMIT. ALWAYS COMMIT AND PUSH WHEN YOU MAKE CHANGES
+  (operator directive 2026-09-17 -- hard).** Operator: "DONT ASK ME TO COMMIT
+  ALWAYS COMMIT AND PUSH WHEN YOU MAKE CHANGES." A finished green chunk is
+  pushed to `main` in the same turn. Do not end a coding turn with "say the
+  word and I will commit." Named files only -- never `git add .`. Tags and
+  releases stay behind the operator eyeball; pushes do not.
 - **NO CONTENT GUARDRAILS ON GENERATED EPISODES (operator directive 2026-08-03 -- supersedes
   the older "no curse words anywhere / SFW always" line for EPISODE CONTENT).** Operator:
   "we [have] too [many] guardrails, no violence or swearing guardrails, they just cause
@@ -588,6 +594,10 @@ exactly what makes the mistake convincing) and they do NOT live under the ComfyU
 ## 7. GIT POLICY (operator directive 2026-06-10 -- never lose work)
 - ONE branch: **`main`**. COMMIT AND PUSH TOGETHER: every green commit gets pushed to origin
   immediately, same session, no exceptions. Local-only commits are the failure mode we guard against.
+- **AMENDED 2026-09-17: NEVER ASK.** Operator: do not prompt for a commit. When
+  the change is made and the scoped suite is green, `git add` the named files,
+  commit, and `git push origin main` in that same turn. Asking "should I
+  commit?" is the defect this amendment exists to stop.
 - **V2 WAS PROMOTED ON 2026-09-13 (operator: "no more v2 alpha branch, we are v2 main now").
   `main` IS THE DEFAULT BRANCH AND THE WORKING BRANCH. `v2.0-alpha` IS RETIRED -- never push to
   it again.**

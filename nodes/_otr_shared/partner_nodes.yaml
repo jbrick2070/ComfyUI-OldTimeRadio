@@ -338,40 +338,6 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
-  cloud_pixverse_i2v:
-    api_node: true
-    auth_hidden_present:
-    - auth_token_comfy_org
-    - api_key_comfy_org
-    category: partner/video/PixVerse
-    class_name: PixverseImageToVideoNode
-    function: EXECUTE_NORMALIZED_ASYNC
-    import_path: comfy_api_nodes.nodes_pixverse
-    inputs:
-      hidden:
-        api_key_comfy_org:
-        auth_token_comfy_org:
-        comfy_usage_source:
-        unique_id:
-      optional:
-        negative_prompt: STRING
-        pixverse_template: PIXVERSE_TEMPLATE
-      required:
-        duration_seconds: COMBO
-        image: IMAGE
-        motion_mode: COMBO
-        prompt: STRING
-        quality: COMBO
-        seed: INT
-    is_async: true
-    notes: word_razzle animated word-card i2v; motion_mode motion-strength; cheapest
-      passing seed row (Phase 0)
-    provider_id: PIXVERSE
-    return_types:
-    - VIDEO
-    seed_supported: true
-    selected_output: 0
-    status: OK
   cloud_seedance_2:
     api_node: true
     auth_hidden_present:

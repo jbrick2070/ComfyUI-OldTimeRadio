@@ -452,6 +452,12 @@ RETIRED_ENGINE_IDS = frozenset({
     # of letting it fall through to the generic "no engine named ..." message,
     # which reads as a broken install rather than a retirement.
     "wan_i2v",
+    # THE CLOUD PIXVERSE WORD-CARD LANE, RETIRED 2026-09-17 (operator:
+    # "WORD_RAZZLE / CLOUD GETS RIPPED"). The adapter was CloudWordRazzleEngine
+    # on partner row cloud_pixverse_i2v. Local razzle_ltx_8gb stays; this id
+    # is a named tombstone so a saved graph or force-map still fails as
+    # RetiredEngineError, never as a silent remap and never as "not registered".
+    "word_razzle",
 })
 
 

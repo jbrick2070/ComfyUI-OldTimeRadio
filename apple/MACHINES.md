@@ -62,7 +62,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `cloud_wan_i2v_audio` | none | -- | key | key | key | key | key |
 | `google_omni_video` | none | -- | key | key | key | key | key |
 | `google_veo_video` | none | -- | key | key | key | key | key |
-| `word_razzle` | none | -- | key | key | key | key | key |
 
 **Video -- local diffusion**
 

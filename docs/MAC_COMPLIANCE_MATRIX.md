@@ -117,7 +117,6 @@ The sections below run in that order -- the two that can cost you a machine firs
 | `humo_1.7B_169` | video | manual | 12.6 | **[OVERTURNED from OOM RISK @16GB]** The same 1.7B checkpoint and the same inherited fp8 umt5 + whisper fully-resident loader set as humo_1.7B, just at 832x480 -- roughly the same pixel budget, so the same ~12.6 GB residency again. Its sibling `humo_1.7B` sits in OOM RISK at that residency and the re-check moved only this row (see the overturned list), so treat it as no safer than its sibling. |
 | `mesh_stage` | video | manual | 4.6 | assert_usable gates only on an OTR_BLENDER_EXE path (a plain os.path.exists, no .exe enforcement), ComfyUI CORE hy3d node classes and a 4.59 GB checkpoint; its reclaim barrier already branches to torch.mps, and nothing NVIDIA-specific in it. |
 | `viz_mxc_mandala` | video | none | - | Zero weights and a pure CPU cairo painter with no Metal path at all, but pycairo publishes no macOS wheel, so it needs `brew install cairo pkg-config` before pip can build it -- a friction step, not a device blocker, and no render through it is on record here. |
-| `word_razzle` | video | none | - | It is the Pixverse cloud_pixverse_i2v row, not a local lane -- on this Mac it failed with 'no credentials: set OTR_COMFY_API_KEY', which the guide records explicitly as measuring a credential rather than Apple Silicon. |
 
 ## What the adversarial pass overturned
 

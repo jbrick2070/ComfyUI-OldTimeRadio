@@ -543,13 +543,6 @@ def test_prompt_conditioners_use_engine_specific_markers(
     assert ecv._SEEDANCE_SMOOTH_MARKER not in kling["prompt"]
     _assert_visual_safety(kling["prompt"])
 
-    razzle = ecv.WordRazzle._partner_inputs(req)
-    assert prompt in razzle["prompt"]
-    assert ecv._WAN_SMOOTH_MARKER not in razzle["prompt"]
-    assert ecv._KLING_AVATAR_MARKER not in razzle["prompt"]
-    _assert_visual_safety(razzle["prompt"])
-    _assert_negative_safety(razzle["negative_prompt"])
-
 
 # --------------------------------------------------------------------------- #
 # canonicalize_video (real ffmpeg on a generated AV fixture)

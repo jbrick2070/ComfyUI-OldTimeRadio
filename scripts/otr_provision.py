@@ -1542,7 +1542,6 @@ _REMOTE_NO_WEIGHT_VIDEO_ENGINES = {
     "cloud_ltx25_audio_in",
     "google_omni_video",
     "google_veo_video",
-    "word_razzle",
 }
 _REMOTE_NO_WEIGHT_IMAGE_ENGINES = {
     "cloud_flux_pro",

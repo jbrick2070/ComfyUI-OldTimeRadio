@@ -116,7 +116,6 @@ EXPECTED_CLOUD_GAP = {
     "cloud_wan_i2v_audio",
     "google_omni_video",
     "google_veo_video",
-    "word_razzle",
 }
 
 
@@ -446,9 +445,9 @@ def test_CONTROL_the_cloud_gap_tripwire_is_an_exact_set_not_a_shrug():
     assert not (set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS), (
         "retired engine id(s) back in the cloud gap: %s"
         % sorted(set(CLOUD_SPLITTERS) & RETIRED_ENGINE_IDS))
-    assert "word_razzle" in CLOUD_SPLITTERS, (
-        "word_razzle is a CLOUD i2v engine that the 45-word campaign wrongly "
-        "carried in its local roster; it belongs in this set")
+    assert "word_razzle" not in CLOUD_SPLITTERS, (
+        "word_razzle is retired 2026-09-17; a retired id must never reappear "
+        "in the live cloud gap")
     # This row guards the SUBSTRING hazard: `cloud_wan_i2v` is a legitimate
     # member of the gap above, and a local Wan lane sharing most of that name
     # must never be swept in with it. The local lane named here was `wan_i2v`

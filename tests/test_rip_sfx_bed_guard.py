@@ -76,6 +76,10 @@ _RETIRED_IDS = frozenset({
     # `wan_ti2v`, which is live and stays live; the ids are one letter apart and
     # that is the whole hazard.
     "wan_i2v",
+    # Cloud Pixverse word-card lane, RETIRED 2026-09-17. Adapter deleted;
+    # local razzle_ltx_8gb stays. The id must remain unregistered and
+    # unaliased so a stale graph fails as RetiredEngineError.
+    "word_razzle",
 })
 
 #: Deleted symbols per module -- the CLOSED set. A symbol reappearing on its

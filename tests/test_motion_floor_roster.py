@@ -156,5 +156,5 @@ def test_the_roster_is_not_empty_and_this_gate_is_not_vacuous():
         "trim gate above is close to vacuous" % len(with_minimum))
     # Named anchors the trim gate exists for -- these must always carry a
     # minimum or a discrete menu:
-    for anchor in ("humo", "ltx_video", "wan_ti2v", "word_razzle"):
+    for anchor in ("humo", "ltx_video", "wan_ti2v", "razzle_ltx_8gb"):
         assert anchor in with_minimum, anchor

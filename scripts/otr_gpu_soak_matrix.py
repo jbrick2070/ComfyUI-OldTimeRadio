@@ -131,8 +131,6 @@ PROFILES = [
     "otr_soak_still_pan_flux_gen1",
     "otr_soak_still_pan_ideo",
     "otr_soak_still_word_z_image_turbo",
-    "otr_soak_word_razzle_ideo",
-    "otr_soak_word_razzle_lumina_image",
 ]
 
 #: THE HEAVY VIDEO LANES -- the gap this harness's own docstring named ("no

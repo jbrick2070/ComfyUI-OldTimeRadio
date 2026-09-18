@@ -157,7 +157,6 @@ VIDEO_LANE = {
     "viz_mxc_cpu": "vmcp",
     "viz_mxc_mandala": "vmmn",
     "wan_ti2v": "wti2",
-    "word_razzle": "wraz",
 }
 
 IMAGE_GEN = {

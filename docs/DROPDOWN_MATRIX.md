@@ -42,7 +42,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `cloud_wan_i2v_audio` | none | -- | key | key | key | key | key |
 | `google_omni_video` | none | -- | key | key | key | key | key |
 | `google_veo_video` | none | -- | key | key | key | key | key |
-| `word_razzle` | none | -- | key | key | key | key | key |
 
 **Video -- local diffusion**
 

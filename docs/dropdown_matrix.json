@@ -493,14 +493,6 @@
       },
       "size_gb": 10.6
     },
-    "word_razzle": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": null
-    },
     "z_image_turbo": {
       "memory": {
         "mac16": "oom",

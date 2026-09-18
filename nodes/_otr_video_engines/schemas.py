@@ -387,7 +387,7 @@ class ShotRow(_Forbid):
     #: ``_stamp_budget_floor_shot`` when a provider-side beat is floored
     #: instead of aborting the episode. ABSENCE means the beat was not
     #: floored on that path. Copper Taste (2026-09-17) floored two
-    #: ``word_razzle`` announcer beats and lost the reason because these
+    #: cloud announcer beats and lost the reason because these
     #: keys were not on ShotRow (extra=forbid) and VideoRenderBatch never
     #: wrote the floored ``video.shots`` back through ``stamp_durable``.
     cloud_floor: Optional[str] = None

@@ -81,7 +81,7 @@ def test_missing_and_renamed_values_are_findings():
         assert node_key == "cloud_pixverse_i2v"
         return schema
 
-    eng = _FakeEngine("word_razzle", {
+    eng = _FakeEngine("cloud_probe_i2v", {
         "cloud_pixverse_i2v": {"quality": ("bogus",), "motion_mode": ("normal",)},
     }, node_key="cloud_pixverse_i2v")
     hits = csp.check_engine(
@@ -94,7 +94,7 @@ def test_missing_and_renamed_values_are_findings():
 
 
 def test_class_import_failure_is_a_finding():
-    eng = _FakeEngine("word_razzle", {"cloud_pixverse_i2v": {"quality": ("720p",)}})
+    eng = _FakeEngine("cloud_probe_i2v", {"cloud_pixverse_i2v": {"quality": ("720p",)}})
 
     def boom(_key):
         raise RuntimeError("cannot resolve pinned partner class")
@@ -175,16 +175,16 @@ def test_replay_skips_writer_and_still_checks_video():
     seen = []
 
     class _Video:
-        name = "word_razzle"
-        node_key = "cloud_pixverse_i2v"
+        name = "cloud_wan_i2v"
+        node_key = "cloud_wan_i2v"
         cloud_catalog = None
 
         def cloud_selectors(self):
             seen.append("video")
-            return {"cloud_pixverse_i2v": {"quality": ("720p",)}}
+            return {"cloud_wan_i2v": {"quality": ("720p",)}}
 
     def resolve(eid):
-        return _Video() if eid == "word_razzle" else None
+        return _Video() if eid == "cloud_wan_i2v" else None
 
     def schema_fn(_key):
         return {"quality": ("360p", "540p", "720p", "1080p")}
@@ -208,9 +208,9 @@ def test_replay_skips_writer_and_still_checks_video():
             "class_type": "OTR_VideoDirector",
             "inputs": {
                 "gate_in": ["63", 0],
-                "announcer_video_model": "word_razzle",
-                "music_video_model": "word_razzle",
-                "character_video_model": "word_razzle",
+                "announcer_video_model": "cloud_wan_i2v",
+                "music_video_model": "cloud_wan_i2v",
+                "character_video_model": "cloud_wan_i2v",
                 "announcer_image_model": "z_image_turbo",
                 "music_image_model": "z_image_turbo",
                 "character_image_model": "z_image_turbo",
@@ -280,7 +280,7 @@ def _provider_side_evidence(engine_id, eng):
         reasons.append("node_key")
     if str(engine_id or "").startswith("google_"):
         reasons.append("google")
-    if engine_id in {"word_razzle", "sonilo", "ideo"}:
+    if engine_id in {"sonilo", "ideo"}:
         reasons.append("paid-id")
     return reasons
 

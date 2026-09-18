@@ -87,8 +87,6 @@ def _resolution(engine, name):
         return "env OTR_CLOUD_LTX25_RESOLUTION, default 1920x1080"
     if name == "cloud_ltx25_audio_in":
         return "env OTR_CLOUD_LTX25_A2V_RESOLUTION, default 1920x1080"
-    if name == "word_razzle":
-        return "env OTR_CLOUD_PIXVERSE_QUALITY, default 1080p"
     if name == "cloud_kling_avatar":
         return "provider default (none sent)"
     if name.startswith("google_") and "omni" in name:
@@ -351,7 +349,7 @@ def rows():
             "continuity": c.continuity,
             "trim": "yes" if c.allow_tail_trim else "no",
             "side": "provider" if _get(engine, "provider_side", False) or
-                    name.startswith(("cloud_", "google_")) or name == "word_razzle"
+                    name.startswith(("cloud_", "google_"))
                     else "local",
             "inputs": ", ".join(_get(engine, "required_inputs", ()) or ()) or "-",
             "prompt": _prompt_contract(engine),

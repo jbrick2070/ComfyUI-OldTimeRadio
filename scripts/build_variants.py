@@ -69,8 +69,6 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
                 "otr_soak_still_pan_flux_gen1",
                 "otr_soak_still_pan_ideo",
                 "otr_soak_still_word_z_image_turbo",
-                "otr_soak_word_razzle_ideo",
-                "otr_soak_word_razzle_lumina_image",
                 # LLM x IMAGE x UPSCALE SWEEP (2026-08-25, operator: "one act
                 # test of all seven [LLMs] onboard ... varying image models
                 # ... a variety of upscalers"). Each leg pairs one LLM as

@@ -79,11 +79,11 @@ LOCK = REPO / "tmp" / "_w45_campaign.lock"
 
 #: Cloud engines render provider-side and cannot run offline (no keys,
 #: offline-first). They are qualified STATICALLY and are never campaign legs.
-#: word_razzle is the trap here -- it reads like a local word-card engine and it
-#: is a Pixverse partner row, and an ``otr_w45_word_razzle.json`` profile exists
-#: on disk that would have pulled it into a "local" sweep.
+#: The 2026-09-03 name-trap was ``word_razzle`` (Pixverse, no cloud_ prefix).
+#: That id is retired 2026-09-17; CLOUD_BY_NAME stays as the escape hatch so
+#: a future unprefixed remote lane cannot hide in a local sweep again.
 CLOUD_PREFIXES = ("cloud_", "google_")
-CLOUD_BY_NAME = frozenset({"word_razzle"})
+CLOUD_BY_NAME = frozenset()
 
 #: Engine -> profile stem. Convention first, exceptions named explicitly.
 #: The roll sentinel, taken from the writer's own rolls module so this file

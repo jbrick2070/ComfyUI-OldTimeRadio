@@ -1,4 +1,4 @@
-"""razzle_ltx_8gb -- local LTX 0.9.8 sibling of word_razzle.
+"""razzle_ltx_8gb -- local LTX 0.9.8 kinetic word-card / still-to-motion lane.
 
 Offline. No Comfy graph load. Pins registration, the shared prompt owner,
 the inherited substrate, and the provision/shortcode wiring.
@@ -74,11 +74,6 @@ def test_env_neg_replaces_extras_not_appended(monkeypatch):
     assert "only this extra" in got
     assert "low quality" in got
     assert "static hold" not in got
-
-
-def test_cloud_neg_literal_matches_shared_extra():
-    from nodes._otr_video_engines import eng_cloud_video as ecv
-    assert ecv._RAZZLE_NEG_DEFAULT == rp.NEG_EXTRA
 
 
 def test_inherits_ltx_frame_contract_and_still_plan():

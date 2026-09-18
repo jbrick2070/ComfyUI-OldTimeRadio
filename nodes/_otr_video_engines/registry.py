@@ -762,16 +762,6 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": True, "sidecar_conditional": False,
         "model_requirements": []},
-    # word_razzle (Phase 1, 2026-07-03): the animated word-card cloud i2v engine
-    # (Pixverse row cloud_pixverse_i2v). Provider-side render, cpu_ok. Selectable;
-    # NO enable flag (dropdown pick is the enable; missing OTR_COMFY_API_KEY
-    # fails LOUD at invoke).
-    "word_razzle": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
     # google_omni_video (2026-07-08): direct Google Gemini Omni Flash BYO API
     # text-to-video lane. Provider-side render, no local weights/VRAM. Selectable
     # only; missing Google key fails loud at invoke.

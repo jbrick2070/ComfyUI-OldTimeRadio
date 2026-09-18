@@ -125,7 +125,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  98 experimental profile(s), 49 shipping
+## 16 GB+  --  95 experimental profile(s), 48 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -177,11 +177,10 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_viz_mxc_cpu` | viz_mxc_cpu | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_viz_mxc_mandala` | viz_mxc_mandala | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_word_razzle` | word_razzle | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>49 draft profile(s) here -- not vouched for</summary>
+<details><summary>47 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`, `word_razzle`
+Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
@@ -230,8 +229,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_soak_still_pan_flux_gen1` | still_pan | indextts2 |
 | `otr_soak_still_pan_ideo` | still_pan | indextts2 |
 | `otr_soak_still_word_z_image_turbo` | still_word | indextts2 |
-| `otr_soak_word_razzle_ideo` | word_razzle | indextts2 |
-| `otr_soak_word_razzle_lumina_image` | word_razzle | indextts2 |
 | `otr_stillin_lab_5080` | animatediff15_v3_stillin_lab_video | indextts2 |
 | `otr_upscale_ltx_probe` | ltx_video | indextts2 |
 

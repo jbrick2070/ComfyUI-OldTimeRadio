@@ -160,8 +160,8 @@ open one.
 ### Hosted -- no weights, but you supply a key
 
 `cloud_kling_avatar`, `cloud_seedance_2`, `cloud_wan_i2v`, `cloud_wan_i2v_audio`,
-`cloud_vidu_q2_pro_fast_720p`, `cloud_ltx25_foley_plus`, `cloud_ltx25_audio_in`
-and `word_razzle` render on Comfy's partner services and bill your Comfy credits. `google_veo_video` and
+`cloud_vidu_q2_pro_fast_720p`, `cloud_ltx25_foley_plus` and
+`cloud_ltx25_audio_in` render on Comfy's partner services and bill your Comfy credits. `google_veo_video` and
 `google_omni_video` go straight to Google and bill your Google key.
 
 They download nothing and use no VRAM, so they run on any machine. Selecting one

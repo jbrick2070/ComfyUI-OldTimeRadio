@@ -42,7 +42,6 @@ import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from . import frame_contract as _fc
-from . import razzle_prompt as _RAZZLE
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
@@ -56,11 +55,6 @@ except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
 _LOG = logging.getLogger("OTR.video.eng_cloud_video")
-
-#: The canvas rate word_razzle's discrete menu is expressed at -- the same 25
-#: its contract declares as ``native_fps``. Named so the seconds<->frames
-#: conversion in ``_duration_seconds`` reads off one number, not a literal.
-_RAZZLE_FPS = 25
 
 
 #: S1 (2026-07-25) per-model still plans for the cloud video engines
@@ -1070,193 +1064,6 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
         }
 
 
-# word_razzle Phase 1 (2026-07-03): the ANIMATED word-card cloud i2v engine.
-# Pixverse is the --audit-i2v Phase-0 pick (promptable, non-V3, required image
-# init + prompt + seed + duration_seconds + motion_mode). A word_razzle beat's
-# base still (a still_word / word-card still, or any scene still) is fed as the
-# init image. motion_mode / quality / duration_seconds are provider COMBOs
-# (the pin excludes option lists) so the adapter ships documented defaults, all
-# env-overridable -- the same discipline as the kling mode default. mute_only:
-# the provider audio is stripped (must_strip_audio); the master mix is frozen
-# upstream and muxed LAST. NO FALLBACK: a missing init still fails LOUD.
-#
-# MOTION RAISED (2026-09-17). The July 3 default was "gentle atmospheric
-# motion" / "drifting mist" / "subtle parallax" -- the same damping the
-# 2026-08-17 kinetic amendment and the 2026-08-27 Option B raise already
-# ripped out of Wan / Vidu / Seedance / Kling in this file. A video lane
-# moves. If the operator wants a hold, they pick still_word / still_flat,
-# not a damped i2v prompt. Artifact guards stay: whip pans, melting
-# geometry, warped faces, drifting / unreadable text.
-#
-# THE STRING LIVES IN razzle_prompt.py -- cloud and local razzle share it.
-# These aliases keep the style traceroute's hand-curated negative list
-# pointed at this module.
-_RAZZLE_MOTION_ENV = _RAZZLE.MOTION_ENV
-_RAZZLE_MOTION_DEFAULT = _RAZZLE.MOTION_DEFAULT
-_RAZZLE_NEG_ENV = _RAZZLE.NEG_ENV
-_RAZZLE_NEG_DEFAULT = visual_safety_negative(
-    "warped text, melting letters, distorted typography, "
-    "illegible words, garbled text, flickering letters, "
-    "static hold, frozen frame, no motion")
-
-
-class CloudWordRazzleEngine(_CloudVideoBase):
-    """word_razzle: animate a still with a full decisive action, not a hold."""
-
-    name = "word_razzle"
-    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Pixverse serves a fixed
-    #: TWO-ENTRY menu, 5 s or 8 s -- `_duration_seconds` ends
-    #: `return 8 if secs > 5 else 5`, so a 12-second beat silently
-    #: becomes an 8-second clip today. As frames at the 25 fps canvas
-    #: rate: 5 s = 125, 8 s = 200.
-    frame_contract = FrameContract(
-        discrete_frames=(125, 200),
-        native_fps=25,
-        allow_tail_trim=True,
-        continuity=CONTINUITY_SOFT_REFERENCE,
-    )
-    node_key = "cloud_pixverse_i2v"
-    family = "image_to_video"
-    required_inputs = ("init_image", "text_prompt")
-    reactivity = "mute_only"
-    #: S1 per-model still plan (Shape A base) -- the word-card init still is
-    #: minted by an image engine upstream (still_word / any scene still), so
-    #: the plan matches the standard scene-spine shape.
-    still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
-
-    def cloud_selectors(self):
-        quality = otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "").strip() or "1080p"
-        motion = otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "").strip() or "normal"
-        qualities = (quality, "720p") if quality == "1080p" else (quality,)
-        return {self.node_key: {
-            "quality": qualities,
-            "motion_mode": (motion,),
-            "duration_seconds": ("5", "8"),
-        }}
-
-    def _razzle_prompt(self, request) -> str:
-        """The raised motion clause LEADS (env-overridable); the beat's own
-        text_prompt (scene/subject) is appended so the action matches the
-        beat. A hold belongs on still_word / still_flat, not here."""
-        return _RAZZLE.compose_positive(_req_get(request, "text_prompt"))
-
-    def _derived_duration_seconds(self, request) -> int | None:
-        """Menu bucket from the segment plan, or None when timing is absent."""
-        canvas = _req_get(request, "canvas") or {}
-        c_get = canvas.get if isinstance(canvas, dict) else (
-            lambda k, d=None: getattr(canvas, k, d))
-        fps = int(c_get("fps", 25) or 25) or 25
-        timing = _req_get(request, "timing") or {}
-        t_get = timing.get if isinstance(timing, dict) else (
-            lambda k, d=None: getattr(timing, k, d))
-        n = int(t_get("target_frame_count", 0) or 0)
-        if n <= 0:
-            return None
-        secs = int(round(n / float(fps)))
-        return 8 if secs > 5 else 5
-
-    def _duration_seconds(self, request) -> int:
-        """The provider duration (seconds). Derived from the beat's frame
-        target (timing.target_frame_count / fps) and clamped to Pixverse's
-        supported 5s / 8s tiers; env OTR_CLOUD_PIXVERSE_DURATION overrides
-        only when it AGREES with that segment bucket."""
-        derived = self._derived_duration_seconds(request)
-        env = otr_env.get("OTR_CLOUD_PIXVERSE_DURATION", "").strip()
-        if env:
-            # THE ENV MAY NOT LEAVE THE MENU (chunk 7b, 2026-07-26). This
-            # branch used to `return int(env)` outright, skipping the 5/8 bucket
-            # ladder every other path goes through -- so an operator could send
-            # Pixverse a 20-second ask that this adapter's own declared
-            # ``discrete_frames=(125, 200)`` says is impossible, and the
-            # coverage plan had already partitioned the beat over 5s/8s clips.
-            # A non-integer was silently swallowed here too, the only duration
-            # env in this file that failed quietly rather than loud.
-            legal = sorted(
-                int(d) // _RAZZLE_FPS for d in type(self).frame_contract.discrete_frames)
-            try:
-                secs = int(env)
-            except ValueError as exc:
-                raise _fc.ContractEnvConflict(
-                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%r is not a whole number "
-                    "of seconds. Pixverse serves %s s and nothing between them."
-                    % (self.name, env, legal)) from exc
-            if secs not in legal:
-                raise _fc.ContractEnvConflict(
-                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%d is not on Pixverse's "
-                    "menu %s s, which this adapter declares as "
-                    "discrete_frames=%r at %d fps. The beat was already "
-                    "partitioned over those lengths. NO FALLBACK."
-                    % (self.name, secs, legal,
-                       type(self).frame_contract.discrete_frames, _RAZZLE_FPS))
-            # COPPER TASTE (2026-09-17): a pin that DISAGREES with the segment
-            # asked for the wrong length, paid for a short clip, then floored
-            # got!=planned. The pin may only confirm the plan's bucket.
-            if derived is not None and secs != derived:
-                raise _fc.ContractEnvConflict(
-                    "%s: OTR_CLOUD_PIXVERSE_DURATION=%d disagrees with this "
-                    "segment's plan (%d s from timing). The coverage plan "
-                    "already partitioned over 5s/8s clips. NO FALLBACK."
-                    % (self.name, secs, derived))
-            return secs
-        return derived if derived is not None else 5
-
-    def _quality_for_duration(self, duration_s: int) -> str:
-        """PixverseImageToVideoNode quality that can serve ``duration_s``.
-
-        Non-V6 Pixverse API law: 1080p does not support 8 seconds (and
-        ``motion_mode=fast`` is 5s-only). Copper Taste 2026-09-17 billed two
-        invoke_ok jobs after asking duration_seconds=8 with the default
-        quality=1080p; both partner clips were ~5.37s / 161 frames, and
-        canonicalize against the 200-frame plan returned 134 -- assembly
-        floored got!=planned as CORRUPT_OUTPUT. Auto-downgrade the soft
-        default; an explicit 1080p env pin with an 8s segment refuses loud.
-        """
-        legal = ("360p", "540p", "720p", "1080p")
-        env_q = otr_env.get("OTR_CLOUD_PIXVERSE_QUALITY", "").strip()
-        quality = env_q or "1080p"
-        if quality not in legal:
-            raise _fc.ContractEnvConflict(
-                "%s: OTR_CLOUD_PIXVERSE_QUALITY=%r is not on Pixverse's "
-                "menu %s. NO FALLBACK." % (self.name, quality, list(legal)))
-        if int(duration_s) >= 8 and quality == "1080p":
-            if env_q:
-                raise _fc.ContractEnvConflict(
-                    "%s: OTR_CLOUD_PIXVERSE_QUALITY=1080p cannot pair with "
-                    "duration_seconds=%d on PixverseImageToVideoNode -- "
-                    "1080p supports 5s only. Set quality to 720p (or lower), "
-                    "or leave the env unset so 8s segments auto-use 720p. "
-                    "NO FALLBACK." % (self.name, int(duration_s)))
-            return "720p"
-        return quality
-
-    def _motion_mode_for_duration(self, duration_s: int) -> str:
-        """``fast`` is 5s-only on PixverseImageToVideoNode."""
-        legal = ("normal", "fast")
-        motion = otr_env.get("OTR_CLOUD_PIXVERSE_MOTION", "").strip() or "normal"
-        if motion not in legal:
-            raise _fc.ContractEnvConflict(
-                "%s: OTR_CLOUD_PIXVERSE_MOTION=%r is not on Pixverse's "
-                "menu %s. NO FALLBACK." % (self.name, motion, list(legal)))
-        if motion == "fast" and int(duration_s) >= 8:
-            raise _fc.ContractEnvConflict(
-                "%s: OTR_CLOUD_PIXVERSE_MOTION=fast cannot pair with "
-                "duration_seconds=%d -- fast supports 5s only. NO FALLBACK."
-                % (self.name, int(duration_s)))
-        return motion
-
-    def _partner_inputs(self, request):
-        duration_s = self._duration_seconds(request)
-        return {
-            "image": self._init_image_input(request),
-            "prompt": self._razzle_prompt(request),
-            "negative_prompt": _RAZZLE.compose_negative(),
-            "motion_mode": self._motion_mode_for_duration(duration_s),
-            "quality": self._quality_for_duration(duration_s),
-            "duration_seconds": duration_s,
-            "seed": self._seed(request),
-        }
-
-
 #: LTX 2.5 partner I2V duration menu (Fast). Pro stops at 10. Snap, never send
 #: a second the combo does not list (7 and 9 are missing on purpose).
 _LTX25_FAST_DURATIONS = (2, 3, 4, 5, 6, 8, 10, 12, 14, 16, 18, 20)
@@ -1522,19 +1329,17 @@ Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WanI2VAudio = CloudWanI2VAudioEngine()
 ViduQ2ProFast720p = CloudViduQ2ProFast720pEngine()
-WordRazzle = CloudWordRazzleEngine()
 Ltx25FoleyPlus = CloudLtx25FoleyPlusEngine()
 Ltx25AudioIn = CloudLtx25AudioInEngine()
 
 for _eng in (
         KlingAvatar, Seedance2, WanI2V, WanI2VAudio,
-        ViduQ2ProFast720p, WordRazzle, Ltx25FoleyPlus, Ltx25AudioIn):
+        ViduQ2ProFast720p, Ltx25FoleyPlus, Ltx25AudioIn):
     register(_eng)
 
 __all__ = [
     "CloudKlingAvatarEngine", "CloudSeedance2Engine",
     "CloudWanI2VEngine", "CloudWanI2VAudioEngine",
     "CloudViduQ2ProFast720pEngine",
-    "CloudWordRazzleEngine",
     "CloudLtx25FoleyPlusEngine", "CloudLtx25AudioInEngine",
 ]

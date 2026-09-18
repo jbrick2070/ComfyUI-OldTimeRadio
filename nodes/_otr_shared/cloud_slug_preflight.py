@@ -238,9 +238,6 @@ def _fix_hint(node_key: str, input_name: str, live) -> str:
     if input_name == "model" and spec.get("env"):
         env_name = spec["env"]
     extras = {
-        ("cloud_pixverse_i2v", "quality"): "OTR_CLOUD_PIXVERSE_QUALITY",
-        ("cloud_pixverse_i2v", "duration_seconds"): "OTR_CLOUD_PIXVERSE_DURATION",
-        ("cloud_pixverse_i2v", "motion_mode"): "OTR_CLOUD_PIXVERSE_MOTION",
         ("cloud_kling_avatar", "mode"): "OTR_CLOUD_KLING_MODE",
         ("cloud_elevenlabs_tts", "model"): "OTR_ELEVENLABS_MODEL_ID",
         ("cloud_luma_photon_flash", "model"): "OTR_CLOUD_LUMA_PHOTON_MODEL",
@@ -330,7 +327,7 @@ def _looks_paid(engine_id: str) -> bool:
     eid = str(engine_id or "")
     if eid.startswith("cloud_") or eid.startswith("google_"):
         return True
-    return eid in {"word_razzle", "sonilo", "ideo"}
+    return eid in {"sonilo", "ideo"}
 
 
 def _default_resolve_engine(engine_id: str):

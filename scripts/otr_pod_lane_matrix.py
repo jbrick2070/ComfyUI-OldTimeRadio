@@ -87,7 +87,6 @@ LANES = [
     ("otr_w45_still_motion", "still_motion"),
     ("otr_w45_still_pan", "still_pan"),
     ("otr_w45_still_word", "still_word"),
-    ("otr_w45_word_razzle", "word_razzle"),
     ("otr_w45_mesh_stage", "mesh_stage"),
     ("otr_w45_animatediff15_v3_haunted_video", "animatediff15_v3_haunted_video"),
     ("otr_w45_wan_ti2v", "wan_ti2v"),

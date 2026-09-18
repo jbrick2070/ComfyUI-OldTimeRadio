@@ -143,11 +143,6 @@ VIDEO_NEGATIVE_SOURCES = (
      "_LTX8_DEFAULT_NEGATIVE"),
     ("eng_ltx_video", "nodes/_otr_video_engines/eng_ltx_video.py",
      "_LTX_DEFAULT_NEGATIVE"),
-    # The word-card animator (Pixverse) is a SECOND negative-bearing engine in
-    # eng_cloud_video.py. It was missed on the first pass because this list is
-    # hand-curated -- see the coverage guard below, which is the real fix.
-    ("eng_cloud_word_razzle", "nodes/_otr_video_engines/eng_cloud_video.py",
-     "_RAZZLE_NEG_DEFAULT"),
     # Shared by eng_wan_i2v + eng_wan_ti2v, which import it rather than
     # defining their own. Found BY the coverage guard, not by hand -- which is
     # the argument for the guard existing.
@@ -160,8 +155,8 @@ def discover_video_negative_constants():
     """Every module-level `*NEGATIVE*` string constant in the video engines.
 
     `VIDEO_NEGATIVE_SOURCES` above is hand-curated, which makes it wrong by
-    construction the moment an engine grows a negative -- exactly what happened
-    with `_RAZZLE_NEG_DEFAULT`. This discovers them instead, so the report can
+    construction the moment an engine grows a negative. This discovers them
+    instead, so the report can
     say out loud when it is auditing fewer negatives than exist. Returns
     ``{(relpath, const_name)}``.
     """

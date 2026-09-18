@@ -226,7 +226,6 @@ BOOKEND_SCENE_PROMPT_BOUNDED = frozenset({
 #: inside its own fix and caught by review. The roster test now checks EVERY
 #: set for registration, not just the prompt set, so it cannot recur quietly.)
 BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
-    "word_razzle",
     "razzle_ltx_8gb",
     "animatediff15_v3_haunted_video",
     "animatediff15_v3_stillin_lab_video",

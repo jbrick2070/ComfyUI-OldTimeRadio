@@ -555,10 +555,12 @@ three-still-lane show costs about a third of the all-LTX one. (An earlier draft
 said "about 55 minutes" for LTX. No run took 55 minutes -- the number was
 interpolated rather than measured; the table is what the logs say.)
 
-### `word_razzle` is a CLOUD lane -- do not chase it as a Metal bug
+### `word_razzle` is retired -- do not chase it as a Metal bug
 
-`word_razzle` sits next to `still_word` in the dropdown and sounds local. It is
-not. It is the Pixverse `cloud_pixverse_i2v` row, and it fails like this with no
+`word_razzle` used to sit next to `still_word` in the dropdown and sound local.
+It was the Pixverse `cloud_pixverse_i2v` row. Retired 2026-09-17; pick
+`razzle_ltx_8gb` for the local kinetic lane. A stale saved graph naming it
+fails as `RetiredEngineError`. The old failure looked like this with no
 credential:
 
 ```
@@ -1008,13 +1010,13 @@ CPU. No episode has rendered through the upscale stage on a Mac yet.
 ### Cloud / API engines -- credentials, not a port
 
 `elevenlabs`, `google_tts`, `google_lyria`, `sonilo`, every `cloud_*`,
-`google_image`, `ideo` and `word_razzle` all already declare `mps`. Testing
+`google_image` and `ideo` all already declare `mps`. Testing
 them measures a credential rather than Apple Silicon, and the credentials are
 not all the same one:
 
 | lane | credential it actually measures |
 | --- | --- |
-| `word_razzle`, every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- `OTR_COMFY_API_KEY`, or a **logged-in ComfyUI Desktop session** |
+| every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- `OTR_COMFY_API_KEY`, or a **logged-in ComfyUI Desktop session** |
 | `google_omni_video`, `google_veo_video`, `google_image`, `google_tts`, `google_lyria` | a direct BYO Google API key -- these do not touch Comfy Cloud at all |
 
 The compliance matrix's "Cloud lanes" section records exactly how far this was

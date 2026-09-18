@@ -91,7 +91,7 @@ are generated; select the exact visible label at test time.
 | humo14_high_audio_in_portrait, humo14_high_audio_in_wide, humo17_high_audio_in_portrait, humo17_high_audio_in_wide | NOT TESTED at shipped recipes; even1.7B portrait documents12.84GiB warm,14B approximately13GiB |
 | animatediff15_video, animatediff15_v3_video, animatediff15_v3_haunted_video, animatediff15_v3_stillin_lab_video | BLOCKED by explicit no-extra-pack rule; prior successes do not waive it |
 | mesh_stage | PREREQUISITE-BLOCKED/UNKNOWN: Hunyuan3D plus pinned portable Blender; not a weight-only lane |
-| cloud_kling_avatar, cloud_seedance_2, cloud_wan_i2v, cloud_wan_i2v_audio, cloud_vidu_q2_pro_fast_720p, word_razzle, google_omni_video, google_veo_video | OUT OF SCOPE: remote services, not physicalGPU downloadable models; no paid cloud run authorized |
+| cloud_kling_avatar, cloud_seedance_2, cloud_wan_i2v, cloud_wan_i2v_audio, cloud_vidu_q2_pro_fast_720p, google_omni_video, google_veo_video | OUT OF SCOPE: remote services, not physicalGPU downloadable models; no paid cloud run authorized |
 | + Add Custom Model | Not a bounded predefined model; no invented extra cell |
 
 Retired wan22_high_i2v is an alias, not a registered current cell. No current

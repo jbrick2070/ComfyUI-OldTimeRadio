@@ -8,6 +8,7 @@ alwaysApply: true
 `CLAUDE.md` at the repo root is the source of truth. Operator directives there win over any handoff, memory, or this rule. Do not duplicate or weaken it.
 
 - Fix at the root cause. No shims. Do not wait for the operator to run commands.
+- Never ask to commit. Always commit and push a green chunk to `main` in the same turn (operator 2026-09-17). Named files only.
 - Generated episode content is unfiltered (no profanity/violence prompt bans). Authoring stays clean: no curse words in code, comments, logs, or commits; never the name `dummy`.
 - Story quality is closed. Do not chase prose, writer models, or word-count gates. Gender/voice/face/ledger faults remain bugs.
 - Never invent a Jeffrey-only path. Portable means that install's `output/otr/obs` via Comfy's live output directory (`folder_paths` / `--output-directory`).

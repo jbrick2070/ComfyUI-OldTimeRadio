@@ -159,7 +159,7 @@ Do not assume a dropdown entry is local from its name alone -- `ideo` and
 rows with no visual distinction beyond the source file.
 
 * **Still/video (no video):** `still_flat`, `still_motion`, `still_pan`,
-  `still_word` (+ `word_razzle`, a 5th word-display variant, if wanted).
+  `still_word` (+ `razzle_ltx_8gb` if the kinetic local LTX lane is wanted).
 * **Local image models (4):** `z_image_turbo`, `flux_gen1`,
   `lumina_image`, `ideogram4_local`.
 * **Upscale (2, exhaustive):** `off`, `spandrel_esrgan`.

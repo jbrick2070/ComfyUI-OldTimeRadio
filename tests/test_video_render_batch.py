@@ -51,7 +51,7 @@ _PAYLOAD_KEYS = {"histogram", "video_revision", "by_role", "vram_peak_mb",
                  # Added 2026-09-17: each sanctioned gap carries WHY it was
                  # floored (cloud_floor / budget / still_gap), same order as
                  # sanctioned_gap_shot_ids -- Copper Taste lost this and the
-                 # credits looked empty for word_razzle with no root cause.
+                 # credits looked empty for a cloud floor with no root cause.
                  "sanctioned_gap_reasons",
                  # Added 2026-08-28 with the sanction/absence split: an
                  # undelivered beat with no sanction is a FAULT and is
@@ -163,19 +163,19 @@ def test_an_all_gap_episode_still_reports_its_gaps():
 def test_sanctioned_gap_reasons_name_cloud_and_budget_floors():
     """Copper Taste lost the Pixverse floor reason; the receipt must keep it."""
     p = _payload(
-        _gap("shot_b001", "word_razzle", role="announcer_visual",
+        _gap("shot_b001", "cloud_wan_i2v", role="announcer_visual",
              beat_id="b001", cloud_floor="timeout"),
-        _gap("shot_b006", "word_razzle", role="announcer_visual",
+        _gap("shot_b006", "cloud_wan_i2v", role="announcer_visual",
              beat_id="b006", budget_floor=True),
         _delivered("shot_b002", "still_motion", role="character_video"),
         engine_histogram={"still_motion": 1}, video_revision=1)
     assert p["sanctioned_gap_shot_ids"] == ["shot_b001", "shot_b006"]
     assert p["sanctioned_gap_reasons"] == [
         {"shot_id": "shot_b001", "beat_id": "b001",
-         "role": "announcer_visual", "planned_engine": "word_razzle",
+         "role": "announcer_visual", "planned_engine": "cloud_wan_i2v",
          "reason": "timeout"},
         {"shot_id": "shot_b006", "beat_id": "b006",
-         "role": "announcer_visual", "planned_engine": "word_razzle",
+         "role": "announcer_visual", "planned_engine": "cloud_wan_i2v",
          "reason": "budget"},
     ]
     assert "announcer_visual" not in p["by_role"]
@@ -220,7 +220,7 @@ def test_floored_video_stamp_is_loud_on_save_miss(monkeypatch):
     monkeypatch.setattr(
         "nodes.production_ledger.stamp_durable", _boom)
     ep = {"ledger": {"video": {
-        "roles_effective": {"announcer_visual": "word_razzle"},
+        "roles_effective": {"announcer_visual": "cloud_wan_i2v"},
         "shots": [{"shot_id": "shot_b001", "cloud_floor": "timeout"}],
     }}}
     import pytest
@@ -228,7 +228,7 @@ def test_floored_video_stamp_is_loud_on_save_miss(monkeypatch):
         _stamp_floored_video_shots(ep)
     assert seen["source"] == "video_render_batch_floored_shots"
     assert seen["sections"]["video"]["roles_effective"]["announcer_visual"] == (
-        "word_razzle")
+        "cloud_wan_i2v")
 
 
 def test_an_all_gap_payload_is_not_empty_so_the_credits_roll_cannot_raise():

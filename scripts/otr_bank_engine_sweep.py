@@ -134,7 +134,7 @@ PROFILES = ("otr_soak_llmsweep_01", "otr_soak_llmsweep_02")
 #:   * minimax_h3_video / minimax_h3_audio_in -- the only lanes the ENGINE
 #:     itself refuses to run on the stock boot; it accepts the measured `h3`
 #:     streaming boot or the physical-8-GB `h3_8gb_lab` launch shape
-#: Cloud lanes (word_razzle, cloud_*, google_*) are excluded outright: the
+#: Cloud lanes (cloud_*, google_*) are excluded outright: the
 #: render happens provider-side, so they prove nothing about a local model.
 VIDEO_LANES = (
     ("otr_w45_ltx_8gb", "ltx_8gb"),

@@ -35,13 +35,12 @@ def test_no_weight_video_routes_are_registered_and_asset_free():
         assert registry.CAPABILITIES[engine_id]["model_requirements"] == []
 
 
-def test_word_razzle_profile_skips_only_its_remote_video_download():
+def test_google_omni_all_profile_skips_remote_video_download():
+    """A remaining remote-video profile must not mint a local video fetch lane."""
     provision = _provisioner()
-
-    assert provision.profile_lanes("otr_w45_word_razzle") == {
-        "automatic": ["z_image", "stable_audio_3"],
-        "manual": [],
-    }
+    lanes = provision.profile_lanes("google_omni_all")
+    assert "google_omni_video" not in lanes["automatic"]
+    assert "google_omni_video" not in lanes["manual"]
 
 
 def test_razzle_ltx_8gb_profile_uses_the_ltx_8gb_weight_lane():

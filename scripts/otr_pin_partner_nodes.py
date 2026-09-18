@@ -97,14 +97,6 @@ CURATED_ROWS = {
                                "cheap Vidu Q2 image-to-video row; served by "
                                "cloud_vidu_q2_pro_fast_720p with "
                                "model=viduq2-pro-fast, resolution=720p"),
-    # word_razzle Phase 1 (2026-07-03): the animated word-card i2v row. The
-    # --audit-i2v Phase 0 verdict picked PixverseImageToVideoNode -- promptable,
-    # non-V3, REQUIRED image init + prompt + seed + duration_seconds +
-    # motion_mode (the motion-strength lever the spike wants). Served by the
-    # `word_razzle` adapter (eng_cloud_video); mute_only (init_image+text_prompt).
-    "cloud_pixverse_i2v":     ("PixverseImageToVideoNode", "PIXVERSE", 0,
-                               "word_razzle animated word-card i2v; motion_mode "
-                               "motion-strength; cheapest passing seed row (Phase 0)"),
     # 2026-07-02 roster expansion (operator; pricing-driven tiers):
     "cloud_ideogram_v4":      ("IdeogramV4", "IDEOGRAM", 0,
                                "stills; best text rendering (posters/clues/"
