@@ -95,6 +95,30 @@ _FONT_PATH_KEY = object()          # a sentinel no real key can equal
 _FONT_LOCK = threading.Lock()
 
 
+def _language_marks(led) -> "tuple[str, str]":
+    """``("_es", "Spanish")`` for a non-English ledger; ``("", "")`` for
+    English, Off, a legacy ledger, or an unreadable row.
+
+    Operator 2026-09-18: an indicator he can read without knowing the
+    language -- the iso in the filename and the English label on the title
+    card. Never raises: a label may never cost an episode its video.
+    """
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        meta = (led or {}).get("meta") if isinstance(led, dict) else None
+        if not isinstance(meta, dict) or not str(meta.get("episode_language") or "").strip():
+            return "", ""
+        row = _EPLANG.row_from_meta(meta)
+        if row.iso == _EPLANG.ENGLISH_ISO:
+            return "", ""
+        return "_" + row.iso, str(row.label)
+    except Exception:  # noqa: BLE001 -- a label never breaks the render
+        return "", ""
+
+
 def _safe_episode_title_slug(episode_title, max_chars=40):
     """Filesystem-safe Unicode title without splitting combining sequences.
 
@@ -648,10 +672,14 @@ class _CRTRenderer:
     Centre area is pure math-driven generative art.
     """
 
-    def __init__(self, w, h, title, volume, freqs, waves, fps, timing=None):
+    def __init__(self, w, h, title, volume, freqs, waves, fps, timing=None,
+                 card_label=""):
         self.w = w
         self.h = h
         self.title = title
+        # Shown on the HERO CARD only ("EL MAPA PROHIBIDO · SPANISH"); the
+        # quoted ident HUD and the scramble seed keep the plain title.
+        self.card_label = str(card_label or "").strip()
         self.fps = int(fps) if fps else 24
 
         # -- Audio arrays (convert lists -> np FIRST; the EMA precompute and
@@ -1055,6 +1083,14 @@ class _CRTRenderer:
 
         return measure_text, fit_hero
 
+    def _hero_text(self) -> str:
+        """The hero card's text: the title, plus the language label on a
+        non-English episode. English is byte-identical."""
+        hero = (self.title or "SIGNAL").upper()
+        if self.card_label:
+            hero = f"{hero} · {self.card_label.upper()}"
+        return hero
+
     def title_card_plan(self, main_frames=None):
         """Build the serializable per-frame hero-title plan for this episode.
 
@@ -1080,7 +1116,7 @@ class _CRTRenderer:
         except (TypeError, ValueError):
             reveal_frac = 0.4
         return _OTRTC.build_title_plan(
-            title=(self.title or "SIGNAL").upper(),
+            title=self._hero_text(),
             # The draw seeds its scramble from the RAW title while drawing the
             # uppercased one. Reproducing the frames means reproducing that.
             rng_title=self.title,
@@ -1156,7 +1192,7 @@ class _CRTRenderer:
             return
 
         # -- HERO title (big + bold, centre-anchored, EXEMPT from gutter) -
-        title = (self.title or "SIGNAL").upper()
+        title = self._hero_text()
         font, lines, hero_size = self._fit_hero(draw, title)
 
         # POP: a 1-2 frame brightness bloom right before lock (music_end).
@@ -2222,14 +2258,21 @@ class SignalLostVideoRenderer:
         #   5. fall back to "untitled" if the result is empty so we never
         #      emit `signal_lost__<ts>.mp4` (double underscore).
         safe_title = _safe_episode_title_slug(episode_title)
-        out_path = os.path.join(out_dir, f"signal_lost_{safe_title}_{ts}.mp4")
+        # The language rides BEFORE the timestamp so every reader that keys
+        # on the trailing `_<ts>` is unchanged; English adds nothing.
+        lang_suffix, lang_label = _language_marks(led)
+        out_path = os.path.join(
+            out_dir, f"signal_lost_{safe_title}{lang_suffix}_{ts}.mp4")
 
         # -- 5. Build frame generator ---------------------------------
         # Resolve the b000 music-open title-card window from the ledger lines
         # (start_s/dur_s/speaker_role), with a volume-envelope fallback.
         _title_timing = _resolve_title_timing(led, volume, fps, total_frames)
+        # The hero card names the language in English on a non-English
+        # episode ("EL MAPA PROHIBIDO · SPANISH") -- the card only, never the
+        # quoted HUD that rides every frame. English is byte-identical.
         renderer = _CRTRenderer(W, H, episode_title, volume, freqs, waves, fps,
-                                timing=_title_timing)
+                                timing=_title_timing, card_label=lang_label)
         total_encode_frames = total_frames
 
         # -- Hero title-card plan for the DOWNSTREAM burn ------------------

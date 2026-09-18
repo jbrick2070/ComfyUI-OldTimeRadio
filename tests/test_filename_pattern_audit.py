@@ -88,7 +88,7 @@ ALLOWLIST = [
     # Procgen mp4 (signal_lost_<safe_title>_<ts>.mp4) -- write path
     # only. Treatment write below derives from this canonical name via
     # str.replace, not via slug reconstruction.
-    ("nodes/video_engine.py", 'f"signal_lost_{safe_title}_{ts}.mp4"'),
+    ("nodes/video_engine.py", 'f"signal_lost_{safe_title}{lang_suffix}_{ts}.mp4"'),
     # Treatment write -- derives from out_path (canonical mp4), not
     # from ep_id slug. Write-side, not discovery-side.
     ("nodes/video_engine.py", 'out_path.replace(".mp4", "_treatment.txt")'),
