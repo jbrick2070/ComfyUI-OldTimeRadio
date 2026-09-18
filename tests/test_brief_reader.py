@@ -358,8 +358,11 @@ def test_the_music_prompt_normalises_its_setting_terms():
         "_otr_music_prompt no longer imports spoken_term; its setting terms "
         "will reach the MusicGen prompt in identifier case")
     source = inspect.getsource(mp.compose_music_prompt)
-    assert "spoken_term(t)" in source, (
-        "compose_music_prompt stopped normalising setting_terms")
+    assert "resolve_setting_terms" in source, (
+        "compose_music_prompt must take setting terms from the one owner")
+    helper = inspect.getsource(mp.resolve_setting_terms)
+    assert "spoken_term(t)" in helper, (
+        "resolve_setting_terms stopped normalising setting terms")
 
 
 def test_a_term_that_is_only_punctuation_is_dropped_not_rendered():

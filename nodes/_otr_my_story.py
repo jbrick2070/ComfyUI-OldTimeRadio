@@ -57,6 +57,7 @@ try:
     from ._otr_script_prep import clean_spoken_text
     from ._otr_json import parse_first_json_object
     from ._otr_repair_prompts import make_dispatching_repair_factory
+    from ._otr_text_metrics import set_line_text_metrics
 except ImportError:  # pragma: no cover -- flat / standalone test import
     import _otr_canon as _OTRC  # type: ignore
     import _otr_casting as _OTRCAST  # type: ignore
@@ -68,6 +69,7 @@ except ImportError:  # pragma: no cover -- flat / standalone test import
     from _otr_script_prep import clean_spoken_text  # type: ignore
     from _otr_json import parse_first_json_object  # type: ignore
     from _otr_repair_prompts import make_dispatching_repair_factory  # type: ignore
+    from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
 try:
     from ..config import cast_pools as _POOLS
@@ -287,7 +289,7 @@ class SpokenLine(BaseModel):
                 continue
             alt = data.get(key)
             if isinstance(alt, str) and alt.strip():
-                data["text"] = alt
+                set_line_text_metrics(data, alt)
                 return data
         return data
 
