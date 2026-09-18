@@ -691,13 +691,27 @@ class TestWriterB2aSurface:
         # happen: the descriptor, the saved value AND the link table were moved
         # together by scripts/otr_widget_surgery.py, so `gate_in` went from
         # input slot 32 to 31 and link 279 followed it by identity.
-        assert len(wv) == 36, (
-            f"writer widgets_values length drift: {len(wv)} (expected 36: "
+        #
+        # 2026-09-18 (the multilingual one-switch): `episode_language` was
+        # APPENDED as the trailing widget, taking the vector 36 -> 37. It is
+        # declared after `replay_from` and before the `gate_in` forceInput,
+        # which consumes no saved slot -- so it lands last and no earlier index
+        # and no link dst_slot moved. The shipped bake ships "English", which
+        # is today's behaviour byte for byte and says so on the ledger.
+        assert len(wv) == 37, (
+            f"writer widgets_values length drift: {len(wv)} (expected 37: "
             f"32 after the 2026-08-14 target_words removal and the 2026-08-28 "
             f"refine_target_grade removal, plus the trailing replay_from "
             f"widget appended 2026-09-02 for the canonical replay, plus the "
             f"four My Story fields appended 2026-09-10, minus "
-            f"perfect_run_spacesaver removed 2026-09-13)"
+            f"perfect_run_spacesaver removed 2026-09-13, plus "
+            f"episode_language appended 2026-09-18)"
+        )
+        # The one-switch ships English -- not Off, and never a language the
+        # first-run listener did not ask for.
+        assert wv[slot('episode_language')] == "English", (
+            f"episode_language must ship 'English'; "
+            f"got {wv[slot('episode_language')]!r}"
         )
         # 2026-09-06 operator directive: the shipped template starts with
         # ONE ACT for first-run portability. The generic node/legacy-input

@@ -716,6 +716,19 @@ CREATIVE_WHITELIST = frozenset({
     "source_ref",
     # CANONICAL REPLAY (campaign item 0, 2026-09-02): the writer's replay_from widget.
     "replay_from",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the writer's episode_language
+    # dropdown. A creative/content dial -- it decides what language the episode
+    # is in, not which engine renders it -- so a headless leg may set it and
+    # apply_profile never manages it. An unknown token still fails LOUD at
+    # run() (resolve_label, no fallback), and a fidelity bank on a non-English
+    # row refuses before any LLM call.
+    #
+    # A FORCING PROFILE MUST STAY ENGLISH. Nothing in this whitelist lets a
+    # profile set a language -- profiles go through apply_profile, which only
+    # touches its own managed widget map -- and the Lemmy audition profiles
+    # rely on that: a Spanish always-include is a silent no-op, pinned by
+    # tests/test_lemmy_language_exclusion.py.
+    "episode_language",
     # Google BYO API concrete model pickers bind the virtual google_api:slot-a/b
     # LLM rows. They are content/model-selection widgets on the writer, not
     # managed audio/image/video engine widgets.

@@ -140,6 +140,40 @@ def _build_title_excerpt_set(
     }
 
 
+def _title_language_instruction(meta) -> str:
+    """The native title rule for this episode's language, or "" for English.
+
+    Joins the row's own `writer_instruction` (which is written IN the language,
+    so the model reads its own tongue before answering in it) to the row's
+    `title_instruction` (the mechanical rule: word count, character ceiling,
+    title case, accents survive).
+
+    English returns "" so the title prompt stays byte-identical, which is the
+    English regression gate. A registry failure must never cost an episode its
+    title, so the read degrades to "" and logs -- the same contract the
+    work-anchor read next door keeps.
+    """
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG_TITLE
+        except ImportError:  # pragma: no cover -- flat/standalone load
+            import _otr_episode_languages as _EPLANG_TITLE  # type: ignore
+        row = _EPLANG_TITLE.row_from_meta(meta)
+        if row.iso == _EPLANG_TITLE.ENGLISH_ISO:
+            return ""
+        parts = [
+            _EPLANG_TITLE.writer_language_instruction(row),
+            _EPLANG_TITLE.title_instruction(row),
+        ]
+        return " ".join(p for p in (s.strip() for s in parts) if p)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_LedgerScriptWriter] episode-language title rule unavailable "
+            "(%s); titling without it", exc,
+        )
+        return ""
+
+
 def _generate_title_from_script(
     generate_fn,
     assembled_script: str,
@@ -157,6 +191,12 @@ def _generate_title_from_script(
     # self-test byte-identical, and the original lane (which adapts nothing)
     # renders exactly the prompt it always did.
     work_title: str = "",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the episode language row's
+    # `authoring.writer_instruction` (native) and `authoring.title_instruction`
+    # (the per-row length / case / accent rule), joined by the caller. Default
+    # "" keeps English, Off, every legacy caller and every self-test
+    # byte-identical.
+    language_instruction: str = "",
 ) -> str:
     """Generate an episode title via a forced scratchpad pass.
 
@@ -257,12 +297,30 @@ def _generate_title_from_script(
         "title, and never name a different work\n"
     ) if work_str else ""
 
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18). The title is AUTHORED in the
+    # episode language, never translated: no English scratch title is drafted
+    # and converted, because a converted title reads like a caption on someone
+    # else's show. The row carries the language's own rule (word count, length,
+    # title case, "accents survive"), and the scratchpad's DETAILS and
+    # CANDIDATES steps run in that language too -- English candidates would put
+    # the model one translation away from its own answer on the final line.
+    #
+    # Empty on English and Off, so those episodes render the prompt they always
+    # did.
+    _language_rule = (language_instruction or "").strip()
+    language_sys = (" " + _language_rule) if _language_rule else ""
+    language_rule_line = (
+        f" - {_language_rule}\n"
+        " - write the DETAILS and CANDIDATES sections in that same language "
+        "as well; do not draft in English and translate\n"
+    ) if _language_rule else ""
+
     _form = (title_form_label or "").strip() or "sci-fi radio drama"
     sys_msg = (
         f"You are titling a single episode of a {_form}. "
         "You receive the finished story material and propose an "
         "specific, evocative episode title. You work on a scratchpad "
-        "first, then commit to a final answer."
+        f"first, then commit to a final answer.{language_sys}"
     )
     user_msg = (
         f"{story_block}\n\n"
@@ -282,6 +340,7 @@ def _generate_title_from_script(
         " - feel specific and memorable, not generic\n"
         " - avoid cliches like \"The Beginning\", \"Final Chapter\", "
         "\"Untitled\", or \"Episode X\"\n"
+        f"{language_rule_line}"
         f"{anchor_rule}"
         "\n"
         "Output the DETAILS, CANDIDATES, and TITLE sections. The final "
@@ -867,6 +926,12 @@ class WriterTailMixin:
                         .get("title_form_label") or "sci-fi radio drama"
                     ),
                     work_title=_title_work,
+                    # The episode language, resolved from the LEDGER (the
+                    # widget is long out of scope by here, and the stamp is
+                    # the authority). METHOD-LOCAL import for the same reason
+                    # the work-anchor read above is: `_run_writer_tail` is a
+                    # separate method, not a closure over run().
+                    language_instruction=_title_language_instruction(meta),
                 )
             if regen_title:
                 final_title = regen_title
@@ -1042,6 +1107,9 @@ class WriterTailMixin:
                 _intro_id = _intro_row["line_id"]
                 _spliced = _OTRLC_TAIL.splice_work_frame(
                     str(_intro_row.get("text") or ""), _work_frame,
+                    # The Python-owned WORK sentence speaks the episode's
+                    # language; the FRAME inside it stays the work's own title.
+                    episode_meta=meta,
                 )
                 if _spliced:
                     # PROTECTED_FACT_COMPONENT_FLAG or the clean stage

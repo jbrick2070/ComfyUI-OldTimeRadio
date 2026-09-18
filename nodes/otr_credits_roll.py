@@ -143,6 +143,29 @@ def _require(container, key, source):
     return v
 
 
+def _credits_chrome(meta) -> dict:
+    """The audience-facing credits chrome in the episode's language.
+
+    Degrades to the English row rather than failing the card: the credits roll
+    is the last thing between a finished episode and `otr/obs/`, and a LABEL may
+    never be the reason an episode does not publish. `_require` above still
+    fails loud for a missing RECEIPT, which is a different thing -- a missing
+    number is a broken ledger, a missing header is a missing translation.
+    """
+    try:
+        from . import _otr_episode_languages as _EPLANG
+    except ImportError:  # pragma: no cover -- flat/standalone load
+        import _otr_episode_languages as _EPLANG  # type: ignore
+    try:
+        return dict(_EPLANG.row_from_meta(meta).credits)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_CreditsRoll] episode-language chrome unavailable (%s); "
+            "printing the English headers", exc,
+        )
+        return dict(_EPLANG.row_by_label(_EPLANG.ENGLISH_LABEL).credits)
+
+
 # _story_style_receipt (and its _STORY_STYLE_STATUS_SCAFFOLD_OFF constant) were
 # DELETED here (2026-08-03; both QA lanes confirmed zero callers after the
 # display swap). If archive regeneration is ever built, the rescue recipe they
@@ -295,6 +318,20 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     # as the episode's identity.
     style = str(_require(meta, "visual_style", "meta")).strip()
 
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18). Every AUDIENCE-FACING header and
+    # label below is a row value; the MACHINE RECEIPTS beside them are not.
+    #
+    # The split is the whole design. `MODELS` and `[ STORY SPINE ]` are the show
+    # talking to the person watching, so they speak the episode's language. The
+    # values under them -- VRAM, CUDA, torch, model ids, seeds, revisions -- are
+    # serial numbers, and a translated serial number is a wrong serial number.
+    # `SIGNAL LOST`, `OTR v2` and `CastLock` are brand tokens and stay put.
+    #
+    # An unstamped ledger (Off, or frozen before this feature) resolves to the
+    # English row, whose values are today's literals character for character --
+    # so this is a byte-identical change on every English episode.
+    chrome = _credits_chrome(meta)
+
     # --- COL 1 -------------------------------------------------------------
     gp = meta.get("gen_params_initial") or {}
     ren = _require(meta, "render_engines", "meta")
@@ -303,7 +340,8 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
 
     col1 = []
     # MODELS
-    models = {"header": "MODELS", "tag": "GENERATIVE STACK · THIS EPISODE",
+    models = {"header": chrome["models_header"],
+              "tag": "GENERATIVE STACK · THIS EPISODE",
               "img_rev": (img.get("image_revision")),
               "vid_rev": (ren.get("video_revision")),
               "image_rows": _hist_rows(img.get("by_role") or {}),
@@ -345,7 +383,8 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     ledger_grid.append(_code_receipt())
     ledger_grid.append(("REV:", "img %s · vid %s" % (
         img.get("image_revision"), ren.get("video_revision"))))
-    col1.append(("grid", {"header": "[ PRODUCTION LEDGER ]", "rows": ledger_grid}))
+    col1.append(("grid", {"header": chrome["production_ledger_header"],
+                          "rows": ledger_grid}))
 
     # [ SYSTEM ] -- soft probe block. Operator 2026-07-03 / roundtable R1: SYSTEM
     # moves OUT of static col 1 INTO the TOP of the col-3 scroll (below), so the
@@ -431,7 +470,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     # >> SOURCE INTERCEPT -> >> DIAGNOSTIC. SYSTEM leads (operator/R1: the scroll
     # carries all the same details as the old right panel).
     flow = []
-    flow.append(("system", {"header": "[ SYSTEM ]", "rows": sys_grid}))
+    flow.append(("system", {"header": chrome["system_header"], "rows": sys_grid}))
     # STORY SPINE
     spine = []
     news = meta.get("news") if isinstance(meta.get("news"), dict) else {}
@@ -445,11 +484,11 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     produced = (meta.get("produced_story")
                 if isinstance(meta.get("produced_story"), dict) else {})
     if produced.get("logline"):
-        spine.append(("Premise:", str(produced["logline"])))
+        spine.append((chrome["premise_label"], str(produced["logline"])))
     elif news.get("script_brief"):
-        spine.append(("Premise:", str(news["script_brief"])))
+        spine.append((chrome["premise_label"], str(news["script_brief"])))
     if produced.get("subject"):
-        spine.append(("Subject:", str(produced["subject"])))
+        spine.append((chrome["subject_label"], str(produced["subject"])))
     # CONTENT PASS (operator ruling 2026-08-03: keep the UI, improve what it
     # says). The four dramatic_state rows (Question / A wants / B wants /
     # Ending) are GONE from the scroll: they are derived BEFORE any dialogue
@@ -482,7 +521,8 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
     if _rolled:
         spine.append(("Rolled:", " · ".join(_rolled)))
     if spine:
-        flow.append(("spine", {"header": "[ STORY SPINE ]", "rows": spine}))
+        flow.append(("spine", {"header": chrome["story_spine_header"],
+                               "rows": spine}))
 
     # CLASSIFIED TRANSCRIPT (full)
     dialog = []
@@ -510,7 +550,7 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         raise CreditsDataError(
             "transcript unreadable from durable ledger lines: %s" % exc) from exc
     flow.append(("transcript",
-                 {"header": "[ CLASSIFIED TRANSCRIPT ]",
+                 {"header": chrome["classified_transcript_header"],
                   "tag": "EPISODE // %s · SCENE 1" % title.upper(),
                   "lines": dialog}))
 
@@ -589,6 +629,16 @@ def build_credits_layout(led: dict, *, w: int, h: int, manifest: dict) -> dict:
         "col1": col1,
         "col2": col2,
         "col3_flow": flow,
+        # THE MULTILINGUAL ONE-SWITCH (2026-09-18). The chrome table travels ON
+        # the layout so the DRAWERS never resolve a language themselves: they
+        # receive a layout, not a ledger, and a second reader is a second answer
+        # waiting to disagree with this one. `_draw_col2` reads it for its own
+        # header; every other header was already resolved above.
+        "chrome": dict(chrome),
+        # The native language name, printed as the show's gratitude to the
+        # audience watching in it. Absent -- Off, or a pre-feature ledger -- and
+        # the card prints nothing extra, exactly as it always did.
+        "language_header": str(meta.get("language_header") or ""),
         "footer_l": "Made with OTR v2 — 100%% generated",
         "footer_c": ">> voices from the CastLock final stamp — "
                     "delivered, not planned.",
@@ -944,6 +994,21 @@ _LEDGER_DROP_ORDER = ("FRAMES:", "VRAM:", "REV:")
 _ABRIDGED_HEADER = "[ PRODUCTION LEDGER -- ABRIDGED ]"
 _ABRIDGED_TAIL = ("+%d CUT", "FOR SPACE -- FULL LEDGER ON FILE")
 
+#: How the abridged mark is grafted onto the row's own ledger header. Bracket
+#: form, so a language whose header is `[ LIBRO DE PRODUCCIÓN ]` becomes
+#: `[ LIBRO DE PRODUCCIÓN -- ABRIDGED ]` rather than losing its own words.
+_ABRIDGED_SUFFIX = " -- ABRIDGED"
+
+
+def _abridged_header(layout) -> str:
+    """The episode language's ledger header, marked as abridged."""
+    header = (layout.get("chrome") or {}).get("production_ledger_header", "")
+    if not header:
+        return _ABRIDGED_HEADER
+    if header.endswith(" ]"):
+        return header[:-2] + _ABRIDGED_SUFFIX + " ]"
+    return header + _ABRIDGED_SUFFIX
+
 
 def _abridge(layout, dropped):
     """A COPY of ``layout`` with ``dropped`` ledger labels removed and the cut
@@ -956,7 +1021,11 @@ def _abridge(layout, dropped):
             continue
         rows = [r for r in block["rows"] if r[0] not in dropped]
         rows.append((_ABRIDGED_TAIL[0] % len(dropped), _ABRIDGED_TAIL[1]))
-        col1.append((kind, {"header": _ABRIDGED_HEADER, "rows": rows}))
+        # THE ABRIDGED MARK KEEPS THE EPISODE'S LANGUAGE. The space ladder is
+        # the one path that REPLACES a header it did not author, so an English
+        # constant here would put an English ledger heading on a native card
+        # precisely on the crowded renders nobody screenshots.
+        col1.append((kind, {"header": _abridged_header(layout), "rows": rows}))
     out["col1"] = col1
     return out
 
@@ -1197,7 +1266,13 @@ def _draw_col2(d, x, top, layout, w, h):
     col2 = layout["col2"]
     y = top
     fh1 = _load_font(_sc(_PT_H1, h))
-    d.text((x, y), "CAST & VOICES", fill=_rgba(_TEAL), font=fh1)
+    # The episode language's own header, carried on the layout by
+    # `build_credits_layout`. The English default keeps every legacy layout
+    # dict -- including the ones in the credits self-tests -- rendering exactly
+    # as it did.
+    d.text((x, y), (layout.get("chrome") or {}).get(
+        "cast_voices_header", "CAST & VOICES"),
+        fill=_rgba(_TEAL), font=fh1)
     y += _fh(fh1)
     ftag = _load_font(_sc(_PT_TAG, h))
     d.text((x, y), "DELIVERED VOICE · PERSISTENT", fill=_rgba(_GREEN, _A_TAG),

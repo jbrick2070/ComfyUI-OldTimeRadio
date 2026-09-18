@@ -81,10 +81,11 @@ def test_source_ref_slot_pinned_after_source_bank():
     # so it closes the declared vector now -- not `story_author`, which the
     # reorder moved up next to `source_ref` (see the chain above).
     assert order[-1] == "gate_in"
-    # A COUNT, not a position -- this one is a literal on purpose. 37 declared
-    # inputs carry a 36-wide saved vector because gate_in is a forceInput
+    # A COUNT, not a position -- this one is a literal on purpose. 38 declared
+    # inputs carry a 37-wide saved vector because gate_in is a forceInput
     # socket and consumes no widgets_values slot (asserted just below).
-    assert len(order) == 37
+    # 38 since 2026-09-18: episode_language appended as the trailing widget.
+    assert len(order) == 38
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
@@ -147,9 +148,10 @@ def test_patch_widget_by_name_lands_on_source_ref():
 
     # A COUNT, not a position: the writer's saved vector has been 36 wide
     # since 2026-09-13, when the inert perfect_run_spacesaver widget was
-    # removed. Patching must not change the width -- a patch that grew or
-    # shrank the vector would be corrupting every later widget in the graph.
-    assert len(node1["widgets_values"]) == 36
+    # removed, and 37 since 2026-09-18, when episode_language was appended.
+    # Patching must not change the width -- a patch that grew or shrank the
+    # vector would be corrupting every later widget in the graph.
+    assert len(node1["widgets_values"]) == 37
 
     # Neighbour checks. They exist to prove the patch landed on source_ref
     # ALONE and left the widgets on either side of it holding canonical's own

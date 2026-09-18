@@ -477,6 +477,16 @@
             "name": "replay_from"
           },
           "link": null
+        },
+        {
+          "localized_name": "episode_language",
+          "name": "episode_language",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "episode_language"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -567,7 +577,8 @@
         true,
         true,
         true,
-        ""
+        "",
+        "English"
       ],
       "color": "#1B2940",
       "bgcolor": "#3B3D42"

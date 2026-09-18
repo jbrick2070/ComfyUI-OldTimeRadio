@@ -177,6 +177,12 @@ from . import _otr_source_snapshot as _otr_source_snapshot
 # validator all call, so the cheap early refusal and the real one cannot
 # disagree about what is admissible.
 from . import _otr_story_input as _otr_story_input
+# THE MULTILINGUAL ONE-SWITCH (2026-09-18). One dropdown, resolved once at the
+# top of run() and stamped on the ledger beside `source_bank`; every downstream
+# painter reads the LEDGER, never this widget. Module scope because the widget
+# choices are built in INPUT_TYPES -- a broken registry must fail at load, the
+# same no-fallback law `source_bank` follows.
+from . import _otr_episode_languages as _EPLANG
 from . import _otr_word_delivery as _OTRWD
 # MODULE SCOPE ON PURPOSE (item F, 2026-08-17). This module was previously
 # imported ONLY inside the `provenance_normalize` branch below, which is true
@@ -1567,6 +1573,25 @@ def _upstream_identity_names(meta: dict) -> list[str]:
     return out
 
 
+def _native_authoring_instruction(meta: Mapping[str, Any]) -> str:
+    """The episode language's own authoring instruction, or "" for English.
+
+    Read from the LEDGER, never from the widget: the stamp is the authority
+    once run() has made it, so every authoring pass -- outline, composition,
+    title regen, and the downstream cleanup/exchange/repair passes -- asks the
+    same question of the same source and cannot disagree.
+
+    English returns "" DELIBERATELY, not the English row's instruction string.
+    An empty instruction leaves every prompt byte-identical, which is the
+    English regression gate; telling the model "write in English" would change
+    every English prompt in the pack to say something it already assumed.
+    """
+    row = _EPLANG.row_from_meta(meta)
+    if row.iso == _EPLANG.ENGLISH_ISO:
+        return ""
+    return _EPLANG.writer_language_instruction(row)
+
+
 def _stamp_news_seed_receipt(
     meta: dict[str, Any],
     resolved: Mapping[str, Any],
@@ -1930,6 +1955,8 @@ def _compose_and_stamp_announcer_close(
                 # media_archive's coda_system prompt -- while the
                 # fictional-outro call below has passed it since Stage 4.
                 source_bank_id=resolved["source_bank"],
+                # The episode language, from the ledger. English/Off is "".
+                episode_meta=meta,
             )
         if not outro_res.text:
             # Pathological (brief cleaned to empty) -- never ship an empty
@@ -1953,7 +1980,7 @@ def _compose_and_stamp_announcer_close(
                 str(meta.get("credits_source_line") or "").strip()
             )
             outro_res = _OTRLC.LineResult(
-                text=_OTRLC.fallback_announcer_outro(""),
+                text=_OTRLC.fallback_announcer_outro("", episode_meta=meta),
                 compose_flags=(
                     ("announcer_outro_fallback",)
                     + (("source_note_deferred_to_credits",)
@@ -1987,7 +2014,7 @@ def _compose_and_stamp_announcer_close(
             else "is ALSO empty -- this episode attributes nowhere",
         )
         outro_res = _OTRLC.LineResult(
-            text=_OTRLC.fallback_announcer_outro(""),
+            text=_OTRLC.fallback_announcer_outro("", episode_meta=meta),
             compose_flags=(
                 ("announcer_outro_fallback",)
                 + (("source_note_deferred_to_credits",)
@@ -2018,6 +2045,8 @@ def _compose_and_stamp_announcer_close(
                 ending_change=_outro_ending_change,
                 final_character_line=_outro_final_char_line,
                 source_bank_id=resolved["source_bank"],  # Stage 4
+                # The episode language, from the ledger. English/Off is "".
+                episode_meta=meta,
             )
         if _style_grammar_on:
             # On-flag but no news brief -> mark it (text unchanged; frozen).
@@ -2940,6 +2969,43 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         "no writer, no TTS, no music, no stills minted; same seeds, "
                         "same audio, only the video phase runs. The A/A null."),
                 }),
+                # THE MULTILINGUAL ONE-SWITCH (2026-09-18). The ONLY language
+                # control in the pack, APPENDED after replay_from and before
+                # the gate_in socket -- gate_in consumes no widgets_values
+                # slot, so this is the trailing saved value and every earlier
+                # index is untouched (BUG-LOCAL-097).
+                #
+                # Choices come from config/episode_languages.json: admitted
+                # rows only, so a later language appears here by itself the day
+                # its row ships. Same no-fallback law as source_bank -- a
+                # broken registry raises at INPUT_TYPES rather than serving a
+                # silently English dropdown.
+                "episode_language": (
+                    _EPLANG.dropdown_choices(),
+                    {
+                        "default": _EPLANG.ENGLISH_LABEL,
+                        "tooltip": (
+                            "The language the EPISODE is in -- spoken "
+                            "dialogue, the announcer, the title card, the "
+                            "captions and the closing credits.\n\n"
+                            "ComfyUI's own knobs stay English, the music "
+                            "prompts stay English, and the machine readouts "
+                            "in the credits (VRAM, CUDA, model ids, seeds) "
+                            "stay English serial numbers.\n\n"
+                            "Anything you type yourself is kept as you typed "
+                            "it: your premise, your title, your story "
+                            "fields.\n\n"
+                            "Off is not a language -- it is off: nothing is "
+                            "stamped and the episode runs exactly as it did "
+                            "before this control existed. English does the "
+                            "same thing and says so on the ledger.\n\n"
+                            "Every language here speaks through Kokoro. The "
+                            "Shakespeare and Public Domain banks perform the "
+                            "author's own words, so they are English only and "
+                            "refuse before anything is generated."
+                        ),
+                    },
+                ),
                 # MY STORY (2026-09-10). The four fields a person fills in to
                 # tell their own story, APPENDED after replay_from so every
                 # earlier saved value keeps its index (BUG-LOCAL-097). All
@@ -3088,6 +3154,13 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # OTR_WorkflowValidator -- never parsed, just sequenced.
         gate_in="",
         replay_from="",
+        # THE MULTILINGUAL ONE-SWITCH (2026-09-18), the trailing widget.
+        # DEFAULT "" ON PURPOSE, and it is not the same value the canvas ships:
+        # a graph saved before this widget existed passes nothing, and "" is
+        # the legacy-missing state that resolves to the English row -- feature
+        # on, today's behaviour byte for byte. The canvas default is the
+        # explicit "English" label, which resolves to the same row.
+        episode_language="",
         # MY STORY (2026-09-10), appended after replay_from in widget order.
         story_characters="",
         story_plot="",
@@ -3112,6 +3185,22 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # as though the person had asked for it, and would file the saved
         # draft under an identity the validator cannot reproduce.
         # ------------------------------------------------------------------ #
+        # ------------------------------------------------------------------ #
+        # THE EPISODE LANGUAGE, RESOLVED FIRST -- before the replay shortcut,
+        # before the rolls, before a model is loaded. Resolution is pure: it
+        # reads one widget string and answers "which row, or Off".
+        #
+        # It is first because an unknown token must fail at zero cost, and
+        # because the replay branch below returns from run() entirely and still
+        # has to compare the widget against the frozen ledger.
+        #
+        # `_language.row` is None ONLY for Off. Off stamps nothing and is never
+        # handed to `resolve_lemmy_cameo`, the Kokoro adapter or the painters as
+        # an iso -- they read the LEDGER, which an Off run leaves unstamped and
+        # therefore English.
+        # ------------------------------------------------------------------ #
+        _language = _EPLANG.resolve_label(episode_language)
+        _language_row = _language.row
         _story_raw = _otr_story_input.capture_raw(
             idea=custom_premise, characters=story_characters,
             plot=story_plot, setting=story_setting, author=story_author,
@@ -3169,6 +3258,30 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             led = _PLR.import_replay_bundle(_replay_src)
             data = led.data
             meta = data.get("meta") or {}
+            # THE REPLAY LANGUAGE CHECK, AND IT SITS HERE FOR A REASON: BEFORE
+            # the cast block, which on a replay means before this branch hands
+            # anything downstream at all. The frozen LEDGER's iso wins -- a
+            # replay re-renders THAT episode -- so a widget naming a different
+            # language fails now rather than re-casting an English Lemmy ledger
+            # through a Spanish row. `Off` never compares (it asks for the
+            # recorded path, which is what a replay is).
+            #
+            # ROW DRIFT IS WARNED, NEVER SILENTLY CLAIMED. When the recorded
+            # row hash no longer matches the row on disk, the replay continues
+            # on the CURRENT row and the receipt names both revisions, so a
+            # published replay can prove which copy painted it.
+            _replay_language = _EPLANG.replay_language_check(meta, _language)
+            if _replay_language.row_drift is not None:
+                meta["episode_language_row_drift"] = _replay_language.row_drift
+                led.save()
+                log.warning(
+                    "[OTR_LedgerScriptWriter] episode_language row drift on "
+                    "replay: %s row_revision %r -> %r; continuing on the "
+                    "current row",
+                    _replay_language.iso,
+                    _replay_language.row_drift["recorded_row_revision"],
+                    _replay_language.row_drift["current_row_revision"],
+                )
             script_json = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
             script_text = "\n".join(
                 "%s: %s" % (str(r.get("speaker") or "").upper(), str(r.get("text") or ""))
@@ -3215,6 +3328,23 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         visual_style, _style_roll = _ROLLS.resolve_style_selection(
             visual_style)
         _source_bank_row = _otr_story_routing.require_runnable_bank(source_bank)
+        # ------------------------------------------------------------------ #
+        # THE FIDELITY GATE -- the first point the bank id is authoritative,
+        # and still BEFORE the LLM preflight, the scaffold env mutation and
+        # _resolve_inputs. Shakespeare and Public Domain perform the author's
+        # own words; a verbatim lane cannot also be a translation lane, so the
+        # combination refuses here rather than spending a model on an episode
+        # that could only be wrong.
+        #
+        # PRECEDENCE, stated because an unstated order is the defect: fidelity
+        # first (this gate, which keeps English byte-identical), then language,
+        # then the Lemmy knob. The exclusions are DATA on the language row --
+        # the banks never learn about ISO codes.
+        # ------------------------------------------------------------------ #
+        _EPLANG.check_source_bank_admission(
+            _language_row,
+            getattr(_source_bank_row, "source_bank_id", "") or source_bank,
+        )
         # ------------------------------------------------------------------ #
         # MY STORY ADMISSION, CHECK SITE 2 -- the bank row is bound, so this
         # is the first point the answer is authoritative. Deliberately BEFORE
@@ -3558,6 +3688,19 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # Stage 2C: stamp the authoritative story-path selection (resolved
         # dict is the single source; run() gated it runnable already).
         meta["source_bank"] = resolved["source_bank"]
+        # THE LANGUAGE STAMP, beside source_bank and BEFORE the freeze. This is
+        # the handoff from the one widget to the whole rest of the pipeline:
+        # from here on nothing reads `episode_language` again -- the writer
+        # prompt, CastLock, the Kokoro adapter, the line composer, the credits
+        # roll and the caption painter all resolve the LEDGER.
+        #
+        # `Off` stamps NOTHING, deliberately: no key, not a null, not "off". An
+        # absent stamp is how a reader tells "this run asked for today's path"
+        # from "this run chose English", and `row_from_meta` floors both to the
+        # English row, so the two behave identically and say different things.
+        _language_stamp = _EPLANG.resolve_ledger(episode_language)
+        if _language_stamp is not None:
+            meta.update(_language_stamp)
         # DELIVERY INTENT (2026-09-10) -- stamped on EVERY new run, not only
         # My Story ones. A field that appears on some runs and not others
         # cannot be read as a contract: the terminal mux needs to tell "this
@@ -4516,6 +4659,11 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     tuple(e.text for e in _verbatim_plan.entries)
                     if _verbatim_plan is not None else ()
                 ),
+                # The episode language, read from the LEDGER rather than the
+                # widget: the stamp is the authority from here on, and an Off
+                # or legacy run resolves to English, whose instruction is ""
+                # and leaves this prompt byte-identical.
+                language_instruction=_native_authoring_instruction(meta),
             )
 
         # Length is an OBSERVATION (2026-08-14). Nothing was requested, so
@@ -4641,6 +4789,23 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "[OTR_LedgerScriptWriter] injected %d optional source term(s) "
                 "into the composition prompt",
                 len(meta["specificity_anchors"]),
+            )
+        # THE MULTILINGUAL ONE-SWITCH (2026-09-18). `canon_header` is the one
+        # block every composition pass receives, so the episode language's own
+        # instruction rides it into per-line composition, the grouped-exchange
+        # path, the intro/outro rewrites and the cleanup passes -- one edit, one
+        # authority, no per-pass plumbing to keep in step.
+        #
+        # It leads the header: the language of the answer is the first thing the
+        # model needs, ahead of the canon it is writing inside. English and Off
+        # produce "" and leave the header byte-identical.
+        _language_prompt_lead = _native_authoring_instruction(meta)
+        if _language_prompt_lead:
+            canon_header = _language_prompt_lead + "\n\n" + canon_header
+            log.info(
+                "[OTR_LedgerScriptWriter] composition prompt authors in %s "
+                "(%s)", _EPLANG.row_from_meta(meta).label,
+                meta.get("episode_language"),
             )
         log.info(
             "[OTR_LedgerScriptWriter] episode_canon built; composition "
@@ -5582,6 +5747,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                                 safe_open_brief=safe_open_brief,
                                 # QA F1 (2026-07-09): pack-routed intro seam.
                                 source_bank_id=resolved["source_bank"],
+                                # The episode language, from the ledger.
+                                episode_meta=meta,
                             )
                         except _OTRLC.AnnouncerBriefStarvedError as _open_exc:
                             # A STARVED BRIEF MUST NOT KILL A RENDER HERE. The
@@ -5606,7 +5773,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                                 _open_exc.reason,
                             )
                             line_res = _OTRLC.LineResult(
-                                text=_OTRLC.fallback_safe_open(safe_open_brief),
+                                text=_OTRLC.fallback_safe_open(
+                                    safe_open_brief, episode_meta=meta),
                                 compose_flags=(
                                     "announcer_intro",
                                     "announcer_intro_structural_fallback",
@@ -5633,7 +5801,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     # outro fallback as the placeholder so a mid-loop
                     # crash still leaves a valid closing bookend; the
                     # post-loop outro pass overwrites this row.
-                    cleaned = _OTRLC.fallback_announcer_outro(nc_brief)
+                    cleaned = _OTRLC.fallback_announcer_outro(
+                        nc_brief, episode_meta=meta)
                     beat_compose_flags = ()
                 else:
                     line_req = _build_line_request_for_beat(
@@ -5841,6 +6010,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             work_title=_work_title,
                         ),
                         source_bank_id=resolved["source_bank"],
+                        # The episode language, from the ledger. A REWRITE that
+                        # dropped the instruction would put an English opening
+                        # in front of a native episode.
+                        episode_meta=meta,
                     )
                 if (
                     "announcer_intro_structural_fallback"

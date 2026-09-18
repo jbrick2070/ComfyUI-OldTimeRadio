@@ -194,7 +194,7 @@ class TestHeadlessSurface:
         # total, not a position, so it is allowed to be a literal. schemas
         # comes from the LIVE INPUT_TYPES() above, so the patch is resolved
         # against the real widget vector rather than a remembered one.
-        assert len(node1["widgets_values"]) == 36
+        assert len(node1["widgets_values"]) == 37
         assert value(node1, "visual_style") == "anime"
         # The NEIGHBOUR checks: the patch wrote visual_style and nothing else,
         # so each of these still carries canonical's own saved value. The bank

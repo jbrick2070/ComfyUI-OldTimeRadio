@@ -32,7 +32,7 @@ from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 #
 # `gate_in` is in this list because it is a declared INPUT, but it is a
 # forceInput SOCKET: it consumes no widgets_values slot, which is why the
-# saved widget vector is 36 while this list is 37 long.
+# saved widget vector is 37 while this list is 38 long.
 #
 # Departures, so a reader knows why the numbering here will not match older
 # comments elsewhere in the repo:
@@ -73,6 +73,12 @@ _EXPECTED_INPUT_ORDER = [
     "use_exchange", "enable_production_stage3_validators",
     "news_briefs_required",
     "replay_from",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18). Appended after `replay_from`
+    # and before the `gate_in` socket, which consumes no widgets_values slot --
+    # so this is the TRAILING saved value and every earlier index is untouched
+    # (BUG-LOCAL-097). A trailing widget is nearly free; a mid-list one would
+    # have cost the re-index everywhere.
+    "episode_language",
     "gate_in",                      # SOCKET -- no widgets_values slot
 ]
 
@@ -113,7 +119,7 @@ def test_widget_order_appends_slots_at_end():
 
     `gate_in` appears in this list because it is a declared INPUT, but it is a
     forceInput SOCKET and consumes no `widgets_values` slot -- which is why the
-    saved widget vector is 36 while this list is 37.
+    saved widget vector is 37 while this list is 38.
     """
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
@@ -129,8 +135,8 @@ def test_widget_order_appends_slots_at_end():
     # The socket, called out separately because it is the one entry here that
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
-    assert len(widgets) == 36, (
-        "the writer should declare 36 widgets plus the gate_in socket; got %d"
+    assert len(widgets) == 37, (
+        "the writer should declare 37 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

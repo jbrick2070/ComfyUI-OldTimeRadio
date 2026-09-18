@@ -1,0 +1,446 @@
+{
+  "schema_version": 1,
+  "kokoro_mirror": {
+    "package": "kokoro",
+    "version": "0.9.4",
+    "lang_codes_source": "kokoro.pipeline.LANG_CODES",
+    "note": "Every LANG_CODES key is a row (or folded into English for a/b). Off is not a row. Kokoro is the dance leader."
+  },
+  "rows": [
+    {
+      "iso": "en",
+      "label": "English",
+      "admitted": true,
+      "sort_order": 10,
+      "native_header": "English",
+      "row_revision": 3,
+      "authoring": {
+        "spoken_name": "English",
+        "writer_instruction": "Write the episode in English. Titles, dialogue, and announcer copy are English.",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in English, 2-5 words, at most 28 characters."
+      },
+      "spoken": {
+        "reserved_announcer_name": "ANNOUNCER",
+        "sign_on_greeting": "Good evening",
+        "station_id_open": "This is SIGNAL LOST",
+        "tonight_label": "Tonight",
+        "station_id_close": "This has been SIGNAL LOST",
+        "sign_off_greeting": "Good night",
+        "work_line_prefix": "a scene from ",
+        "open_on_prefix": "We open on "
+      },
+      "credits": {
+        "models_header": "MODELS",
+        "production_ledger_header": "[ PRODUCTION LEDGER ]",
+        "cast_voices_header": "CAST & VOICES",
+        "story_spine_header": "[ STORY SPINE ]",
+        "premise_label": "Premise:",
+        "subject_label": "Subject:",
+        "classified_transcript_header": "[ CLASSIFIED TRANSCRIPT ]",
+        "system_header": "[ SYSTEM ]",
+        "writer_llm_header": "[ WRITER-LLM-CONFIG ]",
+        "origin_hud": "ORIGIN",
+        "more_hud": "+%d MORE"
+      },
+      "captions": {
+        "font_policy": "latin_arial",
+        "wrap_policy": "word_split",
+        "cps_policy": "latin_17"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "b",
+          "lang_code_character_pool": ["a", "b"],
+          "voices": [
+            "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
+            "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
+            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
+            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
+            "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
+            "am_michael", "am_onyx", "am_puck", "am_santa"
+          ]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": [],
+        "readiness_extras": [],
+        "min_voice_count": 3
+      }
+    },
+    {
+      "iso": "es",
+      "label": "Spanish",
+      "admitted": true,
+      "sort_order": 20,
+      "native_header": "Español",
+      "row_revision": 3,
+      "authoring": {
+        "spoken_name": "español",
+        "writer_instruction": "Escribe el episodio en español. Títulos, diálogo y locución del locutor en español. No traduzcas un borrador en inglés: genera en español.",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Spanish, 2-5 words, at most 28 characters, Spanish title case. Accents survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "LOCUTOR",
+        "sign_on_greeting": "Buenas noches",
+        "station_id_open": "Esta es SIGNAL LOST",
+        "tonight_label": "Esta noche",
+        "station_id_close": "Esto ha sido SIGNAL LOST",
+        "sign_off_greeting": "Buenas noches",
+        "work_line_prefix": "una escena de ",
+        "open_on_prefix": "Abrimos en "
+      },
+      "credits": {
+        "models_header": "MODELOS",
+        "production_ledger_header": "[ LIBRO DE PRODUCCIÓN ]",
+        "cast_voices_header": "REPARTO Y VOCES",
+        "story_spine_header": "[ ARMAZÓN ]",
+        "premise_label": "Premisa:",
+        "subject_label": "Tema:",
+        "classified_transcript_header": "[ TRANSCRIPCIÓN CLASIFICADA ]",
+        "system_header": "[ SISTEMA ]",
+        "writer_llm_header": "[ GUIONISTA / LLM ]",
+        "origin_hud": "ORIGEN",
+        "more_hud": "+%d MÁS"
+      },
+      "captions": {
+        "font_policy": "latin_arial",
+        "wrap_policy": "word_split",
+        "cps_policy": "latin_17"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "e",
+          "voices": ["ef_dora", "em_alex", "em_santa"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": [],
+        "min_voice_count": 3
+      }
+    },
+    {
+      "iso": "pt",
+      "label": "Portuguese",
+      "admitted": true,
+      "sort_order": 30,
+      "native_header": "Português",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "português",
+        "writer_instruction": "Escreva o episódio em português brasileiro. Títulos, diálogo e locução do locutor em português. Não traduza um rascunho em inglês: gere em português.",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Portuguese, 2-5 words, at most 30 characters. Accents survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "LOCUTOR",
+        "sign_on_greeting": "Boa noite",
+        "station_id_open": "Esta é SIGNAL LOST",
+        "tonight_label": "Esta noite",
+        "station_id_close": "Isto foi SIGNAL LOST",
+        "sign_off_greeting": "Boa noite",
+        "work_line_prefix": "uma cena de ",
+        "open_on_prefix": "Abrimos em "
+      },
+      "credits": {
+        "models_header": "MODELOS",
+        "production_ledger_header": "[ LIVRO DE PRODUÇÃO ]",
+        "cast_voices_header": "ELENCO E VOZES",
+        "story_spine_header": "[ ARMAÇÃO ]",
+        "premise_label": "Premissa:",
+        "subject_label": "Assunto:",
+        "classified_transcript_header": "[ TRANSCRIÇÃO CLASSIFICADA ]",
+        "system_header": "[ SISTEMA ]",
+        "writer_llm_header": "[ ROTEIRISTA / LLM ]",
+        "origin_hud": "ORIGEM",
+        "more_hud": "+%d MAIS"
+      },
+      "captions": {
+        "font_policy": "latin_arial",
+        "wrap_policy": "word_split",
+        "cps_policy": "latin_17"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "p",
+          "voices": ["pf_dora", "pm_alex", "pm_santa"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": [],
+        "min_voice_count": 3
+      }
+    },
+    {
+      "iso": "it",
+      "label": "Italian",
+      "admitted": true,
+      "sort_order": 40,
+      "native_header": "Italiano",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "italiano",
+        "writer_instruction": "Scrivi l'episodio in italiano. Titoli, dialoghi e locuzione dell'annunciatore in italiano. Non tradurre una bozza inglese: genera in italiano.",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Italian, 2-5 words, at most 28 characters. Accents survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "ANNUNCIATORE",
+        "sign_on_greeting": "Buonasera",
+        "station_id_open": "Questa è SIGNAL LOST",
+        "tonight_label": "Stasera",
+        "station_id_close": "Questa è stata SIGNAL LOST",
+        "sign_off_greeting": "Buonanotte",
+        "work_line_prefix": "una scena da ",
+        "open_on_prefix": "Si apre su "
+      },
+      "credits": {
+        "models_header": "MODELLI",
+        "production_ledger_header": "[ REGISTRO DI PRODUZIONE ]",
+        "cast_voices_header": "CAST E VOCI",
+        "story_spine_header": "[ STRUTTURA ]",
+        "premise_label": "Premessa:",
+        "subject_label": "Soggetto:",
+        "classified_transcript_header": "[ TRASCRIZIONE CLASSIFICATA ]",
+        "system_header": "[ SISTEMA ]",
+        "writer_llm_header": "[ SCENEGGIATORE / LLM ]",
+        "origin_hud": "ORIGINE",
+        "more_hud": "+%d ALTRI"
+      },
+      "captions": {
+        "font_policy": "latin_arial",
+        "wrap_policy": "word_split",
+        "cps_policy": "latin_17"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "i",
+          "voices": ["if_sara", "im_nicola"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": [],
+        "min_voice_count": 2
+      }
+    },
+    {
+      "iso": "fr",
+      "label": "French",
+      "admitted": true,
+      "sort_order": 50,
+      "native_header": "Français",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "français",
+        "writer_instruction": "Écris l'épisode en français. Titres, dialogues et locution de l'annonceur en français. Ne traduis pas un brouillon anglais: génère en français.",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in French, 2-5 words, at most 28 characters. Accents survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "ANNONCEUR",
+        "sign_on_greeting": "Bonsoir",
+        "station_id_open": "Ici SIGNAL LOST",
+        "tonight_label": "Ce soir",
+        "station_id_close": "C'était SIGNAL LOST",
+        "sign_off_greeting": "Bonne nuit",
+        "work_line_prefix": "une scène de ",
+        "open_on_prefix": "Nous ouvrons sur "
+      },
+      "credits": {
+        "models_header": "MODÈLES",
+        "production_ledger_header": "[ REGISTRE DE PRODUCTION ]",
+        "cast_voices_header": "DISTRIBUTION ET VOIX",
+        "story_spine_header": "[ CHARPENTE ]",
+        "premise_label": "Prémisse:",
+        "subject_label": "Sujet:",
+        "classified_transcript_header": "[ TRANSCRIPTION CLASSIFIÉE ]",
+        "system_header": "[ SYSTÈME ]",
+        "writer_llm_header": "[ SCÉNARISTE / LLM ]",
+        "origin_hud": "ORIGINE",
+        "more_hud": "+%d DE PLUS"
+      },
+      "captions": {
+        "font_policy": "latin_arial",
+        "wrap_policy": "word_split",
+        "cps_policy": "latin_17"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "f",
+          "voices": ["ff_siwis"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": [],
+        "min_voice_count": 1
+      }
+    },
+    {
+      "iso": "hi",
+      "label": "Hindi",
+      "admitted": true,
+      "sort_order": 60,
+      "native_header": "हिन्दी",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "हिन्दी",
+        "writer_instruction": "पूरा एपिसोड हिन्दी में लिखो। शीर्षक, संवाद और उद्घोषक की भाषा हिन्दी हो। अंग्रेज़ी ड्राफ्ट का अनुवाद मत करो — सीधे हिन्दी में लिखो।",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Hindi, short, Devanagari. Accents and matras survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "उद्घोषक",
+        "sign_on_greeting": "नमस्कार",
+        "station_id_open": "यह है SIGNAL LOST",
+        "tonight_label": "आज रात",
+        "station_id_close": "यह रहा SIGNAL LOST",
+        "sign_off_greeting": "शुभ रात्रि",
+        "work_line_prefix": "एक दृश्य — ",
+        "open_on_prefix": "हम खुलते हैं — "
+      },
+      "credits": {
+        "models_header": "मॉडल",
+        "production_ledger_header": "[ निर्माण पंजी ]",
+        "cast_voices_header": "कलाकार और आवाज़ें",
+        "story_spine_header": "[ कथा ढाँचा ]",
+        "premise_label": "आधार:",
+        "subject_label": "विषय:",
+        "classified_transcript_header": "[ वर्गीकृत प्रतिलेख ]",
+        "system_header": "[ सिस्टम ]",
+        "writer_llm_header": "[ लेखक / LLM ]",
+        "origin_hud": "मूल",
+        "more_hud": "+%d और"
+      },
+      "captions": {
+        "font_policy": "devanagari",
+        "wrap_policy": "unicode_grapheme",
+        "cps_policy": "devanagari_soft"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "h",
+          "voices": ["hf_alpha", "hf_beta", "hm_omega", "hm_psi"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": [],
+        "min_voice_count": 3
+      }
+    },
+    {
+      "iso": "ja",
+      "label": "Japanese",
+      "admitted": true,
+      "sort_order": 70,
+      "native_header": "日本語",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "日本語",
+        "writer_instruction": "エピソード全体を日本語で書いてください。タイトル、台詞、アナウンサーも日本語。英語原稿の翻訳ではなく、最初から日本語で書くこと。",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Japanese, short. CJK glyphs survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "アナウンサー",
+        "sign_on_greeting": "こんばんは",
+        "station_id_open": "こちらは SIGNAL LOST",
+        "tonight_label": "今夜",
+        "station_id_close": "SIGNAL LOST でした",
+        "sign_off_greeting": "おやすみなさい",
+        "work_line_prefix": "一場面：",
+        "open_on_prefix": "幕開けは"
+      },
+      "credits": {
+        "models_header": "モデル",
+        "production_ledger_header": "[ 制作台帳 ]",
+        "cast_voices_header": "出演と声",
+        "story_spine_header": "[ 物語の骨組み ]",
+        "premise_label": "前提：",
+        "subject_label": "主題：",
+        "classified_transcript_header": "[ 機密文字起こし ]",
+        "system_header": "[ システム ]",
+        "writer_llm_header": "[ 脚本 / LLM ]",
+        "origin_hud": "出典",
+        "more_hud": "+%d ほか"
+      },
+      "captions": {
+        "font_policy": "cjk",
+        "wrap_policy": "cjk_chars",
+        "cps_policy": "cjk_soft"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "j",
+          "voices": ["jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": ["misaki[ja]"],
+        "min_voice_count": 3
+      }
+    },
+    {
+      "iso": "zh",
+      "label": "Mandarin",
+      "admitted": true,
+      "sort_order": 80,
+      "native_header": "普通话",
+      "row_revision": 2,
+      "authoring": {
+        "spoken_name": "普通话",
+        "writer_instruction": "请用普通话写完整集。标题、对白和播音员台词都用中文。不要翻译英文草稿，直接用中文创作。",
+        "visual_prompt_iso": "en",
+        "title_instruction": "Author meta.episode_title in Mandarin Chinese, short. CJK glyphs survive."
+      },
+      "spoken": {
+        "reserved_announcer_name": "播音员",
+        "sign_on_greeting": "晚上好",
+        "station_id_open": "这里是 SIGNAL LOST",
+        "tonight_label": "今晚",
+        "station_id_close": "以上是 SIGNAL LOST",
+        "sign_off_greeting": "晚安",
+        "work_line_prefix": "一场戏：",
+        "open_on_prefix": "开场："
+      },
+      "credits": {
+        "models_header": "模型",
+        "production_ledger_header": "[ 制作台账 ]",
+        "cast_voices_header": "演员与声音",
+        "story_spine_header": "[ 故事骨架 ]",
+        "premise_label": "前提：",
+        "subject_label": "主题：",
+        "classified_transcript_header": "[ 机密文稿 ]",
+        "system_header": "[ 系统 ]",
+        "writer_llm_header": "[ 编剧 / LLM ]",
+        "origin_hud": "来源",
+        "more_hud": "+%d 更多"
+      },
+      "captions": {
+        "font_policy": "cjk",
+        "wrap_policy": "cjk_chars",
+        "cps_policy": "cjk_soft"
+      },
+      "engines": {
+        "kokoro": {
+          "lang_code": "z",
+          "voices": [
+            "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
+            "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"
+          ]
+        }
+      },
+      "admission": {
+        "source_bank_exclusions": ["shakespeare", "public_domain"],
+        "readiness_extras": ["misaki[zh]"],
+        "min_voice_count": 3
+      }
+    }
+  ]
+}

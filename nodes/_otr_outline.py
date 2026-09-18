@@ -1627,6 +1627,11 @@ def generate_outline(
     # voice engines read as emotion and the Ghost author reads beside intent.
     speaker_plan: tuple = (),
     verbatim_texts: tuple = (),
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the episode language row's own
+    # `authoring.writer_instruction`, already resolved from the LEDGER by the
+    # caller. Default "" keeps English, Off, every legacy caller and every
+    # self-test byte-identical.
+    language_instruction: str = "",
 ) -> Outline:
     """Generate a validated Outline via a tree of small LLM calls.
 
@@ -1726,10 +1731,22 @@ def generate_outline(
         else:
             period_system_overlay = resolved
 
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18). The episode language's own
+    # authoring instruction, written IN that language, leads every outline
+    # stage's system prompt. It leads rather than trails because the language
+    # of the answer is the first thing the model has to know.
+    #
+    # AUTHORED, NEVER TRANSLATED: the instruction asks the model to WRITE the
+    # story in the episode language. There is no English outline behind it and
+    # no convert step -- a translated spine reads like a translation.
+    #
+    # Empty on English and on Off, so those runs render exactly the prompt they
+    # always did.
+    _language_lead = str(language_instruction or "").strip()
+
     def _make_system(stage_system: str) -> str:
-        if period_system_overlay is None:
-            return stage_system
-        return period_system_overlay + "\n\n" + stage_system
+        parts = [p for p in (_language_lead, period_system_overlay, stage_system) if p]
+        return "\n\n".join(parts)
 
     # Lane-enablement chunk 1 (2026-07-06): the three STAGE system prompts
     # resolve ONCE from the bank's pack seams via the router's repo=None lane

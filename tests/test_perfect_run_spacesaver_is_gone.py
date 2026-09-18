@@ -106,9 +106,14 @@ def test_the_writer_still_has_exactly_one_widget_per_saved_value():
     assert len(descriptors) == len(node["widgets_values"]), (
         "the writer carries %d widget descriptor(s) and %d saved value(s)"
         % (len(descriptors), len(node["widgets_values"])))
-    assert len(descriptors) == 36, (
-        "the writer should carry 36 widgets after the removal (37 before); "
-        "got %d" % len(descriptors))
+    # 37 since 2026-09-18: `episode_language` (the multilingual one-switch) was
+    # APPENDED as the trailing widget. This test's own subject -- one descriptor
+    # per saved value -- is asserted above and is what actually matters here;
+    # the literal is the total, and an append moves it.
+    assert len(descriptors) == 37, (
+        "the writer should carry 37 widgets (36 after the "
+        "perfect_run_spacesaver removal, plus episode_language appended "
+        "2026-09-18); got %d" % len(descriptors))
 
 
 def test_gate_in_kept_its_link_through_the_removal():

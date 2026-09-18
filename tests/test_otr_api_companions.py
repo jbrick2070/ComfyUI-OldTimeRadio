@@ -224,6 +224,13 @@ def _writer_schemas_s5() -> dict:
     required["replay_from"] = ("STRING", {"default": ""})
     for name in ("story_characters", "story_plot", "story_setting", "story_author"):
         required[name] = ("STRING", {"default": ""})
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): episode_language is the trailing
+    # widget in the live INPUT_TYPES, so it is the trailing entry here too.
+    required["episode_language"] = (
+        ["Off", "English", "Spanish", "Portuguese", "Italian", "French",
+         "Hindi", "Japanese", "Mandarin"],
+        {"default": "English"},
+    )
     return schemas
 
 
@@ -543,7 +550,10 @@ def test_round_trip_canonical_node1_inputs_correct():
     # 36 since 2026-09-13: `perfect_run_spacesaver` was removed from slot 8
     # with the full three-part migration (descriptor, saved value, and link
     # 279's dst_slot, which moved 32 -> 31 with the gate_in socket).
-    assert len(dump) == 36, f"node 1 widgets_values length drift: {len(dump)}"
+    # 37 since 2026-09-18: `episode_language` (the multilingual one-switch)
+    # appended as the trailing widget -- declared after replay_from and before
+    # the gate_in socket, which holds no slot, so nothing earlier moved.
+    assert len(dump) == 37, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

@@ -298,7 +298,7 @@ class TestHeadlessSurface:
         # runtime-policy block -- exactly as the canonical saved them. Each
         # value is resolved from the node's own widget descriptors, so this
         # still reads the widget it names after the next migration moves it.
-        assert len(node1["widgets_values"]) == 36
+        assert len(node1["widgets_values"]) == 37
         assert value(node1, "source_bank") == "scifi_news_pro"
         assert value(node1, "google_api_slot_a_model") == (
             "(select Google API model)")
@@ -423,7 +423,7 @@ class TestClientBankReachesTheWidget:
         workflow = json.loads(
             _CANONICAL_WORKFLOW.read_text(encoding="utf-8"))
         node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
-        assert len(node1["widgets_values"]) == 36
+        assert len(node1["widgets_values"]) == 37
         # 2026-08-15 (operator): canonical ships the roll sentinel here. The
         # point of this assertion is that admitting a client bank does not
         # disturb the source_bank widget, whatever legal value it holds.

@@ -52,6 +52,7 @@ Audio is never touched -- the burn happens on the video stream only, downstream.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import Optional
@@ -71,6 +72,8 @@ try:
     from ._otr_shared import env as otr_env  # type: ignore
 except ImportError:  # loaded with nodes/ on sys.path
     from _otr_shared import env as otr_env  # type: ignore
+
+log = logging.getLogger("OTR")
 
 # -- ASS coordinate space ---------------------------------------------------
 # The header pins these, so every position and size in the file is expressed in
@@ -134,6 +137,30 @@ MIN_CUE_DUR_S = 1.0
 CAPTION_MARGIN_X = 40
 
 _ANNOUNCER_COLOR_BBGGRR = "&H80C8FF&"  # soft amber (#FFC880) -- announcer distinct
+
+
+def _reserved_announcer_label(ledger, fallback: str) -> str:
+    """The announcer's on-screen name in the episode's language.
+
+    English resolves to "ANNOUNCER", which is what this surface has always
+    burned -- so an English episode's SDH is byte-identical.
+
+    Degrades to the caller's value rather than failing: captions are a
+    deliverable, and a missing label is never a reason to ship no subtitles.
+    """
+    meta = (ledger or {}).get("meta") if isinstance(ledger, dict) else None
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG  # type: ignore
+        except ImportError:  # pragma: no cover - direct CLI execution
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        return _EPLANG.spoken_text(meta, "reserved_announcer_name") or fallback
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_Captions] episode-language announcer label unavailable (%s); "
+            "burning %r", exc, fallback,
+        )
+        return fallback
 
 # -- Style presets ----------------------------------------------------------
 # ASS V4+ Style fields: Name, Fontname, Fontsize, PrimaryColour,
@@ -514,6 +541,20 @@ def build_ass_from_ledger(ledger_path, style: str = "sdh_standard",
         nm = str(
             cast_row.get("name") or cast_row.get("display_name") or ""
         ).strip()
+        # THE RESERVED ANNOUNCER'S DISPLAY NAME (the multilingual one-switch,
+        # 2026-09-18). Character names are whatever the writer produced -- a
+        # Spanish episode gets Spanish names from the writer, and Python never
+        # touches them. The ANNOUNCER is the exception: nobody named him, Python
+        # did, and "ANNOUNCER:" burned into a Spanish episode's SDH is the one
+        # English word a native viewer cannot miss.
+        #
+        # THE STRUCTURAL KEY IS NOT RENAMED, DELIBERATELY. `name ==
+        # "ANNOUNCER"` is an identity check in roughly forty places -- cast
+        # partition, speaker resolution, markup parsing, the voice-coverage
+        # audit -- so it stays the id and this stays a DISPLAY substitution at
+        # the one surface that paints it.
+        if nm.upper() == "ANNOUNCER":
+            nm = _reserved_announcer_label(ledger, nm)
 
         # Prepend speaker label to the text of the FIRST cue of a turn so
         # wrapping accounts for its width; color is injected after wrapping.

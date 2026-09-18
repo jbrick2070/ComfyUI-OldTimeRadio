@@ -975,6 +975,10 @@ CREATIVE_WHITELIST = frozenset({
     "source_ref",
     # CANONICAL REPLAY (campaign item 0, 2026-09-02): the writer's replay_from widget.
     "replay_from",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the writer's episode_language
+    # dropdown; mirror of the package whitelist. Unknown tokens fail LOUD at
+    # run(), and a fidelity bank on a non-English row refuses before any LLM.
+    "episode_language",
     # Google BYO API concrete model pickers are pure headless bindings for
     # the virtual google_api:slot-a/b LLM rows, not managed media engines.
     "google_api_slot_a_model", "google_api_slot_b_model",

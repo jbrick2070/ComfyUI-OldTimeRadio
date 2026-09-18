@@ -24,6 +24,11 @@ try:  # pragma: no cover - package / standalone import styles
 except ImportError:  # pragma: no cover
     from _otr_config import OBJECTIVE_DEFLECTION_TENSION_MIN  # type: ignore
 
+try:  # pragma: no cover - package / standalone import styles
+    from . import _otr_episode_languages as _EPLANG
+except ImportError:  # pragma: no cover
+    import _otr_episode_languages as _EPLANG  # type: ignore
+
 log = logging.getLogger("OTR")
 
 
@@ -54,6 +59,10 @@ __all__ = [
     "build_work_frame",
     "splice_work_frame",
     "WORK_FRAME_SENTENCE",
+    # THE MULTILINGUAL ONE-SWITCH: every Python-authored on-air string on this
+    # path comes from the episode language row.
+    "spoken_chrome",
+    "work_frame_sentence",
 ]
 
 
@@ -1267,18 +1276,77 @@ def validate_announcer_line(text: str) -> tuple[bool, str]:
     return True, cleaned
 
 
-def fallback_announcer_intro(script_brief: str) -> str:
+# --------------------------------------------------------------------------- #
+# THE MULTILINGUAL ONE-SWITCH (2026-09-18) -- the Python-authored on-air strings
+# --------------------------------------------------------------------------- #
+#
+# These three fallbacks and the WORK sentence are the only places in this module
+# where PYTHON writes words a listener hears. They used to be English literals,
+# which meant a Spanish episode signed on in English no matter how well the
+# model wrote the rest of it.
+#
+# They are now row values, read from the LEDGER. `episode_meta=None` -- every
+# legacy caller and every self-test -- resolves to the English row, whose values
+# ARE today's literals character for character (pinned by
+# tests/test_episode_languages.py). So this is a byte-identical change on every
+# English episode and the reason the English row exists.
+#
+# SIGNAL LOST stays SIGNAL LOST on every row. It is the call sign, not a phrase
+# to be rendered; the grammar bends around it ("Esta es SIGNAL LOST").
+
+
+def spoken_chrome(episode_meta=None) -> dict:
+    """The episode language's Python-authored on-air strings.
+
+    Degrades to English rather than failing a spoken line: an unreadable
+    registry must never be the reason an episode has no opening.
+    """
+    try:
+        return dict(_EPLANG.row_from_meta(episode_meta).spoken)
+    except Exception as exc:  # noqa: BLE001
+        log.warning(
+            "[OTR_AnnouncerPass] episode-language chrome unavailable (%s); "
+            "using the English row", exc,
+        )
+        return dict(_EPLANG.row_by_label(_EPLANG.ENGLISH_LABEL).spoken)
+
+
+def _native_announcer_lead(episode_meta=None) -> str:
+    """The row's own authoring instruction for an announcer prompt, or "".
+
+    English returns "" so every English announcer prompt stays byte-identical.
+    """
+    try:
+        row = _EPLANG.row_from_meta(episode_meta)
+    except Exception:  # noqa: BLE001 -- a label may never cost an episode
+        return ""
+    if row.iso == _EPLANG.ENGLISH_ISO:
+        return ""
+    return _EPLANG.writer_language_instruction(row)
+
+
+def _announcer_system(system: str, episode_meta=None) -> str:
+    """Lead the pack's announcer seam with the episode language instruction.
+
+    The seam text stays English -- it is craft direction to the model, not show
+    speech -- but the LINE it asks for is written in the episode's language, so
+    the instruction has to arrive before the seam it modifies.
+    """
+    lead = _native_announcer_lead(episode_meta)
+    return (lead + "\n\n" + system) if lead else system
+
+
+def fallback_announcer_intro(script_brief: str, *, episode_meta=None) -> str:
+    spoken = spoken_chrome(episode_meta)
     brief = clean_one_line(script_brief)
-    return (
-        f"Good evening. This is SIGNAL LOST. Tonight: {brief}"
-        if brief else "Good evening. This is SIGNAL LOST."
-    )
+    head = f"{spoken['sign_on_greeting']}. {spoken['station_id_open']}."
+    return f"{head} {spoken['tonight_label']}: {brief}" if brief else head
 
 
 WORK_LINE_PREFIX = "a scene from "
 
 
-def _work_line(work_title: str) -> str:
+def _work_line(work_title: str, *, episode_meta=None) -> str:
     """Render the announcer's WORK context value, or "" to omit the label.
 
     A pure helper rather than an inline expression because the inline ternary
@@ -1295,10 +1363,12 @@ def _work_line(work_title: str) -> str:
     all rather than a bare "WORK:" the model reads as a form to fill in.
     """
     cleaned = clean_one_line(work_title)
-    return f"{WORK_LINE_PREFIX}{cleaned}" if cleaned else ""
+    if not cleaned:
+        return ""
+    return "%s%s" % (spoken_chrome(episode_meta)["work_line_prefix"], cleaned)
 
 
-def fallback_safe_open(safe_open_brief) -> str:
+def fallback_safe_open(safe_open_brief, *, episode_meta=None) -> str:
     # DIRECT attribute access on all three fields. These two were the last
     # getattr-with-default survivors on this path, and leaving them beside a
     # direct `work_title` read would have said the doctrine is a style
@@ -1311,20 +1381,24 @@ def fallback_safe_open(safe_open_brief) -> str:
     # sit silently empty on every episode. The dataclass default supplies the
     # safety, so a rename raises here instead of quietly emptying the line.
     work = clean_one_line(safe_open_brief.work_title)
-    tonight = f" Tonight, a scene from {work}." if work else ""
+    spoken = spoken_chrome(episode_meta)
+    head = f"{spoken['sign_on_greeting']}. {spoken['station_id_open']}."
+    tonight = (
+        " %s, %s%s." % (spoken["tonight_label"], spoken["work_line_prefix"], work)
+        if work else ""
+    )
     if where:
-        return (
-            f"Good evening. This is SIGNAL LOST.{tonight} "
-            f"We open on {where}."
-        )
-    return f"Good evening. This is SIGNAL LOST.{tonight}"
+        return f"{head}{tonight} {spoken['open_on_prefix']}{where}."
+    return f"{head}{tonight}"
 
 
-def fallback_announcer_outro(news_close_brief: str) -> str:
+def fallback_announcer_outro(news_close_brief: str, *, episode_meta=None) -> str:
+    spoken = spoken_chrome(episode_meta)
     close = clean_one_line(news_close_brief)
+    tail = f"{spoken['station_id_close']}."
     return (
-        f"This has been SIGNAL LOST. {close} Good night."
-        if close else "This has been SIGNAL LOST. Good night."
+        f"{tail} {close} {spoken['sign_off_greeting']}."
+        if close else f"{tail} {spoken['sign_off_greeting']}."
     )
 
 
@@ -1421,7 +1495,10 @@ def safe_open_viability(*, setting, opening_status_quo, cast) -> "str | None":
 def compose_announcer_intro(
     *, creative_fn, script_brief: str, safe_open_brief=None,
     creative_repo_id: str | None = None,
-    source_bank_id: str = "media_archive", **_compat,
+    source_bank_id: str = "media_archive",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the episode's ledger `meta`.
+    # None resolves to the English row, so every legacy caller is unchanged.
+    episode_meta=None, **_compat,
 ) -> LineResult:
     """Author one opening; structural sanitation never re-calls the model."""
     if safe_open_brief is not None:
@@ -1460,7 +1537,8 @@ def compose_announcer_intro(
                 # material the model transcribes. The VALUE stays a clean
                 # bibliographic title -- the field owns the fact, the composer
                 # owns the phrasing.
-                ("WORK", _work_line(safe_open_brief.work_title)),
+                ("WORK", _work_line(safe_open_brief.work_title,
+                                    episode_meta=episode_meta)),
                 ("SETTING", clean_one_line(safe_open_brief.setting)),
                 ("TIME", clean_one_line(safe_open_brief.time_of_day)),
                 ("OPENING STATUS",
@@ -1470,15 +1548,18 @@ def compose_announcer_intro(
             )
             if value
         )
-        fallback = fallback_safe_open(safe_open_brief)
+        fallback = fallback_safe_open(safe_open_brief, episode_meta=episode_meta)
     else:
         phase = "announcer_intro_system"
         context = clean_one_line(script_brief)
         if not context:
             raise RuntimeError("[OTR_AnnouncerPass] empty opening brief")
-        fallback = fallback_announcer_intro(context)
-    system = _resolved_closing_prompt(
-        creative_repo_id, phase=phase, source_bank_id=source_bank_id,
+        fallback = fallback_announcer_intro(context, episode_meta=episode_meta)
+    system = _announcer_system(
+        _resolved_closing_prompt(
+            creative_repo_id, phase=phase, source_bank_id=source_bank_id,
+        ),
+        episode_meta,
     )
     ok, cleaned, retried = _authored_or_one_more_ask(
         creative_fn,
@@ -1611,8 +1692,23 @@ def _loose_key(text: str) -> str:
     )
 
 
-#: How the deterministic WORK phrase enters the spoken line.
+#: How the deterministic WORK phrase enters the spoken line. Kept as the ENGLISH
+#: template -- it is the English row's rendering, and the constant is public API
+#: (tests/test_announcer_work_frame.py names it). `work_frame_sentence` below is
+#: the language-aware builder every production caller uses.
 WORK_FRAME_SENTENCE = "Tonight, a scene from {frame}."
+
+
+def work_frame_sentence(frame: str, *, episode_meta=None) -> str:
+    """The Python-owned WORK sentence in the episode's language.
+
+    English composes "Tonight, a scene from {frame}." -- character for
+    character what `WORK_FRAME_SENTENCE` renders, which is why that constant
+    stays the readable statement of the shape and this is the builder.
+    """
+    spoken = spoken_chrome(episode_meta)
+    return "%s, %s%s." % (
+        spoken["tonight_label"], spoken["work_line_prefix"], frame)
 
 #: Words whose trailing period ends an ABBREVIATION, not a sentence. Without
 #: these the split fires inside "Tonight, Mr. Holmes enters the office and we
@@ -1643,7 +1739,7 @@ def _first_sentence_end(text: str):
     return None
 
 
-def splice_work_frame(intro_text: str, frame: str) -> str:
+def splice_work_frame(intro_text: str, frame: str, *, episode_meta=None) -> str:
     """Put the Python-owned WORK sentence in front of the announcer's opening.
 
     REPLACES THE FIRST SENTENCE rather than prepending to it. The pack seam
@@ -1660,7 +1756,7 @@ def splice_work_frame(intro_text: str, frame: str) -> str:
     text = clean_one_line(intro_text)
     if not frame:
         return text
-    sentence = WORK_FRAME_SENTENCE.format(frame=frame)
+    sentence = work_frame_sentence(frame, episode_meta=episode_meta)
     if not text:
         return sentence
     cut = _first_sentence_end(text)
@@ -1679,6 +1775,11 @@ def _assemble_news_coda_surface(bridge: str, fact: str) -> str:
 def compose_news_coda(
     *, creative_fn, news_close_brief, premise, intro_text="",
     creative_repo_id=None, source_bank_id: str = "media_archive",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the episode's ledger `meta`.
+    # Only the BRIDGE is authored, and it is authored in the episode language.
+    # The source FACT stays exactly as the source wrote it -- it is an
+    # attribution, not show speech, and translating it would misquote it.
+    episode_meta=None,
 ) -> LineResult:
     """Author one bridge and append the complete source fact unchanged.
 
@@ -1700,9 +1801,12 @@ def compose_news_coda(
         # stays fully judgeable. Marking it protected would exempt an ordinary
         # authored line from cleaning for no reason.
         return LineResult("", ("news_coda_no_brief",))
-    system = _resolved_closing_prompt(
-        creative_repo_id, phase="coda_system",
-        source_bank_id=source_bank_id,
+    system = _announcer_system(
+        _resolved_closing_prompt(
+            creative_repo_id, phase="coda_system",
+            source_bank_id=source_bank_id,
+        ),
+        episode_meta,
     )
     ok, bridge, bridge_retried = _authored_or_one_more_ask(
         creative_fn,
@@ -1735,15 +1839,20 @@ def compose_announcer_outro(
     creative_repo_id: str | None = None, ending_change: str = "",
     final_character_line: str = "",
     source_bank_id: str = "media_archive",
+    # THE MULTILINGUAL ONE-SWITCH (2026-09-18): the episode's ledger `meta`.
+    episode_meta=None,
 ) -> LineResult:
     """Author one closing; style and length never reopen authorship."""
     brief = clean_one_line(script_brief)
     close = clean_one_line(news_close_brief)
     if not brief and not close:
         raise RuntimeError("[OTR_AnnouncerPass] empty closing briefs")
-    system = _resolved_closing_prompt(
-        creative_repo_id, phase="announcer_outro_system",
-        source_bank_id=source_bank_id,
+    system = _announcer_system(
+        _resolved_closing_prompt(
+            creative_repo_id, phase="announcer_outro_system",
+            source_bank_id=source_bank_id,
+        ),
+        episode_meta,
     )
     context = "\n".join(filter(None, (
         f"STORY: {brief}" if brief else "",
@@ -1771,7 +1880,7 @@ def compose_announcer_outro(
             else ("announcer_outro",),
         )
         if ok else LineResult(
-            fallback_announcer_outro(close or brief),
+            fallback_announcer_outro(close or brief, episode_meta=episode_meta),
             ("announcer_outro_structural_fallback",),
         )
     )
