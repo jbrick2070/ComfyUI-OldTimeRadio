@@ -50,6 +50,13 @@ STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
   name the download size and use `-nf4` when only the quantized load
   fits. The dropdown rows and loaders stay the same. Download-state
   badges stay ripped.
+* Official model and install docs live in `apple/`. That folder is the
+  index strangers and agents should read: `VIDEO_MODELS.md`,
+  `IMAGE_MODELS.md`, `WRITERS.md`, `VOICES.md`, `MUSIC.md`,
+  `UPSCALERS.md`, `MACHINES.md`, `INSTALL.md`. Do not reopen
+  `docs/MODEL_ASSET_INDEX.md` as a user-facing campaign. It is a
+  generated lab cross-check. Its filename-key lies stay parked unless
+  someone is already inside `scripts/otr_asset_index.py`.
 
 ---
 

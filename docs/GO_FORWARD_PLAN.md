@@ -79,17 +79,6 @@ it through.
 Needs his call, because it trades a stranger's first run against the writer
 quality on the machine that renders the dailies.
 
-### A3. `MODEL_ASSET_INDEX.md` keys rows by filename, not by registered engine id
-
-Consequences measured 2026-09-12: `still_flat` / `still_motion` / `still_pan` /
-`still_word` have NO ROW AT ALL (50 profile selections between them) because they
-live in `cheap_families.py` and the generator globs `eng_*.py`. Three registered
-LTX 2.5 engines collapse into one row flagged "not declared in code -- verify",
-a false negative caused by an import style the scanner's regex misses, hiding 19
-selections of a GATED 22 GiB family. `bark` carries the same false flag because
-`suno` is not in a hardcoded publisher allowlist. The fork is what to render when
-one file implements six engines, which is why this is not a glob widening.
-
 ### A4. The writer's 36-widget order -- SETTLED 2026-09-14, ready to execute
 
 Operator, when asked for his preference: *"ask fable and cursor to agree upon the

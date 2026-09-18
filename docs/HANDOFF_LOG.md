@@ -1,3 +1,14 @@
+## 2026-09-17 -- apple/ is the official model index
+
+Did: Operator: official necessary model docs live in `apple/`. Cut A3
+  from GO_FORWARD. `docs/MODEL_ASSET_INDEX.md` stays a generated lab
+  cross-check, not a user campaign. Still lanes and the three LTX 2.5
+  engines are already named in `apple/VIDEO_MODELS.md`.
+Current step: A5 still waits on the 16 GB GGUF video/foley/mime hole.
+Next: do not start `otr_asset_index.py` to "fix" the generated index.
+Models: Composer QA then Sonnet on this ruling write.
+Commits: this chunk.
+
 ## 2026-09-17 -- shipping CPU graph writes Sonnet 5 + Luna
 
 Did: Operator wanted Qwen off `otr_cpu_low` and Sonnet + Luna on it. That
