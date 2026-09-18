@@ -1666,34 +1666,30 @@ def fit_tags_for(repo_id: str) -> tuple:
     implied = getattr(curated, "implied_quant_policy", "") or ""
     tags = []
     for name, budget_gb in _fit_budgets():
-        # Apple Silicon pays the unquantized price; NVIDIA gets bitsandbytes
-        # unless this pick owns Quant none (the Qwen full row).
+        # Apple Silicon pays the unquantized price; NVIDIA can NF4. The
+        # plain machine tag means FULL download fits that budget. If only
+        # the halved NF4 resident fits, the tag says so (`nv8-nf4`) instead
+        # of advertising an 8.7 GB row as an 8 GB card pick.
         if name == "mac16":
             if implied == "bnb_nf4":
                 continue
             resident = metal_resident_gb(hf_weights_id(repo_id), download_gb)[0]
-        elif implied == "none":
-            resident = download_gb
-        else:
-            resident = download_gb / 2.0
-        if resident <= budget_gb:
+            if resident <= budget_gb:
+                tags.append(name)
+            elif resident <= _MAC16_PHYSICAL_GB:
+                # MARGINAL: published on a 16 GB M4 and also hard-rebooted
+                # one at the writer-to-video handover. The tag says tight
+                # rather than picking one of those facts.
+                tags.append(name + "-tight")
+            continue
+        if implied == "none":
+            if download_gb <= budget_gb:
+                tags.append(name)
+            continue
+        if download_gb <= budget_gb:
             tags.append(name)
-        elif name == "mac16" and resident <= _MAC16_PHYSICAL_GB:
-            # MARGINAL, AND THE BINARY VERSION OF THIS WAS WRONG. A first cut
-            # tagged only <= 12.0 and dropped `mac16` from `Qwen/Qwen3.5-4B`
-            # (14.0 GB projected) -- for a writer that had ALREADY PUBLISHED a
-            # complete 23-beat episode on the 16 GB M4 that same day
-            # (`lightning_mac_proof_2_..._q354b_...mp4`; `q354b` is this row).
-            # Telling an operator a model cannot run when a receipt says it did
-            # is the same defect the flux2_klein cell was, pointing the other
-            # way.
-            #
-            # It is also not simply fine: the same combination hard-rebooted the
-            # machine hours later, at the writer -> video handover, with a test
-            # suite competing for RAM. Both facts are true, so the tag says so
-            # rather than picking one -- it fits when nothing else is resident,
-            # and there is no margin for anything that is.
-            tags.append(name + "-tight")
+        elif (download_gb / 2.0) <= budget_gb:
+            tags.append(name + "-nf4")
     return tuple(tags)
 
 
@@ -1761,6 +1757,10 @@ def vram_badge_for(repo_id: str) -> str:
     # read "(4.3 GB)" for a model that measured 14 GB there, and a reader who
     # trusted that badge lost the machine. The download size is true
     # everywhere; the tags carry what changes.
+    if suffix:
+        # GGUF: the number is weights plus KV at a named context, not a
+        # safetensors download. Keep that wording; do not relabel it.
+        return " (%.1f GB%s)" % (float(est), suffix)
     curated = _by_repo_id().get(repo_id)
     download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
     tags = list(fit_tags_for(repo_id))
@@ -1772,10 +1772,10 @@ def vram_badge_for(repo_id: str) -> str:
     if repo_id in GATED_CURATED_MODELS or getattr(curated, "requires_auth", False):
         tags.insert(0, "gated")
     if download_gb > 0 and tags:
-        return " (%.1f GB, %s)" % (download_gb, " ".join(tags))
+        return " (%.1f GB download, %s)" % (download_gb, " ".join(tags))
     if download_gb > 0:
         # Fits nothing in the table -- say the size and say nothing false.
-        return " (%.1f GB)" % download_gb
+        return " (%.1f GB download)" % download_gb
     return " (%.1f GB%s)" % (float(est), suffix)
 
 

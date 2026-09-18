@@ -26,7 +26,8 @@ def test_retired_nf4_spelling_collapses_to_the_one_qwen():
 
 def test_one_qwen_fit_tags_cover_nv8_and_mac():
     tags = catalog.fit_tags_for(catalog.DEFAULT_LLM)
-    assert "nv8" in tags
+    assert "nv8-nf4" in tags
+    assert "nv8" not in tags
     assert "nv16" in tags and "nv24" in tags
     assert "mac16-tight" in tags or "mac16" in tags
     # Retired :nf4 spelling aliases onto the same curated row.
@@ -96,7 +97,8 @@ def test_chat_template_kwargs_fire_for_the_one_qwen():
 def test_fresh_and_default_llm_options_are_the_one_qwen():
     assert catalog.fresh_llm_option() == catalog.default_llm_option()
     assert catalog.fresh_llm_option().startswith(catalog.DEFAULT_LLM + " (")
-    assert "nv8" in catalog.fresh_llm_option()
+    assert "nv8-nf4" in catalog.fresh_llm_option()
+    assert "download" in catalog.fresh_llm_option()
     assert catalog.DEFAULT_LLM_NF4 not in catalog.dropdown_choices()
 
 

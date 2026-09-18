@@ -79,25 +79,6 @@ it through.
 Needs his call, because it trades a stranger's first run against the writer
 quality on the machine that renders the dailies.
 
-### A2. The `nv8` fit tag is computed on a halving the canonical's own setting invalidates
-
-`_otr_model_catalog.py` halves the download size in TWO places -- once in the
-gate's estimator and once in `fit_tags_for`, which mints the tag. The canonical's
-saved widget string literally reads
-`'Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv8 nv16 nv24)'`: it advertises that it
-fits a 7.0 GiB NVIDIA budget, on an assumption of NF4 that its own
-`quant_policy "none"` rules out. The label is the only thing a stranger reads
-before pressing Queue.
-
-**Why this is an arc and not a fix.** `fit_tags_for` runs at INPUT_TYPES time,
-before any widget value exists, so it structurally CANNOT read the quant policy.
-Assume one policy, emit both, or drop the tag -- three defensible answers. And
-honest tags change the label, which no longer matches the saved
-`widgets_values`, so `tests/test_saved_workflow_model_values_resolve.py` goes red
-and 94 variants regenerate. Measured: un-halving the GATE alone flips ZERO
-profiles' verdict tier (`_FAIL_RATIO` 1.5 is wider than the 1.24 error), so that
-half is a truth fix with no safety effect. The tag is where the behaviour is.
-
 ### A3. `MODEL_ASSET_INDEX.md` keys rows by filename, not by registered engine id
 
 Consequences measured 2026-09-12: `still_flat` / `still_motion` / `still_pan` /

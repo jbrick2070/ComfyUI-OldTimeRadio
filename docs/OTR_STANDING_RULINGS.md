@@ -46,8 +46,10 @@ STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
   `cloud_ltx25_foley_plus`.
 * The shipping CPU graph (`otr_cpu_low`) writes through Comfy Credits:
   Sonnet 5 + Luna. It does not run local Qwen. Lab leftover `cpu_floor`
-  is the same writer pair; it is not a graph people open. Download-state
-  badges stay ripped; do not open a badge fan-out.
+  is the same writer pair; it is not a graph people open. Writer badges
+  name the download size and use `-nf4` when only the quantized load
+  fits. The dropdown rows and loaders stay the same. Download-state
+  badges stay ripped.
 
 ---
 

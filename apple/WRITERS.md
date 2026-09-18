@@ -68,13 +68,12 @@ and `google/gemma-4-12b-it` is what the 16 GB NVIDIA graphs *ship*.
 
 | What the dropdown says | Download | Licence | Worth knowing |
 |---|---|---|---|
-| `Qwen/Qwen3.5-4B:nf4 (8.7 GB, nv8 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The NF4 pick.** Same weights as the row below. 8 GB NVIDIA graphs and a freshly dropped writer node save this with Quant `bnb_nf4`. No Mac tag -- there is no Metal NF4. |
-| `Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)` | 8.7 GB | Apache 2.0 | **The full pick.** Canonical and the Mac graphs save this with Quant `none`. No `nv8` -- unquantized it does not fit an 8 GB card. |
+| `Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` | 8.7 GB | Apache 2.0 | **The one Qwen.** NVIDIA loads NF4 (`nv8-nf4`). Mac / CPU load full (`mac16-tight`). There is no second Qwen row. |
 | `unsloth/Llama-3.2-3B-Instruct (6.4 GB, mac16 nv8 nv16 nv24)` | 6.4 GB | Llama 3.2 Community | **The no-quantization row.** It is the one to pick if your machine has no `bitsandbytes` -- AMD above all. Nobody has published an episode with it yet. |
 | `mistralai/Mistral-Nemo-Instruct-2407 (24.0 GB, nv16 nv24)` | 24.0 GB | Apache 2.0 | Not what the 16 GB NVIDIA graphs ship (that is `gemma-4-12b-it`, below) -- an earlier writer, still proven on 16 GB+ NVIDIA, and the pack's audio regression baseline. |
 | `google/gemma-4-E2B-it (6.0 GB, nv8 nv16 nv24)` | 6.0 GB | Apache 2.0 | Compact technical-slot option. Loads the native text decoder (PBUG-20260906-07). OOM on a 16 GB Mac -- do not pick it there. |
 | `google/gemma-4-E4B-it (9.0 GB, mac16-tight nv8 nv16 nv24)` | 9.0 GB | Apache 2.0 | Same family, a size up. Proven on 16 GB NVIDIA. |
-| `google/gemma-4-12b-it (23.9 GB, nv16 nv24)` | 23.9 GB | Apache 2.0 | What the ordinary 16 GB NVIDIA graphs ship with. NF4 is baked into the pick -- there is no other 12B variant, so you do not also change Quant. Canonical stays Qwen; switch this row and it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
+| `google/gemma-4-12b-it (23.9 GB download, nv16-nf4 nv24-nf4)` | 23.9 GB | Apache 2.0 | What the ordinary 16 GB NVIDIA graphs ship with. NF4 is baked into the pick -- there is no other 12B variant, so you do not also change Quant. Canonical stays Qwen; switch this row and it loads NF4 even if Quant still says `none`. Too big for an 8 GB card -- it is refused at the gate there, not at the crash. |
 | `google/gemma-2-2b-it (5.2 GB, gated mac16 nv8 nv16 nv24)` | 5.2 GB | Gemma Terms of Use | The smallest of all, and **the only one that needs a Hugging Face login**. Intended as a `technical_model`, not a creative one. |
 
 The local rows download themselves except the gated Gemma 2 pick, which still needs a Hugging Face login.
@@ -88,12 +87,13 @@ absent unless you set a key yourself.
 ## Reading the label
 
 The size and the machine hints in the label are not decoration. Take
-`Qwen/Qwen3.5-4B (8.7 GB, mac16-tight nv16 nv24)` apart:
+`Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)` apart:
 
 | Piece | Means |
 |---|---|
-| `8.7 GB` | What it downloads, once. Not what it occupies while running. |
-| `nv8` `nv16` `nv24` | Fits an NVIDIA card of that many GB **at the Quant this pick owns**. The NF4 Qwen row has `nv8`. The full Qwen row does not. |
+| `8.7 GB download` | What it downloads, once. Not what it occupies while running. |
+| `nv8-nf4` | Fits an 8 GB NVIDIA card only as NF4, which that machine already bakes. Plain `nv8` means the full download fits. |
+| `nv16` `nv24` | Fits an NVIDIA card of that many GB at full precision. `nv16-nf4` means only the quantized load fits. |
 | `mac16` | Fits a 16 GB Apple Silicon machine. |
 | `-tight` | Fits with nothing to spare. Close everything else. |
 | `gated` | Needs a Hugging Face account and an accepted licence before it will download. |

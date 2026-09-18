@@ -226,7 +226,7 @@ def test_dropdown_empty_cache_labels_are_bare(empty_hub_root):
     cache, every label is the bare repo id / handle -- the "downloaded"
     state of an HF-cache model is per-user and not shown."""
     entries = catalog.build_dropdown_choices(hub_root=empty_hub_root)
-    active_ids = set(catalog._by_repo_id())
+    active_ids = {m.repo_id for m in catalog._active_curated_models()}
     assert {e.repo_id for e in entries} == active_ids
     for e in entries:
         assert e.label == e.repo_id + catalog.vram_badge_for(e.repo_id)
