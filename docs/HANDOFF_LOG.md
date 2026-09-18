@@ -1,3 +1,40 @@
+## 2026-09-18 -- GO_FORWARD trimmed to the two remaining bug-fix rows
+
+Did: Operator asked for a clean go-forward that only keeps work that
+  still needs doing, mainly bug fixes. Cut CODE rows that were not
+  defects (device_options test module, regenerate
+  `docs/MODEL_ASSET_INDEX.md`, writer widget-label cosmetics) and moved
+  them to GO_FORWARD_ARCHIVE. CastLock leftover Bark `v2/` is already
+  cleared on a non-bark `_stamp`, so it did not become a row. Live
+  multilingual path/readiness/title-slug PBUGs (20260918-01..03) are
+  already fixed and stay out. Two CODE rows remain, in order: native
+  character authoring still leaks English, then the `cuda:1` voice
+  stamp that silently becomes card zero. Section 2 operator picks and
+  section 3 holds are unchanged. Testing is still not in the plan.
+Current step: CODE 1 native character dialogue.
+Next: finish the native-authoring wiring already started on this
+  checkout; do not reopen the archived coverage/index/label rows.
+Models: planner write; no panel (queue trim, not a new design).
+Commits: this docs chunk.
+
+## 2026-09-17 -- CODE 1 closed: My Story alias uses set_line_text_metrics
+
+Did: SpokenLine alias promotion in `nodes/_otr_my_story.py` now calls
+  `set_line_text_metrics` (both import branches). Music brief pin follows
+  the extract: `compose_music_prompt` -> `resolve_setting_terms` ->
+  `spoken_term(t)`. Working gate is `scripts/otr_working_gate.py`
+  (seconds); chunk gate is the full suite (~10 min), commands in
+  `docs/known-failures.md`. Last chunk-gate SET at `90e75d33`: 34 failed
+  of 16052. Two of those are this chunk. Row left GO_FORWARD; remaining
+  CODE rows renumbered 1-4 (cuda:1, device_options, model index, widgets).
+Current step: CODE 1 is now `cuda:1` voice stamp. Next production finding
+  from the SET (not yet a plan row): CastLock leftover Bark `v2/` after
+  kokoro auto_registry.
+Next: do not fill `EXPECTED_FAILED_NODEIDS`. Do not start another 11-min
+  suite until a row is green.
+Models: Composer QA then Sonnet on this diff.
+Commits: this chunk.
+
 ## 2026-09-17 -- apple/ is the official model index
 
 Did: Operator: official necessary model docs live in `apple/`. Cut A3

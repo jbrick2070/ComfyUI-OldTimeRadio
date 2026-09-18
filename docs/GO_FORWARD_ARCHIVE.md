@@ -1,5 +1,37 @@
 # GO_FORWARD -- ARCHIVE
 
+## 2026-09-18 -- not bug-fix rows; left the live plan
+
+Operator: go-forward items are the bug fixes that still need doing.
+These were CODE 2-4 on the trimmed 2026-09-17 queue. They are not
+crash-class and they are not ledger-identity defects. Do not put them
+back unless he asks.
+
+* **`device_options.py` has no test module.** Every device widget already
+  routes through `nodes/_otr_shared/device_options.py`. A new
+  `tests/test_device_options.py` would document `resolve_device("default")`
+  and the uncalled `vendor()`. That is coverage, not a defect.
+  `vendor()` still has no caller in `nodes/` -- do not wire it until A1
+  is answered.
+* **Regenerate `docs/MODEL_ASSET_INDEX.md`.** Standing ruling 2026-09-17:
+  `apple/` is the user index. The generated lab file is a cross-check.
+  Do not start `scripts/otr_asset_index.py` to "fix" it, and do not
+  reopen the filename-key campaign.
+* **Writer widget `display_name` and duplicate-title consolidation.**
+  Cosmetic. Use `scripts/otr_widget_surgery.py` if he reopens it. Never
+  reorder by hand.
+* **When `docs/RUNPOD_INSTALL.md` is next open:** the "one terms click"
+  LTX 2.5 heading is wrong. The Gemma encoder is a second gated repo
+  (`elix3r`). Fix the heading in that same edit. Not its own commit.
+
+CastLock leftover Bark `v2/` after a kokoro `auto_registry` stamp is
+also not a live row: `_stamp` already clears a `v2/` preset when the
+stamped engine is not bark. The contract is
+`test_auto_registry_stamps_voice_refs` and
+`test_kokoro_castlock_spoken_rows_have_no_bark_presets`.
+
+---
+
 ## 2026-09-17 -- story and music prompt-craft dumped
 
 Operator: the story is fine as it is; the music is great, it is fixed.
