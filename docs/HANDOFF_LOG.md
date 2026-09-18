@@ -19,9 +19,13 @@ Design: one Grok round (`cursor-grok-4.6-high-fast` via cursor-agent)
   refuted the anchor; seven of ten claims grounded and folded --
   `docs/2026-09-18-fidelity-lane-translation/judgment.md`. Printed credit
   lines were scoped OUT by the judge and are the one CODE row left.
-Current step: GO_FORWARD section 2 holds one small row (printed credits).
-  Section 1 forks wait for his word; the four-machine wave waits on both.
-Next: printed-credits row, then nothing coded until he answers a fork.
+Current step: GO_FORWARD section 2 is EMPTY. The printed-credits item
+  turned out to have three owners (per-bank sentences in banks.json,
+  Python sentences, the roll's own English labels) and three shapes, so
+  it is a section-1 fork, not code. Section 1 forks wait for his word;
+  the four-machine wave waits on section 1.
+Next: nothing coded until he answers a fork. When he does, the answer
+  goes to section 2 and gets coded the same day.
   Live proof of a Spanish Shakespeare one-act belongs to the test wave.
   Gemini deep-research prompt handed to the operator for the vendored
   public-domain translations (fr/it complete; pt/zh/ja/hi thin).

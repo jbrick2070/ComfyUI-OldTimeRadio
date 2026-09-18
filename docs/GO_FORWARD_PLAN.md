@@ -70,11 +70,19 @@ the row into section 2, or cuts it.
   already points at `/main/`. One click. His.
 * **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged. Manager still
   serves 2.1.4. The API gives no reason. His Discord, not a code change.
-* **My Story credit line on a native episode.** The frame pass is told to
-  include the English `attribution_sentence` verbatim; if the native outro
-  does not carry it byte-for-byte, Python appends the English sentence. Speak
-  the credit in the episode language, or keep the byline English as a
-  credit. His call; one small edit either way.
+* **The printed credits roll on a native episode.** Headers are row data
+  already; the SOURCE line and the roll's own labels are not. The SOURCE line
+  has three owners: per-bank English sentences in `banks.json`
+  (`credits_source_line` on original, scifi_news_pro, my_story), Python
+  sentences (`printed_credit_line`, `credits_source_line` for a named
+  author, the "freely adapted from" wrapper, the writer tail's "Story
+  generation models used:"), and the roll's literal `>> SOURCE:` /
+  `>> SOURCE INTERCEPT:` / `>> DIAGNOSTIC` chrome. Three shapes: a
+  bank-by-language matrix in `banks.json`; a per-row map keyed by bank in
+  the language registry; or one generic per-row machine-disclosure line
+  that replaces every bank default off-English, with the Python sentences
+  and roll labels as row `credits` keys. The last is the smallest and loses
+  the per-bank wording. His pick. English byte-identical whichever way.
 * **Native-language science feeds for SciFi News Pro.** Today the lane reads
   the English science feed and authors the new story natively (standing
   ruling 2026-09-18). A feed in the episode language would give it native
@@ -94,21 +102,10 @@ here). Do not `git add .`. Composer QA then Sonnet before every push.
 (~10 min):** full `pytest tests`, once the row is green. Commands live in
 [known-failures](known-failures.md). Those gates are not the test wave.
 
-### 1. Printed credit lines stay English on a native episode
-
-**Decided (judgment, 2026-09-18): row data, like the spoken credits.** The
-SPOKEN credits (provenance coda, My Story attribution) are row data now.
-The PRINTED ones are still Python English on the credits roll:
-`_otr_provenance.printed_credit_line`, `_otr_story_input.credits_source_line`
-/ `ANONYMOUS_CREDIT`, `_otr_verbatim_lane.non_verbatim_credit_line`, and the
-writer tail's "Story generation models used:" line. Add `credits`
-templates per row and read them with an `episode_meta` kw, keeping the
-`adapted from` prefix that `non_verbatim_credit_line` string-matches.
-English byte-identical. Verify: every row formats every template; English
-outputs equal today's strings; the credits-roll tests stay green.
-
-Vendored public-domain translations (French and Italian are complete on
-Wikisource) are a separate data row behind his scope word -- see
+Empty. Every decided row has shipped. The printed-credits item moved to
+section 1 (it has more than one answer -- see there). Vendored
+public-domain translations (French and Italian are complete on Wikisource)
+are a separate data row behind his scope word -- see
 [the inventory](2026-09-18-fidelity-lane-translation/pd_translation_inventory.md)
 and the Gemini prompt in the same folder.
 
