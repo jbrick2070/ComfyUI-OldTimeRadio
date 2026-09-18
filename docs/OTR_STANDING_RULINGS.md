@@ -56,6 +56,16 @@ Parked idea from the same exchange: native-language science feeds for SciFi
 News Pro (*"even better if we can find some foreign RSS feeds"*). A section-1
 fork, not a code row.
 
+**Vendored translations, same day:** operator: *"I want the best for the
+foreign languages I can publish ... I want the best pack available."* Read
+as: clear under both the US first-publication test (before 1931) and
+life+70 (translator died before 1956); verse preferred where a public-
+domain verse translation exists; scene-level transcription allowed; no
+all-scenes-all-languages requirement -- a scene that does not pass the
+acceptance gate keeps the model translation. The gate runs before any
+ingestion; nothing enters on the strength of a document. The old "died
+before 1944" line was a conservative bound, not a rule; do not cite it.
+
 **Printed credits, same day:** operator picked the bank-by-language matrix
 (*"bank-by-language matrix I think would be best"*). A bank's
 `credits_source_line` in `banks.json` is English data and its

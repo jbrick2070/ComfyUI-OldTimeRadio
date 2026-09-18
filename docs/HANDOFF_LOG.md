@@ -22,9 +22,24 @@ Found in review: Sonnet caught that the writer-tail site and
   that breaks the registry and asserts every site prints its English
   literal. Grok is NOT used for code QA; the code rounds ran cursor-agent
   + Sonnet 5.
-Current step: GO_FORWARD section 2 is EMPTY again. Section 1 forks wait
-  for his word. The Gemini deep-research return for vendored translations
-  is his to paste into the fidelity folder.
+  Then the hero-font row Sonnet's post-QA surfaced: `_load_font` gains a
+  policy and the renderer loads every face through the row's
+  `captions.font_policy`, reusing the credits roll's script-face walk, so
+  a Hindi / CJK title no longer tofus on the card or the HUD. cursor-agent
+  then measured that the shared Devanagari walk missed `Nirmala.ttc` (the
+  Windows 10/11 collection) on this very box -- hero measured in Consolas,
+  ASS burned Nirmala UI; the `.ttc` spellings lead the list now and the
+  test fails rather than skips when a listed face is present but
+  unresolved. Still open and older than this window: on Linux / macOS the
+  CRT measures Noto / Sangam while `_otr_captions` burns the hardcoded
+  Windows family names -- a measure/draw pairing hole in the captions
+  module, not a row yet.
+  He dropped `shakespeare_corpus_spec_v2.yaml` (filed beside the
+  inventory); it refutes the inventory's "died before 1944" line and
+  lists five blocking questions, now in the section-1 fork.
+Current step: GO_FORWARD section 2 is EMPTY. Section 1 forks wait for
+  his word, the vendored-translation fork now carrying the spec's five
+  questions.
 Next: nothing coded until he answers a fork. Test wave when section 1 is
   clear.
 Models: driver Claude Fable 5.1; cursor-agent + Sonnet 5 REFUTE on each

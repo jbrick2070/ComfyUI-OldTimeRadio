@@ -70,20 +70,6 @@ the row into section 2, or cuts it.
   already points at `/main/`. One click. His.
 * **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged. Manager still
   serves 2.1.4. The API gives no reason. His Discord, not a code change.
-* **Vendored public-domain Shakespeare translations.** The model translation
-  ships; this would let the lane perform a real translator's words where one
-  exists. The v2 corpus spec he dropped
-  ([spec](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml),
-  beside [the inventory](2026-09-18-fidelity-lane-translation/pd_translation_inventory.md))
-  refutes the inventory's "died before 1944" line (no jurisdiction uses it:
-  US = published before 1931; life+70 = died before 1956; CN/JP life+50 =
-  died before 1976) and puts five questions before any ingestion: which
-  jurisdiction governs publication; whether the death-year rule is a hard
-  constraint; verse or prose; whether manual transcription is funded; and
-  whether all 14 scenes must exist in all 7 languages (today they do not).
-  Phase order in the spec: fr + it, then es, ja, zh, then pt + hi. Nothing
-  enters the pipeline on the strength of either document -- the spec's
-  acceptance gate runs first. His answers turn this into a data row.
 * **Native-language science feeds for SciFi News Pro.** Today the lane reads
   the English science feed and authors the new story natively (standing
   ruling 2026-09-18). A feed in the episode language would give it native
@@ -103,21 +89,53 @@ here). Do not `git add .`. Composer QA then Sonnet before every push.
 (~10 min):** full `pytest tests`, once the row is green. Commands live in
 [known-failures](known-failures.md). Those gates are not the test wave.
 
-### 1. The hero title card has no script-aware font
+### 1. Vendored public-domain Shakespeare translations -- "the best pack I can publish"
 
-**Decided (found by Sonnet post-QA, 2026-09-18): one answer.** The CRT
-renderer's hero card draws the episode title through `_load_font`
-(`video_engine.py` ~336-372), one OS monospace face with no script
-awareness, while the credits roll already picks a Devanagari / CJK face
-(`otr_credits_roll._credits_font_policy` / `_credits_script_font_paths`).
-A Hindi, Japanese or Mandarin title can tofu on the card. Reuse the
-credits roll's face resolution for the hero measure and draw (and the ASS
-title layer's face), keyed on the row's `captions.font_policy`; Latin
-rows byte-identical. Verify: a CJK title measures and draws with the
-script face; English fixtures unchanged. Pre-existing since native titles
-landed; not a regression of the indicator.
+**Decided 2026-09-18 (operator: *"I want the best for the foreign
+languages I can publish ... I want the best pack available"*).** The five
+questions in the
+[corpus spec](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml)
+close as: clear under BOTH the US test (first published before 1931) AND
+life+70 (translator died before 1956) -- the set anyone can publish
+anywhere; verse where a public-domain verse translation exists, prose
+otherwise; scene-level hand transcription is allowed (14 scenes per
+language, never whole plays); no coverage requirement -- a scene that
+does not pass the gate keeps the model translation that ships today.
+Vendored words replace the model's wherever they exist, per scene, per
+language.
 
-Vendored public-domain translations are a section-1 fork -- see there.
+**Build order (the spec's, kept):**
+1. The acceptance gate first -- a checker that opens every (play, scene,
+   language) lead and records HTTP status and final URL, byte length and
+   encoding, target headings present, speaker-label count, dialogue-to-
+   markup ratio, transcription-pending markers, licence string, revision
+   id; verdict READY / PARTIAL / EMPTY / BLOCKED. Nothing enters on the
+   strength of a document. Cache raw fetches; parse from local.
+2. The alias table and anchor-matching alignment BEFORE the parser:
+   19th-century editions renumber scenes, so a scene resolves by its
+   English opening and closing speaker/content with a confidence score,
+   never by counting headings.
+3. Vendoring shape: `config/source_banks/shakespeare/translations/<iso>/`
+   with one normalised `NAME:` speaker-labelled scene file per target
+   scene plus a manifest row (translator, death year, first publication,
+   transcription licence, source URL, revision id, raw sha256, verdict,
+   confidence). The plan step selects from the vendored scene when the
+   manifest says READY; otherwise the model translation runs as today;
+   the receipt says which. The credit line names the translator.
+4. Phases: fr + it (evaluate Carcano verse before Rusconi prose), then
+   es (Macpherson), ja (one clean Aozora play as the old-kana test), zh
+   (Zhu Shenghao), then pt + hi scene by scene.
+Traps the spec names and this row honours: LiberLiber's Italian set is
+Raponi (in copyright); "A transcribir" means no text; Aozora canonical
+text is Shift_JIS with ruby markup; strip `utm_source` and treat it as
+proof a row was never opened.
+
+This is a data row with a code seam (the manifest read at the plan
+step). Design has one answer per piece; run one contrarian on the
+manifest shape and the gate output before ingestion, then code.
+
+Vendored public-domain translations were the last section-1 fork with a
+code shape; everything else in section 1 is his word alone.
 
 ## 3. TEST -- only after 1 and 2 are empty
 
