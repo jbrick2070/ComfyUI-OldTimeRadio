@@ -86,7 +86,10 @@ class LtxOpenHealthTests(unittest.TestCase):
 
     def test_allowlist_adds_only_the_exact_ltx098_internal_id(self):
         self.assertEqual(self.rd._LTX_OPEN_ENGINES,
-                         PREVIOUS_LTX_ENGINES | {"ltx_8gb"})
+                         PREVIOUS_LTX_ENGINES | {
+                             "ltx_8gb", "razzle_ltx_8gb",
+                             "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
+                         })
 
     def test_previous_five_ltx_lanes_remain_healthy(self):
         for engine in sorted(PREVIOUS_LTX_ENGINES):
@@ -95,7 +98,8 @@ class LtxOpenHealthTests(unittest.TestCase):
                 self.assertEqual(self.rd.check_ltx_open_health(clips, strict=True), [])
 
     def test_missing_clip_is_still_bad_for_every_accepted_engine(self):
-        for engine in sorted(PREVIOUS_LTX_ENGINES | {"ltx_8gb"}):
+        for engine in sorted(PREVIOUS_LTX_ENGINES | {"ltx_8gb",
+                                                   "razzle_ltx_8gb"}):
             with self.subTest(engine=engine), self.assertLogs(self.rd._LOG, level="WARNING"):
                 bad = self.rd.check_ltx_open_health(manifest(row(engine=engine, exists=False)))
                 self.assertEqual(len(bad), 1)

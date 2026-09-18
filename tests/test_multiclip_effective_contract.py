@@ -320,8 +320,8 @@ def test_the_derivation_is_a_NAMED_allowlist():
     ``wan_ti2v`` is deliberately NOT here. Its ceiling stays a RENDER cap and
     its topology stays unmoved (pinned below); the same contradiction is latent
     for it and is logged as its own defect rather than fixed inside this build."""
-    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb", "fastwan_8gb",
-                                       "wan_ti2v")
+    assert fc.PLANNING_CAP_ENGINES == ("ltx_8gb", "razzle_ltx_8gb",
+                                       "fastwan_8gb", "wan_ti2v")
     assert "wan_ti2v" in fc.PLANNING_CAP_ENGINES
 
 

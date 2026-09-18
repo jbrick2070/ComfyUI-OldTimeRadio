@@ -142,6 +142,7 @@ VIDEO_LANE = {
     "ltx25_mime": "l25m",
     "ltx25_video": "l25v",
     "ltx_8gb": "lx8g",
+    "razzle_ltx_8gb": "rlx8",
     "ltx_audio_in": "lxai",
     "ltx_video": "lxvd",
     "mesh_stage": "mesh",
@@ -187,10 +188,16 @@ TTS = {
     "chatterbox": "chat",
     "dia": "dia",
     "cloud_elevenlabs": "elev",
-    "elevenlabs": "elev",  # legacy alias; engine id is cloud_elevenlabs
     "google_tts": "gtts",
     "bark": "bark",
     "indextts2": "idx2",
+}
+
+#: Live-id aliases, per dimension. Old graphs stored ``elevenlabs``; the
+#: engine id is ``cloud_elevenlabs``. Sharing a CODE is correct; sharing a
+#: TABLE SLOT made uniqueness look like a collision. code_for resolves here.
+VALUE_ALIASES = {
+    "tts": {"elevenlabs": "cloud_elevenlabs"},
 }
 
 MUSIC_GEN = {
@@ -261,5 +268,7 @@ def code_for(dimension: str, value: str, default: str = "unk") -> str:
     complete; this fallback is for the custom-model case the dropdown allows.
     """
     table = DIMENSIONS.get(dimension) or {}
-    bare = _bare(value)
-    return table.get(bare) or table.get(value) or default
+    aliases = VALUE_ALIASES.get(dimension) or {}
+    bare = aliases.get(_bare(value), _bare(value))
+    raw = aliases.get(value, value)
+    return table.get(bare) or table.get(raw) or default

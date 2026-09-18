@@ -108,6 +108,8 @@ def identity_is_stable(engine):
 #: it independently, so weakening either one alone does not stop the other
 #: noticing a substitution inside the set.
 EXPECTED_CLOUD_GAP = {
+    "cloud_ltx25_audio_in",
+    "cloud_ltx25_foley_plus",
     "cloud_seedance_2",
     "cloud_vidu_q2_pro_fast_720p",
     "cloud_wan_i2v",

@@ -369,6 +369,15 @@
       },
       "size_gb": null
     },
+    "razzle_ltx_8gb": {
+      "memory": {
+        "mac16": "fits",
+        "nv16": "fits",
+        "nv8": "fits"
+      },
+      "note": "Local razzle sibling of ltx_8gb (2026-09-17). Same 0.9.8 weights and 512x288 canvas; only the raised motion clause differs. Verdict is fits, not proven -- no published episode on this id yet.",
+      "size_gb": 9.1
+    },
     "sd15": {
       "memory": {
         "mac16": "proven",

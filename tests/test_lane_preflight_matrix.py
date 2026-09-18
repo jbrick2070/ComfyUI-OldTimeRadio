@@ -65,7 +65,7 @@ CANVAS_FPS = 25
 #: gate would mean the FIRST evidence is a dead process on a real leg, which is
 #: the cost `ltx_8gb` already paid (S8b-13: the one LTX lane with no gate).
 SAGE_SENSITIVE = frozenset({
-    "ltx_video", "ltx_audio_in", "ltx_8gb", "ltx25_video",
+    "ltx_video", "ltx_audio_in", "ltx_8gb", "razzle_ltx_8gb", "ltx25_video",
     "minimax_h3_video", "minimax_h3_audio_in",
 })
 

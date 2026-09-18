@@ -84,6 +84,9 @@ class TableShapeTests(unittest.TestCase):
         what every published episode on disk carries; `ltx098_low_video` is what
         the operator clicked. Keying on the latter spelled every lane 'unk'."""
         self.assertEqual(SC.code_for("video_lane", "ltx_8gb"), "lx8g")
+        self.assertEqual(SC.code_for("video_lane", "razzle_ltx_8gb"), "rlx8")
+        self.assertEqual(SC.code_for("tts", "cloud_elevenlabs"), "elev")
+        self.assertEqual(SC.code_for("tts", "elevenlabs"), "elev")
         self.assertEqual(SC.code_for("video_lane", "still_pan"), "stpa")
         self.assertEqual(SC.code_for("video_lane", "ltx098_low_video"), "unk",
                          "a dropdown label must NOT be silently aliased here; "

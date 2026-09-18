@@ -42,6 +42,7 @@ import re
 
 from .registry import EngineUnusable, EngineUsabilityReason, register
 from . import frame_contract as _fc
+from . import razzle_prompt as _RAZZLE
 from .frame_contract import CONTINUITY_SOFT_REFERENCE, FrameContract
 from .._otr_shared.still_plan_helpers import StillPlanRow
 from .._otr_story_brief_helpers import (
@@ -1055,27 +1056,34 @@ class CloudViduQ2ProFast720pEngine(_CloudVideoBase):
 # Pixverse is the --audit-i2v Phase-0 pick (promptable, non-V3, required image
 # init + prompt + seed + duration_seconds + motion_mode). A word_razzle beat's
 # base still (a still_word / word-card still, or any scene still) is fed as the
-# init image; the engine adds a LIVING-POSTER world-motion prompt whose whole
-# job is to keep the lettering readable EVERY frame (the operator acceptance
-# bar). motion_mode / quality / duration_seconds are provider COMBOs (the pin
-# excludes option lists) so the adapter ships documented defaults, all
+# init image. motion_mode / quality / duration_seconds are provider COMBOs
+# (the pin excludes option lists) so the adapter ships documented defaults, all
 # env-overridable -- the same discipline as the kling mode default. mute_only:
 # the provider audio is stripped (must_strip_audio); the master mix is frozen
 # upstream and muxed LAST. NO FALLBACK: a missing init still fails LOUD.
-_RAZZLE_MOTION_ENV = "OTR_CLOUD_RAZZLE_MOTION_PROMPT"
-_RAZZLE_MOTION_DEFAULT = (
-    "living period poster, gentle atmospheric motion around the lettering -- "
-    "drifting mist, soft neon flicker, subtle parallax depth -- the words stay "
-    "crisp, sharp and fully legible in every frame, letterforms never warp, "
-    "melt or distort")
-_RAZZLE_NEG_ENV = "OTR_CLOUD_RAZZLE_NEG"
+#
+# MOTION RAISED (2026-09-17). The July 3 default was "gentle atmospheric
+# motion" / "drifting mist" / "subtle parallax" -- the same damping the
+# 2026-08-17 kinetic amendment and the 2026-08-27 Option B raise already
+# ripped out of Wan / Vidu / Seedance / Kling in this file. A video lane
+# moves. If the operator wants a hold, they pick still_word / still_flat,
+# not a damped i2v prompt. Artifact guards stay: whip pans, melting
+# geometry, warped faces, drifting / unreadable text.
+#
+# THE STRING LIVES IN razzle_prompt.py -- cloud and local razzle share it.
+# These aliases keep the style traceroute's hand-curated negative list
+# pointed at this module.
+_RAZZLE_MOTION_ENV = _RAZZLE.MOTION_ENV
+_RAZZLE_MOTION_DEFAULT = _RAZZLE.MOTION_DEFAULT
+_RAZZLE_NEG_ENV = _RAZZLE.NEG_ENV
 _RAZZLE_NEG_DEFAULT = visual_safety_negative(
     "warped text, melting letters, distorted typography, "
-    "illegible words, garbled text, flickering letters")
+    "illegible words, garbled text, flickering letters, "
+    "static hold, frozen frame, no motion")
 
 
 class CloudWordRazzleEngine(_CloudVideoBase):
-    """word_razzle: animate a word-card still into a living period poster."""
+    """word_razzle: animate a still with a full decisive action, not a hold."""
 
     name = "word_razzle"
     #: THE FRAME LADDER (chunk 7a, 2026-07-26). Pixverse serves a fixed
@@ -1099,14 +1107,10 @@ class CloudWordRazzleEngine(_CloudVideoBase):
     still_plan = _CLOUD_VIDEO_SHAPE_A_BASE_PLAN
 
     def _razzle_prompt(self, request) -> str:
-        """The world-motion + text-preservation prompt. The base motion clause
-        (env-overridable) LEADS; the beat's own text_prompt (scene/subject) is
-        appended so the animation matches the beat, never overriding the
-        readability directive."""
-        motion = otr_env.get(_RAZZLE_MOTION_ENV, "").strip() or _RAZZLE_MOTION_DEFAULT
-        beat = str(_req_get(request, "text_prompt") or "").strip()
-        prompt = f"{motion}. {beat}".strip().rstrip(".") if beat else motion
-        return append_visual_safety_clause(prompt)
+        """The raised motion clause LEADS (env-overridable); the beat's own
+        text_prompt (scene/subject) is appended so the action matches the
+        beat. A hold belongs on still_word / still_flat, not here."""
+        return _RAZZLE.compose_positive(_req_get(request, "text_prompt"))
 
     def _derived_duration_seconds(self, request) -> int | None:
         """Menu bucket from the segment plan, or None when timing is absent."""
@@ -1217,9 +1221,7 @@ class CloudWordRazzleEngine(_CloudVideoBase):
         return {
             "image": self._init_image_input(request),
             "prompt": self._razzle_prompt(request),
-            "negative_prompt": visual_safety_negative(
-                otr_env.get(_RAZZLE_NEG_ENV, "").strip()
-                or _RAZZLE_NEG_DEFAULT),
+            "negative_prompt": _RAZZLE.compose_negative(),
             "motion_mode": self._motion_mode_for_duration(duration_s),
             "quality": self._quality_for_duration(duration_s),
             "duration_seconds": duration_s,

@@ -226,6 +226,8 @@ BOOKEND_SCENE_PROMPT_BOUNDED = frozenset({
 #: inside its own fix and caught by review. The roster test now checks EVERY
 #: set for registration, not just the prompt set, so it cannot recur quietly.)
 BOOKEND_SCENE_PROMPT_SELF_COMPOSED = frozenset({
+    "word_razzle",
+    "razzle_ltx_8gb",
     "animatediff15_v3_haunted_video",
     "animatediff15_v3_stillin_lab_video",
     # The LIGHTNING peer (2026-09-08) composes its prompts through the SAME
@@ -340,16 +342,6 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
                                    "2026-09-03: appears in ZERO profiles, "
                                    "unreachable on a bookend today. OWED: wire "
                                    "and fix, or retire.",
-    "word_razzle": "title/word lane, and IT IS TEXT-DRIVEN -- `eng_cloud_video` "
-                   "declares required_inputs ('init_image', 'text_prompt') and "
-                   "`_razzle_prompt` already composes its own motion clause "
-                   "then appends whatever text_prompt arrives. VERIFIED "
-                   "2026-09-03: wired to BOTH bookend roles in "
-                   "otr_w45_word_razzle.json, status=SHIPPING -- so it ships "
-                   "this defect today. OWED: its repair shape differs from the "
-                   "others; stacking the pack register after razzle's own "
-                   "motion clause may read as two motion instructions, so "
-                   "check the composed text before adding it to the prompt set.",
 }
 
 
@@ -6965,7 +6957,7 @@ def apply_engine_override(ledger):
 #: ltx_video, the native LTX 0.9.8 low-memory lane (manifest ID ltx_8gb),
 #: the LTX 2.5 HQ I2V lane, and the additive LTX-AV audio lane.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx_8gb", "ltx25_video", "ltx_audio_in",
+    {"ltx_video", "ltx_8gb", "razzle_ltx_8gb", "ltx25_video", "ltx_audio_in",
      # The foley and mime lanes (2026-08-26) render the LTX 2.5 picture graph
      # unchanged -- only the audio latent's fate differs -- so an open that
      # renders on one is every bit as real an LTX open as `ltx25_video`.

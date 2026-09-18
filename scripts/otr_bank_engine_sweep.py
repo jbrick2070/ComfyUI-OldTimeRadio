@@ -138,6 +138,7 @@ PROFILES = ("otr_soak_llmsweep_01", "otr_soak_llmsweep_02")
 #: render happens provider-side, so they prove nothing about a local model.
 VIDEO_LANES = (
     ("otr_w45_ltx_8gb", "ltx_8gb"),
+    ("otr_w45_razzle_ltx_8gb", "razzle_ltx_8gb"),
     ("otr_w45_wan_ti2v", "wan_ti2v"),
     ("otr_w45_fastwan", "fastwan_8gb"),
     ("otr_w45_mesh_stage", "mesh_stage"),

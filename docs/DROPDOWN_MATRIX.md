@@ -59,6 +59,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered | ? | not offered |
 | `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
+| `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
 | `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
 | `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
 | `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered | ? | not offered |

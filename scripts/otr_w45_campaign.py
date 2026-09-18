@@ -105,7 +105,8 @@ PROFILE_EXCEPTIONS = {
 LEG_ORDER = (
     "still_flat", "still_pan", "still_motion", "still_word",
     "viz_camera", "viz_green", "viz_mxc_cpu", "viz_mxc_mandala",
-    "mesh_stage", "ltx_8gb", "fastwan_8gb", "ltx_video", "ltx_audio_in",
+    "mesh_stage", "ltx_8gb", "razzle_ltx_8gb", "fastwan_8gb", "ltx_video",
+    "ltx_audio_in",
     "humo_1.7B", "humo_1.7B_169", "humo", "humo_14B_169",
     "wan_ti2v",
     # The AnimateDiff lanes are named rather than left to the sorted append, so

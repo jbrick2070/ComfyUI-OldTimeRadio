@@ -125,7 +125,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  97 experimental profile(s), 48 shipping
+## 16 GB+  --  98 experimental profile(s), 49 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -166,6 +166,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_mesh_stage` | mesh_stage | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_minimax_h3_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
 | `otr_w45_minimax_h3_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
+| `otr_w45_razzle_ltx_8gb` | razzle_ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_still_flat` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_still_motion` | still_motion | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_still_pan` | still_pan | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |

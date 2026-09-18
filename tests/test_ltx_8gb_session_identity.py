@@ -169,6 +169,8 @@ _ENGINES_WITH_A_SESSION = {
     # receipt -- so a Lightning session can never reuse a golden-module handle
     "animatediff15_lightning_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
+    "razzle_ltx_8gb",          # 2026-09-17 -- inherits Ltx8gbEngine identity
+                               # (engine name differs; recipe + weights match)
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29
     "fastwan_8gb",             # 2026-08-01 -- inherits WanTi2vEngine's, and its

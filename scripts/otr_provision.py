@@ -1729,7 +1729,7 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane("humo_1_7b", True)
         if engine == "wan_ti2v":
             return Lane("wan_ti2v_gguf", False)
-        if engine == "ltx_8gb":
+        if engine in ("ltx_8gb", "razzle_ltx_8gb"):
             return Lane("ltx_8gb", False)
         if engine == "animatediff15_lightning_video":
             # BEFORE the _ANIMATEDIFF_ENGINES branch and deliberately NOT in

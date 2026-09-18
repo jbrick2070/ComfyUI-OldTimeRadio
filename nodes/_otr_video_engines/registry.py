@@ -475,6 +475,14 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["ltxv-2b-0.9.8-distilled"]},
+    # razzle_ltx_8gb (2026-09-17): same 0.9.8 weights and canvas as ltx_8gb;
+    # only the motion clause differs. Same capabilities row on purpose.
+    "razzle_ltx_8gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda", "mps"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltxv-2b-0.9.8-distilled"]},
     # triposg_talk / triposr / hunyuan3d_talk / trellis_talk CAPABILITIES rows
     # REMOVED 2026-06-29 (C3 -- "registry IS the menu"): these dark 3D scaffolds
     # render NotImplementedError and are now UNREGISTERED, and the

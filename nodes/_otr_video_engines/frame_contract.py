@@ -316,7 +316,7 @@ def can_split(engine) -> bool:
 #: VRAM-affordable pass. Listing it lets the planner split those beats into
 #: affordable NATIVE segments, which is what "original video for every second of
 #: audio" requires.
-PLANNING_CAP_ENGINES = ("ltx_8gb", "fastwan_8gb", "wan_ti2v")
+PLANNING_CAP_ENGINES = ("ltx_8gb", "razzle_ltx_8gb", "fastwan_8gb", "wan_ti2v")
 
 
 class PlanningCapError(ValueError):

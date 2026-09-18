@@ -866,6 +866,14 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
             return frozen
         return otr_env.get("OTR_LTX_8GB_NEGATIVE") or frozen
 
+    def _compose_positive(self, request) -> str:
+        """Positive CLIP text for this shot. A sibling may override."""
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        return get("text_prompt") or (
+            "the subject moving with clear intent, hands busy in the scene, "
+            "cinematic light")
+
     def _negative_for(self, shot_negative):
         """The negative conditioning for THIS shot, and the one place that
         decides it.
@@ -1236,9 +1244,9 @@ class Ltx8gbEngine(_WS.WanInitImageMixin, _MC.MotionEngineBase):
         # killed, still shipping here. This lane's dialect is its LTX parent's
         # (see eng_ltx_video.PROMPT_STYLE_DIRECTIVE), so: a named action, and
         # the light kept because this tier's prompt carries its own look.
-        positive = get("text_prompt") or (
-            "the subject moving with clear intent, hands busy in the scene, "
-            "cinematic light")
+        # `_compose_positive` is the seam a sibling (razzle_ltx_8gb) overrides;
+        # a local variable here would make that override impossible.
+        positive = self._compose_positive(request)
         negative = self._negative_for(get("negative_prompt"))
         graph = {
             "ckpt": {"class": "ckpt", "inputs": {"ckpt_name": self._ckpt_name()}},

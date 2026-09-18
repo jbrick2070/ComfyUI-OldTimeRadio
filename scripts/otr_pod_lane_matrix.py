@@ -93,6 +93,7 @@ LANES = [
     ("otr_w45_wan_ti2v", "wan_ti2v"),
     ("otr_w45_fastwan", "fastwan_8gb"),
     ("otr_w45_ltx_8gb", "ltx_8gb"),
+    ("otr_w45_razzle_ltx_8gb", "razzle_ltx_8gb"),
     ("otr_w45_ltx_video", "ltx_video"),
     # The LTX 2.5 family is LAST on purpose: re-confirmed 2026-09-03 to OOM at
     # `decode` on a 24 GB Ada card, matching the evidence ledger's existing

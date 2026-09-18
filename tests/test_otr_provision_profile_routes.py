@@ -44,6 +44,15 @@ def test_word_razzle_profile_skips_only_its_remote_video_download():
     }
 
 
+def test_razzle_ltx_8gb_profile_uses_the_ltx_8gb_weight_lane():
+    provision = _provisioner()
+
+    assert provision.profile_lanes("otr_w45_razzle_ltx_8gb") == (
+        provision.profile_lanes("otr_w45_ltx_8gb"))
+    assert "ltx_8gb" in provision.profile_lanes("otr_w45_razzle_ltx_8gb")[
+        "automatic"]
+
+
 def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
     """AMD installs with NOTHING extra -- no manual tier, no third-party pack.
 

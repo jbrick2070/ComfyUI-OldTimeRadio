@@ -83,6 +83,7 @@ without that map would play ~4% short.
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | minimax_h3_audio_in | local | audio_conditioned_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | soft_reference | yes |
 | minimax_h3_video | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | strict_first_frame | yes |
+| razzle_ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
 | still_flat | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_motion | local | static_motion | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | still_pan | local | static_image_gen | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
@@ -124,6 +125,7 @@ without that map would play ~4% short.
 | mesh_stage | init_image | no text input |
 | minimax_h3_audio_in | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | minimax_h3_video | init_image | text_prompt OPTIONAL (sent when present) |
+| razzle_ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | still_flat | text_prompt | text_prompt REQUIRED |
 | still_motion | text_prompt | text_prompt REQUIRED |
 | still_pan | text_prompt | text_prompt REQUIRED |
@@ -169,6 +171,7 @@ the engine's own `aspect` column above.
 | mesh_stage | mesh_fodder/wide/always; scene_background_plate/wide/always; portrait/inherit_engine/never |
 | minimax_h3_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | minimax_h3_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
+| razzle_ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_flat | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_motion | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | still_pan | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -216,6 +219,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | mesh_stage | 1472x832 | declared |
 | minimax_h3_audio_in | 864x480 | declared |
 | minimax_h3_video | 864x480 | declared |
+| razzle_ltx_8gb | 512x288 | declared |
 | still_flat | 1472x832 | shared landscape (by design for this family) |
 | still_motion | 1472x832 | shared landscape (by design for this family) |
 | still_pan | 1472x832 | shared landscape (by design for this family) |
@@ -267,6 +271,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 | mesh_stage | single | 1: 442 | 442 | 442 | 0 |
 | minimax_h3_audio_in | jump | 2: 323, 129 | 452 | 442 | 1 |
 | minimax_h3_video | chain | 2: 323, 129 | 452 | 442 | 0 |
+| razzle_ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
 | still_flat | single | 1: 442 | 442 | 442 | 0 |
 | still_motion | single | 1: 442 | 442 | 442 | 0 |
 | still_pan | single | 1: 442 | 442 | 442 | 0 |
@@ -315,6 +320,7 @@ and it read exactly like a measured number until someone looked.
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
 | minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | minimax_h3_video | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
+| razzle_ltx_8gb | - | contract max | none cited |
 | still_flat | - | contract max | none cited |
 | still_motion | - | contract max | none cited |
 | still_pan | - | contract max | none cited |
@@ -328,7 +334,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **36**
+* registered engine names: **37**
 * provider-side: **10**
-* local: **26**
-* can chain (strict_first_frame): **8**
+* local: **27**
+* can chain (strict_first_frame): **9**

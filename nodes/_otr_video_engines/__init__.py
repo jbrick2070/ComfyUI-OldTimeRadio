@@ -103,6 +103,13 @@ try:  # pragma: no cover - trivial guard
 except Exception:  # noqa: BLE001
     pass
 
+# razzle_ltx_8gb (2026-09-17): ltx_8gb substrate + the shared raised razzle
+# motion clause. ADDITIVE -- ltx_8gb stays the generic 8 GB i2v row.
+try:  # pragma: no cover - trivial guard
+    from . import eng_razzle_ltx_8gb as _eng_razzle_ltx_8gb  # noqa: F401
+except Exception:  # noqa: BLE001
+    pass
+
 # fastwan_8gb (2026-08-01): the FastWan 2.2 TI2V-5B 3-step DMD distillation --
 # a SUBCLASS of eng_wan_ti2v sharing its whole 5B substrate (beat hoist, teardown,
 # frame ladder, tiled decode) and overriding only the recipe seam, the LoRA route

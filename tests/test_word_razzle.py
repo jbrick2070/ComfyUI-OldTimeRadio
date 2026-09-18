@@ -84,9 +84,13 @@ def test_partner_inputs_kwargs_all_declared(tmp_path):
     assert hasattr(ins["image"], "ndim") and ins["image"].ndim == 4
 
 
-def test_prompt_leads_with_readability_directive(tmp_path):
+def test_prompt_leads_with_raised_motion_not_a_hold(tmp_path):
     ins = ecv.WordRazzle._partner_inputs(_request(tmp_path))
-    assert "legible" in ins["prompt"].lower()
+    prompt = ins["prompt"].lower()
+    assert "full, decisive action" in prompt
+    assert "purposeful camera" in prompt
+    for banned in ("subtle", "gentle", "drifting mist", "soft neon"):
+        assert banned not in prompt
     assert "a glowing radio marquee at night" in ins["prompt"]   # beat appended
 
 

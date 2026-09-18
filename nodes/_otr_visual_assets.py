@@ -93,8 +93,9 @@ MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
             for category, repo, filename in _SOURCES}
 _VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_model")
 _IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
-_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "stable_audio_3", "sd15",
-                      "lumina_image"})
+_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "razzle_ltx_8gb",
+                      "stable_audio_3", "sd15", "lumina_image"})
+_LTX_8GB_WEIGHT_ENGINES = frozenset({"ltx_8gb", "razzle_ltx_8gb"})
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -453,7 +454,7 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
-    if "ltx_8gb" in engines:
+    if engines & _LTX_8GB_WEIGHT_ENGINES:
         if ltx is None:
             raise VisualAssetError("LTX098 adapter resolution is unavailable")
         add("checkpoints", ltx._ckpt_name(), authority=ltx._ckpt_path())
@@ -676,7 +677,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
     zimage = ltx = sa3 = sd15 = lumina = None
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo as zimage
-    if "ltx_8gb" in engines:
+    if engines & _LTX_8GB_WEIGHT_ENGINES:
         from ._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
         ltx = Ltx8gbEngine()
     if "stable_audio_3" in engines:
