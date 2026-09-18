@@ -248,6 +248,7 @@ def test_a_non_english_row_supplies_its_own_native_instruction(label):
     meta = _stamped(label)
     instruction = _native_authoring_instruction(meta)
     assert instruction == el.row_by_label(label).authoring["writer_instruction"]
+    assert instruction == el.native_authoring_instruction(meta)
     assert instruction.strip()
 
 
@@ -257,11 +258,26 @@ def test_the_title_rule_joins_the_native_voice_to_the_mechanical_rule(label):
     rule = _title_language_instruction(_stamped(label))
     assert row.authoring["writer_instruction"] in rule
     assert row.authoring["title_instruction"] in rule
+    assert rule == el.title_language_instruction(_stamped(label))
 
 
 def test_the_title_rule_degrades_instead_of_costing_an_episode_its_title():
     """A registry failure must never fail an episode over a LABEL."""
     assert _title_language_instruction({"episode_language": "tlh"}) == ""
+
+
+def test_lead_system_prefixes_only_when_there_is_an_instruction():
+    assert el.lead_system("SYS", "") == "SYS"
+    assert el.lead_system("SYS", "   ") == "SYS"
+    assert el.lead_system("SYS", None) == "SYS"
+    assert el.lead_system("SYS", " Escribe. ") == "Escribe.\n\nSYS"
+
+
+def test_shared_language_leaves_stay_strict_on_unknown_stamps():
+    with pytest.raises(el.EpisodeLanguageError):
+        el.native_authoring_instruction({"episode_language": "tlh"})
+    with pytest.raises(el.EpisodeLanguageError):
+        el.title_language_instruction({"episode_language": "tlh"})
 
 
 def test_no_instruction_asks_the_model_to_translate():
@@ -341,3 +357,4 @@ def test_the_writer_hands_the_outline_the_ledgers_language():
     assert "language_instruction=_native_authoring_instruction(meta)" in src
     # And the composition header -- the one block every compose pass reads.
     assert "canon_header = _language_prompt_lead" in src
+    assert "language_instruction=_language_prompt_lead" in src

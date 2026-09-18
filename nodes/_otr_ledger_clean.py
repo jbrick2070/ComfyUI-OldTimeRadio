@@ -193,9 +193,11 @@ def _is_exhausted_clean_response(exc: BaseException) -> bool:
             and isinstance(exc.last_error, (json.JSONDecodeError, ValidationError, PostValidationError)))
 
 try:
+    from . import _otr_episode_languages as _EPLANG
     from . import _otr_spoken_text_policy as _POLICY
     from ._otr_text_metrics import set_line_text_metrics
 except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_episode_languages as _EPLANG  # type: ignore
     import _otr_spoken_text_policy as _POLICY  # type: ignore
     from _otr_text_metrics import set_line_text_metrics  # type: ignore
 
@@ -961,6 +963,7 @@ def _f2_fix(
     lines_around: "Sequence[str]",
     where: str = "",
     previous_attempt: str = "",
+    language_instruction: str = "",
 ) -> str:
     """Rewrite the line so it belongs to the STATED speaker.
 
@@ -1038,15 +1041,23 @@ def _f2_fix(
         "speaker name in front, no brackets, no quotation marks around the "
         "whole line.",
     ]
+    language_instruction = str(language_instruction or "").strip()
+    if language_instruction:
+        # Keep the answer-format instruction last. The native-language
+        # reminder follows every English shape example and sits at the
+        # response boundary.
+        body[-1:-1] = [language_instruction, ""]
+    system = (
+        "You rewrite one line of radio dialogue so that it belongs to the "
+        "character who speaks it. You return JSON only."
+    )
+    if language_instruction:
+        system = language_instruction + "\n\n" + system
     try:
         # LLM slot: creative -- it is rewriting dialogue into a voice.
         result = structured_call(
             prompt=[
-                {"role": "system", "content": (
-                    "You rewrite one line of radio dialogue so that it "
-                    "belongs to the character who speaks it. You return JSON "
-                    "only."
-                )},
+                {"role": "system", "content": system},
                 {"role": "user", "content": "\n".join(body)},
             ],
             schema=_Fixed,
@@ -1555,6 +1566,7 @@ def _repair_prompt(
     previous_attempt: str = "",
     where: str = "",
     authorized_spans: Sequence[_RepairSpan] | None = None,
+    language_instruction: str = "",
 ) -> "list[dict[str, str]]":
     speaker_label = speaker or "the announcer"
     parts = [
@@ -1647,6 +1659,12 @@ def _repair_prompt(
         "wrapped around the whole line, no description of anyone doing "
         "anything.",
     ]
+    language_instruction = str(language_instruction or "").strip()
+    if language_instruction:
+        # Insert BEFORE the final answer-format item. The partial-scope branch
+        # below deliberately replaces parts[-1]; making the language reminder
+        # last would cause that branch to overwrite the wrong instruction.
+        parts[-1:-1] = [language_instruction, ""]
     if authorized_spans is not None:
         parts[0] = ("Write replacement speech ONLY for the approved original spans. "
                     "Everything outside them will be retained exactly, including whitespace. "
@@ -1659,12 +1677,16 @@ def _repair_prompt(
             "approved ID. No duplicate, missing or unknown IDs. An empty replacement may "
             "remove a direction, but the complete spoken row must remain nonempty. "
             "Keep any join changes inside the replacement; never return the whole line."]
+    system = (
+        "You write radio dialogue inside the authorized editing scope. "
+        "Return JSON only."
+    )
+    if language_instruction:
+        system = language_instruction + "\n\n" + system
     return [
         {
             "role": "system",
-            "content": (
-                "You write radio dialogue inside the authorized editing scope. Return JSON only."
-            ),
+            "content": system,
         },
         {"role": "user", "content": "\n".join(parts)},
     ]
@@ -1683,6 +1705,7 @@ def _call_repair(
     proposal_receipt: MutableMapping[str, Any],
     where: str = "",
     sightings: "list[dict[str, Any]] | None" = None,
+    language_instruction: str = "",
 ) -> str:
     """Return a scoped candidate, or empty on malformed/exhausted answers.
 
@@ -1715,6 +1738,7 @@ def _call_repair(
         previous_attempt=previous_attempt,
         where=where,
         authorized_spans=authorized_spans if scope_mode == "partial" else None,
+        language_instruction=language_instruction,
     )
     # SHA VERIFY, and this is the exact path where it earned itself: `where`
     # was threaded into this builder's signature and never rendered into the
@@ -1789,19 +1813,17 @@ def run_ledger_clean(
     is the point on a dirty episode: it names every row that was touched,
     what the judge said about it in its own words, and what the repair did.
 
-    F2 IS DETECTED AND REPORTED, NOT REPAIRED, and that is deliberate. Its
-    metadata half -- a row that names no speaker, or disagrees with its beat
-    or the cast -- is not fixed by rewriting prose; the beat already owns the
-    answer, so a model call there would be asking a writer to repair a
-    bookkeeping fault. Its CONTENT half -- one character speaking another's
-    words -- is a reading of the whole episode rather than of one line, and
-    is not this pass's job. Both are reported so a regression shows up in the
-    artifact.
+    F2's metadata half is reported rather than repaired: the beat already owns
+    speaker identity. Its CONTENT half -- one character speaking another's
+    words -- is author-repaired into the assigned speaker's voice, bounded and
+    flagged when the judge cannot confirm it.
     """
     rows = _rows(ledger_data, "lines")
     beats = _beats_by_id(ledger_data)
     cast = _cast_names(ledger_data)
     admissible = _POLICY.repairable_kinds(bank_id)
+    language_instruction = _EPLANG.native_authoring_instruction(
+        ledger_data.get("meta") or {})
     # Every prompt this run sends reports whether the context it was built
     # with actually landed in its bytes. Collected here so the ledger carries
     # one verdict for the episode instead of a log line nobody reads.
@@ -1943,6 +1965,7 @@ def run_ledger_clean(
                     likely=likely, why=why,
                     roster=[n for n in cast.values() if n],
                     slot_fn=slot_fn, receipt=receipt,
+                    language_instruction=language_instruction,
                 ))
 
         # The free detector runs first so the judge can be shown its evidence.
@@ -2017,6 +2040,7 @@ def run_ledger_clean(
             slot_fn=slot_fn,
             receipt=receipt,
             sightings=sightings,
+            language_instruction=language_instruction,
         ))
 
     receipt["context_seen"]["acts_summarized"] = len(act_briefs)
@@ -2058,7 +2082,8 @@ def run_ledger_clean(
     if fidelity_wanted(meta_now):
         source_rewrite = rewrite_spoken_from_source(
             ledger_data, slot_fn=slot_fn, slot_scheduler=slot_scheduler,
-            configured_model_id=configured_model_id)
+            configured_model_id=configured_model_id,
+            language_instruction=language_instruction)
         receipt["source_rewrite"] = source_rewrite
         receipt["model_calls"] += sum(
             bool(attempt.get("generation_started"))
@@ -2090,6 +2115,7 @@ def _repair_row(
     slot_fn: "Callable[..., str]",
     receipt: MutableMapping[str, Any],
     sightings: "list[dict[str, Any]] | None" = None,
+    language_instruction: str = "",
 ) -> "dict[str, Any]":
     """Repair ONE row, bounded, the judge re-reading each attempt.
 
@@ -2153,6 +2179,7 @@ def _repair_row(
             proposal_receipt=proposal,
             where=where,
             sightings=sightings,
+            language_instruction=language_instruction,
         )
         if not candidate:
             attempts.append({"attempt": attempt, "outcome": "call_failed", **proposal})
@@ -2303,6 +2330,7 @@ def _fix_attribution(
     roster: "Sequence[str]",
     slot_fn: "Callable[..., str]",
     receipt: MutableMapping[str, Any],
+    language_instruction: str = "",
 ) -> "dict[str, Any]":
     """Rewrite one misattributed line into its stated speaker's voice.
 
@@ -2324,6 +2352,7 @@ def _fix_attribution(
             likely_speaker=likely, why=why,
             lines_around=lines_around, where=where,
             previous_attempt=previous,
+            language_instruction=language_instruction,
         )
         if not candidate:
             break

@@ -48,11 +48,15 @@ exactly like every other line in that lane already does.
 """
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable, Optional
 
+from . import _otr_episode_languages as _EPLANG
 from . import _otr_ledger as _OTRL
 from . import _otr_ledger_freeze as _OTRLF
 from . import _otr_line_composer as _OTRLC
+
+log = logging.getLogger("OTR")
 
 SCHEMA_VERSION = "cast_coverage_repair_v1"
 
@@ -134,6 +138,14 @@ def repair_zero_coverage_cast(
     gaps = _OTRLF.cast_coverage_gaps(data)
     if not gaps:
         return receipt
+    try:
+        language_instruction = _EPLANG.native_authoring_instruction(meta)
+    except Exception as exc:  # noqa: BLE001 -- repair remains fail-soft
+        language_instruction = ""
+        log.warning(
+            "[cast_coverage_repair] episode language unavailable (%s); "
+            "composing without a native-language instruction", exc,
+        )
 
     cast_by_id = {
         row.get("char_id"): row
@@ -209,6 +221,7 @@ def repair_zero_coverage_cast(
             arc_phase=arc_phase,
             source_block=_source_block_for(name, presence, scene_label),
             speaker_role="character",
+            language_instruction=language_instruction,
         )
         try:
             with _helper_ctx("cast_coverage_repair"):

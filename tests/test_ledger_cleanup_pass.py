@@ -47,9 +47,11 @@ class _RecordingSlot:
     def __init__(self, response: str = ""):
         self.response = response
         self.calls = 0
+        self.messages = []
 
     def __call__(self, messages, **kwargs):
         self.calls += 1
+        self.messages.append(messages)
         return self.response
 
 
@@ -332,6 +334,35 @@ def test_llm_title_fill_is_used_when_the_slot_answers(monkeypatch):
     receipt = lc.run_ledger_cleanup(ledger, slot_fn=_RecordingSlot())
     assert ledger["meta"]["episode_title"] == "The Still Lamp"
     assert receipt["prose_fills"][0]["action"] == "llm_filled"
+
+
+def test_cleanup_title_fallback_carries_the_joined_native_rule():
+    ledger = _complete_ledger()
+    ledger["meta"].update(episode_title="", episode_language="es")
+    slot = _RecordingSlot('{"episode_title": "La Lámpara Quieta"}')
+    assert lc._llm_episode_title(ledger, slot) == "La Lámpara Quieta"
+    messages = slot.messages[0]
+    system = messages[0]["content"]
+    user = messages[1]["content"]
+    assert system.startswith("Escribe el episodio en español.")
+    assert "Author meta.episode_title in Spanish" in system
+    assert user.startswith("Escribe el episodio en español.")
+    assert "Author meta.episode_title in Spanish" in user
+
+
+def test_cleanup_title_language_read_degrades_instead_of_raising(monkeypatch):
+    ledger = _complete_ledger()
+    ledger["meta"]["episode_title"] = ""
+    slot = _RecordingSlot('{"episode_title": "The Still Lamp"}')
+
+    def _unavailable(_meta):
+        raise RuntimeError("registry unavailable")
+
+    monkeypatch.setattr(
+        lc._EPLANG, "title_language_instruction", _unavailable)
+    assert lc._llm_episode_title(ledger, slot) == "The Still Lamp"
+    assert slot.messages[0][0]["content"].startswith(
+        "You title an already-written radio episode.")
 
 
 # ---------------------------------------------------------------------------

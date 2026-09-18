@@ -299,6 +299,22 @@ def test_spoken_correction_is_applied_without_changing_surrounding_bytes_ids_or_
     assert data["lines"][0]["char_count"] == len(data["lines"][0]["text"])
 
 
+def test_spoken_correction_carries_the_native_rule_and_omits_it_when_empty():
+    rule = "Escribe todo el diálogo en español."
+    data = _ledger()
+    slot = Slot({"edits": [_edit()]})
+    source.rewrite_spoken_from_source(data, slot_fn=slot, language_instruction=rule)
+    system = slot.calls[0][0]["content"]
+    # The slot appends its schema contract after the system text, so the
+    # rule is checked in place rather than at the very end.
+    assert "no source correction is needed. " + rule in system
+
+    plain = Slot({"edits": [_edit()]})
+    source.rewrite_spoken_from_source(_ledger(), slot_fn=plain)
+    assert rule not in plain.calls[0][0]["content"]
+    assert "no source correction is needed." in plain.calls[0][0]["content"]
+
+
 def test_spoken_source_alias_repairs_to_an_applied_missing_action_within_two_calls():
     data = _ledger()
     data['meta']['source_meta']['story_input']['fields'] = {

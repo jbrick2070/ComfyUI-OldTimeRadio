@@ -298,6 +298,7 @@ def build_exchange_prompt(
     failure_reasons: Optional[Sequence[str]] = None,
     system_prompt: Optional[str] = None,
     source_block: str = "",
+    language_instruction: str = "",
 ) -> List[dict]:
     """Build the chat messages for one exchange over a 2-3 slot group.
 
@@ -388,6 +389,9 @@ def build_exchange_prompt(
     # when the injected value equals the constant (science lane, test-pinned).
     base = EXCHANGE_SYSTEM_PROMPT if system_prompt is None else system_prompt
     system = base + f"  - {grounding_clause}\n"
+    language_instruction = str(language_instruction or "").strip()
+    if language_instruction:
+        system = language_instruction + "\n\n" + system
     from ._otr_dialogue_policy import append_dialogue_policy
     # Only the speakers this exchange actually voices. `cast` stays where it
     # belongs -- rendering voice guidance for those speakers in the user
@@ -445,8 +449,10 @@ def build_exchange_prompt(
         "Write these slots as one exchange:",
         slot_block,
         "",
-        fmt,
     ])
+    if language_instruction:
+        user_parts.extend([language_instruction, ""])
+    user_parts.append(fmt)
 
     if failure_reasons:
         user_parts.extend([
@@ -554,6 +560,7 @@ def _run_once(
     failure_reasons: Optional[Sequence[str]],
     system_prompt: Optional[str],
     source_block: str = "",
+    language_instruction: str = "",
 ) -> Tuple[Optional[Dict[str, str]], Optional[str]]:
     """One generate + parse cycle. Returns (parsed_or_None, parse_error).
 
@@ -572,6 +579,7 @@ def _run_once(
         failure_reasons=failure_reasons,
         system_prompt=system_prompt,
         source_block=source_block,
+        language_instruction=language_instruction,
     )
     # LLM slot: creative
     # Reason: exchange dialogue rendering is creative-axis work (rule 6).
@@ -600,6 +608,7 @@ def compose_exchange(
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
     system_prompt: Optional[str] = None,
     source_block: str = "",
+    language_instruction: str = "",
 ) -> ExchangeResult:
     """Compose one exchange over a 2-3 voiced beat group.
 
@@ -663,6 +672,7 @@ def compose_exchange(
             failure_reasons=None,
             system_prompt=system_prompt,
             source_block=source_block,
+            language_instruction=language_instruction,
         )
         result.attempts += 1
         if parsed is None:
@@ -708,6 +718,7 @@ def compose_exchange(
         # failure reasons it is answering, and the receipt could no longer
         # say which passage the accepted line came from.
         source_block=source_block,
+        language_instruction=language_instruction,
     )
     result.attempts += 1
     result.repaired = True
@@ -939,6 +950,7 @@ def run_exchange_prepass(
     temperature: float = DEFAULT_EXCHANGE_TEMPERATURE,
     max_new_tokens: int = DEFAULT_EXCHANGE_MAX_NEW_TOKENS,
     system_prompt: Optional[str] = None,
+    language_instruction: str = "",
 ) -> Dict[str, str]:
     """Compose voiced beat groups as exchanges; return {beat_id: text}.
 
@@ -1016,6 +1028,7 @@ def run_exchange_prepass(
                 temperature=temperature,
                 max_new_tokens=max_new_tokens,
                 system_prompt=system_prompt,
+                language_instruction=language_instruction,
             )
             if res.status not in ("ok", "ok_repaired"):
                 continue

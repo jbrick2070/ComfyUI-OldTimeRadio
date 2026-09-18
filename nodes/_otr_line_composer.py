@@ -344,6 +344,9 @@ class LineRequest:
     # render below is dropped => byte-identical to the pre-grammar prompt. This
     # is the single behavioral injection of the style grammar.
     ending_template: str = ""
+    # Multilingual one-switch: the row-owned native authoring instruction.
+    # Empty for English/legacy so every existing prompt stays byte-identical.
+    language_instruction: str = ""
 
 
 @dataclass(frozen=True)
@@ -1005,6 +1008,9 @@ def _build_user_prompt(req: LineRequest) -> str:
             "do not invent people, places, or objects the news does not "
             "imply. Keep it natural and speakable aloud."
         )
+    language_instruction = str(req.language_instruction or "").strip()
+    if language_instruction:
+        parts.append(language_instruction)
     parts.append("Speak now.")
     return "\n".join(parts)
 
@@ -1055,6 +1061,9 @@ def compose_line_draft(
             phase="line_composer_system",
             source_bank_id=source_bank_id,
         )
+    language_instruction = str(req.language_instruction or "").strip()
+    if language_instruction:
+        system = language_instruction + "\n\n" + system
     from ._otr_dialogue_policy import append_dialogue_policy
     # The policy follows the ONE speaker this call writes. `allowed_people`
     # is the whole cast and still feeds named-entity grounding and transport
@@ -1109,9 +1118,12 @@ def compose_line_draft(
         # rolling the same dice warmer. Built from `messages`, never appended
         # to `ask`, so a third attempt shows ONE rejected reply rather than a
         # growing pile the model has to sort through.
+        retry_complaint = _EMPTY_LINE_COMPLAINT
+        if language_instruction:
+            retry_complaint += "\n\n" + language_instruction
         ask = list(messages) + [
             {"role": "assistant", "content": str(raw or "")},
-            {"role": "user", "content": _EMPTY_LINE_COMPLAINT},
+            {"role": "user", "content": retry_complaint},
         ]
         cooled = True
     raise LineCompositionFailedError(attempts=attempts, request=req)
@@ -1317,12 +1329,9 @@ def _native_announcer_lead(episode_meta=None) -> str:
     English returns "" so every English announcer prompt stays byte-identical.
     """
     try:
-        row = _EPLANG.row_from_meta(episode_meta)
+        return _EPLANG.native_authoring_instruction(episode_meta)
     except Exception:  # noqa: BLE001 -- a label may never cost an episode
         return ""
-    if row.iso == _EPLANG.ENGLISH_ISO:
-        return ""
-    return _EPLANG.writer_language_instruction(row)
 
 
 def _announcer_system(system: str, episode_meta=None) -> str:

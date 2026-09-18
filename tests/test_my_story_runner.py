@@ -139,7 +139,7 @@ class Slots:
 def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
          include_act_breaks=True, idea="a keeper hears a voice",
          characters="Ada, the keeper. Tom.", raw_num_characters=None,
-         house_source=False):
+         house_source=False, episode_language=None):
     from nodes import production_ledger as PL
 
     raw_requested = num_characters if raw_num_characters is None else raw_num_characters
@@ -173,6 +173,8 @@ def _run(slots, *, author="A. Listener", act_count=1, num_characters=2,
         },
     }
     led = PL.new_ledger(episode_id=None)
+    if episode_language is not None:
+        led.data.setdefault("meta", {})["episode_language"] = episode_language
     parts = MS.run_my_story_episode(
         payload={}, pack=RT.resolve_story_pack("my_story"), resolved=resolved,
         led=led, meta=led.data.setdefault("meta", {}),
@@ -1571,3 +1573,80 @@ def test_p0_p1_scope_stays_local_and_reaches_existing_source_owner(monkeypatch):
     assert "complete named_cast and cast_plan" in slots.prompts[1][0]["content"]
     assert "cast, acts and ending" in slots.prompts[3][0]["content"]
     assert "complete named_cast and cast_plan" not in slots.prompts[3][0]["content"]
+
+
+# ---------------------------------------------------------------------------
+# native authoring: the listener types in any language, the episode is
+# authored in the selected one
+# ---------------------------------------------------------------------------
+
+def _spanish_rule():
+    from nodes import _otr_episode_languages as EL
+    rule = EL.native_authoring_instruction({"episode_language": "es"})
+    assert rule.strip()
+    return rule.strip()
+
+
+def test_a_native_episode_leads_every_authoring_prompt_with_the_row_rule():
+    rule = _spanish_rule()
+    slots = Slots(acts=2, inter=1)
+    _run(slots, act_count=2, episode_language="es")
+    authoring = [m for m in slots.prompts
+                 if "Check and rewrite the supplied draft" not in m[0]["content"]]
+    interpret = [m for m in authoring
+                 if "work out what they actually want" in m[0]["content"]]
+    spoken = [m for m in authoring if m not in interpret]
+    # treatment + two acts + frame
+    assert len(spoken) == 4, [m[0]["content"][:40] for m in spoken]
+    for messages in spoken:
+        assert messages[0]["content"].startswith(rule + "\n\n")
+        assert messages[-1]["content"].endswith(rule)
+    # Interpretation is an internal receipt and stays as it was.
+    assert len(interpret) == 1
+    assert not interpret[0][0]["content"].startswith(rule)
+
+
+def test_a_native_episode_carries_the_rule_into_every_spoken_source_rewrite():
+    rule = _spanish_rule()
+    slots = Slots()
+    _run(slots, episode_language="es")
+    rewrites = [m for m in slots.prompts
+                if "Check and rewrite the supplied draft" in m[0]["content"]]
+    # interpretation + treatment + act + frame each get one correction
+    assert len(rewrites) == 4
+    spoken = [m for m in rewrites
+              if "authoring_context" in m[1]["content"]
+              and "work out what they actually want" not in m[1]["content"]]
+    assert len(spoken) == 3
+    for messages in spoken:
+        # The slot appends its schema contract after the instruction, so the
+        # rule sits inside the system text rather than at its very end.
+        assert (" " + rule) in messages[0]["content"]
+    interpret = [m for m in rewrites if m not in spoken]
+    assert len(interpret) == 1
+    assert rule not in interpret[0][0]["content"]
+
+
+def test_an_english_episode_never_sees_a_native_rule():
+    rule = _spanish_rule()
+    slots = Slots()
+    _run(slots, episode_language="en")
+    for messages in slots.prompts:
+        for message in messages:
+            assert rule not in message["content"]
+
+
+def test_an_unstamped_ledger_authors_exactly_as_before():
+    stamped = Slots()
+    _run(stamped, episode_language="en")
+    legacy = Slots()
+    _run(legacy)
+    assert legacy.prompts == stamped.prompts
+
+
+def test_the_runner_hands_the_rule_to_the_spoken_passes_only():
+    import inspect
+    src = inspect.getsource(MS.run_my_story_episode)
+    assert "language_instruction = _EPLANG.native_authoring_instruction(meta)" in src
+    assert src.count("language_instruction=language_instruction") == 3
+    assert "language_instruction" not in inspect.getsource(MS._pass_interpret)

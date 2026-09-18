@@ -20,7 +20,7 @@ import pytest
 from nodes import _otr_cast_coverage_repair as repair
 from nodes import _otr_freeze_cascade as freeze_cascade
 from nodes._otr_ledger_freeze import cast_coverage_gaps
-from nodes._otr_line_composer import LineCompositionFailedError
+from nodes._otr_line_composer import LineCompositionFailedError, LineResult
 from nodes._otr_shakespeare_sources import cast_presence_from_text
 
 MARIA_SCENE_TEXT = """[Enter Sir Toby, Sir Andrew, and Fabian.]
@@ -249,6 +249,29 @@ def test_mode2_mints_exactly_one_new_row_for_an_unallocated_cast_member():
     assert maria_lines[0]["skip"] is False
     maria_beats = [b for b in data["beats"] if b["char_id"] == "c03"]
     assert len(maria_beats) == 1
+
+
+def test_multilingual_cast_repair_threads_the_native_instruction(monkeypatch):
+    data = _base_ledger()
+    data["meta"]["episode_language"] = "es"
+    captured = []
+
+    def _compose(**kwargs):
+        captured.append(kwargs["req"])
+        return LineResult("Una línea.")
+
+    monkeypatch.setattr(repair._OTRLC, "compose_line", _compose)
+    repair.repair_zero_coverage_cast(
+        _Led(data),
+        creative_fn=_creative_fn("unused"),
+        canon_header="TITLE: Prueba",
+        style_descriptor="",
+        source_bank_id="original",
+        meta=data["meta"],
+    )
+    assert len(captured) == 1
+    assert captured[0].language_instruction
+    assert "español" in captured[0].language_instruction
 
 
 def test_mode2_beat_id_never_collides():

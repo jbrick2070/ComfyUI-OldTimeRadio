@@ -174,6 +174,75 @@ def _replacement_reply(*values):
                               for i, value in enumerate(values, 1)]}
 
 
+def test_native_instruction_reaches_whole_and_partial_line_repair_prompts():
+    rule = "Escribe el episodio en español."
+    whole = lcl._repair_prompt(
+        speaker="ANA",
+        text="(suspira) Quédate.",
+        complaint="1. (suspira): action",
+        lines_around=[],
+        language_instruction=rule,
+    )
+    assert whole[0]["content"].startswith(rule + "\n\n")
+    assert rule in whole[1]["content"]
+    assert 'Answer JSON: {"text":' in whole[1]["content"].splitlines()[-1]
+
+    partial = lcl._repair_prompt(
+        speaker="ANA",
+        text="(suspira) Quédate.",
+        complaint="1. (suspira): action",
+        lines_around=[],
+        authorized_spans=(
+            lcl._RepairSpan("span_001", 0, 9, "(suspira)"),
+        ),
+        language_instruction=rule,
+    )
+    assert partial[0]["content"].startswith(rule + "\n\n")
+    assert rule in partial[1]["content"]
+    assert "Return JSON with a replacements LIST" in partial[1]["content"]
+
+
+def test_native_instruction_reaches_f2_replacement_speech():
+    original = "Step back, Ana."
+    rule = "Escribe el episodio en español."
+    slot = _Slot(repairs={original: [{"text": "Retrocederé."}]})
+    assert lcl._f2_fix(
+        slot_fn=slot,
+        speaker="ANA",
+        text=original,
+        likely_speaker="BEA",
+        why="addresses Ana by name",
+        lines_around=[],
+        language_instruction=rule,
+    ) == "Retrocederé."
+    assert slot.repair_prompts
+    assert slot.repair_prompts[0].startswith(rule + "\n\n")
+    assert rule in slot.repair_prompts[0]
+
+
+def test_run_ledger_clean_hands_the_native_rule_to_the_spoken_source_rewrite():
+    import inspect
+    src = inspect.getsource(lcl.run_ledger_clean)
+    call = src[src.index("rewrite_spoken_from_source("):]
+    call = call[:call.index(")") + 1]
+    assert "language_instruction=language_instruction" in call
+
+
+def test_run_ledger_clean_threads_native_instruction_to_line_repair():
+    ledger = _ledger("The door closes behind him.")
+    ledger["meta"]["episode_language"] = "es"
+    original = ledger["lines"][1]["text"]
+    slot = _Slot(
+        judgements={original: [_dirty_judgement(original)]},
+        authorizations={original: [{"verdict": "whole_row_direction"}]},
+        repairs={original: [{"text": "Ya se fue."}]},
+    )
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert slot.repair_prompts
+    assert all("Escribe el episodio en español." in prompt
+               for prompt in slot.repair_prompts)
+
+
 def test_whole_row_false_accusation_preserves_valid_coda_and_outer_whitespace():
     original = "  Until next time.\t"
     ledger = _ledger(original, bank="my_story")

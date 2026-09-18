@@ -158,14 +158,7 @@ def _title_language_instruction(meta) -> str:
             from . import _otr_episode_languages as _EPLANG_TITLE
         except ImportError:  # pragma: no cover -- flat/standalone load
             import _otr_episode_languages as _EPLANG_TITLE  # type: ignore
-        row = _EPLANG_TITLE.row_from_meta(meta)
-        if row.iso == _EPLANG_TITLE.ENGLISH_ISO:
-            return ""
-        parts = [
-            _EPLANG_TITLE.writer_language_instruction(row),
-            _EPLANG_TITLE.title_instruction(row),
-        ]
-        return " ".join(p for p in (s.strip() for s in parts) if p)
+        return _EPLANG_TITLE.title_language_instruction(meta)
     except Exception as exc:  # noqa: BLE001
         log.warning(
             "[OTR_LedgerScriptWriter] episode-language title rule unavailable "

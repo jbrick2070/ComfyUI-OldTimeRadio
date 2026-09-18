@@ -52,8 +52,10 @@ import logging
 from typing import Any, Callable, Mapping, MutableMapping
 
 try:
+    from . import _otr_episode_languages as _EPLANG
     from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
 except ImportError:  # pragma: no cover -- flat test/standalone load
+    import _otr_episode_languages as _EPLANG  # type: ignore
     from _otr_ledger_scrub import row_is_verbatim as _row_is_verbatim  # type: ignore
 
 log = logging.getLogger("OTR.ledger_cleanup")
@@ -401,10 +403,21 @@ def _llm_episode_title(
     if not spoken:
         return ""
 
+    try:
+        language_instruction = _EPLANG.title_language_instruction(
+            ledger_data.get("meta") or {})
+    except Exception as exc:  # noqa: BLE001 -- title completion stays fail-soft
+        language_instruction = ""
+        log.warning(
+            "[ledger_cleanup] episode-language title rule unavailable (%s); "
+            "titling without it", exc,
+        )
     prompt = [
         {
             "role": "system",
             "content": (
+                ((language_instruction + "\n\n") if language_instruction else "")
+                +
                 "You title an already-written radio episode. Return JSON "
                 "only. The title must describe THIS script -- do not invent "
                 "events, characters, or a sequel hook, and do not add "
@@ -415,6 +428,8 @@ def _llm_episode_title(
         {
             "role": "user",
             "content": (
+                ((language_instruction + "\n\n") if language_instruction else "")
+                +
                 "Return {\"episode_title\": \"...\"} -- a single plain-text "
                 "title of at most twelve words for this script:\n\n"
                 + "\n".join(spoken)

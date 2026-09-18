@@ -360,8 +360,13 @@ def _apply_spoken_edits(edits, candidate, raw_fields):
 
 
 def rewrite_spoken_from_source(ledger_data, *, slot_fn, slot_scheduler=None,
-                               configured_model_id=None):
-    """Source correction owned by ledger_clean, before its transaction closes."""
+                               configured_model_id=None, language_instruction=""):
+    """Source correction owned by ledger_clean, before its transaction closes.
+
+    ``language_instruction`` keeps a correction in the episode language: the
+    typed source may be English while every spoken row is native, and a
+    source quote is evidence for an edit, never its replacement text.
+    """
     from ._otr_ledger_clean import PROTECTED_FACT_COMPONENT_FLAG, set_line_text_metrics
     if not fidelity_wanted((ledger_data or {}).get("meta") or {}):
         return None
@@ -399,7 +404,9 @@ def rewrite_spoken_from_source(ledger_data, *, slot_fn, slot_scheduler=None,
                      "Use the edits schema instead of returning the full draft. Keep every "
                      "unrelated byte unchanged. Never change speakers, order or ids. "
                      "Return an empty edits list when no source correction is needed."
-                     % ", ".join(CREATIVE_FIELDS)))
+                     % ", ".join(CREATIVE_FIELDS))
+                    + ((" " + str(language_instruction).strip())
+                       if str(language_instruction or "").strip() else ""))
     receipt["candidate_line_ids"] = [row["line_id"] for row in candidate["lines"]]
     if result is not None:
         updated = {row["line_id"]: row["text"] for row in accepted["lines"]}

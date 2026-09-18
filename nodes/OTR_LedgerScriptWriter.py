@@ -1586,10 +1586,7 @@ def _native_authoring_instruction(meta: Mapping[str, Any]) -> str:
     English regression gate; telling the model "write in English" would change
     every English prompt in the pack to say something it already assumed.
     """
-    row = _EPLANG.row_from_meta(meta)
-    if row.iso == _EPLANG.ENGLISH_ISO:
-        return ""
-    return _EPLANG.writer_language_instruction(row)
+    return _EPLANG.native_authoring_instruction(meta)
 
 
 def _stamp_news_seed_receipt(
@@ -4791,11 +4788,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 "into the composition prompt",
                 len(meta["specificity_anchors"]),
             )
-        # THE MULTILINGUAL ONE-SWITCH (2026-09-18). `canon_header` is the one
-        # block every composition pass receives, so the episode language's own
-        # instruction rides it into per-line composition, the grouped-exchange
-        # path, the intro/outro rewrites and the cleanup passes -- one edit, one
-        # authority, no per-pass plumbing to keep in step.
+        # THE MULTILINGUAL ONE-SWITCH (2026-09-18). `canon_header` is shared
+        # user context for the per-line path. Grouped exchange and later repair
+        # authors do not consume it; they receive this same row-owned string
+        # through explicit language_instruction parameters below.
         #
         # It leads the header: the language of the answer is the first thing the
         # model needs, ahead of the canon it is writing inside. English and Off
@@ -5487,6 +5483,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 beat_tension=_a5_tension,
                 # F4 (story-engine v1) -- speaker gender/pronouns.
                 speaker_gender=gender_by_name.get(speaker, ""),
+                # The actual character/mid-announcer authoring seam. The
+                # canon header also carries this as context, but system/tail
+                # placement in compose_line owns response language.
+                language_instruction=_language_prompt_lead,
             )
 
         # Stage 3 reads the real outline beat directly. It validates only
@@ -5562,6 +5562,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         generate_fn=creative_generate_fn,
                         tier_a_check=_ex_tier_a,
                         system_prompt=_ex_system,  # lane chunk 2
+                        language_instruction=_language_prompt_lead,
                     )
                 meta["exchange_prepass_audit"] = {
                     "beats_composed": len(_ex_lines_by_beat_id),

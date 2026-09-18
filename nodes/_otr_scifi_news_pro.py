@@ -75,6 +75,7 @@ try:
         speaker_identity_key,
     )
     from . import _otr_canon as _OTRC
+    from . import _otr_episode_languages as _EPLANG
     from . import _otr_word_delivery as _OTRWD
 except ImportError:  # pragma: no cover -- flat test/standalone load
     import _otr_episode_budget as _OTRB  # type: ignore
@@ -110,6 +111,7 @@ except ImportError:  # pragma: no cover -- flat test/standalone load
         speaker_identity_key,
     )
     import _otr_canon as _OTRC  # type: ignore
+    import _otr_episode_languages as _EPLANG  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
 
 try:
@@ -1925,6 +1927,7 @@ def _pass_dossier(technical_fn, pack, digest: str) -> DossierLLM:
 
 def _pass_pitch(
     creative_fn, pack, dossier: DossierLLM, cards, stance, *, n_max: int,
+    language_instruction: str = "",
 ) -> Pitch:
     card = cards[0]
     user = (
@@ -1940,7 +1943,8 @@ def _pass_pitch(
         # LLM slot: creative -- P1 pitch.
         return structured_call(
             prompt=ProviderCapacityMessages([
-                {"role": "system", "content": _seam(pack, "scifi_news_pro_pitch_system")},
+                {"role": "system", "content": _EPLANG.lead_system(
+                    _seam(pack, "scifi_news_pro_pitch_system"), language_instruction)},
                 {"role": "user", "content": user},
             ]),
             schema=Pitch,
@@ -1979,7 +1983,8 @@ def _cameo_prompt_clause(decision) -> str:
 def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
                     stance, *, n_max: int,
                     provenance: "dict[str, str]",
-                    digest: str = "", decision=None) -> Treatment:
+                    digest: str = "", decision=None,
+                    language_instruction: str = "") -> Treatment:
     # On a cameo episode the REQUEST is for the other characters, so the total
     # still reads as the operator asked. A REQUEST throughout: never a cap, and
     # never a refusal if the model returns a different number.
@@ -2002,7 +2007,9 @@ def _pass_treatment(creative_fn, pack, dossier: DossierLLM, pitch: Pitch,
         return structured_call(
             prompt=ProviderCapacityMessages([
                 {"role": "system",
-                 "content": _seam(pack, "scifi_news_pro_treatment_system")},
+                 "content": _EPLANG.lead_system(
+                     _seam(pack, "scifi_news_pro_treatment_system"),
+                     language_instruction)},
                 {"role": "user", "content": user},
             ]),
             schema=Treatment,
@@ -2131,6 +2138,7 @@ def _pass_news_read(
     provenance: "dict[str, str]",
     digest: str,
     cast_names: "list[str]",
+    language_instruction: str = "",
 ) -> NewsCloseRead:
     """Author one source-grounded factual close through a typed ladder."""
     # `cast_names` is NOT listed here (PBUG-20260824-01 Class B). The
@@ -2156,7 +2164,9 @@ def _pass_news_read(
             prompt=ProviderCapacityMessages([
                 {
                     "role": "system",
-                    "content": _seam(pack, "scifi_news_pro_news_read_system"),
+                    "content": _EPLANG.lead_system(
+                        _seam(pack, "scifi_news_pro_news_read_system"),
+                        language_instruction),
                 },
                 {"role": "user", "content": user},
             ]),
@@ -2206,7 +2216,8 @@ _CAST_ALIAS_SYSTEM = (
 )
 
 
-def _pass_cast_aliases(technical_fn, pack, treatment: Treatment) -> "dict":
+def _pass_cast_aliases(technical_fn, pack, treatment: Treatment,
+                       language_instruction: str = "") -> "dict":
     """Ask the cast's own author what it will call each character.
 
     WHY THIS PASS EXISTS (operator, 2026-08-24): *"deterministic py is too
@@ -2240,7 +2251,8 @@ def _pass_cast_aliases(technical_fn, pack, treatment: Treatment) -> "dict":
         # LLM slot: technical -- naming judgment, no story content.
         result = structured_call(
             prompt=ProviderCapacityMessages([
-                {"role": "system", "content": _CAST_ALIAS_SYSTEM},
+                {"role": "system", "content": _EPLANG.lead_system(
+                    _CAST_ALIAS_SYSTEM, language_instruction)},
                 {"role": "user", "content": user},
             ]),
             schema=CastAliases,
@@ -3402,9 +3414,11 @@ def _pass_script(creative_fn, pack, treatment: Treatment, digest: str,
                  envelope: SceneEnvelope, cast_names: "list[str]",
                  extra_aliases: "dict[str, list[str]] | None" = None,
                  context_cap_fn: "Callable[[], int] | None" = None,
+                 language_instruction: str = "",
                  ) -> "tuple[str, ParsedScript, dict]":
     """P3 whole-play markup through the shared observed-attempt ladder."""
-    system = _seam(pack, "scifi_news_pro_script_system")
+    system = _EPLANG.lead_system(
+        _seam(pack, "scifi_news_pro_script_system"), language_instruction)
     return _run_markup_ladder(
         creative_fn,
         pass_id="script",
@@ -4822,7 +4836,6 @@ def run_scifi_news_pro_episode(
     # speaker set equal the cast rows. A cameo injected after the script is
     # written cannot pass that gate, so the only place the decision can live is
     # in front of the prompts that produce the script.
-    from . import _otr_episode_languages as _EPLANG
     cameo = _OTRCAST.resolve_lemmy_cameo(
         getattr(source_bank_row, "source_bank_id", ""),
         resolved.get("lemmy_force"),
@@ -4839,6 +4852,10 @@ def run_scifi_news_pro_episode(
     # further down and attached via `meta["scifi_news_pro"] = f2`, so binding it
     # to the ledger accessor at this point would be dead and misleading.
     meta = _ledger_meta(led)
+    # The news source stays as published; the new story is authored in the
+    # selected language. The writer validated and stamped the row before
+    # dispatching this lane, so an unknown stamp here is corruption and raises.
+    language_instruction = _EPLANG.native_authoring_instruction(meta)
     receipts: "list[dict[str, Any]]" = []
 
     def receipt(pass_id, model_id, attempts, temp, tokens, *, trace=()):
@@ -4940,7 +4957,8 @@ def run_scifi_news_pro_episode(
         )
     fn, box = _counting(creative_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_pitch"):
-        pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max)
+        pitch = _pass_pitch(fn, pack, dossier, cards, stance, n_max=n_max,
+                            language_instruction=language_instruction)
     receipt("pitch", creative_model, box["calls"],
             _TEMP["pitch"], None)
     f2["pitch"] = pitch.model_dump()
@@ -4950,6 +4968,7 @@ def run_scifi_news_pro_episode(
         treatment = _pass_treatment(
             fn, pack, dossier, pitch, stance, n_max=n_max,
             provenance=provenance, digest=source_preview, decision=cameo,
+            language_instruction=language_instruction,
         )
     # Identity is Python's, the stake is the model's. Runs on the ACCEPTED
     # treatment, before anything downstream reads a cast name.
@@ -4965,7 +4984,8 @@ def run_scifi_news_pro_episode(
     # a stranger four attempts running (PBUG-20260824-01).
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_cast_aliases"):
-        cast_aliases = _pass_cast_aliases(fn, pack, treatment)
+        cast_aliases = _pass_cast_aliases(
+            fn, pack, treatment, language_instruction=language_instruction)
     if box["calls"]:
         receipt("cast_aliases", technical_model, box["calls"], 0.10, None)
     f2["cast_aliases"] = {k: list(v) for k, v in cast_aliases.items()}
@@ -4973,7 +4993,8 @@ def run_scifi_news_pro_episode(
     fn, box = _counting(technical_fn)
     with _helper_ctx(slot_scheduler, "scifi_news_pro_news_read"):
         read = _pass_news_read(
-            fn, pack, dossier, provenance, source_preview, cast_names
+            fn, pack, dossier, provenance, source_preview, cast_names,
+            language_instruction=language_instruction,
         )
     receipt("news_read", technical_model, box["calls"], 0.20, None)
     treatment = treatment.model_copy(
@@ -4991,6 +5012,7 @@ def run_scifi_news_pro_episode(
             fn, pack, treatment, source_preview, envelope, cast_names,
             cast_aliases,
             context_cap_fn=_creative_context_cap_fn(slot_scheduler),
+            language_instruction=language_instruction,
         )
     p3_attempts = tuple(p3_meta["attempt_trace"])
     if box["calls"] != len(p3_attempts):

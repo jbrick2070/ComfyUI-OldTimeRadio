@@ -19,7 +19,10 @@ import pytest
 
 from nodes._otr_line_composer import (
     LineRequest,
+    _EMPTY_LINE_COMPLAINT,
+    _SYSTEM_PROMPT,
     _build_user_prompt,
+    compose_line_draft,
 )
 
 
@@ -148,6 +151,66 @@ def test_partial_sprint3_fields_render_only_those_lines():
     # Constraint still lands because dramatic_question / next_turn
     # are present.
     assert "Perform the objective indirectly" in prompt
+
+
+class _Capture:
+    def __init__(self, responses):
+        self.responses = list(responses)
+        self.calls = []
+
+    def __call__(self, messages, **_kwargs):
+        self.calls.append(messages)
+        return self.responses.pop(0)
+
+
+def test_empty_language_keeps_the_complete_line_messages_unchanged():
+    req = _minimal_legacy_request()
+    capture = _Capture(["A plain line."])
+    assert compose_line_draft(
+        creative_fn=capture,
+        req=req,
+        creative_repo_id=None,
+        source_bank_id="science_news",
+    ) == "A plain line."
+    assert capture.calls == [[
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": _build_user_prompt(req)},
+    ]]
+
+
+def test_native_instruction_leads_system_and_touches_the_generation_tail():
+    rule = "Escribe todo el diálogo en español."
+    req = _minimal_legacy_request(language_instruction=rule)
+    capture = _Capture(["Una línea clara."])
+    assert compose_line_draft(
+        creative_fn=capture,
+        req=req,
+        creative_repo_id=None,
+        source_bank_id="science_news",
+    ) == "Una línea clara."
+    system, user = (
+        capture.calls[0][0]["content"],
+        capture.calls[0][1]["content"],
+    )
+    assert system.startswith(rule + "\n\n" + _SYSTEM_PROMPT)
+    assert user.endswith(rule + "\nSpeak now.")
+
+
+def test_native_instruction_survives_the_empty_line_retry():
+    rule = "Escribe todo el diálogo en español."
+    req = _minimal_legacy_request(language_instruction=rule)
+    capture = _Capture(["[ALICE]", "Ahora hablo."])
+    assert compose_line_draft(
+        creative_fn=capture,
+        req=req,
+        creative_repo_id=None,
+        source_bank_id="science_news",
+    ) == "Ahora hablo."
+    retry = capture.calls[1]
+    assert retry[-1] == {
+        "role": "user",
+        "content": _EMPTY_LINE_COMPLAINT + "\n\n" + rule,
+    }
 
 
 def test_static_prefix_unchanged_between_legacy_and_sprint3():

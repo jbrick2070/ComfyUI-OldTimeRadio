@@ -37,7 +37,9 @@ __all__ = [
     "dropdown_choices",
     "iso_from_meta",
     "kokoro_config",
+    "lead_system",
     "load_registry",
+    "native_authoring_instruction",
     "reload_registry",
     "replay_language_check",
     "resolve_label",
@@ -46,6 +48,7 @@ __all__ = [
     "row_by_label",
     "row_from_meta",
     "spoken_text",
+    "title_language_instruction",
     "title_instruction",
     "validate_registry",
     "writer_language_instruction",
@@ -532,11 +535,48 @@ def writer_language_instruction(row: Optional[LanguageRow]) -> str:
     return str(row.authoring.get("writer_instruction") or "")
 
 
+def native_authoring_instruction(meta, *, path: str = None) -> str:
+    """Row-owned native authoring instruction, or "" for English/legacy.
+
+    Strict by design: a stamped unknown language is structural corruption.
+    Audience-facing callers that promise a fail-soft fallback catch around
+    this leaf at their existing boundary.
+    """
+    row = row_from_meta(meta, path=path)
+    if row.iso == ENGLISH_ISO:
+        return ""
+    return writer_language_instruction(row)
+
+
+def lead_system(system: str, language_instruction: str) -> str:
+    """Put the native instruction ahead of a system prompt.
+
+    An empty instruction returns ``system`` unchanged, so every English and
+    Off prompt stays byte-identical.
+    """
+    language_instruction = str(language_instruction or "").strip()
+    if not language_instruction:
+        return system
+    return language_instruction + "\n\n" + system
+
+
 def title_instruction(row: Optional[LanguageRow]) -> str:
     """The native title rule for the title-regen pass."""
     if row is None:
         return ""
     return str(row.authoring.get("title_instruction") or "")
+
+
+def title_language_instruction(meta, *, path: str = None) -> str:
+    """Native authoring plus title mechanics, or "" for English/legacy."""
+    row = row_from_meta(meta, path=path)
+    if row.iso == ENGLISH_ISO:
+        return ""
+    parts = (
+        writer_language_instruction(row),
+        title_instruction(row),
+    )
+    return " ".join(part.strip() for part in parts if part.strip())
 
 
 # --------------------------------------------------------------------------- #

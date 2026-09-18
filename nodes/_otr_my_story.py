@@ -49,6 +49,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 try:
     from . import _otr_canon as _OTRC
     from . import _otr_casting as _OTRCAST
+    from . import _otr_episode_languages as _EPLANG
     from . import _otr_story_input as _SI
     from . import _otr_story_source as _SOURCE
     from . import _otr_word_delivery as _OTRWD
@@ -61,6 +62,7 @@ try:
 except ImportError:  # pragma: no cover -- flat / standalone test import
     import _otr_canon as _OTRC  # type: ignore
     import _otr_casting as _OTRCAST  # type: ignore
+    import _otr_episode_languages as _EPLANG  # type: ignore
     import _otr_story_input as _SI  # type: ignore
     import _otr_story_source as _SOURCE  # type: ignore
     import _otr_word_delivery as _OTRWD  # type: ignore
@@ -412,9 +414,24 @@ def _resolve_seed() -> int:
 
 def _call(pass_id: str, bundle: Any, *, attempt_receipts=None,
           source_rewrite_receipts=None, slot_scheduler=None, configured_model_id=None,
-          source_rewrite_instruction="", **kwargs) -> Any:
-    """Use the shared capacity contract and retain actual attempt evidence."""
+          source_rewrite_instruction="", language_instruction="", **kwargs) -> Any:
+    """Use the shared capacity contract and retain actual attempt evidence.
+
+    ``language_instruction`` is the episode row's native authoring rule. It
+    leads the system message, closes the user message, and rides the source
+    rewrite so a fidelity correction against the typed source never pulls a
+    native line back into the source's language. Empty leaves every prompt
+    byte-identical.
+    """
+    language_instruction = str(language_instruction or "").strip()
     author_context = [dict(message) for message in kwargs["prompt"]]
+    if language_instruction:
+        author_context[0]["content"] = _EPLANG.lead_system(
+            author_context[0]["content"], language_instruction)
+        author_context[-1]["content"] += "\n\n" + language_instruction
+        source_rewrite_instruction = " ".join(
+            part for part in (str(source_rewrite_instruction or "").strip(),
+                              language_instruction) if part)
     prompt = [dict(message) for message in author_context]
     prompt[-1]["content"] = _SOURCE.raw_source_block(bundle.fields) + "\n\n" + prompt[-1]["content"]
     kwargs["prompt"] = ProviderCapacityMessages(prompt)
@@ -1002,6 +1019,10 @@ def run_my_story_episode(
     meta = _ledger_meta(led)
     meta["episode_seed"] = seed
     _OTRWD.stamp_contract(meta, owner="my_story")
+    # The listener types the story in any language; the episode is authored
+    # in the selected one. The writer validated and stamped the row before
+    # dispatching this lane, so an unknown stamp here is corruption and raises.
+    language_instruction = _EPLANG.native_authoring_instruction(meta)
 
     receipts: "list[dict]" = []
 
@@ -1094,6 +1115,7 @@ def run_my_story_episode(
                 creative_fn, pack, bundle, interp,
                 act_count=act_count, requested_characters=requested,
                 include_act_breaks=include_act_breaks, attempt_receipts=story["attempts"],
+                language_instruction=language_instruction,
                 **source_kwargs(creative_model))
         receipt("treatment", creative_model, _TEMP["treatment"][0],
                 None)
@@ -1136,7 +1158,9 @@ def run_my_story_episode(
             with _helper_ctx(slot_scheduler, "my_story_act_%d" % plan.n):
                 act = _pass_act(creative_fn, pack, bundle, treatment, plan, prev,
                                 prev_plan, must_speak=must_speak, is_last=is_last,
-                                attempt_receipts=story["attempts"], **source_kwargs(creative_model))
+                                attempt_receipts=story["attempts"],
+                                language_instruction=language_instruction,
+                                **source_kwargs(creative_model))
             story["act_number_normalization"]["replies"].append(
                 {"original": act.n, "slot": plan.n})
             act.n = plan.n
@@ -1170,7 +1194,9 @@ def run_my_story_episode(
         with _helper_ctx(slot_scheduler, "my_story_frame"):
             frame = _pass_frame(creative_fn, pack, bundle, treatment,
                                 attribution=attribution, inter_wanted=inter_wanted,
-                                attempt_receipts=story["attempts"], **source_kwargs(creative_model))
+                                attempt_receipts=story["attempts"],
+                                language_instruction=language_instruction,
+                                **source_kwargs(creative_model))
         receipt("frame", creative_model, _TEMP["frame"][0], None)
         story["frame_proposal"] = frame.model_dump(mode="json")
         spoken_frame = " ".join(frame.announcer_intro + frame.announcer_outro + [frame.coda])

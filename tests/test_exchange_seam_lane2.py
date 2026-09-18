@@ -30,8 +30,10 @@ from nodes import _otr_compose_exchange as ex_mod
 from nodes._otr_compose_exchange import (
     EXCHANGE_SYSTEM_PROMPT,
     SlotContract,
+    TierAResult,
     VoicedSlot,
     build_exchange_prompt,
+    compose_exchange,
 )
 from nodes._otr_creative_prompt_router import resolve_creative_system_prompt
 from nodes._otr_story_pack import get_pack_prompt
@@ -51,7 +53,7 @@ class TestByteIdentity:
 
 
 class TestAssemblyIdentity:
-    def _messages(self, system_prompt):
+    def _messages(self, system_prompt, language_instruction=""):
         group = [
             VoicedSlot("d001", "MARLOW", intent="refuses the order"),
             VoicedSlot("d002", "VERA", intent="presses him"),
@@ -63,6 +65,7 @@ class TestAssemblyIdentity:
         return build_exchange_prompt(
             group, contracts, ["d000|ANNOUNCER: previously..."], [],
             system_prompt=system_prompt,
+            language_instruction=language_instruction,
         )
 
     def test_dynamic_grounding_guidance_is_appended(self):
@@ -78,6 +81,15 @@ class TestAssemblyIdentity:
         assert system.startswith(custom)
         assert EXCHANGE_SYSTEM_PROMPT not in system
         assert "Ground the exchange in ONE concrete detail" in system
+
+    def test_native_instruction_leads_system_and_precedes_format(self):
+        rule = "Escribe todo el diálogo en español."
+        messages = self._messages(None, rule)
+        system = messages[0]["content"]
+        user = messages[1]["content"]
+        assert system.startswith(rule + "\n\n" + EXCHANGE_SYSTEM_PROMPT)
+        assert user.index(rule) < user.index(
+            "Output EXACTLY one line per slot id")
 
 
 class TestPublicDomainRouting:
@@ -101,6 +113,17 @@ class TestThreading:
         assert params["system_prompt"].default is None
         assert params["system_prompt"].kind is inspect.Parameter.KEYWORD_ONLY
 
+    @pytest.mark.parametrize("fn", [
+        ex_mod.build_exchange_prompt,
+        ex_mod._run_once,
+        ex_mod.compose_exchange,
+        ex_mod.run_exchange_prepass,
+    ])
+    def test_language_instruction_defaults_empty(self, fn):
+        param = inspect.signature(fn).parameters["language_instruction"]
+        assert param.default == ""
+        assert param.kind is inspect.Parameter.KEYWORD_ONLY
+
     def _writer_tree(self):
         return ast.parse(_WRITER.read_text(encoding="utf-8"))
 
@@ -116,6 +139,9 @@ class TestThreading:
                 assert "system_prompt" in kwargs, (
                     f"writer exchange-prepass call at line {call.lineno} "
                     f"missing system_prompt")
+                assert "language_instruction" in kwargs, (
+                    f"writer exchange-prepass call at line {call.lineno} "
+                    f"missing language_instruction")
                 sites += 1
         assert sites == 1, f"expected 1 prepass call site, found {sites}"
 
@@ -150,3 +176,39 @@ class TestThreading:
                     f"inside a try/except -- pack failures must fail LOUD")
         assert found == 1, (
             f"expected exactly 1 exchange_system resolve site, found {found}")
+
+
+def test_exchange_repair_keeps_native_instruction_on_both_calls():
+    rule = "Escribe todo el diálogo en español."
+    group = [
+        VoicedSlot("d001", "MARLOW", intent="refuses"),
+        VoicedSlot("d002", "VERA", intent="presses"),
+    ]
+    contracts = {
+        "d001": SlotContract("d001", "MARLOW"),
+        "d002": SlotContract("d002", "VERA"),
+    }
+    calls = []
+    responses = iter([
+        "not the required shape",
+        "d001|MARLOW: No firmaré.\nd002|VERA: Entonces escucha.",
+    ])
+
+    def generate(messages, **_kwargs):
+        calls.append(messages)
+        return next(responses)
+
+    result = compose_exchange(
+        group,
+        contracts,
+        [],
+        [],
+        generate_fn=generate,
+        tier_a_check=lambda *_a: TierAResult(ok=True),
+        language_instruction=rule,
+    )
+    assert result.status == "ok_repaired"
+    assert len(calls) == 2
+    for messages in calls:
+        assert messages[0]["content"].startswith(rule + "\n\n")
+        assert rule in messages[1]["content"]
