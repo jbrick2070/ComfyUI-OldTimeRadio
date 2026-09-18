@@ -1,0 +1,266 @@
+spec: shakespeare-multilingual-radio-drama-corpus
+version: 2.0
+date: 2026-09-18
+supersedes: "v1 prose report (Public-Domain_Shakespeare_Translations.docx)"
+note: >
+  Source rows below are LEADS, not facts. Nothing enters the pipeline until it passes
+  acceptance_gate. v1 scored 28 cells as ready without opening the pages.
+
+# ---------------------------------------------------------------- BLOCKERS
+blocking_questions:
+  - id: Q1
+    q: "Which jurisdiction governs publication?"
+    why: "Decides the eligibility window and whether Mandarin is 31 plays or 2."
+  - id: Q2
+    q: "Is 'translator died before 1944' a hard constraint or an inherited assumption?"
+    why: "It matches no jurisdiction. Correct life+70 date is 1956. Costs 12 years of translators."
+  - id: Q3
+    q: "Verse or prose?"
+    why: "Verse preserves metre for TTS timing. Changes source choice in it/es."
+  - id: Q4
+    q: "Is manual transcription funded?"
+    why: "Decides whether hi and most of pt stay in scope."
+  - id: Q5
+    q: "Must all 14 scenes exist in all 7 languages?"
+    why: "If yes, project is currently impossible; renegotiate the scene list."
+
+# ---------------------------------------------------------------- LEGAL
+legal:
+  deprecated_rule: "translator died before 1944 — not a copyright test in any jurisdiction"
+  tests:
+    us:            { basis: first_publication, public_domain_if: "published before 1931-01-01" }
+    life_plus_70:  { basis: translator_death,  public_domain_if: "died before 1956-01-01", scope: "EU, UK, most of LatAm" }
+    life_plus_50:  { basis: translator_death,  public_domain_if: "died before 1976-01-01", scope: "CN; JP pre-2018 works" }
+  japan_note: "2018 term extension is not retroactive; works already PD stayed PD."
+  three_separate_rights:
+    - translation    # translator death + first publication
+    - transcription  # Wikisource CC BY-SA ToU; Aozora per-file; Cervantes Virtual own terms
+    - edition        # reprints renumber scenes; record which edition you pulled
+  required_row_fields:
+    - translator_death_date
+    - translation_first_published
+    - transcription_license
+    - jurisdiction_cleared_for
+
+status_codes:
+  VERIFIED:   "opened and checked 2026-09-18"
+  UNVERIFIED: "plausible, not opened — treat as lead"
+  REFUTED:    "v1 asserted it; checking showed it wrong"
+  LEAD:       "new in v2, needs confirmation"
+
+# ---------------------------------------------------------------- TARGET SCENES
+target_scenes:
+  macbeth:        ["1.3"]
+  tempest:        ["1.2", "3.1"]
+  midsummer:      ["3.1", "3.2"]
+  twelfth_night:  ["1.5", "2.5"]
+  much_ado:       ["2.3", "3.1"]
+  as_you_like_it: ["3.2"]
+  hamlet:         ["1.1"]
+  king_lear:      ["1.1"]
+  romeo_juliet:   ["2.2"]
+  comedy_errors:  ["3.1"]
+alignment:
+  problem: "19th-c translations do not share Folger act/scene numbering. Hugo restructures,
+            Rusconi merges/splits, JP uses 幕/場, reprints renumber."
+  do_not: "resolve a scene by counting the Nth scene heading — silent wrong-text failure"
+  do: "anchor matching: store English opening+closing speaker/content per target scene,
+       resolve via alias_table, emit confidence score, flag below threshold for review"
+  build_order: "before the parser — retrofitting means full re-ingest"
+
+# ---------------------------------------------------------------- SOURCES
+sources:
+
+  fr:
+    status: UNVERIFIED
+    verdict: "likely 10/10 — but zero pages opened, in v1 or v2"
+    translator: { name: "François-Victor Hugo", died: 1873 }
+    edition: "Œuvres complètes de Shakespeare, 1865-1872"
+    host: fr.wikisource.org
+    form: prose-dominant
+    caveat: "v1 marked 8 of 10 rows 'URL not verified' then scored them ready anyway"
+
+  it:
+    status: UNVERIFIED
+    verdict: "likely 8-10/10"
+    primary:   { translator: "Carlo Rusconi", died: 1889, editions: "UTET 1858-1859; Sonzogno 1901", form: prose }
+    verse_alt_1: { translator: "Giulio Carcano", died: 1884, work: "complete plays in verse, 1875-1882", status: LEAD, digital_text: not_located }
+    verse_alt_2: { translator: "Andrea Maffei", died: "1885 (CONFIRM)", works: ["Macbeth 1863", "La tempesta 1869"], host: it.wikisource.org, status: LEAD }
+    v1_error: "v1 dates all Rusconi rows 1867; it.wikisource says 1858-1859 UTET"
+
+  es:
+    status: LEAD
+    verdict: "3 confirmed + up to 22 more — materially better than v1's 3"
+    confirmed:
+      - { play: macbeth,      translator: "Menéndez y Pelayo", died: 1912, host: es.wikisource.org, form: prose, labels: UPPERCASE_INLINE }
+      - { play: romeo_juliet, translator: "Menéndez y Pelayo", died: 1912, host: es.wikisource.org, form: prose }
+      - { play: hamlet,       translator: "L. F. de Moratín (pseud. Inarco Celenio)", died: 1828, host: es.wikisource.org, form: prose, labels: Titlecase_Inline }
+    new:
+      translator: "Guillermo Macpherson"
+      died: 1898
+      count: 22
+      years: "1873-1897"
+      form: verse
+      note: "translated direct from English, not via French"
+      host: cervantesvirtual.com
+      path: "Biblioteca de Traducciones Españolas"
+      confirmed_present: ["Romeo y Julieta"]
+      action: "check site Marco legal before bulk download — not Wikisource, terms may restrict reuse"
+
+  pt:
+    status: VERIFIED
+    verdict: "1/10"
+    confirmed: { play: hamlet, translator: "Luís I of Portugal", died: 1889, form: prose }
+    best_host: "gutenberg.org ebook 25667 (cleaner than pt.wikisource for this title)"
+    rest: "scan only, pre-1911 orthography, needs transcription"
+
+  ja:
+    status: REFUTED
+    verdict: "1/10 — NOT 8. This is v1's largest error."
+    translator: { name: "Tsubouchi Shōyō", died: "1935-02-28" }
+    edition: "新修シェークスピヤ全集, 1933-1935 (v1 says 1928 — wrong volume set)"
+    published_on_aozora:
+      - { title: "ロミオとヂュリエット", work_id: 42773, play: romeo_juliet }
+    NOT_published_aozora_status_入力中:
+      - { title: "マクベス",       work_id: 42777, since: 2004-02-01 }
+      - { title: "ハムレット",     work_id: 1491,  since: 2004-01-18 }
+      - { title: "リヤ王",         work_id: 1492,  since: 2004-01-18 }
+      - { title: "むだ騒ぎ",       work_id: 1494,  since: 2004 }
+      - { title: "お気に召すまゝ", work_id: 42775, since: 2004-02-01 }
+      - { title: "颶風",           work_id: 51146, since: 2010-01-07 }
+      - { title: "真夏の夜の夢",   work_id: 51145, since: 2010-01-07 }
+    v1_failure: "read work IDs off the index and assumed availability. A work ID is not a file."
+    fallback:
+      host: "dl.ndl.go.jp (National Diet Library)"
+      quality: "machine OCR, explicitly NOT proofread; vertical 旧字 is worst case"
+      endpoint: "https://lab.ndl.go.jp/dl/api/book/fulltext/{PID}"
+      note: "PID from dl.ndl.go.jp/pid/{PID}; not every item is in the OCR programme"
+
+  hi:
+    status: UNVERIFIED
+    verdict: "4 scan-only, all unusable without manual transcription"
+    translator: { name: "Lala Sitaram", died: 1937 }
+    host: "archive.org / DLI"
+    blocker: "early-20th-c Devanagari ligatures defeat current OCR. No shortcut."
+    decision: "fund transcription or cut"
+
+  zh:
+    status: LEAD
+    verdict: "NOT blocked. v1's 'zero viable texts' is wrong. Depends on Q1."
+    if_jurisdiction_is_eu_or_life_plus_70:
+      translator: { name: "朱生豪 Zhu Shenghao", died: "1944-12-26" }
+      count: "31 plays + a half"
+      pd_since: { cn: 1995, eu_uk: 2015 }
+      not_pd_in: "US — translations published posthumously from 1947"
+      host: zh.wikisource.org
+      seen: "author page lists 哈姆雷特 and 暴風雨"
+      status: UNVERIFIED
+      action: "open the play pages before relying on this"
+    if_jurisdiction_is_us:
+      translator: { name: "田汉 Tian Han", died: 1968 }
+      works:
+        - { title: "哈孟雷特", play: hamlet,       publisher: "中华书局 Shanghai", published: "1922-11" }
+        - { title: "罗密欧与朱丽叶", play: romeo_juliet, publisher: "中华书局", published: 1924 }
+      pd_in_us: true   # published pre-1931
+      pd_in_eu: "not until 2039"
+      note: "first complete vernacular Chinese Shakespeare play; full speaker labels"
+      digital_copy: not_located
+    excluded: "Lin Shu — prose retellings from Lamb's Tales, not verbatim. v1 correct here."
+
+# ---------------------------------------------------------------- TRAPS
+traps:
+  - id: liberliber
+    severity: HIGH
+    what: "LiberLiber's complete Italian Shakespeare is Goffredo Raponi's translation.
+           File headers read DIRITTI D'AUTORE: sì. Still in copyright."
+    why: "ranks high in search; most likely accidental infringement in the project"
+  - id: work_id_not_file
+    what: "Aozora work IDs, Internet Archive identifiers, and Wikisource Index:/Página:
+           entries can all exist with no text behind them"
+  - id: a_transcribir
+    what: "'A transcribir' on es.wikisource means scan uploaded, transcription not started.
+           v1 noted the phrase and scored those rows ready anyway."
+  - id: wikisource_namespaces
+    what: "a play may exist as proofread Página: units with no mainspace transclusion, or
+           vice versa — query both"
+  - id: aozora_encoding
+    what: "canonical Aozora .txt is Shift_JIS, not UTF-8. Markup is 漢字《かんじ》 ruby,
+           ｜ delimiter, ［＃…］ notes, ※［＃…］ gaiji. v1's <rt>/<rp> stripper only
+           applies to the rendered HTML."
+  - id: utm_params
+    what: "every URL in v1 carries ?utm_source=gemini — strip it, and read its presence as
+           proof the row was never opened"
+
+# ---------------------------------------------------------------- INGESTION
+endpoints:
+  wikisource:
+    wikitext:  "/w/api.php?action=parse&page={TITLE}&prop=wikitext&format=json"
+    html:      "/api/rest_v1/page/html/{TITLE}"
+    revid:     "/w/api.php?action=query&prop=revisions&rvprop=ids"
+    prefer: wikitext
+    why: "speaker labels are often template-wrapped — structurally detectable, not regex-guessed"
+    requirements: ["descriptive User-Agent with contact address", "respect maxlag"]
+  aozora:
+    source: "github.com/aozorabunko/aozorabunko"
+    why: "more stable than scraping; card metadata carries the per-file licence"
+  ndl: "https://lab.ndl.go.jp/dl/api/book/fulltext/{PID}"
+  gutenberg: "use a mirror for bulk; human-proofread, generally cleaner than Wikisource"
+  archive_org: "full-text API for hi scans; value is confirming existence, not usable text"
+caching: "fetch once, store raw, parse from local. Re-scraping during parser iteration gets you blocked."
+
+# ---------------------------------------------------------------- PARSING
+parsing:
+  alias_table:
+    role: infrastructure   # dependency of alignment, not a downstream convenience
+    key: canonical_english_character_name
+    holds: "every observed surface form per language per source, accented variants included"
+    examples: ["Trìnc. -> Trinculo", "Lady Macb. -> Lady Macbeth"]
+  stage_directions:
+    strip_from: tts_string
+    keep_in: structured_output
+    why: "only performance metadata these texts carry — timing and delivery"
+  normalisation:
+    pt: "pre-1911 orthography — philosophia->filosofia, fóra->fora, y->i"
+    es: "19th-c accentuation; inverted punctuation is fine for modern TTS"
+    ja: "旧字旧仮名 — ヂュリエット vs ジュリエット. Needs MeCab + historical dict (UniDic variant).
+         Own work item, not a regex pass."
+  encoding: "UTF-8 on write, no BOM, everywhere. Convert Shift_JIS at ingest, never later."
+
+# ---------------------------------------------------------------- GATE
+acceptance_gate:
+  run_before: "any ingestion order is finalised"
+  cost: "~1 day; replaces the unproven half of the v1 table with facts"
+  checker_records:
+    - http_status_and_final_url
+    - byte_length_and_detected_encoding
+    - target_act_and_scene_headings_present
+    - speaker_label_count_in_target_scene
+    - dialogue_to_markup_ratio        # catches near-empty scaffold pages
+    - transcription_pending_markers   # "A transcribir", 作業中, Index:-only
+    - licence_string
+    - revision_or_version_id
+  verdicts: [READY, PARTIAL, EMPTY, BLOCKED]
+  enters_pipeline_only_if:
+    - verdict == READY
+    - alignment_confidence > threshold
+    - licence recorded
+  never_enters_on: "the strength of this document or v1"
+
+# ---------------------------------------------------------------- PHASING
+phases:
+  1: { langs: [fr, it], note: "run the gate first — all fr rows unproven. Evaluate it verse alt before committing to Rusconi prose." }
+  2: { langs: [es],     note: "promoted — Macpherson makes es plausibly 2nd best covered. Confirm site terms." }
+  3: { langs: [ja],     note: "demoted from v1 Phase 2. Do the one clean Aozora play early as a 旧字 normalisation test, then decide if NDL correction is worth funding." }
+  4: { langs: [zh],     note: "newly viable, blocked only on Q1. If EU: 31 plays, best-covered language in the project." }
+  5: { langs: [pt, hi], note: "cost decisions, not engineering decisions" }
+
+# ---------------------------------------------------------------- HONESTY
+not_verified_in_v2:
+  - "no fr.wikisource play page was opened — all 10 fr rows remain unproven"
+  - "it Rusconi confirmed listed on author index; individual scene pages not opened"
+  - "zh Zhu Shenghao play pages not opened; author index only"
+  - "Tian Han 1922/1924 confirmed bibliographically; no digital copy located"
+  - "Carcano verse translation confirmed to exist; no digital text located"
+  - "Andrea Maffei death year (believed 1885) not confirmed"
+  - "Cervantes Virtual confirmed for Romeo y Julieta only; other 21 plays unchecked"
+  - "hi not re-examined; v1 assessment carried forward unchanged"

@@ -70,19 +70,20 @@ the row into section 2, or cuts it.
   already points at `/main/`. One click. His.
 * **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged. Manager still
   serves 2.1.4. The API gives no reason. His Discord, not a code change.
-* **The printed credits roll on a native episode.** Headers are row data
-  already; the SOURCE line and the roll's own labels are not. The SOURCE line
-  has three owners: per-bank English sentences in `banks.json`
-  (`credits_source_line` on original, scifi_news_pro, my_story), Python
-  sentences (`printed_credit_line`, `credits_source_line` for a named
-  author, the "freely adapted from" wrapper, the writer tail's "Story
-  generation models used:"), and the roll's literal `>> SOURCE:` /
-  `>> SOURCE INTERCEPT:` / `>> DIAGNOSTIC` chrome. Three shapes: a
-  bank-by-language matrix in `banks.json`; a per-row map keyed by bank in
-  the language registry; or one generic per-row machine-disclosure line
-  that replaces every bank default off-English, with the Python sentences
-  and roll labels as row `credits` keys. The last is the smallest and loses
-  the per-bank wording. His pick. English byte-identical whichever way.
+* **Vendored public-domain Shakespeare translations.** The model translation
+  ships; this would let the lane perform a real translator's words where one
+  exists. The v2 corpus spec he dropped
+  ([spec](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml),
+  beside [the inventory](2026-09-18-fidelity-lane-translation/pd_translation_inventory.md))
+  refutes the inventory's "died before 1944" line (no jurisdiction uses it:
+  US = published before 1931; life+70 = died before 1956; CN/JP life+50 =
+  died before 1976) and puts five questions before any ingestion: which
+  jurisdiction governs publication; whether the death-year rule is a hard
+  constraint; verse or prose; whether manual transcription is funded; and
+  whether all 14 scenes must exist in all 7 languages (today they do not).
+  Phase order in the spec: fr + it, then es, ja, zh, then pt + hi. Nothing
+  enters the pipeline on the strength of either document -- the spec's
+  acceptance gate runs first. His answers turn this into a data row.
 * **Native-language science feeds for SciFi News Pro.** Today the lane reads
   the English science feed and authors the new story natively (standing
   ruling 2026-09-18). A feed in the episode language would give it native
@@ -102,12 +103,21 @@ here). Do not `git add .`. Composer QA then Sonnet before every push.
 (~10 min):** full `pytest tests`, once the row is green. Commands live in
 [known-failures](known-failures.md). Those gates are not the test wave.
 
-Empty. Every decided row has shipped. The printed-credits item moved to
-section 1 (it has more than one answer -- see there). Vendored
-public-domain translations (French and Italian are complete on Wikisource)
-are a separate data row behind his scope word -- see
-[the inventory](2026-09-18-fidelity-lane-translation/pd_translation_inventory.md)
-and the Gemini prompt in the same folder.
+### 1. The hero title card has no script-aware font
+
+**Decided (found by Sonnet post-QA, 2026-09-18): one answer.** The CRT
+renderer's hero card draws the episode title through `_load_font`
+(`video_engine.py` ~336-372), one OS monospace face with no script
+awareness, while the credits roll already picks a Devanagari / CJK face
+(`otr_credits_roll._credits_font_policy` / `_credits_script_font_paths`).
+A Hindi, Japanese or Mandarin title can tofu on the card. Reuse the
+credits roll's face resolution for the hero measure and draw (and the ASS
+title layer's face), keyed on the row's `captions.font_policy`; Latin
+rows byte-identical. Verify: a CJK title measures and draws with the
+script face; English fixtures unchanged. Pre-existing since native titles
+landed; not a regression of the indicator.
+
+Vendored public-domain translations are a section-1 fork -- see there.
 
 ## 3. TEST -- only after 1 and 2 are empty
 

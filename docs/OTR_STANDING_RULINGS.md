@@ -56,6 +56,14 @@ Parked idea from the same exchange: native-language science feeds for SciFi
 News Pro (*"even better if we can find some foreign RSS feeds"*). A section-1
 fork, not a code row.
 
+**Printed credits, same day:** operator picked the bank-by-language matrix
+(*"bank-by-language matrix I think would be best"*). A bank's
+`credits_source_line` in `banks.json` is English data and its
+`credits_source_line_<iso>` siblings are the same sentence per row; the
+Python-authored printed sentences and the roll's SOURCE labels are row
+`credits` keys. English byte-identical. Do not reopen the per-row-map or
+generic-line shapes.
+
 ## 2026-09-17 -- 1080 is Lanczos on the standard OTR composite
 
 Operator: basic plus standard. True 1080 is the standard OTR file, via

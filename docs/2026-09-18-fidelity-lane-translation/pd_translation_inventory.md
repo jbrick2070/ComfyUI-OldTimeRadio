@@ -6,10 +6,13 @@ Research agent, web-verified where marked. Languages from
 Macbeth, Tempest, Midsummer, Twelfth Night, Much Ado, As You Like It, Hamlet,
 King Lear, Romeo and Juliet, Comedy of Errors (Folger CC BY-NC text).
 
-PD line: translator died before 1954 (life+70); Spain is life+80, so
-"worldwide" below means died in 1944 or earlier (1944 + 80 = 2024). Every
-translator marked PD clears both; Zhu Shenghao (d. 1944) is the edge case
-and clears.
+PD line used by this inventory: translator died in 1944 or earlier -- a
+CONSERVATIVE bound, not a legal test. The v2 corpus spec beside this file
+(`shakespeare_corpus_spec_v2.yaml`) states the real tests: US = first
+published before 1931; life+70 (EU, UK, most of Latin America) = died before
+1956; life+50 (CN; JP pre-2018 works) = died before 1976. Which one governs
+is the operator's Q1 in that spec. Every translator marked PD here clears all
+three.
 
 | Lang | Play | Translator (died) | PD | Source | Text format | Notes |
 |---|---|---|---|---|---|---|

@@ -1,3 +1,36 @@
+## 2026-09-18 -- printed credits follow the language (bank matrix); language indicator
+
+Did: Operator picked the bank-by-language matrix for the printed SOURCE
+  line (*"bank-by-language matrix I think would be best"*). Each bank
+  with a default `credits_source_line` in `banks.json` carries
+  `credits_source_line_<iso>` scalar siblings for the seven rows (bank
+  defaults are scalar-checked, so a nested map was refused -- flattened);
+  the writer reads the iso key and falls back to the default. The
+  Python-authored printed sentences (provenance credit, the "freely
+  adapted" wrap -- now a containment test because Hindi and Japanese put
+  the source before the verb -- My Story's printed credit, the writer
+  tail's models line) and the roll's SOURCE / SOURCE INTERCEPT labels are
+  row `credits` keys (21 new, parity-checked). New fail-soft accessor
+  `credits_or_english`. Then his ask *"some easy indicator: filename or
+  at the start on the baked screen"*: `video_engine._language_marks`
+  puts `_<iso>` in the mp4 name BEFORE the timestamp and appends
+  ` · <LANGUAGE>` (English label) to the hero card; English, Off and
+  legacy ledgers byte-identical.
+Found in review: Sonnet caught that the writer-tail site and
+  `credits_or_english` itself were not fail-soft (an unreadable registry
+  would have crashed every `original` run); both hardened, with a test
+  that breaks the registry and asserts every site prints its English
+  literal. Grok is NOT used for code QA; the code rounds ran cursor-agent
+  + Sonnet 5.
+Current step: GO_FORWARD section 2 is EMPTY again. Section 1 forks wait
+  for his word. The Gemini deep-research return for vendored translations
+  is his to paste into the fidelity folder.
+Next: nothing coded until he answers a fork. Test wave when section 1 is
+  clear.
+Models: driver Claude Fable 5.1; cursor-agent + Sonnet 5 REFUTE on each
+  diff, Sonnet re-check on amendments.
+Commits: two code chunks then this docs chunk -- see `git log`.
+
 ## 2026-09-18 -- Shakespeare translates its passage; every lane admitted; cuda:1 round-trips
 
 Did: Two code chunks on `main`. (1) Fidelity lanes: new
