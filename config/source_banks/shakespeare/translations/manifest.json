@@ -127,6 +127,57 @@
       }
     },
     {
+      "iso": "es",
+      "play": "tempest",
+      "scene": "1.2",
+      "file": "es/tempest_1_2.txt",
+      "translator": "Jaime Clark",
+      "translator_death_date": 1875,
+      "translation_first_published": 1873,
+      "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
+      "source_url": "https://es.wikisource.org/wiki/Archivo:La_tempestad_-_La_noche_de_Reyes_(Jaime_Clark).pdf",
+      "revision_id": "sha256:0f728e848ab17568",
+      "raw_sha256": "0f728e848ab175683d0192603f7a364a06848a303825114818586eb35d714bd5",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ESCENA II.",
+      "speaker_labels": 138,
+      "distinct_speakers": 7,
+      "speaker_map": {
+        "MIR.": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "PRÓS.": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "ARI.": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "ARIEL.": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "CAL.": {
+          "spoken": "CALIBAN",
+          "roster": "CALIBAN"
+        },
+        "FER.": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "CANCION DE ARIEL.": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        }
+      },
+      "transcription_method": "model_ocr",
+      "transcription_date": "2026-09-19",
+      "source_pages": "10–28"
+    },
+    {
       "iso": "fr",
       "play": "as_you_like_it",
       "scene": "3.2",
