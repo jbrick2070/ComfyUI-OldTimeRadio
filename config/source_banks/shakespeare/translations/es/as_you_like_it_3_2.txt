@@ -1,7 +1,7 @@
 ESCENA II.
 El bosque.
 Entra ORLANDO, con un papel.
-ORLANDO: —Quedad aquí, versos míos, en testimonio de mi amor. Y tú, reina de la noche coronada de triple diadema, observa con tu casta mirada desde tu pálida y alta esfera el nombre de tu cazadora, que domina toda mi existencia.—Estos árboles ¡oh Rosalinda! serán mis libros, y grabaré mis pensamientos en su corteza, para que tus virtudes sean contempladas por todas partes por cuantos seres hay en este bosque.—Corre, corre, Orlando, y graba en cada árbol el nombre de la bella, la casta, la imponderable. (Sale.—Entran Corino y Piedra-de-toque.)
+ORLANDO: —Quedad aquí, versos míos, en testimonio de mi amor. Y tú, reina de la noche coronada de triple diadema, observa con tu casta mirada desde tu pálida y alta esfera el nombre de tu cazadora, que domina toda mi existencia.—Estos árboles ¡oh Rosalinda! serán mis libros, y grabaré mis pensamientos en su corteza, para que tus virtudes sean contempladas por todas partes por cuantos seres hay en este bosque.—Corre, corre, Orlando, y graba en cada árbol el nombre de la bella, la casta, la imponderable.
 CORINO: —¿Y cómo os place esta vida de pastor, señor Piedra-de-toque?
 PIEDRA: —Á la verdad, pastor, que considerada en sí misma es una vida buena, pero como vida de pastor no vale nada. Me gusta bastante porque es solitaria; pero siendo tan retraída, es una vida muy despreciable. Agrádame también por lo que tiene de campestre, pero me fastidia el que no sea en la corte. Y notad que cuadra bien á mi temperamento, porque es una vida económica; pero como no ofrece mucha abundancia, mi estómago no se aviene con ella. Pastor: ¿tienes algo de filósofo?
 CORINO: —No más que lo suficiente para comprender que cuanto más enfermo está uno, peor se siente; que faltan tres buenos amigos á quien no tiene dinero, medios y satisfacción; que la lluvia moja y el fuego quema; que el buen pasto engorda al rebaño; y que entra por mucho el que no haya sol para que sea de noche; y que quien no adquirió ingenio por la naturaleza ó por el arte, puede quejarse ó de su educación ó de su mala estirpe.
@@ -24,7 +24,7 @@ CORINO: —Tenéis, como cortesano, demasiado ingenio para mí.—Me callaré.
 PIEDRA: —¿Quieres condenarte, pues? Dios te valga, hombre superficial! Dios te abra la mollera, porque no sabes nada.
 CORINO: —Señor, soy un honrado labrador, que gano lo que como y lo que visto; que no aborrezco á nadie ni envidio la dicha de ningún hombre; que me alegro del bien de los demás y me resigno á mi propio daño; y mi mayor orgullo se reduce á ver pastar mis ovejas y amamantar mis corderos.
 PIEDRA: —He ahí otro pecado de ignorancia en que caéis: juntar moruecos y ovejas, prometiéndoos ganar la vida por la cópula del ganado: servir de tercero á un carnero-guía, y sacrificar una ovejita de año entregándola á un morueco viejo, de patas torcidas, y de todos modos cornudo, faltando en ello á toda equidad y proporción. Si no te condenas por esto, á fe que no querrá coger nunca pastores el diablo. No veo por cuál otro motivo escaparías.
-CORINO: —Aquí viene el joven señor Ganimedes, el hermano de mi nueva ama. (Entra Rosalinda, leyendo un papel.)
+CORINO: —Aquí viene el joven señor Ganimedes, el hermano de mi nueva ama.
 ROSALINDA: No hay desde Oriente á Poniente joya como Rosalinda. Do quiera lleva el ambiente la fama de Rosalinda. El cuadro más refulgente negro es junto á Rosalinda. Ni recuerde faz la mente sino la de Rosalinda.
 PIEDRA: —Pues yo os haré rimas por el estilo ocho años seguidos, exceptuando solamente las horas de almorzar, comer y dormir.
 ROSALINDA: —¡Calla, loco!
@@ -32,12 +32,12 @@ PIEDRA: —Va de muestra: Si falta al ciervo una cierva venga y busque á Rosali
 ROSALINDA: —¡Silencio, tonto! Los encontré en un árbol.
 PIEDRA: —Á fe mía que da mal fruto.
 ROSALINDA: —Pues lo ingertaré contigo, que será ingertarlo con un níspero, y así será el fruto más temprano del país; porque os habréis podrido antes de estar medio maduro, que es la condición propia del níspero.
-PIEDRA: —Eso decís; pero si cuerdamente ó no, que lo decida el bosque. (Entra Celia, leyendo un papel.)
+PIEDRA: —Eso decís; pero si cuerdamente ó no, que lo decida el bosque.
 ROSALINDA: —Guardad silencio y haceos á un lado, que aquí viene mi hermana leyendo.
 CELIA: ¿Y habrá silencio en el desierto bosque porque nadie lo habita? No: que á cada árbol prestaré una lengua que bellas cosas diga. Una dirá cuán presto cruza el hombre la senda de la vida, de cuyo espacio el hueco de la mano encierra la medida. Y otra los olvidados juramentos de dos almas amigas. En las más bellas ramas y al extremo de las mejores líneas, grabaré embelleciendo mis sentencias un nombre: Rosalinda. Y cuantos lean notarán que el cielo quiso mostrar un día juntas en breve espacio, sus más bellas y nobles maravillas. Á la naturaleza dió el encargo de un cuerpo en que se anidan todas las gracias juntas y aumentadas; por eso ella combina la hermosa faz, no el corazón, de Helena: la majestad altiva de Clëopatra, el alma de Atalantoa, de Lucrecia la esquiva modestia; y con mil prendas quiso el cielo juntar en Rosalinda de corazones, rostros y miradas la suprema valía. Tan bellos dones quiso dar el cielo á su obra favorita para que siendo yo su esclavo siempre rinda á sus piés mi vida.
 ROSALINDA: —¡Oh Dios de misericordia! ¡Y qué fastidiosa homilia de amor habéis hecho pesar sobre vuestros feligreses, sin daros la pena de decir siquiera: «¡Tened paciencia, buenas gentes!»
 CELIA: —¿Qué es esto? ¡Atrás, amigos! Pastor, retírate un poco: y tú, vete con él, bellaco.
-PIEDRA: —Ven, pastor. Pongámonos en honrosa retirada, si no con carros y bagajes, al menos con zurrón y cayado. (Salen Corino y Piedra-de-toque.)
+PIEDRA: —Ven, pastor. Pongámonos en honrosa retirada, si no con carros y bagajes, al menos con zurrón y cayado.
 CELIA: —¿Oiste esos versos?
 ROSALINDA: —Sí: todos ellos y aun más; porque algunos tenían más piés que los que el verso admite.
 CELIA: —Eso no importa: los versos podrán así caminar por sus piés.
@@ -75,9 +75,9 @@ ROSALINDA: —Aunque es lástima ver semejante cuadro, debía venir bien á la d
 CELIA: —Ataja tu lengua, por Dios. Se pone á saltar fuera de tiempo. Vestía de cazador.
 ROSALINDA: —¡Siniestro presagio! Viene á traspasar mi corazón.
 CELIA: —Quisiera entonar la canción sin tropiezo; pero me haces desafinar.
-ROSALINDA: —¿No sabes que soy mujer? Cuando pienso, tengo de hablar. Sigue, querida mía, sigue. (Entran Orlando y Duque.)
+ROSALINDA: —¿No sabes que soy mujer? Cuando pienso, tengo de hablar. Sigue, querida mía, sigue.
 CELIA: —Me sacáis de mis casillas. ¡Calla! ¿no es él quien viene?
-ROSALINDA: —El es. Escóndete y obsérvalo. (Celia y Rosalinda se retiran.)
+ROSALINDA: —El es. Escóndete y obsérvalo.
 JAQUES: —Gracias por vuestra compañía; pero en verdad me habría sido lo mismo estar solo.
 ORLANDO: —Lo mismo que á mi. Sin embargo, por cumplir con la moda, os doy también las gracias por vuestra sociedad.
 JAQUES: —Id con Dios. Procuremos encontrarnos lo menos posible.
@@ -101,7 +101,7 @@ ORLANDO: —Se había ahogado en el arroyo. Si os asomáis al agua le veréis la
 JAQUES: —Allí no veré sino la mía.
 ORLANDO: —Pues tengo para mí que si es cara de algo es la de un tonto.
 JAQUES: —No gastaré más palabras con vos. ¡Adios, señor don Cupido!
-ORLANDO: —Gracias á Dios que os váis. Adios, señor don Quejumbres. (Sale Jaques.—Celia y Rosalinda se adelantan.)
+ORLANDO: —Gracias á Dios que os váis. Adios, señor don Quejumbres.
 ROSALINDA: —Le hablaré como un paje impertinente, y así disfrazada le haré alguna travesura. ¿Oís?
 CELIA: —Bien ¿qué queréis?
 ROSALINDA: —¿Qué hora ha dado?
@@ -144,4 +144,4 @@ ROSALINDA: —Pues os curaré, si solamente consentís en llamarme Rosalinda, y 
 ORLANDO: —Bien. Á fe de mi amor, que lo haré. Decidme á dónde es.
 ROSALINDA: —Venid conmigo y os le mostraré. Mientras caminamos, me diréis en qué parte del bosque vivís. ¿Queréis venir?
 ORLANDO: —Con todo mi corazón, joven amigo.
-ROSALINDA: —No. Tenéis que llamarme Rosalinda. ¡Ea! ¡Hermana! ¿Quieres venir? (Salen.)
+ROSALINDA: —No. Tenéis que llamarme Rosalinda. ¡Ea! ¡Hermana! ¿Quieres venir?

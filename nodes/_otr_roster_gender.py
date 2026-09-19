@@ -708,19 +708,31 @@ def gender_map_for_names(
     *,
     play_code: str = "",
     supplement: Optional[Mapping] = None,
+    resolve_as: Optional[Mapping] = None,
 ) -> dict:
     """UPPER-CASED name -> verdict dict, for every name that RESOLVED.
 
     Unresolved names are omitted, never recorded as 'unknown': the caller pins
     what it knows and leaves the rest to the existing allocator untouched.
+
+    ``resolve_as`` (name -> the roster name to resolve INSTEAD) is the bridge
+    for a vendored translation: the ladder is language-internal by
+    construction -- exact / short_form / qualified / contains are all string
+    tests against the English sidecar -- so `PRIMA STREGA` cannot reach `FIRST
+    WITCH` on any rung, and `RÉGANE` cannot reach `REGAN`. The verdict is still
+    KEYED by the spoken name, because that is the cast-row name `lock_cast`
+    looks up. No new gender logic: the English name walks the same ladder the
+    English episode walks. Absent or unmatched, byte-identical to before.
     """
+    lookup = {_norm(k): str(v) for k, v in (resolve_as or {}).items() if _norm(k)}
     out = {}
     for name in names or []:
         key = _norm(name)
         if not key or key in out:
             continue
         verdict = resolve_with_supplement(
-            name, characters, play_code=play_code, supplement=supplement,
+            lookup.get(key) or name, characters,
+            play_code=play_code, supplement=supplement,
         )
         if verdict.is_pinned:
             out[key] = {

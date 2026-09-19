@@ -12,13 +12,39 @@
       "translation_first_published": 1883,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://es.wikisource.org/wiki/Como_gust%C3%A9is_(M%C3%A1rquez_tr.)",
-      "revision_id": "sha256:dcc26508806f7c80",
-      "raw_sha256": "dcc26508806f7c8031ed746a8f11745bf44850d0aea2f0c459c9408f15df3a0f",
+      "revision_id": "sha256:c32e4af97b81995b",
+      "raw_sha256": "c32e4af97b81995bee89c02f32ab9601aac72ff68f4617a36929892bfd70eda0",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO III / ESCENA II",
       "speaker_labels": 144,
-      "distinct_speakers": 6
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "ORLANDO": {
+          "spoken": "ORLANDO",
+          "roster": "ORLANDO"
+        },
+        "CORINO": {
+          "spoken": "CORINO",
+          "roster": "CORIN"
+        },
+        "PIEDRA": {
+          "spoken": "PIEDRA-DE-TOQUE",
+          "roster": "TOUCHSTONE"
+        },
+        "ROSALINDA": {
+          "spoken": "ROSALINDA",
+          "roster": "ROSALIND"
+        },
+        "CELIA": {
+          "spoken": "CELIA",
+          "roster": "CELIA"
+        },
+        "JAQUES": {
+          "spoken": "JAQUES",
+          "roster": "JAQUES"
+        }
+      }
     },
     {
       "iso": "fr",
@@ -36,7 +62,25 @@
       "alignment_confidence": 1.0,
       "edition_label": "SCÈNE I",
       "speaker_labels": 60,
-      "distinct_speakers": 4
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "BERNARDO": {
+          "spoken": "BERNARDO",
+          "roster": "BARNARDO"
+        },
+        "FRANCISCO": {
+          "spoken": "FRANCISCO",
+          "roster": "FRANCISCO"
+        },
+        "HORATIO": {
+          "spoken": "HORATIO",
+          "roster": "HORATIO"
+        },
+        "MARCELLUS": {
+          "spoken": "MARCELLUS",
+          "roster": "MARCELLUS"
+        }
+      }
     },
     {
       "iso": "fr",
@@ -54,7 +98,49 @@
       "alignment_confidence": 1.0,
       "edition_label": "SCÈNE I",
       "speaker_labels": 84,
-      "distinct_speakers": 10
+      "distinct_speakers": 10,
+      "speaker_map": {
+        "KENT": {
+          "spoken": "KENT",
+          "roster": "KENT"
+        },
+        "GLOCESTER": {
+          "spoken": "GLOCESTER",
+          "roster": "GLOUCESTER"
+        },
+        "EDMOND": {
+          "spoken": "EDMOND",
+          "roster": "EDMUND"
+        },
+        "LEAR": {
+          "spoken": "LEAR",
+          "roster": "LEAR"
+        },
+        "GONERIL": {
+          "spoken": "GONERIL",
+          "roster": "GONERIL"
+        },
+        "CORDÉLIA": {
+          "spoken": "CORDÉLIA",
+          "roster": "CORDELIA"
+        },
+        "RÉGANE": {
+          "spoken": "RÉGANE",
+          "roster": "REGAN"
+        },
+        "ALBANY ET CORNOUAILLES": {
+          "spoken": "ALBANY ET CORNOUAILLES",
+          "roster": "BOTH"
+        },
+        "LE DUC DE BOURGOGNE": {
+          "spoken": "LE DUC DE BOURGOGNE",
+          "roster": "BURGUNDY"
+        },
+        "LE ROI DE FRANCE": {
+          "spoken": "LE ROI DE FRANCE",
+          "roster": "FRANCE"
+        }
+      }
     },
     {
       "iso": "it",
@@ -66,13 +152,47 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/Macbeth_(Shakespeare-Rusconi)/Atto_primo",
-      "revision_id": "sha256:868862baf1278ac0",
-      "raw_sha256": "868862baf1278ac0e87dbec6520d270ad251deccb2d33cb2ee4671176a5043ea",
+      "revision_id": "sha256:0b150929e7363597",
+      "raw_sha256": "0b150929e736359727efc81ee64a35d0c8b5267c916a00d20ac31cea4e3366e4",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ATTO PRIMO / SCENA III",
       "speaker_labels": 51,
-      "distinct_speakers": 8
+      "distinct_speakers": 8,
+      "speaker_map": {
+        "1A STREGA": {
+          "spoken": "PRIMA STREGA",
+          "roster": "FIRST WITCH"
+        },
+        "2A STREGA": {
+          "spoken": "SECONDA STREGA",
+          "roster": "SECOND WITCH"
+        },
+        "3A STREGA": {
+          "spoken": "TERZA STREGA",
+          "roster": "THIRD WITCH"
+        },
+        "TUTTE LE STREGHE CANTANDO E DANZANDO": {
+          "spoken": "TUTTE LE STREGHE",
+          "roster": "ALL"
+        },
+        "MACBETH": {
+          "spoken": "MACBETH",
+          "roster": "MACBETH"
+        },
+        "BANQUO": {
+          "spoken": "BANQUO",
+          "roster": "BANQUO"
+        },
+        "ROSSE": {
+          "spoken": "ROSSE",
+          "roster": "ROSS"
+        },
+        "ANGUS": {
+          "spoken": "ANGUS",
+          "roster": "ANGUS"
+        }
+      }
     }
   ]
 }

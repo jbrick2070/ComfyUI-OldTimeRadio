@@ -108,6 +108,11 @@ _REQUIRED_CREDITS = (
     "credit_licensed", "credit_used_under", "credit_synthetic",
     "credit_adapted_prefix", "credit_freely", "credit_freely_source_with",
     "credit_freely_source",
+    # The translator of a vendored scene, named on the printed roll. REQUIRED,
+    # so every row must carry it -- `_require_str_map` copies only the keys in
+    # this tuple, so a key left out here is dropped before a caller sees it and
+    # the credit silently falls back to English.
+    "credit_translated_by",
     "credit_story_by", "credit_story_anonymous",
     "credit_models_used", "credit_models_none",
 )

@@ -580,6 +580,19 @@ REQUIRED_MANIFEST_FIELDS = (
     "revision_id", "raw_sha256", "verdict", "alignment_confidence",
 )
 
+#: OPTIONAL per-row key: the edition's speaker label -> how the episode carries
+#: it. `{"1A STREGA": {"spoken": "PRIMA STREGA", "roster": "FIRST WITCH"}}`.
+#: `spoken` is the cast-row name in the translation's language; `roster` is the
+#: ENGLISH sidecar name the gender ladder resolves (or a collective marker,
+#: `ALL` / `BOTH`, for a joint turn the selector must refuse). The text file is
+#: never edited to carry this -- it is signed by `raw_sha256` and it is the
+#: translator's own words; the mapping carries identity, the text stays as
+#: written. OPTIONAL BY DESIGN: a required key here would make `load_manifest`
+#: refuse every row vendored before it existed, which a review panel killed on
+#: a different feature for exactly that reason. A row without it degrades to
+#: the label-as-name join and the plan receipt says so (`unbound_labels`).
+SPEAKER_MAP_FIELD = "speaker_map"
+
 
 class CorpusError(ValueError):
     """A manifest that cannot be trusted. Never degraded around: a wrong
@@ -631,6 +644,10 @@ def load_manifest(path: str) -> list:
             raise CorpusError(
                 "%s: scenes[%d] alignment_confidence %r is not within 0..1"
                 % (path, i, row["alignment_confidence"]))
+        # Optional, but when present it must be whole: a half-written map
+        # would bind some of a scene's people and silently leave the rest to
+        # the roll, and the manifest is documented as never degraded around.
+        _validate_speaker_map(path, i, row.get(SPEAKER_MAP_FIELD))
         # NO RIGHTS TEST HERE, DELIBERATELY. This used to raise CorpusError on
         # a publication-date failure, and CorpusError is documented as never
         # degraded around. Nothing in production calls `load_manifest` yet, so
@@ -647,6 +664,44 @@ def load_manifest(path: str) -> list:
         # above, because the credit roll names them; they are data, not a gate.
         pass
     return [dict(row) for row in rows]
+
+
+def _validate_speaker_map(path: str, index: int, value) -> None:
+    """Refuse a `speaker_map` that is present and malformed. Absent is fine."""
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        raise CorpusError("%s: scenes[%d] %s must be an object"
+                          % (path, index, SPEAKER_MAP_FIELD))
+    for label, spec in value.items():
+        if not str(label or "").strip():
+            raise CorpusError("%s: scenes[%d] %s has an empty label"
+                              % (path, index, SPEAKER_MAP_FIELD))
+        if not isinstance(spec, Mapping):
+            raise CorpusError("%s: scenes[%d] %s[%r] must be an object"
+                              % (path, index, SPEAKER_MAP_FIELD, label))
+        for key in ("spoken", "roster"):
+            if not str(spec.get(key) or "").strip():
+                raise CorpusError(
+                    "%s: scenes[%d] %s[%r] needs a non-empty %r"
+                    % (path, index, SPEAKER_MAP_FIELD, label, key))
+
+
+def speaker_bindings(row) -> dict:
+    """``{label: {"spoken": ..., "roster": ...}}`` from a manifest row, or
+    ``{}`` when the row carries no map. Plain dicts -- the lane turns them into
+    the selector's typed binding, so this module stays a leaf."""
+    raw = (row or {}).get(SPEAKER_MAP_FIELD) if isinstance(row, Mapping) else None
+    if not isinstance(raw, Mapping):
+        return {}
+    return {
+        " ".join(str(label).split()): {
+            "spoken": str(spec.get("spoken") or "").strip(),
+            "roster": str(spec.get("roster") or "").strip(),
+        }
+        for label, spec in raw.items()
+        if isinstance(spec, Mapping)
+    }
 
 
 def select_scene(rows: Sequence[Mapping], *, iso: str, play: str, scene: str,
@@ -683,12 +738,13 @@ def select_scene(rows: Sequence[Mapping], *, iso: str, play: str, scene: str,
 __all__ = [
     "BLOCKED", "EMPTY", "LIFE_PLUS_50_DEATH_BEFORE", "LIFE_PLUS_70_DEATH_BEFORE",
     "MANIFEST_NAME", "MIN_DIALOGUE_RATIO", "MIN_SPEAKER_LABELS", "PARTIAL",
-    "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION",
+    "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION", "SPEAKER_MAP_FIELD",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",
     "US_PUBLICATION_BEFORE", "CorpusError", "LeadReport", "assess",
     "count_speaker_labels", "vendored_text",
     "dialogue_ratio", "find_pending_markers", "headings_present",
-    "load_manifest", "publication_reasons", "select_scene", "strip_tracking",
+    "load_manifest", "publication_reasons", "select_scene", "speaker_bindings",
+    "strip_tracking",
 ]
 
 

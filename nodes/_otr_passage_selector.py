@@ -11,12 +11,16 @@ play's own, there is nothing for a model to drift away from: this is what stops
 a Forest-of-Arden scene being narrated as if it were Verona.
 
 FORM, NOT AUTHOR -- but only as far as it is PROVEN. The parser targets the
-FOLGER plain-text layout specifically, and that is the only format with vendored
-examples under test. Other already-dialogue public-domain sources (Wilde, Ibsen,
-Chekhov) are plausible future callers because the selection logic is about form
-rather than authorship, but their layouts are NOT verified here and must not be
-assumed: a speculative multi-format grammar would widen the prefix match and
-weaken the prose refusal below. Add an adapter per real sample, with corpus tests.
+FOLGER plain-text layout and, since 2026-09-18, the COLON layout of the vendored
+translations (``NAME: speech``, one speech per line -- see ``_COLON_SPEECH_RE``);
+those are the only two formats with vendored examples under test. Other
+already-dialogue public-domain sources (Wilde, Ibsen, Chekhov) are plausible
+future callers because the selection logic is about form rather than authorship,
+but their layouts are NOT verified here and must not be assumed: a speculative
+multi-format grammar would widen the prefix match and weaken the prose refusal
+below. Add an adapter per real sample, with corpus tests -- and gate it the way
+the colon layout is gated (``detect_layout``), so the English corpus is provably
+untouched by it.
 
 Prose sources are a different problem and are NOT served by this module: prose has
 no speech prefixes to slice, and pretending otherwise is how a narrator's account
@@ -47,6 +51,7 @@ from __future__ import annotations
 import hashlib
 import re
 from dataclasses import dataclass
+from typing import Mapping
 
 from ._otr_episode_budget import BEAT_WORD_HARD_MAX
 from ._otr_text_metrics import canonical_word_count
@@ -54,7 +59,11 @@ from ._otr_text_metrics import canonical_word_count
 __all__ = [
     "PassageError",
     "Speech",
+    "SpeakerBinding",
     "Passage",
+    "FOLGER_LAYOUT",
+    "COLON_LAYOUT",
+    "detect_layout",
     "parse_speeches",
     "strip_stage_directions",
     "chunk_speech",
@@ -100,6 +109,33 @@ _NON_SPEAKER_TOKENS = frozenset({
     "ACT", "SCENE", "FINIS", "THE END", "EPILOGUE", "PROLOGUE", "EXIT", "EXEUNT",
 })
 
+# THE THIRD LAYOUT (2026-09-18): the vendored translations under
+# config/source_banks/shakespeare/translations write `NAME: speech`, one speech
+# per line, the name at column 0. Rusconi, Hugo and Marquez label people the
+# ASCII rule above cannot see -- accented (CORDÉLIA, RÉGANE) and ordinal-led
+# (1A STREGA, 2A STREGA, 3A STREGA) -- so the name class here is "starts with a
+# letter or digit, runs to the first colon" and the all-caps test is made AFTER
+# the match (`_is_upper_label`), where `str.islower` knows every alphabet.
+# Measured before this existed: Hugo's Hamlet and Lear parsed to ZERO speeches,
+# Rusconi's Macbeth and Marquez's As You Like It to ONE (the scene heading,
+# swallowing the whole scene as its text), so `plan_verbatim_passage` reported
+# unavailable and every native-language Shakespeare row fell back to the model
+# translation in silence.
+_COLON_SPEECH_RE = re.compile(r"^(?P<name>[^\W_][^:\n]{0,79}?):(?:\s+|$)")
+
+# Heading words the colon editions carry, checked against the FIRST word of a
+# colon-layout name only. `SCENA III.` / `ESCENA II.` / `SCÈNE I.` carry no
+# colon and never match; this is for the edition that writes `ESCENA II: El
+# bosque`. Never applied to the Folger layout, so no English file can change.
+_HEADING_WORDS = frozenset({
+    "ACT", "ACTE", "ATTO", "ACTO", "AKT",
+    "SCENE", "SCÈNE", "SCENA", "ESCENA", "SZENE",
+})
+
+#: The two layouts `detect_layout` can name. A document has ONE layout.
+FOLGER_LAYOUT = "folger"
+COLON_LAYOUT = "colon"
+
 # Collective turns, not cast identities. "ALL" is a real speaker label in the
 # Macbeth text ("ALL, [dancing in a circle]"), but charging it a cast slot and a
 # char_id would mint a phantom voice that no TTS speaker can own. Delivering a
@@ -126,8 +162,10 @@ def _line_units(text: str) -> list[str]:
 
 
 def _split_long_line(line: str, cap: int) -> list[str]:
-    """A single line over the cap (none in the vendored corpus) splits at word
-    boundaries. Every word survives, in order."""
+    """A single line over the cap splits at word boundaries. Every word
+    survives, in order. None in the Folger corpus; the colon-layout
+    translations write a whole speech on one line, so their long speeches
+    (Banquo's "Qual distanza v'ha ancora" is one) take this path."""
     pieces: list[str] = []
     piece: list[str] = []
     for token in line.split():
@@ -187,12 +225,43 @@ def chunk_speech(text: str, *, cap: int = BEAT_WORD_HARD_MAX) -> tuple[str, ...]
 
 
 @dataclass(frozen=True)
+class SpeakerBinding:
+    """How one edition label is carried through the episode.
+
+    ``spoken`` is the name the episode CALLS the character -- the cast row, the
+    captions, the credits -- in the translation's own language and in the same
+    upper-case shape the Folger prefixes arrive in (``lock_cast`` upper-cases
+    every source name anyway). ``roster`` is the ENGLISH sidecar name the gender
+    ladder resolves instead of the spoken one: ``_otr_roster_gender`` is
+    language-internal by construction, so ``1A STREGA`` cannot reach ``FIRST
+    WITCH`` on any rung without this bridge. A ``roster`` naming a collective
+    marker (``ALL``, ``BOTH``) makes the speech collective, exactly as the
+    Folger ``ALL`` label is.
+    """
+
+    spoken: str
+    roster: str
+
+
+@dataclass(frozen=True)
 class Speech:
-    """One character's uninterrupted turn, exactly as the source has it."""
+    """One character's uninterrupted turn, exactly as the source has it.
+
+    ``label`` is the prefix as the PAGE writes it and ``roster_name`` the English
+    sidecar name it was bound to; both are empty on an unbound speech, where the
+    speaker IS the page label. Defaults keep every existing construction site
+    and the English parse byte-identical.
+    """
 
     index: int
     speaker: str
     text: str
+    label: str = ""
+    roster_name: str = ""
+
+    @property
+    def page_label(self) -> str:
+        return self.label or self.speaker
 
     @property
     def word_count(self) -> int:
@@ -203,7 +272,11 @@ class Speech:
 
     @property
     def is_collective(self) -> bool:
-        return self.speaker in _COLLECTIVE_SPEAKERS
+        # A bound speech is collective by its ROSTER identity: Rusconi's "TUTTE
+        # LE STREGHE CANTANDO E DANZANDO" is Folger's "ALL, [dancing in a
+        # circle]" with the stage direction fused into the label, and it must be
+        # refused the same way -- a chorus cannot own a cast slot.
+        return (self.roster_name or self.speaker) in _COLLECTIVE_SPEAKERS
 
     def beat_cost(self, *, beat_word_cap: int = BEAT_WORD_HARD_MAX) -> int:
         # The chunker is the owner: a speech costs exactly the beats the
@@ -222,10 +295,25 @@ class Passage:
     first_index: int
     last_index: int
     eligible_count: int
+    # Labels anywhere in the SOURCE (not only this window) that the supplied
+    # bindings did not name. Always empty when no bindings were supplied. An
+    # unbound label is carried as written and degrades to the label-as-name
+    # gender join; this is where a reader finds out that it did.
+    unbound_labels: tuple[str, ...] = ()
 
     @property
     def speech_count(self) -> int:
         return len(self.speeches)
+
+    @property
+    def roster_names(self) -> dict:
+        """spoken name -> the English roster name it was bound to (bound
+        speakers only, in speaking order)."""
+        out: dict = {}
+        for speech in self.speeches:
+            if speech.roster_name and speech.speaker not in out:
+                out[speech.speaker] = speech.roster_name
+        return out
 
 
 def strip_stage_directions(source_text: str) -> str:
@@ -239,14 +327,104 @@ def strip_stage_directions(source_text: str) -> str:
     return _BRACKET_SPAN_RE.sub(" ", str(source_text or ""))
 
 
-def parse_speeches(source_text: str) -> tuple[Speech, ...]:
+def _folger_prefix(line: str) -> tuple[str, str] | None:
+    """``(name, remainder)`` when an unindented line opens a Folger speech."""
+    match = _SPEECH_RE.match(line)
+    if match is None or match.group("name") in _NON_SPEAKER_TOKENS:
+        return None
+    return match.group("name"), line[match.end():].strip()
+
+
+def _is_upper_label(name: str) -> bool:
+    # At least one letter, and no lowercase one in ANY alphabet. `[A-Z]` in
+    # `_SPEECH_RE` is what made CORDÉLIA invisible; this is the test that
+    # regex could not express.
+    return any(ch.isalpha() for ch in name) and not any(ch.islower() for ch in name)
+
+
+def _colon_prefix(line: str) -> tuple[str, str] | None:
+    """``(name, remainder)`` when an unindented line opens a colon-layout speech."""
+    match = _COLON_SPEECH_RE.match(line)
+    if match is None:
+        return None
+    name = " ".join(match.group("name").split())
+    if not _is_upper_label(name) or name in _NON_SPEAKER_TOKENS:
+        return None
+    if name.split()[0].rstrip(".") in _HEADING_WORDS:
+        return None
+    return name, line[match.end():].strip()
+
+
+def _detect_layout(cleaned: str) -> str:
+    """Which of the two grammars this (direction-stripped) document is in.
+
+    THE GATE THAT KEEPS THE ENGLISH CORPUS BYTE-IDENTICAL. A colon layout is
+    NOT admitted line by line beside the Folger one: measured across all 81
+    files under config/source_banks/*/sources, exactly ONE column-0 `ALLCAPS:`
+    line exists -- `STAVE I:  MARLEY'S GHOST`, a chapter heading in the prose
+    Christmas Carol -- and a per-line rule would have minted it as a speaker.
+    So the layout is decided ONCE per document, and the colon layout needs
+    what a dialogue needs and a heading never has: TWO DISTINCT labelled
+    voices, outnumbering the Folger prefixes. `tests/test_passage_selector.py`
+    pins the measurement and re-parses every English file both ways.
+    """
+    folger = 0
+    colon_names: list[str] = []
+    for raw_line in cleaned.splitlines():
+        line = raw_line.rstrip()
+        if not line or line != line.lstrip():
+            continue
+        if _folger_prefix(line) is not None:
+            folger += 1
+        hit = _colon_prefix(line)
+        if hit is not None:
+            colon_names.append(hit[0])
+    if len(set(colon_names)) >= 2 and len(colon_names) > folger:
+        return COLON_LAYOUT
+    return FOLGER_LAYOUT
+
+
+def detect_layout(source_text: str) -> str:
+    """``FOLGER_LAYOUT`` or ``COLON_LAYOUT`` for a raw source text."""
+    return _detect_layout(strip_stage_directions(source_text))
+
+
+def _bind(speech: Speech, bindings) -> Speech:
+    binding = bindings.get(speech.speaker) if bindings else None
+    if binding is None:
+        # Unbound: the page label is carried as written. Not an error here --
+        # the Passage lists it under `unbound_labels` so the receipt says so.
+        return speech
+    return Speech(
+        index=speech.index,
+        speaker=str(binding.spoken or "").strip() or speech.speaker,
+        text=speech.text,
+        label=speech.speaker,
+        roster_name=str(binding.roster or "").strip(),
+    )
+
+
+def parse_speeches(
+    source_text: str,
+    *,
+    speaker_bindings: "Mapping[str, SpeakerBinding] | None" = None,
+) -> tuple[Speech, ...]:
     """Split play-form text into ordered speeches.
 
     Stage directions are excluded from spoken text -- they are performance
     instruction, not dialogue, and speaking them aloud is a fidelity defect of
     its own. Their position is implicitly preserved by speech ordering.
+
+    ``speaker_bindings`` (page label -> ``SpeakerBinding``) renames each bound
+    speech to its spoken name and records its roster name; it is applied HERE,
+    before any window is costed, so ``Speech.is_collective`` already sees the
+    roster identity when ``eligible_windows`` refuses a chorus. ``None`` is the
+    English path and touches nothing.
     """
     cleaned = strip_stage_directions(source_text)
+    prefix_of = (
+        _colon_prefix if _detect_layout(cleaned) == COLON_LAYOUT else _folger_prefix
+    )
     speeches: list[tuple[str, list[str]]] = []
     for raw_line in cleaned.splitlines():
         line = raw_line.rstrip()
@@ -255,10 +433,10 @@ def parse_speeches(source_text: str) -> tuple[Speech, ...]:
             continue
         # A prefix is never indented; indented lines continue the current speech.
         if line == line.lstrip():
-            match = _SPEECH_RE.match(line)
-            if match is not None and match.group("name") not in _NON_SPEAKER_TOKENS:
-                remainder = line[match.end():].strip()
-                speeches.append((match.group("name"), [remainder] if remainder else []))
+            hit = prefix_of(line)
+            if hit is not None:
+                name, remainder = hit
+                speeches.append((name, [remainder] if remainder else []))
                 continue
         if speeches:
             speeches[-1][1].append(stripped)
@@ -267,7 +445,8 @@ def parse_speeches(source_text: str) -> tuple[Speech, ...]:
     for speaker, lines in speeches:
         text = "\n".join(lines).strip()
         if text:
-            out.append(Speech(index=len(out), speaker=speaker, text=text))
+            out.append(_bind(Speech(index=len(out), speaker=speaker, text=text),
+                             speaker_bindings))
     return tuple(out)
 
 
@@ -347,6 +526,7 @@ def select_passage(
     tolerance: float = 0.25,
     min_speakers: int = 2,
     beat_word_cap: int = BEAT_WORD_HARD_MAX,
+    speaker_bindings: "Mapping[str, SpeakerBinding] | None" = None,
 ) -> Passage:
     """Choose one verbatim passage. Deterministic for a given seed.
 
@@ -357,8 +537,21 @@ def select_passage(
     Raises PassageError when no window fits, rather than relaxing a constraint --
     a passage that overruns its beats cannot be performed, and a passage stretched
     to fit is no longer the source's own words.
+
+    ``speaker_bindings`` is handed straight to ``parse_speeches``; see there.
     """
-    speeches = parse_speeches(source_text)
+    speeches = parse_speeches(source_text, speaker_bindings=speaker_bindings)
+    unbound: tuple[str, ...] = ()
+    # The same sentinel as the lane's: `{}` means a vendored row with no map,
+    # and it must report EVERY label as unbound. Fixing only the lane leaves an
+    # `unbound_labels` key that is always empty, which never trips the writer's
+    # warning -- so both layers test `is not None` or neither does.
+    if speaker_bindings is not None:
+        seen: list[str] = []
+        for speech in speeches:
+            if not speech.roster_name and speech.speaker not in seen:
+                seen.append(speech.speaker)
+        unbound = tuple(seen)
     if not speeches:
         raise PassageError(
             "no speeches parsed from the source text -- refusing to select a "
@@ -421,6 +614,7 @@ def select_passage(
         first_index=first,
         last_index=last,
         eligible_count=len(windows),
+        unbound_labels=unbound,
     )
 
 
@@ -547,8 +741,16 @@ def build_beat_plan(passage: Passage, *, beat_count: int) -> tuple[BeatPlanEntry
 
 
 def render_passage_text(passage: Passage) -> str:
-    """The selected window in Folger's own verse layout -- the speaker prefix on
-    its own line, the speech beneath -- for the pre-outline authors that read the
-    lane's ``full_text``. Words verbatim; the layout is the parser's own, so the
-    result parses back into the same speeches."""
+    """The selected window in the parser's own layout, for the pre-outline
+    authors that read the lane's ``full_text``. Words verbatim; the layout is
+    one the parser reads, so the result parses back into the same speeches.
+
+    An unbound passage renders in Folger's verse layout -- the speaker prefix
+    on its own line, the speech beneath -- byte-identical to before. A BOUND
+    passage renders in the colon layout, because a spoken name like CORDÉLIA
+    is not a Folger prefix (`[A-Z]`) and the verse layout would glue her lines
+    to the previous speaker on any re-parse.
+    """
+    if any(s.roster_name for s in passage.speeches):
+        return "\n\n".join(f"{s.speaker}: {s.text}" for s in passage.speeches)
     return "\n\n".join(f"{s.speaker}\n{s.text}" for s in passage.speeches)

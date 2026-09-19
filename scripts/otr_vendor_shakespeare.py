@@ -89,6 +89,7 @@ def to_text(markup):
     # READ WHO SPEAKS OFF THE PAGE BEFORE THE PAGE IS THROWN AWAY. Every edition
     # in the set marks its speakers; once the tags are gone that fact cannot be
     # recovered, only guessed at -- see `mark_speakers`.
+    body = strip_direction_parentheticals(body)
     body = mark_speakers(body)
     body = re.sub(r"(?i)</(div|p|li|tr|h[1-6]|span)\s*>", "\n", body)
     body = re.sub(r"(?i)<br\s*/?>", "\n", body)
@@ -140,6 +141,34 @@ _SPEAKER_SPANS = (
                r'<i>(?P<name>[^<]{1,40})</i>'
                r'\s*(?:\((?:<[^>]+>|[^()<])*\))?\s*\.'),
 )
+
+
+#: A parenthetical whose CONTENT IS WHOLLY ITALIC. Rusconi and Marquez set
+#: stage business that way -- `(<i>entra Rosse</i>)`, `(<i>escono</i>)` -- and
+#: the editions are consistent about it.
+_ITALIC_PARENTHETICAL = re.compile(
+    r"\(\s*<i>(?P<body>[^<]{1,80})</i>\s*\)", re.I | re.S)
+
+
+def strip_direction_parentheticals(markup):
+    """Drop `(<i>entra Rosse</i>)`, keep `(car cette partie du monde...)`.
+
+    A BLANKET `()` STRIP WOULD DELETE REAL DIALOGUE. The verbatim cleaner keeps
+    parenthetical words on purpose, because Folger prints "(God shield us!)"
+    INSIDE Bottom's line, and Hugo does the same in French -- Horatio's "(car
+    cette partie du monde connu l'estimait pour tel)" is spoken. But Folger
+    puts stage business in SQUARE brackets, which the selector already strips
+    before parsing, while the colon editions put it in round ones. So the
+    vendored lane inherited an assumption that is false for its own sources and
+    would have performed `entrano Rosse e Angus` and `le streghe scompariscono`
+    aloud.
+
+    The page separates the two and we do not have to guess: stage business is
+    ITALIC, dialogue is not. Same rule as the speaker marks, read at vendor
+    time while the markup still exists -- once it is plain text the distinction
+    is gone and only a word-list could stand in for it.
+    """
+    return _ITALIC_PARENTHETICAL.sub(" ", markup)
 
 
 def mark_speakers(markup):
@@ -501,6 +530,16 @@ def write_rows(rows):
         stored = text + "\n"
         io.open(dest, "w", encoding="utf-8", newline="\n").write(stored)
         digest = hashlib.sha256(stored.encode("utf-8")).hexdigest()
+        # THE ROW IS REBUILT FROM SCRATCH, so a hand-curated key would be
+        # deleted by a routine re-vendor -- the same way a re-fetch used to
+        # wipe the gender roster off a sidecar (`STAMPER_OWNED_SIDECAR_KEYS`).
+        # The speaker map is curated by hand against the edition's labels and
+        # the English sidecar; carry it forward, and let the reader re-check
+        # it against the new text via `unbound_labels` on the next plan.
+        carried = {
+            k: v for k, v in (by_key.get(key) or {}).items()
+            if k == CORPUS.SPEAKER_MAP_FIELD
+        }
         by_key[key] = {
             "iso": iso, "play": play, "scene": scene,
             "file": rel.replace("\\", "/"),
@@ -521,6 +560,7 @@ def write_rows(rows):
                 x for x in EDITION_LABELS[key] if x),
             "speaker_labels": after,
             "distinct_speakers": after_speakers,
+            **carried,
         }
         print("  wrote %-46s %5d chars  %3d speeches / %2d speakers"
               % (rel, len(text), after, after_speakers))

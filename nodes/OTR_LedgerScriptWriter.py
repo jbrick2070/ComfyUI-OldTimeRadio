@@ -3831,9 +3831,45 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     # from the English one -- a second shape, which is exactly
                     # what re-planning through this selector exists to avoid.
                     source_ref=str(resolved.get("source_ref") or ""),
+                    # THE BRIDGE FROM THE EDITION'S LABELS TO THE ENGLISH
+                    # ROSTER. `1A STREGA` is read off the page; the episode
+                    # calls her PRIMA STREGA and genders her as FIRST WITCH.
+                    # Optional on the manifest row: a row without one keeps
+                    # its labels as written and the receipt lists them.
+                    speaker_map=_OTRVC.speaker_bindings(_vendored_row),
                 )
                 if _replanned is not None:
                     _verbatim_plan = _replanned
+                    # RE-PROJECT THE PAYLOAD, NOT ONLY THE PLAN. `_resolve_inputs`
+                    # already ran `project_payload` against the ENGLISH cut, so
+                    # `news_article.full_text` and `news_seed` hold Folger's
+                    # words. Swapping the plan alone left the two halves of the
+                    # episode reading different texts: compose and cast take
+                    # PRIMA STREGA and CORDELIA off the vendored plan while the
+                    # interpreter, the outline's macro pass and the 11.61
+                    # name-authority brief still read FIRST WITCH and CORDELIA
+                    # off the English projection -- which that authority then
+                    # treats as a FOREIGN identity on the performed roster.
+                    # That is the "second shape" the re-plan exists to avoid,
+                    # and fixing the receipt alone did not fix it.
+                    _v_article = _otr_source_payload.validate_source_payload(
+                        _OTRVL_V.project_payload(
+                            dict(resolved.get("news_article") or {}),
+                            _replanned),
+                        origin="vendored verbatim projection")
+                    resolved["news_article"] = _v_article
+                    resolved["news_seed"] = _v_article.get(
+                        "seed_text", resolved.get("news_seed"))
+                    if _vreceipt.get("unbound_labels"):
+                        # A label the map forgot is carried as the page wrote
+                        # it and gendered by that spelling alone -- which for
+                        # `GLOCESTER` means the roll. Loud, because a wrong
+                        # voice on a named character is a real bug here.
+                        log.warning(
+                            "[OTR_LedgerScriptWriter] vendored scene labels "
+                            "with no speaker_map entry (carried as written, "
+                            "gender falls to the label-as-name join): %s",
+                            _vreceipt["unbound_labels"])
                     # THE RECEIPT DESCRIBES WHAT WAS PERFORMED. `setdefault`
                     # kept the ENGLISH receipt here and nested the vendored
                     # facts under one key -- so `raw_sha256`, `speakers`,
@@ -3996,6 +4032,25 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     import _otr_verbatim_lane as _OTRVL  # type: ignore
                 meta["credits_source_line"] = _OTRVL.non_verbatim_credit_line(
                     str(meta.get("credits_source_line") or ""), episode_meta=meta)
+            # AND WHEN A REAL TRANSLATOR'S WORDS WERE PERFORMED, NAME THEM.
+            # `verbatim_passage.vendored` carried Hugo, Rusconi and Marquez by
+            # name and had no consumer anywhere, so a French Hamlet spoke
+            # Hugo's 1865 lines and credited only Folger. The licence line
+            # stays -- it is still true of the scene -- and the translator is
+            # appended beside it.
+            _vendored_prov = dict(
+                (meta.get("verbatim_passage") or {}).get("vendored") or {})
+            if _vendored_prov.get("translator"):
+                try:
+                    from . import _otr_verbatim_lane as _OTRVL_C
+                except ImportError:  # pragma: no cover -- flat load
+                    import _otr_verbatim_lane as _OTRVL_C  # type: ignore
+                meta["credits_source_line"] = _OTRVL_C.vendored_credit_line(
+                    str(meta.get("credits_source_line") or ""),
+                    translator=str(_vendored_prov.get("translator") or ""),
+                    first_published=str(
+                        _vendored_prov.get("first_published") or ""),
+                    episode_meta=meta)
             # A NON-COMMERCIAL SOURCE HAS TO REACH A HUMAN (2026-08-04).
             # commercial_use_allowed was already validated, carried and
             # normalized -- and shown to nobody. An operator publishing a
@@ -4243,6 +4298,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                                 .load_gender_supplement(
                                     _otr_roster_gender.supplement_dir_for_bank(
                                         _source_bank_row)),
+                                # A vendored translation's speakers are
+                                # gendered by their ENGLISH roster name (the
+                                # sidecar is English); the verdict stays keyed
+                                # by the spoken name the cast row carries.
+                                # Empty on the English path.
+                                resolve_as=(
+                                    _verbatim_plan.roster_names
+                                    if _verbatim_plan is not None else None),
                             )
                         )
                     except _otr_roster_gender.RosterGenderError:

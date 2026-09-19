@@ -462,6 +462,33 @@ class TestTheWiringIsThere:
             "the ledger must carry the vendored receipt, not the English one")
         assert "setdefault(\"verbatim_passage\", {})[\"vendored\"]" not in src
 
+    def test_the_writer_bridges_vendored_labels_to_the_english_roster(self):
+        """Row 2 of 2026-09-18, asserted at BOTH real sites: the plan step
+        hands the manifest's speaker_map to the selector, and the gender join
+        resolves each spoken name AS its English roster name. Either half
+        alone is a helper nothing calls."""
+        from nodes import OTR_LedgerScriptWriter as W
+        src = inspect.getsource(W.OTR_LedgerScriptWriter)
+        assert "speaker_map=_OTRVC.speaker_bindings(_vendored_row)" in src, (
+            "the vendored plan is cut without its speaker map")
+        assert "resolve_as=" in src and "_verbatim_plan.roster_names" in src, (
+            "the gender ladder never sees the English roster name")
+        assert 'if _vreceipt.get("unbound_labels"):' in src, (
+            "a label the map forgot must be visible in the log")
+        lane = inspect.getsource(VL.plan_verbatim_passage)
+        assert "speaker_bindings=bindings" in lane, (
+            "the lane builds bindings and never hands them to the selector")
+        # THE PAYLOAD IS RE-PROJECTED, NOT ONLY THE PLAN. `_resolve_inputs`
+        # projected the ENGLISH cut into news_article/news_seed; swapping the
+        # plan alone left the interpreter, the outline's macro pass and the
+        # 11.61 name authority reading FIRST WITCH off Folger while compose and
+        # cast performed PRIMA STREGA. Two texts, one episode.
+        assert "_OTRVL_V.project_payload(" in src, (
+            "the vendored cut never reaches news_article; the interpreter "
+            "still reads the English passage")
+        assert 'resolved["news_seed"] = _v_article.get(' in src, (
+            "news_seed still carries the English excerpt")
+
     def test_the_voice_hook_projects_verbatim_rows_before_any_engine_cleaner(self):
         from nodes import _otr_voice_node_common as V
         src = inspect.getsource(V)
@@ -674,3 +701,204 @@ class TestMultiWordSourceNamesSurviveTheAssembler:
         assert [s.name for s in open_slots] == ["FIRST WITCH", "ANTIPHOLUS OF EPHESUS"]
         assert all(s.source_owned for s in open_slots)
         assert lemmy is False, "the fidelity bank never seats the cameo"
+
+
+# --------------------------------------------------------------------------- #
+# 2026-09-18: the vendored translations, planned through the same selector and
+# gendered through the same ladder -- by their English roster names
+# --------------------------------------------------------------------------- #
+TRANSLATIONS = CORPUS.parent / "translations"
+
+#: (iso, the ref THE SHIPPING BANK EMITS, the English sidecar stem, and the
+#: gender each spoken name must land on -- read off the sidecar, not guessed)
+VENDORED_GENDERS = [
+    ("it", MACBETH, "macbeth__act1_scene3", {
+        "PRIMA STREGA": "female", "SECONDA STREGA": "female",
+        "TERZA STREGA": "female", "MACBETH": "male", "BANQUO": "male",
+        "ROSSE": "male", "ANGUS": "male"}),
+    ("fr", "folger-lear:act1-scene1-love-test", "king_lear__act1_scene1", {
+        "KENT": "male", "GLOCESTER": "male", "EDMOND": "male", "LEAR": "male",
+        "GONERIL": "female", "CORDÉLIA": "female", "RÉGANE": "female",
+        "LE DUC DE BOURGOGNE": "male", "LE ROI DE FRANCE": "male"}),
+    ("fr", "folger-hamlet:act1-scene1-platform-watch", "hamlet__act1_scene1", {
+        "BERNARDO": "male", "FRANCISCO": "male", "HORATIO": "male",
+        "MARCELLUS": "male"}),
+    ("es", "folger-as-you-like-it:act3-scene2-rosalind-orlando",
+     "as_you_like_it__act3_scene2", {
+        "ORLANDO": "male", "CORINO": "male", "PIEDRA-DE-TOQUE": "male",
+        "ROSALINDA": "female", "CELIA": "female", "JAQUES": "male"}),
+]
+
+
+def _vendored(iso, ref):
+    from nodes import _otr_verbatim_corpus as VC
+    text, row = VC.vendored_text(str(TRANSLATIONS), iso, ref)
+    assert text and row, (iso, ref)
+    return text, VC.speaker_bindings(row)
+
+
+@pytest.mark.skipif(not TRANSLATIONS.exists(), reason="translations absent")
+class TestVendoredScenesPerform:
+    @pytest.mark.parametrize("iso, ref, stem, genders", VENDORED_GENDERS)
+    def test_every_vendored_scene_plans_at_the_writer_dials(self, monkeypatch,
+                                                            iso, ref, stem, genders):
+        """Before 2026-09-18 every one of these was `unavailable` -- the
+        selector parsed 0 or 1 speeches -- and the model translation ran in
+        its place. Planned at cast 2, 4 and 6 and every act dial the writer
+        offers, with the map the manifest actually carries."""
+        monkeypatch.setenv("OTR_CAST_SEED", "42")
+        monkeypatch.setenv("OTR_C7", "1")
+        text, bindings = _vendored(iso, ref)
+        for cast in (2, 4, 6):
+            for acts in (1, 2, 3, 6):
+                plan, receipt = VL.plan_verbatim_passage(
+                    source_text=text, source_meta={"recommended_word_budget": 300},
+                    num_characters=cast, act_count=acts, source_ref=ref,
+                    speaker_map=bindings)
+                assert plan is not None, (iso, ref, cast, acts, receipt.get("reason"))
+                assert receipt["status"] == "planned"
+                assert receipt["unbound_labels"] == []
+                assert set(plan.speakers) <= set(genders), plan.speakers
+                assert len(plan.speakers) <= cast
+                assert plan.beat_count == B.voiced_beat_count(acts)
+                # every performed speaker names its roster row on the receipt
+                by_spoken = {m["spoken"]: m for m in receipt["speaker_map"]}
+                assert set(by_spoken) == set(plan.speakers)
+                for spoken in plan.speakers:
+                    assert plan.roster_names[spoken] == by_spoken[spoken]["roster"]
+                    assert by_spoken[spoken]["label"]
+
+    @pytest.mark.parametrize("iso, ref, stem, genders", VENDORED_GENDERS)
+    def test_every_spoken_name_is_gendered_by_its_english_roster_row(
+            self, iso, ref, stem, genders):
+        """The correctness half: a wrong-gender voice on a named character is
+        a real bug (operator). Against the REAL sidecar, through the REAL
+        ladder, keyed by the name the cast row will carry."""
+        from nodes import _otr_roster_gender as RG
+        text, bindings = _vendored(iso, ref)
+        typed = {k: PS.SpeakerBinding(**v) for k, v in bindings.items()}
+        speeches = PS.parse_speeches(text, speaker_bindings=typed)
+        roster_names = {s.speaker: s.roster_name for s in speeches if s.roster_name}
+        chars = RG.load_roster_characters(CORPUS / (stem + ".txt"))
+        assert chars, stem
+        got = RG.gender_map_for_names(list(roster_names), chars,
+                                      resolve_as=roster_names)
+        for spoken, want in genders.items():
+            assert spoken in got, (spoken, "did not resolve")
+            assert got[spoken]["gender"] == want, (spoken, got[spoken])
+            assert got[spoken]["tier"] == "exact", (spoken, got[spoken])
+            assert got[spoken]["roster_name"] == roster_names[spoken]
+        # and WITHOUT the bridge the cross-language names do not resolve at
+        # all -- which is the silent wrong-voice roll this change closes
+        bare = RG.gender_map_for_names(list(roster_names), chars)
+        for spoken in ("PRIMA STREGA", "GLOCESTER", "RÉGANE", "BERNARDO",
+                       "PIEDRA-DE-TOQUE", "ROSALINDA"):
+            if spoken in genders:
+                assert spoken not in bare, (spoken, bare.get(spoken))
+
+    def test_the_collectives_are_never_performed_and_never_gendered(self):
+        """`TUTTE LE STREGHE CANTANDO E DANZANDO` binds to ALL and `ALBANY ET
+        CORNOUAILLES` to BOTH: joint turns, refused by the selector exactly as
+        Folger's `ALL, [dancing in a circle]` is. They own no cast slot, so
+        they are the only names the ladder leaves unresolved."""
+        for iso, ref, expect in (("it", MACBETH, "TUTTE LE STREGHE"),
+                                 ("fr", "folger-lear:act1-scene1-love-test",
+                                  "ALBANY ET CORNOUAILLES")):
+            text, bindings = _vendored(iso, ref)
+            typed = {k: PS.SpeakerBinding(**v) for k, v in bindings.items()}
+            speeches = PS.parse_speeches(text, speaker_bindings=typed)
+            joint = [s for s in speeches if s.speaker == expect]
+            assert len(joint) == 1 and joint[0].is_collective, expect
+            for a, b in PS.eligible_windows(speeches, target_words=30,
+                                            cast_ceiling=10, max_beats=14,
+                                            tolerance=0.9, min_words=0,
+                                            max_words=None):
+                assert expect not in {s.speaker for s in speeches[a:b + 1]}
+
+    def test_a_label_the_map_forgot_degrades_and_says_so(self, monkeypatch):
+        monkeypatch.setenv("OTR_CAST_SEED", "42")
+        monkeypatch.setenv("OTR_C7", "1")
+        text, bindings = _vendored("fr", "folger-lear:act1-scene1-love-test")
+        partial = {k: v for k, v in bindings.items() if k != "GLOCESTER"}
+        plan, receipt = VL.plan_verbatim_passage(
+            source_text=text, source_meta={"recommended_word_budget": 300},
+            num_characters=6, act_count=3,
+            source_ref="folger-lear:act1-scene1-love-test", speaker_map=partial)
+        assert plan is not None
+        assert receipt["unbound_labels"] == ["GLOCESTER"]
+        assert "GLOCESTER" not in plan.roster_names
+        if "GLOCESTER" in plan.speakers:
+            # carried as the page wrote it, gendered by that spelling alone
+            by_spoken = {m["spoken"]: m for m in receipt["speaker_map"]}
+            assert by_spoken["GLOCESTER"]["roster"] == ""
+
+    def test_the_english_receipt_is_byte_identical_without_a_map(self, monkeypatch):
+        monkeypatch.setenv("OTR_CAST_SEED", "42")
+        monkeypatch.setenv("OTR_C7", "1")
+        raw = _scenes()["macbeth__act1_scene3.txt"]
+        plan, receipt = VL.plan_verbatim_passage(
+            source_text=raw, source_meta={"recommended_word_budget": 300},
+            num_characters=2, act_count=1, source_ref=MACBETH)
+        assert "speaker_map" not in receipt and "unbound_labels" not in receipt
+        assert plan.roster_names == {}
+
+
+# --------------------------------------------------------------------------- #
+# the translator is named on the printed credits
+# --------------------------------------------------------------------------- #
+class TestTheTranslatorIsCredited:
+    """We perform a named human's translation. `verbatim_passage.vendored`
+    carried Hugo, Rusconi and Marquez by name and had ZERO consumers anywhere,
+    so a French Hamlet spoke Hugo's 1865 lines and credited only Folger."""
+
+    FOLGER = "adapted from Folger Shakespeare, used under CC BY-NC 3.0"
+
+    @pytest.mark.parametrize("iso, who, year, expect", [
+        ("it", "Carlo Rusconi", "1838", "tradotto da"),
+        ("fr", "Fran\u00e7ois-Victor Hugo", "1865", "traduit par"),
+        ("es", "Jos\u00e9 Arnaldo M\u00e1rquez", "1883", "traducido por"),
+        ("en", "Carlo Rusconi", "1838", "translated by"),
+    ])
+    def test_the_credit_is_authored_in_the_episode_language(self, iso, who,
+                                                            year, expect):
+        line = VL.vendored_credit_line(self.FOLGER, translator=who,
+                                       first_published=year,
+                                       episode_meta={"episode_language": iso})
+        assert expect in line, (iso, line)
+        assert who in line
+        assert year in line
+        # THE LICENCE LINE STAYS. It is still true of the scene, and the
+        # tempting fix -- replacing it so the translator reads "naturally" --
+        # would drop a non-commercial notice the operator is entitled to see.
+        assert self.FOLGER in line
+
+    def test_no_translator_leaves_the_line_exactly_as_it_was(self):
+        """The English Folger path performs no translation and must be
+        byte-identical."""
+        assert VL.vendored_credit_line(
+            self.FOLGER, translator="") == self.FOLGER
+        assert VL.vendored_credit_line(
+            self.FOLGER, translator="   ") == self.FOLGER
+
+    def test_the_writer_actually_appends_it(self):
+        """The defect was never that the helper was wrong -- there was no
+        helper and no caller. Assert the CALL at its real site."""
+        from nodes import OTR_LedgerScriptWriter as W
+        src = inspect.getsource(W.OTR_LedgerScriptWriter)
+        assert "_OTRVL_C.vendored_credit_line(" in src, (
+            "the translator never reaches the printed credits")
+        assert '(meta.get("verbatim_passage") or {}).get("vendored")' in src, (
+            "the credit must read the vendored provenance off the ledger")
+
+    def test_every_shipped_language_can_render_the_credit(self):
+        """REQUIRED means every row. A row missing the key raises on load, and
+        a key missing from _REQUIRED_CREDITS is filtered out before a caller
+        sees it -- both fail silently in the direction of an English credit in
+        a French roll."""
+        from nodes import _otr_episode_languages as EL
+        for iso in ("en", "es", "pt", "it", "fr", "hi", "ja", "zh"):
+            t = EL.credits_or_english({"episode_language": iso})
+            assert t.get("credit_translated_by"), iso
+            rendered = t["credit_translated_by"].format(
+                translator="Carlo Rusconi", year="1838")
+            assert "Rusconi" in rendered and "1838" in rendered, iso

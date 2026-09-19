@@ -10,11 +10,14 @@ import pathlib
 
 import pytest
 
+from nodes import _otr_passage_selector as PS
 from nodes._otr_episode_budget import BEAT_WORD_HARD_MAX
 from nodes._otr_passage_selector import (
     Passage,
     PassageError,
+    SpeakerBinding,
     chunk_speech,
+    detect_layout,
     eligible_windows,
     parse_speeches,
     select_passage,
@@ -25,6 +28,8 @@ CORPUS = (
     pathlib.Path(__file__).resolve().parent.parent
     / "config" / "source_banks" / "shakespeare" / "sources"
 )
+BANKS = pathlib.Path(__file__).resolve().parent.parent / "config" / "source_banks"
+TRANSLATIONS = BANKS / "shakespeare" / "translations"
 
 # Both Folger speech layouts in one sample, plus a stage direction and an
 # indented continuation line.
@@ -305,3 +310,241 @@ class TestAgainstTheRealCorpus:
             target_words=120, cast_ceiling=6, max_beats=3, seed="floor",
         )
         assert passage.speech_count <= 3
+
+
+# --------------------------------------------------------------------------- #
+# the colon layout (2026-09-18): `NAME: speech`, the vendored translations
+# --------------------------------------------------------------------------- #
+#: Every stored translation, with the labels the EDITION writes (read off the
+#: real files, not invented) and the first real speaker of each -- the line
+#: the scene heading used to swallow.
+VENDORED_SCENES = {
+    "it/macbeth_1_3.txt": (
+        ["1A STREGA", "2A STREGA", "3A STREGA",
+         "TUTTE LE STREGHE CANTANDO E DANZANDO", "MACBETH", "BANQUO", "ROSSE",
+         "ANGUS"], "1A STREGA", 51),
+    "fr/hamlet_1_1.txt": (
+        ["BERNARDO", "FRANCISCO", "HORATIO", "MARCELLUS"], "BERNARDO", 60),
+    "fr/king_lear_1_1.txt": (
+        ["KENT", "GLOCESTER", "EDMOND", "LEAR", "GONERIL", "CORDÉLIA",
+         "RÉGANE", "ALBANY ET CORNOUAILLES", "LE DUC DE BOURGOGNE",
+         "LE ROI DE FRANCE"], "KENT", 84),
+    "es/as_you_like_it_3_2.txt": (
+        ["ORLANDO", "CORINO", "PIEDRA", "ROSALINDA", "CELIA", "JAQUES"],
+        "ORLANDO", 144),
+}
+
+
+def _english_source_files():
+    return sorted(BANKS.glob("*/sources/*.txt"))
+
+
+def _column_zero_colon_labels(text: str) -> list[str]:
+    cleaned = strip_stage_directions(text)
+    out = []
+    for raw in cleaned.splitlines():
+        line = raw.rstrip()
+        if line and line == line.lstrip():
+            hit = PS._colon_prefix(line)
+            if hit is not None:
+                out.append(hit[0])
+    return out
+
+
+@pytest.mark.skipif(not TRANSLATIONS.exists(), reason="translations absent")
+class TestColonLayout:
+    def test_the_english_corpus_is_measured_and_pinned(self):
+        """THE MEASUREMENT THE GATE RESTS ON. Across every English source file
+        there is exactly ONE column-0 `ALLCAPS:` line -- `STAVE I:  MARLEY'S
+        GHOST`, a chapter heading in the prose Christmas Carol -- and it is the
+        only label in its file, so the two-distinct-voices rule never admits
+        it. The seven `“MR. SLOTE:` minutes in Cannibalism in the Cars open
+        with a curly quote at column 0 and are not prefixes at all. If this
+        count ever moves, the gate below needs re-arguing, not re-tuning."""
+        files = _english_source_files()
+        assert len(files) == 81, len(files)
+        hits = {p: _column_zero_colon_labels(p.read_text(encoding="utf-8"))
+                for p in files}
+        found = {p.name: labels for p, labels in hits.items() if labels}
+        assert found == {"christmas_carol_marley.txt": ["STAVE I"]}, found
+
+    def test_no_english_file_is_read_in_the_colon_layout(self):
+        """Detection, then the parse itself, both ways: `parse_speeches` must
+        equal a Folger-only read on every English file, byte for byte."""
+        for path in _english_source_files():
+            text = path.read_text(encoding="utf-8")
+            assert detect_layout(text) == PS.FOLGER_LAYOUT, path.name
+            cleaned = strip_stage_directions(text)
+            folger_only = []
+            speeches: list[tuple[str, list[str]]] = []
+            for raw in cleaned.splitlines():
+                line = raw.rstrip()
+                if not line.strip():
+                    continue
+                hit = PS._folger_prefix(line) if line == line.lstrip() else None
+                if hit is not None:
+                    speeches.append((hit[0], [hit[1]] if hit[1] else []))
+                elif speeches:
+                    speeches[-1][1].append(line.strip())
+            for speaker, lines in speeches:
+                body = "\n".join(lines).strip()
+                if body:
+                    folger_only.append(PS.Speech(index=len(folger_only),
+                                                 speaker=speaker, text=body))
+            assert parse_speeches(text) == tuple(folger_only), path.name
+
+    def test_a_single_labelled_line_is_a_heading_not_a_dialogue(self):
+        carol = (BANKS / "public_domain_story" / "sources"
+                 / "christmas_carol_marley.txt").read_text(encoding="utf-8")
+        assert detect_layout(carol) == PS.FOLGER_LAYOUT
+        assert parse_speeches(carol) == ()
+        # and a quoted label is never a prefix, however many there are
+        minutes = "“MR. SLOTE: 'Gentlemen--I decline.'\n" \
+                  "“MR. GASTON: 'Objection.'\n" \
+                  "“THE CHAIR: 'Take your seat.'\n"
+        assert _column_zero_colon_labels(minutes) == []
+        assert parse_speeches(minutes) == ()
+
+    @pytest.mark.parametrize("name, first, count", [
+        (n, f, c) for n, (_, f, c) in VENDORED_SCENES.items()])
+    def test_every_vendored_scene_parses_to_its_recorded_speech_count(
+            self, name, first, count):
+        """The manifest recorded `speaker_labels` at vendor time from the
+        corpus module's own counter; the selector must now see the same
+        speeches. Before this layout it saw 0, 0, 1 and 1."""
+        text = (TRANSLATIONS / name).read_text(encoding="utf-8")
+        assert detect_layout(text) == PS.COLON_LAYOUT
+        speeches = parse_speeches(text)
+        assert len(speeches) == count, (name, len(speeches))
+        assert speeches[0].speaker == first, speeches[0]
+
+    @pytest.mark.parametrize("name", sorted(VENDORED_SCENES))
+    def test_every_label_the_edition_writes_is_a_speaker(self, name):
+        text = (TRANSLATIONS / name).read_text(encoding="utf-8")
+        seen: list[str] = []
+        for speech in parse_speeches(text):
+            if speech.speaker not in seen:
+                seen.append(speech.speaker)
+        assert seen == VENDORED_SCENES[name][0], seen
+
+    @pytest.mark.parametrize("name", sorted(VENDORED_SCENES))
+    def test_a_scene_heading_is_never_a_speaker(self, name):
+        """`SCENA III.` / `SCÈNE I.` / `ESCENA II.` used to be the ONLY speaker
+        (Macbeth, As You Like It) with the whole scene as its text."""
+        text = (TRANSLATIONS / name).read_text(encoding="utf-8")
+        for speech in parse_speeches(text):
+            head = speech.speaker.split()[0].rstrip(".")
+            assert head not in PS._HEADING_WORDS, speech.speaker
+            assert "SCENA" not in speech.speaker and "SCÈNE" not in speech.speaker
+        # the first line of every stored file is its heading, and it is gone
+        heading = text.splitlines()[0]
+        assert heading.split()[0].rstrip(".") in PS._HEADING_WORDS
+        assert all(heading not in s.text for s in parse_speeches(text))
+
+    def test_accented_and_ordinal_labels_are_speakers_and_headings_are_not(self):
+        text = ("ESCENA II.\nEl bosque.\n"
+                "1A STREGA: Ove sei tu stata, sorella?\n"
+                "CORDÉLIA: Rien, monseigneur.\n"
+                "ESCENA III: no es un personaje.\n"
+                "RÉGANE: Étudiez-vous.\n")
+        speakers = [s.speaker for s in parse_speeches(text)]
+        assert speakers == ["1A STREGA", "CORDÉLIA", "RÉGANE"], speakers
+
+    def test_colon_speeches_keep_their_words(self):
+        text = "MACBETH: Parlate, se il potete: chi siete voi?\nBANQUO: Dio!\n"
+        by = {s.speaker: s.text for s in parse_speeches(text)}
+        # the colon INSIDE the speech is the speech's own
+        assert by == {"MACBETH": "Parlate, se il potete: chi siete voi?",
+                      "BANQUO": "Dio!"}
+
+    def test_the_italian_scene_selects_a_passage_at_the_shipped_budget(self):
+        text = (TRANSLATIONS / "it/macbeth_1_3.txt").read_text(encoding="utf-8")
+        passage = select_passage(text, target_words=300, cast_ceiling=6,
+                                 max_beats=14, seed="rusconi")
+        assert passage.beat_cost <= 14 and len(passage.speakers) >= 2
+
+
+# --------------------------------------------------------------------------- #
+# speaker bindings: the vendored label -> the spoken name and the English roster
+# --------------------------------------------------------------------------- #
+def _italian_bindings() -> dict:
+    return {
+        "1A STREGA": SpeakerBinding("PRIMA STREGA", "FIRST WITCH"),
+        "2A STREGA": SpeakerBinding("SECONDA STREGA", "SECOND WITCH"),
+        "3A STREGA": SpeakerBinding("TERZA STREGA", "THIRD WITCH"),
+        "TUTTE LE STREGHE CANTANDO E DANZANDO": SpeakerBinding("TUTTE LE STREGHE", "ALL"),
+        "MACBETH": SpeakerBinding("MACBETH", "MACBETH"),
+        "BANQUO": SpeakerBinding("BANQUO", "BANQUO"),
+        "ROSSE": SpeakerBinding("ROSSE", "ROSS"),
+        "ANGUS": SpeakerBinding("ANGUS", "ANGUS"),
+    }
+
+
+@pytest.mark.skipif(not TRANSLATIONS.exists(), reason="translations absent")
+class TestSpeakerBindings:
+    def test_bound_speeches_carry_spoken_name_label_and_roster(self):
+        text = (TRANSLATIONS / "it/macbeth_1_3.txt").read_text(encoding="utf-8")
+        first = parse_speeches(text, speaker_bindings=_italian_bindings())[0]
+        assert (first.speaker, first.label, first.roster_name) == (
+            "PRIMA STREGA", "1A STREGA", "FIRST WITCH")
+        assert first.text.startswith("Ove sei tu stata")
+
+    def test_the_three_witches_stay_three_distinct_speakers(self):
+        """`eligible_windows` counts distinct `speech.speaker`; binding the
+        ordinals to one name would merge three throats into one."""
+        text = (TRANSLATIONS / "it/macbeth_1_3.txt").read_text(encoding="utf-8")
+        speeches = parse_speeches(text, speaker_bindings=_italian_bindings())
+        witches = {s.speaker for s in speeches if "STREGA" in s.speaker}
+        assert witches == {"PRIMA STREGA", "SECONDA STREGA", "TERZA STREGA"}
+        # the opening exchange (before the chorus) is a three-voice window
+        opening = speeches[:11]
+        assert {s.speaker for s in opening} == witches
+        windows = eligible_windows(opening, target_words=60, cast_ceiling=6,
+                                   max_beats=14, tolerance=0.9)
+        assert any(len({s.speaker for s in opening[a:b + 1]}) == 3
+                   for a, b in windows)
+
+    def test_the_chorus_is_collective_and_never_inside_a_window(self):
+        """Rusconi's `TUTTE LE STREGHE CANTANDO E DANZANDO` is Folger's `ALL,
+        [dancing in a circle]` with the direction fused into the label. Bound
+        to `ALL`, it is refused the way the English chorus is refused."""
+        text = (TRANSLATIONS / "it/macbeth_1_3.txt").read_text(encoding="utf-8")
+        speeches = parse_speeches(text, speaker_bindings=_italian_bindings())
+        chorus = [s for s in speeches if s.speaker == "TUTTE LE STREGHE"]
+        assert len(chorus) == 1 and chorus[0].is_collective
+        for a, b in eligible_windows(speeches, target_words=30, cast_ceiling=8,
+                                     max_beats=14, tolerance=0.9, min_words=0,
+                                     max_words=None):
+            assert not any(s.is_collective for s in speeches[a:b + 1])
+
+    def test_an_unbound_label_is_carried_as_written_and_listed(self):
+        text = (TRANSLATIONS / "it/macbeth_1_3.txt").read_text(encoding="utf-8")
+        partial = {k: v for k, v in _italian_bindings().items() if k != "ROSSE"}
+        passage = select_passage(text, target_words=300, cast_ceiling=6,
+                                 max_beats=14, seed="rusconi",
+                                 speaker_bindings=partial)
+        assert passage.unbound_labels == ("ROSSE",)
+        rosse = [s for s in parse_speeches(text, speaker_bindings=partial)
+                 if s.speaker == "ROSSE"]
+        assert rosse and rosse[0].roster_name == "" and rosse[0].label == ""
+        assert "ROSSE" not in passage.roster_names
+
+    def test_the_english_path_reports_nothing_unbound(self):
+        text = (CORPUS / "macbeth__act1_scene3.txt").read_text(encoding="utf-8")
+        passage = select_passage(text, target_words=300, cast_ceiling=6,
+                                 max_beats=14, seed="folger")
+        assert passage.unbound_labels == () and passage.roster_names == {}
+
+    def test_a_bound_passage_renders_in_a_layout_that_parses_back(self):
+        """CORDÉLIA is not a Folger prefix; the verse layout would glue her
+        lines to the previous speaker on a re-parse."""
+        text = (TRANSLATIONS / "fr/king_lear_1_1.txt").read_text(encoding="utf-8")
+        bindings = {"LEAR": SpeakerBinding("LEAR", "LEAR"),
+                    "CORDÉLIA": SpeakerBinding("CORDÉLIA", "CORDELIA")}
+        passage = select_passage(text, target_words=120, cast_ceiling=2,
+                                 max_beats=6, seed="hugo",
+                                 speaker_bindings=bindings)
+        back = parse_speeches(PS.render_passage_text(passage))
+        assert [s.speaker for s in back] == [s.speaker for s in passage.speeches]
+        assert [" ".join(s.text.split()) for s in back] == [
+            " ".join(s.text.split()) for s in passage.speeches]

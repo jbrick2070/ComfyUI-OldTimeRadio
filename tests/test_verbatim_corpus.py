@@ -549,6 +549,96 @@ def test_a_language_with_no_vendored_scene_is_a_quiet_miss():
     assert C.vendored_text(_corpus_root(), "it", "folger-hamlet:act9-scene9-nothing") == ("", None)
 
 
+# --------------------------------------------------------------------------- #
+# speaker_map (2026-09-18): the edition's label -> spoken name + English roster
+# --------------------------------------------------------------------------- #
+
+
+def test_speaker_map_is_optional_and_absent_means_no_bindings(tmp_path):
+    """A REQUIRED key would refuse every row vendored before it existed."""
+    assert C.SPEAKER_MAP_FIELD not in C.REQUIRED_MANIFEST_FIELDS
+    rows = C.load_manifest(_write(tmp_path, [_manifest_row()]))
+    assert C.speaker_bindings(rows[0]) == {}
+    assert C.speaker_bindings(None) == {}
+
+
+def test_a_present_speaker_map_round_trips_as_plain_dicts(tmp_path):
+    row = _manifest_row(speaker_map={
+        " 1A  STREGA ": {"spoken": "PRIMA STREGA", "roster": "FIRST WITCH"}})
+    rows = C.load_manifest(_write(tmp_path, [row]))
+    assert C.speaker_bindings(rows[0]) == {
+        "1A STREGA": {"spoken": "PRIMA STREGA", "roster": "FIRST WITCH"}}
+
+
+@pytest.mark.parametrize("bad", [
+    "not an object",
+    {"": {"spoken": "X", "roster": "Y"}},
+    {"1A STREGA": "PRIMA STREGA"},
+    {"1A STREGA": {"spoken": "PRIMA STREGA"}},
+    {"1A STREGA": {"spoken": "", "roster": "FIRST WITCH"}},
+])
+def test_a_malformed_speaker_map_is_refused_and_names_the_field(tmp_path, bad):
+    """Present but half-written would bind some of a scene's people and leave
+    the rest to the roll in silence; the manifest is never degraded around."""
+    with pytest.raises(C.CorpusError) as caught:
+        C.load_manifest(_write(tmp_path, [_manifest_row(speaker_map=bad)]))
+    assert C.SPEAKER_MAP_FIELD in str(caught.value)
+
+
+#: corpus play key -> the English Folger source stem whose sidecar is the roster
+_ENGLISH_STEM = {
+    "macbeth": "macbeth__act1_scene3",
+    "as_you_like_it": "as_you_like_it__act3_scene2",
+    "hamlet": "hamlet__act1_scene1",
+    "king_lear": "king_lear__act1_scene1",
+}
+
+
+def test_every_shipped_map_binds_to_a_name_the_english_sidecar_carries():
+    """The bridge is only worth having if the far end exists: each `roster`
+    must be a `name` in the English sidecar (the ladder's exact tier) or a
+    collective marker the selector refuses. Read off the real files."""
+    from pathlib import Path
+    from nodes import _otr_passage_selector as PS
+    from nodes import _otr_roster_gender as RG
+    root = Path(_corpus_root())
+    sources = root.parent / "sources"
+    rows = C.load_manifest(str(root / C.MANIFEST_NAME))
+    assert len(rows) == 4
+    for row in rows:
+        bindings = C.speaker_bindings(row)
+        assert bindings, "%s/%s carries no speaker_map" % (row["iso"], row["play"])
+        roster = {r["name"] for r in RG.load_roster_characters(
+            sources / (_ENGLISH_STEM[row["play"]] + ".txt"))}
+        assert roster, row["play"]
+        for label, spec in bindings.items():
+            assert spec["roster"] in roster or spec["roster"] in PS._COLLECTIVE_SPEAKERS, (
+                row["play"], label, spec)
+            # the spoken name is a cast-row name: upper-case, like a Folger prefix
+            assert spec["spoken"] == spec["spoken"].upper(), spec
+
+
+def test_every_label_in_every_vendored_text_is_bound():
+    """Measured, not asserted: parse each stored scene and check the map names
+    every label the edition writes. An unbound label is a voice that falls to
+    the roll -- allowed by design, but not in the four scenes we ship."""
+    from pathlib import Path
+    from nodes import _otr_passage_selector as PS
+    root = Path(_corpus_root())
+    for row in C.load_manifest(str(root / C.MANIFEST_NAME)):
+        text = (root / row["file"]).read_text(encoding="utf-8")
+        labels = {s.speaker for s in PS.parse_speeches(text)}
+        assert labels, row["file"]
+        missing = labels - set(C.speaker_bindings(row))
+        assert not missing, (row["file"], missing)
+
+
+@pytest.mark.parametrize("iso, source_ref, translator", VENDORED)
+def test_the_row_a_render_reads_carries_its_speaker_map(iso, source_ref, translator):
+    _, row = C.vendored_text(_corpus_root(), iso, source_ref)
+    assert row is not None and C.speaker_bindings(row)
+
+
 def test_tampered_bytes_are_refused_rather_than_performed():
     """The integrity check is the whole reason the manifest carries a hash: a
     corpus whose text has drifted from what was reviewed must not be spoken."""
@@ -564,3 +654,73 @@ def test_tampered_bytes_are_refused_rather_than_performed():
         io.open(victim, "w", encoding="utf-8", newline="\n").write(
             body + "MACBETH: A line no translator wrote.\n")
         assert C.vendored_text(tmp, "it", "folger-macbeth:act1-scene3-witches") == ("", None)
+
+
+#: Stage business the colon editions set in ROUND brackets, which Folger sets
+#: in square ones and the selector already strips. Each of these was spoken
+#: aloud in a planned window before `strip_direction_parentheticals`.
+EDITION_STAGE_WORDS = (
+    "entra Rosse", "entrano Rosse", "escono", "scompaiono", "scompariscono",
+    "s\u2019ode un tamburo", "Entran Corino", "Sale.",
+)
+
+
+@pytest.mark.parametrize("iso, source_ref, _translator", VENDORED)
+def test_no_stage_direction_is_left_to_be_spoken(iso, source_ref, _translator):
+    """A direction that survives is READ ALOUD by whoever holds the line.
+
+    Folger puts stage business in square brackets and the selector strips them
+    before parsing; Rusconi and Marquez use round ones, so the vendored lane
+    inherited an assumption that was false for its own sources. A blanket `()`
+    strip is the wrong fix -- Hugo prints real dialogue in parentheses, exactly
+    as Folger prints "(God shield us!)" inside Bottom's line -- so the strip is
+    keyed on the edition's own italics and this asserts the outcome.
+    """
+    text, _row = C.vendored_text(_corpus_root(), iso, source_ref)
+    assert text
+    for phrase in EDITION_STAGE_WORDS:
+        assert phrase.lower() not in text.lower(), (source_ref, phrase)
+
+
+def test_the_translators_own_parenthetical_dialogue_survives():
+    """The other half, and the reason a blanket strip was refused: Horatio's
+    "(car cette partie du monde connu l'estimait pour tel)" is Hugo's French
+    for Folger's spoken "(For so this side...)". Losing it would be the same
+    defect in the opposite direction."""
+    text, _row = C.vendored_text(
+        _corpus_root(), "fr", "folger-hamlet:act1-scene1-platform-watch")
+    assert "car cette partie du monde" in text
+
+
+def test_a_vendored_row_with_no_speaker_map_reports_every_label_unbound():
+    """`{}` IS NOT `None`. A vendored row whose manifest carries no speaker_map
+    is the case that needs the unbound receipt most -- every label degrades to
+    the gender roll -- and truthiness read it as the English path, so it was
+    the one case that went unreceipted and unwarned. Two tests bracketed this
+    and both missed it: one covers a PARTIAL map, one covers the key ABSENT.
+    """
+    from nodes import _otr_verbatim_lane as VL
+    text, _row = C.vendored_text(
+        _corpus_root(), "it", "folger-macbeth:act1-scene3-witches")
+    plan, receipt = VL.plan_verbatim_passage(
+        source_text=text, source_meta={"recommended_word_budget": 300},
+        num_characters=3, act_count=1,
+        source_ref="folger-macbeth:act1-scene3-witches", speaker_map={})
+    assert plan is not None
+    # every speaker the edition wrote is reported, because none was bound
+    assert receipt["unbound_labels"], "an empty map reported nothing unbound"
+    assert set(plan.speakers) <= set(receipt["unbound_labels"])
+    assert not plan.roster_names
+
+
+def test_the_english_path_still_reports_no_unbound_labels():
+    """The other side of the sentinel: `None` is English and must stay
+    byte-identical -- no unbound key, nothing to warn about."""
+    from nodes import _otr_verbatim_lane as VL
+    text, row = C.vendored_text(
+        _corpus_root(), "it", "folger-macbeth:act1-scene3-witches")
+    _plan, receipt = VL.plan_verbatim_passage(
+        source_text=text, source_meta={"recommended_word_budget": 300},
+        num_characters=3, act_count=1,
+        source_ref="folger-macbeth:act1-scene3-witches", speaker_map=None)
+    assert not receipt.get("unbound_labels")

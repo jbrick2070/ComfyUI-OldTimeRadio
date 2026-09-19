@@ -47,7 +47,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 try:
@@ -110,6 +110,48 @@ def non_verbatim_credit_line(existing: str, *, episode_meta: Any = None) -> str:
         return f"{NON_VERBATIM_CREDIT_PREFIX} the source"
 
 
+def vendored_credit_line(existing: str, *, translator: str,
+                         first_published: str = "",
+                         episode_meta: Any = None) -> str:
+    """The printed credit when a REAL TRANSLATOR'S words were performed.
+
+    WE WERE PERFORMING A NAMED HUMAN'S WORK AND NOT SAYING SO. A French Hamlet
+    speaks Francois-Victor Hugo's 1865 lines, and the credits roll printed only
+    "adapted from <Folger>, used under CC BY-NC 3.0" -- accurate about the
+    scene, silent about whose French it was. The provenance was on the ledger
+    the whole time (`verbatim_passage.vendored`) with no consumer anywhere, so
+    it reached no human surface at all.
+
+    PRINT ONLY, deliberately. The 2026-08-05 ruling in `_otr_provenance` settles
+    that attribution is a printed surface and not a spoken one, so this does not
+    touch the coda -- the announcer still names Shakespeare and the play.
+
+    Appends rather than replaces: the Folger licence line is still true and
+    still required. Never raises; a printed credit never fails a roll.
+    """
+    line = str(existing or "").strip()
+    name = str(translator or "").strip()
+    if not name:
+        return line
+    year = str(first_published or "").strip()
+    try:
+        try:
+            from . import _otr_episode_languages as _EPLANG
+        except ImportError:  # pragma: no cover -- flat load
+            import _otr_episode_languages as _EPLANG  # type: ignore
+        template = str(_EPLANG.credits_or_english(episode_meta)
+                       ["credit_translated_by"])
+        credit = template.format(translator=name, year=year).strip()
+    except Exception as exc:  # noqa: BLE001 -- a printed credit never fails
+        log.warning("[verbatim_lane] translator credit template unavailable "
+                    "(%s); using the English form", exc)
+        credit = ("translated by %s (%s)" % (name, year) if year
+                  else "translated by %s" % name)
+    if not credit:
+        return line
+    return "%s; %s" % (line, credit) if line else credit
+
+
 def bank_is_verbatim(bank_row: Any) -> bool:
     """Does this bank perform its source text verbatim? Reads only the typed
     default; a missing key means no, byte-identically to every other bank."""
@@ -127,6 +169,11 @@ class VerbatimPlan:
     passage_text: str
     seed: str
     receipt: dict
+    # Spoken name -> ENGLISH sidecar name, for the speakers a vendored
+    # translation's `speaker_map` bound. The writer hands it to the gender
+    # ladder as `resolve_as`, so PRIMA STREGA is gendered as FIRST WITCH while
+    # the cast row keeps the Italian name. Empty on the English path.
+    roster_names: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def beat_count(self) -> int:
@@ -182,12 +229,36 @@ def plan_verbatim_passage(
     act_count: int,
     source_ref: str,
     unavailable_reason: str = "",
+    speaker_map: Mapping[str, Mapping[str, str]] | None = None,
 ) -> tuple[VerbatimPlan | None, dict]:
     """Select and cut the passage. Returns ``(plan, receipt)``; a miss returns
     ``(None, receipt)`` with ``status: unavailable`` and never raises for a
-    source-shaped reason."""
+    source-shaped reason.
+
+    ``speaker_map`` is a vendored translation's per-label bridge
+    (``_otr_verbatim_corpus.speaker_bindings``): page label -> ``{"spoken",
+    "roster"}``. It is applied inside the selector, before any window is
+    costed, and stamped on the receipt as what was PERFORMED plus whatever the
+    source labelled that the map did not name. ``None`` is the English path and
+    the receipt is byte-identical to before.
+    """
     base = dict(source_ref=source_ref, num_characters=num_characters,
                 act_count=act_count)
+    bindings = None
+    # `is not None`, NOT truthiness. The docstring above states the contract --
+    # None IS the English path -- and `{}` is not None: it is a VENDORED row
+    # whose manifest carries no speaker_map, which is the one case that needs
+    # the unbound receipt most. Reading `{}` as "English" made that row skip
+    # the whole receipt block, so every label degraded to the 40/40/20 gender
+    # roll with nothing on the ledger and no warning in the log.
+    if speaker_map is not None:
+        bindings = {
+            str(label): _PS.SpeakerBinding(
+                spoken=str((spec or {}).get("spoken") or ""),
+                roster=str((spec or {}).get("roster") or ""),
+            )
+            for label, spec in speaker_map.items()
+        }
     if unavailable_reason:
         return None, unavailable_receipt(unavailable_reason, **base)
     if not str(source_text or "").strip():
@@ -214,6 +285,7 @@ def plan_verbatim_passage(
             max_beats=max_beats,
             seed=seed,
             min_speakers=min_speakers,
+            speaker_bindings=bindings,
         )
         entries = _PS.build_beat_plan(passage, beat_count=max_beats)
     except _PS.PassageError as exc:
@@ -251,14 +323,38 @@ def plan_verbatim_passage(
             for e in entries
         ],
     })
+    if bindings is not None:
+        # What the episode calls each performed speaker, and who they are on
+        # the English roster -- the receipt a reader needs to check a voice
+        # against the source. `unbound_labels` covers the WHOLE source, not
+        # only this window: a label the map forgot is a degrade wherever it
+        # falls, and the day it lands inside the window is not the day to
+        # discover it.
+        receipt["speaker_map"] = [
+            {"label": s.page_label, "spoken": s.speaker, "roster": s.roster_name}
+            for s in _distinct_speeches(passage)
+        ]
+        receipt["unbound_labels"] = list(passage.unbound_labels)
     plan = VerbatimPlan(
         entries=tuple(entries),
         speakers=tuple(passage.speakers),
         passage_text=_PS.render_passage_text(passage),
         seed=seed,
         receipt=receipt,
+        roster_names=dict(passage.roster_names),
     )
     return plan, receipt
+
+
+def _distinct_speeches(passage) -> list:
+    """One speech per speaker, in speaking order."""
+    seen: list = []
+    out: list = []
+    for speech in passage.speeches:
+        if speech.speaker not in seen:
+            seen.append(speech.speaker)
+            out.append(speech)
+    return out
 
 
 def project_payload(news_article: Mapping[str, Any], plan: VerbatimPlan) -> dict:
@@ -333,5 +429,6 @@ __all__ = [
     "project_payload",
     "raw_text_for_snapshot",
     "speaking_cast_seats",
+    "vendored_credit_line",
     "unavailable_receipt",
 ]
