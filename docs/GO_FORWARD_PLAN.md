@@ -238,71 +238,64 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-**30 scenes are vendored: fr 12, it 11, es 4, zh 3** (measured from the manifest
-2026-09-19 evening, not remembered -- this row said 16 four hours earlier, and
-before that said 4). All 95 leads are hunted and every unvendored cell carries a
-named next step in `leads.json`. Adding a scene is mechanical: read the
-edition's own act/scene label into `EDITION_LABELS`, add the row, run
-`scripts/otr_vendor_shakespeare.py --write`.
-
-**A SHIPPED RULE IS NOT A VENDORED SCENE.** The Japanese and Portuguese
-extractor rules ship and are pinned by a fixture, and **ja and pt still vendor
-ZERO**. The two facts read as one and are not. Quote the manifest, never the
-rule inventory.
+**38 scenes are vendored: it 13, fr 12, es 6, zh 5, ja 1, pt 1** (read from the
+manifest 2026-09-19 evening -- this row said 30 an hour earlier, 16 before that
+and 4 before that, so read it rather than quote it). All 95 leads are hunted.
+Adding a scene is mechanical: read the edition's own act/scene label into
+`EDITION_LABELS`, add the row, run `scripts/otr_vendor_shakespeare.py --write`.
 
 **A TRANSLATOR'S OWN CHOICE IS NOT A DEFECT (operator 2026-09-19):** *"maybe
 some of these foreign translators decide to create a new act or a new speech,
 and it's part of their local vernacular and history and culture. Who am I to
-judge"*. Two Midsummer scenes had been held for exactly this and were wrong to
-hold: Snug speaks in both Rusconi and Zhu Shenghao and never in the Folger
-sidecar, and Rusconi labels the play-within-the-play by ROLE where Folger labels
-by ACTOR. An unbound label costs a VOICE and never the dialogue, so such a
+judge"*. An unbound label costs a VOICE and never the dialogue, so such a
 speaker is NAMED in `_KNOWN_UNBOUND` with its reason and the scene ships. Refuse
-a row for OUR extractor failing; never for the translator's editorial hand.
+a row for OUR extractor failing; never for the translator's editorial hand. Snug
+speaks in Rusconi and Zhu and never in Folger; Rusconi labels the
+play-within-the-play by ROLE where Folger labels by ACTOR. Both ship.
 
-What remains is two per-edition extractor rules, both specified and neither
-built. State, diagnoses and the measured counts live in
-[2026-09-19-shakespeare-vendoring](2026-09-19-shakespeare-vendoring/).
+**HOLD NOTES ARE DATED CLAIMS ABOUT CODE THAT KEEPS CHANGING. RE-MEASURE, DO NOT
+READ.** Nine holds were examined closely on 2026-09-19 and **five described a
+tool state rather than a source property** -- three of those written that same
+day, hours earlier, by the window that then disproved them. The Japanese Romeo
+was held for a defect the Aozora rules had already fixed; the Chinese Tempest
+for a page that the content bracketing had already made readable; the Italian
+Comedy of Errors for a sidecar that exists under a name I constructed instead of
+looking up. `scripts/`-adjacent scratch has a re-check harness; run it after any
+shared-code change, the whole set costs three minutes.
 
-**The Chinese rule.** Speaker is 1-4 CJK characters plus U+3000 at a paragraph
-head; block business is a centred div opening with a fullwidth black bracket;
-headings match `^第.*[幕场場]$` and must be exempted or the scene anchors break.
-The page marks 65 speeches across 14 characters in Midsummer 3.1 and
-`mark_speakers` claims 0. **The trap, found independently by two models:**
-`_marked_name` rejects `len(name) < 2` and most of this cast is one character
-(波, 衮, 蒂), so the rule can mark every speaker correctly and still drop them
-all downstream.
+**WHAT IS LEFT, AND NONE OF IT IS BOOKKEEPING ANY MORE.**
 
-**The Italian Rusconi rule.** Abbreviated marks (`Orl.`, `Ber.`) followed by a
-period at a paragraph head. The generic name shapes claim these correctly and
-also claim stage directions and spoken text. The obvious fix is measured
-harmful: anchoring on `<p>` took tempest from 142 speeches to 6. Twelve act-page
-URLs are verified and recorded.
+* **27 page-scan cells.** Twelve carry a full TEXT LAYER (8 es, 4 pt) and need
+  extraction, not transcription -- see
+  [the audit](2026-09-19-shakespeare-vendoring/scan_sources_text_layer_audit.md),
+  which also records a prototype and the four ways it failed. The other 15 are
+  image-only and are the real OCR work, unblocked by the one-model ruling. The
+  vendor script fetches URLs and has no PDF path at all; that seam is the work.
+* **4 Japanese cells have no published source.** Aozora catalogues Tsubouchi's
+  Hamlet, As You Like It and Much Ado as in-progress and 404s every card. Not a
+  hunt that ran out of ideas -- re-check the author page, not a search engine.
+* **2 French Midsummer cells: the editions do not align.** Hugo prints EIGHT
+  scenes for the play against Folger's nine and no single Hugo scene equals a
+  Folger one; all four neighbours were extracted and read. `EDITION_SCENE_END`
+  cannot express this -- it handles an edition FINER than Folger, and Hugo's
+  scenes span ACROSS Folger boundaries. Needs a sub-scene rule or another
+  edition.
+* **1 Italian Tempest 3.1: Maffei prints no second scene heading**, so the act
+  runs as one block and any label returns three Folger scenes with a perfect
+  cast list. Deliberately has no `EDITION_LABELS` entry; the reason sits where
+  the entry would go.
+* **1 Japanese Romeo 1.1 needs an English sidecar written.** It extracts at 95
+  speeches across 12 real characters and there is no
+  `sources/romeo_juliet__act1_scene1.txt` to bind to. No extractor work.
 
-Both touch shared extractor code every edition runs through, so each needs a
-blast-radius check before its push: run the vendor script with no flags (it is
-check-only by default) and diff the per-scene speech/speaker counts. The
-2026-09-19 before-state, for that diff:
-
-```
-es as_you_like_it 3.2  144/6    fr king_lear    1.1   84/10   fr tempest       1.2  143/8
-es comedy_of_errors 3.1 56/9    fr macbeth      1.3   51/8    fr tempest       3.1   25/3
-es romeo_juliet   2.2   55/3    fr much_ado     2.3   82/7    fr twelfth_night 1.5  120/6
-fr as_you_like_it 3.2  145/6    fr much_ado     3.1   26/4    fr twelfth_night 2.5   87/8
-fr comedy_of_errors 3.1 61/9    fr romeo_juliet 2.2   56/3    it macbeth       1.3   51/8
-fr hamlet        1.1    60/4
-```
-
-Two rows print in that check and are deliberately NOT vendored: `es/macbeth 1.3`
-is THIN at 3 speeches, and `it/tempest 1.2` is the 142/13 the Italian hold note
-calls polluted. Extractable is not vendored; confirm against the manifest.
-
-**Then production OCR of the 23 page-scan cells**, unblocked by the 2026-09-19
-ruling that one model's OCR counts as verbatim. Parallel model work, not coding.
-
-Live traps: LiberLiber's Italian set is Raponi and still in copyright;
-"A transcribir" means no text exists; Aozora's canonical text is Shift_JIS with
-ruby markup; a `utm_source` parameter is proof the lead was never opened.
+**THE CHECKS THAT EARNED THEIR KEEP, all three now tests and all three proven to
+go red.** A label with nothing behind it (found three deleted songs). Site
+chrome and zero-width padding (found 8,000 characters of privacy policy being
+spoken). Two speeches in a row by one character (found a verse speech whose
+label hid inside its own italic run). **Counts found none of them** -- every one
+was invisible to speech and speaker totals, which is why
+`prove_suffix_only`-style byte diffing against the stored file is the gate
+before any push that touches shared extractor code.
 
 ## 3. TEST -- only after 1 and 2 are empty
 
