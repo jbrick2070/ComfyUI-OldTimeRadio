@@ -800,12 +800,12 @@
       "translator_death_date": 1935,
       "translation_first_published": 1926,
       "transcription_license": "public domain (NDL scan, not yet located on Commons)",
-      "url": "",
+      "url": "https://commons.wikimedia.org/wiki/File:NDL979394_%E6%B2%99%E7%BF%81%E5%85%A8%E9%9B%86_%E7%AC%AC24%E7%B7%A8_(%E9%96%93%E9%81%95%E3%81%A4%E3%82%9E%E3%81%8D)_part1.pdf",
       "form": "verse",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "series_number": 24,
-      "edition": "沙翁全集 No. 24 まちがひつゞき, first published 1926.7",
-      "note": "Series position and first-publication date verified by the operator 2026-09-18. From No. 24 the series was retitled 沙翁傑作集 -> 沙翁全集; it is the same 40-volume sequence, so search the later title for this and later volumes."
+      "edition": "沙翁全集 第24編（間違つゞき）",
+      "note": "Operator hunt 2026-09-18, url verified 200. Series is 沙翁全集 at this volume -- it was renamed 沙翁傑作集 -> 沙翁全集 from No. 24, so a search under one title misses half the sequence. Page scan: the remaining work is transcription, not another hunt."
     },
     {
       "iso": "ja",
@@ -830,12 +830,12 @@
       "translator_death_date": 1935,
       "translation_first_published": 1912,
       "transcription_license": "public domain (NDL scan, not yet located on Commons)",
-      "url": "",
+      "url": "https://dl.ndl.go.jp/pid/979373",
       "form": "verse",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "series_number": 4,
-      "edition": "沙翁傑作集 No. 4 リヤ王, first published 1912.4",
-      "note": "Series position and first-publication date verified by the operator 2026-09-18; the scan URL is not located yet."
+      "edition": "沙翁傑作集 第4編（リヤ王）",
+      "note": "Operator hunt 2026-09-18, url verified 200. Series is 沙翁傑作集 at this volume -- it was renamed 沙翁傑作集 -> 沙翁全集 from No. 24, so a search under one title misses half the sequence. Page scan: the remaining work is transcription, not another hunt."
     },
     {
       "iso": "ja",
@@ -1040,7 +1040,8 @@
       "url": "https://pt.wikisource.org/wiki/Galeria:William_Shakespeare_-_Sonho_de_uma_Noite_de_Ver%C3%A3o_(trad._Castilho,_1874).pdf",
       "form": "verse",
       "url_is": "page_scan",
-      "note": "Operator hunt 2026-09-18. Castilho 1800-1875, so BOTH tests clear on a proven death year -- the only Portuguese rows in this batch that do. Page scan: needs transcription."
+      "note": "Operator hunt 2026-09-18. Castilho 1800-1875, so BOTH tests clear on a proven death year -- the only Portuguese rows in this batch that do. Page scan: needs transcription.",
+      "excluded": "INDIRECT TRANSLATION -- operator 2026-09-18: Castilho worked from a FRENCH intermediary, not from Shakespeare's English. Same rule that excluded Maffei's Macbeth (made from Schiller's German). Rights were never the issue: he died in 1875 and clears every test. Fidelity is a separate axis from rights and is the one that refuses here. This COSTS the two Portuguese Midsummer cells, which were the only pt rows with a proven translator death year."
     },
     {
       "iso": "pt",
@@ -1053,7 +1054,8 @@
       "url": "https://pt.wikisource.org/wiki/Galeria:William_Shakespeare_-_Sonho_de_uma_Noite_de_Ver%C3%A3o_(trad._Castilho,_1874).pdf",
       "form": "verse",
       "url_is": "page_scan",
-      "note": "Operator hunt 2026-09-18. Castilho 1800-1875, so BOTH tests clear on a proven death year -- the only Portuguese rows in this batch that do. Page scan: needs transcription."
+      "note": "Operator hunt 2026-09-18. Castilho 1800-1875, so BOTH tests clear on a proven death year -- the only Portuguese rows in this batch that do. Page scan: needs transcription.",
+      "excluded": "INDIRECT TRANSLATION -- operator 2026-09-18: Castilho worked from a FRENCH intermediary, not from Shakespeare's English. Same rule that excluded Maffei's Macbeth (made from Schiller's German). Rights were never the issue: he died in 1875 and clears every test. Fidelity is a separate axis from rights and is the one that refuses here. This COSTS the two Portuguese Midsummer cells, which were the only pt rows with a proven translator death year."
     },
     {
       "iso": "pt",
