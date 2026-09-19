@@ -48,7 +48,9 @@ needed to try is already in the repo and nothing is waiting on us:
 
 * **A graph is built and shipped** -- `workflows/variants/otr_amd_still.json`,
   generated from `config/profiles/otr_amd_still.json` the same way as every
-  working graph and marked `draft` because it has no receipts. It is the
+  working graph. It reads `draft` because `status` records PROMOTION, not
+  proof -- an outside tester published an episode from this exact graph on
+  2026-09-14. It is the
   still-image tier: Qwen3.5-4B writer (unquantised), `still_motion` over
   Z-Image Turbo stills, Kokoro voices, Stable Audio 3. Two older lab profiles,
   `otr_amd16_rocm` and `otr_amd8_rocm`, still load with `--profile` for a 16 GB
@@ -61,10 +63,12 @@ needed to try is already in the repo and nothing is waiting on us:
 * **The unknowns are written down** rather than hand-waved -- see the end of this
   page.
 
-If you get an episode out of one, you are the first person to do it, and the
-credit is yours in this repo. If you get a traceback instead, that is worth just
-as much: it is the first real ROCm signal this project has ever had. Either way
-an issue with the probe output pasted in is the whole ask.
+One person has done this: a Radeon AI PRO R9700 (RDNA4) under ROCm 7.2 on
+Ubuntu 24.04 published an episode from `otr_amd_still` on 2026-09-14, with no
+edits to the graph. What is still unclaimed is everything that run did not
+cover -- RDNA3, Windows, the 8 GB profile, and every lane past the still tier.
+A traceback is worth as much as a success there. Either way an issue with the
+probe output pasted in is the whole ask.
 
 ---
 
@@ -122,12 +126,12 @@ python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_rocm_probe.py
 ```
 
 It prints about thirty lines and stops. No weights, no render, nothing written
-outside the checkout. Paste the output into the issue and you are done -- that
-alone is more AMD evidence than this project has ever had.
+outside the checkout. Paste the output into the issue and you are done -- on a
+card or an OS the 2026-09-14 run did not cover, that alone is new evidence.
 
 **Three of those lines decide whether the rest of the mission is even worth your
-time.** `is_amd()` is what our device resolution branches on and has never once
-executed on an AMD card. `vendor()` must come back `amd`; if it says `nvidia` or
+time.** `is_amd()` is what our device resolution branches on; it executed on a
+Radeon for the first time on 2026-09-14, and on one card only. `vendor()` must come back `amd`; if it says `nvidia` or
 `unknown`, the pack cannot tell your card apart from a GeForce and we have a bug
 to fix before you spend an evening rendering. And if `bitsandbytes` imports with
 a working backend, then every AMD graph we ship is leaving speed on the table by
@@ -257,9 +261,10 @@ Open an issue on the repo titled `ROCm: <your card>` and paste it in.
 
 Being straight with you, because you are the one spending the time:
 
-* **Nothing here has ever touched ROCm.** Both profiles are marked `draft`
-  and `UNVERIFIED on hardware` in their own files. That is not modesty, it is
-  the literal status.
+* **One card, one tier, one day.** `otr_amd_still` has a published episode
+  from 2026-09-14; the two lab profiles `otr_amd16_rocm` and `otr_amd8_rocm`
+  still read `UNVERIFIED on hardware` in their own files and genuinely are.
+  Everything past the still tier on AMD remains unmeasured.
 * The engines were chosen to be pure PyTorch, and that was verified by
   reading every one of them. Whether ROCm's kernels agree with them at
   runtime is exactly what nobody knows.
@@ -275,7 +280,7 @@ If it fails in the first ninety seconds, that is still a result. Send it.
 ## What you get
 
 Your name and card in this repo's hardware-support notes, in the commit that
-turns two `draft` profiles into a supported platform, and the first AMD-made
+widens AMD past one card and one tier, and an AMD-made
 episode of a show that did not previously exist on your hardware.
 
 *This message will not self-destruct. It will sit here until somebody with an

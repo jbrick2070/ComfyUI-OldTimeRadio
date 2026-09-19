@@ -32,10 +32,12 @@ Leaving those two dropdowns alone is still the right answer there.
 
 **Qwen3.5-4B** is the only writer here with a finished episode to its name on
 all three of an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
-downloads itself. It is also what the AMD graphs ship, though nobody has
-published an episode from AMD yet -- [MACHINES.md](MACHINES.md)
-marks that cell unmeasured rather than proven, and that is the honest word for
-it. Leaving both slots alone is a good answer on every one of those machines.
+downloads itself. It is also what the AMD graphs ship, and an outside tester
+published an episode from `otr_amd_still` on a Radeon under ROCm 7.2 on
+2026-09-14 -- so add AMD to that list, at the still tier.
+[MACHINES.md](MACHINES.md) is the generated table and is the place to check
+which cell is proven. Leaving both slots alone is a good answer on every one of
+those machines.
 The 16 GB+
 NVIDIA graphs -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
 instead; leaving those two slots alone is still a good answer there, but it

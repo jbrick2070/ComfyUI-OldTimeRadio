@@ -1,6 +1,6 @@
 {
     "id": "otr_amd_still",
-    "display_name": "AMD ROCm (ALPHA -- nothing in this project has ever run on an AMD card; this graph is an assumption, not a receipt). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.",
+    "display_name": "AMD ROCm (an outside tester published an episode from this graph on a Radeon AI PRO R9700 under ROCm 7.2, 2026-09-14, no edits). A still image with motion, Kokoro voices, Stable Audio 3. quant_policy is 'none' because bitsandbytes on ROCm is unmeasured -- see apple/ROCM.md.",
     "status": "draft",
     "platform": "any",
     "device_backend": "cuda",

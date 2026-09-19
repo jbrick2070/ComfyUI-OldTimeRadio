@@ -487,7 +487,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | mime | _not built_ | | | | | | | |
 | **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
-### AMD ROCm (experimental -- no receipts)
+### AMD ROCm
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|
@@ -533,8 +533,9 @@ hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
 has published 11 documented full OTR episodes through this pack; the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
-ComfyUI started in `--cpu` mode, the card present and unused. `draft` means
-cut from the same source with no receipts: the AMD stills graph. What each
+ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
+yet promoted -- it is a status, not a verdict on proof: the AMD stills graph
+reads `draft` and has an outside tester's published episode behind it. What each
 machine class runs, engine by engine,
 is in [apple/MACHINES.md](apple/MACHINES.md).
 
@@ -724,10 +725,13 @@ The automatic fix made episodes worse on a 12B model, the largest a 16 GB card
 holds, so it ships off; on a much larger model the switch is
 `JUDGE_ATTRIBUTION` in `nodes/_otr_ledger_clean.py`.
 
-**AMD has no receipts yet.** `workflows/variants/otr_amd_still.json` is cut from
-the same source as every proven graph and every engine it selects is plain
-PyTorch, so it should work -- but nobody on the project owns a Radeon, and
-"should" is not a receipt. It ships `draft`.
+**AMD has a receipt.** An outside tester ran
+`workflows/variants/otr_amd_still.json` end to end on a Radeon AI PRO R9700
+(RDNA4) under ROCm 7.2 on Ubuntu 24.04, 2026-09-14, with no edits to the graph,
+and published a finished episode. Nobody on the project owns a Radeon, so what
+is proven is the still tier on that one card: RDNA3, Windows and the 8 GB AMD
+profile are still unmeasured. The profile ships `draft` because `status`
+records promotion, not proof.
 [apple/ROCM.md](apple/ROCM.md) has the graph, two lab profiles, a five-minute
 probe that downloads nothing, and the open questions. The first episode off a
 Radeon earns its author the AMD column in

@@ -37,7 +37,12 @@ _ARCHES = (
     ("otr_8gb_", "8 GB NVIDIA"),
     ("otr_16gb_", "16 GB NVIDIA"),
     ("otr_mac16_", "Apple Silicon, 16 GB"),
-    ("otr_amd_", "AMD ROCm (experimental -- no receipts)"),
+    # A GENERATOR HEADING MUST NOT ASSERT PROOF. This said "no receipts" for
+    # five days after an outside tester published an episode from
+    # `otr_amd_still` on a Radeon (2026-09-14). A hardcoded string inside a
+    # script is hand-written prose with a worse editor: nothing regenerates it
+    # and no drift test reads it. Proof lives in docs/dropdown_matrix.json.
+    ("otr_amd_", "AMD ROCm"),
     ("otr_cpu_", "CPU only"),
     ("otr_cloud_", "Comfy Cloud (opt-in easter egg; needs OTR_COMFY_API_KEY)"),
 )

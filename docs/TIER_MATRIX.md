@@ -41,7 +41,7 @@ means the lanes need no video weights.
 | mime | _not built_ | | | | | | | |
 | **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
 
-### AMD ROCm (experimental -- no receipts)
+### AMD ROCm
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|

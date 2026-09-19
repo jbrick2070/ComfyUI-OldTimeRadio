@@ -202,8 +202,11 @@ Each of these cost a real session before it was written down.
   `obs_publish OK ->`.
 * **Do not pick a per-machine graph for the user.** The graphs under
   `workflows/variants/` are presets, and the canonical template in the menu is
-  the intended first run. Shipping rows have a published episode behind them;
-  `otr_amd_still` is draft and has none.
+  the intended first run. Shipping rows have a published episode behind them.
+  `otr_amd_still` reads `draft` in its profile but DOES have one -- an outside
+  tester published an episode from it on a Radeon AI PRO R9700 under ROCm 7.2
+  on 2026-09-14. The `status` field records promotion, not proof; for proof
+  read the machine table in [MACHINES.md](MACHINES.md), which is generated.
 * **On Apple Silicon, read [MAC.md](MAC.md) before choosing anything heavier
   than the defaults.** An out-of-memory on unified memory can reboot the
   machine, not just the render. Some Desktop installs also need
