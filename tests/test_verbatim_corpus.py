@@ -663,6 +663,7 @@ _ENGLISH_STEM = {
     ("midsummer", "3.2"): "midsummer__act3_scene2",
     ("much_ado", "2.3"): "much_ado__act2_scene3",
     ("much_ado", "3.1"): "much_ado__act3_scene1",
+    ("romeo_juliet", "1.1"): "romeo_juliet__act1_scene1",
     ("romeo_juliet", "2.2"): "romeo_juliet__act2_scene2",
     ("tempest", "1.2"): "tempest__act1_scene2",
     ("tempest", "3.1"): "tempest__act3_scene1",

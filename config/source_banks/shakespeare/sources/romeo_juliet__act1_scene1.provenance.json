@@ -1,0 +1,116 @@
+{
+  "schema_version": "otr_source_provenance_v1",
+  "slug": "romeo_juliet",
+  "unit": "act1_scene1",
+  "work_title": "Romeo and Juliet",
+  "author": "William Shakespeare",
+  "license_label": "CC BY-NC 3.0 (Folger Shakespeare Library)",
+  "source_url": "https://folger-main-site-assets.s3.amazonaws.com/uploads/2022/11/romeo-and-juliet_TXT_FolgerShakespeare.txt",
+  "fetched_utc": "2026-09-19T22:59:16Z",
+  "body_sha256": "4226071b1bdd1a434a3ba6e0e8befe969f0912766631354bb56c6c9bd82ffeac",
+  "body_bytes": 10958,
+  "body_words": 1995,
+  "text_path": "config/source_banks/shakespeare/sources/romeo_juliet__act1_scene1.txt",
+  "act": 1,
+  "scene": 1,
+  "speakers": [
+    "SAMPSON",
+    "GREGORY",
+    "ABRAM",
+    "BENVOLIO",
+    "TYBALT",
+    "CITIZENS",
+    "CAPULET",
+    "LADY CAPULET",
+    "MONTAGUE",
+    "LADY MONTAGUE",
+    "PRINCE",
+    "ROMEO"
+  ],
+  "characters": [
+    {
+      "name": "SAMPSON",
+      "roster_name": "SAMPSON",
+      "description": "",
+      "gender": "male",
+      "gender_source": "group"
+    },
+    {
+      "name": "GREGORY",
+      "roster_name": "GREGORY",
+      "description": "",
+      "gender": "male",
+      "gender_source": "group"
+    },
+    {
+      "name": "ABRAM",
+      "roster_name": "ABRAM",
+      "description": "a Montague servingman",
+      "gender": "male",
+      "gender_source": "title"
+    },
+    {
+      "name": "BENVOLIO",
+      "roster_name": "BENVOLIO",
+      "description": "their kinsman",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "TYBALT",
+      "roster_name": "TYBALT",
+      "description": "kinsman to the Capulets",
+      "gender": "unknown",
+      "gender_source": "unknown"
+    },
+    {
+      "name": "CITIZENS",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "CAPULET",
+      "roster_name": "CAPULET",
+      "description": "her father",
+      "gender": "male",
+      "gender_source": "relation"
+    },
+    {
+      "name": "LADY CAPULET",
+      "roster_name": "LADY CAPULET",
+      "description": "her mother",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "MONTAGUE",
+      "roster_name": "MONTAGUE",
+      "description": "his father",
+      "gender": "male",
+      "gender_source": "relation"
+    },
+    {
+      "name": "LADY MONTAGUE",
+      "roster_name": "LADY MONTAGUE",
+      "description": "his mother",
+      "gender": "female",
+      "gender_source": "relation"
+    },
+    {
+      "name": "PRINCE",
+      "roster_name": "",
+      "description": "",
+      "gender": "unknown",
+      "gender_source": "absent_from_roster"
+    },
+    {
+      "name": "ROMEO",
+      "roster_name": "ROMEO",
+      "description": "",
+      "gender": "male",
+      "gender_source": "back_reference"
+    }
+  ]
+}

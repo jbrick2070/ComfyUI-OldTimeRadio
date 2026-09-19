@@ -1376,6 +1376,74 @@
     {
       "iso": "ja",
       "play": "romeo_juliet",
+      "scene": "1.1",
+      "file": "ja/romeo_juliet_1_1.txt",
+      "translator": "坪内逍遙 Tsubouchi Shōyō",
+      "translator_death_date": 1935,
+      "translation_first_published": 1933,
+      "transcription_license": "Aozora Bunko per-file licence",
+      "source_url": "https://www.aozora.gr.jp/cards/000264/files/42773_39853.html",
+      "revision_id": "sha256:85754b2d3cd13d70",
+      "raw_sha256": "85754b2d3cd13d70024a9ff92718bad21e0ad5f7954a5f4a15b3c6efd393282d",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "第一幕 / 第一場",
+      "speaker_labels": 95,
+      "distinct_speakers": 12,
+      "speaker_map": {
+        "ベン": {
+          "spoken": "BENVOLIO",
+          "roster": "BENVOLIO"
+        },
+        "サン": {
+          "spoken": "SAMPSON",
+          "roster": "SAMPSON"
+        },
+        "ロミオ": {
+          "spoken": "ROMEO",
+          "roster": "ROMEO"
+        },
+        "グレ": {
+          "spoken": "GREGORY",
+          "roster": "GREGORY"
+        },
+        "モン長": {
+          "spoken": "MONTAGUE",
+          "roster": "MONTAGUE"
+        },
+        "エブラ": {
+          "spoken": "ABRAM",
+          "roster": "ABRAM"
+        },
+        "チッバ": {
+          "spoken": "TYBALT",
+          "roster": "TYBALT"
+        },
+        "カピ長": {
+          "spoken": "CAPULET",
+          "roster": "CAPULET"
+        },
+        "モン妻": {
+          "spoken": "LADY MONTAGUE",
+          "roster": "LADY MONTAGUE"
+        },
+        "警吏長": {
+          "spoken": "CITIZENS",
+          "roster": "CITIZENS"
+        },
+        "カピ妻": {
+          "spoken": "LADY CAPULET",
+          "roster": "LADY CAPULET"
+        },
+        "領主": {
+          "spoken": "PRINCE",
+          "roster": "PRINCE"
+        }
+      }
+    },
+    {
+      "iso": "ja",
+      "play": "romeo_juliet",
       "scene": "2.2",
       "file": "ja/romeo_juliet_2_2.txt",
       "translator": "坪内逍遙 Tsubouchi Shōyō",
