@@ -70,8 +70,7 @@
       "url": "https://www.gutenberg.org/ebooks/56454.txt.utf-8",
       "form": "prose",
       "url_is": "whole_work_single_page",
-      "url_found_by": "url hunt 2026-09-19; first line on page: ¿Quién está ahí?",
-      "hold": "THIN, held 2026-09-19. The Gutenberg whole-work text (#56454, Moratin) extracts only 923 chars / 12 speeches / 2 speakers for a scene that runs ~9k chars in other editions -- the scene-end detection cuts early on a single-file play text. The URL and the labels are RIGHT (first line on the page is BERNARDO.--Quien esta ahi?); what is wrong is the cut. Do not vendor until the extracted speech count matches what the text marks."
+      "url_found_by": "url hunt 2026-09-19; first line on page: ¿Quién está ahí?"
     },
     {
       "iso": "es",

@@ -904,7 +904,27 @@ EDITION_LABELS = {
 }
 
 
-def extract(lines, play_label, act_label, scene_label):
+#: Cells whose Folger scene spans MORE THAN ONE of the edition's scenes.
+#:
+#: An edition may SUBDIVIDE where Folger does not, and then no single printed
+#: heading names the scene we want. Moratin cuts Hamlet's opening watch in two:
+#: `ESCENA PRIMERA` is Francisco and Bernardo alone -- fourteen lines -- and
+#: `ESCENA II` carries the rest of the same continuous scene, Horatio, Marcellus
+#: and the Ghost. His `ESCENA III` is `Salon de palacio` with Claudius, which is
+#: Folger 1.2. So Folger 1.1 runs from the first heading THROUGH the second and
+#: stops at the third, and scoping to the printed label alone returned 923
+#: characters of a 9,000-character scene.
+#:
+#: Note which direction this handles. Here the EDITION is finer than Folger, so
+#: naming an end label is enough. Hugo's Midsummer is the opposite -- his scenes
+#: span ACROSS Folger boundaries, one of his containing parts of two of theirs --
+#: and no end label can express that. Those rows stay held and say so.
+EDITION_SCENE_END = {
+    ("es", "hamlet", "1.1"): "ESCENA III",
+}
+
+
+def extract(lines, play_label, act_label, scene_label, end_label=None):
     """``(text, reason)`` -- the scene's lines, or "" and why not.
 
     Stops at the NEXT heading of the same shape. Returns "" rather than a
@@ -959,6 +979,22 @@ def extract(lines, play_label, act_label, scene_label):
         stem = re.match(r"^\s*(\S+)", scene_label)
         stem = _fold(stem.group(1)) if stem else ""
     end = len(lines)
+    if end_label:
+        # AN EXPLICIT END BEATS THE SHAPE RULE, and it must be searched AFTER
+        # the scene starts: `ESCENA III` and `ESCENA PRIMERA` share a stem, so
+        # the ordinary cut fires on the very next heading and returns the first
+        # fourteen lines. Refuse rather than guess if it is not there -- a scene
+        # that silently runs to the end of the file is the failure this whole
+        # function exists to prevent.
+        end_at = find_label(lines[scene_at + 1:], end_label)
+        if end_at < 0:
+            return "", "end heading %r not found after the scene" % end_label
+        end = scene_at + 1 + end_at
+        body = [l.rstrip() for l in lines[scene_at:end]]
+        body = [l for l in body if l.strip()]
+        if len(body) < 4:
+            return "", "only %d lines between headings" % len(body)
+        return "\n".join(body), ""
     for j in range(scene_at + 1, len(lines)):
         folded = _fold(lines[j]).strip()
         if cjk_units:
@@ -1036,7 +1072,8 @@ def main():
             continue
         text = to_text(html)
         lines = text.splitlines()
-        body, reason = extract(lines, *EDITION_LABELS[key])
+        body, reason = extract(lines, *EDITION_LABELS[key],
+                               end_label=EDITION_SCENE_END.get(key))
         # MEASURE THE ARTIFACT, NOT AN INTERMEDIATE. The gate counts `NAME:`
         # labels, and the extracted body does not carry them yet -- since the
         # speakers became publisher MARKS the raw body scores almost nothing,
@@ -1092,6 +1129,15 @@ _LABEL_SHAPES = (
     re.compile(r"^(?P<name>[A-Za-z\u00c0-\u024f0-9][^\n.]{0,38})\.\s*$"),
     re.compile(r"^(?P<name>[A-Za-z\u00c0-\u024f0-9][^\n.]{0,38})\.\s+(?=\S)"),
     re.compile(r"^(?P<name>[^\n\u3000]{1,12})\u3000"),
+    # PERIOD, THEN A DASH RUN, WITH NO SPACE BETWEEN. Moratin's Hamlet is a
+    # plain-text Gutenberg edition -- no markup at all for `mark_speakers` to
+    # read -- and it writes `BERNARDO.--Quien esta ahi?`. The shape above needs
+    # whitespace after the period and this convention has none, so the scene
+    # arrived as unattributed prose carrying three accidental labels, one of
+    # them `sepulcro? Habla`. Last in the list because it is the most specific:
+    # every earlier shape fails on `.--` before this one is reached.
+    re.compile(r"^(?P<name>[A-Za-z\u00c0-\u024f0-9][^\n.]{0,38})"
+               r"\.[-\u2010-\u2015]{2,}\s*"),
 )
 
 

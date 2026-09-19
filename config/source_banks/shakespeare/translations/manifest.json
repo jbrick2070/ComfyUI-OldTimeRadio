@@ -96,6 +96,42 @@
     },
     {
       "iso": "es",
+      "play": "hamlet",
+      "scene": "1.1",
+      "file": "es/hamlet_1_1.txt",
+      "translator": "Leandro Fernández de Moratín",
+      "translator_death_date": 1828,
+      "translation_first_published": 1798,
+      "transcription_license": "Project Gutenberg licence",
+      "source_url": "https://www.gutenberg.org/ebooks/56454.txt.utf-8",
+      "revision_id": "sha256:b1468ffe68d6427e",
+      "raw_sha256": "b1468ffe68d6427e79a0015eb5e5d32a0811d4a65840bd00910aee8eabaa9139",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ACTO PRIMERO / ESCENA PRIMERA",
+      "speaker_labels": 57,
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "BERNARDO": {
+          "spoken": "BARNARDO",
+          "roster": "BARNARDO"
+        },
+        "FRANCISCO": {
+          "spoken": "FRANCISCO",
+          "roster": "FRANCISCO"
+        },
+        "HORACIO": {
+          "spoken": "HORATIO",
+          "roster": "HORATIO"
+        },
+        "MARCELO": {
+          "spoken": "MARCELLUS",
+          "roster": "MARCELLUS"
+        }
+      }
+    },
+    {
+      "iso": "es",
       "play": "macbeth",
       "scene": "1.3",
       "file": "es/macbeth_1_3.txt",

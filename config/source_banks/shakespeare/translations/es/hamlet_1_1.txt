@@ -1,0 +1,63 @@
+ESCENA PRIMERA
+Explanada delante del palacio real de Elsingor. Noche obscura
+FRANCISCO, BERNARDO
+Francisco estará paseándose haciendo centinela. Bernardo se va
+acercando hacia él. Estos personajes y los de la escena siguiente
+estarán armados con espada y lanza.
+BERNARDO: ¿Quién está ahí? FRANCISCO.--No: respóndame él á mí. Deténgase, y diga quién es...
+BERNARDO: Viva el rey.
+FRANCISCO: ¿Es Bernardo?
+BERNARDO: El mismo.
+FRANCISCO: Tú eres el más puntual en venir á la hora.
+BERNARDO: Las doce han dado ya; bien puedes ir á recogerte.
+FRANCISCO: Te doy mil gracias por la mudanza. Hace un frío que penetra, y yo estoy delicado del pecho.
+BERNARDO: ¿Has hecho tu guardia tranquilamente?
+FRANCISCO: Ni un ratón se ha movido.
+BERNARDO: Muy bien. Buenas noches. Si encuentras á Horacio y Marcelo, mis compañeros de guardia, diles que vengan presto.
+FRANCISCO: Me parece que los oigo... Alto ahí. ¡Eh! ¿Quién va? ESCENA II HORACIO, MARCELO y dichos
+HORACIO: Amigos de este país.
+MARCELO: Y fieles vasallos del rey de Dinamarca.
+FRANCISCO: Buenas noches.
+MARCELO: ¡Oh honrado soldado! Pásalo bien. ¿Quién te relevó de la centinela?
+FRANCISCO: Bernardo, que queda en mi lugar. Buenas noches. (_Vase Francisco. Marcelo y Horacio se acercan adonde está Bernardo haciendo centinela_).
+MARCELO: ¡Hola, Bernardo!
+BERNARDO: ¿Quién está ahí? ¿Es Horacio?
+HORACIO: Un pedazo de él.
+BERNARDO: Bien venido, Horacio; Marcelo, bien venido.
+MARCELO: Y qué, ¿se ha vuelto á aparecer aquella cosa esta noche?
+BERNARDO: Yo nada he visto.
+MARCELO: Horacio dice que es aprensión nuestra, y nada quiere creer de cuanto le he dicho acerca de ese espantoso fantasma que hemos visto ya en dos ocasiones. Por eso le he rogado que se venga á la guardia con nosotros, para que si esta noche vuelve el aparecido, pueda dar crédito á nuestros ojos, y le hable si quiere.
+HORACIO: ¡Qué! No, no vendrá.
+BERNARDO: Sentémonos un rato, y deja que asaltemos de nuevo tus oídos con el suceso que tanto repugnan oir, y que en dos noches seguidas hemos ya presenciado nosotros. HORACIO.--Muy bien: sentémonos, y oigamos lo que Bernardo nos cuente. (_Siéntanse los tres_).
+BERNARDO: La noche pasada, cuando esa misma estrella que está al occidente del polo había hecho ya su carrera para iluminar aquel espacio del cielo donde ahora resplandece, Marcelo y yo, á tiempo que el reloj daba la una...
+MARCELO: Chit. Calla; mírale por dónde viene otra vez. (_Se aparece á un extremo del teatro la sombra del rey Hamlet armado de todas armas, con un manto real, yelmo en la cabeza, y la visera alzada. Los soldados y Horacio se levantan despavoridos_).
+BERNARDO: Con la misma figura que tenía el difunto rey.
+MARCELO: Horacio, tú que eres hombre de estudios, háblale.
+BERNARDO: ¿No se parece todo al rey? Mírale, Horacio.
+HORACIO: Muy parecido es... Su vista me conturba con miedo y asombro.
+BERNARDO: Querrá que le hablen.
+MARCELO: Háblale, Horacio. HORACIO (_se encamina hacia donde está la sombra_).--¿Quién eres tú, que así usurpas este tiempo á la noche, y esa presencia noble y guerrera que tuvo un día la majestad del soberano dinamarqués que yace en el sepulcro? Habla: por el cielo te lo pido. (_Vase la sombra á paso lento_).
+MARCELO: Parece que está irritado.
+BERNARDO: ¿Ves? Se va como despreciándonos.
+HORACIO: Deténte, habla. Yo te lo mando, habla.
+MARCELO: Ya se fué. No quiere responderos.
+BERNARDO: ¿Qué tal, Horacio? Tú tiemblas, y has perdido el color. ¿No es esto algo más que aprensión? ¿Qué te parece?
+HORACIO: Por Dios, que nunca lo hubiera creído sin la sensible y cierta demostración de mis propios ojos.
+MARCELO: ¿No es enteramente parecido al rey?
+HORACIO: Como tú á ti mismo. Y tal era el arnés de que iba ceñido cuando peleó con el ambicioso rey de Noruega; y así le ví arrugar ceñudo la frente cuando en una alteración colérica hizo caer al de Polonia sobre el hielo, de un solo golpe... ¡Extraña aparición es ésta!
+MARCELO: Pues de esa manera, y á esta misma hora de la noche, se ha paseado dos veces con ademán guerrero delante de nuestra guardia.
+HORACIO: Yo no comprendo el fin particular con que esto sucede; pero en mi ruda manera de pensar, pronostica alguna extraordinaria mudanza á nuestra nación.
+MARCELO: Ahora bien, sentémonos (_siéntanse_); y decidme, cualquiera de vosotros que lo sepa, ¿por qué fatigan todas las noches á los vasallos con estas guardias tan penosas y vigilantes? ¿Para qué es esta fundición de cañones de bronce, y este acopio extranjero de máquinas de guerra? ¿A qué fin esa multitud de carpinteros de marina, precisados á un afán molesto, que no distingue el domingo de lo restante de la semana? ¿Qué causas puede haber para que sudando el trabajador apresurado junte las noches á los días? ¿Quién de vosotros podrá decírmelo?
+HORACIO: Yo te lo diré, ó á lo menos los rumores que sobre esto corren. Nuestro último rey (cuya imagen acaba de aparecérsenos) fué provocado a combate, como ya sabéis, por Fortimbrás de Noruega, estimulado éste de la más orgullosa emulación. En aquel desafío, nuestro valeroso Hamlet (que tal renombre alcanzó en la parte del mundo que nos es conocida) mató á Fortimbrás, el cual por un contrato sellado y ratificado según el fuero de las armas, cedía al vencedor (dado caso que muriese en la pelea) todos aquellos países que estaban bajo su dominio. Nuestro rey se obligó también á cederle una porción equivalente, que hubiera pasado a manos de Fortimbrás, como herencia suya, si hubiese vencido; así como, en virtud de aquel convenio y de los artículos estipulados, recayó todo en Hamlet. Ahora el joven Fortimbrás, de un carácter fogoso, falto de experiencia y lleno de presunción, ha ido recogiendo de aquí y de allí por las fronteras de Noruega una turba de gente resuelta y perdida, á quien la necesidad de comer determina á intentar empresas que piden valor; y según claramente vemos, su fin no es otro que el de recobrar con violencia y á fuerza de armas los mencionados países que perdió su padre. Este es, en mi dictamen, el motivo principal de nuestras prevenciones, el de esta guardia que hacemos, y la verdadera causa de la agitación y movimiento en que toda la nación está.
+BERNARDO: Si no es ésa, ya no alcanzo cuál puede ser... Y en parte lo confirma la visión espantosa que se ha presentado armada en nuestro puesto con la figura misma del rey que fué y es todavía el autor de estas guerras.
+HORACIO: Es por cierto una mota que turba los ojos del entendimiento. En la época más gloriosa y feliz de Roma, poco antes que el poderoso César cayese, quedaron vacíos los sepulcros, y los amortajados cadáveres vagaron por las calles de la ciudad gimiendo en voz confusa; las estrellas resplandecieron con encendidas colas, cayó lluvia de sangre, se ocultó el sol entre celajes funestos, y el húmedo planeta, cuya influencia gobierna el imperio de Neptuno, padeció eclipse, como si el fin del mundo hubiese llegado. Hemos visto ya iguales anuncios de sucesos terribles, precursores que avisan los futuros destinos: el cielo y la tierra juntos los han manifestado á nuestro país y á nuestra gente... Pero... silencio... ¿Veis?... Allí... Otra vez vuelve... (_Vuelve á salir la sombra por otro lado. Se levantan los tres, y echan mano á las lanzas. Horacio se encamina hacia la sombra, y los otros dos siguen detrás_). Aunque el terror me hiela, yo le quiero salir al encuentro... Deténte, fantasma. Si puedes articular sonidos, si tienes voz, háblame. Si allá donde estás puedes recibir algún beneficio para tu descanso y mi perdón, háblame. Si sabes los hados que amenazan á tu país, los cuales felizmente previstos puedan evitarse, ¡ay! habla... O si acaso durante tu vida acumulaste en las entrañas de la tierra mal habidos tesoros, por lo que se dice que vosotros, infelices espíritus, después de la muerte vagáis inquietos, decláralo... deténte y habla... Marcelo, deténle... (_Canta un gallo á lo lejos, y empieza á retirarse la sombra; los soldados quieren detenerla haciendo uso de las lanzas: pero la sombra los evita, y desaparece con prontitud_).
+MARCELO: ¿Le daré con mi lanza?
+HORACIO: Sí, hiérele, si no quiere detenerse.
+BERNARDO: Aquí está.
+HORACIO: Aquí.
+MARCELO: Se ha ido. Nosotros le ofendemos, siendo él un soberano, en hacer demostraciones de violencia. Bien que, según parece, es invulnerable como el aire, y nuestros esfuerzos vanos y cosa de burla.
+BERNARDO: El iba ya á hablar cuando el gallo cantó.
+HORACIO: Es verdad, y al punto se estremeció como el delincuente apremiado con terrible precepto. Yo he oído decir que el gallo, trompeta de la mañana, hace despertar al dios del día con la alta y aguda voz de su garganta sonora, y que á este anuncio todo extraño espíritu errante por la tierra ó el mar, el fuego ó el aire, huye á su centro; y el fantasma que hemos visto acaba de confirmar la certeza de esta opinión. (_Empieza á iluminarse lentamente el teatro_).
+MARCELO: En efecto, desapareció al cantar el gallo. Algunos dicen que cuando se acerca el tiempo en que se celebra el nacimiento de nuestro Redentor, este pájaro matutino canta toda la noche, y que entonces ningún espíritu se atreve á salir de su morada; las noches son saludables, ningún planeta influye siniestramente, ningún maleficio produce efecto, ni las hechiceras tienen poder para sus encantos: ¡tan sagrados son y tan felices aquellos días!
+HORACIO: Yo también lo tengo entendido así, y en parte lo creo. Pero ved cómo ya la mañana, cubierta con la rosada túnica, viene pisando el rocío de aquel alto monte oriental. Demos fin á la guardia, y soy de opinión que digamos al joven Hamlet lo que hemos visto esta noche; porque yo os prometo que este espíritu hablará con él, aunque ha sido para nosotros mudo. ¿No os parece que le demos esta noticia, indispensable en nuestro celo y tan propia de nuestra obligación?
+MARCELO: Sí, sí, hagámoslo. Yo sé en dónde le hallaremos esta mañana con más seguridad.
