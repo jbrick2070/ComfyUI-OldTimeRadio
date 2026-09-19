@@ -183,8 +183,21 @@ published episode here ran viz_camera, viz_mxc_cpu and viz_green together.
 ROCm profiles declare `device_backend: "cuda"`, because that is how ROCm
 presents itself to torch -- so every CUDA lane reads as offered there, and the
 column is really answering "is this vendor-locked or sidecar-locked?" rather
-than "has this been run on AMD?". Nothing in this repo has an AMD receipt. Treat
-an AMD cell as the absence of a hard blocker, nothing more.
+than "has this been run on AMD?". So treat an unmarked AMD cell as the absence
+of a hard blocker, nothing more.
+
+**AMD HAS A RECEIPT, and this paragraph used to deny it.** An outside tester ran
+`workflows/variants/otr_amd_still.json` end to end on a Radeon AI PRO R9700
+(32 GB, RDNA4 / gfx1201) under ROCm 7.2 on Ubuntu 24.04 and published a finished
+episode, with no edits to the graph -- commit `0fc0fb90`, 2026-09-14, pack commit
+`0b38424`. Four engines are marked **proven** there from their own artifacts
+rather than their summary: `viz_mxc_cpu`, `still_motion`, `kokoro` and
+`z_image_turbo`. Their music line was ambiguous, so no music engine is marked.
+What that receipt does NOT cover, and still reads **?**: RDNA3, Windows, the
+8 GB AMD profile, and every lane past the still tier. It is also 100+ commits
+old and the widget tier has regenerated the graphs since, so what is proven is
+that the PIPELINE and the engines that graph selects run on ROCm -- not that
+today's file byte-for-byte has been through a Radeon.
 
 **On a Mac, OOM is a HARD MACHINE REBOOT, not a failed render** -- unified
 memory has no separate pool to exhaust. That is why the Mac column is worth

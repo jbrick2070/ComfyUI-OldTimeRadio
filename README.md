@@ -94,7 +94,7 @@ pressing **Queue** is the whole path.
 | NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
-| Apple Silicon, 16 GB | Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first -- an out-of-memory there can reboot the machine. |
+| Apple Silicon, 16 GB | **It runs.** All four Mac graphs published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
 
