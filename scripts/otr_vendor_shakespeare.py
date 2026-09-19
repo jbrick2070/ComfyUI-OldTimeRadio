@@ -273,6 +273,35 @@ _SPEAKER_SPANS = (
     # the name directly missed every one of them -- Macbeth's "Thane di Glamis
     # e di Cawdor!" stayed inside Angus's speech. The qualifier is matched so
     # the label is found, and dropped because it is stage business.
+    #
+    # THIS PATTERN IS UNANCHORED AND THAT IS A KNOWN DEFECT -- do not "fix" it
+    # with a `<p>` anchor without re-extracting `it/macbeth 1.3` first.
+    # Measured 2026-09-19, both halves:
+    #
+    # THE DEFECT IS REAL. Unanchored, this matches ANY italic phrase followed
+    # by a period, and Rusconi's transcribers italicise plenty that is not a
+    # speaker. King Lear act 1 scene 1: the edition marks 84 speeches, the
+    # pipeline produced 90 across 14 "speakers", the extras being
+    # `(<i>escono Gloc. ed Edm</i>.)` and `(<i>a Cord</i>.)` -- directions --
+    # and in sibling plays `<i>Cucullus non facit monachum</i>.` (Feste's
+    # Latin joke) and `<i>M. O. A. I.</i>` (Malvolio's letter), SPOKEN TEXT
+    # cast as people. A count cannot see it: 142 speeches / 13 speakers reads
+    # as a clean scene.
+    #
+    # AND THE OBVIOUS FIX BREAKS A SHIPPED SCENE. A reviewer measured King
+    # Lear's page and found every label opens a `<p>`; anchoring to that
+    # marked ZERO speakers on Macbeth's page, whose transcriber used a
+    # different structure, and the vendored `it/macbeth 1.3` came back as
+    # unattributed prose (`1a Strega Ove sei tu stata` for
+    # `1A STREGA: Ove sei tu stata`). The edition is one translator but many
+    # transcriptions, and they do not share a skeleton.
+    #
+    # So the rule needs to tolerate both page shapes, or the DIRECTIONS need
+    # stripping first (`_ITALIC_PARENTHETICAL` misses Rusconi's punctuation --
+    # he closes `</i>.)` and `</i>.).`, and sometimes opens `<i>(a Cord</i>.)`
+    # with the parenthesis INSIDE the italic). Whichever is chosen, verify by
+    # re-extracting every vendored Italian scene and diffing against the
+    # stored bytes -- that check is what caught this.
     re.compile(r'(?is)(?P<ord>\d\s*<sup>\s*[ao]\s*</sup>\s*)?'
                r'<i>(?P<name>[^<]{1,40})</i>'
                r'\s*(?:\((?:<[^>]+>|[^()<])*\))?\s*\.'),
