@@ -35,6 +35,7 @@ import os
 import uuid
 import re
 import shutil
+import unicodedata
 from pathlib import Path
 
 import logging
@@ -1192,9 +1193,97 @@ _OBS_NAME_MAX = 150
 
 
 def _obs_field(text, fallback="none"):
-    """One filename-safe field: lowercase, no separators of our own."""
+    """One filename-safe field: lowercase, no separators of our own.
+
+    ASCII-only ON PURPOSE. Every value that reaches this is one of OUR short
+    codes -- `scif`, `koko`, `sa3` -- drawn from a fixed table, so there is
+    nothing here to preserve. The EPISODE TITLE does not come through here;
+    see `_obs_title`.
+    """
     s = re.sub(r"[^A-Za-z0-9._-]+", "-", str(text or "").strip()).strip("-.")
     return (s or fallback).lower()
+
+
+#: What a filesystem actually refuses, and nothing more. The Windows set is a
+#: superset of POSIX's, so obeying it everywhere keeps one name per episode
+#: across the 5080, the 4060 and the share between them.
+_FILENAME_FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
+
+#: Windows refuses these as a basename whatever the extension.
+_WINDOWS_RESERVED = frozenset(
+    ["con", "prn", "aux", "nul"]
+    + ["com%d" % n for n in range(1, 10)]
+    + ["lpt%d" % n for n in range(1, 10)])
+
+
+def _trim_title(text, budget):
+    """Trim a title to ``budget`` UTF-8 BYTES without splitting a character.
+
+    TWO THINGS len() DOES NOT MEASURE. It counts codepoints, while a filesystem
+    counts UTF-16 units (NTFS) or UTF-8 bytes (ext4, and any share that lands
+    on one) -- a CJK title is about three bytes per codepoint, so a cap that
+    looks safe at 150 can be 450 bytes on the wire. And slicing at an arbitrary
+    codepoint splits a Devanagari cluster: `रा` is ra + a vowel sign,
+    and cutting between them leaves a bare combining mark that renders as a
+    dotted circle. Budgeting in bytes and refusing to strand a combining mark
+    fixes both.
+    """
+    text = str(text or "")
+    if len(text.encode("utf-8")) <= budget:
+        return text
+    out = ""
+    used = 0
+    for character in text:
+        size = len(character.encode("utf-8"))
+        if used + size > budget:
+            break
+        out += character
+        used += size
+    # Never end on a combining mark whose base was just cut away.
+    while out and unicodedata.combining(out[-1]):
+        out = out[:-1]
+    return out
+
+
+def _obs_title(text, fallback="episode"):
+    """The episode title, kept in ITS OWN SCRIPT.
+
+    THE TITLE IS THE OPERATOR'S CONTENT AND WE DO NOT TRANSLITERATE IT
+    (2026-09-18). `_obs_field` strips to ASCII, which erased the title outright
+    on three shipped languages -- a Japanese episode published as
+    `_ja_20260918_190917__pori__...`, a Mandarin one as `_zh_...`, and Hindi
+    as `_-_-_-_hi_...` -- so every episode in a script the operator cannot
+    read was indistinguishable from the next one in the folder he browses.
+
+    ROMANISING WAS THE OBVIOUS FIX AND IT WAS MEASURED AND REJECTED. No
+    romaniser is right across these rows: `anyascii` renders 嘘の夜明け as
+    `XunoYeMingke`, which is the CHINESE reading of Japanese kanji, and drops
+    the vowels out of Devanagari; `misaki.cutlet` returns IPA phonemes rather
+    than romaji because misaki vendored it as a G2P. A wrong romanisation is
+    worse than none, because nothing about `XunoYeMingke` announces that it is
+    wrong. Unicode filenames are what the filesystem, the share and every
+    modern OS already support, and the archival copy and the burnt-in title
+    card carry the same title anyway.
+
+    So: strip what a filesystem genuinely refuses, normalise, and keep the
+    rest. The `_<iso>_` tag already in the stem answers "which language"; this
+    answers "which episode".
+    """
+    # ORDER MATTERS, and the first cut got it wrong: collapsing whitespace to
+    # `_` BEFORE trimming turned a trailing space into a trailing underscore,
+    # and a whitespace-only title into a bare `_` instead of the fallback.
+    # Trim, then collapse what is left inside, then trim our own separators.
+    s = unicodedata.normalize("NFC", str(text or "")).strip()
+    s = _FILENAME_FORBIDDEN.sub("-", s)
+    s = re.sub(r"\s+", "_", s)
+    # Windows silently drops a trailing dot or space, which would make the
+    # name on disk differ from the name we recorded.
+    s = s.strip("-._ \t　")
+    if not s:
+        return fallback
+    if s.split(".")[0].lower() in _WINDOWS_RESERVED:
+        s = "_" + s
+    return s.lower()
 
 
 def _obs_basename(final: str) -> str:
@@ -1307,12 +1396,38 @@ def _obs_basename(final: str) -> str:
             _code("llm", meta.get("creative_writing_model"), "nollm"),
             _code("music_gen", meta.get("music_engine"), "nomus"),
         ]
-        name = "%s__%s_final%s" % (_obs_field(title, "episode"),
-                                   "__".join(fields), ext or ".mp4")
-        if len(name) > _OBS_NAME_MAX:
-            keep = _OBS_NAME_MAX - (len(name) - len(title))
-            name = "%s__%s_final%s" % (_obs_field(title[:max(16, keep)]),
-                                       "__".join(fields), ext or ".mp4")
+        # MEASURE THE STRING THAT IS ACTUALLY IN THE NAME. The first cut
+        # subtracted the RAW title's bytes to size the fixed part, but the name
+        # is built from the PROCESSED title, and processing SHRINKS it whenever
+        # a run of forbidden characters or whitespace collapses to one
+        # separator. That made `fixed` an underestimate and `keep` an
+        # overestimate. Measured against the pre-fix formula on the two cases
+        # the test now pins: a CJK title with collapsing runs published at 212
+        # bytes and a Devanagari one at 202, both against this 150-byte cap --
+        # silently, because an oversized name is still a VALID one and the
+        # fail-soft `except` below only catches crashes. Found by the Sonnet
+        # post-QA, 2026-09-18; the same subtraction pattern pre-dated the byte
+        # budget, so it was wrong before in units of codepoints and wrong after
+        # in units of bytes.
+        #
+        # `max(16, ...)` is a FLOOR, not a ceiling guarantee: if the fixed tail
+        # alone ever exceeded the cap the name would still overflow. Not
+        # reachable through the real short-code table -- worst case with every
+        # field on its fallback measures 78 bytes -- and that table has its own
+        # length discipline, so the floor stays.
+        shown = _obs_title(title, "episode")
+        name = "%s__%s_final%s" % (shown, "__".join(fields), ext or ".mp4")
+        if len(name.encode("utf-8")) > _OBS_NAME_MAX:
+            fixed = len(name.encode("utf-8")) - len(shown.encode("utf-8"))
+            keep = max(16, _OBS_NAME_MAX - fixed)
+            shown = _obs_title(_trim_title(title, keep), "episode")
+            # `_obs_title` can ADD a byte after the trim -- the `_` it prefixes
+            # to a Windows reserved word -- so re-trim the finished string. It
+            # is already filesystem-safe, and `_trim_title` still refuses to
+            # strand a combining mark.
+            if len(shown.encode("utf-8")) > keep:
+                shown = _trim_title(shown, keep)
+            name = "%s__%s_final%s" % (shown, "__".join(fields), ext or ".mp4")
         return name
     except Exception as exc:  # noqa: BLE001 -- a publish never dies over a name.
         # BUT IT SAYS SO. The first cut of this helper referenced `re` without

@@ -15649,3 +15649,50 @@ breaks out immediately, because more room cannot help and climbing would
 triple the time to the same refusal. The first rung is byte-identical to the
 previous single call, so every language that already fit pays nothing.
 Covered by `tests/test_verbatim_translation.py`.
+
+## PBUG-20260918-09 -- the published episode could not be bound to its ledger on three languages
+
+**Verified against tonight's published artifacts.** The seven-language sweep
+put four episodes in `otr/obs` whose titles are not Latin, and all of them
+published with NO TITLE IN THE NAME:
+`_ja_20260918_190917__pori__...`, `_zh_20260918_184435__vstb__...`,
+`_-_-_-_hi_20260918_191718__scif__...`. The Portuguese one lost only its
+accent (`conv-s` for `convés`).
+
+**Cause.** `otr_master_audio_mux._obs_field` sanitises to `[A-Za-z0-9._-]`,
+and the episode TITLE was passed through it. A Japanese title erases to
+nothing, a Devanagari one to a run of hyphens; the leading `-` is then
+stripped and the language tag is left standing at the front of the name.
+
+**The half that was not cosmetic.** `_otr_ledger._published_obs_path` binds a
+published file to its episode by matching the obs stem against the episode id
+with `SHOW_PREFIX` removed -- `stem == form or stem.startswith(form + "_")`.
+Erasing the title destroys the front of that stem, so the candidate matched
+neither form, the publisher's path was REFUSED, and `meta.paths.obs_final`
+recorded nothing on every Japanese, Mandarin and Hindi episode. The file was
+on disk and the ledger could not say so. That is PBUG-20260904-06's exact
+failure mode -- a name-bound reader refusing a renamed artifact -- recurring
+silently on three languages. Measured both ways: the old shape returns None,
+the new one binds.
+
+**Fix.** A separate `_obs_title` keeps the title in its own script: NFC
+normalise, replace only what a filesystem refuses (`< > : " / \ | ? *` and
+control characters), collapse whitespace, refuse a trailing dot or space
+(Windows drops those silently), prefix a Windows reserved device name, and
+never return empty. `_obs_field` is UNCHANGED and still ASCII-only for the
+short-code fields, whose values all come from our own fixed table.
+
+**Romanising was measured and rejected.** No romaniser is right across these
+rows: `anyascii` renders 嘘の夜明け as `XunoYeMingke`, the CHINESE reading of
+Japanese kanji, and drops the vowels out of Devanagari; `misaki.cutlet`
+returns IPA phonemes rather than romaji because misaki vendored it as a G2P.
+A wrong romanisation is worse than none because nothing about it announces
+that it is wrong. The archival copy and the burnt-in title card carry the same
+title anyway.
+
+**Truncation was byte-blind too.** The cap compared `len()`, which counts
+codepoints, against a budget a filesystem counts in UTF-16 units or UTF-8
+bytes -- a CJK title is about three bytes per codepoint, so 150 "characters"
+could be 450 bytes. `_trim_title` budgets in bytes and never ends on a
+combining mark, because slicing `र` from its vowel sign leaves a dotted
+circle. Covered by `tests/test_obs_published_filename.py` (63 tests).

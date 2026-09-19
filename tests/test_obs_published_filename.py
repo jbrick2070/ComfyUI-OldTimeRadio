@@ -194,3 +194,163 @@ def test_a_very_long_title_is_capped(monkeypatch):
     assert len(got) <= mux._OBS_NAME_MAX + 8, len(got)
     assert got.endswith("_final.mp4")
     assert "cart" in got, "the fields must survive the trim, not the title"
+
+
+# --- 2026-09-18: the title is the operator's content, kept in its own script --
+#
+# `_obs_field` strips to ASCII, and the title used to go through it, so three
+# shipped languages published with NO TITLE AT ALL: a Japanese episode landed
+# as `_ja_20260918_190917__pori__...`, Mandarin as `_zh_...`, Hindi as
+# `_-_-_-_hi_...`. Every episode in a script the operator cannot read was
+# indistinguishable from the next in the folder he actually browses.
+#
+# Romanising was measured and rejected: `anyascii` reads 嘘の夜明け as
+# "XunoYeMingke" -- the CHINESE reading of Japanese kanji -- and strips the
+# vowels out of Devanagari, while `misaki.cutlet` returns IPA rather than
+# romaji. A wrong romanisation is worse than none because nothing about it
+# announces that it is wrong.
+
+_JA = "\u5618\u306e\u591c\u660e\u3051"          # 嘘の夜明け
+_ZH = "\u5982\u9858"                            # 如願
+_HI = "\u0938\u0924\u094d\u092f \u0915\u0940 \u0930\u093e\u0924"  # सत्य की रात
+
+
+@pytest.mark.parametrize("native", [_JA, _ZH, _HI, "conv\u00e9s"])
+def test_a_native_script_title_survives_into_the_obs_name(native):
+    stem = "%s_xx_20260918_190917" % native
+    out = mux._obs_title(stem)
+    kept = native.replace(" ", "_").lower()
+    assert kept in out, (native, out)
+    # The regression it replaces: ASCII-stripping left the language tag alone
+    # at the front of the name.
+    assert not out.startswith("_")
+
+
+def test_the_short_code_fields_are_still_ascii_only():
+    """`_obs_field` is unchanged and must stay that way -- every value that
+    reaches it is one of OUR codes from a fixed table, so there is nothing
+    there to preserve, and widening it would change every existing name."""
+    for code in ("scif", "koko", "sa3", "vcam", "none", "q354b"):
+        assert mux._obs_field(code) == code
+    assert mux._obs_field(_JA, "episode") == "episode"
+
+
+@pytest.mark.parametrize("hostile, want", [
+    ('a/b:c*d?e"f<g>h|i', "a-b-c-d-e-f-g-h-i"),   # forbidden everywhere
+    ("trailing dot.", "trailing_dot"),            # Windows drops trailing dots
+    ("trailing space ", "trailing_space"),        # ... and trailing spaces
+    ("", "episode"),
+    ("   ", "episode"),
+    ("---", "episode"),
+])
+def test_a_hostile_title_is_made_safe_without_being_emptied(hostile, want):
+    assert mux._obs_title(hostile) == want
+
+
+@pytest.mark.parametrize("reserved", ["CON", "nul.mp4", "com1", "LPT9"])
+def test_a_windows_device_name_cannot_be_the_basename(reserved):
+    out = mux._obs_title(reserved)
+    assert out.split(".")[0].lower() not in mux._WINDOWS_RESERVED
+    assert out.startswith("_")
+
+
+def test_the_name_actually_round_trips_on_this_filesystem(tmp_path):
+    """The claim is that the filesystem accepts these, so assert it rather
+    than reasoning about it."""
+    for native in (_JA, _ZH, _HI):
+        name = mux._obs_title("%s_xx_1" % native) + "__scif_final.mp4"
+        path = tmp_path / name
+        path.write_bytes(b"x")
+        assert name in [p.name for p in tmp_path.iterdir()]
+
+
+# --- the production path, and the two things len() does not measure ----------
+
+def test_obs_basename_itself_keeps_a_native_title(monkeypatch):
+    """Through `_obs_basename`, not just the helper. The cursor review's note:
+    a helper tested alone proves the helper, never the production path."""
+    _install(monkeypatch, _FULL)
+    out = mux._obs_basename(
+        "signal_lost_%s_ja_20260918_190917_captioned_with_credits_final.mp4"
+        % _JA)
+    assert _JA in out, out
+    assert out.endswith("_final.mp4")
+    assert not out.startswith("_")
+
+
+@pytest.mark.parametrize("budget", list(range(8, 40)))
+def test_trimming_never_strands_a_combining_mark(budget):
+    """Devanagari is the case: U+0930 U+093E is ra plus a vowel SIGN, and a
+    codepoint slice between them leaves a bare combining mark that renders as
+    a dotted circle."""
+    import unicodedata
+    long_hi = (_HI + " ") * 12
+    out = mux._trim_title(long_hi, budget)
+    assert len(out.encode("utf-8")) <= budget
+    assert not (out and unicodedata.combining(out[-1])), repr(out)
+
+
+@pytest.mark.parametrize("native", [_JA, _HI])
+def test_the_cap_is_counted_in_bytes_not_codepoints(native):
+    """A CJK codepoint is three UTF-8 bytes, so a 150-CODEPOINT cap is 450
+    bytes on any filesystem that counts them (ext4, and any share landing on
+    one). The cap has to be a byte cap or it is not a cap."""
+    out = mux._trim_title(native * 60, mux._OBS_NAME_MAX)
+    assert len(out.encode("utf-8")) <= mux._OBS_NAME_MAX
+    assert out, "trimming must not empty a title outright"
+
+
+def test_the_published_name_still_binds_to_its_episode(tmp_path):
+    """PBUG-20260918-09, and the reason this change is not cosmetic.
+
+    `_otr_ledger._published_obs_path` binds the published file to its episode
+    by matching the obs stem against the episode id with the show prefix
+    removed. ASCII-stripping the title destroyed the front of that stem, so on
+    every Japanese, Mandarin and Hindi episode the published artifact was
+    REFUSED and `meta.paths.obs_final` recorded nothing -- the file was on
+    disk and the ledger could not say so. That is PBUG-20260904-06's exact
+    failure mode (a name-bound reader refusing a renamed artifact), recurring
+    silently on three languages.
+    """
+    from nodes import _otr_ledger as ledger
+    episode_id = "signal_lost_%s_ja_20260918_190917" % _JA
+    name = mux._obs_title("%s_ja_20260918_190917" % _JA) + "__pori__sa3_final.mp4"
+    published = tmp_path / name
+    published.write_bytes(b"x")
+    assert ledger._published_obs_path(
+        str(published), inferred_obs_root=tmp_path,
+        episode_id=episode_id) == published.resolve()
+
+    # And the shape it replaces does NOT bind -- pinned so a future
+    # "simplification" back to ASCII cannot pass quietly.
+    stripped = tmp_path / "_ja_20260918_190917__pori__sa3_final.mp4"
+    stripped.write_bytes(b"x")
+    assert ledger._published_obs_path(
+        str(stripped), inferred_obs_root=tmp_path,
+        episode_id=episode_id) is None
+
+
+def test_the_byte_cap_holds_when_processing_SHRINKS_the_title(monkeypatch):
+    """The bug the Sonnet post-QA reproduced: the cap was sized against the
+    RAW title while the name carried the PROCESSED one.
+
+    Processing shrinks a title whenever a run of forbidden characters or
+    whitespace collapses to a single separator, so the fixed part was
+    underestimated and the budget overestimated. Measured against the pre-fix formula on the
+    two parametrised cases below: the CJK title published at 212 UTF-8 bytes
+    and the Devanagari one at 202, both against a 150-byte cap -- silently,
+    because an oversized name is still a VALID name and the fail-soft handler
+    only catches crashes. (The two ASCII cases do NOT overflow pre-fix; they
+    are here to pin that the fix did not break the ordinary path.)
+    """
+    _install(monkeypatch, _FULL)
+    for title in ("::: " * 120,                      # collapses hard
+                  (_JA + "::: ") * 40,               # CJK + collapsing runs
+                  (_HI + "   ") * 30,                # Devanagari + whitespace
+                  "a" * 400):                        # the plain long case
+        got = mux._obs_basename(
+            "signal_lost_%s_20260918_190917_captioned_with_credits_final.mp4"
+            % title)
+        assert len(got.encode("utf-8")) <= mux._OBS_NAME_MAX, (
+            "%d bytes for %r" % (len(got.encode("utf-8")), got[:60]))
+        assert got.endswith("_final.mp4")
