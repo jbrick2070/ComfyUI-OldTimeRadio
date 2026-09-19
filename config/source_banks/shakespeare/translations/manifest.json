@@ -47,6 +47,178 @@
       }
     },
     {
+      "iso": "es",
+      "play": "comedy_of_errors",
+      "scene": "3.1",
+      "file": "es/comedy_of_errors_3_1.txt",
+      "translator": "José Arnaldo Márquez",
+      "translator_death_date": 1903,
+      "translation_first_published": 1883,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://es.wikisource.org/wiki/Comedia_de_equivocaciones_(M%C3%A1rquez_tr.)",
+      "revision_id": "sha256:6dca77a66ab02c59",
+      "raw_sha256": "6dca77a66ab02c59a8f18df6d5b9fd3de4fc4c8758a9ed0e0a9a841caa9c4702",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ACTO III. / ESCENA I.",
+      "speaker_labels": 56,
+      "distinct_speakers": 9,
+      "speaker_map": {
+        "ADRIANA": {
+          "spoken": "ADRIANA",
+          "roster": "ADRIANA"
+        },
+        "ANGELO": {
+          "spoken": "ANGELO",
+          "roster": "ANGELO"
+        },
+        "ANTÍFOLO DE ÉFESO": {
+          "spoken": "ANTÍFOLO DE ÉFESO",
+          "roster": "ANTIPHOLUS OF EPHESUS"
+        },
+        "BALTASAR": {
+          "spoken": "BALTASAR",
+          "roster": "BALTHASAR"
+        },
+        "DROMIO DE SIRACUSA": {
+          "spoken": "DROMIO DE SIRACUSA",
+          "roster": "DROMIO OF SYRACUSE"
+        },
+        "DROMIO DE ÉFESO": {
+          "spoken": "DROMIO DE ÉFESO",
+          "roster": "DROMIO OF EPHESUS"
+        },
+        "LUCÍA": {
+          "spoken": "LUCÍA",
+          "roster": "LUCE"
+        }
+      }
+    },
+    {
+      "iso": "es",
+      "play": "romeo_juliet",
+      "scene": "2.2",
+      "file": "es/romeo_juliet_2_2.txt",
+      "translator": "Marcelino Menéndez y Pelayo",
+      "translator_death_date": 1912,
+      "translation_first_published": 1881,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://es.wikisource.org/wiki/Romeo_y_Julieta_(Men%C3%A9ndez_y_Pelayo_tr.)/Acto_II",
+      "revision_id": "sha256:3c3684f9dd77cd63",
+      "raw_sha256": "3c3684f9dd77cd6342698738c982781a9d36b160d79d07fc88db6fda56b6feb2",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ACTO II. / ESCENA II.",
+      "speaker_labels": 55,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "AMA": {
+          "spoken": "AMA",
+          "roster": "NURSE"
+        },
+        "JULIETA": {
+          "spoken": "JULIETA",
+          "roster": "JULIET"
+        },
+        "ROMEO": {
+          "spoken": "ROMEO",
+          "roster": "ROMEO"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "as_you_like_it",
+      "scene": "3.2",
+      "file": "fr/as_you_like_it_3_2.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Comme_il_vous_plaira_(trad._Hugo)",
+      "revision_id": "sha256:e42956c6dffa525e",
+      "raw_sha256": "e42956c6dffa525eca87710e5c82f2abf2a8cbaba0edb05a26fb2f71c959fcb8",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE XII.",
+      "speaker_labels": 145,
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "CORIN": {
+          "spoken": "CORIN",
+          "roster": "CORIN"
+        },
+        "CÉLIA": {
+          "spoken": "CÉLIA",
+          "roster": "CELIA"
+        },
+        "JACQUES": {
+          "spoken": "JACQUES",
+          "roster": "JAQUES"
+        },
+        "ORLANDO": {
+          "spoken": "ORLANDO",
+          "roster": "ORLANDO"
+        },
+        "PIERRE DE TOUCHE": {
+          "spoken": "PIERRE DE TOUCHE",
+          "roster": "TOUCHSTONE"
+        },
+        "ROSALINDE": {
+          "spoken": "ROSALINDE",
+          "roster": "ROSALIND"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "comedy_of_errors",
+      "scene": "3.1",
+      "file": "fr/comedy_of_errors_3_1.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/La_Com%C3%A9die_des_erreurs_(trad._Hugo)",
+      "revision_id": "sha256:643856befc2855c6",
+      "raw_sha256": "643856befc2855c690162755cd0857cddf5b3f8d989ea9ba8f0ab0ae6ed25383",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE V.",
+      "speaker_labels": 61,
+      "distinct_speakers": 9,
+      "speaker_map": {
+        "ADRIANA": {
+          "spoken": "ADRIANA",
+          "roster": "ADRIANA"
+        },
+        "ANGELO": {
+          "spoken": "ANGELO",
+          "roster": "ANGELO"
+        },
+        "ANTIPHOLUS D’ÉPHÈSE": {
+          "spoken": "ANTIPHOLUS D’ÉPHÈSE",
+          "roster": "ANTIPHOLUS OF EPHESUS"
+        },
+        "BALTHAZAR": {
+          "spoken": "BALTHAZAR",
+          "roster": "BALTHASAR"
+        },
+        "DROMION DE SYRACUSE": {
+          "spoken": "DROMION DE SYRACUSE",
+          "roster": "DROMIO OF SYRACUSE"
+        },
+        "DROMION D’ÉPHÈSE": {
+          "spoken": "DROMION D’ÉPHÈSE",
+          "roster": "DROMIO OF EPHESUS"
+        },
+        "LUCE": {
+          "spoken": "LUCE",
+          "roster": "LUCE"
+        }
+      }
+    },
+    {
       "iso": "fr",
       "play": "hamlet",
       "scene": "1.1",
@@ -139,6 +311,342 @@
         "LE ROI DE FRANCE": {
           "spoken": "LE ROI DE FRANCE",
           "roster": "FRANCE"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "macbeth",
+      "scene": "1.3",
+      "file": "fr/macbeth_1_3.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Macbeth_(trad._Hugo)",
+      "revision_id": "sha256:c9fc0b16b5f6a673",
+      "raw_sha256": "c9fc0b16b5f6a673f6b8b5e794943d2b211e5eaf4ebb7936e312bd15c8e5173b",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE III.",
+      "speaker_labels": 51,
+      "distinct_speakers": 8,
+      "speaker_map": {
+        "ANGUS": {
+          "spoken": "ANGUS",
+          "roster": "ANGUS"
+        },
+        "BANQUO": {
+          "spoken": "BANQUO",
+          "roster": "BANQUO"
+        },
+        "DEUXIÈME SORCIÈRE": {
+          "spoken": "DEUXIÈME SORCIÈRE",
+          "roster": "SECOND WITCH"
+        },
+        "MACBETH": {
+          "spoken": "MACBETH",
+          "roster": "MACBETH"
+        },
+        "PREMIÈRE SORCIÈRE": {
+          "spoken": "PREMIÈRE SORCIÈRE",
+          "roster": "FIRST WITCH"
+        },
+        "ROSSE": {
+          "spoken": "ROSSE",
+          "roster": "ROSS"
+        },
+        "TOUTES TROIS": {
+          "spoken": "TOUTES TROIS",
+          "roster": "ALL"
+        },
+        "TROISIÈME SORCIÈRE": {
+          "spoken": "TROISIÈME SORCIÈRE",
+          "roster": "THIRD WITCH"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "much_ado",
+      "scene": "2.3",
+      "file": "fr/much_ado_2_3.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Beaucoup_de_bruit_pour_rien_(trad._Hugo)",
+      "revision_id": "sha256:0351bfae0b40d7ff",
+      "raw_sha256": "0351bfae0b40d7ff0649af6dd42fd5354234ecad73e7803fffb7e9f3546c8479",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE V.",
+      "speaker_labels": 82,
+      "distinct_speakers": 7,
+      "speaker_map": {
+        "BALTHAZAR": {
+          "spoken": "BALTHAZAR",
+          "roster": "BALTHASAR"
+        },
+        "BÉATRICE": {
+          "spoken": "BÉATRICE",
+          "roster": "BEATRICE"
+        },
+        "BÉNÉDICT": {
+          "spoken": "BÉNÉDICT",
+          "roster": "BENEDICK"
+        },
+        "CLAUDIO": {
+          "spoken": "CLAUDIO",
+          "roster": "CLAUDIO"
+        },
+        "DON PEDRO": {
+          "spoken": "DON PEDRO",
+          "roster": "PRINCE"
+        },
+        "LE PAGE": {
+          "spoken": "LE PAGE",
+          "roster": "BOY"
+        },
+        "LÉONATO": {
+          "spoken": "LÉONATO",
+          "roster": "LEONATO"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "much_ado",
+      "scene": "3.1",
+      "file": "fr/much_ado_3_1.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Beaucoup_de_bruit_pour_rien_(trad._Hugo)",
+      "revision_id": "sha256:3dde66a5b383ac7c",
+      "raw_sha256": "3dde66a5b383ac7c7b91cb20597b8da0e70681afe1c23a17c9544d00e44c761f",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE VI.",
+      "speaker_labels": 26,
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "BÉATRICE": {
+          "spoken": "BÉATRICE",
+          "roster": "BEATRICE"
+        },
+        "HÉRO": {
+          "spoken": "HÉRO",
+          "roster": "HERO"
+        },
+        "MARGUERITE": {
+          "spoken": "MARGUERITE",
+          "roster": "MARGARET"
+        },
+        "URSULE": {
+          "spoken": "URSULE",
+          "roster": "URSULA"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "romeo_juliet",
+      "scene": "2.2",
+      "file": "fr/romeo_juliet_2_2.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Rom%C3%A9o_et_Juliette_(trad._Hugo)",
+      "revision_id": "sha256:fe7ef1922b32e7ed",
+      "raw_sha256": "fe7ef1922b32e7ed3b95481a8599b233d72233a5e8afde04bf71b1322ea9f65a",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE VII.",
+      "speaker_labels": 56,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "JULIETTE": {
+          "spoken": "JULIETTE",
+          "roster": "JULIET"
+        },
+        "LA NOURRICE": {
+          "spoken": "LA NOURRICE",
+          "roster": "NURSE"
+        },
+        "ROMÉO": {
+          "spoken": "ROMÉO",
+          "roster": "ROMEO"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "tempest",
+      "scene": "1.2",
+      "file": "fr/tempest_1_2.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/La_Temp%C3%AAte_(Shakespeare,_trad._Hugo)",
+      "revision_id": "sha256:c83e406cd69d4177",
+      "raw_sha256": "c83e406cd69d417777da93f86eedd086136de59fe73346d5550919b1b8832cba",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE II.",
+      "speaker_labels": 143,
+      "distinct_speakers": 8,
+      "speaker_map": {
+        "ARIEL": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "CALIBAN": {
+          "spoken": "CALIBAN",
+          "roster": "CALIBAN"
+        },
+        "FERDINAND": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "LES MÊMES VOIX": {
+          "spoken": "LES MÊMES VOIX",
+          "roster": "ALL"
+        },
+        "MIRANDA": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "PROSPERO": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "VOIX": {
+          "spoken": "VOIX",
+          "roster": "ALL"
+        },
+        "VOIX ÉPARSES": {
+          "spoken": "VOIX ÉPARSES",
+          "roster": "ALL"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "tempest",
+      "scene": "3.1",
+      "file": "fr/tempest_3_1.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/La_Temp%C3%AAte_(Shakespeare,_trad._Hugo)",
+      "revision_id": "sha256:a2ab0b61f50d28be",
+      "raw_sha256": "a2ab0b61f50d28bea686c6b4e658373dc185d8211dc982b7c63ee40b99919695",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE V.",
+      "speaker_labels": 25,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "FERDINAND": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "MIRANDA": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "PROSPERO": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "twelfth_night",
+      "scene": "1.5",
+      "file": "fr/twelfth_night_1_5.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Le_soir_des_rois_ou_ce_que_vous_voudrez_(trad._Hugo)",
+      "revision_id": "sha256:820e2a268cd0ee96",
+      "raw_sha256": "820e2a268cd0ee969eb66fc647a647bfb1a378589261684d07ec26329cc64920",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE V.",
+      "speaker_labels": 120,
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "FESTE": {
+          "spoken": "FESTE",
+          "roster": "FOOL"
+        },
+        "MALVOLIO": {
+          "spoken": "MALVOLIO",
+          "roster": "MALVOLIO"
+        },
+        "MARIA": {
+          "spoken": "MARIA",
+          "roster": "MARIA"
+        },
+        "OLIVIA": {
+          "spoken": "OLIVIA",
+          "roster": "OLIVIA"
+        },
+        "SIR TOBIE": {
+          "spoken": "SIR TOBIE",
+          "roster": "TOBY"
+        },
+        "VIOLA": {
+          "spoken": "VIOLA",
+          "roster": "VIOLA"
+        }
+      }
+    },
+    {
+      "iso": "fr",
+      "play": "twelfth_night",
+      "scene": "2.5",
+      "file": "fr/twelfth_night_2_5.txt",
+      "translator": "François-Victor Hugo",
+      "translator_death_date": 1873,
+      "translation_first_published": "1865-1872",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://fr.wikisource.org/wiki/Le_soir_des_rois_ou_ce_que_vous_voudrez_(trad._Hugo)",
+      "revision_id": "sha256:985618fa4df0befb",
+      "raw_sha256": "985618fa4df0befbe35aa6ee53c6201a38264ef1d37b4b5e6cf99159b7ffc8a2",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCÈNE X.",
+      "speaker_labels": 87,
+      "distinct_speakers": 8,
+      "speaker_map": {
+        "FABIEN": {
+          "spoken": "FABIEN",
+          "roster": "FABIAN"
+        },
+        "MALVOLIO": {
+          "spoken": "MALVOLIO",
+          "roster": "MALVOLIO"
+        },
+        "MARIA": {
+          "spoken": "MARIA",
+          "roster": "MARIA"
+        },
+        "SIR ANDRÉ": {
+          "spoken": "SIR ANDRÉ",
+          "roster": "ANDREW"
+        },
+        "SIR TOBIE": {
+          "spoken": "SIR TOBIE",
+          "roster": "TOBY"
         }
       }
     },

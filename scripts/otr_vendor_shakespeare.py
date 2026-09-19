@@ -462,11 +462,42 @@ def extract(lines, play_label, act_label, scene_label):
             scene_label, " under %s" % act_label if act_label else "")
     scene_at += start
     # The next heading of EITHER shape ends the scene.
-    stem = re.match(r"^\s*(\S+)", scene_label)
-    stem = _fold(stem.group(1)) if stem else ""
+    #
+    # THE STEM IS THE LABEL WITHOUT ITS NUMBER, and deriving it by splitting on
+    # WHITESPACE only works for a script that has any. `SCENE III.` splits to
+    # `SCENE`, which the following `SCENE IV.` starts with, so the cut closes.
+    # A CJK heading has no spaces, so the stem came out as the WHOLE label --
+    # number and all -- and the next scene never started with it, so nothing
+    # ever ended the scene. Measured on Tsubouchi's Romeo and Juliet: act 1
+    # scene 1 returned 322 lines where the window is about 114, running through
+    # the whole act and into the next one, and the balcony scene came back with
+    # Mercutio, the Nurse, Friar Laurence and the Prince in it.
+    #
+    # A CJK act/scene heading is `<marker><numeral><unit>` -- the unit being
+    # act or scene, in either traditional or simplified form. Two headings are
+    # the same SHAPE when they share the marker and the unit, whatever numeral
+    # sits between. That is the same rule the whitespace split expresses for
+    # Latin, applied to a script that writes it without a gap.
+    _CJK_HEADING = re.compile(r"^(?P<mark>第).{1,4}(?P<unit>[幕場场])$")
+    cjk = _CJK_HEADING.match(scene_label.strip())
+    cjk_units = ""
+    if cjk:
+        # stop at the next scene OF THIS UNIT, or at any act heading -- an act
+        # boundary ends a scene just as surely as the next scene does.
+        cjk_units = cjk.group("unit") + "幕"
+        stem = ""
+    else:
+        stem = re.match(r"^\s*(\S+)", scene_label)
+        stem = _fold(stem.group(1)) if stem else ""
     end = len(lines)
     for j in range(scene_at + 1, len(lines)):
         folded = _fold(lines[j]).strip()
+        if cjk_units:
+            hit = re.match(r"^第.{1,4}([幕場场])", folded)
+            if hit and hit.group(1) in cjk_units:
+                end = j
+                break
+            continue
         if stem and folded.startswith(stem):
             end = j
             break
