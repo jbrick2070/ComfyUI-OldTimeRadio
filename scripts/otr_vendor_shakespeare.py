@@ -186,7 +186,20 @@ _DIRECTION_BLOCK = re.compile(
 #: the spelling of the markup differs.
 _SPEAKER_SPANS = (
     # Wikisource (Hugo): class="sc", the name often rendered lowercase.
-    re.compile(r'(?is)<span\b[^>]*class="sc"[^>]*>(?P<name>[^<]{1,40})</span>'),
+    #
+    # `personnage` IS THE SAME FACT IN A DIFFERENT SPELLING, and missing it cost
+    # nearly a whole play. Hugo's `Le soir des rois` was transcribed by someone
+    # who used `class="personnage"` -- 918 spans of it against 119 `sc` -- and
+    # with only `sc` known, `to_text` marked 66 speakers on a page that has 918
+    # labels. The scene would not have been WRONG, it would have been almost
+    # entirely unattributed prose. Two independent reviewers reported it before
+    # it was measured here.
+    #
+    # Safe to fold into the union rather than hold for a per-edition binding:
+    # `personnage` appears ZERO times on all four vendored pages, so it cannot
+    # reach them, and the class name means exactly one thing.
+    re.compile(r'(?is)<span\b[^>]*class="(?:sc|personnage)"[^>]*>'
+               r'(?P<name>[^<]{1,40})</span>'),
     # Gutenberg (Marquez): an inline small-caps style, name carries its period.
     re.compile(r'(?is)<span\b[^>]*font-variant:\s*(?:all-)?small-caps[^>]*>'
                r'(?P<name>[^<]{1,40})</span>'),

@@ -787,6 +787,42 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_personnage_is_read_as_a_speaker_class_like_sc():
+    """The same fact in a different spelling, and missing it cost a whole play.
+
+    Hugo's `Le soir des rois` was transcribed by someone who marked speakers
+    `class="personnage"` -- 918 spans of it against 119 `class="sc"`. With only
+    `sc` known, `to_text` marked 66 speakers on a page carrying 918 labels, so
+    the scene would not have come out WRONG so much as almost entirely
+    unattributed prose. Two independent reviewers reported it before it was
+    measured; afterwards the same page marks 1902 (two marks per label).
+
+    Folded into the union rather than held for a per-edition binding because
+    `personnage` appears ZERO times on all four vendored pages -- it cannot
+    reach them -- and the class name means exactly one thing.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_personnage",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    mark = vendor.SPEAKER_MARK
+    for markup, name in [
+        ('<span class="personnage">le duc.</span>', "le duc."),
+        ('<span class="personnage" style="">maria.</span>', "maria."),
+        ('<span class="sc">Macbeth</span>', "Macbeth"),
+    ]:
+        out = vendor.to_text(markup)
+        assert mark in out, "%r produced no speaker mark" % markup
+        assert name.rstrip(".") in out
+
+    # a class that is neither is still not a speaker
+    assert mark not in vendor.to_text('<span class="poem">un vers</span>')
+
+
 def test_a_ruby_gloss_is_a_pronunciation_guide_and_is_not_spoken():
     """Japanese editions annotate a kanji with how to READ it, and nobody says
     the annotation out loud.
