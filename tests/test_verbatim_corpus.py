@@ -13,6 +13,7 @@ CPU only, no network. UTF-8 no BOM.
 from __future__ import annotations
 
 import json
+import os
 
 import pytest
 
@@ -662,6 +663,12 @@ def test_tampered_bytes_are_refused_rather_than_performed():
 EDITION_STAGE_WORDS = (
     "entra Rosse", "entrano Rosse", "escono", "scompaiono", "scompariscono",
     "s\u2019ode un tamburo", "Entran Corino", "Sale.",
+    # Survived the first strip and reached the vendored Macbeth, where it sat
+    # inside MACBETH's own line and would have been performed in his voice.
+    # A hand-list is why: every phrase above is short, so nothing here tested
+    # the LENGTH CAP that let this one through. See the test below, which
+    # pins the cause rather than one more symptom.
+    "rimane alcuni istanti",
 )
 
 
@@ -680,6 +687,43 @@ def test_no_stage_direction_is_left_to_be_spoken(iso, source_ref, _translator):
     assert text
     for phrase in EDITION_STAGE_WORDS:
         assert phrase.lower() not in text.lower(), (source_ref, phrase)
+
+
+def test_a_long_stage_direction_is_stripped_like_a_short_one():
+    """THE CAUSE, not another symptom. The strip was written `[^<]{1,80}`, and
+    80 is a number somebody picked -- a stage direction is a sentence whenever
+    the edition wants one. Rusconi has two past it, and the failure mode is the
+    worst available: a direction too long for the cap is not reported, it is
+    silently KEPT and then spoken by whoever holds the line.
+
+    The hand-list above cannot catch this class, because every phrase in it is
+    short. What bounds the match honestly is `[^<]`, which cannot cross a tag,
+    so the body is one text run inside one `<i>` wrapped in parentheses.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_under_test",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    # The real one, 89 characters, from it/macbeth 1.3.
+    long_direction = ("rimane alcuni istanti assorto in profonda meditazione, "
+                      "quindi si volge ad Angus e a Rosse")
+    assert len(long_direction) > 80, "this test is pointless if it fits the old cap"
+    markup = ("<p>Thane di Glamis e di Cawdor! Poi... "
+              "(<i>" + long_direction + "</i>) Grazie, signori.</p>")
+    assert "rimane alcuni istanti" not in vendor.strip_direction_parentheticals(markup)
+
+    # And the short ones still go, so the fix did not trade one bug for another.
+    assert "entra Rosse" not in vendor.strip_direction_parentheticals(
+        "<p>Poi... (<i>entra Rosse</i>) Grazie.</p>")
+
+    # A parenthetical that is NOT italic is dialogue and is untouched, however
+    # long it runs -- that is the whole reason the strip is keyed on markup.
+    dialogue = "(car cette partie du monde connu l’estimait pour tel)"
+    assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
 def test_the_translators_own_parenthetical_dialogue_survives():

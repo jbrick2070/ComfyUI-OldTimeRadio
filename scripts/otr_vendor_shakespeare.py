@@ -146,8 +146,23 @@ _SPEAKER_SPANS = (
 #: A parenthetical whose CONTENT IS WHOLLY ITALIC. Rusconi and Marquez set
 #: stage business that way -- `(<i>entra Rosse</i>)`, `(<i>escono</i>)` -- and
 #: the editions are consistent about it.
+#:
+#: THE BODY IS NOT LENGTH-CAPPED, AND THE CAP THAT USED TO BE HERE WAS A BUG.
+#: It read `{1,80}`, which is a plausible-looking number and nothing more: a
+#: stage direction is a sentence when the edition wants one, and Rusconi's
+#: Macbeth has two past 80 -- the 89-character `rimane alcuni istanti assorto
+#: in profonda meditazione, quindi si volge ad Angus e a Rosse`, which survived
+#: into the vendored `it/macbeth 1.3` and would have been PERFORMED IN
+#: MACBETH'S OWN VOICE mid-speech, and a 163-character scene setting. The
+#: failure is silent in the worst direction: a direction too long for the cap
+#: is not flagged, it is simply kept and spoken.
+#:
+#: What actually bounds this match is `[^<]`, which cannot cross a tag, so the
+#: body is confined to a single text run inside one `<i>` that is immediately
+#: wrapped in parentheses. That is the real anchor. A character count on top of
+#: it bought nothing and cost a wrong mouth.
 _ITALIC_PARENTHETICAL = re.compile(
-    r"\(\s*<i>(?P<body>[^<]{1,80})</i>\s*\)", re.I | re.S)
+    r"\(\s*<i>(?P<body>[^<]+)</i>\s*\)", re.I | re.S)
 
 
 def strip_direction_parentheticals(markup):
