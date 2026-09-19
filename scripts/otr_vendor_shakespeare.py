@@ -357,6 +357,23 @@ def main():
         key = (lead.get("iso"), lead.get("play"), lead.get("scene"))
         if lead.get("excluded") or lead.get("url_is") not in TEXT_FORMS:
             continue
+        if lead.get("hold"):
+            # A LOCATED, CORRECT SOURCE THIS PIPELINE CANNOT YET READ SAFELY.
+            # Distinct from `excluded`, which means the TRANSLATION is
+            # disqualified (an indirect translation, a text that does not
+            # exist); a held row is good source waiting on the extractor, and
+            # the field carries the reason so nobody has to rediscover it.
+            #
+            # It exists because `alt_of` was being used for this, and that
+            # overloading cost a real incident: a self-referential `alt_of`
+            # was read as a data error, cleared, and the row vendored
+            # immediately -- putting a scene on disk with several speakers
+            # merged into the wrong mouths. A flag whose NAME says "alternate"
+            # cannot carry "do not vendor, the parser is not ready", and the
+            # next reader will clear it again.
+            print("  HOLD  %-3s %-16s %-5s  %s"
+                  % (key + (str(lead["hold"])[:54],)))
+            continue
         if lead.get("alt_of"):
             # One scene, one vendored file. An alternate writes the same
             # path and the LAST one wins silently -- on the first run a

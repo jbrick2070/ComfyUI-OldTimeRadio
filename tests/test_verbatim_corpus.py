@@ -787,6 +787,37 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_a_held_lead_carries_its_reason_and_is_not_vendored():
+    """A HOLD is a located, correct source the extractor cannot read SAFELY yet.
+
+    It is not `excluded`, which disqualifies the TRANSLATION (indirect, or no
+    text exists). The distinction is the whole point: a held row is good source
+    and someone will come back to it, so the reason travels with it.
+
+    This exists because `alt_of` was carrying the meaning, and a flag whose name
+    says "alternate" cannot say "do not vendor, the parser is not ready". It was
+    read as a data error, cleared, and the row vendored on the spot with several
+    speakers in the wrong mouths. A reader who clears a field named `hold` and
+    reads the reason is making a decision; one who clears `alt_of` is tidying.
+    """
+    root = _corpus_root()
+    with open(os.path.join(root, "leads.json"), encoding="utf-8") as handle:
+        leads = json.load(handle)["leads"]
+    with open(os.path.join(root, "manifest.json"), encoding="utf-8") as handle:
+        vendored = {(r["iso"], r["play"], r["scene"])
+                    for r in json.load(handle)["scenes"]}
+
+    held = [r for r in leads if r.get("hold")]
+    assert held, "no held rows -- delete this test rather than letting it pass vacuously"
+    for row in held:
+        key = (row["iso"], row["play"], row["scene"])
+        assert str(row["hold"]).strip(), "%s/%s %s is held with no reason" % key
+        assert len(str(row["hold"])) > 40, (
+            "%s/%s %s: a hold reason has to say what is actually wrong" % key)
+        assert key not in vendored, (
+            "%s/%s %s is HELD but a manifest row vendors it anyway" % key)
+
+
 def test_every_shipped_manifest_row_has_its_text_on_disk():
     """A `READY` row aimed at nothing, which NOTHING ELSE CATCHES.
 
