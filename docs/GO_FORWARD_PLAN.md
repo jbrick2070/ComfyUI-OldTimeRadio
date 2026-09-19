@@ -53,9 +53,17 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   (0 of 8) -- so Gemini writer, Google TTS, Lyria, Gemini image and the
   publish path are proven; Veo rendered four clips total today and then
   429'd through a full 75 s backoff on every shot, which a per-minute cap
-  would not survive: the key's `veo-3.1-lite-generate-preview` daily / plan
-  allowance is spent. Google's rate-limits page carries no Veo row; the
-  number lives in his AI Studio rate-limit dashboard.
+  would not survive. **Afternoon, on the rotated paid key, the same
+  request to every Veo model in the catalog (backoff off):**
+  `veo-3.1-fast-generate-preview` ACCEPTED, `veo-3.1-generate-preview`
+  ACCEPTED, `veo-3.1-lite-generate-preview` HTTP 429. So the quota is
+  PER MODEL and only the lite preview -- the profile's pin -- is spent
+  today; the key is fine. Every other engine passed a live one-call smoke
+  on that key (writer Flash + Lite, TTS, image, Lyria, Omni). The override
+  is `OTR_GOOGLE_VEO_MODEL_ID` (`_selected_model`, eng_google_veo_video.py);
+  the test leg runs on fast. Whether the shipped pin moves to fast (dearer
+  per clip, answers today) or stays on lite (cheap, resets on Google's
+  clock) is his call.
   **The fork, once video renders:** which profile ships -- `google_veo_low_1act`
   (2 chars, 100-frame clips) is the cheap candidate -- and promoting it means
   a variant + launch recipe (`SHIPPING_SET`), a tier-matrix row and the
