@@ -67,7 +67,11 @@ def test_missing_key_fails_before_request(monkeypatch):
         return {}
 
     monkeypatch.setattr(L, "create_interaction", _create)
-    with pytest.raises(GoogleAPIKeyMissingError, match="no API key"):
+    # Match the PROMISE THIS TEST IS NAMED FOR, not the prose around it. The
+    # old pattern was "no API key", which the key-file rewrite turned into
+    # "No Google API key ..." -- a better message that failed a case-sensitive
+    # match, so a passing contract read as a broken one.
+    with pytest.raises(GoogleAPIKeyMissingError, match="No request was sent"):
         AE.get_engine("google_lyria").generate_clip("soft synth cue", 8, 123)
     assert called is False
 
