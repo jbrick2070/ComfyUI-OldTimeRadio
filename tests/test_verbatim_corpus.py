@@ -690,15 +690,17 @@ _ENGLISH_STEM = {
 #: dialogue. These characters speak their own lines under their own names and
 #: draw from the roll, which is the correct outcome; refusing the scene would
 #: have thrown away the translation to protect an English cast list.
+#: PRUNED 2026-09-19, and pruning matters: an entry here SUPPRESSES the guard
+#: for that string forever, so one left behind after its defect is fixed is a
+#: hole nobody can see. Six went out because no vendored text contains them any
+#: more -- `IMBÉCILE DE CHEVALIER`, `JE PUIS COMMANDER OÙ J'ADORE`, `NUL HOMME
+#: NE LE DOIT SAVOIR`, `QUI JAMAIS NE SE FATIGUE`, `TRÈS-BEAU PYRAME` and a
+#: Spanish line fragment. All were labels invented out of Malvolio's letter and
+#: Ariel's songs by rules that have since been fixed; if any of them ever comes
+#: back, the suite should say so instead of shrugging.
 _KNOWN_UNBOUND = {
-    "IMBÉCILE DE CHEVALIER",
-    "JE PUIS COMMANDER OÙ J’ADORE",
-    "NUL HOMME NE LE DOIT SAVOIR",
-    "QUI JAMAIS NE SE FATIGUE",
-    "TRÈS-BEAU PYRAME",
     "ANTIPHOLUS", "DROMIO", "ANTÍFOLO",
     "AMIPHOLUS D’ÉPHÈSE",
-    "i buen señor Angelo, es necesario que nos excuséis á todos",
     # Snug speaks in Rusconi's and Zhu Shenghao's Midsummer 3.1 and never
     # speaks in the Folger sidecar, where he appears only in the entry and
     # exit directions. Two translators, independently, gave him lines.
@@ -1328,3 +1330,77 @@ def test_an_indent_marked_edition_gets_its_speakers_and_loses_its_business():
     # and the dialogue itself is untouched
     assert "やい、グレゴリー。" in out
     assert "待った！" in out
+
+
+def test_no_vendored_speech_is_empty():
+    """A LABEL WITH NOTHING BEHIND IT IS A LOST SPEECH, and it is invisible to
+    every count this corpus keeps.
+
+    The speaker is marked separately from the words, so a rule that eats the
+    words leaves the mark standing. `fr/tempest 1.2` shipped six lines reading
+    `ARIEL:` and `VOIX ÉPARSES:` followed by nothing at all, because Hugo sets
+    Ariel's songs in a 90% `poem` block and the stage-direction rule strips that
+    whole type band. Three songs were being deleted that way, "Come unto these
+    yellow sands" and "Sigh no more, ladies" among them. The speaker count was
+    identical either way.
+
+    This is the assertion nobody writes, because the natural check asks whether
+    a speech has a SPEAKER and never whether a speaker has a SPEECH.
+    """
+    from pathlib import Path
+    root = Path(_corpus_root())
+    for row in C.load_manifest(str(root / C.MANIFEST_NAME)):
+        text = (root / row["file"]).read_text(encoding="utf-8")
+        empty = [line for line in text.splitlines()
+                 if re.match(r"^[^:]{1,40}:\s*$", line)]
+        assert not empty, (row["file"], empty[:4])
+
+
+def test_a_vendored_scene_carries_no_site_chrome_or_zero_width_padding():
+    """The site is not in the play, and neither is the typesetter's scaffolding.
+
+    `extract` ends a scene at the NEXT heading of the same shape. When the scene
+    is the LAST one on its page there is no next heading, so it ran to the end
+    of the document and the closing speaker delivered the footnotes, the licence
+    blurb and `Informativa sulla privacy` as the tail of their final speech --
+    in five Italian scenes and one Chinese one. None of that text carries a
+    label, so it attaches to whoever spoke last and NO COUNT MOVES.
+
+    The zero-width entries are the same class one layer down: Wikisource hangs
+    each verse line on U+FEFF purely to indent it, which is invisible in a diff
+    and in a terminal and is still a character handed to a voice engine.
+    """
+    from pathlib import Path
+    root = Path(_corpus_root())
+    forbidden = ("Estratto da", "Informativa sulla privacy",
+                 "Dichiarazione sui cookie", "Aggiungi lingue",
+                 "Privacy policy", "\ufeff", "\u200b")
+    for row in C.load_manifest(str(root / C.MANIFEST_NAME)):
+        text = (root / row["file"]).read_text(encoding="utf-8")
+        for needle in forbidden:
+            assert needle not in text, (row["file"], repr(needle))
+
+
+def test_no_scene_runs_the_same_speaker_back_to_back_more_than_twice():
+    """TWO SPEECHES IN A ROW BY ONE CHARACTER IS WHERE A SPEECH WENT MISSING.
+
+    Drama alternates. A run of `ORL, ORL` means either the edition really prints
+    it that way -- an aside, a song, a speech resumed after business -- or the
+    speech BETWEEN them was absorbed into its neighbour. This is the only
+    structural check here that needs no second language, no English sidecar and
+    nobody reading the text, and it is what localised the Rusconi verse defect:
+    `it/as_you_like_it 3.2` showed three runs, and each one was a place where a
+    speech whose label sat INSIDE its own italic run had been swallowed.
+
+    The bar is deliberately loose. A couple of runs in a long scene is ordinary
+    stagecraft; a handful is a parser losing turns.
+    """
+    from pathlib import Path
+    from nodes import _otr_passage_selector as PS
+    root = Path(_corpus_root())
+    for row in C.load_manifest(str(root / C.MANIFEST_NAME)):
+        text = (root / row["file"]).read_text(encoding="utf-8")
+        seq = [s.speaker for s in PS.parse_speeches(text)]
+        runs = sum(1 for a, b in zip(seq, seq[1:]) if a == b)
+        assert runs <= 3, (row["file"], "%d back-to-back runs in %d speeches"
+                           % (runs, len(seq)))
