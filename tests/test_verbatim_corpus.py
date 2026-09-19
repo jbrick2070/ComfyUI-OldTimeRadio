@@ -787,6 +787,54 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_a_small_type_block_that_is_a_bare_name_is_kept_as_a_speaker():
+    """Some transcribers set the SPEAKER in small type too.
+
+    Once the direction rule reads the whole 60-99% band instead of two
+    hard-coded percentages, it reaches them. Measured on Menendez y Pelayo's
+    Spanish editions: `font-size: 83%` wraps EVERY speaker -- 127 such blocks in
+    Macbeth, 193 in Romeo and Juliet -- so stripping the band wholesale deletes
+    `ROMEO.`, `BENVOLIO.` and `MERCUTIO.` and leaves the play with nobody to say
+    the lines. Neither edition is vendored, so nothing shipped was hurt; this
+    closes the trap before someone records a label for one.
+
+    The signal is case and punctuation, never the percentage. An ACT or SCENE
+    heading is kept too, deliberately: `extract` locates a scene BY those
+    headings, and no name shape matches them (they carry no trailing period).
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_smalltype",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    def marked(body):
+        # NOTE the doubled `%%`: this is a %-formatted string and a literal
+        # `83%;` reads as a format spec, which raises rather than failing an
+        # assertion -- it cost a confusing red run on the way in.
+        return vendor.to_text(
+            '<p><span style="font-size: 83%%;">%s</span></p>' % body)
+
+    # speakers survive
+    for name in ("ROMEO.", "BENVOLIO.", "LADY MACBETH.",
+                 "BRUJA 1.ª"):          # the Spanish ordinal is not lowercase
+        assert name in marked(name), "small-type speaker %r was deleted" % name
+
+    # stage business still goes
+    for direction in ("Plaza pública, cerca del jardin de Capuleto.",
+                      "Tres BRUJAS.", "Fanfares.", "À Cordélia."):
+        assert direction.strip(".") not in marked(direction), (
+            "stage business %r survived" % direction)
+
+    # apparatus with a colon is not a speaker
+    assert "PERSONNAGES" not in marked("PERSONNAGES :")
+
+    # and a heading is kept, because scene location needs it
+    assert "ACTO PRIMERO" in marked("ACTO PRIMERO")
+
+
 def test_a_tag_ends_at_the_first_unquoted_angle_bracket():
     """`<[^>]+>` stops at the first `>` ANYWHERE, including one inside a quoted
     attribute -- and MediaWiki's Parsoid puts a JSON blob in `data-mw` that

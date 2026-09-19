@@ -233,6 +233,42 @@ def mark_speakers(markup):
     is not -- and only the spans that survive are speakers. Reversing these two
     steps casts every entrance as a speaking part.
     """
+    def _is_bare_label(text):
+        """Is this small-type block a SPEAKER NAME rather than stage business?
+
+        SOME TRANSCRIBERS SET THE SPEAKER IN SMALL TYPE TOO, and once the
+        direction rule reads the whole 60-99% band instead of two hard-coded
+        percentages, it reaches them. Measured on Menendez y Pelayo's Spanish
+        editions: `font-size: 83%` wraps EVERY speaker -- 127 such blocks in
+        Macbeth, 193 in Romeo and Juliet -- so stripping the band wholesale
+        would delete `ROMEO.`, `BENVOLIO.`, `MERCUTIO.` and leave the play
+        speaker-less. Neither edition is vendored, so nothing shipped was hurt;
+        this closes the trap before someone records a label for one.
+
+        The signal is punctuation and case, not the percentage: a speaker label
+        carries no lowercase and no colon, stage business is a sentence.
+        `PERSONNAGES :` is apparatus and is caught by the colon; the ordinal
+        indicators in `BRUJA 1.ª` are not lowercase words and are allowed.
+
+        An ACT or SCENE heading also survives this test, and that is correct --
+        `extract` locates a scene BY those headings, so removing them would
+        break scene location outright. Nothing downstream mistakes them for a
+        speaker: the name shapes want a trailing period or a colon and a
+        heading has neither.
+        """
+        body = re.sub(r"(?s)<[^>]+>", " ", text)
+        # `html.unescape`, spelled out: the parameter here is `markup` for the
+        # reason `to_text` documents -- a parameter named `html` shadows the
+        # stdlib module and silently turns this into an attribute lookup.
+        body = re.sub(r"\s+", " ", html.unescape(body)).strip()
+        if not body or len(body) > 30:
+            return False
+        if ":" in body or "：" in body:
+            return False
+        if any(ch.islower() and ch not in "ªº" for ch in body):
+            return False
+        return any(ch.isalpha() for ch in body)
+
     def _strip_direction(match):
         # DROP THE DIRECTION, DO NOT KEEP IT AS NARRATION. Keeping the words
         # put them back in a mouth: an unlabelled line merges into the PENDING
@@ -242,6 +278,13 @@ def mark_speakers(markup):
         # speaker; stage business is the edition's apparatus and is not
         # performed. Same rule for the qualifier on a label ("a part",
         # "montrant Edmond") -- it was never dialogue either.
+        #
+        # UNLESS THE BLOCK IS A BARE NAME. Some transcribers set the SPEAKER in
+        # small type as well, and dropping it would leave the play without
+        # anyone to say the lines. Kept on its own line so the ordinary name
+        # shapes can claim it -- see `_is_bare_label`.
+        if _is_bare_label(match.group("body")):
+            return "\n" + match.group("body") + "\n"
         return "\n"
 
     def _mark(match):
