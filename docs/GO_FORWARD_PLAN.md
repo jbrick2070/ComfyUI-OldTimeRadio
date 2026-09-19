@@ -39,10 +39,6 @@ proven wrong. Aesthetic drift is closed
 
 Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **A1. Canonical writer on an 8 GB card.** Canonical saves Qwen 3.5 4B,
-  `llm_quant_policy` `none`, ceiling `10.0`; a dropped node defaults to
-  `bnb_nf4` / `14.5`. Leave canonical as the 16 GB graph and point 8 GB users
-  at the variant, or retune both.
 * **A5. 16 GB foley / mime without GGUF.** Official LTX 2.5 safetensors do not
   fit 16 GB (measured). `otr_16gb_video`, `otr_16gb_foley` and `otr_16gb_mime`
   still load the Q3 GGUF; cloud deluxe already ships `cloud_ltx25_foley_plus`.
@@ -59,6 +55,16 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Native-language science feeds for SciFi News Pro.** The lane reads the
   English feed and authors natively. Which feeds, and whether the dossier
   extraction stays English, is his call before any code.
+* **`nodes/_otr_scene_resolver.py` -- rip it or wire it (new 2026-09-18).**
+  Built for an automated act/scene extraction + confidence-scored alignment
+  design that the vendored-Shakespeare row below never ended up using -- the
+  shipped pipeline reads each edition's own act/scene label by hand instead
+  (`EDITION_LABELS`), which cannot silently vendor the wrong scene the way a
+  computed alignment score could. Zero production callers, same as before
+  this note was written. Either it still has a role once vendoring scales
+  past hand-verified leads (fewer manual label lookups, more leads per
+  session), or it is a verified-dead symbol per the repo's rip-or-wire rule.
+  His call; a grep receipt either way before acting.
 
 ## 2. CODE -- decided, in order
 
@@ -71,99 +77,42 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-**Decided 2026-09-18** (*"I want the best pack available"*): a scene ships a
-real translator's words -- ~~when they clear both the US test (first published
-before 1931) and life+70 (translator died before 1956)~~ **(withdrawn that
-evening, see above)**; verse preferred
-where a public-domain verse translation exists; scene-level transcription is
-allowed; no coverage requirement -- any scene without vendored words keeps the
-model translation that ships today. The rule this replaces ("died before 1944")
-was a conservative bound, not a legal test.
+**The pipeline is built, wired and proven end to end (2026-09-18).** A real
+translator's words now reach a performed beat: `scripts/otr_vendor_shakespeare.py`
+extracts a scene by the EDITION'S OWN markup (speakers, stage business and
+footnote chrome are read off the page's own HTML, not guessed from prose),
+`nodes/_otr_verbatim_corpus.py` resolves and sha256-verifies it by the ref the
+shipping bank actually emits, `nodes/_otr_passage_selector.py` reads its
+`NAME:` layout alongside Folger's two (measured inert on all 81 English
+sources), and a manifest `speaker_map` bridges each edition label to the
+existing English gender ladder -- so a voice lands on the right character and
+the printed credits name the translator beside the source licence. Receipt:
+[HANDOFF_LOG](HANDOFF_LOG.md).
 
-Spec, inventory and the gate's field list:
-[2026-09-18-fidelity-lane-translation](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml).
+**THE ORIGINAL DESIGN BELOW WAS SUPERSEDED, NOT COMPLETED.** This row used to
+describe an automated `_otr_scene_resolver.py` + alias table + "anchor-matching
+alignment by English opening/closing speaker with a confidence score." None of
+that shipped. What shipped instead: the operator's own verification pass reads
+each lead's page and records the edition's own act/scene label by hand
+(`EDITION_LABELS` in the vendor script) -- simpler, and it cannot silently
+vendor the wrong scene the way a computed alignment score could.
+`alignment_confidence` in the manifest is a stamped constant, not a measured
+score; nothing currently computes one. `_otr_scene_resolver.py` has zero
+production callers now, same as before -- see the new fork in section 1: does
+it still have a role, or is it a rip.
 
-**The gate is built and has run** (`scripts/otr_shakespeare_corpus_gate.py`,
-`nodes/_otr_verbatim_corpus.py`, leads in
-`config/source_banks/shakespeare/translations/leads.json`, report in the
-evidence folder).
+**What is actually vendored: four scenes, three languages.**
+`it/macbeth 1.3` (Rusconi), `fr/hamlet 1.1` and `fr/king_lear 1.1` (Hugo),
+`es/as_you_like_it 3.2` (Marquez). Zero for ja, zh, pt, hi -- entirely
+unstarted, not blocked on anything but locating and hand-verifying a lead.
 
-**What it measured, 2026-09-18 -- NOT ONE LEAD URL IS A SCENE, BUT SEVEN ARE
-THE RIGHT WORK.** Seven pages carry two to five act headings, i.e. the whole
-play (`ACTE PREMIER` / `ACTO PRIMERO` / `ACTO PRIMEIRO`): both fr Macbeth
-leads, all three es leads, pt Hamlet and hi As You Like It. One -- `Teatro
-completo di Shakspeare` -- is the collected-works index with no act heading
-at all. The Aozora URL is the 図書カード rather than the text, and the
-archive.org URL is the details page rather than the scan.
-
-Two corrections worth keeping, both caught in review rather than by the
-author. An early, laxer gate called eight leads READY on page chrome -- the
-same error the spec convicts v1 of, committed again in miniature. Then the
-strict gate reported "target scene headings not found" for pages that DO
-carry headings, because it read only digits and single-letter romans while
-the 19th-century convention is the ordinal WORD; the plan said those pages
-were heading-less landing pages, and that was wrong. Both are fixed, and the
-verdicts now distinguish "wrong page" from "right work, wrong granularity".
-
-**`nodes/_otr_scene_resolver.py` EXISTS AND IS DELIBERATELY NOT WIRED YET --
-this is the row that says what it is waiting for** (2026-09-18; the repo's
-"wire it in the same change or write the row" rule). It resolves `act.scene`
-to a span and refuses rather than guessing, and its arrival already paid for
-itself: building it against the real cached French Macbeth exposed
-PBUG-20260918-07 in `_labelled`, where the bare English `act` matched inside
-the French word `action` 24 times and a five-act play measured as two.
-
-A FOURTH BLOCKER WAS ITS OWN CORRECTNESS, and this row denied it until the
-Fable review of 2026-09-18 read the import line: the module did
-`from nodes import _otr_verbatim_corpus`, and inside a running ComfyUI
-`nodes` is COMFYUI'S OWN registry module, not this package. It resolved only
-under pytest, where the test file puts the repo root on `sys.path` first, so
-24 green tests proved the helper and nothing about the wiring -- the
-2026-09-07 defect class exactly. Fixed to the relative import every sibling
-uses, verified by importing it the way `__init__.py` does. **The sentence
-that used to stand here claimed none of the blockers was the resolver's own,
-and that was false.**
-
-THREE THINGS STILL BLOCK THE WIRING, none of them the resolver's correctness:
-1. **It must not hand chrome to the performance.** Its span stops at the next
-   HEADING, so an end-of-act marker such as `FIN DU PREMIER ACTE.` rides
-   inside the extracted text. Wired as-is that becomes a SPOKEN line -- the
-   exact defect PBUG-20260918-04 already shipped once. A test asserts the gap
-   on purpose and says to delete itself when the trim lands.
-2. **The coordinate may not exist in the edition.** François-Victor Hugo
-   numbers scenes CONTINUOUSLY with no act divisions (`SCÈNE I.` through
-   `SCÈNE XXIV.` on the cached Macbeth, zero act headings). Asking that page
-   for "1.3" is not a miss to fix in the resolver; it is the alias table
-   below, and wiring before it exists would silently vendor a WRONG scene
-   that looks right.
-3. **Nothing it would feed is built.** There is no vendored tree and no
-   plan-step read, so a wired resolver would have no consumer today.
-
-So the wiring lands WITH the alias table, not before it.
-
-**Next action: resolve a lead to its SCENE.** For the seven whole-work pages
-that is a RANGE inside a text already fetched and already rights-cleared --
-locate the act heading, then the scene heading under it, then the next scene
-heading. Per host for the rest: a Wikisource subpage (and the `action=parse`
-wikitext endpoint the spec prefers, where speaker labels are template-wrapped
-and structurally detectable); Aozora's zipped Shift_JIS file rather than the
-card; archive.org's `_djvu.txt` rather than the details page. Then the alias table and anchor-matching alignment
-(editions renumber scenes, so a scene resolves by its English opening and
-closing speaker with a confidence score, never by counting headings), then
-the vendored tree `config/source_banks/shakespeare/translations/<iso>/` with
-one normalised `NAME:`-labelled scene file per scene and a manifest row
-(translator, death year, first publication, transcription licence, source
-URL, revision id, raw sha256, verdict, confidence), then the plan-step read
-that prefers a READY scene and falls back to the model translation, with the
-receipt naming which and the credit naming the translator. Phases: fr + it
-(weigh Carcano verse against Rusconi prose), then es, ja, zh, then pt + hi.
-
-Named traps: LiberLiber's Italian set is Raponi and still in copyright;
-"A transcribir" means no text exists; Aozora's canonical text is Shift_JIS with
-ruby markup; a `utm_source` parameter is proof the row was never opened.
-
-One contrarian on the manifest shape and the first gate output before any
-ingestion.
+**Next action: vendor the next scene.** The pipeline is proven, so this is now
+mechanical per scene, not a design question: open the lead, read off its
+edition's own act/scene label (`EDITION_LABELS`), add the row, run
+`scripts/otr_vendor_shakespeare.py --write`. Named traps, still live:
+LiberLiber's Italian set is Raponi and still in copyright; "A transcribir"
+means no text exists; Aozora's canonical text is Shift_JIS with ruby markup;
+a `utm_source` parameter is proof the lead was never opened.
 
 ## 3. TEST -- only after 1 and 2 are empty
 

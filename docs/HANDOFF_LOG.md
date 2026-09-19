@@ -1,3 +1,58 @@
+## 2026-09-18 (evening) -- native-language Shakespeare performs a real translator's words
+
+Did: Four scenes vendored (`it/macbeth 1.3` Rusconi, `fr/hamlet 1.1` and
+  `fr/king_lear 1.1` Hugo, `es/as_you_like_it 3.2` Marquez) and the whole
+  lane wired so they actually reach a beat, which they could not this
+  morning. `scripts/otr_vendor_shakespeare.py` reads speakers, stage
+  business and footnote chrome off the EDITION'S OWN markup (small-caps
+  spans, italic names, a 90%-font-size div for stage directions) instead
+  of guessing from stripped prose -- the guess had already put Cordelia's
+  aside inside Goneril's speech and cast FANFARES as a witch. Fable then
+  built the two rows the render path needed: a third `NAME:` layout for
+  `_otr_passage_selector` (measured inert on all 81 English sources --
+  exactly one column-0 `ALLCAPS:` line, a heading in a prose Christmas
+  Carol) and a manifest `speaker_map` bridging each edition label to the
+  EXISTING English gender ladder (`resolve_roster_gender`, Bug Bible
+  12.61) rather than new gender logic.
+Found in review: cursor (contrarian, twice) caught that swapping the
+  vendored plan alone left the interpreter and the 11.61 name authority
+  still reading the ENGLISH `news_article` while compose performed the
+  Italian one -- `project_payload` now re-runs from the vendored plan --
+  and that Rusconi/Marquez stage directions in round parens were being
+  spoken aloud (Folger's square-bracket convention doesn't hold for
+  them); fixed by reading the edition's own italics rather than a
+  blanket strip, which would have deleted Hugo's real spoken
+  parentheticals too. Separately, the operator ran agy by hand and an
+  adversarial verify workflow (ten agents, five claims, default-refuted)
+  confirmed all five and found two more: the translator was never
+  credited anywhere (`verbatim_passage.vendored` carried Hugo/Rusconi/
+  Marquez by name with zero readers in the repo -- new
+  `vendored_credit_line`, `credit_translated_by` now REQUIRED across all
+  8 language rows), and `speaker_map={}` was read as truthy-false and
+  impersonated the English path, so a row with no map silently skipped
+  its own unbound-labels receipt -- the one case that needed it most.
+  Both fixed at the two-line root the docstrings already declared
+  (`is not None`, not truthiness). The workflow also confirmed the
+  Folger CC BY-NC notice keeps firing on a public-domain translation and
+  talked me out of dropping it: the Wikisource transcription itself
+  carries CC BY-SA + GFDL, so the notice is a true, conservative
+  over-claim and removing it trades that for a real obligation nothing
+  surfaces.
+Current step: `_otr_scene_resolver.py` is now a confirmed-dead symbol --
+  the automated alignment design it was built for was superseded by
+  hand-verified `EDITION_LABELS` -- and is a new section-1 fork (rip or
+  wire) rather than a decision made in this pass.
+Next: vendor the next scene. Mechanical now, not a design question --
+  ja, zh, pt, hi are entirely unstarted. Portuguese and Hindi already
+  have partial gap-report leads; Japanese and Mandarin need fresh ones.
+Models: driver Claude Opus 5 (Sonnet 5 from the `/model` switch this
+  turn); Fable 5.1 built both rows; cursor-agent REFUTE on the finished
+  build and again after fixes; a ten-agent adversarial verify workflow
+  on the operator's own agy findings.
+Commits: three code chunks (vendored text + markup extraction; the
+  lookup/wiring fixes cursor's first pass found; Fable's build plus the
+  second review round) then this docs chunk -- see `git log`.
+
 ## 2026-09-18 -- printed credits follow the language (bank matrix); language indicator
 
 Did: Operator picked the bank-by-language matrix for the printed SOURCE
