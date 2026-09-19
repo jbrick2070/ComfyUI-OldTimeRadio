@@ -787,6 +787,36 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_every_shipped_manifest_row_has_its_text_on_disk():
+    """A `READY` row aimed at nothing, which NOTHING ELSE CATCHES.
+
+    The vendor script appends manifest rows and never prunes them, so removing
+    a vendored scene leaves its row behind. Measured 2026-09-19: a Chinese
+    scene was vendored, found to carry two wrong mouths, and deleted -- and
+    `load_manifest` validated the surviving row without complaint, because
+    `file` being non-blank says a path was WRITTEN DOWN, not that anything is
+    there.
+
+    Downstream the failure is silent by design: `vendored_text` returns
+    ("", None) for a missing file exactly as it does for a hash mismatch, so
+    the lane falls back to the model translation while the manifest still
+    advertises a real translator's words. That degradation is CORRECT at render
+    time and wrong at authoring time, which is why this is a test over the
+    shipped corpus rather than a raise inside the loader -- the loader is also
+    called with fixture manifests whose files deliberately do not exist.
+    """
+    root = _corpus_root()
+    with open(os.path.join(root, "manifest.json"), encoding="utf-8") as handle:
+        manifest = json.load(handle)
+    missing = []
+    for row in manifest["scenes"]:
+        if not os.path.isfile(os.path.join(root, row["file"])):
+            missing.append("%s/%s %s -> %s"
+                           % (row["iso"], row["play"], row["scene"], row["file"]))
+    assert not missing, (
+        "manifest rows naming text that is not on disk: %s" % "; ".join(missing))
+
+
 def test_a_chinese_clause_is_not_mistaken_for_a_speaker_name():
     """A WRONG MOUTH, measured on Zhu Shenghao's Midsummer: Bottom's whole
     speech was performed by Snout.

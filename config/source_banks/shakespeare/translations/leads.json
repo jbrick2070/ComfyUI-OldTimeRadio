@@ -992,10 +992,12 @@
       "translator": "Luís I of Portugal",
       "translator_death_date": 1889,
       "translation_first_published": 1877,
-      "transcription_license": "Project Gutenberg licence",
-      "url": "https://www.gutenberg.org/ebooks/25667.txt.utf-8",
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "url": "https://pt.wikisource.org/wiki/Hamlet:_drama_em_cinco_actos/Acto_primeiro/Cena_I",
       "form": "prose",
-      "url_is": "landing_or_whole_work"
+      "url_is": "scene_page",
+      "alt_url": "https://www.gutenberg.org/ebooks/25667.txt.utf-8",
+      "note": "UPGRADED 2026-09-19 from the Gutenberg whole-work text to the transcribed pt.wikisource SCENE page, which carries markup the extractor can key on instead of bare prose. Verified by fetching it: the page renders 18,558 chars, names 'traduzido por Luís I de Portugal', and cites 'Lisboa: Imprensa Nacional, 1880, páginas 7-13'. Speakers are div class='tiInherit' (68 on the page); stage directions are font-size:80% spans -- '(Retira-se.)', '(A sombra afasta-se.)', '(O gallo canta.)'. CAUTION, MEASURED: _DIRECTION_BLOCK matches 90% and 95% ONLY, so it finds ZERO here and every direction would be SPOKEN. This row must not be vendored until the extractor can read an 80% block. The Gutenberg text is kept as alt_url; it is the same translation with no markup at all. This is the ONLY transcribed, direct-from-English, public-domain Portuguese Shakespeare located -- the Domingos Ramos and Júlio Dantas volumes have Commons scans and Wikisource Index pages with ZERO transcribed pages behind them."
     },
     {
       "iso": "pt",
@@ -1199,7 +1201,7 @@
       "form": "prose",
       "url_is": "act_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found.",
+      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found. HELD 2026-09-19, and the flag is doing real work even though its VALUE is meaningless: `alt_of` is read as a boolean ('do not vendor as a side effect') and never dereferenced, so naming its own cell is cosmetically wrong but functionally the only thing keeping this row from vendoring. It was cleared briefly and the row vendored IMMEDIATELY -- EDITION_LABELS already has an entry -- producing a file with two wrong mouths (Puck's speech inside Gwen's line 36, another at line 24) and unstripped block directions riding at the end of three speeches, e.g. a speech ending in the entrance cue. Restored until the Chinese markup is handled: the edition marks block directions with fullwidth brackets and separates the speaker with an ideographic space, and the extractor reads neither.",
       "alt_of": "zh/midsummer/3.1"
     },
     {

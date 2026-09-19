@@ -118,9 +118,23 @@ def to_text(markup):
 #: fact off the page instead of guessing one from prose.
 SPEAKER_MARK = "\x01"
 
-#: A stage direction / sound cue, set smaller by every edition in the set.
+#: A stage direction / sound cue. Every edition in the set sets its apparatus in
+#: SMALLER TYPE than the dialogue; the exact percentage is the transcriber's
+#: taste and nothing else.
+#:
+#: THE PERCENTAGE IS NOT A GATE (operator 2026-09-19: "I don't want font size
+#: blocking our workflow"). This read `9[05]%` -- two hard-coded values, taken
+#: from the two editions that happened to be vendored first. It found ZERO on
+#: the transcribed Portuguese Hamlet, whose stage directions are `80%` spans
+#: (`(Retira-se.)`, `(O gallo canta.)`), so that edition would have PERFORMED
+#: every one of them. Discovering a third convention should not mean a code
+#: change and a fourth should not mean another; "smaller than the body text" is
+#: the rule the publishers are actually following.
+#:
+#: 60-99% is the whole band of small type. 100% and above is body text or a
+#: heading and is never apparatus.
 _DIRECTION_BLOCK = re.compile(
-    r'(?is)<(div|span|p)\b[^>]*font-size:\s*9[05]%[^>]*>(?P<body>.*?)</\1\s*>')
+    r'(?is)<(div|span|p)\b[^>]*font-size:\s*[6-9]\d%[^>]*>(?P<body>.*?)</\1\s*>')
 
 #: How each publisher marks a speaker. All three converge on small caps; only
 #: the spelling of the markup differs.
