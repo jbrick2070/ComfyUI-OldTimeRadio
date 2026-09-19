@@ -71,6 +71,19 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   operator applies by hand. One word from him picks the profile, and his
   dashboard says when Veo will answer again.
 
+* **Non-English episodes admit only Kokoro, so Shakespeare-in-translation
+  cannot run on the Google lane until he says which languages Google TTS
+  may voice.** Measured 2026-09-19: French Hamlet on `google_veo_low_1act`
+  stopped in 29 s at `cast_lock.py:70` -- "engine 'google_tts' is not
+  admitted on a French episode (row engines: ['kokoro']). Kokoro is the
+  dance leader day 1." That is his 2026-09-12 ruling working as written
+  (`config/episode_languages.json` rows list the admitted engines; English
+  admits everything). Gemini TTS speaks every language the switch carries,
+  so admitting it is one list entry per row -- but a voice on a language is
+  an ear decision, not a config edit (see the French `ff_siwis` day). The
+  English Hamlet leg proves the lane on Shakespeare content meanwhile. One
+  word per language, or "all", and the rows get it.
+
 * **`google_tts` refuses a cast row with no gender; `my_story` leaves an
   unstated gender empty by design.** Measured 2026-09-19 on the second live
   leg of `google_veo_low_1act`: the canonical's bank is `roll`, the roll
