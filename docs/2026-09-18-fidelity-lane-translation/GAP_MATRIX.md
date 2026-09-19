@@ -18,7 +18,7 @@ Generated from `config/source_banks/shakespeare/translations/leads.json` against
 | twelfth_night 2.5 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | HAVE-URL | NO LEAD | HAVE-URL |
 | much_ado 2.3 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | NEED-URL | HAVE-URL |
 | much_ado 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | NEED-URL | HAVE-URL |
-| as_you_like_it 3.2 | HAVE-URL | HAVE-URL | BLOCKED | NO LEAD | NEED-URL | HAVE-URL | HAVE-URL |
+| as_you_like_it 3.2 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | HAVE-URL | HAVE-URL |
 | hamlet 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | NEED-URL | HAVE-URL |
 | king_lear 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | NEED-URL | HAVE-URL |
 | romeo_juliet 2.2 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | BLOCKED | NO LEAD | HAVE-URL |
@@ -26,7 +26,7 @@ Generated from `config/source_banks/shakespeare/translations/leads.json` against
 
 ## Tally
 
-- HAVE-URL     70 of 98
+- HAVE-URL     71 of 98
 - NEED-URL     14 of 98
-- BLOCKED      2 of 98
+- BLOCKED      1 of 98
 - NO LEAD      12 of 98

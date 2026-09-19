@@ -12,8 +12,23 @@
       "transcription_license": "cervantesvirtual.com -- Marco legal READ 2026-09-18: personal and private use only; distribution and online dissemination are prohibited and any other use needs written permission",
       "url": "",
       "form": "verse",
-      "excluded": "No free transcription of the volume this scene is in. Macpherson's As You Like It is in TOMO VIII, which es.wikisource marks 'A transcribir' (no text) and which the Cervantes Virtual edition carries under terms forbidding redistribution. CORRECTED 2026-09-18 by the Fable review: an earlier wording here said a Commons scan had been located and told the reader to 'use that row'. There is no such row, and the Commons scan that WAS found is Tomo I -- a different volume, which covers King Lear and Midsummer and does not contain this play. Finding Tomo VIII on Commons, archive.org or HathiTrust clears this cell.",
+      "excluded": "Macpherson's Tomo VIII has no free transcription -- es.wikisource marks it 'A transcribir' and the Cervantes Virtual edition forbids redistribution. SUPERSEDED 2026-09-18 for this scene by the José Arnaldo Márquez 1883 row, which is native searchable text. Kept so the Macpherson dead end is not hunted again.",
       "url_is": "landing_or_whole_work"
+    },
+    {
+      "iso": "es",
+      "play": "as_you_like_it",
+      "scene": "3.2",
+      "translator": "José Arnaldo Márquez",
+      "translator_death_date": 1903,
+      "translation_first_published": 1883,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "url": "https://es.wikisource.org/wiki/Como_gust%C3%A9is_(M%C3%A1rquez_tr.)",
+      "form": "prose",
+      "url_is": "whole_work_single_page",
+      "verified_to_scene": "2026-09-18 operator hunt, re-verified here by fetching the page: 5 act headings (ACTO I-V), 22 scene headings, 874 speeches across 82 distinct speakers. NATIVE SEARCHABLE TEXT, not a scan.",
+      "label_style": "Orlando.— (name, full stop, newline, em dash)",
+      "note": "THE LAST SPANISH CELL. Scenes RESET PER ACT in this edition, so the target 3.2 is 'ESCENA II.' under 'ACTO III.' -- not the second scene on the page. The whole play is one page with no act subpages, so the resolver extracts a RANGE. Supersedes the Macpherson dead end for this scene: that one was blocked because Tomo VIII has no free transcription, and this is a different translator entirely."
     },
     {
       "iso": "es",
