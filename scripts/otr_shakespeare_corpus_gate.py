@@ -10,8 +10,10 @@ script exists to replace claims with measurements before anyone vendors a line.
     python scripts/otr_shakespeare_corpus_gate.py --leads config/source_banks/shakespeare/translations/leads.json
     python scripts/otr_shakespeare_corpus_gate.py --leads ... --fetch --iso fr
 
-Without ``--fetch`` it reports what the leads file already claims and verdicts
-the RIGHTS only -- useful, and honest about having opened nothing. With
+Without ``--fetch`` it reports what the leads file already claims and opens
+nothing, so every lead it has not excluded comes back PARTIAL -- honest about
+having measured nothing. (It used to verdict the RIGHTS in that mode; rights
+verdict nothing now -- operator 2026-09-18.) With
 ``--fetch`` it downloads each lead once into ``--cache`` and parses from local
 (re-scraping during parser iteration gets you blocked), then writes a JSON
 report plus a readable table.
@@ -195,17 +197,20 @@ def assess_lead(lead: dict, *, cache_dir: str, do_fetch: bool,
         # the hunt this field exists to stop from happening twice.
         return CORPUS.assess(report)
     if not do_fetch:
-        # Rights only. An unopened page cannot be READY, so a lead that clears
-        # the rights is reported PARTIAL with the reason said out loud.
+        # An unopened page cannot be READY whatever else is true of it, so the
+        # lead is reported PARTIAL with the reason said out loud.
         report = CORPUS.assess(report)
         if report.verdict != CORPUS.BLOCKED:
             report.verdict = CORPUS.PARTIAL
-            report.reasons = ["not fetched -- rights checked only"]
+            report.reasons = ["not fetched -- no page was opened"]
         return report
     if not report.url:
-        # A lead with no page yet. Rights still decide BLOCKED, because a
-        # translator who fails the test is not worth finding; otherwise the
-        # verdict is the work item: locate the page.
+        # A lead with no page yet. The verdict is the WORK ITEM -- locate the
+        # page -- because that is the only actionable fact about this row.
+        # Rights decide nothing here (operator 2026-09-18); only a recorded
+        # `excluded` dead end still outranks the missing page, and it should,
+        # since there is no point locating a page for a lead a human already
+        # ruled out.
         report = CORPUS.assess(report)
         if report.verdict != CORPUS.BLOCKED:
             report.verdict = CORPUS.EMPTY
@@ -284,7 +289,7 @@ def main(argv: "list[str] | None" = None) -> int:
     print("\n" + "  ".join(f"{k}={v}" for k, v in sorted(tally.items())))
     print("report: %s" % args.report)
     if not args.fetch:
-        print("RIGHTS ONLY -- no page was opened. Re-run with --fetch before "
+        print("NOT FETCHED -- no page was opened. Re-run with --fetch before "
               "vendoring anything.")
     return 0
 

@@ -15635,10 +15635,14 @@ its JSON, not of a model that cannot translate Devanagari.
 source words by a flat 4 tokens. The output is not English, and a script that
 costs more per source word than the source did is truncated mid-JSON.
 
-**Fix, and why it GROWS rather than predicts.** The true tokens-per-source-word
-ratio depends on the writer's tokenizer and the target script, and the writers
-here are GGUF with no tokenizer file on disk to measure against, so a
-per-language constant would be a guess dressed as a measurement. A failed
+**Fix, and why it GROWS rather than predicts.** NOT because the ratio cannot
+be measured -- this entry first claimed the GGUF writers ship no tokenizer to
+measure against, and that is false: `llama_cpp.Llama` exposes `tokenize()` and
+the backend already holds that object (corrected 2026-09-18 by the Fable
+architecture review). The real reason is that a measured table would be a
+second artefact to keep in sync: the ratio is per model and per passage, so it
+would need re-measuring on every writer swap and be silently wrong in between.
+Growth is self-correcting and needs no maintenance. A failed
 batch is retried at larger budgets (x1, x3, x6) while -- and only while -- the
 error looks like truncation. A reply that came back WHOLE and merely wrong
 breaks out immediately, because more room cannot help and climbing would

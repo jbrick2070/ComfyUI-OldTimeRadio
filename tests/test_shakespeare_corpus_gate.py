@@ -38,6 +38,17 @@ GATE = _gate()
 # --------------------------------------------------------------------------- #
 
 
+def _clears(first_published, translator_died):
+    """Did this row clear both publication tests?
+
+    `clears_publication_anywhere` was DELETED 2026-09-18 -- a boolean is only
+    useful for refusing, and rights refuse nothing now. The year-parsing rules
+    it encoded are still worth pinning (a span reads its LATEST year, a death
+    reads its FIRST), so these tests ask `publication_reasons` instead: no
+    reasons means it cleared.
+    """
+    return not C.publication_reasons(first_published, translator_died)
+
 def test_a_mediawiki_revision_number_wins_outright():
     body = 'var x = {"wgCurRevisionId":12345678,"wgTitle":"Macbeth"};'
     assert GATE.revision_id("https://fr.wikisource.org/wiki/Macbeth", body,
@@ -91,14 +102,17 @@ def _lead(**over):
 def test_without_fetch_a_clean_lead_is_partial_and_says_why(tmp_path):
     r = GATE.assess_lead(_lead(), cache_dir=str(tmp_path), do_fetch=False)
     assert r.verdict == C.PARTIAL
-    assert r.reasons == ["not fetched -- rights checked only"]
+    assert r.reasons == ["not fetched -- no page was opened"]
 
 
-def test_without_fetch_rights_still_block(tmp_path):
+def test_without_fetch_rights_do_not_block(tmp_path):
+    """WITHDRAWN 2026-09-18 -- rights refuse nothing. An unfetched lead is
+    PARTIAL because it has not been opened, which is a statement about the
+    page, not about the translator."""
     r = GATE.assess_lead(_lead(translator_death_date=1968,
                                 translation_first_published=1955),
                          cache_dir=str(tmp_path), do_fetch=False)
-    assert r.verdict == C.BLOCKED
+    assert r.verdict != C.BLOCKED
 
 
 def test_a_lead_with_no_url_is_empty_not_a_crash(tmp_path):
@@ -109,11 +123,14 @@ def test_a_lead_with_no_url_is_empty_not_a_crash(tmp_path):
     assert "locate the page first" in r.reasons[0]
 
 
-def test_a_lead_with_no_url_but_bad_rights_is_blocked_not_empty(tmp_path):
+def test_a_lead_with_no_url_reports_the_missing_page_not_the_rights(tmp_path):
+    """WITHDRAWN 2026-09-18. The actionable fact about this lead is that
+    nobody has found its page; the translator's dates are not a verdict."""
     r = GATE.assess_lead(_lead(url="", translator_death_date=1968,
                                 translation_first_published=1955),
                          cache_dir=str(tmp_path), do_fetch=True)
-    assert r.verdict == C.BLOCKED
+    assert r.verdict == C.EMPTY
+    assert any("locate the page first" in reason for reason in r.reasons)
 
 
 def test_tracking_parameters_are_stripped_from_the_lead_url(tmp_path):
@@ -222,7 +239,7 @@ def test_the_blocked_languages_are_blocked_for_the_reason_the_spec_gives():
     leads = {(l["iso"], l["translator"]): l for l in GATE.load_leads(str(LEADS))}
     zhu = next(v for (iso, t), v in leads.items() if iso == "zh" and "Zhu" in t)
     tian = next(v for (iso, t), v in leads.items() if iso == "zh" and "Tian" in t)
-    assert not C.clears_publication_anywhere(
+    assert not _clears(
         zhu["translation_first_published"], zhu["translator_death_date"])
-    assert not C.clears_publication_anywhere(
+    assert not _clears(
         tian["translation_first_published"], tian["translator_death_date"])

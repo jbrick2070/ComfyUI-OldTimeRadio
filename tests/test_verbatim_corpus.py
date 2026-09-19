@@ -1,8 +1,13 @@
 """The vendored-translation corpus: legal tests, gate verdicts, manifest.
 
-Operator 2026-09-18: "I want the best pack available" -- a scene ships a real
-translator's words only when they clear BOTH the US test and life+70. The old
-"died before 1944" line was a conservative bound, not a copyright test.
+Operator 2026-09-18 EVENING: "I don't want to waste anything in rights I'm not
+publishing these commercially." RIGHTS REFUSE NOTHING -- the publication years
+land in `LeadReport.notes`, which no verdict reads. What still refuses is
+FIDELITY (a translation made from an intermediary) and a source whose text does
+not exist, both recorded by hand in `excluded`.
+
+The morning's rule -- clear the US test AND life+70 -- was withdrawn the same
+day; tests that pinned it now pin its absence, and say so in their docstrings.
 CPU only, no network. UTF-8 no BOM.
 """
 from __future__ import annotations
@@ -29,7 +34,7 @@ from nodes import _otr_verbatim_corpus as C
     (1910, 1935),      # Tsubouchi
 ])
 def test_the_shipped_translators_clear_both_tests(published, died):
-    assert C.clears_publication_anywhere(published, died)
+    assert _clears(published, died)
     assert C.publication_reasons(published, died) == []
 
 
@@ -38,23 +43,43 @@ def test_the_shipped_translators_clear_both_tests(published, died):
     (1900, 1962, "translator died 1962"),        # Rangeya Raghav: life+70 fails
     (1990, 2003, "first published 1990"),        # Bachchan: both fail
 ])
-def test_a_row_that_fails_either_test_is_refused_and_says_which(published, died, why):
-    assert not C.clears_publication_anywhere(published, died)
+def test_a_row_that_fails_either_test_says_which(published, died, why):
+    """It is REPORTED, not refused -- see the module docstring. The wording is
+    still pinned because it is what a reader is shown."""
+    assert not _clears(published, died)
     assert any(why in r for r in C.publication_reasons(published, died))
 
 
+def _clears(first_published, translator_died):
+    """Did this row clear both publication tests?
+
+    `clears_publication_anywhere` was DELETED 2026-09-18 -- a boolean is only
+    useful for refusing, and rights refuse nothing now. The year-parsing rules
+    it encoded are still worth pinning (a span reads its LATEST year, a death
+    reads its FIRST), so these tests ask `publication_reasons` instead: no
+    reasons means it cleared.
+    """
+    return not C.publication_reasons(first_published, translator_died)
+
 def test_zhu_shenghao_is_the_case_the_old_rule_got_wrong():
-    """d.1944 clears life+70, but the collected plays were published in 1947,
-    so the pack-I-can-publish set excludes them until the US clock runs out.
-    The 'died before 1944' bound would have waved them through."""
-    assert C.clears_publication_anywhere(1947, 1944) is False
-    assert C.clears_publication_anywhere(1930, 1944) is True
+    """Kept as a YEAR-ARITHMETIC test, not a policy one.
+
+    d.1944 clears life+70 while the collected plays were published in 1947, so
+    the withdrawn rule reported a failure here. It is worth remembering why
+    that rule was wrong twice over: rights refuse nothing now, AND the
+    arithmetic was never right for a foreign work -- zh.wikisource records that
+    the translation was already public domain in China on the URAA date of
+    1996-01-01 and never previously published in the US, so 1947 never blocked
+    it in the first place. A false BLOCKED is the expensive direction: it
+    discards a good source in silence."""
+    assert _clears(1947, 1944) is False
+    assert _clears(1930, 1944) is True
 
 
 @pytest.mark.parametrize("value", ["", None, "unknown", "n/a", True, 0])
 def test_an_unrecorded_year_never_clears(value):
-    assert not C.clears_publication_anywhere(value, 1873)
-    assert not C.clears_publication_anywhere(1865, value)
+    assert not _clears(value, 1873)
+    assert not _clears(1865, value)
 
 
 def test_the_death_reader_takes_the_first_year():
@@ -102,18 +127,48 @@ def test_each_measured_fault_lands_in_the_reasons(over, fragment):
     assert any(fragment in reason for reason in r.reasons), r.reasons
 
 
-def test_rights_beat_every_quality_measure():
-    """A perfect page from an in-copyright translator is BLOCKED, and the
-    reasons name the rights, not the prose."""
+def test_a_rights_failing_page_with_good_text_is_READY():
+    """WITHDRAWN 2026-09-18: rights used to force BLOCKED. Operator: "I don't
+    want to waste anything in rights I'm not publishing these commercially."
+
+    ASSERTING READY IS THE POINT, and the first attempt at this change did not.
+    Rights reasons were appended to `reasons`, the verdict is READY only when
+    `reasons` is empty, and `select_scene` takes READY only -- so every
+    rights-failing lead was pinned at PARTIAL and could never be selected. The
+    refusal had moved, not gone, while the docstring claimed otherwise. Caught
+    by the Sonnet post-QA; a `!= BLOCKED` assertion would not have caught it,
+    which is why this one is `== READY`.
+    """
     r = C.assess(_clean_report(translator_died=1962, first_published=1955))
-    assert r.verdict == C.BLOCKED
-    assert all("speaker" not in reason for reason in r.reasons)
+    assert r.verdict == C.READY, (r.verdict, r.reasons)
+    assert r.reasons == []
+    # Said out loud, just never counted.
+    assert any("1931" in note or "1956" in note for note in r.notes), r.notes
 
 
-def test_a_missing_licence_is_blocked_not_partial():
+def test_a_missing_licence_is_a_note_not_a_refusal():
     r = C.assess(_clean_report(licence=""))
-    assert r.verdict == C.BLOCKED
-    assert "transcription_license" in r.reasons[0]
+    assert r.verdict == C.READY
+    assert any("transcription_license" in note for note in r.notes)
+
+
+def test_notes_never_change_the_verdict():
+    """The invariant behind both tests above: whatever lands in `notes`, the
+    verdict is whatever the TEXT earned."""
+    clean = C.assess(_clean_report())
+    noted = C.assess(_clean_report(translator_died=1999, first_published=1990,
+                                   licence=""))
+    assert clean.verdict == noted.verdict == C.READY
+    assert noted.notes and not clean.notes
+
+
+def test_only_an_explicit_exclusion_can_block():
+    """BLOCKED is now reserved for a human's recorded dead end -- a fidelity
+    failure or a source that does not exist -- never an arithmetic result."""
+    assert C.assess(_clean_report(excluded="translated from Schiller's German")
+                    ).verdict == C.BLOCKED
+    assert C.assess(_clean_report(translator_died=1999, first_published=1990)
+                    ).verdict != C.BLOCKED
 
 
 def test_an_empty_page_is_empty_and_a_thin_one_is_partial():
@@ -205,14 +260,29 @@ def test_a_valid_manifest_round_trips(tmp_path):
     assert len(rows) == 1 and rows[0]["translator"].startswith("François")
 
 
-@pytest.mark.parametrize("over, fragment", [
-    ({"translator_death_date": 1962}, "does not clear"),
-    ({"translation_first_published": 1947}, "does not clear"),
+@pytest.mark.parametrize("over", [
+    {"translator_death_date": 1962},
+    {"translation_first_published": 1947},
 ])
-def test_a_manifest_row_that_does_not_clear_is_refused_loudly(tmp_path, over, fragment):
-    with pytest.raises(C.CorpusError) as caught:
-        C.load_manifest(_write(tmp_path, [_manifest_row(**over)]))
-    assert fragment in str(caught.value)
+def test_a_manifest_row_is_never_refused_on_rights(tmp_path, over):
+    """WITHDRAWN 2026-09-18, and this one was the dangerous half.
+
+    `load_manifest` used to raise `CorpusError` here, and `CorpusError` is
+    documented as never degraded around -- so once the writer's plan step reads
+    this manifest, a copyright-date arithmetic result could KILL A RENDER. The
+    standing rule is that authoring-time tools fail loud while the RENDER PATH
+    degrades to the best available result with an honest receipt, and a
+    copyright question is the textbook authoring-time concern. Operator, same
+    day: rights are the installing user's to settle.
+
+    The years are still REQUIRED fields -- the credit roll names them. They
+    just decide nothing.
+    """
+    rows = C.load_manifest(_write(tmp_path, [_manifest_row(**over)]))
+    assert len(rows) == 1
+    for key in ("translator", "translator_death_date",
+                "translation_first_published"):
+        assert key in rows[0], "%s must survive as data" % key
 
 
 def test_a_missing_field_is_refused_and_names_it(tmp_path):
@@ -279,18 +349,18 @@ def test_a_publication_span_reads_its_LATEST_year():
     span straddling the cutoff."""
     assert C.publication_year("1865-1872") == 1872
     assert C.publication_year("1929-1932") == 1932
-    assert not C.clears_publication_anywhere("1929-1932", 1889)
-    assert C.clears_publication_anywhere("1865-1872", 1873)
+    assert not _clears("1929-1932", 1889)
+    assert _clears("1865-1872", 1873)
     # A death is a single event; that reader still takes the first year.
     assert C._year("1935-02-28") == 1935
 
 
 def test_tsubouchi_blocks_on_either_spelling_of_the_revision():
-    assert not C.clears_publication_anywhere(1933, 1935)
-    assert not C.clears_publication_anywhere("1933-1935", 1935)
+    assert not _clears(1933, 1935)
+    assert not _clears("1933-1935", 1935)
     # The earlier first publication would clear, which is why the lead says
     # to confirm WHICH text before vendoring.
-    assert C.clears_publication_anywhere(1910, 1935)
+    assert _clears(1910, 1935)
 
 
 def test_a_dramatis_personae_is_not_a_performable_scene():

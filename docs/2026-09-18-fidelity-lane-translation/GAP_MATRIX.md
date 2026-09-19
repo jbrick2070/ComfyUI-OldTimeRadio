@@ -3,9 +3,8 @@
 Generated from `config/source_banks/shakespeare/translations/leads.json` against the canonical 14 target scenes. 14 x 7 = 98 cells.
 
 - **HAVE-URL** -- rights-cleared lead with a page located. Still needs the scene resolved out of it, or transcription if it is a scan. NOTHING here is vendored yet.
-- **NEED-URL** -- translator clears, no page found.
-- **HOLD-RIGHTS** -- page located, translator death year unknown, so life+70 cannot be evaluated.
-- **BLOCKED** -- every lead for the cell is excluded.
+- **NEED-URL** -- a translator is named, no page found yet.
+- **BLOCKED** -- every lead for the cell is excluded, on FIDELITY or because no transcription exists. Never on rights, which gate nothing here.
 - **NO LEAD** -- nothing at all.
 
 | Scene | French | Italian | Spanish | Portuguese | Japanese | Hindi | Mandarin |
@@ -29,6 +28,5 @@ Generated from `config/source_banks/shakespeare/translations/leads.json` against
 
 - HAVE-URL     70 of 98
 - NEED-URL     14 of 98
-- HOLD-RIGHTS  0 of 98
 - BLOCKED      2 of 98
 - NO LEAD      12 of 98

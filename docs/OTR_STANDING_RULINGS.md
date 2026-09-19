@@ -58,15 +58,41 @@ Parked idea from the same exchange: native-language science feeds for SciFi
 News Pro (*"even better if we can find some foreign RSS feeds"*). A section-1
 fork, not a code row.
 
-**Vendored translations, same day:** operator: *"I want the best for the
-foreign languages I can publish ... I want the best pack available."* Read
-as: clear under both the US first-publication test (before 1931) and
-life+70 (translator died before 1956); verse preferred where a public-
-domain verse translation exists; scene-level transcription allowed; no
-all-scenes-all-languages requirement -- a scene that does not pass the
-acceptance gate keeps the model translation. The gate runs before any
-ingestion; nothing enters on the strength of a document. The old "died
-before 1944" line was a conservative bound, not a rule; do not cite it.
+**Vendored translations -- RIGHTS ARE NOT A GATE (operator 2026-09-18
+EVENING, and this SUPERSEDES the paragraph below it that same day).**
+Operator: *"I don't want to waste anything in rights I'm not publishing
+these commercially"*, and earlier the same evening *"its up to the user to
+get their own legals sorted out, don't over-engineer a digital rights
+mess."*
+* **Nothing is refused on rights.** Not a lead, not a manifest row, not a
+  render. A translator's death year and a first-publication year are
+  RECORDED as data on the row because they cost nothing and a later reader
+  may want them; they decide nothing. `rights_hold` and `fidelity_hold` are
+  not fields.
+* **Do not research rights.** No death-year hunts, no licence archaeology,
+  no URAA analysis. Measured the day this was written: a research prompt had
+  been built whose top two priorities were death-year lookups for Domingos
+  Ramos and Lala Sitaram, framed as carrying eleven of thirty-two open
+  cells. Under this ruling they carry none.
+* **A rights question is the INSTALLING USER'S** to settle, so the useful
+  surface is the credit roll naming translator and first publication, not a
+  guard. This is not a licence to misattribute: fidelity still governs, and
+  a translation made from an intermediary (Schiller's German rather than
+  Shakespeare's English) is still refused -- on FIDELITY, which is a
+  different axis and unaffected by this ruling.
+
+*The paragraph that follows is the superseded reading, kept because the
+words are his and the fidelity half of it still stands:* operator: *"I want
+the best for the foreign languages I can publish ... I want the best pack
+available."* Read at the time as: clear under both the US first-publication
+test (before 1931) and life+70 (translator died before 1956); verse
+preferred where a public-domain verse translation exists; scene-level
+transcription allowed; no all-scenes-all-languages requirement -- a scene
+that does not pass the acceptance gate keeps the model translation. The gate
+runs before any ingestion; nothing enters on the strength of a document. The
+old "died before 1944" line was a conservative bound, not a rule; do not cite
+it. **The two date tests in that sentence are WITHDRAWN. Everything else in
+it -- the gate, verse preference, the model-translation fallback -- stands.**
 
 **Printed credits, same day:** operator picked the bank-by-language matrix
 (*"bank-by-language matrix I think would be best"*). A bank's

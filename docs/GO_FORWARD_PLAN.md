@@ -64,9 +64,17 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 ### 1. Vendored public-domain Shakespeare translations
 
+**RIGHTS ARE NOT A GATE (operator 2026-09-18 evening):** *"I don't want to
+waste anything in rights I'm not publishing these commercially."* Nothing is
+refused on a date, no rights research happens, and translator/publication
+years are recorded as row DATA only. See
+[standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
+still governs: a translation made from an intermediary is still refused.
+
 **Decided 2026-09-18** (*"I want the best pack available"*): a scene ships a
-real translator's words when they clear **both** the US test (first published
-before 1931) **and** life+70 (translator died before 1956); verse preferred
+real translator's words -- ~~when they clear both the US test (first published
+before 1931) and life+70 (translator died before 1956)~~ **(withdrawn that
+evening, see above)**; verse preferred
 where a public-domain verse translation exists; scene-level transcription is
 allowed; no coverage requirement -- any scene without vendored words keeps the
 model translation that ships today. The rule this replaces ("died before 1944")
@@ -105,7 +113,18 @@ itself: building it against the real cached French Macbeth exposed
 PBUG-20260918-07 in `_labelled`, where the bare English `act` matched inside
 the French word `action` 24 times and a five-act play measured as two.
 
-THREE THINGS BLOCK THE WIRING, and none is the resolver's own correctness:
+A FOURTH BLOCKER WAS ITS OWN CORRECTNESS, and this row denied it until the
+Fable review of 2026-09-18 read the import line: the module did
+`from nodes import _otr_verbatim_corpus`, and inside a running ComfyUI
+`nodes` is COMFYUI'S OWN registry module, not this package. It resolved only
+under pytest, where the test file puts the repo root on `sys.path` first, so
+24 green tests proved the helper and nothing about the wiring -- the
+2026-09-07 defect class exactly. Fixed to the relative import every sibling
+uses, verified by importing it the way `__init__.py` does. **The sentence
+that used to stand here claimed none of the blockers was the resolver's own,
+and that was false.**
+
+THREE THINGS STILL BLOCK THE WIRING, none of them the resolver's correctness:
 1. **It must not hand chrome to the performance.** Its span stops at the next
    HEADING, so an end-of-act marker such as `FIN DU PREMIER ACTE.` rides
    inside the extracted text. Wired as-is that becomes a SPOKEN line -- the

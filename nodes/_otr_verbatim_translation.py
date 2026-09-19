@@ -272,12 +272,21 @@ def translate_entries(
         # a generation that ran out of room before it closed its JSON, not of
         # a model that cannot translate.
         #
-        # The honest fix is to GROW rather than to predict. The true ratio
-        # depends on the writer's tokenizer and the target script, and this
-        # box has no tokenizer file to measure (the writers are GGUF), so any
-        # per-language constant would be a guess dressed as a measurement.
-        # Each rung retries the whole batch with more room; a script that fits
-        # never pays for the later rungs, and English is byte-identical.
+        # The fix is to GROW rather than to predict, and the reason is NOT
+        # that the ratio cannot be measured -- an earlier version of this
+        # comment claimed the GGUF writers ship no tokenizer to measure
+        # against, which is false: `llama_cpp.Llama` exposes `tokenize()` and
+        # the backend already holds that object. (Corrected by the Fable
+        # architecture review, 2026-09-18, because the next reader would have
+        # believed it.)
+        #
+        # The real reason is that a measured table would be a SECOND ARTEFACT
+        # TO KEEP IN SYNC. The ratio is per model and per passage, so the
+        # table would need re-measuring on every writer swap and would be
+        # silently wrong in between -- the failure mode this repo keeps
+        # meeting. Growth is self-correcting and needs no maintenance. Each
+        # rung retries the whole batch with more room; a script that fits never
+        # pays for the later rungs, and English is byte-identical.
         budget = _output_budget(entries, indices)
         last_exc: "StructuredCallFailedError | None" = None
         result = None

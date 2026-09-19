@@ -1,16 +1,25 @@
 """The vendored-translation corpus: legal tests, the acceptance gate, the manifest.
 
-Operator ruling 2026-09-18 (*"I want the best pack available"*): a Shakespeare
-scene ships a real translator's words when they clear BOTH the US test and
-life+70 -- the set that can be published anywhere. Everything else keeps the
-model translation that already ships (`_otr_verbatim_translation`), per scene,
-per language. Nothing is ingested on the strength of a document: every lead is
-opened and verdicted first.
+Operator ruling 2026-09-18, EVENING, and it supersedes the morning's: *"I don't
+want to waste anything in rights I'm not publishing these commercially."*
+RIGHTS REFUSE NOTHING HERE. The publication years and the licence are recorded
+on the row and written into `LeadReport.notes`, where a reader sees them and no
+verdict reads them. A scene ships a real translator's words when its TEXT is
+good; everything else keeps the model translation that already ships
+(`_otr_verbatim_translation`), per scene, per language. Nothing is ingested on
+the strength of a document: every lead is still opened and verdicted first, on
+what the page contains.
 
-THE DEPRECATED RULE. The first inventory used "translator died before 1944".
-That is not a copyright test in any jurisdiction -- it was a conservative bound
-that happened to clear everything it listed. The real tests are below, and they
-are the reason Mandarin is a live phase rather than two plays.
+WHAT STILL REFUSES: fidelity. A translation made from an intermediary --
+Maffei's Macbeth came from Schiller's German, not Shakespeare's English -- is
+excluded, and so is a source whose text does not exist. That is a different
+axis from rights and is unaffected by the ruling above.
+
+THE MORNING'S RULE, kept so the reversal is legible: leads had to clear the US
+first-publication test AND life+70. It was withdrawn the same day. Before that,
+the first inventory used "translator died before 1944", which is not a
+copyright test in any jurisdiction -- a conservative bound that happened to
+clear everything it listed.
 
 WHY A PURE MODULE. The fetcher (`scripts/otr_shakespeare_corpus_gate.py`) is a
 one-off that touches the network; the writer's plan step WILL read the manifest
@@ -45,23 +54,29 @@ LIFE_PLUS_70_DEATH_BEFORE = 1956
 LIFE_PLUS_50_DEATH_BEFORE = 1976
 
 
-def clears_publication_anywhere(first_published: Any, translator_died: Any) -> bool:
-    """True when a translation is public domain under BOTH shipped tests.
-
-    The operator asked for the pack he can publish, not the largest pack: a
-    row that clears only one jurisdiction is a row that is unsafe somewhere,
-    so both must pass. An unknown year fails -- "not recorded" is not
-    "cleared".
-    """
-    published = publication_year(first_published)
-    died = _year(translator_died)
-    if published is None or died is None:
-        return False
-    return published < US_PUBLICATION_BEFORE and died < LIFE_PLUS_70_DEATH_BEFORE
+# `clears_publication_anywhere` WAS HERE and is deleted, 2026-09-18.
+#
+# It answered "is this public domain under both tests" as a BOOLEAN, which is
+# only ever useful for refusing something, and rights refuse nothing now
+# (operator: "I don't want to waste anything in rights I'm not publishing
+# these commercially"). Its single production caller was `load_manifest`,
+# which is exactly where a date could have killed a render; when that call
+# went, the function became a verified orphan -- `grep -rn
+# clears_publication_anywhere --include=*.py .` returned only its own
+# definition, its `__all__` entry, and tests. This repo's standing rule is
+# that such a symbol is deleted in full or wired back, never left sitting as
+# "documentation", so it is gone along with the tests that only it justified.
+#
+# `publication_reasons` below SURVIVES and is wired: it writes the human
+# sentence into `LeadReport.notes`, which a reader sees and no verdict reads.
+# The difference is the whole point -- a sentence informs, a boolean refuses.
 
 
 def publication_reasons(first_published: Any, translator_died: Any) -> list[str]:
-    """Why a row does not clear, in the words the manifest should record."""
+    """Why a row does not clear, in the words the manifest should record.
+
+    Informational ONLY. Nothing refuses a lead on this; see `assess`.
+    """
     out: list[str] = []
     published = publication_year(first_published)
     died = _year(translator_died)
@@ -164,7 +179,15 @@ class LeadReport:
     first_published: Any = ""
     excluded: str = ""
     verdict: str = EMPTY
+    #: Why this lead is NOT ready. Anything here keeps the verdict below READY,
+    #: so only things a person could act on belong in it.
     reasons: list = field(default_factory=list)
+    #: Things worth SAYING that decide nothing -- the publication years, a
+    #: missing licence string. Kept apart from `reasons` because folding them
+    #: together silently capped every rights-failing lead at PARTIAL, which
+    #: `select_scene` never picks: a gate wearing an informational label
+    #: (caught by the Sonnet post-QA, 2026-09-18).
+    notes: list = field(default_factory=list)
 
     def as_row(self) -> dict:
         return {
@@ -185,17 +208,19 @@ class LeadReport:
             "translation_first_published": self.first_published,
             "excluded": self.excluded,
             "verdict": self.verdict, "reasons": list(self.reasons),
+            "notes": list(self.notes),
         }
 
 
 def assess(report: LeadReport) -> LeadReport:
     """Set ``verdict`` and ``reasons`` from what the fetch measured.
 
-    BLOCKED beats every other verdict: a rights failure is not a quality
-    question and no amount of clean text fixes it.
+    BLOCKED means a HUMAN recorded a dead end, and nothing else does. Rights
+    never reach the verdict (operator 2026-09-18): the publication years land
+    in ``notes``, which a reader sees and the verdict ignores, so a page whose
+    TEXT is good reaches READY however its dates read.
 
-    An ``excluded`` lead is blocked FIRST, ahead of the date tests, and keeps
-    the recorded wording. Two of the three exclusions measured on 2026-09-18
+    An ``excluded`` lead is blocked FIRST and keeps the recorded wording. Two of the three exclusions measured on 2026-09-18
     pass every date test and are still unusable -- Maffei's Macbeth is a
     translation of Schiller's German rather than of Shakespeare, and
     Macpherson's As You Like It sits behind a licence forbidding
@@ -208,22 +233,33 @@ def assess(report: LeadReport) -> LeadReport:
 
     reasons: list[str] = []
 
-    rights = publication_reasons(report.first_published, report.translator_died)
-    if rights:
-        report.reasons = rights
-        report.verdict = BLOCKED
-        return report
+    # RIGHTS REPORT, THEY DO NOT REFUSE (operator 2026-09-18: "I don't want to
+    # waste anything in rights I'm not publishing these commercially"). These
+    # used to return BLOCKED and that was wrong twice over: it is not the
+    # project's question to answer, and the arithmetic was wrong anyway --
+    # "first published before 1931" is the rule for a US-published work, and
+    # applying it to a foreign one produced a false BLOCKED that discarded the
+    # entire Mandarin lane. A false BLOCKED is the expensive direction, because
+    # a false READY ships bad text and gets caught while a false BLOCKED throws
+    # away a good source in silence. The years still travel on the row and
+    # still appear here, so a reader sees them; they decide nothing.
+    # These go to `notes`, NOT `reasons`. Putting them in `reasons` was the
+    # first attempt and it was a gate in disguise: the verdict is READY only
+    # when `reasons` is empty, so every rights-failing lead was pinned at
+    # PARTIAL and `select_scene` -- which takes READY only -- could never pick
+    # it. The refusal had moved, not gone.
+    report.notes = list(publication_reasons(report.first_published,
+                                            report.translator_died))
     if not str(report.licence or "").strip():
-        report.reasons = ["transcription_license not recorded"]
-        report.verdict = BLOCKED
-        return report
+        report.notes.append("transcription_license not recorded")
 
     if report.is_scan:
         # A page image has no text to measure, and decoding one as UTF-8
         # produces measurements that mean nothing. Say what it is: the work
-        # is transcription, and the rights are already settled above.
-        report.reasons = ["a page scan with no text layer -- needs "
-                          "transcription, not another source"]
+        # is transcription.
+        reasons.append("a page scan with no text layer -- needs "
+                       "transcription, not another source")
+        report.reasons = reasons
         report.verdict = EMPTY
         return report
 
@@ -594,14 +630,21 @@ def load_manifest(path: str) -> list:
             raise CorpusError(
                 "%s: scenes[%d] alignment_confidence %r is not within 0..1"
                 % (path, i, row["alignment_confidence"]))
-        if not clears_publication_anywhere(row["translation_first_published"],
-                                           row["translator_death_date"]):
-            raise CorpusError(
-                "%s: scenes[%d] (%s %s %s) does not clear both publication "
-                "tests: %s" % (path, i, row["iso"], row["play"], row["scene"],
-                               "; ".join(publication_reasons(
-                                   row["translation_first_published"],
-                                   row["translator_death_date"]))))
+        # NO RIGHTS TEST HERE, DELIBERATELY. This used to raise CorpusError on
+        # a publication-date failure, and CorpusError is documented as never
+        # degraded around. Nothing in production calls `load_manifest` yet, so
+        # it was never killing a render -- it was armed to, the moment the plan
+        # step starts reading this manifest, which is the next step on the row.
+        # A copyright-date arithmetic result would then have decided whether an
+        # episode rendered at all. That breaks the
+        # standing rule that authoring-time tools fail loud while the render
+        # path degrades to the best available result with an honest receipt,
+        # and a copyright question is the textbook authoring-time concern. The
+        # operator settled the wider point on 2026-09-18 -- "I don't want to
+        # waste anything in rights I'm not publishing these commercially" -- so
+        # rights refuse nothing anywhere. The years remain REQUIRED fields
+        # above, because the credit roll names them; they are data, not a gate.
+        pass
     return [dict(row) for row in rows]
 
 
@@ -642,7 +685,7 @@ __all__ = [
     "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",
     "US_PUBLICATION_BEFORE", "CorpusError", "LeadReport", "assess",
-    "clears_publication_anywhere", "count_speaker_labels",
+    "count_speaker_labels",
     "dialogue_ratio", "find_pending_markers", "headings_present",
     "load_manifest", "publication_reasons", "select_scene", "strip_tracking",
 ]

@@ -36,7 +36,21 @@ import re
 import unicodedata
 from dataclasses import dataclass, field
 
-from nodes import _otr_verbatim_corpus as CORPUS
+try:
+    # `from nodes import ...` resolves to COMFYUI'S OWN `nodes` registry module
+    # inside a running ComfyUI, not to this package -- it worked only under
+    # pytest, where the test file puts the repo root on sys.path first.
+    #
+    # Nothing in production imports this module yet, so it was never breaking a
+    # render; it was a TRAP SET FOR THE DAY IT IS WIRED, and the 24 green tests
+    # would not have moved when it sprang. That is the 2026-09-07 defect class:
+    # semantics destroyed, invisible to every check the author ran. Found by
+    # the Fable architecture review 2026-09-18, and the "would crash a render
+    # today" wording it prompted was itself an overclaim that the cursor review
+    # then corrected. This is the pattern every sibling uses.
+    from . import _otr_verbatim_corpus as CORPUS
+except ImportError:  # pragma: no cover -- flat import harnesses
+    import _otr_verbatim_corpus as CORPUS  # type: ignore
 
 #: Below this many characters an "extracted scene" is a heading immediately
 #: followed by another heading -- structurally located, but there is nothing
