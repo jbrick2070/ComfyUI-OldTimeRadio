@@ -162,6 +162,7 @@ class LeadReport:
     translator: str = ""
     translator_died: Any = ""
     first_published: Any = ""
+    excluded: str = ""
     verdict: str = EMPTY
     reasons: list = field(default_factory=list)
 
@@ -182,6 +183,7 @@ class LeadReport:
             "translator": self.translator,
             "translator_death_date": self.translator_died,
             "translation_first_published": self.first_published,
+            "excluded": self.excluded,
             "verdict": self.verdict, "reasons": list(self.reasons),
         }
 
@@ -191,7 +193,19 @@ def assess(report: LeadReport) -> LeadReport:
 
     BLOCKED beats every other verdict: a rights failure is not a quality
     question and no amount of clean text fixes it.
+
+    An ``excluded`` lead is blocked FIRST, ahead of the date tests, and keeps
+    the recorded wording. Two of the three exclusions measured on 2026-09-18
+    pass every date test and are still unusable -- Maffei's Macbeth is a
+    translation of Schiller's German rather than of Shakespeare, and
+    Macpherson's As You Like It sits behind a licence forbidding
+    redistribution -- so a date-shaped reason would have described neither.
     """
+    if str(report.excluded or "").strip():
+        report.reasons = [str(report.excluded).strip()]
+        report.verdict = BLOCKED
+        return report
+
     reasons: list[str] = []
 
     rights = publication_reasons(report.first_published, report.translator_died)
@@ -400,22 +414,65 @@ def _numberings(value: str) -> list:
             for v in sorted(set(out), key=len, reverse=True)]
 
 
+def _joins_without_a_gap(word: str) -> bool:
+    """May this heading word sit against its number with nothing between?
+
+    CJK writes `第1幕` with no space and Devanagari headings are not reliably
+    spaced either, so those must allow a zero-width join. A word spelled in
+    ASCII letters must NOT: see `_labelled`.
+    """
+    return not any("a" <= character <= "z" for character in word.lower())
+
+
 def _labelled(raw: str, words: tuple, value: str) -> "re.Match | None":
     """`ACT I` / `atto 1` / `第1幕` -- a WORD beside the number, either order.
 
     Digit guards rather than `\\b`: in `第1幕` there is no word boundary
     between the kanji and the digit, so `\\b1` never matched and every CJK
     heading read as absent.
+
+    TWO RULES EARNED ON REAL PAGES, 2026-09-18 (PBUG-20260918-07).
+
+    A LATIN HEADING WORD NEEDS A SEPARATOR BEFORE ITS NUMBER. The gap used to
+    be `{0,4}`, so `act` followed by the roman `i` matched the middle of the
+    French word `action` -- 24 times on one cached page, against 3 real
+    `ACTE` headings, which is why a five-act Macbeth measured as two acts.
+    CJK keeps the zero-width join because `第1幕` genuinely has none.
+
+    THE EARLIEST MATCH WINS, NOT THE FIRST WORD TRIED. `_ACT_WORDS` lists
+    `act` before `acte`, and returning on the first word that matched ANYWHERE
+    let a trailing `FIN DU PREMIER ACTE.` steal the anchor from the real
+    heading above it. Words are also tried longest-first so a prefix cannot
+    claim a longer word's match.
+
+    WHAT THE SEPARATOR RULE KNOWINGLY GIVES UP, so the next reader does not
+    rediscover it as a bug: a GLUED Latin heading (`ACT1`, no space) no longer
+    matches, and neither does Latin NUMBER-then-WORD (`PREMIER ACTE` as a
+    heading in its own right). Both were reachable under the old `{0,4}` gap.
+    Neither form appears in any lead, any fixture, or any row of
+    `config/episode_languages.json` -- they were checked before the trade --
+    and both are the same latitude that made ordinary prose match. If a real
+    edition ever uses one, widen it for THAT script rather than restoring the
+    blanket zero-gap.
     """
     numbers = "|".join(_numberings(value))
-    for word in words:
+    best = None
+    for word in sorted(words, key=len, reverse=True):
         w = re.escape(word.lower())
-        for pattern in (r"%s[\s.,:\-]{0,4}(?<![0-9])(%s)(?![0-9])" % (w, numbers),
-                        r"(?<![0-9])(%s)(?![0-9])[\s.,:\-]{0,4}%s" % (numbers, w)):
+        joined = _joins_without_a_gap(word)
+        gap = r"[\s.,:\-]{0,4}" if joined else r"[\s.,:\-]{1,4}"
+        patterns = [r"%s%s(?<![0-9])(%s)(?![0-9])" % (w, gap, numbers)]
+        if joined:
+            # NUMBER-then-WORD exists for `第1幕`, and only there. Allowing it
+            # for Latin let `SCENE III.` + newline + `ACT II.` pair the scene's
+            # numeral with the FOLLOWING act word and report an act 3 that is
+            # not on the page -- measured 2026-09-18 on a three-heading string.
+            patterns.append(r"(?<![0-9])(%s)(?![0-9])%s%s" % (numbers, gap, w))
+        for pattern in patterns:
             match = re.search(pattern, raw)
-            if match:
-                return match
-    return None
+            if match is not None and (best is None or match.start() < best.start()):
+                best = match
+    return best
 
 
 def act_headings_found(text: str) -> int:

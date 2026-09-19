@@ -188,7 +188,12 @@ def assess_lead(lead: dict, *, cache_dir: str, do_fetch: bool,
         translator_died=lead.get("translator_death_date", ""),
         first_published=lead.get("translation_first_published", ""),
         revision_id=str(lead.get("revision_id") or ""),
+        excluded=str(lead.get("excluded") or ""),
     )
+    if report.excluded:
+        # A recorded dead end. Never fetched, in either mode: re-opening it is
+        # the hunt this field exists to stop from happening twice.
+        return CORPUS.assess(report)
     if not do_fetch:
         # Rights only. An unopened page cannot be READY, so a lead that clears
         # the rights is reported PARTIAL with the reason said out loud.
