@@ -1,0 +1,57 @@
+SCENA I
+BERNARDO: Quem vem lá? viva quem?
+FRANCISCO: Responde tu primeiro, faze alto, deixa-te reconhecer.
+BERNARDO: Viva o rei.
+FRANCISCO: Bernardo?
+BERNARDO: Eu mesmo.
+FRANCISCO: És pontual.
+BERNARDO: Acaba de dar meia noite; vae descansar, Francisco.
+FRANCISCO: Agradeço-te de me teres vindo render; faz um frio glacial, e começava a sentir-me incommodado. Não houve novidade emquanto estiveste de sentinella?
+FRANCISCO: Nem sequer ouvi correr um rato.
+BERNARDO: Então boas noites; se vires Horacio e Marcello, que tambem estão de guarda, dize-lhes que se aviem.
+FRANCISCO: Creio ouvil-os, façam alto, quem vem lá?
+HORACIO: Amigos da patria.
+MARCELLO: Subditos do rei de Dinamarca.
+FRANCISCO: Santas noites.
+MARCELLO: Viva, meu valente soldado, quem te rendeu?
+FRANCISCO: Bernardo está agora de sentinella. Boa noite.
+MARCELLO: Olá, Bernardo?
+BERNARDO: Não é Horacio que eu vejo?
+HORACIO: Elle mesmo em corpo e alma.
+BERNARDO: Bemvindo sejas, Horacio, e tu tambem, amigo Marcello.
+MARCELLO: Dize-me, já viste a apparição esta noite? Ainda nada vi.
+MARCELLO: Horacio diz que é effeito da minha imaginação, e nega-se a acreditar na visão temerosa, de que já por duas vezes fomos testemunhas; pedi-lhe portanto que viesse comnosco, para que se o phantasma de novo apparecer, elle possa testemunhar a verdade do que afiançâmos e dirigir-lhe a palavra.
+HORACIO: Historias, qual apparecer!
+BERNARDO: Sentemo-nos um instante, e vamos repetir-te a narração do que temos presenceado duas noites consecutivas e a que prestas tão pouco credito.
+HORACIO: Com todo o gosto, e deixemos fallar Bernardo.
+BERNARDO: A noite passada, á hora em que esta estrella que vêem ao poente do polo descreve o seu giro e vem illuminar esta parte do firmamento, em que ora brilha, no momento em que na torre soava uma hora, Marcello e eu...
+MARCELLO: Silencio, eil-o que apparece.
+BERNARDO: Assimilha-se ao defunto rei.
+MARCELLO: Tu que estudaste, Horacio, falla-lhe.
+BERNARDO: Não é verdade que se parece com o defunto rei? Observa bem, Horacio.
+HORACIO: A similhança é espantosa; a surpreza e o terror paralysaram-me. Parece esperar que lhe fallem.
+MARCELLO: Falla-lhe, Horacio.
+HORACIO: Quem quer que és, que a esta hora da noite usurpas a fórma magestosa e guerreira, debaixo da qual se mostrava o meu defunto soberano, em nome do céu, falla, ordeno-to eu!
+MARCELLO: Parece descontente.
+BERNARDO: Eil-o que se afasta, caminhando lenta e gravemente.
+HORACIO: Detem-te, falla, falla, intimo-te a que falles.
+MARCELLO: Foi-se sem responder.
+BERNARDO: Então, Horacio, que é essa tremura e pallidez; não haverá alguma cousa mais do que um effeito de imaginação, que dizes agora?
+HORACIO: Pelo Deus do céu, não o acreditava sem o testemunho positivo e irrecusavel dos meus proprios olhos.
+MARCELLO: Não se parece com o rei?
+HORACIO: Como tu te pareces comtigo mesmo, era a armadura que usava quando combateu o ambicioso norueguez; tinha aquelle ar ameaçador, no dia em que no seu proprio carro, atacou, por causa de uma acalorada porfia, o guerreiro polaco, e o prostrou no gêlo para nunca mais se levantar. É assombroso!
+MARCELLO: Assim é que elle já duas vezes passou pelo nosso posto de observação com o seu caminhar grave e marcial. Com que designio, ignoro-o, mas em minha opinião é um presagio para o estado de alguma grande catastrophe.
+MARCELLO: Pois bem, sentemo-nos, e aquelle d'entre vós todos que o souber, diga porque fatigam, com guardas vigilantes e rigorosas, os subditos d'este reino; para que esta fundição diaria de canhões de bronze, estas compras de armamentos e munições no estrangeiro; para que se enchem de operarios os nossos arsenaes maritimos; porque este augmento de trabalho, que nem os dias santos são respeitados; para que esta actividade de dia e de noite? O que será? Qual de vós m'o poderá dizer?
+HORACIO: Posso eu, ao menos, referir os boatos. Nosso ultimo rei, cuja imagem ainda ha pouco vimos, foi, segundo dizem, convocado a campo fechado por Fortimbraz de Noruega, que um cioso orgulho tinha levado a esse acto. N'esse combate o nosso valente Hamlet, e era justa a sua reputação, matou a Fortimbraz. Ora em virtude de uma declaração authentica, sanccionada pelas leis da cavallaria, se Fortimbraz succumbisse, todos os seus estados pertenceriam ao vencedor. Por sua parte o nosso rei tinha empenhado da mesma fórma a sua palavra; e no caso de elle ser vencido, uma igual porção de territorio pertenceria a Fortimbraz. Assim, em virtude d'este pacto reciproco, a successão do vencido pertencia de direito a Hamlet. Comtudo o joven Fortimbraz, ardente e sem experiencia, reuniu nas fronteiras de Noruega um exercito de aventureiros, promptos e resolvidos pela soldada aos mais audaciosos commettimentos. O seu projecto, segundo o nosso governo está informado, é nada menos do que retomar á viva força e de mão armada esse territorio que seu pae perdeu com a vida: eis-aqui, na minha fraca opinião, a rasão principal dos preparativos que fazemos, das guardas a que somos obrigados, e d'esta actividade tumultuosa que se nota em todo o paiz.
+BERNARDO: Tambem eu julgo ser esse o motivo; isto explica-nos porque vemos passar diante dos postos de guarda a sombra do rei, com a sua armadura e com o seu porte magestoso, d'esse rei que foi e é o causador d'esta guerra.
+HORACIO: É um argueiro nos olhos da intelligencia para lhes perturbar a vista. Nos tempos mais gloriosos e florescentes de Roma, pouco antes da morte do grande Julio, abriram-se os tumulos, e os mortos, nas suas mortalhas, divagaram pela cidade, soltando gritos ameaçadores; viram-se estrellas deixar após si rastos luminosos, choveu sangue, desastrosos signaes appareceram no céu, e o astro humido, sob cuja influencia está o imperio de Neptuno, eclipsou-se; todos julgavam ser o fim do mundo. Estes mesmos signaes precursores de acontecimentos terriveis, correios de maus destinos, preludios de grandes catastrophes, o céu e a terra os fizeram apparecer nos nossos climas, aos olhos impressionaveis dos nossos compatriotas. Mas silencio, olhem, eil-o que volta. Vou interpellal-o, embora elle me fulmine. Pára. Illusão. Se tens o dom da palavra, se pódes articular sons, falla; se ha alguma boa acção cujo cumprimento te possa alliviar e contribuir para a minha salvação, responde-me: se és sabedor de alguma desgraça que ameace a tua patria, e que um aviso opportuno possa desviar... Oh falla! ou se em tua vida confiaste ás entranhas da terra riquezas mal adquiridas; e a maior parte das vezes é por isso que vós, os espiritos, divagaes depois da morte, dil-o. Detem-te e falla. Veda-lhe o caminho, Marcello.
+MARCELLO: Devo servir-me da minha partazana?
+HORACIO: Serve-te se não parar.
+BERNARDO: Para cá?
+HORACIO: Por acolá.
+MARCELLO: Partiu! — que presença magestosa! — são desacertadas estas demonstrações violentas! é invulneravel como o ar, e os nossos golpes não são senão o ridiculo esforço de uma colera impotente.
+BERNARDO: Ia fallar quando cantou o gallo.
+HORACIO: Estremeceu como um culpado que uma intimação subita aterra. Ouvi dizer que o gallo, que é o clarim da aurora, acorda o Deus da manhã com a sua voz sonora e penetrante, e que a esse signal todos os espiritos errantes no mar, no fogo, na terra ou no ar se apressam em voltar aos seus respectivos dominios. A prova está no que acabâmos de presencear.
+MARCELLO: O gallo cantou, e elle desappareceu. Algumas pessoas dizem que na vespera do dia em que se celebra a natividade do Salvador do mundo, o arauto da manhã canta toda a noite sem interrupção; pretendem então que nenhum espirito ousa saír da sua mansão, que as noites são salubres, que nenhuma estrella exerce influencia maligna, nenhum maleficio surte effeito, que nenhuma feiticeira exercita os seus feitiços, tanto esse dia é bento, e está sob o imperio de uma graça celeste.
+HORACIO: Assim o ouvi dizer, e acredito-o. Mas eis que no oriente, acolá no fundo, por detrás dos outeiros, surge a manhã, vestida de purpura por entre o orvalho. Demos fim á nossa vigilia, e vamos dar parte ao joven Hamlet do que vimos esta noite; porque, por vida minha, creio que este espirito, mudo para todos, lhe fallará. Approvam esta confidencia, que nos impõe o nosso dever e a nossa affeição?
+MARCELLO: Vamos sem detença; sei onde o acharemos, e onde lhe poderemos fallar sem constrangimento.

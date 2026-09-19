@@ -56,12 +56,12 @@
       "translation_first_published": 1883,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://es.wikisource.org/wiki/Comedia_de_equivocaciones_(M%C3%A1rquez_tr.)",
-      "revision_id": "sha256:6dca77a66ab02c59",
-      "raw_sha256": "6dca77a66ab02c59a8f18df6d5b9fd3de4fc4c8758a9ed0e0a9a841caa9c4702",
+      "revision_id": "sha256:de4993188c707118",
+      "raw_sha256": "de4993188c707118982983c503cde449b7844be235dfe063633c7ab59434ef03",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO III. / ESCENA I.",
-      "speaker_labels": 56,
+      "speaker_labels": 57,
       "distinct_speakers": 9,
       "speaker_map": {
         "ADRIANA": {
@@ -91,6 +91,62 @@
         "LUCÍA": {
           "spoken": "LUCÍA",
           "roster": "LUCE"
+        }
+      }
+    },
+    {
+      "iso": "es",
+      "play": "macbeth",
+      "scene": "1.3",
+      "file": "es/macbeth_1_3.txt",
+      "translator": "Marcelino Menéndez y Pelayo",
+      "translator_death_date": 1912,
+      "translation_first_published": 1881,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://es.wikisource.org/wiki/Macbeth_(Men%C3%A9ndez_y_Pelayo_tr.)/Acto_I",
+      "revision_id": "sha256:c01b980f0dba035b",
+      "raw_sha256": "c01b980f0dba035b78ad026a0c64e4c6e1c7a6403473ef0607f3064eb6d49086",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ESCENA III",
+      "speaker_labels": 48,
+      "distinct_speakers": 9,
+      "speaker_map": {
+        "MACBETH": {
+          "spoken": "MACBETH",
+          "roster": "MACBETH"
+        },
+        "BANQUO": {
+          "spoken": "BANQUO",
+          "roster": "BANQUO"
+        },
+        "ROSS": {
+          "spoken": "ROSS",
+          "roster": "ROSS"
+        },
+        "BRUJA 1.ª": {
+          "spoken": "FIRST WITCH",
+          "roster": "FIRST WITCH"
+        },
+        "BRUJA 2.ª": {
+          "spoken": "SECOND WITCH",
+          "roster": "SECOND WITCH"
+        },
+        "BRUJA 3.ª": {
+          "spoken": "THIRD WITCH",
+          "roster": "THIRD WITCH"
+        },
+        "ANGUSS": {
+          "spoken": "ANGUS",
+          "roster": "ANGUS"
+        },
+        "LAS TRES BRUJAS": {
+          "spoken": "ALL",
+          "roster": "ALL"
+        },
+        "BRUJAS": {
+          "spoken": "ALL",
+          "roster": "ALL"
         }
       }
     },
@@ -1310,6 +1366,42 @@
         "乳母": {
           "spoken": "NURSE",
           "roster": "NURSE"
+        }
+      }
+    },
+    {
+      "iso": "pt",
+      "play": "hamlet",
+      "scene": "1.1",
+      "file": "pt/hamlet_1_1.txt",
+      "translator": "Luís I of Portugal",
+      "translator_death_date": 1889,
+      "translation_first_published": 1877,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://pt.wikisource.org/wiki/Hamlet:_drama_em_cinco_actos/Acto_primeiro/Cena_I",
+      "revision_id": "sha256:f23079f783999708",
+      "raw_sha256": "f23079f783999708560ba9a31d752c03f6542370a66954fa99fba39afd7f3007",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 56,
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "BERNARDO": {
+          "spoken": "BARNARDO",
+          "roster": "BARNARDO"
+        },
+        "FRANCISCO": {
+          "spoken": "FRANCISCO",
+          "roster": "FRANCISCO"
+        },
+        "HORACIO": {
+          "spoken": "HORATIO",
+          "roster": "HORATIO"
+        },
+        "MARCELLO": {
+          "spoken": "MARCELLUS",
+          "roster": "MARCELLUS"
         }
       }
     },

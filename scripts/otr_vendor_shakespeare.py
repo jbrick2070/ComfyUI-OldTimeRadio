@@ -297,6 +297,21 @@ _DIRECTION_BLOCK = re.compile(
 _TIINHERIT_BLOCK = re.compile(
     r'(?is)<div[^>]*class="[^"]*tiInherit[^"]*"[^>]*>(?P<body>.*?)</div\s*>')
 
+#: AN ACT OR SCENE HEADING IS A BARE ALL-CAPS BLOCK TOO, and on the editions
+#: that print the speaker on its own line it is the SAME block type. So the test
+#: that says "this bare block is a speaker" says it about `ESCENA IV` as well,
+#: and marking that one costs the scene its anchor: `extract` finds a scene BY
+#: its printed heading, so a heading claimed as a character makes the scene
+#: unfindable and the row comes back EMPTY. Measured on pt/hamlet 1.1, which is
+#: exactly how the first cut of the name-on-its-own-line rule was caught.
+#:
+#: The same exemption exists in the Aozora and Chinese rules for the same
+#: reason; this is the Latin-script spelling of it. Matched on the opening word
+#: only, because the numeral that follows is the transcriber's taste -- roman,
+#: arabic, with or without a trailing period.
+_HEADING_LABEL = re.compile(
+    r"(?i)^\s*(?:ESCENA|SCENA|SCÈNE|SCENE|ACTO|ATTO|ACT|ACTE)\b")
+
 #: AOZORA / TSUBOUCHI MARKS BY INDENT CLASS, NOT BY TYPE SIZE (measured
 #: 2026-09-19 on Romeo and Juliet, 42773_39853.html). The row was held on a
 #: recorded diagnosis that turned out to be wrong: it said this edition "sets
@@ -583,10 +598,40 @@ def mark_speakers(markup):
         #
         # UNLESS THE BLOCK IS A BARE NAME. Some transcribers set the SPEAKER in
         # small type as well, and dropping it would leave the play without
-        # anyone to say the lines. Kept on its own line so the ordinary name
-        # shapes can claim it -- see `_is_bare_label`.
-        if _is_bare_label(match.group("body")):
-            return "\n" + match.group("body") + "\n"
+        # anyone to say the lines.
+        #
+        # MARK IT, DO NOT MERELY KEEP IT. The previous form returned the name as
+        # a plain line "so the ordinary name shapes can claim it", and they
+        # never do: every one of them keys on a span class or an italic tag, and
+        # by the time they run this is bare text. So the name survived
+        # unattributed and `normalise_labels` had to guess it back out of prose,
+        # which is the thing this file exists to avoid. On the editions that
+        # print `<div class="tiInherit">BERNARDO</div>` above the speech, that
+        # meant a wall of unlabelled prose with a few speakers recovered by luck
+        # -- 25 of 56 on the Portuguese Hamlet, and the Spanish Macbeth's
+        # witches missing entirely while its named parts came through.
+        #
+        # TWO THINGS ARE NOT SPEAKERS AND BOTH WERE MEASURED, NOT IMAGINED.
+        # A HEADING: `ESCENA IV` is a bare all-caps block in exactly this
+        # class, and claiming it cost `extract` the anchor it finds the scene
+        # by -- pt/hamlet 1.1 came back EMPTY on the first cut of this rule.
+        # A SINGLE LATIN LETTER: the Spanish Comedy of Errors carries a lone `M`
+        # where a transcription split `Mi buen senor Angelo` across a block, and
+        # marking it invented a character called M who delivers the rest of the
+        # line. One ideograph is a whole name and one letter never is.
+        body = match.group("body")
+        if _is_bare_label(body):
+            name = re.sub(r"(?is)<[^>]+>|\s+", " ", body).strip()
+            if name and _HEADING_LABEL.match(name):
+                # KEEP IT AS A PLAIN LINE, do not drop it. `extract` locates a
+                # scene BY this string and ends it at the next one, so deleting
+                # the heading is as fatal as marking it: the first cut dropped
+                # it and pt/hamlet 1.1 could not find `SCENA I` at all, while
+                # es/macbeth 1.3 lost the `ESCENA IV` that ends it and ran on
+                # into the next scene, collecting Duncan and Malcolm.
+                return "\n" + name + "\n"
+            if name and (len(name) > 1 or _CJK_CHAR.match(name)):
+                return "\n%s%s%s " % (SPEAKER_MARK, name, SPEAKER_MARK)
         return "\n"
 
     def _mark(match):
