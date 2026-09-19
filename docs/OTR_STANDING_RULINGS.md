@@ -22,6 +22,40 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-18 EVENING -- THE REGISTRY IS PARKED. PUSH THE REPO, DO NOT VERSION.
+
+Operator, twice in one evening: *"I don't care about the registry right now.
+I just want to focus on getting it to the Git. We will do the registry once
+the whole go forward plan is clean"*, and then *"don't waste any other
+credits worrying about the versioning. You just update the repo, and then
+when everything is good, and we will update the registry."*
+
+* **Do not edit `pyproject.toml`.** Editing it AUTO-FIRES a publish (7A), so
+  it is a release trigger, not a config file. The only exception already
+  taken: adding a dependency that `tests/test_dependency_lists_in_sync.py`
+  requires, with the version deliberately UNCHANGED so the publish is
+  refused as a duplicate and no version string burns.
+* **Do not propose a version number, a bump, or a release shape.** The minor
+  digit was already his alone (7A); this parks the patch digit too. He floated
+  "2.3 alpha" and then withdrew it in the same breath -- treat that as not a
+  decision.
+* **Push to `main` as normal.** Nothing here relaxes the commit-and-push
+  rule; the repo is the deliverable for now.
+
+**THE FACT THAT MAKES THIS EASY, measured 2026-09-18:** versions are not
+reaching anyone anyway. `2.1.5` and `2.1.6` are both **Flagged**; the Active
+version an installer receives is **2.1.4 (2026-09-15)**. Both flags carry an
+`any-code-execute` tag on the ffmpeg `subprocess.run` call -- not a defect,
+and this repo already established (see `.comfyignore`, 2026-09-02) that the
+resolution is an ADMIN REVIEW REQUEST to Comfy-Org, not another diff. So a
+new number would produce a third flagged version and change nothing an
+installer sees. **The blocker is the scan, not the version.**
+
+His reason, in his words: *"we're not solid enough... the only people who pay
+attention are the experimentalists."* The day supported it -- three
+production bugs, every one visible only on a live render and none catchable
+by the suite.
+
 ## 2026-09-18 -- every lane is eligible for the episode language
 
 Operator, on learning that only the inline writer had been wired and that the
