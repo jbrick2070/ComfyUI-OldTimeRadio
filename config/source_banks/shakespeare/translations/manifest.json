@@ -711,12 +711,12 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/Come_vi_piace/Atto_terzo",
-      "revision_id": "sha256:9cd6b4852b699556",
-      "raw_sha256": "9cd6b4852b69955632ef27054b7529d6e42227b758fe2b35716dd3c60fea8321",
+      "revision_id": "sha256:35ae78cce254c64f",
+      "raw_sha256": "35ae78cce254c64fdd227e3c2998758f14906434b9aa52f49d4d7f1cda1d0a86",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA II",
-      "speaker_labels": 109,
+      "speaker_labels": 111,
       "distinct_speakers": 6,
       "speaker_map": {
         "ORL": {

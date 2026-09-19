@@ -434,11 +434,45 @@ _RUSCONI_PARAGRAPH = re.compile(
 #: is what settles it: four characters exist in that scene and a rule that
 #: returns one is wrong. When two editions of one scene disagree about how many
 #: people are in it, suspect the parser before the translator.
+#: A VERSE SPEECH PUTS THE LABEL INSIDE THE ITALIC WITH THE WORDS. The ordinary
+#: shape closes the italic after the name -- `<i>Ros</i>.` -- but where Rusconi
+#: sets a speech as quoted VERSE he italicises the whole thing, label and all:
+#:
+#:     <p><i>Ros. Dall'India all'Oriente alcun tesoro non v'ha ...</i></p>
+#:
+#: The name bound of 40 characters then fails against a run of several hundred,
+#: nothing is marked, and the speech is appended to whoever spoke last. That is
+#: how `it/as_you_like_it 3.2` came out at 109 speeches where the French and
+#: Spanish editions both carry 145 and 144: Rosalind's verses arrived inside
+#: Corin's line, and `Ros,` was left sitting in the middle of Orlando's.
+#:
+#: Found by a structural check rather than by reading: TWO SPEECHES IN A ROW BY
+#: THE SAME CHARACTER. Drama alternates, so a run of `PIET, PIET` or `ORL, ORL`
+#: is where a speech between them went missing. That check needs no second
+#: language and it is the one that localised this.
+#:
+#: The second alternative below matches the label at the HEAD of the italic run
+#: instead of at its end. It is bounded hard -- a capitalised word of at most 20
+#: characters carrying no space, digit or punctuation, closed by a period --
+#: because everything after it is the speech itself and a loose match here would
+#: eat dialogue.
+#:
+#: THE 40-CHARACTER LOOKAHEAD IS LOAD-BEARING. Without it this alternative fires
+#: on an ABBREVIATED NAME: `<i>D. Pedro</i>` is Don Pedro, and the rule read `D`
+#: as the whole label and swallowed his own period, shipping him as `D Pedro` in
+#: much_ado 2.3. A label is a few characters and a verse speech is hundreds, so
+#: the italic must CONTINUE with a substantial run of plain text for this to be
+#: a speech at all. Caught by the same no-drift diff that catches everything
+#: else here -- it was a five-character change to a scene nobody was looking at.
 _RUSCONI_HEAD = re.compile(
     r'(?is)^(?P<prefix>(?:(?!<i\b)[^<()]|<(?!i\b)[^>]*>)*?)'
     r'(?P<ord>\d\s*(?:<sup>\s*[ao]\s*</sup>|[ªº])\s*)?'
+    r'(?:'
     r'<i>(?P<name>[^<()]{1,40})</i>'
-    r'(?:\s*\([^()]{0,200}\))?\s*\.')
+    r'(?:\s*\([^()]{0,200}\))?\s*\.'
+    r'|'
+    r'<i>(?P<vname>[A-ZÀ-Þ][^\s<>.,;:()\d]{0,19})\.(?=\s[^<]{40,})'
+    r')')
 
 #: A parenthetical whose CONTENT IS WHOLLY ITALIC. Rusconi and Marquez set
 #: stage business that way -- `(<i>entra Rosse</i>)`, `(<i>escono</i>)` -- and
@@ -612,7 +646,11 @@ def mark_speakers(markup):
         head = _RUSCONI_HEAD.match(match.group("body"))
         if not head:
             return match.group(0)
-        name = head.group("name").strip()
+        # Either alternative may have fired: `name` closes the italic after the
+        # label, `vname` opens it with the label and keeps the speech inside.
+        name = (head.group("name") or head.group("vname") or "").strip()
+        if not name:
+            return match.group(0)
         ordinal = re.sub(r"(?s)<[^>]+>|\s+", "",
                          head.groupdict().get("ord") or "")
         full = ("%s %s" % (ordinal, name)).strip()
