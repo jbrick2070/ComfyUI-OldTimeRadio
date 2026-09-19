@@ -681,6 +681,15 @@ _ENGLISH_STEM = {
 #:   * A bare `ANTIPHOLUS` / `DROMIO` is genuinely ambiguous -- the twins are two
 #:     people and binding a bare label to either would be a guess. Abstaining is
 #:     correct; see `resolve_roster_gender`, which abstains on the same case.
+#: A TRANSLATOR'S OWN CHOICE IS NOT A DEFECT, and the entries below are the
+#: first that are there for that reason rather than for a parsing gap.
+#: Operator 2026-09-19: *"maybe some of these foreign translators decide to
+#: create a new act or a new speech, and it's part of their local vernacular and
+#: history and culture. Who am I to judge"*. Right -- and the mechanism above
+#: already honours it, because an unbound label costs a VOICE and never the
+#: dialogue. These characters speak their own lines under their own names and
+#: draw from the roll, which is the correct outcome; refusing the scene would
+#: have thrown away the translation to protect an English cast list.
 _KNOWN_UNBOUND = {
     "IMBÉCILE DE CHEVALIER",
     "JE PUIS COMMANDER OÙ J’ADORE",
@@ -690,6 +699,17 @@ _KNOWN_UNBOUND = {
     "ANTIPHOLUS", "DROMIO", "ANTÍFOLO",
     "AMIPHOLUS D’ÉPHÈSE",
     "i buen señor Angelo, es necesario que nos excuséis á todos",
+    # Snug speaks in Rusconi's and Zhu Shenghao's Midsummer 3.1 and never
+    # speaks in the Folger sidecar, where he appears only in the entry and
+    # exit directions. Two translators, independently, gave him lines.
+    "SNUG", "史",
+    # Rusconi labels the ROLE where Folger labels the ACTOR: inside the
+    # play-within-the-play these are Pyramus and Thisbe, not Bottom and Flute.
+    # Binding a role to its actor would merge two speakers into one voice.
+    "PIR", "TIS",
+    # "Fata" -- a fairy. The English scene names its fairies individually, so
+    # there is no single counterpart and a guess would invent one.
+    "FAT",
 }
 
 

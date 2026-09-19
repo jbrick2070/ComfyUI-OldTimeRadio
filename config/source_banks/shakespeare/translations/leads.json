@@ -679,8 +679,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Bot. Ci siam tutti?",
-      "hold": "CANNOT BIND, held 2026-09-19 -- an EDITION DIFFERENCE, like its Chinese sibling. The scene extracts cleanly at 66 speeches across 10 real speakers. Three of them have nowhere to go in the Folger sidecar: `SNUG` speaks twice here and never speaks in the English scene, where he appears only in the entry and exit directions; and `PIR` and `TIS` are PYRAMUS and THISBE -- the parts Bottom and Flute play inside the play, which Rusconi labels by the ROLE while Folger labels by the actor. `FAT` (Fata, a fairy) also has no single sidecar counterpart, the English scene naming its fairies individually. Do not resolve any of these by binding to the nearest name: a role label bound to its actor merges two speakers, and Snug bound to anyone puts his lines in another mouth. Needs the same operator ruling as zh/midsummer 3.1 about a translation's extra or differently-labelled speaker. The sibling 3.2 binds completely and is vendored."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Bot. Ci siam tutti?"
     },
     {
       "iso": "it",
@@ -1280,8 +1279,7 @@
       "form": "prose",
       "url_is": "act_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found. The source is good; the extractor is not ready for it.",
-      "hold": "CANNOT BIND, held 2026-09-19 -- an EDITION DIFFERENCE, not a parse fault. The Chinese text extracts cleanly at 65 speeches across 14 speakers, every one of them a real character, and 13 of the 14 bind to the English sidecar. 史 (史納格, Snug) is the fourteenth and has TWO speeches here, while in the Folger sidecar for this scene Snug never speaks -- he appears only in the entry and exit directions, so the roster built from speakers does not carry him and the binding test refuses the row. Do not resolve this by binding 史 to another character: he is a distinct person and that would put his lines in someone else's mouth, which is the one failure this corpus cannot afford. It needs an operator ruling on what a translation's EXTRA speaker binds to when the English scene has no such speaking part. The sibling scene 3.2 binds completely and is vendored."
+      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found. The source is good; the extractor is not ready for it."
     },
     {
       "iso": "zh",

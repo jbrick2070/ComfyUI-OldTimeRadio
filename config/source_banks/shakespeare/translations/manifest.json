@@ -896,6 +896,50 @@
     {
       "iso": "it",
       "play": "midsummer",
+      "scene": "3.1",
+      "file": "it/midsummer_3_1.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo",
+      "revision_id": "sha256:07da7bb8f7c2933c",
+      "raw_sha256": "07da7bb8f7c2933c65b905644976013f9fba03cc08221f62f7d3940ff757bb85",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 66,
+      "distinct_speakers": 10,
+      "speaker_map": {
+        "BOT": {
+          "spoken": "BOTTOM",
+          "roster": "BOTTOM"
+        },
+        "QUIN": {
+          "spoken": "QUINCE",
+          "roster": "QUINCE"
+        },
+        "SNOUT": {
+          "spoken": "SNOUT",
+          "roster": "SNOUT"
+        },
+        "STAR": {
+          "spoken": "STARVELING",
+          "roster": "STARVELING"
+        },
+        "PUCK": {
+          "spoken": "ROBIN",
+          "roster": "ROBIN"
+        },
+        "TIT": {
+          "spoken": "TITANIA",
+          "roster": "TITANIA"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "midsummer",
       "scene": "3.2",
       "file": "it/midsummer_3_2.txt",
       "translator": "Carlo Rusconi",
@@ -1166,6 +1210,78 @@
         "瑪": {
           "spoken": "MARCELLUS",
           "roster": "MARCELLUS"
+        }
+      }
+    },
+    {
+      "iso": "zh",
+      "play": "midsummer",
+      "scene": "3.1",
+      "file": "zh/midsummer_3_1.txt",
+      "translator": "朱生豪 Zhu Shenghao",
+      "translator_death_date": 1944,
+      "translation_first_published": 1947,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)/%E4%BB%B2%E5%A4%8F%E5%A4%9C%E4%B9%8B%E5%A4%A2/%E7%AC%AC%E4%B8%89%E5%B9%95",
+      "revision_id": "sha256:a6e0689f9b30a034",
+      "raw_sha256": "a6e0689f9b30a034d1f59979ce1b1db8f5febd4bb0d73a45b12abf53ffe1b26e",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "第一场",
+      "speaker_labels": 65,
+      "distinct_speakers": 14,
+      "speaker_map": {
+        "波": {
+          "spoken": "BOTTOM",
+          "roster": "BOTTOM"
+        },
+        "衮": {
+          "spoken": "QUINCE",
+          "roster": "QUINCE"
+        },
+        "斯": {
+          "spoken": "SNOUT",
+          "roster": "SNOUT"
+        },
+        "司": {
+          "spoken": "STARVELING",
+          "roster": "STARVELING"
+        },
+        "迫": {
+          "spoken": "ROBIN",
+          "roster": "ROBIN"
+        },
+        "弗": {
+          "spoken": "FLUTE",
+          "roster": "FLUTE"
+        },
+        "蒂": {
+          "spoken": "TITANIA",
+          "roster": "TITANIA"
+        },
+        "豆": {
+          "spoken": "PEASEBLOSSOM",
+          "roster": "PEASEBLOSSOM"
+        },
+        "蛛": {
+          "spoken": "COBWEB",
+          "roster": "COBWEB"
+        },
+        "飞": {
+          "spoken": "MOTE",
+          "roster": "MOTE"
+        },
+        "芥": {
+          "spoken": "MUSTARDSEED",
+          "roster": "MUSTARDSEED"
+        },
+        "四仙合": {
+          "spoken": "ALL",
+          "roster": "ALL"
+        },
+        "四仙": {
+          "spoken": "ALL",
+          "roster": "ALL"
         }
       }
     },
