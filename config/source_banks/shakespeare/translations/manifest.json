@@ -1464,6 +1464,78 @@
           "roster": "HELENA"
         }
       }
+    },
+    {
+      "iso": "zh",
+      "play": "tempest",
+      "scene": "1.2",
+      "file": "zh/tempest_1_2.txt",
+      "translator": "朱生豪 Zhu Shenghao",
+      "translator_death_date": 1944,
+      "translation_first_published": 1947,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://zh.wikisource.org/zh-hant/%E6%9A%B4%E9%A2%A8%E9%9B%A8",
+      "revision_id": "sha256:2d28af68e93d0d6a",
+      "raw_sha256": "2d28af68e93d0d6adad5eee94aa5244a75b7953a5356a8584d639024d14218d0",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "第一幕 / 第二場",
+      "speaker_labels": 135,
+      "distinct_speakers": 5,
+      "speaker_map": {
+        "普洛斯彼羅": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "米蘭達": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "愛麗兒": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "腓迪南": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "凱列班": {
+          "spoken": "CALIBAN",
+          "roster": "CALIBAN"
+        }
+      }
+    },
+    {
+      "iso": "zh",
+      "play": "tempest",
+      "scene": "3.1",
+      "file": "zh/tempest_3_1.txt",
+      "translator": "朱生豪 Zhu Shenghao",
+      "translator_death_date": 1944,
+      "translation_first_published": 1947,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://zh.wikisource.org/zh-hant/%E6%9A%B4%E9%A2%A8%E9%9B%A8",
+      "revision_id": "sha256:c3451685d22fc14a",
+      "raw_sha256": "c3451685d22fc14a49a1bbb19c2219a7a86fa92394fca43f2d9dc661b55d2372",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "第三幕 / 第一場",
+      "speaker_labels": 25,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "普洛斯彼羅": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "米蘭達": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "腓迪南": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        }
+      }
     }
   ]
 }
