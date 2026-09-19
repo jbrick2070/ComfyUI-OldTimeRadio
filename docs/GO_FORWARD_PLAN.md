@@ -61,9 +61,20 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   today; the key is fine. Every other engine passed a live one-call smoke
   on that key (writer Flash + Lite, TTS, image, Lyria, Omni). The override
   is `OTR_GOOGLE_VEO_MODEL_ID` (`_selected_model`, eng_google_veo_video.py);
-  the test leg runs on fast. Whether the shipped pin moves to fast (dearer
-  per clip, answers today) or stays on lite (cheap, resets on Google's
-  clock) is his call.
+  the test leg runs on fast.
+  **His quota page (project ArchivalFlow, paid Tier 1) then settled it
+  exactly:** every Veo model gets **2 requests per minute and 10 per day**;
+  fast and lite sat at 10/10 by early afternoon, full at 2/10. An episode
+  makes 16 Veo calls (8 beats x 2 jump segments), so no Veo lane fits
+  Tier 1 as shaped; TTS (10/min), image (100/min) and Lyria (150/min) are
+  nowhere near a limit. Tier 2 wants $250 spent over 30 days, and he is
+  not begging for it. **His ruling: Google is a STILLS-ONLY lane** --
+  `config/profiles/google_still_1act.json` (67332dc5): Gemini image for
+  stills, `still_flat` to composite them (CPU, no models), Google TTS,
+  Lyria, Flash / Flash-Lite writers, no Veo. Dry run resolves all 17
+  overrides. If Veo ever comes back it is his call between 8-second clips
+  (one call per beat, 8/day fits) and a disclosed opt-in model rotation,
+  which collides with the no-fallback law as a default.
   **The fork, once video renders:** which profile ships -- `google_veo_low_1act`
   (2 chars, 100-frame clips) is the cheap candidate -- and promoting it means
   a variant + launch recipe (`SHIPPING_SET`), a tier-matrix row and the
