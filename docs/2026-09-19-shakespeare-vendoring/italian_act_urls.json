@@ -1,0 +1,14 @@
+[
+{"id":"it/as_you_like_it/3.2","status":"found","url":"https://it.wikisource.org/wiki/Come_vi_piace/Atto_terzo","url_serves":"act","first_line_excerpt":"Orl. Restate qui appesi,","scene_heading_on_page":"SCENA II."},
+{"id":"it/comedy_of_errors/3.1","status":"found","url":"https://it.wikisource.org/wiki/La_commedia_degli_equivochi/Atto_terzo","url_serves":"act","first_line_excerpt":"Ant. Buon Angelo, bisogna","scene_heading_on_page":"SCENA I."},
+{"id":"it/hamlet/1.1","status":"found","url":"https://it.wikisource.org/wiki/Amleto/Atto_primo","url_serves":"act","first_line_excerpt":"Ber. Chi è là?","scene_heading_on_page":"SCENA I."},
+{"id":"it/king_lear/1.1","status":"found","url":"https://it.wikisource.org/wiki/Il_Re_Lear/Atto_primo","url_serves":"act","first_line_excerpt":"Kent. Avrei sempre","scene_heading_on_page":"SCENA I."},
+{"id":"it/midsummer/3.1","status":"found","url":"https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo","url_serves":"act","first_line_excerpt":"Bot. Ci siam tutti?","scene_heading_on_page":"SCENA I."},
+{"id":"it/midsummer/3.2","status":"found","url":"https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo","url_serves":"act","first_line_excerpt":"Ob. Desidero sapere","scene_heading_on_page":"SCENA II."},
+{"id":"it/much_ado/2.3","status":"found","url":"https://it.wikisource.org/wiki/Molto_strepito_per_nulla/Atto_secondo","url_serves":"act","first_line_excerpt":"Ben. Ragazzo...","scene_heading_on_page":"SCENA III."},
+{"id":"it/much_ado/3.1","status":"found","url":"https://it.wikisource.org/wiki/Molto_strepito_per_nulla/Atto_terzo","url_serves":"act","first_line_excerpt":"Ero. Buona Margherita,","scene_heading_on_page":"SCENA I."},
+{"id":"it/romeo_juliet/2.2","status":"found","url":"https://it.wikisource.org/wiki/Giulietta_e_Romeo/Atto_secondo","url_serves":"act","first_line_excerpt":"Rom. L’Amore irride","scene_heading_on_page":"SCENA II."},
+{"id":"it/tempest/1.2","status":"found","url":"https://it.wikisource.org/wiki/La_tempesta_%28Shakespeare-Rusconi%29/Atto_primo","url_serves":"act","first_line_excerpt":"Mir. Se foste voi,","scene_heading_on_page":"SCENA II."},
+{"id":"it/twelfth_night/1.5","status":"found","url":"https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_primo","url_serves":"act","first_line_excerpt":"Mar. Su, dimmi dove","scene_heading_on_page":"SCENA V."},
+{"id":"it/twelfth_night/2.5","status":"found","url":"https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_secondo","url_serves":"act","first_line_excerpt":"Tob. Va per la tua via,","scene_heading_on_page":"SCENA VI.","notes":"The requested standard Act 2 Scene 5 is printed as SCENA VI; this act skips SCENA IV."}
+]
