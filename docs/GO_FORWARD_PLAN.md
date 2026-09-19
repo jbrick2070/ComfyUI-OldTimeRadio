@@ -1,186 +1,151 @@
 # OTR Go-Forward Plan
 
-**ONLY UNFINISHED WORK BELONGS HERE.** When work finishes its receipt moves to
+**ONLY UNFINISHED WORK BELONGS HERE.** When work finishes, its receipt moves to
 [HANDOFF_LOG](HANDOFF_LOG.md) or its own evidence folder and the row leaves this
 page. A finished prerequisite earns **one clause inside the row that still needs
-it** -- never a receipt, never a measurement write-up, never a struck-through or
-"SHIPPED" row. The test is one question: *does a row still in this file stop
-making sense without that sentence?* No -> cut it.
+it** -- never a receipt, never a struck-through or "SHIPPED" row. The test is one
+question: *does a row still in this file stop making sense without that
+sentence?* No -> cut it.
 
 Read AGENTS.md, CLAUDE.md and [standing rulings](OTR_STANDING_RULINGS.md) first;
-this file does not restate them. **For what has already happened -- commits,
-measurements, receipts -- read [HANDOFF_LOG](HANDOFF_LOG.md), newest entry
-first.**
+this file does not restate them, and does not restate the review or push rules.
+**For what already happened -- commits, measurements, receipts -- read
+[HANDOFF_LOG](HANDOFF_LOG.md), newest entry first.**
 
 ## Operating order (hard)
 
-Scope the row in front of you, then code it, then -- only when the whole
-queue is empty -- test.
+1. **SCOPE AND DECIDE** -- more than one defensible answer? It lives here, and
+   no code is written on it.
+2. **CODE** -- one verifiable answer? Build it. An open fork elsewhere does not
+   freeze a decided row.
+3. **TEST** -- only when 1 and 2 are both empty.
 
-1. **SCOPE AND DECIDE** -- if the next item has more than one answer, it
-   lives here. No code on that row.
-2. **CODE** -- if it already has one answer, build it. Other open forks
-   do not freeze a decided bug fix.
-3. **TEST** -- only when every open fork and every code row is gone.
-
-A row with more than one defensible answer is section 1, even if it looks
-like a bug. A row with one verifiable answer is section 2. A row that can
-only be settled by a live leg is not a row: settle it without the leg, or
-cut it with the reason written in. **Testing does not settle a decide or
-a code row** (operator 2026-09-12 / 2026-09-17: coding and arcs first;
-test wave last).
-
-The only things that genuinely defer **that row** are an open operator
-ruling on it and a deliberate cut with its reason.
-
-Held, parked, and constraint lists are not work. They do not fill
-section 1 and they do not block section 3.
+A row that can only be settled by a live leg is not a row: settle it without the
+leg, or cut it with the reason written in. Testing never settles a decide or a
+code row (operator 2026-09-12 / 2026-09-17).
 
 ## 0. The bar
 
 > **"As long as it doesn't crash when it's not supposed to."** -- operator,
-> 2026-09-11. Exactness is not the goal: *"I'm not expecting anything exact."*
+> 2026-09-11. *"I'm not expecting anything exact."*
 
-**CRASH-CLASS AND DURABILITY-CLASS DEFECTS ARE THE WORK** -- an uncaught
-exception, a live asset written where a sweeper can delete it, an identity that
-silently resolves outside its episode, and **a machine that silently renders a
-configuration we have already proven wrong.** Aesthetic drift is closed and is
-not work; see [ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md).
+Crash-class and durability-class defects are the work: an uncaught exception, a
+live asset written where a sweeper can delete it, an identity that resolves
+outside its episode, a machine that silently renders a configuration already
+proven wrong. Aesthetic drift is closed
+([ARC_CLOSED](2026-09-11-visual-continuity-diagnosis/ARC_CLOSED.md)).
 
 ## 1. SCOPE AND DECIDE
 
-Open forks only. No code on a row in this section. One word from him closes
-the row into section 2, or cuts it.
+Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **A1. Canonical writer on an 8 GB card.** Live canonical still saves
-  Qwen 3.5 4B, `llm_quant_policy` `none`, ceiling `10.0`. A dropped node
-  defaults to `bnb_nf4` / `14.5`. Leave canonical as the 16 GB graph and
-  point 8 GB users at the variant, or retune both.
-* **A5. 16 GB foley / mime without GGUF.** Official LTX 2.5 safetensors do
-  not fit 16 GB (measured). Three shipping graphs still load the Q3 GGUF:
-  `otr_16gb_video`, `otr_16gb_foley`, `otr_16gb_mime`. Cloud deluxe already
-  ships `cloud_ltx25_foley_plus`. Stay on Q3, move those three to cloud, or
-  drop them.
-* **Gallery.** Comfy lists one graph. The 21 shipping variants sit in
+* **A1. Canonical writer on an 8 GB card.** Canonical saves Qwen 3.5 4B,
+  `llm_quant_policy` `none`, ceiling `10.0`; a dropped node defaults to
+  `bnb_nf4` / `14.5`. Leave canonical as the 16 GB graph and point 8 GB users
+  at the variant, or retune both.
+* **A5. 16 GB foley / mime without GGUF.** Official LTX 2.5 safetensors do not
+  fit 16 GB (measured). `otr_16gb_video`, `otr_16gb_foley` and `otr_16gb_mime`
+  still load the Q3 GGUF; cloud deluxe already ships `cloud_ltx25_foley_plus`.
+  Stay on Q3, move those three to cloud, or drop them.
+* **Gallery.** Comfy lists one graph; the 21 shipping variants sit in
   `workflows/variants/`, which the template scanner does not read. Promoting
-  them changes what the gallery shows tomorrow. Say yes before the files move.
-* **Pre-push hook.** A `build_variants --check` plus the sibling matrix
-  checks, from `.githooks/pre-push`. Changes how both boxes push.
+  them changes what the gallery shows tomorrow.
+* **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
+  from `.githooks/pre-push`. Changes how both boxes push.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
-  already points at `/main/`. One click. His.
-* **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged. Manager still
-  serves 2.1.4. The API gives no reason. His Discord, not a code change.
-* **Native-language science feeds for SciFi News Pro.** Today the lane reads
-  the English science feed and authors the new story natively (standing
-  ruling 2026-09-18). A feed in the episode language would give it native
-  source material too. Which feeds, and whether the dossier extraction stays
-  English, is his call before any code.
+  points at `/main/`. One click, his.
+* **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged; Manager serves
+  2.1.4. The API gives no reason. His Discord, not a code change.
+* **Native-language science feeds for SciFi News Pro.** The lane reads the
+  English feed and authors natively. Which feeds, and whether the dossier
+  extraction stays English, is his call before any code.
 
-## 2. CODE -- already decided, do these in order
+## 2. CODE -- decided, in order
 
-Crash-class and ledger-identity first. Each row is one commit on `main`. Do
-not start a row below while one above is red. Do not start a row whose
-answer is still sitting in section 1.
+### 1. Vendored public-domain Shakespeare translations
 
-**This checkout still carries the Google/cloud sidequest pile** (not a row
-here). Do not `git add .`. Composer QA then Sonnet before every push.
+**Decided 2026-09-18** (*"I want the best pack available"*): a scene ships a
+real translator's words when they clear **both** the US test (first published
+before 1931) **and** life+70 (translator died before 1956); verse preferred
+where a public-domain verse translation exists; scene-level transcription is
+allowed; no coverage requirement -- any scene without vendored words keeps the
+model translation that ships today. The rule this replaces ("died before 1944")
+was a conservative bound, not a legal test.
 
-**Working gate (seconds):** `scripts/otr_working_gate.py`. **Chunk gate
-(~10 min):** full `pytest tests`, once the row is green. Commands live in
-[known-failures](known-failures.md). Those gates are not the test wave.
+Spec, inventory and the gate's field list:
+[2026-09-18-fidelity-lane-translation](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml).
 
-### 1. Vendored public-domain Shakespeare translations -- "the best pack I can publish"
+**The gate is built and has run** (`scripts/otr_shakespeare_corpus_gate.py`,
+`nodes/_otr_verbatim_corpus.py`, leads in
+`config/source_banks/shakespeare/translations/leads.json`, report in the
+evidence folder).
 
-**Decided 2026-09-18 (operator: *"I want the best for the foreign
-languages I can publish ... I want the best pack available"*).** The five
-questions in the
-[corpus spec](2026-09-18-fidelity-lane-translation/shakespeare_corpus_spec_v2.yaml)
-close as: clear under BOTH the US test (first published before 1931) AND
-life+70 (translator died before 1956) -- the set anyone can publish
-anywhere; verse where a public-domain verse translation exists, prose
-otherwise; scene-level hand transcription is allowed (14 scenes per
-language, never whole plays); no coverage requirement -- a scene that
-does not pass the gate keeps the model translation that ships today.
-Vendored words replace the model's wherever they exist, per scene, per
-language.
+**What it measured, 2026-09-18 -- NOT ONE LEAD URL IS A SCENE, BUT SEVEN ARE
+THE RIGHT WORK.** Seven pages carry two to five act headings, i.e. the whole
+play (`ACTE PREMIER` / `ACTO PRIMERO` / `ACTO PRIMEIRO`): both fr Macbeth
+leads, all three es leads, pt Hamlet and hi As You Like It. One -- `Teatro
+completo di Shakspeare` -- is the collected-works index with no act heading
+at all. The Aozora URL is the 図書カード rather than the text, and the
+archive.org URL is the details page rather than the scan.
 
-**Build order (the spec's, kept):**
-1. The acceptance gate first -- a checker that opens every (play, scene,
-   language) lead and records HTTP status and final URL, byte length and
-   encoding, target headings present, speaker-label count, dialogue-to-
-   markup ratio, transcription-pending markers, licence string, revision
-   id; verdict READY / PARTIAL / EMPTY / BLOCKED. Nothing enters on the
-   strength of a document. Cache raw fetches; parse from local.
-2. The alias table and anchor-matching alignment BEFORE the parser:
-   19th-century editions renumber scenes, so a scene resolves by its
-   English opening and closing speaker/content with a confidence score,
-   never by counting headings.
-3. Vendoring shape: `config/source_banks/shakespeare/translations/<iso>/`
-   with one normalised `NAME:` speaker-labelled scene file per target
-   scene plus a manifest row (translator, death year, first publication,
-   transcription licence, source URL, revision id, raw sha256, verdict,
-   confidence). The plan step selects from the vendored scene when the
-   manifest says READY; otherwise the model translation runs as today;
-   the receipt says which. The credit line names the translator.
-4. Phases: fr + it (evaluate Carcano verse before Rusconi prose), then
-   es (Macpherson), ja (one clean Aozora play as the old-kana test), zh
-   (Zhu Shenghao), then pt + hi scene by scene.
-Traps the spec names and this row honours: LiberLiber's Italian set is
-Raponi (in copyright); "A transcribir" means no text; Aozora canonical
-text is Shift_JIS with ruby markup; strip `utm_source` and treat it as
-proof a row was never opened.
+Two corrections worth keeping, both caught in review rather than by the
+author. An early, laxer gate called eight leads READY on page chrome -- the
+same error the spec convicts v1 of, committed again in miniature. Then the
+strict gate reported "target scene headings not found" for pages that DO
+carry headings, because it read only digits and single-letter romans while
+the 19th-century convention is the ordinal WORD; the plan said those pages
+were heading-less landing pages, and that was wrong. Both are fixed, and the
+verdicts now distinguish "wrong page" from "right work, wrong granularity".
 
-This is a data row with a code seam (the manifest read at the plan
-step). Design has one answer per piece; run one contrarian on the
-manifest shape and the gate output before ingestion, then code.
+**Next action: resolve a lead to its SCENE.** For the seven whole-work pages
+that is a RANGE inside a text already fetched and already rights-cleared --
+locate the act heading, then the scene heading under it, then the next scene
+heading. Per host for the rest: a Wikisource subpage (and the `action=parse`
+wikitext endpoint the spec prefers, where speaker labels are template-wrapped
+and structurally detectable); Aozora's zipped Shift_JIS file rather than the
+card; archive.org's `_djvu.txt` rather than the details page. Then the alias table and anchor-matching alignment
+(editions renumber scenes, so a scene resolves by its English opening and
+closing speaker with a confidence score, never by counting headings), then
+the vendored tree `config/source_banks/shakespeare/translations/<iso>/` with
+one normalised `NAME:`-labelled scene file per scene and a manifest row
+(translator, death year, first publication, transcription licence, source
+URL, revision id, raw sha256, verdict, confidence), then the plan-step read
+that prefers a READY scene and falls back to the model translation, with the
+receipt naming which and the credit naming the translator. Phases: fr + it
+(weigh Carcano verse against Rusconi prose), then es, ja, zh, then pt + hi.
 
-Vendored public-domain translations were the last section-1 fork with a
-code shape; everything else in section 1 is his word alone.
+Named traps: LiberLiber's Italian set is Raponi and still in copyright;
+"A transcribir" means no text exists; Aozora's canonical text is Shift_JIS with
+ruby markup; a `utm_source` parameter is proof the row was never opened.
+
+One contrarian on the manifest shape and the first gate output before any
+ingestion.
 
 ## 3. TEST -- only after 1 and 2 are empty
 
-**Operator 2026-09-17:** *"TEST WAVE AFTER CODING."* Same gate as 2026-09-12.
-Do not freeze a wave head to settle a row above. Do not book a qualification
-leg from this file.
-
-When every **open** section-1 fork is gone and section 2 is empty, freeze ONE
-hash, write it into the `WAVE HEAD:` line of
-[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md), and turn four
-machines loose on it at once -- the 5080, the 4060, the Mac and a RunPod box,
-each running the real canonical workflow, all reporting home.
-
-Everything they owe is already written in
-[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md). Nothing
-needs planning when the day comes; it needs starting.
-
-Until then: **do not freeze a head, do not book a leg, and do not settle a
-decide or code row by rendering something.** Two heads were cut early on
-2026-09-11 and both had to be withdrawn.
-
-**Then the next morning begins in `otr/obs/`, not in the editor** -- count
-what landed against what was promised, read the four phone-homes, and triage
-anything crash-class first.
+**Operator 2026-09-17:** *"TEST WAVE AFTER CODING."* When section 1 is empty and
+section 2 is empty, freeze ONE hash into the `WAVE HEAD:` line of
+[PROMPTS.md](2026-09-11-four-machine-test-wave/PROMPTS.md) and turn four machines
+loose on it at once -- the 5080, the 4060, the Mac and a RunPod box, each running
+the real canonical workflow, all reporting home. What they owe is already in
+[COVERAGE_OWED](2026-09-11-four-machine-test-wave/COVERAGE_OWED.md); nothing
+needs planning, it needs starting. Until then do not freeze a head and do not
+book a qualification leg (two heads were cut early on 2026-09-11 and both had to
+be withdrawn). The morning after begins in `otr/obs/`, not the editor.
 
 ## Already scoped -- do not build
 
-These are decided. They are not section 1 and they are not section 2.
-
-* 8 GB ship set stays draft until the physical 8 GB wave. He ruled hold.
-* `scene_coherence_check` stays inert. Story quality is closed.
-* No IP-Adapter on AnimateDiff. He ruled hold.
-* Do not ping the Radeon tester. Do not post to the ROCm thread.
-* `stable_audio_3` listing `cpu`: re-read the published `--cpu` leg log
-  before editing the capability test. Not a new ruling if that log already
-  published.
+8 GB ship set (held until the physical 8 GB wave) · `scene_coherence_check`
+stays inert · no IP-Adapter on AnimateDiff · do not ping the Radeon tester ·
+`stable_audio_3` listing `cpu` (re-read the published `--cpu` leg log before
+editing the capability test).
 
 ## Constraints specific to this plan
 
-Only the ones not already in CLAUDE.md or the standing rulings.
-
 - Full listener source, no RSS. Cast count is flexible and records requested vs
-  actual; the house announcer is excluded from dramatic cast.
-- **WE DO NOT CHASE ACT COUNT** (operator, 2026-09-11), the same rule as word
-  count: the value is a request, and a run delivers the closest performable
+  actual; the house announcer is excluded from the dramatic cast.
+- **We do not chase act count** (operator 2026-09-11), the same rule as word
+  count: the value is a request and a run delivers the closest performable
   episode.
 - Model checking and a fixed attempt budget only -- no separate chunker, no
   recursive loop.
@@ -190,16 +155,12 @@ Only the ones not already in CLAUDE.md or the standing rulings.
   banks.
 - No replay, migration or re-render project: a saved input means fresh
   generation.
-- **1080 / Veo generate resolution** -- standing ruling 2026-09-17
-  (do not duplicate it here).
 
 ## Parked
 
-Parked and tombstoned items live in
-[GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md). That includes the unqualified
-installed-family and GGUF opt-in combinations, the H3 policy receipts, the
-cfg promotion comparisons, the AMD scoped pod and platform acceptance, the
-cloud billing opt-in routing, the operator-parked casting/adaptation ideas,
-OTR-Lite after v2, the release runway, the missing `device_options` test
-module, regenerating `docs/MODEL_ASSET_INDEX.md`, and writer widget-label
-cosmetics.
+[GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md) holds the tombstones: unqualified
+installed-family and GGUF opt-in combinations, H3 policy receipts, cfg promotion
+comparisons, the AMD scoped pod and platform acceptance, cloud billing opt-in
+routing, operator-parked casting/adaptation ideas, OTR-Lite after v2, the release
+runway, the missing `device_options` test module, regenerating
+`docs/MODEL_ASSET_INDEX.md`, and writer widget-label cosmetics.

@@ -15511,3 +15511,49 @@ pins the positive half. Four live legs published to `otr/obs` after the fix.
   clusters; this applies the same contract to the durable filename surface.
 - confidence: HIGH (live artifact reproduces the exact `isalnum` deletion;
   focused executable regression).
+
+## PBUG-20260918-04 -- the translator echoes the speaker label into the spoken line
+
+**Verified by a published episode.** `otr/obs/el_pico_de_hierro_es_20260918_164906__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4`
+(Spanish, shakespeare, Comedy of Errors 3.1, 2026-09-18).
+
+Four of four character rows shipped with the speaker name inside the spoken
+text: `b002` reads `ANTÍFON DE EFESO: Ve, váte. Traedme un pico de hierro.`
+and `b003`-`b005` all begin `BALTHASAR: `. Kokoro reads that label aloud and
+the caption burns it, so the listener hears the character announce their own
+name before every line.
+
+**Cause.** `_otr_verbatim_translation` shows the model `N. SPEAKER: text` and
+asks for the texts alone; the model returned the label too. Structural
+validation checked count and non-emptiness only, so it passed. The model also
+TRANSLATED the name (`ANTIPHOLUS OF EPHESUS` -> `ANTÍFON DE EFESO`), so
+matching the plan's speaker string would not have caught it.
+
+**Fix.** `strip_echoed_label()` removes a leading label deterministically --
+matched by SHAPE (a short prefix before a colon carrying no lowercase, which
+covers Latin caps and the caseless scripts alike) or by a folded match against
+the plan's own speaker, and only when the ENGLISH source line does NOT itself
+open with a label -- a real "MY LORD:" salutation survives. A reply that is
+ONLY a label strips to empty, and the strip runs inside the structural
+validator so that fails and retries rather than shipping "ANA:" as the row
+(post-QA, same day). The prompt also says it in words now. Covered by
+`tests/test_verbatim_translation.py`.
+
+## PBUG-20260918-05 -- the announcer speaks an English preposition mid-sentence
+
+**Verified by the same published episode.** `b001` reads
+`Esta noche, una escena de The Comedy of Errors, by William Shakespeare,` --
+the Python-owned WORK sentence spoke Spanish while the frame inside it kept
+the English `, by `. An English ordinal (`Act One, Scene Three`) sits in the
+same builder and would have shipped the same way on a lane that passes act
+and scene.
+
+**Cause.** `_otr_line_composer.build_work_frame` hardcoded `, by {author}`,
+`, Act {x}` and `an episode we call "{y}"` while `work_frame_sentence` around
+it had been row-owned since the multilingual work.
+
+**Fix.** The four joiners are row `spoken` keys (`work_by`, `work_act`,
+`work_act_scene`, `work_subtitle`) on all eight rows; a non-English row reads
+the NUMERAL rather than an English ordinal word. English is byte-identical,
+pinned by `tests/test_announcer_work_frame.py`. The work's own TITLE is never
+translated.

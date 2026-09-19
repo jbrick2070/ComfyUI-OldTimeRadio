@@ -27,8 +27,10 @@ three.
 | pt | Hamlet | Luis I of Portugal (1889) | Yes | Gutenberg 25667 | `BERNARDO` caps on own line, prose below | The only clean Portuguese hit. |
 | pt | Midsummer | A. F. de Castilho (1875) | Yes | archive.org `sonhodumanoited00shakgoog` | Verse; Google OCR, confidence 77 | Usable with cleanup. |
 | pt | Macbeth, Tempest | Domingos Ramos / Henrique Braga (death years NOT verified) | Unverified | pt.wikisource author page (Galeria PDFs, 1912/1914) | Scan only | Attribution disagrees across sources. |
-| ja | Romeo | Tsubouchi Shoyo (1935) | Yes | aozora.gr.jp card 42773 (`files/42773_ruby_38390.zip`) | `NAME<full-width space>speech`, same line; old kana / old kanji | Only Aozora Shakespeare published. |
-| ja | Hamlet, Lear, Macbeth, Tempest, Midsummer, Much Ado, As You Like It | Tsubouchi | Yes | aozora person 264 | In progress, not downloadable | Twelfth Night and Comedy of Errors not queued. Gutenberg: none. |
+| ja | Macbeth, Midsummer, Twelfth Night | Tsubouchi Shoyo (1935) | **Yes, both tests** | Wikimedia Commons, NDL scans of 沙翁傑作集 No. 10 (1923), No. 9 (1921), No. 18 (1921) | PAGE SCAN, no text layer | **Operator 2026-09-18, and it beats this file's own row.** The PRE-1931 series clears the US test where the 1933-35 revision does not. Gate-verified HTTP 200 on all three. Needs transcription, not another source. |
+| ja | Tempest | Tsubouchi (1935) | Yes, both tests | 沙翁傑作集 No. 7 (1921), Commons | scan | URL not yet located -- a constructed `NDL979376` guess 404'd, which is why a guessed URL is never a fact. |
+| ja | Romeo | Tsubouchi (1935) | **NO -- US test** | aozora.gr.jp card 42773 | old kana / old kanji | The Aozora text is the 1933-35 新修 revision, first published 1933. DO NOT USE; the pre-1931 series is the approved source. |
+| ja | Hamlet, Lear, Much Ado, As You Like It, Comedy of Errors | Tsubouchi | depends on volume | aozora person 264 (作業中), NDL / Commons for the pre-1931 volumes | scan or not yet transcribed | Check the 沙翁傑作集 volume year per play before using anything. |
 | zh | Hamlet, Tempest, Midsummer | Zhu Shenghao (1944) | Yes | zh.wikisource (traditional; act subpages) | Hamlet: one-character abbreviated speaker + full-width space; Tempest: full-width colon | Inconsistent label style. |
 | zh | the other seven | Zhu | Yes | zh.wikisource collection page | Red links, not transcribed | Gutenberg: none. |
 | hi | As You Like It (1917) | Lala Sitaram (1937) | Yes | archive.org `in.ernet.dli.2015.263809` (`_djvu.txt`) | `NAME--speech` same line; OCR moderate-to-poor; names Indianised | Only PD Hindi hit. Sitaram's Hamlet/Macbeth exist in print, no scan found. |
@@ -37,7 +39,12 @@ three.
 ## Coverage gaps
 
 - Hindi: one play, one poor scan.
-- Japanese: one play, old-kana text (a `misaki[ja]` G2P risk); the rest queued.
+- Japanese: SUPERSEDED 2026-09-18. Three plays (five of the fourteen target
+  scenes) are rights-cleared under BOTH tests and located as NDL scans of the
+  pre-1931 沙翁傑作集; they need transcription, not a different source. The
+  Aozora text everyone reaches for first is the 1933 revision and fails the
+  US test. Old kana remains a `misaki[ja]` G2P question for whatever is
+  transcribed.
 - Mandarin: 3 of 10, traditional characters, two label conventions.
 - Portuguese: Hamlet clean; Midsummer OCR; nothing else in plain text.
 - Spanish: 5 of 10 clean, two with `Name.--` mixed-case labels.

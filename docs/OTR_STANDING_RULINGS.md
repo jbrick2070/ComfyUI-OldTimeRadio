@@ -48,7 +48,9 @@ What that fixes, lane by lane:
   and no model authors them, so "eligible" means TRANSLATION of the verbatim
   passage into the episode language. This is the one place the older "never
   translate an English draft" line does not apply, and it is a separate code
-  row (see GO_FORWARD). Until it lands the two banks keep their exclusion.
+  row (see GO_FORWARD). The exclusions were lifted the same day and a Spanish
+  Shakespeare episode has published; until vendored translations land, a
+  non-English fidelity episode performs the MODEL translation.
 - English and `Off` stay byte-identical on every seam. Captions stay
   `line.text`. `ANNOUNCER` stays the identity key. No caption-language widget.
 
