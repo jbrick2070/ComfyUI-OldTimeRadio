@@ -319,8 +319,9 @@ _AOZORA_SPEAKER = re.compile(
     r'(?is)(<div class="burasage"[^>]*>)\s*'
     r'(?P<who>(?:<img[^>]*>|[^\s　<]){1,10}?)　+')
 
-#: How each publisher marks a speaker. All three converge on small caps; only
-#: the spelling of the markup differs.
+#: How each publisher marks a speaker. Hugo and Marquez converge on small caps;
+#: Rusconi is handled by the per-edition rules below because his italic markup
+#: is also used inside dialogue and stage business.
 _SPEAKER_SPANS = (
     # Wikisource (Hugo): class="sc", the name often rendered lowercase.
     #
@@ -340,47 +341,20 @@ _SPEAKER_SPANS = (
     # Gutenberg (Marquez): an inline small-caps style, name carries its period.
     re.compile(r'(?is)<span\b[^>]*font-variant:\s*(?:all-)?small-caps[^>]*>'
                r'(?P<name>[^<]{1,40})</span>'),
-    # Wikisource (Rusconi): an italic name, with the ordinal as a superscript --
-    # `1<sup>a</sup> <i>Strega</i>` is "1a Strega", three distinct witches.
-    # THE PARENTHETICAL IS PART OF THE LABEL, NOT THE SPEECH. An aside prints
-    # as `<i>Macbeth</i> (<i>fra se</i>).`, and requiring the period to follow
-    # the name directly missed every one of them -- Macbeth's "Thane di Glamis
-    # e di Cawdor!" stayed inside Angus's speech. The qualifier is matched so
-    # the label is found, and dropped because it is stage business.
-    #
-    # THIS PATTERN IS UNANCHORED AND THAT IS A KNOWN DEFECT -- do not "fix" it
-    # with a `<p>` anchor without re-extracting `it/macbeth 1.3` first.
-    # Measured 2026-09-19, both halves:
-    #
-    # THE DEFECT IS REAL. Unanchored, this matches ANY italic phrase followed
-    # by a period, and Rusconi's transcribers italicise plenty that is not a
-    # speaker. King Lear act 1 scene 1: the edition marks 84 speeches, the
-    # pipeline produced 90 across 14 "speakers", the extras being
-    # `(<i>escono Gloc. ed Edm</i>.)` and `(<i>a Cord</i>.)` -- directions --
-    # and in sibling plays `<i>Cucullus non facit monachum</i>.` (Feste's
-    # Latin joke) and `<i>M. O. A. I.</i>` (Malvolio's letter), SPOKEN TEXT
-    # cast as people. A count cannot see it: 142 speeches / 13 speakers reads
-    # as a clean scene.
-    #
-    # AND THE OBVIOUS FIX BREAKS A SHIPPED SCENE. A reviewer measured King
-    # Lear's page and found every label opens a `<p>`; anchoring to that
-    # marked ZERO speakers on Macbeth's page, whose transcriber used a
-    # different structure, and the vendored `it/macbeth 1.3` came back as
-    # unattributed prose (`1a Strega Ove sei tu stata` for
-    # `1A STREGA: Ove sei tu stata`). The edition is one translator but many
-    # transcriptions, and they do not share a skeleton.
-    #
-    # So the rule needs to tolerate both page shapes, or the DIRECTIONS need
-    # stripping first (`_ITALIC_PARENTHETICAL` misses Rusconi's punctuation --
-    # he closes `</i>.)` and `</i>.).`, and sometimes opens `<i>(a Cord</i>.)`
-    # with the parenthesis INSIDE the italic). Whichever is chosen, verify by
-    # re-extracting every vendored Italian scene and diffing against the
-    # stored bytes -- that check is what caught this.
-    re.compile(r'(?is)(?P<ord>\d\s*<sup>\s*[ao]\s*</sup>\s*)?'
-               r'<i>(?P<name>[^<]{1,40})</i>'
-               r'\s*(?:\((?:<[^>]+>|[^()<])*\))?\s*\.'),
 )
 
+
+#: Rusconi's headed transcription: the speaker opens the paragraph, optionally
+#: after MediaWiki's page-number span, and the italic label is followed by a
+#: period.  The paragraph is matched as a unit so the prefix cannot drift over
+#: a neighbouring paragraph while looking for the first italic tag.
+_RUSCONI_PARAGRAPH = re.compile(
+    r'(?is)(?P<open><p\b[^>]*>)(?P<body>.*?)</p\s*>')
+_RUSCONI_HEAD = re.compile(
+    r'(?is)^(?P<prefix>(?:(?!<i\b)[^<()]|<(?!i\b)[^>]*>)*?)'
+    r'(?P<ord>\d\s*<sup>\s*[ao]\s*</sup>\s*)?'
+    r'<i>(?P<name>[^<()]{1,40})</i>'
+    r'(?:\s*\([^()]{0,200}\))?\s*\.')
 
 #: A parenthetical whose CONTENT IS WHOLLY ITALIC. Rusconi and Marquez set
 #: stage business that way -- `(<i>entra Rosse</i>)`, `(<i>escono</i>)` -- and
@@ -550,9 +524,73 @@ def mark_speakers(markup):
 
     body = _ZH_SPEAKER.sub(_mark_zh_speaker, body)
 
+    def _mark_rusconi_paragraph(match):
+        head = _RUSCONI_HEAD.match(match.group("body"))
+        if not head:
+            return match.group(0)
+        name = head.group("name").strip()
+        ordinal = re.sub(r"(?s)<[^>]+>|\s+", "",
+                         head.groupdict().get("ord") or "")
+        full = ("%s %s" % (ordinal, name)).strip()
+        return (match.group("open") + "\n" + SPEAKER_MARK + full
+                + SPEAKER_MARK + " " + match.group("body")[head.end():]
+                + "</p>")
+
+    # ONE EDITION, ONE RULE -- AND THE RULE KEYS ON THE DOCUMENT, NOT ON A LIST
+    # OF CELLS. Two earlier cuts of this were both half right.
+    #
+    # The first kept the old unanchored italic pattern for `it/macbeth 1.3` and
+    # `it/tempest 1.2` and applied the anchored one only to the held cells, on
+    # the reasoning that those two pages are "differently transcribed" and their
+    # vendored counts are a contract. MEASURED, AND THAT IS NOT TRUE: the
+    # anchored rule reads both of those pages and reads them BETTER -- macbeth
+    # 1.3 goes from 21 claimed speakers to 16, tempest 1.2 from 23 to 12, losing
+    # `JOHNSON` (a footnote author), `LE ISOLE DIABOLICHE` (a footnote title)
+    # and quoted lines cast as people. What a per-cell flag preserved was the
+    # DEFECT, because the baseline it protected was itself polluted, and a
+    # blast-radius check is for catching regressions rather than freezing a bug.
+    #
+    # The second cut -- dropping the flag and running every pattern everywhere
+    # -- broke it the other way, and this is the part worth keeping. ON A
+    # RUSCONI PAGE THE SMALL-CAPS SPANS ARE STAGE BUSINESS, NOT SPEAKERS:
+    #
+    #   <p><i>Entrano</i> <span style="font-variant:small-caps">Pietra-del-Paragone</span>
+    #      <i>e</i> <span style="font-variant:small-caps">Andrey; Giacomo</span> ...
+    #
+    # so the Marquez small-caps pattern claimed every name in every ENTRANCE.
+    # That is not cosmetic: the claimed direction swallowed the real speech
+    # behind it, and `Ros. Dall'India all'Oriente...` arrived inside a
+    # `ROSALINDA` label built out of `(leggendo un foglio)`.
+    #
+    # THE FACT THAT DECIDES IT IS A PROPERTY OF THE PAGE. An edition that heads
+    # its paragraphs with an abbreviated italic label does not ALSO mark
+    # speakers in small caps -- it marks its cast lists and entrances that way.
+    # So ask the document: if the headed rule claimed speakers here, the
+    # small-caps spans on this page are business and the generic patterns are
+    # skipped. A page that yields no headed labels is a Hugo or Marquez page and
+    # takes the generic patterns exactly as before. This keys on what the markup
+    # IS rather than on which cell asked for it, so a new Rusconi cell needs no
+    # entry anywhere.
+    # ASK WHICH MECHANISM THE PAGE ACTUALLY USES, by running both and counting.
+    # A first cut asked only "did the headed rule claim ANYTHING", and that is a
+    # hair trigger: one incidental `<i>word</i>.` at a paragraph head on a Hugo
+    # page disabled the `sc` rule and took the French Twelfth Night from 87
+    # speeches to nothing. Measured over the vendored corpus, the two mechanisms
+    # are not close on any real page -- the headed rule claims 50 to 120 labels
+    # on a Rusconi page and one or two anywhere else, and the small-caps rules
+    # claim a whole cast on Hugo and Marquez and only the entrance names on
+    # Rusconi. So the larger count is the page's real mechanism, and comparing
+    # needs no threshold and no list of cells.
+    before = body.count(SPEAKER_MARK)
+    headed = _RUSCONI_PARAGRAPH.sub(_mark_rusconi_paragraph, body)
+    headed_labels = (headed.count(SPEAKER_MARK) - before) // 2
+
+    generic = body
     for pattern in _SPEAKER_SPANS:
-        body = pattern.sub(_mark, body)
-    return body
+        generic = pattern.sub(_mark, generic)
+    generic_labels = (generic.count(SPEAKER_MARK) - before) // 2
+
+    return headed if headed_labels > generic_labels else generic
 
 
 def _fold(text):

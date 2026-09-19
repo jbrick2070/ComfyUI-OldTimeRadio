@@ -99,7 +99,8 @@
       "url": "https://es.wikisource.org/wiki/Macbeth_(Men%C3%A9ndez_y_Pelayo_tr.)/Acto_I",
       "form": "prose",
       "url_is": "act_page",
-      "url_found_by": "url hunt 2026-09-19; first line on page: ¿Qué has hecho, hermana?"
+      "url_found_by": "url hunt 2026-09-19; first line on page: ¿Qué has hecho, hermana?",
+      "hold": "HALF-ATTRIBUTED, held 2026-09-19, and it reached the manifest BY ACCIDENT. The row had always read THIN (3 speeches) and was skipped for it. The Rusconi document-shape change lifted it over the threshold to 29 speeches -- and those 29 are only MACBETH (13), BANQUO (12), ROSS (2) and ANGUSS (2). THE WITCHES ARE NOT ATTRIBUTED AT ALL, and they carry most of the scene. The cause is a THIRD page layout: this edition prints the speaker on its OWN LINE above the speech -- `BRUJA 1.ª` then the line -- where the Marquez rule expects an inline small-caps span. So the named parts are found by the generic rule and the witches are left as loose prose. `ANGUSS` is also wrong, doubled from the source or the split. THE LESSON IS THE ACCIDENT, not the layout: a threshold crossed by an unrelated change is not a qualification, and nothing would have caught this except reading the speaker list of a scene nobody had asked about. Needs a name-on-its-own-line rule for this edition, then a re-read of the witches before it ships."
     },
     {
       "iso": "es",
@@ -574,8 +575,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Orl. Restate qui appesi,",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Orl. Restate qui appesi,"
     },
     {
       "iso": "it",
@@ -591,7 +591,7 @@
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
       "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ant. Buon Angelo, bisogna",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "hold": "NO ENGLISH SIDECAR, held 2026-09-19. The Rusconi rule reads this scene cleanly -- 32 speeches across 8 real speakers (ANT. DI E, ANT, BALD, LUCIA, DROM, ADR, ANG, DROM. DI S), no directions and no footnotes among them -- so the EXTRACTOR is not what stops it. There is no `sources/comedy_of_errors__act3_scene1.txt`, so there is no roster to bind the labels to and the binding test cannot pass. Note the two twin pairs: `ANT. DI E` is Antipholus of Ephesus against a bare `ANT`, and `DROM. DI S` is Dromio of Syracuse against a bare `DROM` -- when the sidecar lands, those four must bind to four DIFFERENT characters or the play's whole joke lands in the wrong mouths."
     },
     {
       "iso": "it",
@@ -606,8 +606,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ber. Chi è là?",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ber. Chi è là?"
     },
     {
       "iso": "it",
@@ -622,8 +621,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Kent. Avrei sempre",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Kent. Avrei sempre"
     },
     {
       "iso": "it",
@@ -682,7 +680,7 @@
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
       "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Bot. Ci siam tutti?",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "hold": "CANNOT BIND, held 2026-09-19 -- an EDITION DIFFERENCE, like its Chinese sibling. The scene extracts cleanly at 66 speeches across 10 real speakers. Three of them have nowhere to go in the Folger sidecar: `SNUG` speaks twice here and never speaks in the English scene, where he appears only in the entry and exit directions; and `PIR` and `TIS` are PYRAMUS and THISBE -- the parts Bottom and Flute play inside the play, which Rusconi labels by the ROLE while Folger labels by the actor. `FAT` (Fata, a fairy) also has no single sidecar counterpart, the English scene naming its fairies individually. Do not resolve any of these by binding to the nearest name: a role label bound to its actor merges two speakers, and Snug bound to anyone puts his lines in another mouth. Needs the same operator ruling as zh/midsummer 3.1 about a translation's extra or differently-labelled speaker. The sibling 3.2 binds completely and is vendored."
     },
     {
       "iso": "it",
@@ -697,8 +695,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Ob. Desidero sapere",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Ob. Desidero sapere"
     },
     {
       "iso": "it",
@@ -713,8 +710,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA III.; first line: Ben. Ragazzo...",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA III.; first line: Ben. Ragazzo..."
     },
     {
       "iso": "it",
@@ -729,8 +725,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ero. Buona Margherita,",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ero. Buona Margherita,"
     },
     {
       "iso": "it",
@@ -745,8 +740,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Rom. L’Amore irride",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Rom. L’Amore irride"
     },
     {
       "iso": "it",
@@ -810,8 +804,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA V.; first line: Mar. Su, dimmi dove",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA V.; first line: Mar. Su, dimmi dove"
     },
     {
       "iso": "it",
@@ -826,8 +819,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA VI.; first line: Tob. Va per la tua via,; The requested standard Act 2 Scene 5 is printed as SCENA VI; this act skips SCENA IV.",
-      "hold": "THIN/POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT -- found and verified by the url hunt, first line read off the page -- and extraction returns healthy-looking counts. The LABELS are not: Rusconi's abbreviated speaker marks (Orl., Ber., Ob.) are claimed correctly, but the same name-shape rules also claim stage directions and in-dialogue text. Measured on the written files before they were reverted: 'ESCONO GLOC. ED EDM' and 'ESCE CON LIS' (directions), 'CUCULLUS NON FACIT MONACHUM' and 'M. O. A. I' (Feste's Latin joke and Malvolio's letter -- spoken text), 'LE ISOLE DIABOLICHE', 'CON UN FOGLIO'. A speech/speaker COUNT cannot see this: 142 speeches / 13 speakers looked healthy. Needs a per-edition speaker rule for Rusconi (the abbreviation is followed by a period and the label sits at the head of the paragraph), not the generic name shapes."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA VI.; first line: Tob. Va per la tua via,; The requested standard Act 2 Scene 5 is printed as SCENA VI; this act skips SCENA IV."
     },
     {
       "iso": "ja",

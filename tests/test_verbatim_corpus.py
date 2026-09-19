@@ -833,6 +833,37 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_rusconi_headed_markup_claims_speakers_not_italic_prose():
+    """The Rusconi rule reads real paragraph-head labels off fetched markup.
+
+    The fixture is copied from the Italian Wikisource pages named by the held
+    leads.  The same page uses italics for entrances and for words spoken by a
+    character, so a loose ``<i>... </i>.`` match must not cast those strings.
+    """
+    import importlib.util
+    # Load the vendor module independently; the fixture path is only the data
+    # source, not an importable Python file.
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_rusconi_vendor",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           "fixtures", "rusconi_speaker_markup.html"),
+              encoding="utf-8") as handle:
+        markup = handle.read()
+
+    out = vendor.to_text(markup)
+    text = vendor.canonicalise_labels(vendor.normalise_labels(out))
+    labels = [line.split(":", 1)[0]
+              for line in text.splitlines() if ":" in line]
+    assert labels == ["ORL", "BER", "VIL", "MAL"], labels
+    for wrong in ("ESCONO GLOC. ED EDM", "CUCULLUS NON FACIT MONACHUM",
+                  "M. O. A. I", "CON UN FOGLIO"):
+        assert wrong not in labels
+
+
 def test_personnage_is_read_as_a_speaker_class_like_sc():
     """The same fact in a different spelling, and missing it cost a whole play.
 

@@ -671,13 +671,13 @@
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://fr.wikisource.org/wiki/Le_soir_des_rois_ou_ce_que_vous_voudrez_(trad._Hugo)",
-      "revision_id": "sha256:985618fa4df0befb",
-      "raw_sha256": "985618fa4df0befbe35aa6ee53c6201a38264ef1d37b4b5e6cf99159b7ffc8a2",
+      "revision_id": "sha256:ae3a8fe45973cef7",
+      "raw_sha256": "ae3a8fe45973cef7b40443eb47d2912b470847e85af276d52ebd3580eab91191",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCÈNE X.",
-      "speaker_labels": 87,
-      "distinct_speakers": 8,
+      "speaker_labels": 84,
+      "distinct_speakers": 5,
       "speaker_map": {
         "FABIEN": {
           "spoken": "FABIEN",
@@ -698,6 +698,146 @@
         "SIR TOBIE": {
           "spoken": "SIR TOBIE",
           "roster": "TOBY"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "as_you_like_it",
+      "scene": "3.2",
+      "file": "it/as_you_like_it_3_2.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Come_vi_piace/Atto_terzo",
+      "revision_id": "sha256:9cd6b4852b699556",
+      "raw_sha256": "9cd6b4852b69955632ef27054b7529d6e42227b758fe2b35716dd3c60fea8321",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA II",
+      "speaker_labels": 109,
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "ORL": {
+          "spoken": "ORLANDO",
+          "roster": "ORLANDO"
+        },
+        "ROS": {
+          "spoken": "ROSALIND",
+          "roster": "ROSALIND"
+        },
+        "CEL": {
+          "spoken": "CELIA",
+          "roster": "CELIA"
+        },
+        "GIAC": {
+          "spoken": "JAQUES",
+          "roster": "JAQUES"
+        },
+        "COR": {
+          "spoken": "CORIN",
+          "roster": "CORIN"
+        },
+        "PIET": {
+          "spoken": "TOUCHSTONE",
+          "roster": "TOUCHSTONE"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "hamlet",
+      "scene": "1.1",
+      "file": "it/hamlet_1_1.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Amleto/Atto_primo",
+      "revision_id": "sha256:dd0867034fc1430e",
+      "raw_sha256": "dd0867034fc1430ee9ce865467fb677662eb7ccb97908935f482452c2341ee11",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 60,
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "BER": {
+          "spoken": "BARNARDO",
+          "roster": "BARNARDO"
+        },
+        "FRANC": {
+          "spoken": "FRANCISCO",
+          "roster": "FRANCISCO"
+        },
+        "MAR": {
+          "spoken": "MARCELLUS",
+          "roster": "MARCELLUS"
+        },
+        "OR": {
+          "spoken": "HORATIO",
+          "roster": "HORATIO"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "king_lear",
+      "scene": "1.1",
+      "file": "it/king_lear_1_1.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Il_Re_Lear/Atto_primo",
+      "revision_id": "sha256:df85d0e5b2182696",
+      "raw_sha256": "df85d0e5b218269689ac9e6e63f26a502ea493623e64b50b26d15015520d5c24",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 84,
+      "distinct_speakers": 10,
+      "speaker_map": {
+        "LEAR": {
+          "spoken": "LEAR",
+          "roster": "LEAR"
+        },
+        "KENT": {
+          "spoken": "KENT",
+          "roster": "KENT"
+        },
+        "CORD": {
+          "spoken": "CORDELIA",
+          "roster": "CORDELIA"
+        },
+        "GLOC": {
+          "spoken": "GLOUCESTER",
+          "roster": "GLOUCESTER"
+        },
+        "GON": {
+          "spoken": "GONERIL",
+          "roster": "GONERIL"
+        },
+        "REG": {
+          "spoken": "REGAN",
+          "roster": "REGAN"
+        },
+        "BORG": {
+          "spoken": "BURGUNDY",
+          "roster": "BURGUNDY"
+        },
+        "FRANC": {
+          "spoken": "FRANCE",
+          "roster": "FRANCE"
+        },
+        "EDM": {
+          "spoken": "EDMUND",
+          "roster": "EDMUND"
+        },
+        "ALB. E CORN": {
+          "spoken": "BOTH",
+          "roster": "BOTH"
         }
       }
     },
@@ -750,6 +890,246 @@
         "ANGUS": {
           "spoken": "ANGUS",
           "roster": "ANGUS"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "midsummer",
+      "scene": "3.2",
+      "file": "it/midsummer_3_2.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo",
+      "revision_id": "sha256:e1faabd6a0ecdb7b",
+      "raw_sha256": "e1faabd6a0ecdb7b85929477f13feb7023ee68a890560197969b6d0f9b886855",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA II",
+      "speaker_labels": 111,
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "ER": {
+          "spoken": "HERMIA",
+          "roster": "HERMIA"
+        },
+        "LIS": {
+          "spoken": "LYSANDER",
+          "roster": "LYSANDER"
+        },
+        "DEM": {
+          "spoken": "DEMETRIUS",
+          "roster": "DEMETRIUS"
+        },
+        "EL": {
+          "spoken": "HELENA",
+          "roster": "HELENA"
+        },
+        "OB": {
+          "spoken": "OBERON",
+          "roster": "OBERON"
+        },
+        "PUCK": {
+          "spoken": "ROBIN",
+          "roster": "ROBIN"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "much_ado",
+      "scene": "2.3",
+      "file": "it/much_ado_2_3.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Molto_strepito_per_nulla/Atto_secondo",
+      "revision_id": "sha256:ff5107ac3f017ab0",
+      "raw_sha256": "ff5107ac3f017ab0713281892ed8f0128c52f636bcb03d03d25a20ad28b185e3",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA III",
+      "speaker_labels": 73,
+      "distinct_speakers": 7,
+      "speaker_map": {
+        "D. PEDRO": {
+          "spoken": "PRINCE",
+          "roster": "PRINCE"
+        },
+        "CLAUD": {
+          "spoken": "CLAUDIO",
+          "roster": "CLAUDIO"
+        },
+        "LEON": {
+          "spoken": "LEONATO",
+          "roster": "LEONATO"
+        },
+        "BEN": {
+          "spoken": "BENEDICK",
+          "roster": "BENEDICK"
+        },
+        "BALD": {
+          "spoken": "BALTHASAR",
+          "roster": "BALTHASAR"
+        },
+        "BEAT": {
+          "spoken": "BEATRICE",
+          "roster": "BEATRICE"
+        },
+        "RAG": {
+          "spoken": "BOY",
+          "roster": "BOY"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "much_ado",
+      "scene": "3.1",
+      "file": "it/much_ado_3_1.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Molto_strepito_per_nulla/Atto_terzo",
+      "revision_id": "sha256:37b30e0d6cf87486",
+      "raw_sha256": "37b30e0d6cf874864f9b1cd183d0d9d15f029c5d817dd854772ff5ebffd40c06",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 24,
+      "distinct_speakers": 4,
+      "speaker_map": {
+        "ERO": {
+          "spoken": "HERO",
+          "roster": "HERO"
+        },
+        "ORS": {
+          "spoken": "URSULA",
+          "roster": "URSULA"
+        },
+        "MAR": {
+          "spoken": "MARGARET",
+          "roster": "MARGARET"
+        },
+        "BEAT": {
+          "spoken": "BEATRICE",
+          "roster": "BEATRICE"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "romeo_juliet",
+      "scene": "2.2",
+      "file": "it/romeo_juliet_2_2.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/Giulietta_e_Romeo/Atto_secondo",
+      "revision_id": "sha256:11580f621382f0ae",
+      "raw_sha256": "11580f621382f0ae5f057f4c774fa4ce1d8e71ae9b9865ac9462e500fc066284",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA II",
+      "speaker_labels": 51,
+      "distinct_speakers": 2,
+      "speaker_map": {
+        "ROM": {
+          "spoken": "ROMEO",
+          "roster": "ROMEO"
+        },
+        "GIUL": {
+          "spoken": "JULIET",
+          "roster": "JULIET"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "twelfth_night",
+      "scene": "1.5",
+      "file": "it/twelfth_night_1_5.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_primo",
+      "revision_id": "sha256:1a1fbf16b44fc3d2",
+      "raw_sha256": "1a1fbf16b44fc3d2495538ea57d937ca9cac3cb2f9787ce664758dac6d324d3d",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA V",
+      "speaker_labels": 116,
+      "distinct_speakers": 6,
+      "speaker_map": {
+        "OL": {
+          "spoken": "OLIVIA",
+          "roster": "OLIVIA"
+        },
+        "VIOL": {
+          "spoken": "VIOLA",
+          "roster": "VIOLA"
+        },
+        "MAR": {
+          "spoken": "MARIA",
+          "roster": "MARIA"
+        },
+        "MAL": {
+          "spoken": "MALVOLIO",
+          "roster": "MALVOLIO"
+        },
+        "TOB": {
+          "spoken": "TOBY",
+          "roster": "TOBY"
+        },
+        "VIL": {
+          "spoken": "FOOL",
+          "roster": "FOOL"
+        }
+      }
+    },
+    {
+      "iso": "it",
+      "play": "twelfth_night",
+      "scene": "2.5",
+      "file": "it/twelfth_night_2_5.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_secondo",
+      "revision_id": "sha256:a9bc75c6c25ebed5",
+      "raw_sha256": "a9bc75c6c25ebed53799db4862917bbd98af5dda49eed56558e4bda03db9aabf",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA VI",
+      "speaker_labels": 84,
+      "distinct_speakers": 5,
+      "speaker_map": {
+        "TOB": {
+          "spoken": "TOBY",
+          "roster": "TOBY"
+        },
+        "MAL": {
+          "spoken": "MALVOLIO",
+          "roster": "MALVOLIO"
+        },
+        "FAB": {
+          "spoken": "FABIAN",
+          "roster": "FABIAN"
+        },
+        "AND": {
+          "spoken": "ANDREW",
+          "roster": "ANDREW"
+        },
+        "MAR": {
+          "spoken": "MARIA",
+          "roster": "MARIA"
         }
       }
     },
