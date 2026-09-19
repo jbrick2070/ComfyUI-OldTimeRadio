@@ -27,6 +27,7 @@ counting headings down the page.
 from __future__ import annotations
 
 import argparse
+import collections
 import hashlib
 import html
 import io
@@ -541,7 +542,7 @@ def main():
         # speakers became publisher MARKS the raw body scores almost nothing,
         # and King Lear read as 27 speeches where the stored file has 87. Count
         # the normalised text, which is the text that will be written.
-        labels, speakers = (CORPUS.speaker_label_stats(normalise_labels(body))
+        labels, speakers = (CORPUS.speaker_label_stats(canonicalise_labels(normalise_labels(body)))
                             if body else (0, 0))
         if not body:
             print("  NO    %-3s %-16s %-5s  %s" % (key + (reason,)))
@@ -636,7 +637,77 @@ def _marked_name(line):
     if not match:
         return ""
     name = match.group("name").strip().rstrip(".:　").strip()
-    return name.upper() if name else ""
+    if not name:
+        return ""
+    # A MARKED SPAN IS A FACT ABOUT THE MARKUP, NOT A PROMISE ABOUT ITS USE.
+    # The rule above is right that a marked name outranks every heuristic, and
+    # it assumed a publisher marks only speakers. Hugo's `Le soir des rois`
+    # transcriber marks the LETTER Malvolio reads aloud in the same class, so
+    # `Je puis commander ou j'adore` and `Nul homme ne le doit savoir` arrived
+    # as characters, each with one line, each about to be cast and voiced.
+    #
+    # This is not the recurrence guess coming back: it vetoes nothing on how
+    # OFTEN a name appears, only on whether the string is shaped like a name at
+    # all. A sentence is not a name in any of these editions. The real
+    # multi-word labels in the corpus are comfortably inside these bounds --
+    # `PREMIERE SORCIERE`, `CHOEUR DES FEES`, `GRAIN DE MOUTARDE`,
+    # `ANTIPHOLUS D'EPHESE`, `PIERRE DE TOUCHE`, `TOUTES TROIS`.
+    # PUNCTUATION ONLY, and the first attempt at this taught the lesson. A
+    # length-and-word-count guard (28 characters, 4 words) killed the song lines
+    # AND `TUTTE LE STREGHE CANTANDO E DANZANDO` -- a real collective label in
+    # Rusconi's Macbeth, six words and thirty-six characters, which two existing
+    # tests guard because a collective must never be gendered or performed.
+    # A collective and a quoted sentence are the same SHAPE, so shape cannot
+    # separate them; sentence punctuation can, and it is the only signal here
+    # that does not cost a legitimate label.
+    if len(name) < 2:
+        return ""
+    if any(ch in name for ch in ",…;:!?"):
+        return ""
+    return name.upper()
+
+
+def _fold_accents(name):
+    """A key that ignores accents, for deciding whether two labels are one
+    character. Never shown to anyone -- the display spelling stays as printed."""
+    stripped = unicodedata.normalize("NFKD", name)
+    return "".join(c for c in stripped if not unicodedata.combining(c)).upper()
+
+
+def canonicalise_labels(body):
+    """Fold labels that differ ONLY by accent into their commonest spelling.
+
+    A transcriber is not consistent about diacritics across a long page, and
+    each spelling arrived as a separate character: `HERO`, `HERO` with a grave
+    and `HERO` with an acute are one woman in `much_ado` 3.1, and
+    `ANTIPHOLUS D'EPHESE` has two accent spellings in `comedy_of_errors` 3.1.
+    Cast three times over, she would be voiced three different ways.
+
+    ONLY ACCENTS ARE FOLDED, which is the whole safety of it. `ANTIPHOLUS` and
+    `ANTIPHOLUS D'EPHESE` fold to different keys and stay two characters --
+    correct, because the twins are two people and a bare label is genuinely
+    ambiguous. A letter substitution is likewise left alone: `AMIPHOLUS` is an
+    OCR fault, not an accent, and merging by edit distance would be guessing.
+
+    The spelling kept is the one the page uses MOST, so the printed cast list
+    reads the way the edition mostly prints it.
+    """
+    lines = body.splitlines()
+    counts = {}
+    for line in lines:
+        name = _name_of(line)
+        if name:
+            counts.setdefault(_fold_accents(name), collections.Counter())[name] += 1
+    canon = {key: tally.most_common(1)[0][0] for key, tally in counts.items()}
+    out = []
+    for line in lines:
+        name = _name_of(line)
+        want = canon.get(_fold_accents(name)) if name else None
+        if want and want != name and line.upper().startswith(name):
+            out.append(want + line[len(name):])
+        else:
+            out.append(line)
+    return "\n".join(out)
 
 
 def _name_of(line):
@@ -719,7 +790,7 @@ def write_rows(rows):
 
     for lead, key, body, labels, speakers in rows:
         iso, play, scene = key
-        text = normalise_labels(body)
+        text = canonicalise_labels(normalise_labels(body))
         after, after_speakers = CORPUS.speaker_label_stats(text)
         rel = os.path.join(iso, "%s_%s.txt" % (play, scene.replace(".", "_")))
         dest = os.path.join(OUT_ROOT, rel)
