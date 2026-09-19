@@ -129,6 +129,93 @@ def _retry_after_seconds(headers: Any) -> float | None:
     return min(value, 300.0)
 
 
+# HTTP 429 IS A RATE LIMIT BEFORE IT IS A BILLING FAULT (measured 2026-09-19 on
+# the third live leg of google_veo_low_1act): four Veo clips submitted through
+# the 4-wide cloud fan-out, two came back 429 "You exceeded your current
+# quota" while the other two rendered seconds apart. That is consistent with
+# a per-minute cap (it is also consistent with the last of a daily allowance
+# running out mid-wave -- the evidence licenses a BOUNDED recovery attempt,
+# not a promise that the cap clears). The classifier files 429 under
+# GoogleAPIBillingOrQuotaError and every poster re-raised it at once, so a
+# rate limit killed the whole shot with "no fallback". Google reports
+# per-minute and per-day exhaustion with the same 429, so the shape is a
+# bounded backoff that honours Retry-After: a per-minute cap MAY clear
+# inside it, a real quota wall still surfaces as the same error after the
+# retries are spent.
+DEFAULT_QUOTA_RETRIES = 4
+_QUOTA_BACKOFF_BASE_S = 5.0
+_QUOTA_BACKOFF_CAP_S = 60.0
+
+
+def _quota_retries() -> int:
+    raw = str(otr_env.get("OTR_GOOGLE_QUOTA_RETRIES") or "").strip()
+    try:
+        return max(0, int(raw)) if raw else DEFAULT_QUOTA_RETRIES
+    except ValueError:
+        return DEFAULT_QUOTA_RETRIES
+
+
+def _processing_interrupted() -> bool:
+    """ComfyUI's Cancel, when running inside the server; False elsewhere."""
+    try:
+        from comfy import model_management
+        return bool(model_management.processing_interrupted())
+    except Exception:  # noqa: BLE001 -- probes and tests run without ComfyUI
+        return False
+
+
+def _interruptible_sleep(seconds: float) -> bool:
+    """Sleep in one-second slices, stopping early on Cancel. Returns True
+    when the full wait elapsed, False when Cancel cut it short."""
+    remaining = float(seconds)
+    while remaining > 0:
+        if _processing_interrupted():
+            return False
+        slice_s = min(1.0, remaining)
+        time.sleep(slice_s)
+        remaining -= slice_s
+    return not _processing_interrupted()
+
+
+def new_quota_budget() -> dict:
+    """One 429 budget for one logical request. `create_interaction` shares a
+    single budget across its own transport-retry loop so the waits cannot
+    multiply (codex: a fresh budget per outer attempt allowed 12 waits)."""
+    return {"used": 0}
+
+
+def _quota_retry(call, *, label: str, budget: dict | None = None):
+    """Run ``call()``; on an HTTP 429 sleep (Retry-After, else 5s doubling,
+    capped at 60s) and try again while the budget lasts
+    (OTR_GOOGLE_QUOTA_RETRIES waits, default 4). Any other error, including
+    401/403, passes straight through. A Cancel during a wait, or before a
+    retry, re-raises the pending 429 without sending another request."""
+    import logging
+    log = logging.getLogger("OTR.google_api")
+    retries = _quota_retries()
+    if budget is None:
+        budget = new_quota_budget()
+    while True:
+        try:
+            return call()
+        except GoogleAPIBillingOrQuotaError as exc:
+            if getattr(exc, "http_status", None) != 429 or budget["used"] >= retries:
+                raise
+            if _processing_interrupted():
+                raise
+            wait = getattr(exc, "retry_after_s", None) or min(
+                _QUOTA_BACKOFF_BASE_S * (2 ** budget["used"]), _QUOTA_BACKOFF_CAP_S)
+            wait = min(float(wait), _QUOTA_BACKOFF_CAP_S)
+            budget["used"] += 1
+            log.warning(
+                "[OTR.google_api] %s: HTTP 429 rate limit; waiting %.0fs then "
+                "retry %d/%d", label, wait, budget["used"], retries)
+            if not _interruptible_sleep(wait):
+                log.warning("[OTR.google_api] %s: cancelled during the 429 wait; "
+                            "no further request sent", label)
+                raise
+
+
 def _attach_evidence(exc: GoogleAPIError, *, status: int | None,
                      response_json: Any = None, raw_body: str | None = None,
                      headers: Any = None) -> GoogleAPIError:
@@ -333,12 +420,14 @@ def get_json(
     key = _api_key or resolve_api_key()
     timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     getter = _get or _get_bytes
-    body = getter(
-        path_or_url,
-        api_key=key,
-        timeout_s=timeout,
-        accept="application/json",
-    )
+    body = _quota_retry(
+        lambda: getter(
+            path_or_url,
+            api_key=key,
+            timeout_s=timeout,
+            accept="application/json",
+        ),
+        label=f"GET {path_or_url}")
     parsed = _safe_json(body)
     if not isinstance(parsed, dict):
         raise GoogleAPIRequestShapeError(
@@ -361,7 +450,9 @@ def post_json(
     key = _api_key or resolve_api_key()
     timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     post = _post or _post_json
-    parsed = post(path, payload, api_key=key, timeout_s=timeout)
+    parsed = _quota_retry(
+        lambda: post(path, payload, api_key=key, timeout_s=timeout),
+        label=f"POST {path}")
     if not isinstance(parsed, dict):
         raise GoogleAPIRequestShapeError(
             "Google API JSON POST did not return a JSON object."
@@ -380,12 +471,16 @@ def download_media(
     key = _api_key or resolve_api_key()
     timeout = int(timeout_s or otr_env.get("OTR_GOOGLE_TIMEOUT_S") or DEFAULT_TIMEOUT_S)
     getter = _get or _get_bytes
-    data = getter(
-        path_or_url,
-        api_key=key,
-        timeout_s=timeout,
-        accept="video/mp4,application/octet-stream",
-    )
+    # The clip download runs inside the same fan-out that 429s (Sonnet):
+    # it gets the same bounded backoff as the submit and the poll.
+    data = _quota_retry(
+        lambda: getter(
+            path_or_url,
+            api_key=key,
+            timeout_s=timeout,
+            accept="video/mp4,application/octet-stream",
+        ),
+        label=f"DOWNLOAD {path_or_url}")
     if not data:
         raise GoogleAPIRequestShapeError("Google API media download was empty.")
     return data
@@ -414,14 +509,18 @@ def create_interaction(
     ))
     post = _post or _post_json
     last_exc: Exception | None = None
+    quota_budget = new_quota_budget()   # ONE 429 budget for the whole call
     for attempt in range(max(0, retries) + 1):
         try:
-            return post(
-                "/v1beta/interactions",
-                payload,
-                api_key=key,
-                timeout_s=timeout,
-            )
+            return _quota_retry(
+                lambda: post(
+                    "/v1beta/interactions",
+                    payload,
+                    api_key=key,
+                    timeout_s=timeout,
+                ),
+                label=f"interactions {payload.get('model')}",
+                budget=quota_budget)
         except GoogleAPIBillingOrQuotaError:
             raise
         except GoogleAPIModelUnavailableError:
