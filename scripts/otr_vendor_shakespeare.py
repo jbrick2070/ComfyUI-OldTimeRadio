@@ -399,6 +399,27 @@ def main():
 #: rule: `NAME:` at line start, the spec's own advice. The editions use
 #: `Orlando.\n—`, `kent.`, `1a Strega.`, `波　` -- normalised on the way in
 #: rather than taught to the parser.
+#: Punctuation that proves a candidate "name" is really a SENTENCE. A speaker
+#: label does not contain a comma or a full stop; a line of dialogue does.
+#:
+#: THE ASCII HALF OF THIS LIST WAS THE WHOLE LIST, AND IT PUT BOTTOM'S SPEECH IN
+#: SNOUT'S MOUTH. `_LABEL_SHAPES[0]` accepts the FULLWIDTH colon as a separator,
+#: so on Zhu Shenghao's Chinese Midsummer it matched everything up to one --
+#: `波　列位，你们得好好想一想` -- and offered that whole clause as a name. The
+#: fullwidth comma inside it is the tell, and `,;--!?` could not see it, because
+#: U+FF0C is not U+002C. The name then occurred once, the recurrence rule
+#: demoted the line to continuation, and Bottom's entire speech was performed by
+#: Snout:
+#:     司: 咱担保她们一定会吓怕。 波　列位，你们得好好想一想：...
+#: Rejecting the clause lets `_LABEL_SHAPES[3]` have the line, which reads the
+#: ideographic space correctly and returns `波` -- the right speaker.
+#:
+#: The two length guards above cannot cover this and are near-useless on CJK:
+#: `split()` finds no spaces in Chinese, so the word count is always 1, and 24
+#: characters is a long sentence in a language that does not space its words.
+#: Punctuation is the signal that survives the script change.
+_NOT_IN_A_NAME = ",;—–!?，、；！？。…"
+
 _LABEL_SHAPES = (
     re.compile(r"^(?P<name>[^\n:：]{1,40})[:：][ \t\u3000]?"),
     re.compile(r"^(?P<name>[A-Za-z\u00c0-\u024f0-9][^\n.]{0,38})\.\s*$"),
@@ -466,7 +487,7 @@ def _name_of(line):
             continue
         if len(name) > 24 or len(name.split()) > 4:
             continue
-        if any(ch in name for ch in ",;—–!?"):
+        if any(ch in name for ch in _NOT_IN_A_NAME):
             continue
         return name.upper()
     return ""

@@ -787,6 +787,40 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_a_chinese_clause_is_not_mistaken_for_a_speaker_name():
+    """A WRONG MOUTH, measured on Zhu Shenghao's Midsummer: Bottom's whole
+    speech was performed by Snout.
+
+        司: 咱担保她们一定会吓怕。 波　列位，你们得好好想一想：...
+
+    `_LABEL_SHAPES[0]` accepts the FULLWIDTH colon as a name separator, so it
+    matched everything up to one and offered `波　列位，你们得好好想一想` as a
+    speaker. The guard that exists to catch exactly this -- punctuation proving
+    the candidate is a sentence -- listed only `,;--!?`, and U+FF0C is not
+    U+002C. The bogus name then occurred once, so the recurrence rule demoted
+    the line to continuation and merged it into the previous speaker.
+
+    Rejecting the clause lets shape[3] have the line, which reads the
+    ideographic space and returns the real speaker. Note neither length guard
+    can help here: Chinese does not space its words, so `split()` always counts
+    one.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_cjk",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    line = "波　列位，你们得好好想一想：这事情可不得了"
+    assert vendor._name_of(line) == "波", "a whole clause read as a speaker"
+
+    # the ASCII half still works, and a real Latin label is untouched
+    assert vendor._name_of("MACBETH: Thane di Glamis") == "MACBETH"
+    assert vendor._name_of("Hold, hold, my heart; this is not a name") == ""
+
+
 def test_the_translators_own_parenthetical_dialogue_survives():
     """The other half, and the reason a blanket strip was refused: Horatio's
     "(car cette partie du monde connu l'estimait pour tel)" is Hugo's French
