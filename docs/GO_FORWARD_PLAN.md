@@ -238,7 +238,7 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-**38 scenes are vendored: it 13, fr 12, es 6, zh 5, ja 1, pt 1** (read from the
+**39 scenes are vendored: it 13, fr 12, es 6, zh 5, ja 2, pt 1** (read from the
 manifest 2026-09-19 evening -- this row said 30 an hour earlier, 16 before that
 and 4 before that, so read it rather than quote it). All 95 leads are hunted.
 Adding a scene is mechanical: read the edition's own act/scene label into
@@ -284,9 +284,7 @@ shared-code change, the whole set costs three minutes.
   runs as one block and any label returns three Folger scenes with a perfect
   cast list. Deliberately has no `EDITION_LABELS` entry; the reason sits where
   the entry would go.
-* **1 Japanese Romeo 1.1 needs an English sidecar written.** It extracts at 95
-  speeches across 12 real characters and there is no
-  `sources/romeo_juliet__act1_scene1.txt` to bind to. No extractor work.
+
 
 **THE CHECKS THAT EARNED THEIR KEEP, all three now tests and all three proven to
 go red.** A label with nothing behind it (found three deleted songs). Site
