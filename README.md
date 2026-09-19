@@ -69,6 +69,32 @@ Environment wins if more than one is set. Both files stay off git. Restart
 ComfyUI after you add one. `api_key.location.example` in this folder is the
 blank reminder.
 
+**What a Google key gets you, and the one limit that shapes it.** With a key
+in place the Google lane writes the script (Gemini Flash / Flash-Lite), casts
+and speaks every part (Gemini TTS), scores it (Lyria) and draws every still
+(Gemini image) -- a whole episode with **no GPU at all**: nothing loads
+locally, so it runs on a laptop with no graphics card. What it does *not* do
+by default is generate video, and the reason is worth knowing before you go
+looking for the switch: on Google's paid **Tier 1**, every Veo model allows
+**2 requests a minute and 10 a day**, while one episode asks for about
+sixteen clips. No arrangement of a Tier 1 key finishes a Veo episode, so the
+shipped Google presets composite the stills instead (`still_flat`) and never
+call Veo.
+
+**If your Google account is on a higher tier, turn video on yourself** -- the
+engines are built, tested and waiting:
+
+* Pick `google_veo_video` (or `google_omni_video`) in the VideoDirector
+  dropdowns, or run the `google_veo_low_1act` / `google_veo_low_3act` lane
+  presets instead of the `google_still_*` pair.
+* `OTR_GOOGLE_VEO_MODEL_ID` chooses the model -- `veo-3.1-lite-generate-preview`
+  (cheapest), `veo-3.1-fast-generate-preview`, `veo-3.1-generate-preview`.
+  Each has its **own** daily allowance, so they run out separately.
+* A 429 mid-episode is a quota wall, not a broken key: the run keeps its
+  place, floors the beat to its still, and publishes anyway.
+* Google's own *Increase Requests* tab (Cloud console → Quotas) is how the
+  daily number goes up without waiting for Tier 2.
+
 ### Comfy Cloud -- sign into the app
 
 Sign into Comfy **with a Comfy API key** (the API-key option on ComfyUI's

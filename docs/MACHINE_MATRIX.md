@@ -234,7 +234,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 
 </details>
 
-## unstated  --  11 experimental profile(s), 6 shipping
+## unstated  --  12 experimental profile(s), 6 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -245,7 +245,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cpu_low` | viz_camera | - | musicgen | - | `shipping` | complete; Python <=3.13 |
 
-<details><summary>5 draft profile(s) here -- not vouched for</summary>
+<details><summary>6 draft profile(s) here -- not vouched for</summary>
 
 Video engines they select: `cloud_wan_i2v_audio`, `google_veo_video`, `still_flat`, `still_motion`
 
@@ -253,6 +253,7 @@ Video engines they select: `cloud_wan_i2v_audio`, `google_veo_video`, `still_fla
 |---|---|---|
 | `cpu_floor` | still_motion | - |
 | `google_still_1act` | still_flat | google_tts |
+| `google_still_3act` | still_flat | google_tts |
 | `google_veo_low_1act` | google_veo_video | google_tts |
 | `google_veo_low_3act` | google_veo_video | google_tts |
 | `otr_cloud_lanes` | cloud_wan_i2v_audio | cloud_elevenlabs |
