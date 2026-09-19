@@ -41,10 +41,6 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
-* **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
-  points at `/main/`. One click, his.
-* **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged; Manager serves
-  2.1.4. The API gives no reason. His Discord, not a code change.
 * **Native-language science feeds for SciFi News Pro.** The lane reads the
   English feed and authors natively. Which feeds, and whether the dossier
   extraction stays English, is his call before any code.
@@ -58,14 +54,28 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   past hand-verified leads (fewer manual label lookups, more leads per
   session), or it is a verified-dead symbol per the repo's rip-or-wire rule.
   His call; a grep receipt either way before acting.
-* **Gallery -- LAST, by ruling (operator 2026-09-19).** Comfy lists one graph;
-  the 21 shipping variants sit in `workflows/variants/`, which the template
-  scanner does not read. They are the filtered hardware dropdown Comfy cannot
-  draw, and they are invisible where a user picks -- so this matters. But it
-  goes after every other bug on this page: *"this should be last on the list
-  when we have all other bugs -- the floor is moving."* The graphs are still
-  being regenerated; promoting them into the gallery now ships churn to
-  strangers. Reopen when section 1 above it is empty.
+
+### The registry push -- one batch, at the bottom, by ruling (operator 2026-09-19)
+
+These three ride the same publish and are deliberately last. The floor is
+moving -- graphs are still being regenerated -- and a publish is the one action
+here that reaches strangers and cannot be taken back.
+
+* **Gallery.** Comfy's scanner globs `*/workflows/*.json` -- ONE level, no
+  recursion, no manifest option (`app/custom_node_manager.py`). So listing the
+  21 variants means putting 21 JSONs at the top of `workflows/`, which is the
+  exact shape that produced SILENT 404s when the pack briefly had two template
+  folders; `tests/test_workflow_templates_single_folder.py` exists because of
+  it. There is NO functional gap today: the variants ship (`.comfyignore`
+  excludes only their `*.md` launch recipes and says "Never widen it to
+  workflows/variants/"), they load when dragged, and `apple/MACHINES.md` opens
+  with a per-machine table naming the exact file. What is missing is menu
+  discovery, and the canonical in the menu already runs on every machine.
+* **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
+  points at `/main/`. One click, his.
+* **Flagged registry versions.** 2.1.5 and 2.1.6 are Flagged; Manager serves
+  2.1.4. The API gives no reason -- there is no `status_reason`, no scan result
+  and no queue position on any endpoint. His Discord, not a code change.
 
 ## 2. CODE -- decided, in order
 
