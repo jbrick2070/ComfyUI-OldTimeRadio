@@ -238,17 +238,27 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-The pipeline is proven end to end and **16 scenes are vendored: fr 12, es 3,
-it 1** (measured from the manifest 2026-09-19, not remembered). All 95 leads are
-hunted and every unvendored cell carries a named next step in `leads.json`.
-Adding a scene is mechanical: read the edition's own act/scene label into
-`EDITION_LABELS`, add the row, run `scripts/otr_vendor_shakespeare.py --write`.
+**30 scenes are vendored: fr 12, it 11, es 4, zh 3** (measured from the manifest
+2026-09-19 evening, not remembered -- this row said 16 four hours earlier, and
+before that said 4). All 95 leads are hunted and every unvendored cell carries a
+named next step in `leads.json`. Adding a scene is mechanical: read the
+edition's own act/scene label into `EDITION_LABELS`, add the row, run
+`scripts/otr_vendor_shakespeare.py --write`.
 
-**A SHIPPED RULE IS NOT A VENDORED SCENE, and this row said otherwise for half a
-day.** The Japanese and Portuguese extractor rules ship and are pinned by a
-regression fixture (`f446d484`) -- and **ja, zh and pt still vendor ZERO scenes**,
-because each of those rows is separately held on a thin or wrong extraction. The
-two facts read as one and are not. Quote the manifest, never the rule inventory.
+**A SHIPPED RULE IS NOT A VENDORED SCENE.** The Japanese and Portuguese
+extractor rules ship and are pinned by a fixture, and **ja and pt still vendor
+ZERO**. The two facts read as one and are not. Quote the manifest, never the
+rule inventory.
+
+**A TRANSLATOR'S OWN CHOICE IS NOT A DEFECT (operator 2026-09-19):** *"maybe
+some of these foreign translators decide to create a new act or a new speech,
+and it's part of their local vernacular and history and culture. Who am I to
+judge"*. Two Midsummer scenes had been held for exactly this and were wrong to
+hold: Snug speaks in both Rusconi and Zhu Shenghao and never in the Folger
+sidecar, and Rusconi labels the play-within-the-play by ROLE where Folger labels
+by ACTOR. An unbound label costs a VOICE and never the dialogue, so such a
+speaker is NAMED in `_KNOWN_UNBOUND` with its reason and the scene ships. Refuse
+a row for OUR extractor failing; never for the translator's editorial hand.
 
 What remains is two per-edition extractor rules, both specified and neither
 built. State, diagnoses and the measured counts live in

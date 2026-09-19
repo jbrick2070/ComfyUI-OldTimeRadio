@@ -1095,6 +1095,46 @@
     },
     {
       "iso": "it",
+      "play": "tempest",
+      "scene": "1.2",
+      "file": "it/tempest_1_2.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/La_tempesta_%28Shakespeare-Rusconi%29/Atto_primo",
+      "revision_id": "sha256:f74dcd87d23eb1a6",
+      "raw_sha256": "f74dcd87d23eb1a60978f1e3a6e14a5eed81f4414b0dfa96a9cc374fb6f27978",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ATTO PRIMO / SCENA II",
+      "speaker_labels": 134,
+      "distinct_speakers": 5,
+      "speaker_map": {
+        "PROSP": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "MIR": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "AR": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "FERD": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "CAL": {
+          "spoken": "CALIBAN",
+          "roster": "CALIBAN"
+        }
+      }
+    },
+    {
+      "iso": "it",
       "play": "twelfth_night",
       "scene": "1.5",
       "file": "it/twelfth_night_1_5.txt",
