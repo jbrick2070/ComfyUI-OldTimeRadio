@@ -22,6 +22,43 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-19 -- ONE MODEL'S OCR COUNTS AS VERBATIM
+
+Operator, asked whether a machine transcription of a page scan is good enough
+for a lane whose whole contract is the author's own words: **"im fin eitwh one
+model ocr"** -- one model is fine. Not a consensus of two, not a quorum of
+three.
+
+**WHAT THIS OPENS.** 23 of the corpus cells exist only as page scans -- 1910s
+and 1890s print with no text layer anywhere online. They were closed on the
+assumption that only a human transcription could be called verbatim. They are
+now in play, which is the difference between a ceiling near 56% and most of
+the corpus.
+
+**WHAT IT DOES NOT CHANGE.** Fidelity still governs everything else. A
+translation made from an intermediary is still refused (Castilho worked from
+a French text). A version that renames the cast is an ADAPTATION and still
+refused -- that is why the nine Hindi cells closed on 2026-09-19, not for
+lack of a scan. OCR relaxes HOW the words are captured, never WHICH words
+count.
+
+**WHICH MODEL, MEASURED THE SAME DAY.** The ruling says one model; the
+evidence says pick a good one. Three read the same page of Tsubouchi's
+Japanese Macbeth blind. Gemini 3.8 Flash and GPT-5.6 Luna agreed on all
+thirteen speaker labels, character for character. Grok's first pass had the
+content right and **four of thirteen labels wrong**, and corrected them only
+on a second, higher-magnification read. Content-right-labels-wrong is the
+dangerous shape: a verbatim speech in the wrong mouth reads as a clean
+success. So: one model, and prefer one that crops and re-reads rather than
+taking a page at a glance.
+
+**THE CHECK THAT SURVIVES.** Count what the EDITION marks -- its labelled
+speeches on the page -- and compare with what the transcription returns.
+Never count what survived, which is how a swallowed character goes unnoticed
+(the Prince absorbed into Lady Montague's one-line part, and the wrong-mouth
+scan that reported zero because a character swallowed whole never appears as
+a speaker to look for).
+
 ## 2026-09-18 EVENING -- THE REGISTRY IS PARKED. PUSH THE REPO, DO NOT VERSION.
 
 Operator, twice in one evening: *"I don't care about the registry right now.

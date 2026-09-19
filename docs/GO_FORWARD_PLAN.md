@@ -122,6 +122,37 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   The lane test moved on with `--source-bank original` (LLM-owned cast, the
   40/40/20 draw always sets a gender). One word from him picks it.
 
+* **Every remaining Shakespeare cell now has a named next step, and three
+  held rows were held on a WRONG DIAGNOSIS.** Measured 2026-09-19. Of 73
+  unvendored cells: 40 needed a URL (not OCR), 23 are page scans, 8 have
+  text we could not parse, 2 are excluded. The URL hunt closed 25 of the 40
+  in one evening -- 12 Italian and 2 Spanish found, 9 Hindi closed as
+  ADAPTATIONS (Sitaram renames the cast), 2 Japanese still open. **OCR is
+  unblocked by the 2026-09-19 ruling** (one model counts as verbatim, see
+  the standing rulings), so the 23 scans are now production work rather
+  than a question.
+  **THE PATTERN WORTH MORE THAN ANY SCENE:** three hold notes each said its
+  edition was unmarked or unparseable, and all three were wrong. Tsubouchi
+  "sets stage business inline with no markup of its own" -- he marks it in
+  `div.jisage_N`. pt.wikisource "no speaker pattern fits" -- every speaker
+  is a bare all-caps `div.tiInherit`. Zhu Shenghao "breaks no paragraph
+  before a speaker" -- every speaker opens a `<p>`. Each note then froze its
+  row for weeks. **Read the markup before believing a note about the
+  markup**, including one written here.
+  **WHAT IS BUILT:** the Japanese and Portuguese rules ship (f446d484,
+  reviewed, with a regression fixture). **WHAT IS SPECIFIED AND NOT BUILT:**
+  the Chinese rule -- `tmp/zh_diagnosis.md` names the markup, counts 65
+  marked speeches against 0 the pipeline currently sees, and flags that
+  `_marked_name`'s `len(name) < 2` guard would silently drop every
+  single-character Chinese speaker (波, 衮, 蒂 are most of the cast).
+  **WHAT IS BROKEN AND HELD:** the Italian set extracts at a healthy-looking
+  142 speeches / 13 speakers with `ESCONO GLOC. ED EDM`, `CUCULLUS NON FACIT
+  MONACHUM` and `M. O. A. I` among its "speakers" -- a direction, Feste's
+  Latin joke and Malvolio's letter. Rusconi needs his own rule; the generic
+  name shapes over-claim on this edition. pt/hamlet returns 25 of the 56
+  speeches the page marks; es/hamlet cuts at 923 chars. Each row carries its
+  measured reason. A speech count cannot see any of this.
+
 * **The Comfy key rides a V1 hidden input, and ComfyUI copies V1 inputs into
   error history.** Since the 2026-09-19 credential rip, nine nodes (writer,
   ShotLock, meta-brief prompt, stills, video, music, both voice nodes, the
