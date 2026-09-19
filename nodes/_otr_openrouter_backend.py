@@ -6,16 +6,17 @@ remote OpenRouter model through the SAME `load`/`generate`/`unload`
 surface the local transformers backends use -- with zero local VRAM.
 
 Hard constraints honoured here (see the go-forward plan, C1-C9):
-  * offline-first: no remote path is reachable unless `OPENROUTER_API_KEY`
-    is set (C6: the separate OTR_ENABLE_OPENROUTER opt-in flag gate was removed).
+  * offline-first: no remote path is reachable unless an OpenRouter key
+    is present (env or the two pack files in the README heading). C6: the
+    separate OTR_ENABLE_OPENROUTER opt-in flag gate was removed.
   * C6 hard cost guard: a conservative per-call AND per-run token
     ceiling is enforced BEFORE the network call; the call aborts
     rather than spend unbounded credits. Spend is logged per call.
   * C5 no half-remote: bounded retries on transient failures, then a
     clean abort (`OpenRouterCallFailedError`) -- never a silent
     mid-run fall-back to local.
-  * C9 no secrets: the key is read from the environment only, never
-    logged and never written to disk.
+  * C9 no secrets: the key is read from the environment or the two pack
+    files, never logged, and never written back to disk.
 
 This module is import-safe with no network and no torch. The two
 mockable seams the tests drive are module-level functions
@@ -385,13 +386,24 @@ def _mandatory_reasoning_effort(
     return effective
 
 
+def _openrouter_key() -> str | None:
+    from ._otr_shared.api_key_files import resolve_lane_key
+
+    return resolve_lane_key("openrouter")
+
+
 def openrouter_enabled() -> bool:
     """Remote is reachable when the API KEY is present -- a creds-present check,
     NOT a promotion gate. C6 (2026-06-29 -- "registry IS the menu"): the separate
     OTR_ENABLE_OPENROUTER opt-in flag is GONE; any CONFIGURED LLM (its credentials
     present) is selectable, and the virtual rows appear in the dropdowns whenever
     the key is set. No key ⇒ remote is off (the rows never appear, S2)."""
-    return bool(_env("OPENROUTER_API_KEY"))
+    from ._otr_shared.api_key_files import KeyFileError
+
+    try:
+        return bool(_openrouter_key())
+    except KeyFileError:
+        return False
 
 
 def is_openrouter_row_id(repo_id: str) -> bool:
@@ -1113,9 +1125,9 @@ def refresh_catalog_cache(*, force: bool = False) -> dict:  # noqa: ARG001 -- fo
     it logs and returns the existing cache. Returns the catalog dict in
     effect after the call."""
     base_url = _env("OPENROUTER_BASE_URL") or DEFAULT_BASE_URL
-    api_key = _env("OPENROUTER_API_KEY")
     timeout_s = _int_env("OPENROUTER_TIMEOUT_S", DEFAULT_TIMEOUT_S)
     try:
+        api_key = _openrouter_key()
         raw_models = _fetch_models_json(base_url=base_url, api_key=api_key, timeout_s=timeout_s)
     except Exception as exc:  # noqa: BLE001 -- a failed refresh keeps the old cache
         log.warning("[OpenRouter] catalog refresh failed (%s); keeping existing cache.", exc)
@@ -1218,11 +1230,11 @@ class OpenRouterBackend:
                 f"profile lane_allowlist {list(policy.lane_allowlist)}."
             )
         if not openrouter_enabled():
+            from ._otr_shared.api_key_files import missing_key_hint
+
             raise OpenRouterConfigError(
-                f"{repo_id} selected but OpenRouter is not enabled. Set "
-                f"OPENROUTER_API_KEY (see "
-                f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/docs/openrouter-setup.md)."
+                f"{repo_id} selected but OpenRouter is not enabled. "
+                + missing_key_hint("openrouter")
             )
         letter = _slot_letter(repo_id)
         # Resolve the slug AND its provider-routing sort together: a ':nitro'/
@@ -1294,10 +1306,15 @@ class OpenRouterBackend:
             messages, "_otr_fail_on_output_limit", False,
         ))
         cache_entry = model
-        api_key = _env("OPENROUTER_API_KEY")
+        from ._otr_shared.api_key_files import KeyFileError, missing_key_hint
+
+        try:
+            api_key = _openrouter_key()
+        except KeyFileError as exc:
+            raise OpenRouterConfigError(str(exc)) from exc
         if not api_key:
             raise OpenRouterConfigError(
-                "OPENROUTER_API_KEY is not set; cannot make a remote call."
+                missing_key_hint("openrouter") + " Cannot make a remote call."
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
         base_url = cache_entry.get("base_url") or DEFAULT_BASE_URL

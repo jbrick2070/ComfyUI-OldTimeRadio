@@ -66,10 +66,14 @@ class VisualAssetValidatorTests(unittest.TestCase):
         preflight = ModuleType(
             "_asset_validator_seam.nodes._otr_shared.cloud_slug_preflight")
         preflight.ensure_prompt_cloud_slugs = lambda prompt, unique_id: None
+        balance = ModuleType(
+            "_asset_validator_seam.nodes._otr_shared.cloud_balance_preflight")
+        balance.ensure_prompt_cloud_balance = lambda prompt, unique_id: None
         self.import_stubs = patch.dict(sys.modules, {
             package.__name__: package, nodes.__name__: nodes,
             validation.__name__: validation, assets.__name__: assets,
             shared.__name__: shared, preflight.__name__: preflight,
+            balance.__name__: balance,
         })
         self.import_stubs.start()
         self.addCleanup(self.import_stubs.stop)

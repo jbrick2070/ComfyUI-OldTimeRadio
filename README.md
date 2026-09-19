@@ -47,6 +47,36 @@ news and for the first model download and for nothing else. Paid options exist
 for people who want them, and every one of them stays off until you turn it
 on.
 
+## API keys (Google, OpenRouter, Comfy Cloud)
+
+You do not need these. Local is the default. Never paste a key into a
+workflow widget.
+
+### Google and OpenRouter -- two ways to enter a key
+
+Same recipe for both.
+
+1. Put the key on the first line of the `.secret` file in this pack folder.
+2. Or keep the key in a file you already have, and put that file's full path
+   on the first line of the matching `.location` file in this pack folder.
+
+| Lane | Key file | Or point from | Also accepted |
+|---|---|---|---|
+| Google | `google.secret` | `google_api_key.location` | `OTR_GOOGLE_API_KEY`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
+| OpenRouter | `openrouter.secret` | `openrouter_api_key.location` | `OPENROUTER_API_KEY` |
+
+Environment wins if more than one is set. Both files stay off git. Restart
+ComfyUI after you add one. `api_key.location.example` in this folder is the
+blank reminder.
+
+### Comfy Cloud -- sign into the app
+
+Sign into Comfy. That is the whole instruction.
+
+A `comfy.secret` / `comfy_api_key.location` / `OTR_COMFY_API_KEY` is only
+for a headless box that has no login. Do not put one of those on a
+Desktop machine unless you already know you need it.
+
 ---
 
 ## Make an episode

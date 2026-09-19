@@ -307,6 +307,12 @@ memory has no separate pool to exhaust. That is why the Mac column is worth
 reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
 
+**Where a hosted key goes.** The cell says **key**. How you enter it is the
+heading of the README. Google and OpenRouter: `google.secret` /
+`openrouter.secret`, or a path in the matching `*_api_key.location` file.
+Comfy Cloud: sign into the app. A Comfy key file is only for a headless
+box. Never paste a key into a workflow.
+
 ---
 
 *This page is generated. To change it, edit `scripts/otr_dropdown_matrix.py` in the GitHub tree and run it -- `scripts/` is not part of an installed copy, so there is nothing here to hand-edit.*

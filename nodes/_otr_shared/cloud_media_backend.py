@@ -373,21 +373,31 @@ def resolve_auth(
     hidden_api_key: Optional[str] = None,
     hidden_auth_token: Optional[str] = None,
 ) -> CloudAuth:
-    """OTR_COMFY_API_KEY env > hidden api_key_comfy_org > hidden
-    auth_token_comfy_org. Missing everything = fail closed, naming all
-    three sources."""
-    env_key = otr_env.get("OTR_COMFY_API_KEY", "").strip()
-    if env_key:
-        return CloudAuth("api_key_env", env_key)
+    """Signed-in Comfy first, then a headless key.
+
+    ``OTR_COMFY_API_KEY`` still beats a hidden login (that order already
+    shipped). A leftover ``comfy.secret`` does NOT -- the app login has to
+    just work. Pack files are the headless path when nothing else is set.
+    Missing everything = fail closed, naming every source.
+    """
+    from .api_key_files import KeyFileError, env_key, file_key, missing_key_hint
+
+    env = env_key("comfy")
+    if env:
+        return CloudAuth("api_key_env", env)
     if hidden_api_key and hidden_api_key.strip():
         return CloudAuth("api_key_hidden", hidden_api_key.strip())
     if hidden_auth_token and hidden_auth_token.strip():
         return CloudAuth("bearer_hidden", hidden_auth_token.strip())
+    try:
+        stored = file_key("comfy")
+    except KeyFileError as exc:
+        raise CloudMediaError(CloudErrorCode.AUTH, str(exc)) from exc
+    if stored:
+        return CloudAuth("api_key_file", stored)
     raise CloudMediaError(
         CloudErrorCode.AUTH,
-        "no credentials: set OTR_COMFY_API_KEY, or run with a logged-in "
-        "Comfy account (hidden inputs api_key_comfy_org / "
-        "auth_token_comfy_org)",
+        "no credentials: %s" % missing_key_hint("comfy"),
     )
 
 

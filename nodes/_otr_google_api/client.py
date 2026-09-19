@@ -46,19 +46,25 @@ def _env(name: str) -> str | None:
 
 
 def resolve_api_key() -> str:
-    """Resolve the Gemini key from environment only.
+    """Resolve the Gemini key: environment, then the two pack files.
 
-    OTR gives its explicit variable highest precedence so a user can isolate
-    this node from other Google SDKs in the same shell. The key is returned to
-    the caller but never logged or serialized.
+    Environment wins so a user can isolate this node from other Google SDKs
+    in the same shell. The two files are the heading in the README: put the
+    key in ``google.secret``, or put a path in ``google_api_key.location``.
+    The key is returned to the caller but never logged or serialized.
     """
-    key = _env("OTR_GOOGLE_API_KEY") or _env("GEMINI_API_KEY") or _env("GOOGLE_API_KEY")
+    from .._otr_shared.api_key_files import (
+        KeyFileError,
+        missing_key_hint,
+        resolve_lane_key,
+    )
+
+    try:
+        key = resolve_lane_key("google")
+    except KeyFileError as exc:
+        raise GoogleAPIKeyMissingError(str(exc)) from exc
     if not key:
-        raise GoogleAPIKeyMissingError(
-            "Google API LLM selected but no API key is configured. Set "
-            "OTR_GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY. No request "
-            "was sent."
-        )
+        raise GoogleAPIKeyMissingError(missing_key_hint("google"))
     return key
 
 

@@ -457,7 +457,11 @@ def _bearer() -> str | None:
     """The credential to send: the configured Comfy API key (via ComfyUI's
     injected api_key_comfy_org hidden input, or OTR_COMFY_API_KEY in headless
     environments)."""
-    return _auth.get("api_key") or otr_env.get("OTR_COMFY_API_KEY")
+    from ._otr_shared.api_key_files import resolve_lane_key
+
+    if _auth.get("api_key"):
+        return _auth.get("api_key")
+    return resolve_lane_key("comfy")
 
 
 # ---------------------------------------------------------------------------

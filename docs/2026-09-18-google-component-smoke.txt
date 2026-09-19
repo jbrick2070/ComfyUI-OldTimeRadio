@@ -1,0 +1,19 @@
+OTR Google component smoke
+catalog only -- no generate, no episode
+when: 2026-09-18 07:43 UTC
+
+KEY: present (not printed)
+CATALOG: 58 ids, 1 pages, host=generativelanguage.googleapis.com
+validator treats a miss here as a stale pin (same as Comfy T1).
+
+writer.creative_pointer       gemini-flash-latest  LIVE
+writer.technical_pointer      gemini-flash-lite-latest  LIVE
+writer.pro_pointer            gemini-pro-latest  LIVE
+google_veo_video              veo-3.1-lite-generate-preview  LIVE
+google_omni_video             gemini-omni-flash-preview  LIVE
+google_image                  gemini-3.1-flash-image  LIVE
+google_tts                    gemini-2.5-flash-preview-tts  LIVE
+google_lyria                  lyria-3-clip-preview  LIVE
+
+RESULT: PASS -- every listed component slug is in the catalog.
+Model-to-model congruity holds for the shipped defaults.

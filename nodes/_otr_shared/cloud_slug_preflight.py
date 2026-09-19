@@ -274,7 +274,9 @@ def check_engine(engine, selectors, *, schema_options_fn, catalog_fn) -> list:
         for node_key, fields in (selectors or {}).items():
             for input_name, candidates in (fields or {}).items():
                 for raw in candidates:
-                    value = _norm(raw)
+                    # Same strip as writers: Google catalog ids are bare,
+                    # adapters sometimes still carry a models/ prefix.
+                    value = _normalize_checked_slug(catalog, raw)
                     if value and value not in result.ids:
                         findings.append(Finding(
                             engine_id, str(node_key), str(input_name), value,
@@ -382,6 +384,165 @@ def _writer_handles(inputs) -> list:
     return rows
 
 
+def _slot_widget(inputs, name) -> str:
+    value = (inputs or {}).get(name, "")
+    if value is None:
+        return ""
+    if not isinstance(value, str):
+        raise ValueError(
+            "cloud slug preflight cannot inspect linked/dynamic %s before "
+            "execution" % name)
+    return value
+
+
+def _restore_slot_map(target, saved) -> None:
+    target["A"] = saved.get("A")
+    target["B"] = saved.get("B")
+
+
+def _normalize_checked_slug(authority, slug) -> str:
+    value = _norm(slug)
+    if str(authority) != "google":
+        return value
+    try:
+        from .google_slug_verifier import normalize_model_name
+    except ImportError:  # pragma: no cover
+        from google_slug_verifier import normalize_model_name
+    return normalize_model_name(value) or value
+
+
+def _writer_config_errors() -> tuple:
+    """Exception classes a backend resolver raises for 'nothing will post'.
+
+    Each backend spells its config error differently (``RuntimeError``
+    subclasses, not ``ValueError``); a linked widget raises ``ValueError``
+    from ``_slot_widget``. All of them are a refuse finding, never a crash.
+    """
+    errors = [ValueError]
+    try:
+        from .._otr_openrouter_backend import OpenRouterConfigError
+        errors.append(OpenRouterConfigError)
+    except ImportError:  # pragma: no cover -- no Comfy tree
+        pass
+    try:
+        from .._otr_comfy_backend import ComfyCreditsConfigError
+        errors.append(ComfyCreditsConfigError)
+    except ImportError:  # pragma: no cover
+        pass
+    try:
+        from .._otr_google_api.models import GoogleAPISlotBindingError
+        errors.append(GoogleAPISlotBindingError)
+    except ImportError:  # pragma: no cover
+        pass
+    return tuple(errors)
+
+
+def _posted_writer_slug(handle, inputs):
+    """The slug the selected backend will POST, or a refuse reason.
+
+    Binds this writer's live slot widgets, then uses that backend's own
+    resolver, then puts the process-global bindings back. Checking the
+    widget text alone would miss an env / recommended fallback that still
+    spends (OpenRouter, Comfy), or keep a stale binding from the previous
+    episode. Google has no fallback: an unbound slot raises before any
+    request, so the finding is a refuse with no spend behind it.
+    """
+    try:
+        if handle in (_OR_A, _OR_B):
+            from .. import _otr_openrouter_backend as orb
+            saved = dict(orb._slot_bindings)
+            try:
+                orb.set_slot_bindings(
+                    slot_a=_slot_widget(inputs, "openrouter_slot_a_model"),
+                    slot_b=_slot_widget(inputs, "openrouter_slot_b_model"),
+                )
+                return orb.resolve_slug(handle), ""
+            finally:
+                _restore_slot_map(orb._slot_bindings, saved)
+        if handle in (_COMFY_A, _COMFY_B):
+            from .. import _otr_comfy_backend as occ
+            saved = dict(occ._slot_bindings)
+            try:
+                occ.set_slot_bindings(
+                    slot_a=_slot_widget(inputs, "comfy_slot_a_model"),
+                    slot_b=_slot_widget(inputs, "comfy_slot_b_model"),
+                )
+                return occ.resolve_slug(handle), ""
+            finally:
+                _restore_slot_map(occ._slot_bindings, saved)
+        if handle in (_GOOG_A, _GOOG_B):
+            from .._otr_google_api import models as gai
+            saved = dict(gai._slot_bindings)
+            try:
+                gai.set_slot_bindings(
+                    slot_a=_slot_widget(inputs, "google_api_slot_a_model"),
+                    slot_b=_slot_widget(inputs, "google_api_slot_b_model"),
+                )
+                return gai.resolve_model_for_slot(handle), ""
+            finally:
+                _restore_slot_map(gai._slot_bindings, saved)
+    except _writer_config_errors() as exc:
+        return "", str(exc)
+    return "", "unknown writer handle %r" % handle
+
+
+def director_engine_picks(inputs) -> tuple:
+    """(video_engine_ids, image_engine_ids) one ``OTR_VideoDirector`` will run.
+
+    Video picks go through the same custom-model / route-freeze resolution the
+    render path uses. Image roles whose paired video lane is proven no-still
+    are dropped, so a wallet is never charged for a still that never renders.
+    Shared with the balance preflight so both gates read the same roles.
+    """
+    try:
+        from .._otr_visual_assets import (
+            _IMAGE_SLOTS, _VIDEO_SLOTS, _custom_models, _proven_no_still,
+            _resolve_slot, _default_role_video_slots, _image_slot_for,
+        )
+        from .._otr_shared.public_engines import resolve_engine_id
+        from .._otr_shared import route_freeze
+    except ImportError:
+        _resolve_slot = None
+
+    videos_out = []
+    images_out = []
+    if _resolve_slot is None:
+        for slot in ("announcer_video_model", "music_video_model",
+                     "character_video_model"):
+            picked = _widget_str(inputs, slot, "")
+            if picked and not picked.startswith("+ Add Custom"):
+                videos_out.append(picked)
+        for slot in ("announcer_image_model", "music_image_model",
+                     "character_image_model"):
+            picked = _widget_str(inputs, slot, "")
+            if picked and not picked.startswith("+ Add Custom"):
+                images_out.append(picked)
+        return videos_out, images_out
+
+    custom = _custom_models(inputs)
+    videos = {}
+    for slot in _VIDEO_SLOTS:
+        picked = _resolve_slot(inputs, slot, custom, "video")
+        videos[slot] = resolve_engine_id(picked)
+    effective = (route_freeze.freeze_role_engines(videos)
+                 if route_freeze is not None else videos)
+    videos_out.extend(resolve_engine_id(v) for v in effective.values() if v)
+    pairing = _default_role_video_slots()
+    no_still = {}
+    for role, vslot in dict(pairing).items():
+        lane = effective.get(role)
+        lane = resolve_engine_id(lane) if lane else ""
+        if _proven_no_still(lane, None):
+            no_still[_image_slot_for(vslot)] = lane
+    for slot in _IMAGE_SLOTS:
+        if slot in no_still:
+            continue
+        picked = _resolve_slot(inputs, slot, custom, "image")
+        if picked:
+            images_out.append(picked)
+    return videos_out, images_out
+
+
 def _collect_scoped(prompt, unique_id, *, walk_fn=None):
     walker = walk_fn
     if walker is None:
@@ -437,52 +598,11 @@ def collect_findings(
         return _catalog_memo[key]
 
     engine_ids = []
-    try:
-        from .._otr_visual_assets import (
-            _IMAGE_SLOTS, _VIDEO_SLOTS, _custom_models, _proven_no_still,
-            _resolve_slot, _default_role_video_slots, _image_slot_for,
-        )
-        from .._otr_shared.public_engines import resolve_engine_id
-        from .._otr_shared import route_freeze
-    except ImportError:
-        _IMAGE_SLOTS = _VIDEO_SLOTS = ()
-        _custom_models = None
-        resolve_engine_id = lambda x: x  # noqa: E731
-        route_freeze = None
-        _resolve_slot = None
-
     directors = [n for n in scoped if n.get("class_type") == _DIRECTOR]
     for node in directors:
-        inputs = node.get("inputs") or {}
-        if _resolve_slot is None:
-            for slot in ("announcer_video_model", "music_video_model",
-                         "character_video_model", "announcer_image_model",
-                         "music_image_model", "character_image_model"):
-                picked = _widget_str(inputs, slot, "")
-                if picked and not picked.startswith("+ Add Custom"):
-                    engine_ids.append(picked)
-            continue
-        custom = _custom_models(inputs)
-        videos = {}
-        for slot in _VIDEO_SLOTS:
-            picked = _resolve_slot(inputs, slot, custom, "video")
-            videos[slot] = resolve_engine_id(picked)
-        effective = (route_freeze.freeze_role_engines(videos)
-                     if route_freeze is not None else videos)
-        engine_ids.extend(resolve_engine_id(v) for v in effective.values() if v)
-        pairing = _default_role_video_slots()
-        no_still = {}
-        for role, vslot in dict(pairing).items():
-            lane = effective.get(role)
-            lane = resolve_engine_id(lane) if lane else ""
-            if _proven_no_still(lane, None):
-                no_still[_image_slot_for(vslot)] = lane
-        for slot in _IMAGE_SLOTS:
-            if slot in no_still:
-                continue
-            picked = _resolve_slot(inputs, slot, custom, "image")
-            if picked:
-                engine_ids.append(picked)
+        videos, images = director_engine_picks(node.get("inputs") or {})
+        engine_ids.extend(videos)
+        engine_ids.extend(images)
 
     for node in scoped:
         ctype = node.get("class_type")
@@ -542,11 +662,15 @@ def collect_findings(
     for node in writers:
         inputs = node.get("inputs") or {}
         for handle, widget, authority, paid_host in _writer_handles(inputs):
-            slug = _widget_str(inputs, widget, "")
+            # The checked value is the one the backend will POST -- a
+            # placeholder widget may still spend via an env / recommended
+            # fallback (OpenRouter, Comfy), so the widget text is not enough.
+            slug, reason = _posted_writer_slug(handle, inputs)
             if _is_placeholder_slug(slug):
                 findings.append(Finding(
                     handle, handle, widget, slug,
-                    "%s is selected but %s is unbound" % (handle, widget),
+                    "%s is selected but no slug will post (%s)"
+                    % (handle, reason or "%s is unbound" % widget),
                     "bind a concrete slug on %s" % widget,
                     "refuse"))
                 continue
@@ -559,7 +683,7 @@ def collect_findings(
                     "catalog host=%s paid host=%s" % (result.host, paid_host),
                     sev))
                 continue
-            if _norm(slug) not in result.ids:
+            if _normalize_checked_slug(authority, slug) not in result.ids:
                 findings.append(Finding(
                     handle, handle, widget, slug,
                     "writer slug %r is not in the %s catalog"
@@ -611,6 +735,7 @@ __all__ = [
     "check_engine",
     "collect_findings",
     "default_partner_selectors",
+    "director_engine_picks",
     "ensure_prompt_cloud_slugs",
     "format_refusal",
     "options_from_class",

@@ -1,0 +1,8 @@
+# Copy this file to google_api_key.location or openrouter_api_key.location.
+# Comfy Cloud: sign into the app. Only use comfy_api_key.location on a
+# headless box that has no login.
+#
+# First real line is the full path to YOUR key file. The key itself
+# stays in that other file. This file is gitignored once renamed.
+#
+# C:\Users\you\keys\google.txt

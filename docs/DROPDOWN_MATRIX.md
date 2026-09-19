@@ -191,6 +191,12 @@ memory has no separate pool to exhaust. That is why the Mac column is worth
 reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
 
+**Where a hosted key goes.** The cell says **key**. How you enter it is the
+heading of the README. Google and OpenRouter: `google.secret` /
+`openrouter.secret`, or a path in the matching `*_api_key.location` file.
+Comfy Cloud: sign into the app. A Comfy key file is only for a headless
+box. Never paste a key into a workflow.
+
 ## Hosted lanes no shipped profile provisions
 
 These need no weights and no VRAM -- only a credential -- and the engines themselves are registered and selectable. But no shipping profile selects one, so they were never added to the provisioner's remote route, and `scripts/otr_provision.py` REFUSES a profile that names one rather than guessing. Using one today means selecting it in the graph, not through a profile. Worth closing before shipping.

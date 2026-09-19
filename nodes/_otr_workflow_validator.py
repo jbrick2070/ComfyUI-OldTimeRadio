@@ -60,10 +60,12 @@ _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
 def _queue_time_readiness_gates(prompt, unique_id):
-    """$0 cloud-slug refusal first, then local weight downloads."""
+    """$0 cloud-slug refusal, then wallet vs estimate, then weight downloads."""
     from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
+    from ._otr_shared.cloud_balance_preflight import ensure_prompt_cloud_balance
     from ._otr_visual_assets import ensure_prompt_visual_assets
     ensure_prompt_cloud_slugs(prompt, unique_id)
+    ensure_prompt_cloud_balance(prompt, unique_id)
     ensure_prompt_visual_assets(prompt, unique_id)
 
 

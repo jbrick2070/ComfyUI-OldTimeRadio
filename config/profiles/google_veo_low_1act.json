@@ -1,0 +1,92 @@
+{
+    "id": "google_veo_low_1act",
+    "display_name": "Google BYO 1-act trial -- Flash + Flash-Lite writers, Veo lite + Gemini image + Google TTS + Lyria. 4 s clips (100 frames at 25 fps). Draft lane preset, not a shipping graph. Needs a Google key.",
+    "status": "draft",
+    "platform": "any",
+    "device_backend": "cpu",
+    "gpu_vendor": "none",
+    "toolchains": [],
+    "allow_sidecars": false,
+    "role_overrides": {
+        "announcer_visual": "google_veo_video",
+        "music_visual": "google_veo_video",
+        "character_visual": "google_veo_video",
+        "announcer_image": "google_image",
+        "music_image": "google_image",
+        "character_image": "google_image"
+    },
+    "slot_overrides": {
+        "cast_voice_policy": "auto_registry",
+        "char_voice_engine": "google_tts",
+        "announcer_voice_engine": "google_tts",
+        "music_engine": "google_lyria",
+        "video_render_engine": "google_veo_video"
+    },
+    "features": {
+        "burn_captions": true,
+        "caption_style": "sdh_standard",
+        "act_count": "1",
+        "num_characters": 2
+    },
+    "seed_policy": {
+        "request_seed": 42,
+        "seed_mode": "request_hash",
+        "cast_seed_env": null,
+        "style_seed_env": null
+    },
+    "llm": {
+        "device": "cpu",
+        "attn_impl": "sdpa",
+        "quant_policy": "none",
+        "vram_ceiling_gb": 0,
+        "gguf_n_ctx": 2048,
+        "gguf_quant": "Q4_K_M",
+        "creative_model": "google_api:slot-a",
+        "technical_model": "google_api:slot-b",
+        "openrouter_slot_a_model": "(enable OpenRouter)",
+        "openrouter_slot_b_model": "(enable OpenRouter)",
+        "comfy_slot_a_model": "(enable Comfy Credits)",
+        "comfy_slot_b_model": "(enable Comfy Credits)",
+        "google_api_slot_a_model": "gemini-flash-latest",
+        "google_api_slot_b_model": "gemini-flash-lite-latest",
+        "lane_allowlist": [
+            "transformers",
+            "gguf",
+            "openrouter",
+            "comfy_credits",
+            "google_api"
+        ]
+    },
+    "video": {
+        "device_policy": "cpu",
+        "dtype_policy": "no_fp8_no_fp4",
+        "max_render_frames": 100
+    },
+    "image": {
+        "dtype_policy": "no_fp8_no_fp4"
+    },
+    "audio": {
+        "voice_device": "cpu"
+    },
+    "render": {
+        "fps": 25,
+        "canvas_w": 832,
+        "canvas_h": 480,
+        "composite_res": "1920x1080",
+        "composite_w": 1920,
+        "composite_h": 1080,
+        "frame_budget": 25,
+        "beats": 40
+    },
+    "preflight": {
+        "required_models": [],
+        "required_keys": [
+            "OTR_GOOGLE_API_KEY"
+        ]
+    },
+    "launch": {
+        "sage_attention": false,
+        "extra_args": [],
+        "env": {}
+    }
+}

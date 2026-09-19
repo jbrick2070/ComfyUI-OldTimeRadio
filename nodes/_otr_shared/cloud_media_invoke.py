@@ -544,7 +544,7 @@ def _inject_hidden_inputs(row: dict, inputs: dict, session) -> dict:
     kwargs = dict(inputs)
     hidden = (row.get("inputs") or {}).get("hidden") or {}
     auth = session.auth
-    if auth.kind in ("api_key_env", "api_key_hidden"):
+    if auth.kind in ("api_key_env", "api_key_hidden", "api_key_file"):
         auth_name = "api_key_comfy_org"
     else:
         auth_name = "auth_token_comfy_org"

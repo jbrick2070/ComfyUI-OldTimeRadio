@@ -590,10 +590,10 @@ bytes in the fetch manifests.
 machine. measured -- it ran there in a lab test, but no episode has used it.
 fits -- nothing blocks it and the arithmetic says it fits; nobody has run it.
 **tight** -- fits with little to spare. **OOM** -- expect to exhaust memory.
-**no** -- it will not fit. key -- hosted, so it runs anywhere you have the API
-key. not offered -- absent from that machine's dropdown because nobody has
-proven it there, which is a statement about receipts and **not about your
-hardware**.
+**no** -- it will not fit. key -- hosted; see the README heading. Google and
+OpenRouter use two files. Comfy Cloud: sign into the app. not offered --
+absent from that machine's dropdown because nobody has proven it there,
+which is a statement about receipts and **not about your hardware**.
 
 **On a Mac, OOM means a hard machine reboot, not a failed render** -- unified
 memory has no separate pool to exhaust. Read the Mac column before you pick.
@@ -660,6 +660,12 @@ an AMD cell as the absence of a hard blocker, nothing more.
 memory has no separate pool to exhaust. That is why the Mac column is worth
 reading before you pick, and why an unmeasured **?** there deserves more caution
 than the same mark on a discrete card.
+
+**Where a hosted key goes.** The cell says **key**. How you enter it is the
+heading of the README. Google and OpenRouter: `google.secret` /
+`openrouter.secret`, or a path in the matching `*_api_key.location` file.
+Comfy Cloud: sign into the app. A Comfy key file is only for a headless
+box. Never paste a key into a workflow.
 """
 
 

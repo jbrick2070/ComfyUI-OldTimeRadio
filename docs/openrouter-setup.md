@@ -1,5 +1,9 @@
 # Using OpenRouter (optional, experimental) — get a key & turn it on
 
+**Where the key lives is the heading of the README.** Two files in the pack
+folder (`openrouter.secret`, or a path in `openrouter_api_key.location`),
+or `OPENROUTER_API_KEY`. This page is how to get a key and pick a model.
+
 OldTimeRadio runs **100% local with zero API keys by default**, and that never changes. This page is only for users who want to *experiment* with running the writer on a hosted frontier model (Claude, GPT, etc.) through [OpenRouter](https://openrouter.ai) to see if it makes a better episode.
 
 > **Status:** opt-in feature on the `v2.0-alpha` branch. It is **off** unless you set an API key *and* an enable flag (below). With them unset, nothing remote ever runs and the local pipeline is byte-for-byte unchanged.

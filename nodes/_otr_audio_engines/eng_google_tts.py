@@ -17,7 +17,11 @@ import re
 import urllib.error
 from typing import Optional
 
-from .._otr_google_api.client import GoogleAPIError
+from .._otr_google_api.client import (
+    GoogleAPIError,
+    GoogleAPIKeyMissingError,
+    resolve_api_key,
+)
 from .base import AudioEngineAdapter
 from .registry import register
 
@@ -105,14 +109,12 @@ def _redact(text, extra=()) -> str:
 
 
 def _resolve_api_key() -> str:
-    for name in _api_key_env_names():
-        val = otr_env.get(name)
-        if val and str(val).strip():
-            return str(val).strip()
-    raise GoogleTTSError(
-        "google_tts.generate_voice: missing Google API key; set one of "
-        "OTR_GOOGLE_API_KEY, GEMINI_API_KEY, or GOOGLE_API_KEY"
-    )
+    try:
+        return resolve_api_key()
+    except GoogleAPIKeyMissingError as exc:
+        raise GoogleTTSError(
+            "google_tts.generate_voice: missing Google API key; %s" % exc
+        ) from exc
 
 
 def _selected_model() -> str:

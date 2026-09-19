@@ -1,5 +1,9 @@
 # Optional: a cloud writer
 
+**How to store a key is the heading of the README.** Google and OpenRouter
+use two files each. Comfy Cloud: sign into the app. This page is what
+those lanes turn on.
+
 **You do not need this.** Everything here is off by default, costs money, and
 replaces one step — the script writing — with a hosted model. The local writer is
 the supported path and the one every published episode used.
@@ -21,9 +25,9 @@ setting it.
 
 | Lane | Who bills you | How it turns on |
 |---|---|---|
-| **OpenRouter** | OpenRouter, per token | Set `OPENROUTER_API_KEY`. That is the whole gate. |
-| **Google** | Google, per token | Set `OTR_GOOGLE_API_KEY` (or `GEMINI_API_KEY`, or `GOOGLE_API_KEY`). |
-| **Comfy Credits** | Your Comfy account's credits | Set `OTR_ENABLE_COMFY_CREDITS=1` **and** be logged into Comfy. |
+| **OpenRouter** | OpenRouter, per token | `openrouter.secret`, or a path in `openrouter_api_key.location`, or `OPENROUTER_API_KEY`. |
+| **Google** | Google, per token | `google.secret`, or a path in `google_api_key.location`, or `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY`. |
+| **Comfy Credits** | Your Comfy account's credits | Sign into the Comfy app. Headless only: `comfy.secret`, `comfy_api_key.location`, or `OTR_COMFY_API_KEY`. Credits also need `OTR_ENABLE_COMFY_CREDITS=1`. |
 
 They are not symmetric, and older notes in `docs/` claim they "differ only in who
 pays" — they do not. **OpenRouter and Google are gated purely on a key being
@@ -35,9 +39,11 @@ setting it does nothing.
 
 ## Turning one on
 
-Set the environment variable **before** ComfyUI starts, in the shell or session
-that launches it. Setting it in a different terminal after the server is up does
-nothing — the server reads its own environment.
+The two files live in the pack folder and do not depend on Desktop inheriting
+your user environment. Environment variables still work: set them **before**
+ComfyUI starts, in the shell or session that launches it. Setting a variable
+in a different terminal after the server is up does nothing -- the server
+reads its own environment.
 
 ```bash
 # Linux / macOS

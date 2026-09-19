@@ -124,6 +124,19 @@ def test_t2_refuse_same_host_warn_other_host():
     assert hits[0].severity == "refuse"
 
 
+def test_t2_google_models_prefix_matches_bare_catalog_id():
+    """Validator congruity: posted models/veo-... must match catalog veo-..."""
+    eng = _FakeEngine("google_veo_video", {
+        "google_veo_video": {"model": ("models/veo-3.1-lite-generate-preview",)},
+    }, catalog="google")
+    hits = csp.check_engine(
+        eng, eng.cloud_selectors(),
+        schema_options_fn=lambda _k: {},
+        catalog_fn=lambda _a: csp.CatalogResult(
+            frozenset({"veo-3.1-lite-generate-preview"}), "", csp.GOOGLE_HOST))
+    assert hits == []
+
+
 def test_t2_missing_catalog_id_refuses():
     eng = _FakeEngine("google_image", {
         "google_image": {"model": ("not-a-real-gemini",)},
@@ -227,6 +240,261 @@ def test_replay_skips_writer_and_still_checks_video():
     assert not [f for f in findings if f.severity == "refuse" and f.engine.startswith("comfy:")]
 
 
+# ---------------------------------------------------------------------------
+# Writer lanes: the checked slug is the one the backend will POST.
+# ---------------------------------------------------------------------------
+
+_LIVE_OR = "google/gemini-3.5-flash"
+_LIVE_GOOGLE = "gemini-3.5-flash"
+_DEAD = "dead/not-a-model"
+
+
+def _writer_prompt(handle, slot_widget, slot_value, extra_inputs=None):
+    """Queued-prompt shape from test_replay_skips_writer_and_still_checks_video."""
+    inputs = {
+        "gate_in": ["63", 0],
+        "creative_writing_model": handle,
+        "technical_model": handle,
+        slot_widget: slot_value,
+    }
+    inputs.update(extra_inputs or {})
+    return {
+        "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+        "70": {"class_type": "OTR_LedgerScriptWriter", "inputs": inputs},
+    }
+
+
+def _catalog(ids_by_authority):
+    def catalog_fn(authority):
+        auth = str(authority)
+        host = csp.GOOGLE_HOST if auth == "google" else csp.OPENROUTER_HOST
+        ids = ids_by_authority.get(auth)
+        if ids is None:
+            return csp.CatalogResult(None, "timeout", host)
+        return csp.CatalogResult(frozenset(ids), "", host)
+    return catalog_fn
+
+
+_LIVE_CATALOG = _catalog({"openrouter": {_LIVE_OR}, "google": {_LIVE_GOOGLE}})
+
+
+def _run(prompt, catalog_fn, **kwargs):
+    csp._CACHE.clear()
+    try:
+        return csp.ensure_prompt_cloud_slugs(
+            prompt, "63",
+            resolve_engine=lambda _eid: None,
+            schema_options_fn=lambda _k: {},
+            catalog_fn=catalog_fn,
+            **kwargs)
+    finally:
+        csp._CACHE.clear()
+
+
+@pytest.fixture
+def clean_slot_env(monkeypatch):
+    for name in ("OTR_OPENROUTER_SLOT_A_DEFAULT", "OTR_OPENROUTER_SLOT_B_DEFAULT",
+                 "OPENROUTER_MODEL_A", "OPENROUTER_MODEL_B",
+                 "OTR_COMFY_SLOT_A_DEFAULT", "OTR_COMFY_SLOT_B_DEFAULT"):
+        monkeypatch.delenv(name, raising=False)
+    return monkeypatch
+
+
+@pytest.mark.parametrize("handle,widget,label", [
+    ("openrouter:slot-a", "openrouter_slot_a_model", "openrouter"),
+    ("google_api:slot-a", "google_api_slot_a_model", "google"),
+    ("comfy:slot-a", "comfy_slot_a_model", "openrouter"),
+])
+def test_dead_writer_slug_refuses_on_every_lane(clean_slot_env, handle, widget, label):
+    prompt = _writer_prompt(handle, widget, _DEAD)
+    with pytest.raises(ValueError) as exc:
+        _run(prompt, _LIVE_CATALOG)
+    text = str(exc.value)
+    assert handle in text
+    assert _DEAD in text
+    assert "%s catalog" % label in text
+
+
+@pytest.mark.parametrize("handle,widget,live", [
+    ("openrouter:slot-a", "openrouter_slot_a_model", _LIVE_OR),
+    ("google_api:slot-a", "google_api_slot_a_model", _LIVE_GOOGLE),
+    ("comfy:slot-a", "comfy_slot_a_model", _LIVE_OR),
+])
+def test_live_writer_slug_passes_on_every_lane(clean_slot_env, handle, widget, live):
+    prompt = _writer_prompt(handle, widget, live)
+    findings = _run(prompt, _LIVE_CATALOG)
+    assert not [f for f in findings if f.severity == "refuse"]
+
+
+def test_google_models_prefix_matches_bare_catalog_id(clean_slot_env):
+    prompt = _writer_prompt("google_api:slot-a", "google_api_slot_a_model",
+                            "models/" + _LIVE_GOOGLE)
+    findings = _run(prompt, _LIVE_CATALOG)
+    assert not [f for f in findings if f.severity == "refuse"]
+
+
+def test_openrouter_placeholder_checks_the_env_fallback_slug(clean_slot_env):
+    clean_slot_env.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", "dead/or-env")
+    prompt = _writer_prompt("openrouter:slot-a", "openrouter_slot_a_model",
+                            "(enable OpenRouter)")
+    with pytest.raises(ValueError) as exc:
+        _run(prompt, _LIVE_CATALOG)
+    text = str(exc.value)
+    assert "dead/or-env" in text
+    assert "openrouter:slot-a" in text
+
+
+def test_openrouter_placeholder_passes_when_env_fallback_is_live(clean_slot_env):
+    clean_slot_env.setenv("OTR_OPENROUTER_SLOT_A_DEFAULT", _LIVE_OR)
+    prompt = _writer_prompt("openrouter:slot-a", "openrouter_slot_a_model",
+                            "(enable OpenRouter)")
+    findings = _run(prompt, _LIVE_CATALOG)
+    assert not [f for f in findings if f.severity == "refuse"]
+
+
+def test_comfy_placeholder_checks_the_recommended_fallback_slug(clean_slot_env):
+    from nodes import _otr_comfy_backend as occ
+    fallback = occ.recommended_slug_for_slot("A")
+    assert fallback
+    prompt = _writer_prompt("comfy:slot-a", "comfy_slot_a_model",
+                            "(enable Comfy Credits)")
+    findings = _run(prompt, _catalog({"openrouter": {fallback}}))
+    assert not [f for f in findings if f.severity == "refuse"]
+    with pytest.raises(ValueError) as exc:
+        _run(prompt, _catalog({"openrouter": {_LIVE_OR}}))
+    assert fallback in str(exc.value)
+
+
+def test_google_unbound_refuses_without_consulting_catalog(clean_slot_env):
+    def no_catalog(_auth):
+        raise AssertionError("an unbound Google slot must refuse before any list ping")
+
+    for placeholder in ("", "(enable Google API)"):
+        prompt = _writer_prompt("google_api:slot-a", "google_api_slot_a_model",
+                                placeholder)
+        with pytest.raises(ValueError) as exc:
+            _run(prompt, no_catalog)
+        text = str(exc.value)
+        assert "google_api:slot-a" in text
+        assert "No request was sent" in text
+
+
+def test_openrouter_catalog_down_refuses(clean_slot_env):
+    prompt = _writer_prompt("openrouter:slot-a", "openrouter_slot_a_model", _LIVE_OR)
+    with pytest.raises(ValueError) as exc:
+        _run(prompt, _catalog({}))
+    assert "catalog unavailable" in str(exc.value)
+
+
+def test_comfy_writer_openrouter_catalog_down_warns(clean_slot_env):
+    prompt = _writer_prompt("comfy:slot-a", "comfy_slot_a_model", _LIVE_OR)
+    findings = _run(prompt, _catalog({}))
+    warns = [f for f in findings if f.severity == "warn"]
+    assert warns and warns[0].engine == "comfy:slot-a"
+    assert csp.COMFY_PAID_HOST in warns[0].fix_hint
+    assert not [f for f in findings if f.severity == "refuse"]
+
+
+def test_google_catalog_down_refuses(clean_slot_env):
+    prompt = _writer_prompt("google_api:slot-a", "google_api_slot_a_model", _LIVE_GOOGLE)
+    with pytest.raises(ValueError) as exc:
+        _run(prompt, _catalog({}))
+    text = str(exc.value)
+    assert "catalog unavailable" in text
+    assert csp.GOOGLE_HOST in text
+
+
+def test_writer_check_restores_process_global_bindings(clean_slot_env):
+    from nodes import _otr_openrouter_backend as orb
+    from nodes._otr_google_api import models as gai
+    orb.set_slot_bindings(slot_a="before/or", slot_b=None)
+    gai.set_slot_bindings(slot_a="before-google", slot_b=None)
+    try:
+        _run(_writer_prompt("openrouter:slot-a", "openrouter_slot_a_model", _LIVE_OR),
+             _LIVE_CATALOG)
+        _run(_writer_prompt("google_api:slot-a", "google_api_slot_a_model", _LIVE_GOOGLE),
+             _LIVE_CATALOG)
+        assert orb._slot_bindings == {"A": "before/or", "B": None}
+        assert gai._slot_bindings == {"A": "before-google", "B": None}
+    finally:
+        orb.clear_slot_bindings()
+        gai.clear_slot_bindings()
+
+
+def test_director_google_engine_dead_model_refuses():
+    class _Veo:
+        name = "google_veo_video"
+        node_key = "google_veo_video"
+        cloud_catalog = "google"
+
+        def cloud_selectors(self):
+            return {"google_veo_video": {"model": ("veo-dead-preview",)}}
+
+    class _Image:
+        name = "google_image"
+        node_key = "google_image"
+        cloud_catalog = "google"
+
+        def cloud_selectors(self):
+            return {"google_image": {"model": ("gemini-dead-image",)}}
+
+    engines = {"google_veo_video": _Veo(), "google_image": _Image()}
+    prompt = {
+        "63": {"class_type": "OTR_WorkflowValidator", "inputs": {}},
+        "80": {
+            "class_type": "OTR_VideoDirector",
+            "inputs": {
+                "gate_in": ["63", 0],
+                "announcer_video_model": "google_veo_video",
+                "music_video_model": "google_veo_video",
+                "character_video_model": "google_veo_video",
+                "announcer_image_model": "google_image",
+                "music_image_model": "google_image",
+                "character_image_model": "google_image",
+            },
+        },
+    }
+    csp._CACHE.clear()
+    with pytest.raises(ValueError) as exc:
+        csp.ensure_prompt_cloud_slugs(
+            prompt, "63",
+            resolve_engine=lambda eid: engines.get(eid),
+            schema_options_fn=lambda _k: {},
+            catalog_fn=_catalog({"google": {"veo-3.1-generate-preview",
+                                            "gemini-3.1-flash-image"}}))
+    text = str(exc.value)
+    assert "veo-dead-preview" in text
+    assert "google catalog" in text
+    csp._CACHE.clear()
+
+
+def test_catalog_ids_openrouter_and_google_with_injected_get_json():
+    def or_get(url):
+        assert url == csp.OPENROUTER_MODELS_URL
+        return {"data": [{"id": "google/gemini-3.5-flash"}, {"id": "x/y"}, {"nope": 1}]}
+
+    got = csp.catalog_ids("openrouter", get_json=or_get)
+    assert got.ids == frozenset({"google/gemini-3.5-flash", "x/y"})
+    assert got.host == csp.OPENROUTER_HOST and got.error == ""
+
+    def google_get(path):
+        assert path.startswith("/v1beta/models?pageSize=")
+        return {"models": [{"name": "models/gemini-3.5-flash"},
+                           {"name": "models/veo-3.1-generate-preview"}]}
+
+    got = csp.catalog_ids("google", get_json=google_get)
+    assert got.ids == frozenset({"gemini-3.5-flash", "veo-3.1-generate-preview"})
+    assert got.host == csp.GOOGLE_HOST and got.error == ""
+
+    def down(_path):
+        raise OSError("connection refused")
+
+    assert csp.catalog_ids("openrouter", get_json=down).ids is None
+    assert csp.catalog_ids("google", get_json=down).ids is None
+    with pytest.raises(ValueError):
+        csp.catalog_ids("bogus", get_json=or_get)
+
+
 def test_validator_calls_slug_check_before_visual_assets():
     src = (REPO / "nodes" / "_otr_workflow_validator.py").read_text(encoding="utf-8")
     tree = ast.parse(src)
@@ -246,8 +514,11 @@ def test_validator_calls_slug_check_before_visual_assets():
         elif isinstance(func, ast.Attribute):
             names.append(func.attr)
     assert "ensure_prompt_cloud_slugs" in names
+    assert "ensure_prompt_cloud_balance" in names
     assert "ensure_prompt_visual_assets" in names
     assert names.index("ensure_prompt_cloud_slugs") < names.index(
+        "ensure_prompt_cloud_balance")
+    assert names.index("ensure_prompt_cloud_balance") < names.index(
         "ensure_prompt_visual_assets")
     calls = [line.strip() for line in src.splitlines()
              if line.strip() == "_queue_time_readiness_gates(prompt, unique_id)"]

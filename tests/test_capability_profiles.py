@@ -40,6 +40,8 @@ GOOGLE_MEDIA_PROFILES = (
     "google_omni_media",
     "google_veo_all",
     "google_omni_all",
+    "google_veo_low_1act",
+    "google_veo_low_3act",
 )
 
 

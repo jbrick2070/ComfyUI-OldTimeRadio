@@ -370,6 +370,12 @@ from the adapters without the suite noticing. Written for multi-clip coverage
 chunk 7a (2026-07-26), when every registered engine gained a declared
 `FrameContract` and the per-engine opt-in was removed.
 
+**API keys are not per-engine rows.** The heading of the README is the
+copy. Google and OpenRouter use two files (`google.secret` /
+`openrouter.secret`, or a path in the matching `*_api_key.location`).
+Comfy Cloud: sign into the app. A `google_*` row below still needs a
+Google key. Never paste a key into a workflow.
+
 ## How to read the clip window
 
 `clip frames` is what ONE render call may legally produce. `step N` means the
