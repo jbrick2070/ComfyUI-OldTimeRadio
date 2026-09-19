@@ -41,28 +41,60 @@ BANK_LABEL = {
 
 
 def collect() -> list[dict]:
+    # READ THE LEDGERS, DO NOT PARSE THE FILENAMES.
+    #
+    # This used to derive the title, the timestamp and the episode directory
+    # from the obs filename. It has been failing on EVERY file since the
+    # 2026-09-03 rename: the timestamp regex is anchored at the end of the
+    # stem, and published names have carried `__<codes>_final` after the
+    # timestamp ever since -- so the match failed, `title` fell back to the raw
+    # filename, and the `EPISODES / stem` lookup found no ledger, which is why
+    # this page has shown no bank, no duration and no voices for weeks.
+    #
+    # Rather than teach it a THIRD format -- the two-word gloss lands next
+    # (operator 2026-09-18) -- stop reading names altogether. Every fact this
+    # page wants is already in the ledger, including `meta.episode_title`,
+    # which is the NATIVE title and is what a listen page should show whatever
+    # the filename says.
+    by_file: dict[str, dict] = {}
+    for ledger_path in EPISODES.glob("*/audio/*_ledger.json"):
+        try:
+            data = json.loads(Path(ledger_path).read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001 -- a bad ledger loses one episode
+            continue
+        meta = data.get("meta") or {}
+        published = str(meta.get("obs_final_path") or "")
+        key = os.path.basename(published) if published else ""
+        if key:
+            by_file[key] = data
+
     rows: list[dict] = []
     for name in os.listdir(OBS):
         if not name.lower().endswith(".mp4"):
             continue
+        data = by_file.get(name)
+        meta = (data or {}).get("meta") or {}
         stem = name.split("_silent")[0]
-        stamp_match = re.search(r"(20\d{6})_(\d{6})$", stem)
+
+        title = str(meta.get("episode_title") or "").strip()
         when = sort_key = ""
-        title = stem
+        stamp_match = re.search(r"(20\d{6})_(\d{6})", stem)
         if stamp_match:
             d, t = stamp_match.group(1), stamp_match.group(2)
             when = f"{d[:4]}-{d[4:6]}-{d[6:]} {t[:2]}:{t[2:4]}"
             sort_key = d + t
-            title = stem[: stamp_match.start()].rstrip("_")
-        title = title.replace("signal_lost_", "").replace("_", " ").strip()
-        title = title.title() if title else stem
+        if not title:
+            # No ledger for this file (a hand-copied mp4, or a pod import that
+            # never wrote one). Fall back to the name, as before.
+            title = stem
+            if stamp_match:
+                title = stem[: stamp_match.start()].rstrip("_")
+            title = title.replace("signal_lost_", "").replace("_", " ").strip()
+            title = title.title() if title else stem
 
         bank, duration, voices = "", 0.0, []
-        found = glob.glob(str(EPISODES / stem / "audio" / "*_ledger.json"))
-        if found:
+        if data:
             try:
-                data = json.loads(Path(found[0]).read_text(encoding="utf-8"))
-                meta = data.get("meta") or {}
                 bank = str(meta.get("source_bank") or "")
                 duration = float(data.get("total_episode_dur_s") or 0)
                 for row in data.get("cast") or []:

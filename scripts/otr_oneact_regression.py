@@ -111,8 +111,23 @@ def check_leg(episode: "pathlib.Path | None", bank: str) -> "list[str]":
     except ImportError:
         problems.append("soundfile absent -- music cues NOT checked")
 
+    # MATCH ON THE IDENTITY TAIL, NOT THE TITLE. This used to glob the whole
+    # episode stem, which is the title plus `_<iso>_<timestamp>`. The published
+    # name carries a two-word English GLOSS in place of the title (operator
+    # 2026-09-18 -- the obs filename is an index, not the title), so a
+    # title-shaped glob matches nothing and every leg reports NOT PUBLISHED --
+    # a deterministic false negative on the day the naming changed. The tail is
+    # in BOTH shapes, the glossed one and the native fallback.
     stem = episode.name.replace("signal_lost_", "")
-    published = [p for d in _obs_dirs() for p in d.glob("*%s*_final.mp4" % stem)]
+    try:
+        if str(REPO) not in sys.path:
+            sys.path.insert(0, str(REPO))
+        from nodes._otr_shared.obs_name import identity_tail as _identity_tail
+        tail = _identity_tail(episode.name) or ""
+    except Exception:  # noqa: BLE001 -- a matcher never fails a green leg
+        tail = ""
+    pattern = "*%s*_final.mp4" % (tail or stem)
+    published = [p for d in _obs_dirs() for p in d.glob(pattern)]
     if not published:
         problems.append("nothing matching this episode in otr/obs -- NOT PUBLISHED")
     elif not any(p.stat().st_size > 0 for p in published):

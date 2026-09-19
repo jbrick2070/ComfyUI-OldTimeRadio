@@ -181,6 +181,8 @@ def _published_obs_path(
     *,
     inferred_obs_root: Path,
     episode_id: str,
+    obs_title_gloss: str = "",
+    episode_iso: str = "",
 ) -> Optional[Path]:
     """Validate a terminal publisher's OBS path against authorized roots.
 
@@ -209,6 +211,28 @@ def _published_obs_path(
         forms = [ep]
         if ep.startswith(SHOW_PREFIX) and len(ep) > len(SHOW_PREFIX):
             forms.append(ep[len(SHOW_PREFIX):])
+        # A THIRD ACCEPTED FORM: the two-word gloss plus this episode's
+        # identity tail (operator 2026-09-18 -- the obs filename is an index,
+        # not the title). The native forms above are KEPT, because they cost
+        # nothing: they only ever match a file leading with this episode's own
+        # id, which is exactly the name the mux writes when no gloss was
+        # minted.
+        #
+        # NOT "exactly as strong as today" -- the accepted set is a superset,
+        # so a second episode rendered in the SAME SECOND with the SAME gloss
+        # would bind here. Every other refusal stands: a different gloss, a
+        # different timestamp, or a prefix of the id are all still refused.
+        # The sanitiser and the tail come from `_otr_shared/obs_name.py` so
+        # this and the mux cannot spell the rule differently -- that seam is
+        # what came apart in PBUG-20260904-06 and again in PBUG-20260918-09.
+        if str(obs_title_gloss or "").strip():
+            try:
+                from ._otr_shared.obs_name import obs_stem as _obs_stem
+            except ImportError:  # pragma: no cover -- flat import harnesses
+                from _otr_shared.obs_name import obs_stem as _obs_stem  # type: ignore
+            glossed = _obs_stem(obs_title_gloss, episode_id, episode_iso)
+            if glossed:
+                forms.append(glossed.casefold())
         if not ep or not any(stem == f or stem.startswith(f + "_") for f in forms):
             return None
         if candidate.suffix.casefold() != ".mp4" or not candidate.is_file():
@@ -223,6 +247,8 @@ def _build_meta_paths(
     episode_id: str,
     *,
     published_obs_path: Any = "",
+    obs_title_gloss: str = "",
+    episode_iso: str = "",
 ) -> dict:
     """Resolve the canonical absolute paths for this episode's per-dir
     workspace, derived from the on-disk ledger location.
@@ -285,6 +311,8 @@ def _build_meta_paths(
                 published_obs_path,
                 inferred_obs_root=obs_root,
                 episode_id=episode_id,
+                obs_title_gloss=obs_title_gloss,
+                episode_iso=episode_iso,
             )
             chosen_obs = published or (obs_root / f"{episode_id}.mp4")
             paths["obs_final"] = str(chosen_obs)
@@ -471,10 +499,18 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
             ledger["schema_version"] = CURRENT_SCHEMA_VERSION
             meta["schema_version"] = CURRENT_SCHEMA_VERSION
         episode_id = ledger.get("episode_id") or ""
+        _gloss = str(meta.get("obs_title_gloss") or "")
+        try:
+            from ._otr_shared.obs_name import episode_iso as _episode_iso
+        except ImportError:  # pragma: no cover -- flat import harnesses
+            from _otr_shared.obs_name import episode_iso as _episode_iso  # type: ignore
+        _iso = _episode_iso(meta)
         meta["paths"] = _build_meta_paths(
             Path(path),
             str(episode_id),
             published_obs_path=meta.get("obs_final_path"),
+            obs_title_gloss=_gloss,
+            episode_iso=_iso,
         )
         # A validated terminal publication has one canonical spelling at both
         # metadata surfaces. Pre-publication ledgers intentionally have no
@@ -485,6 +521,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
                 meta.get("obs_final_path"),
                 inferred_obs_root=Path(meta["paths"].get("obs_dir") or "."),
                 episode_id=str(episode_id),
+                obs_title_gloss=_gloss,
+                episode_iso=_iso,
             )
             if candidate is not None and str(candidate) == chosen_obs:
                 meta["obs_final_path"] = chosen_obs

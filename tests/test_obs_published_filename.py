@@ -354,3 +354,139 @@ def test_the_byte_cap_holds_when_processing_SHRINKS_the_title(monkeypatch):
         assert len(got.encode("utf-8")) <= mux._OBS_NAME_MAX, (
             "%d bytes for %r" % (len(got.encode("utf-8")), got[:60]))
         assert got.endswith("_final.mp4")
+
+
+# --- the two-word gloss (operator 2026-09-18) -------------------------------
+#
+# "this is the episode title. I need you to summarize it in two words for a
+# file name, index" -- the published folder is the only one he opens, and a
+# Japanese or Devanagari title there is a name he cannot read, say or type.
+
+from nodes._otr_shared import obs_name as _N  # noqa: E402
+
+
+class _GlossLedger:
+    """A ledger stub carrying a gloss and a language row."""
+
+    def __init__(self, gloss="", language="ja"):
+        meta = {"visual_style": "cartoon", "source_bank": "public_domain",
+                "char_voice_engine": "kokoro", "creative_writing_model": "g4",
+                "music_engine": "stable_audio_3",
+                "image_engines": {"by_role": {}}, "obs_title_gloss": gloss}
+        if language:
+            # A REAL ledger stamps the ISO here, not the label. Writing
+            # "Japanese" made the first draft of these tests fail against
+            # working code, and nearly sent the fix into the wrong place.
+            meta["episode_language"] = language
+        self.payload = {"meta": meta,
+                        "video": {"shots": [{"engine_id": "wan_ti2v"}]}}
+
+    def in_flight_ledger_path(self):
+        return "in-memory"
+
+    def load_ledger_safe(self, _path):
+        return self.payload
+
+
+def _with_gloss(monkeypatch, gloss, language="ja"):
+    import sys
+    stub = _GlossLedger(gloss, language)
+    monkeypatch.setitem(sys.modules, "_otr_ledger", stub)
+    monkeypatch.setattr(mux, "_otr_ledger", stub, raising=False)
+    import nodes
+    monkeypatch.setattr(nodes, "_otr_ledger", stub, raising=False)
+    return stub
+
+
+_ARCHIVAL_JA = ("signal_lost_%s_ja_20260918_190917"
+                "_silent_captioned_with_credits_final.mp4" % _JA)
+
+
+def test_the_gloss_replaces_the_title_and_keeps_the_language_tag(monkeypatch):
+    _with_gloss(monkeypatch, "false_dawn")
+    got = mux._obs_basename(_ARCHIVAL_JA)
+    assert got.startswith("false_dawn_ja_20260918_190917__"), got
+    assert _JA not in got
+    assert got.endswith("_final.mp4")
+
+
+def test_no_gloss_is_byte_identical_to_todays_name(monkeypatch):
+    """The gloss is additive. An episode without one publishes exactly as it
+    does today, which is what keeps every pre-existing ledger working."""
+    _with_gloss(monkeypatch, "")
+    got = mux._obs_basename(_ARCHIVAL_JA)
+    assert got.startswith("%s_ja_20260918_190917__" % _JA), got
+
+
+def test_a_ledger_with_no_language_row_invents_no_tag(monkeypatch):
+    """The failure the design review caught: reading a two-letter code off the
+    id makes `..._the_fall_of_it_20260918_190917` publish as ITALIAN. The iso
+    comes from the ledger, so a ledger that does not name one gets no tag."""
+    _with_gloss(monkeypatch, "false_dawn", language=None)
+    got = mux._obs_basename(_ARCHIVAL_JA)
+    assert got.startswith("false_dawn_20260918_190917__"), got
+    assert "_it_" not in got and "_ja_" not in got
+
+
+def test_the_published_gloss_name_binds_to_its_episode(tmp_path):
+    """The seam that came apart in PBUG-20260904-06 and -09: the mux WRITES a
+    name the ledger must ACCEPT. Both sides now spell the rule from
+    `_otr_shared/obs_name.py`."""
+    from nodes import _otr_ledger as ledger
+    episode_id = "signal_lost_%s_ja_20260918_190917" % _JA
+    name = "false_dawn_ja_20260918_190917__cart__sa3_final.mp4"
+    published = tmp_path / name
+    published.write_bytes(b"x")
+
+    bound = ledger._published_obs_path(
+        str(published), inferred_obs_root=tmp_path, episode_id=episode_id,
+        obs_title_gloss="false_dawn", episode_iso="ja")
+    assert bound == published.resolve()
+
+    # NOT "exactly as strong as today" -- but a WRONG gloss and a WRONG second
+    # are both still refused, which is the part that matters.
+    assert ledger._published_obs_path(
+        str(published), inferred_obs_root=tmp_path, episode_id=episode_id,
+        obs_title_gloss="other_words", episode_iso="ja") is None
+    wrong_second = tmp_path / "false_dawn_ja_20260918_999999__cart__sa3_final.mp4"
+    wrong_second.write_bytes(b"x")
+    assert ledger._published_obs_path(
+        str(wrong_second), inferred_obs_root=tmp_path, episode_id=episode_id,
+        obs_title_gloss="false_dawn", episode_iso="ja") is None
+
+
+def test_the_native_forms_still_bind_when_a_gloss_exists(tmp_path):
+    """Keeping the native forms costs nothing: they only ever match a file
+    leading with this episode's own id, which is the no-gloss fallback name."""
+    from nodes import _otr_ledger as ledger
+    episode_id = "signal_lost_%s_ja_20260918_190917" % _JA
+    native = tmp_path / ("%s_ja_20260918_190917__cart__sa3_final.mp4" % _JA)
+    native.write_bytes(b"x")
+    assert ledger._published_obs_path(
+        str(native), inferred_obs_root=tmp_path, episode_id=episode_id,
+        obs_title_gloss="false_dawn", episode_iso="ja") == native.resolve()
+
+
+@pytest.mark.parametrize("raw, want", [
+    ("false dawn", "false_dawn"),
+    ("Breaking Silence", "breaking_silence"),
+    ("caf\u00e9 noir", "cafe_noir"),
+    ("reloj inquieto", "reloj_inquieto"),      # Latin non-English: accepted
+])
+def test_validate_gloss_accepts_what_it_should(raw, want):
+    gloss, reason = _N.validate_gloss(raw)
+    assert (gloss, reason) == (want, "")
+
+
+@pytest.mark.parametrize("raw, fragment", [
+    (_JA, "not English script"),
+    (_HI, "not English script"),
+    ("", "empty"),
+    ("a two word summary of the given title", "wanted two"),
+    ("title", "echoed the instruction"),
+    ("supercalifragilisticexpialidocious", "over 16 characters"),
+])
+def test_validate_gloss_refuses_what_it_should(raw, fragment):
+    gloss, reason = _N.validate_gloss(raw)
+    assert gloss == ""
+    assert fragment in reason, reason

@@ -194,3 +194,77 @@ subprocess boundary before trusting it.
 - Tests: `tests/test_obs_published_filename.py`,
   `tests/test_meta_paths.py::TestPublishedNameBindsTheEpisode`. No widget added,
   so no widget-count check.
+
+---
+
+# RESOLVED — Fable and cursor agree, 2026-09-18
+
+Cursor verified the design against the code (staying on it, unlike its earlier
+pass: it was given this FILE to read rather than a prose question, because
+cursor-agent anchors on an artifact). It confirmed the load-bearing claims —
+the three title branches merging at 843-956, `_published_obs_path:209-213`,
+`work_title` unsafe at 880-885, `_obs_title("")` → `"episode"`, and that the
+regression-script glob is a real silent break — and set four conditions.
+Fable answered. Where they differed, Fable's answer is better and is what gets
+built.
+
+**1. The listen page is a second reader — and the fix is to stop reading names.**
+`scripts/otr_build_obs_listen_page.py:48-61` parses obs filenames. Its
+timestamp regex is anchored at the end of the stem, and names have carried
+`__<codes>_final` after the timestamp since 2026-09-03 — so it has been failing
+on every file for two weeks, showing raw names with no bank, duration or
+voices. Do NOT teach it a third format. Walk `episodes/*/audio/*_ledger.json`
+and read `meta.episode_title` (the native title, which is what a listen page
+should show), `meta.obs_final_path`, and `meta.obs_title_gloss` for the short
+label. Fixes old and new shapes at once and removes the reader that would
+break on the next rename.
+
+**2. THREE call sites, not two.** `_published_obs_path` is called from
+`_build_meta_paths:284` (no `meta`, no gloss) and directly from
+`save_ledger_safe:484` for the alias sync. Thread `obs_title_gloss` into
+`_build_meta_paths` from the two save callers that hold `meta`
+(`_otr_ledger.py:474`, `production_ledger.py:1770`), and supply it at 484 too —
+miss that one and the alias sync silently keeps the planned path.
+
+**3. THE ISO COMES FROM THE LEDGER, NOT FROM A REGEX.** Cursor proposed
+narrowing `[a-z]{2}` to the eight admitted rows. That shrinks the hazard
+without closing it: a title whose last word is a two-letter English word still
+matches. `..._of_it_20260918_190917` parses `it` as the iso and the file reads
+as an ITALIAN episode; `..._to_go_...` eats `go`. Both sides would agree on the
+same wrong answer, so the binding still holds — the damage is a wrong language
+in a name the operator reads. Instead take the iso from `meta.episode_language`
+via the same `row_from_meta` that minted the id (`video_engine.py:98-119`).
+Expected tail = `("_" + iso unless English) + "_" + timestamp(+replay)`;
+confirm the id actually ends with it, else fall back to today's name. The "a
+title slug cannot contain the pattern" argument only ever rested on the
+`\d{8}_\d{6}` part, which is unchanged.
+
+**4. Option B keeps the native forms; the STRENGTH CLAIM was wrong.**
+`forms = [ep, ep_without_prefix, gloss + tail]` — the native forms only ever
+match a file leading with this episode's own id, which is exactly the fallback
+name, so keeping them costs nothing. But the accepted set is a SUPERSET of
+today's, so "exactly as strong" is false. Correct claim: **as strong as today
+except a same-second, same-gloss collision**, which the tail-only option could
+not distinguish either.
+
+## Corrections to the record
+
+- **PBUG-09 was not "two modules spelling one rule differently."** PBUG-06 was
+  (the mux stripped `SHOW_PREFIX`, the validator demanded it; the mux already
+  imports it from the ledger at `otr_master_audio_mux.py:67`). PBUG-09 was the
+  title going through `_obs_field`'s ASCII strip. Same failure MODE, different
+  cause. The shared module is justified by the split THIS change creates —
+  gloss sanitised in the mux, bound in the ledger — not by history.
+- **`structured_call` needs `base_temperature=0.2` and
+  `structural_retry_temperature=0.1`.** Dropped when this doc was condensed from
+  the design; a transcription error, not a design one.
+- **`_otr_ledger_cleanup.py:334` is the `def`; the fill is 351-374.**
+- **The ffmpeg lines 1599-1601 are a docstring**; the publish command is the
+  argv list at 1621-1624 via `otr_proc.run(..., encoding="utf-8")`. Adding
+  `-metadata` as list argv is the right shape; verify a CJK value survives the
+  Windows subprocess boundary before trusting it.
+- **An English two-word title passing verbatim as its own gloss is FINE**, not
+  a gap — a three-word-or-fewer English title *is* its own gloss.
+- **The empty-gloss fallback is the mux's existing branch untouched** —
+  `_obs_title(slug + iso + timestamp)`, never `_obs_title(meta.episode_title)`.
+  Dropping the tail strips the very thing the binder matches.

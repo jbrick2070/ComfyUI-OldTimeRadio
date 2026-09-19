@@ -167,6 +167,97 @@ def _title_language_instruction(meta) -> str:
         return ""
 
 
+def _mint_obs_gloss(final_title: str, language_label: str, slot_fn):
+    """``(gloss, source, reason)`` -- two English words naming the episode file.
+
+    THE OBS FILENAME IS AN INDEX, NOT THE TITLE (operator 2026-09-18): *"this
+    is the episode title. I need you to summarize it in two words for a file
+    name"*. The published folder is the only one he opens, and a Japanese or
+    Devanagari title there is a name he cannot read, say or type.
+
+    A SUMMARY, NOT A TRANSLATION, and not a transliteration. Romanising was
+    measured and rejected (PBUG-20260918-09): `anyascii` reads 嘘の夜明け as
+    `XunoYeMingke`, the CHINESE pronunciation of Japanese kanji. The deciding
+    argument is that WRONGNESS IS CHEAP HERE -- a gloss is openly a paraphrase,
+    so a loose one is a slightly-off label, while a wrong romanisation is a
+    confident lie that announces nothing. Summarising is also the easier task
+    for a small local model than translating, which has a right answer it can
+    miss.
+
+    Fails soft to ``("", "native_title", <reason>)``; the caller then keeps the
+    name it writes today. A filename may never cost an episode.
+    """
+    title = " ".join(str(final_title or "").split())
+    if not title:
+        return "", "native_title", "no title to summarise"
+    try:
+        try:
+            from pydantic import BaseModel, Field
+
+            from ._otr_structured_call import structured_call
+            from ._otr_shared.obs_name import validate_gloss
+        except ImportError:  # pragma: no cover -- flat import harnesses
+            from pydantic import BaseModel, Field  # type: ignore
+
+            from _otr_structured_call import structured_call  # type: ignore
+            from _otr_shared.obs_name import validate_gloss  # type: ignore
+    except Exception as exc:  # noqa: BLE001 -- never fatal
+        return "", "native_title", "imports unavailable (%s)" % type(exc).__name__
+
+    class _Gloss(BaseModel):
+        gloss: str = Field(min_length=1, max_length=40)
+
+    said_language = (" It is in %s." % language_label) if language_label else ""
+    prompt = [
+        {
+            "role": "system",
+            "content": (
+                "You summarise an episode title into a two-word label for a "
+                "FILENAME. Return JSON only. The two words must be ENGLISH, "
+                "whatever language the title is in. Summarise the TITLE -- do "
+                "not translate it word for word, do not invent events, and do "
+                "not describe the episode."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "Episode title: %s%s\n\n"
+                'Return {"gloss": "two words"} -- exactly two plain English '
+                "words, lowercase, no punctuation." % (title, said_language)
+            ),
+        },
+    ]
+
+    def _validate(result: "_Gloss") -> "str | None":
+        # The same rule the filename builder will apply, imported rather than
+        # restated -- a validator that disagreed with the writer would accept a
+        # gloss the name then mangles.
+        _accepted, reason = validate_gloss(result.gloss)
+        return reason or None
+
+    try:
+        # LLM slot: technical -- naming an artifact that already exists, the
+        # same slot the ledger-cleanup title fill uses.
+        result = structured_call(
+            prompt=prompt,
+            schema=_Gloss,
+            slot_fn=slot_fn,
+            base_temperature=0.2,
+            structural_retry_temperature=0.1,
+            post_validator=_validate,
+            max_new_tokens=32,
+            max_attempts=2,
+            helper_name="obs_title_gloss",
+        )
+    except Exception as exc:  # noqa: BLE001 -- the native title is the backstop
+        return "", "native_title", "%s: %s" % (type(exc).__name__, str(exc)[:120])
+    gloss, reason = validate_gloss(getattr(result, "gloss", ""))
+    if not gloss:
+        return "", "native_title", reason or "rejected after the call"
+    return gloss, "llm_two_word_gloss", ""
+
+
 def _generate_title_from_script(
     generate_fn,
     assembled_script: str,
@@ -1029,6 +1120,46 @@ class WriterTailMixin:
         # LLM-regenerated runs without inspecting widget state.
         meta["episode_title"] = final_title
         meta["title_source"] = title_source
+
+        # THE OBS FILENAME IS AN INDEX, NOT THE TITLE (operator 2026-09-18).
+        # Two English words summarising the title, for the published folder --
+        # the only one he opens, and the one where a Japanese or Devanagari
+        # title is a name he cannot read, say or type. Minted HERE because all
+        # three title branches (typed widget, custom-lane override, LLM regen)
+        # have merged by this line; there is no earlier point where
+        # `final_title` is settled.
+        #
+        # Stamped ONCE and never rewritten: a later tool changing it would drop
+        # the pointer to the planned path on the next save, which is the
+        # PBUG-20260904-06 failure.
+        # The label comes from the ROW, the way `video_engine._language_marks`
+        # derives it -- not from a `meta` key, which is not guaranteed stamped
+        # at this point. Telling the model "It is in Japanese" is what lets it
+        # summarise rather than guess at the script.
+        try:
+            try:
+                from . import _otr_episode_languages as _EPLANG_GLOSS
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_episode_languages as _EPLANG_GLOSS  # type: ignore
+            _gloss_language_label = str(
+                _EPLANG_GLOSS.row_from_meta(meta).label or "")
+        except Exception:  # noqa: BLE001 -- a label never costs an episode
+            _gloss_language_label = ""
+        gloss, gloss_source, gloss_reason = _mint_obs_gloss(
+            final_title, _gloss_language_label, ctx.technical_fn)
+        meta["obs_title_gloss"] = gloss
+        meta["obs_title_gloss_source"] = (
+            gloss_source if not gloss_reason
+            else "%s (%s)" % (gloss_source, gloss_reason))
+        if gloss:
+            log.info("[OTR_LedgerScriptWriter] obs gloss=%r for title=%r",
+                     gloss, final_title)
+        else:
+            # A cosmetic name, never an episode: the mux keeps the name it
+            # writes today and the reason is on the row for the next reader.
+            log.info(
+                "[OTR_LedgerScriptWriter] no obs gloss (%s); the published "
+                "name keeps the native title", gloss_reason)
 
         # --- J.7. The announcer's WORK phrase becomes Python-owned ---------
         # (J.6 is a TOMBSTONE -- the retired post-hoc title-substitution

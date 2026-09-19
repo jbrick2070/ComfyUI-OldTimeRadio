@@ -1189,7 +1189,9 @@ _PIPELINE_SUFFIXES = ("_silent_procgen_blended_captioned_with_credits",
                       "_blend", "_silent")
 
 #: Cap so a long title plus six fields cannot approach the Windows path limit.
-_OBS_NAME_MAX = 150
+#: Defined in `_otr_shared/obs_name.py` and imported below rather than spelled
+#: here as well -- the whole point of that module is one definition, and a
+#: duplicated 150 is the same drift in miniature.
 
 
 def _obs_field(text, fallback="none"):
@@ -1204,86 +1206,35 @@ def _obs_field(text, fallback="none"):
     return (s or fallback).lower()
 
 
-#: What a filesystem actually refuses, and nothing more. The Windows set is a
-#: superset of POSIX's, so obeying it everywhere keeps one name per episode
-#: across the 5080, the 4060 and the share between them.
-_FILENAME_FORBIDDEN = re.compile(r'[<>:"/\\|?*\x00-\x1f]+')
-
-#: Windows refuses these as a basename whatever the extension.
-_WINDOWS_RESERVED = frozenset(
-    ["con", "prn", "aux", "nul"]
-    + ["com%d" % n for n in range(1, 10)]
-    + ["lpt%d" % n for n in range(1, 10)])
-
-
-def _trim_title(text, budget):
-    """Trim a title to ``budget`` UTF-8 BYTES without splitting a character.
-
-    TWO THINGS len() DOES NOT MEASURE. It counts codepoints, while a filesystem
-    counts UTF-16 units (NTFS) or UTF-8 bytes (ext4, and any share that lands
-    on one) -- a CJK title is about three bytes per codepoint, so a cap that
-    looks safe at 150 can be 450 bytes on the wire. And slicing at an arbitrary
-    codepoint splits a Devanagari cluster: `रा` is ra + a vowel sign,
-    and cutting between them leaves a bare combining mark that renders as a
-    dotted circle. Budgeting in bytes and refusing to strand a combining mark
-    fixes both.
-    """
-    text = str(text or "")
-    if len(text.encode("utf-8")) <= budget:
-        return text
-    out = ""
-    used = 0
-    for character in text:
-        size = len(character.encode("utf-8"))
-        if used + size > budget:
-            break
-        out += character
-        used += size
-    # Never end on a combining mark whose base was just cut away.
-    while out and unicodedata.combining(out[-1]):
-        out = out[:-1]
-    return out
-
-
-def _obs_title(text, fallback="episode"):
-    """The episode title, kept in ITS OWN SCRIPT.
-
-    THE TITLE IS THE OPERATOR'S CONTENT AND WE DO NOT TRANSLITERATE IT
-    (2026-09-18). `_obs_field` strips to ASCII, which erased the title outright
-    on three shipped languages -- a Japanese episode published as
-    `_ja_20260918_190917__pori__...`, a Mandarin one as `_zh_...`, and Hindi
-    as `_-_-_-_hi_...` -- so every episode in a script the operator cannot
-    read was indistinguishable from the next one in the folder he browses.
-
-    ROMANISING WAS THE OBVIOUS FIX AND IT WAS MEASURED AND REJECTED. No
-    romaniser is right across these rows: `anyascii` renders 嘘の夜明け as
-    `XunoYeMingke`, which is the CHINESE reading of Japanese kanji, and drops
-    the vowels out of Devanagari; `misaki.cutlet` returns IPA phonemes rather
-    than romaji because misaki vendored it as a G2P. A wrong romanisation is
-    worse than none, because nothing about `XunoYeMingke` announces that it is
-    wrong. Unicode filenames are what the filesystem, the share and every
-    modern OS already support, and the archival copy and the burnt-in title
-    card carry the same title anyway.
-
-    So: strip what a filesystem genuinely refuses, normalise, and keep the
-    rest. The `_<iso>_` tag already in the stem answers "which language"; this
-    answers "which episode".
-    """
-    # ORDER MATTERS, and the first cut got it wrong: collapsing whitespace to
-    # `_` BEFORE trimming turned a trailing space into a trailing underscore,
-    # and a whitespace-only title into a bare `_` instead of the fallback.
-    # Trim, then collapse what is left inside, then trim our own separators.
-    s = unicodedata.normalize("NFC", str(text or "")).strip()
-    s = _FILENAME_FORBIDDEN.sub("-", s)
-    s = re.sub(r"\s+", "_", s)
-    # Windows silently drops a trailing dot or space, which would make the
-    # name on disk differ from the name we recorded.
-    s = s.strip("-._ \t　")
-    if not s:
-        return fallback
-    if s.split(".")[0].lower() in _WINDOWS_RESERVED:
-        s = "_" + s
-    return s.lower()
+# THE NAMING RULE LIVES IN ONE PLACE, and it is not here. `_otr_ledger`
+# VALIDATES the name this module WRITES, and it cannot import the mux (the mux
+# imports the ledger), so a rule spelled here is invisible to the validator
+# that has to accept its output. That seam came apart in PBUG-20260904-06 and
+# again, for a different reason, in PBUG-20260918-09. The two-word gloss splits
+# it a third way -- sanitised here, bound there -- so the rule moved to
+# `_otr_shared/obs_name.py` before that could happen again.
+try:
+    from ._otr_shared.obs_name import (
+        FILENAME_FORBIDDEN as _FILENAME_FORBIDDEN,
+        WINDOWS_RESERVED as _WINDOWS_RESERVED,
+        identity_tail as _identity_tail,
+        obs_stem as _obs_stem,
+        episode_iso as _episode_iso,
+        sanitise_name_part as _obs_title,
+        trim_to_bytes as _trim_title,
+        OBS_NAME_MAX as _OBS_NAME_MAX,
+    )
+except ImportError:  # pragma: no cover -- flat import harnesses
+    from _otr_shared.obs_name import (  # type: ignore
+        FILENAME_FORBIDDEN as _FILENAME_FORBIDDEN,
+        WINDOWS_RESERVED as _WINDOWS_RESERVED,
+        identity_tail as _identity_tail,
+        obs_stem as _obs_stem,
+        episode_iso as _episode_iso,
+        sanitise_name_part as _obs_title,
+        trim_to_bytes as _trim_title,
+        OBS_NAME_MAX as _OBS_NAME_MAX,
+    )
 
 
 def _obs_basename(final: str) -> str:
@@ -1415,7 +1366,20 @@ def _obs_basename(final: str) -> str:
         # reachable through the real short-code table -- worst case with every
         # field on its fallback measures 78 bytes -- and that table has its own
         # length discipline, so the floor stays.
-        shown = _obs_title(title, "episode")
+        # THE GLOSS, WHEN THE WRITER MINTED ONE. Two English words plus the
+        # identity tail, so the published folder reads in a script the operator
+        # can read whatever language the episode is in. `obs_stem` returns ""
+        # rather than guessing -- no gloss on the ledger, or an episode id that
+        # does not end in the tail the ledger expects -- and then the name below
+        # is byte-for-byte the one this function has always written.
+        #
+        # The iso is passed from the LEDGER, never parsed off the id: a title
+        # ending in two English letters is indistinguishable from a language
+        # tag, and `..._the_fall_of_it_20260918_190917` would otherwise publish
+        # as an ITALIAN episode.
+        glossed = _obs_stem(meta.get("obs_title_gloss"), stem,
+                            _episode_iso(meta))
+        shown = glossed or _obs_title(title, "episode")
         name = "%s__%s_final%s" % (shown, "__".join(fields), ext or ".mp4")
         if len(name.encode("utf-8")) > _OBS_NAME_MAX:
             fixed = len(name.encode("utf-8")) - len(shown.encode("utf-8"))
