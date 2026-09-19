@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any
 
 from .._otr_generation_budget import (
@@ -14,7 +15,67 @@ from .client import (
     GoogleAPIError,
     GoogleAPIRequestShapeError,
     create_interaction,
+    otr_env,
 )
+
+_LOG = logging.getLogger("OTR.google_api")
+
+# THINKING EATS THE OUTPUT BUDGET (measured 2026-09-19, first live leg of
+# google_veo_low_1act). The Interactions API counts thought tokens against
+# `max_output_tokens`, and `gemini-flash-latest` thinks by default: at a
+# 256-token budget it spent 242 on thoughts and returned 7 visible tokens
+# (`status: incomplete`, truncated JSON, the writer's 250-token description
+# call died after 3 attempts). Measured levels, same prompt:
+#   gemini-flash-latest       default -> 861-897 thoughts; "low" -> 0; "minimal" REJECTED (400)
+#   gemini-flash-lite-latest  default -> 0;              "low" -> 241 (turns thinking ON)
+#   gemini-pro-latest         "low"   -> 241 (cannot be switched off)
+# So the level is per MODEL, and headroom is the belt under the braces: the
+# visible budget the caller asked for is what fit_output_tokens sizes; the
+# thinking headroom is added on top (still clamped to the context room) so a
+# model that thinks anyway cannot starve the answer it was asked for.
+THINKING_HEADROOM_TOKENS = 1024
+_THINKING_LEVEL_BY_FAMILY = (
+    ("flash-lite", None),   # already silent; a level would switch it ON
+    ("flash", "low"),       # measured 0 thought tokens at "low"
+)
+# gemini-pro-latest cannot stop thinking and spent 1148 thought tokens on the
+# same prompt at its default level (2048 budget, completed), so its headroom
+# is doubled. Not a shipped pick; a user can select it.
+_THINKING_HEADROOM_BY_FAMILY = (
+    ("pro", 2048),
+)
+
+
+def thinking_level_for(google_model: str) -> str | None:
+    """The `generation_config.thinking_level` to send for a model, or None
+    to leave the provider default. `OTR_GOOGLE_THINKING_LEVEL` overrides for
+    every model (`default` = send nothing)."""
+    override = str(otr_env.get("OTR_GOOGLE_THINKING_LEVEL") or "").strip().lower()
+    if override:
+        return None if override in ("default", "none", "provider") else override
+    name = str(google_model or "").lower()
+    for family, level in _THINKING_LEVEL_BY_FAMILY:
+        if family in name:
+            return level
+    return None
+
+
+def thinking_headroom_tokens(google_model: str = "") -> int:
+    """Thought-token headroom added on top of the caller's visible budget.
+    `OTR_GOOGLE_THINKING_HEADROOM` overrides for every model."""
+    raw = str(otr_env.get("OTR_GOOGLE_THINKING_HEADROOM") or "").strip()
+    if raw:
+        try:
+            return max(0, int(raw))
+        except ValueError:
+            pass
+    name = str(google_model or "").lower()
+    for family, headroom in _THINKING_HEADROOM_BY_FAMILY:
+        if family in name:
+            return headroom
+    return THINKING_HEADROOM_TOKENS
+
+
 from .models import (
     DEFAULT_CONTEXT_WINDOW,
     GOOGLE_API_PROVIDER,
@@ -75,7 +136,20 @@ def _response_format_payload(response_format: Any | None) -> dict[str, Any] | No
 
 
 def _output_limit_reason(body: Any) -> str:
-    """Return a provider limit reason from common interaction response shapes."""
+    """Return a provider limit reason from common interaction response shapes.
+
+    The Interactions API reports a budget-truncated answer as TOP-LEVEL
+    ``status: "incomplete"`` (no finish_reason anywhere in the body -- measured
+    2026-09-19). Only the top-level status counts: a nested object carrying
+    its own ``status`` (a step, a tool call) says nothing about the output
+    budget, so that check lives here and not in the recursive walk below."""
+    if isinstance(body, dict) and (
+            str(body.get("status") or "").strip().lower() == "incomplete"):
+        return "incomplete"
+    return _nested_finish_limit(body)
+
+
+def _nested_finish_limit(body: Any) -> str:
     limit_values = {"length", "max_tokens", "max_output_tokens", "max_tokens_reached"}
     if isinstance(body, dict):
         for key, value in body.items():
@@ -83,12 +157,12 @@ def _output_limit_reason(body: Any) -> str:
                 normalized = str(value or "").strip().casefold()
                 if normalized in limit_values:
                     return normalized
-            found = _output_limit_reason(value)
+            found = _nested_finish_limit(value)
             if found:
                 return found
     elif isinstance(body, list):
         for value in body:
-            found = _output_limit_reason(value)
+            found = _nested_finish_limit(value)
             if found:
                 return found
     return ""
@@ -98,11 +172,28 @@ def _extract_text(
     body: dict[str, Any], *, fail_on_output_limit: bool = False,
 ) -> str:
     limit_reason = _output_limit_reason(body)
-    if fail_on_output_limit and limit_reason:
-        raise GoogleAPIRequestShapeError(
-            "Google API exhausted the provider output capacity "
-            f"({limit_reason}); the partial artifact is not eligible for reroll"
-        )
+    if limit_reason:
+        usage = body.get("usage") if isinstance(body.get("usage"), dict) else {}
+        thought = usage.get("total_thought_tokens")
+        visible = usage.get("total_output_tokens")
+        if fail_on_output_limit:
+            raise GoogleAPIRequestShapeError(
+                "Google API exhausted the provider output capacity "
+                f"({limit_reason}; thought_tokens={thought} output_tokens={visible}); "
+                "the partial artifact is not eligible for reroll"
+            )
+        # The caller asked for whatever came back, so return it -- but say
+        # so, because a truncated JSON body otherwise surfaces three calls
+        # later as a bare "no decodable JSON object" with no cause attached.
+        # Blame thinking only when the usage shows thought tokens.
+        cause = ("a thinking model spent the output budget (see "
+                 "thinking_level_for / OTR_GOOGLE_THINKING_HEADROOM)"
+                 if isinstance(thought, (int, float)) and thought > 0
+                 else "the output budget was exhausted")
+        _LOG.warning(
+            "[OTR.google_api] response truncated (%s): thought_tokens=%s "
+            "output_tokens=%s -- returning the partial text; %s",
+            limit_reason, thought, visible, cause)
     if isinstance(body.get("output_text"), str) and body["output_text"]:
         return body["output_text"]
     texts: list[str] = []
@@ -188,23 +279,34 @@ class GoogleAPIBackend:
         generation_config: dict[str, Any] = {}
         if temperature is not None:
             generation_config["temperature"] = float(temperature)
+        level = thinking_level_for(google_model)
+        if level:
+            generation_config["thinking_level"] = level
         if max_new_tokens is not None or reserve_remaining:
             context_cap = int(
                 cache_entry.get("context_cap") or DEFAULT_CONTEXT_WINDOW
             )
+            prompt_tokens = estimate_prompt_tokens(messages)
             requested_tokens = (
                 context_cap if reserve_remaining else max(1, int(max_new_tokens))
             )
             try:
-                generation_config["max_output_tokens"] = fit_output_tokens(
+                visible_budget = fit_output_tokens(
                     requested_tokens,
                     context_cap=context_cap,
-                    prompt_tokens=estimate_prompt_tokens(messages),
+                    prompt_tokens=prompt_tokens,
                     label=f"Google API {google_model}",
                     require_full=require_full_output or bounded_capacity,
                 )
             except GenerationContextOverflowError as exc:
                 raise GoogleAPIRequestShapeError(str(exc)) from exc
+            # Thought tokens are billed against max_output_tokens, so the
+            # visible budget the caller sized gets thinking headroom on top,
+            # clamped to the room the context leaves (fit_output_tokens has
+            # already guaranteed visible_budget <= that room).
+            room = context_cap - prompt_tokens
+            generation_config["max_output_tokens"] = min(
+                visible_budget + thinking_headroom_tokens(google_model), room)
         if stop:
             generation_config["stop_sequences"] = [str(s) for s in stop if s]
         payload: dict[str, Any] = {
