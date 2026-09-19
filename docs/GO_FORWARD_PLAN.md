@@ -42,6 +42,27 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
 
+* **The Google BYO lane ran end to end for the first time on 2026-09-19 and
+  what stops it now is his Google project's Veo quota, not code.** Five live
+  legs of `google_veo_low_1act` (draft preset, `--source-bank original`),
+  each one stopping on the next real wire fact and each fixed the same day:
+  thinking tokens billed against `max_output_tokens` (904fd0f0), TTS MIME
+  parameters (c2f688de), Veo 429 with no retry (11dac456). Two episodes are
+  in `otr/obs/` -- `fire_clay_20260919_105543__anim__gveo__gimg__gtts__orig__gasa__lyra_final.mp4`
+  (2 of 8 beats got Veo clips) and `brass_glass_20260919_111547__rfrc__...`
+  (0 of 8) -- so Gemini writer, Google TTS, Lyria, Gemini image and the
+  publish path are proven; Veo rendered four clips total today and then
+  429'd through a full 75 s backoff on every shot, which a per-minute cap
+  would not survive: the key's `veo-3.1-lite-generate-preview` daily / plan
+  allowance is spent. Google's rate-limits page carries no Veo row; the
+  number lives in his AI Studio rate-limit dashboard.
+  **The fork, once video renders:** which profile ships -- `google_veo_low_1act`
+  (2 chars, 100-frame clips) is the cheap candidate -- and promoting it means
+  a variant + launch recipe (`SHIPPING_SET`), a tier-matrix row and the
+  README block, all generated. Until then the lane stays a lane preset an
+  operator applies by hand. One word from him picks the profile, and his
+  dashboard says when Veo will answer again.
+
 * **`google_tts` refuses a cast row with no gender; `my_story` leaves an
   unstated gender empty by design.** Measured 2026-09-19 on the second live
   leg of `google_veo_low_1act`: the canonical's bank is `roll`, the roll
