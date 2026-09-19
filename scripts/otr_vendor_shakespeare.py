@@ -104,6 +104,30 @@ def to_text(markup):
     """
     body = re.sub(r"(?is)<(script|style|template)\b.*?</\1>", " ", markup)
     body = re.sub(r"(?s)<!--.*?-->", " ", body)
+    # A SECTION EDIT LINK IS SITE FURNITURE AND A VOICE WILL READ IT ALOUD.
+    # MediaWiki puts `<span class="mw-editsection">[ 編輯 ]</span>` after every
+    # heading. Tag-stripped it becomes three lines -- `[`, `編輯`, `]` -- sitting
+    # directly under the scene heading, inside the extracted body, where they
+    # are indistinguishable from an unattributed stage direction. Measured on
+    # the Chinese Hamlet act page 2026-09-19; the same furniture is what put
+    # `Adicionar idiomas` in the Portuguese tail. Removed with the span, before
+    # any line breaking, so no empty bracket lines survive it.
+    # THE SPAN NESTS ONE LEVEL, so a lazy `.*?</span>` stops at the inner
+    # bracket and keeps the word. The obvious second try -- strip any anchor
+    # whose href carries `action=edit` -- is WORSE and the blast-radius check
+    # caught it: it.wikisource wraps its PAGE-NUMBER markers in edit-links too,
+    # so that rule pushed `[p. 39 ]` into the middle of Macbeth's witches and
+    # into three more Italian speeches. **The speech and speaker counts did not
+    # move at all** (51/8 before and after), so only a text diff against the
+    # stored file could see it -- a count check passes this defect.
+    #
+    # A TEMPERED MATCH to the OUTER close is what is actually wanted: consume up
+    # to the first `</span></span>` pair, which is the editsection's own end,
+    # and bound the run so a malformed page cannot make it quadratic.
+    body = re.sub(
+        r'(?is)<span\b[^>]*class="[^"]*mw-editsection[^"]*"[^>]*>'
+        r'(?:(?!</span>\s*</span>).){0,400}</span>\s*</span>',
+        " ", body)
     # A RUBY GLOSS IS A PRONUNCIATION GUIDE, NOT WORDS ANYONE SAYS. Japanese
     # editions annotate a kanji with its reading:
     #     <ruby><rb>誓言</rb><rp>（</rp><rt>せいごん</rt><rp>）</rp></ruby>
@@ -228,6 +252,56 @@ _TIINHERIT_BLOCK = re.compile(
 #: jisage strip would delete the very anchors it searches for.
 _AOZORA_BUSINESS = re.compile(
     r'(?is)<div class="jisage_\d+"[^>]*>(?P<body>(?:(?!<h[1-6]\b).)*?)</div\s*>')
+
+#: ZHU SHENGHAO MARKS BY PARAGRAPH START PLUS AN IDEOGRAPHIC SPACE (measured
+#: 2026-09-19 against the fetched act page, not inherited from the hold note).
+#: This is the THIRD row in one day held on a diagnosis that was wrong about its
+#: own edition. The note said the edition "breaks no paragraph before a speaker,
+#: so five speeches land in the wrong mouth mid-line". It breaks one every time:
+#:
+#:   <p>波　咱们都会齐了吗？</p>                     dialogue, speaker + U+3000
+#:   <div class="center">【衮斯，史纳格，波顿…上。</div>  block business
+#:   <div class="center"><span …>第三幕</span></div>     heading
+#:
+#: Nothing fired, so the pipeline fell back to heuristic plain-text parsing, and
+#: THAT is what merged the speeches. Counted on the page: 178 marked speeches
+#: across 19 names, against 0 that `mark_speakers` claimed.
+#:
+#: THE ABBREVIATION IS ONE OR TWO CHARACTERS, AND THAT IS THE TRAP. This edition
+#: abbreviates every character to their opening character -- 黑 is 黑美霞
+#: (Hermia), 莱 is 莱散特 (Lysander), 迫 is 迫克 (Puck) -- and `_marked_name`
+#: rejects `len(name) < 2`, so a rule can mark all 19 correctly and still have
+#: every one of them dropped downstream. See the CJK carve-out there.
+#:
+#: DO NOT WIDEN THE HEADING EXEMPTION. The obvious reading of 第 is "the opener
+#: of 第三幕/第一场", and it is WRONG: 第 is DEMETRIUS (第米屈律斯), who speaks 21
+#: times. The strict form below never fires once on this page -- the real
+#: headings live in a centred div, not at a paragraph head -- and a loose
+#: "starts with 第" form deletes a character while leaving a parse that looks
+#: clean. It is kept only as insurance against an edition that does inline one.
+_ZH_BUSINESS = re.compile(
+    r'(?is)<div class="center">\s*【.*?</div\s*>')
+
+#: The speaker opens a paragraph, or follows a block boundary, and is closed by
+#: ONE ideographic space. The optional run after the tag absorbs Wikisource's
+#: page-break markup, which MediaWiki injects between `<p>` and the first
+#: character.
+#:
+#: NO NESTED QUANTIFIER HERE, AND THAT IS NOT A STYLE PREFERENCE. The first cut
+#: skipped the page-break markup with `(?:<span\b[^>]*>.*?</span>\s*)*` -- a
+#: lazy dot inside a star -- which is catastrophic backtracking: on the
+#: span-heavy French and Italian pages the whole vendor run stopped producing
+#: output and never finished. It was caught ONLY by the blast-radius check,
+#: because the Chinese page it was written for is small enough to complete.
+#: A rule can be correct on its own edition and still hang every other one.
+#: Each alternative below consumes a bounded token, so the run is linear.
+_ZH_SPEAKER = re.compile(
+    r'(?is)(?P<prefix><p\b[^>]*>|</p>\s*)'
+    r'(?:<[^<>]{0,300}>|[\s​]|&\#8203;|&zwnj;){0,16}'
+    r'(?P<who>[一-鿿]{1,4})　(?!　)')
+
+#: A printed act or scene heading, which `extract` uses as a scene anchor.
+_ZH_HEADING_NAME = re.compile(r"^第.*[幕场場]$")
 
 #: The speaker label opens the line and is closed by an ideographic space run.
 #: The separator is ONE OR MORE: the edition prints `サン　　` (two) and
@@ -458,6 +532,24 @@ def mark_speakers(markup):
         return "%s\n%s%s%s " % (mm.group(1), SPEAKER_MARK, who, SPEAKER_MARK)
 
     body = _AOZORA_SPEAKER.sub(_mark_indent_speaker, body)
+
+    # Same order and the same reason once more: the block directions NAME the
+    # people who enter, so they are neutralised before any speaker is read off a
+    # paragraph. Unconditional, like the Aozora strip and for the identical
+    # reason -- `_is_bare_label` asks "no lowercase and no colon?", a question
+    # Chinese cannot fail, so the conditional stripper would keep every short
+    # direction as speech.
+    body = _ZH_BUSINESS.sub("\n", body)
+
+    def _mark_zh_speaker(mm):
+        who = mm.group("who").strip()
+        if not who or _ZH_HEADING_NAME.match(who):
+            return mm.group(0)
+        return "%s\n%s%s%s " % (mm.group("prefix"), SPEAKER_MARK, who,
+                                SPEAKER_MARK)
+
+    body = _ZH_SPEAKER.sub(_mark_zh_speaker, body)
+
     for pattern in _SPEAKER_SPANS:
         body = pattern.sub(_mark, body)
     return body
@@ -515,6 +607,24 @@ EDITION_LABELS = {
     ("fr", "hamlet", "1.1"): (None, None, "SC\u00c8NE I"),
     ("fr", "king_lear", "1.1"): (None, None, "SC\u00c8NE I"),
     ("zh", "midsummer", "3.1"): (None, None, "\u7b2c\u4e00\u573a"),
+    # ZHU SHENGHAO, LABELS READ OFF THE PAGES 2026-09-19.
+    #
+    # THE SCRIPT IS PART OF THE LABEL AND THESE TWO ROWS PROVE IT. Midsummer
+    # 3.1 is recorded against the zh-hans URL and prints \u7b2c\u4e00\u573a; 3.2 is recorded
+    # against zh-hant and prints \u7b2c\u4e8c\u5834. Same play, same act, same collection --
+    # and \u573a and \u5834 are different characters, so a label copied from the sibling
+    # row matches nothing and the scene reads as absent. Copy from the page each
+    # row actually points at, never from the row above.
+    ("zh", "midsummer", "3.2"): (None, None, "\u7b2c\u4e8c\u5834"),
+    # A whole-work page, so the act is load-bearing: every act repeats the
+    # scene headings \u7b2c\u4e00\u5834/\u7b2c\u4e8c\u5834, and scoping to the scene alone would take the
+    # first act's copy.
+    ("zh", "tempest", "1.2"): (None, "\u7b2c\u4e00\u5e55", "\u7b2c\u4e8c\u5834"),
+    ("zh", "tempest", "3.1"): (None, "\u7b2c\u4e09\u5e55", "\u7b2c\u4e00\u5834"),
+    # A DIFFERENT TRANSLATION FROM THE ZHU COLLECTION ABOVE, and the title is
+    # how you tell: this page is \u6f22\u59c6\u840a\u812b, not the \u54c8\u59c6\u96f7\u7279 of a Zhu volume. The
+    # row's translator must be confirmed from the page before it is vendored.
+    ("zh", "hamlet", "1.1"): (None, "\u7b2c\u4e00\u5e55", "\u7b2c\u4e00\u5834"),
     # Tsubouchi on Aozora: one page per play, so no play label is needed, and
     # the act and scene headings are plain h3/h4 once the ruby glosses are out
     # of them. An outside pass reported the scene heading as unfindable because
@@ -795,6 +905,11 @@ def _label_candidates(body):
     return counts
 
 
+#: One CJK ideograph, which is a whole name in the Chinese editions. Kana and
+#: the Latin range are deliberately excluded: a single kana or letter really is
+#: too short to be a name, and only the ideographic range carries one.
+_CJK_CHAR = re.compile(r"^[一-鿿]$")
+
 #: A name the PUBLISHER marked, sitting at the head of its line.
 _MARKED_LABEL = re.compile(
     r"^%s(?P<name>[^%s\n]{1,40})%s\s*" % (SPEAKER_MARK, SPEAKER_MARK,
@@ -836,7 +951,17 @@ def _marked_name(line):
     # A collective and a quoted sentence are the same SHAPE, so shape cannot
     # separate them; sentence punctuation can, and it is the only signal here
     # that does not cost a legitimate label.
-    if len(name) < 2:
+    # THE LENGTH FLOOR IS LATIN-ALPHABET REASONING AND IT DELETES A CJK CAST.
+    # One letter is not a name in any of the European editions, so the floor is
+    # right for them. It is catastrophic for Zhu Shenghao, who abbreviates every
+    # character to their opening CHARACTER: measured on Midsummer act 3, 17 of
+    # the 19 speakers are one character long -- 黑 (Hermia), 莱 (Lysander), 第
+    # (Demetrius), 海 (Helena), 波 (Bottom), 迫 (Puck), 奥 (Oberon), 蒂 (Titania)
+    # and the whole bench of mechanicals and fairies. The Chinese rule can mark
+    # all 178 speeches correctly and every one of them still arrives here and
+    # returns "", which is a silent, total cast loss that a speech count cannot
+    # see. A single ideograph carries a whole name; a single letter does not.
+    if len(name) < 2 and not _CJK_CHAR.match(name):
         return ""
     if any(ch in name for ch in ",…;:!?"):
         return ""
