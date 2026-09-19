@@ -13,6 +13,7 @@ CPU only, no network. UTF-8 no BOM.
 from __future__ import annotations
 
 import json
+import re
 import os
 
 import pytest
@@ -1193,3 +1194,74 @@ def test_the_english_path_still_reports_no_unbound_labels():
         num_characters=3, act_count=1,
         source_ref="folger-macbeth:act1-scene3-witches", speaker_map=None)
     assert not receipt.get("unbound_labels")
+
+
+def test_an_indent_marked_edition_gets_its_speakers_and_loses_its_business():
+    """Tsubouchi's Aozora text marks by INDENT CLASS, not by type size.
+
+    The Japanese rows sat held on a recorded diagnosis that said this edition
+    "sets stage business inline, in the same run as the dialogue, with no
+    markup of its own". It does not. The page is meticulously marked -- it
+    simply uses a vocabulary neither other rule knows:
+
+        <div class="burasage">サン　　dialogue...</div>       a speech
+        <div class="jisage_8">...持って出る。</div>            stage business
+        <div class="jisage_6"><h4>第一場　...</h4></div>       a scene heading
+
+    `_DIRECTION_BLOCK` keys on font-size 60-99%; `_SPEAKER_SPANS` keys on span
+    classes and small caps. Neither fires here, so 95 marked dialogue lines in
+    act 1 scene 1 collapsed into unattributed prose -- which is how a one-line
+    part came to "absorb" the Prince's entire first speech, in her voice.
+
+    THREE THINGS THIS PINS, each of which was a live defect:
+
+    * The business strip is UNCONDITIONAL, not `_strip_direction`. That helper
+      keeps a block `_is_bare_label` calls a name, and that test asks "no
+      lowercase and no colon?" -- a question JAPANESE CANNOT FAIL, having no
+      case at all. So `と劍を拔く。` and `二人ともに入る。` were kept as speech.
+    * A speaker label may contain an IMAGE. Shift_JIS cannot encode every
+      character, so Aozora sets the missing ones as `<img class="gaiji">`, and
+      Benvolio's label ends in one. A rule stopping at `<` marked 71 of 95
+      lines and dropped Benvolio from the scene entirely.
+    * The heading divs are EXEMPT, because `extract` locates a scene by them.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_aozora",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    page = (
+        '<div class="jisage_6" style="margin-left: 6em">'
+        '<h4 class="naka-midashi">第一場　　ローナ。街上。</h4></div>'
+        '<div class="jisage_8" style="margin-left: 8em">'
+        'サンプソンとグレゴリーとが劍と楯とを持って出る。<br /></div>'
+        '<div class="burasage" style="margin-left: 4em;">'
+        'サン　　やい、グレゴリー。</div>'
+        '<div class="jisage_8" style="margin-left: 8em">と劍を拔く。<br /></div>'
+        '<div class="burasage" style="margin-left: 4em;">'
+        'ベン<img src="../../../gaiji/1-07/1-07-85.png" alt="gaiji" '
+        'class="gaiji" />　待った！</div>'
+        '<div class="jisage_8" style="margin-left: 8em">二人ともに入る。<br /></div>'
+    )
+    out = vendor.to_text(vendor.mark_speakers(page))
+
+    # the scene heading survives -- `extract` needs it to find the scene
+    assert "第一場" in out
+
+    # both speakers are marked, and the gaiji-bearing label reads as its text
+    labels = re.findall("%s([^%s]+)%s" % (vendor.SPEAKER_MARK,
+                                          vendor.SPEAKER_MARK,
+                                          vendor.SPEAKER_MARK), out)
+    assert labels == ["サン", "ベン"], labels
+
+    # every stage direction is gone -- including the two SHORT ones that
+    # `_is_bare_label` would have kept
+    for business in ("持って出る", "と劍を拔く", "二人ともに入る"):
+        assert business not in out, "stage business survived: %s" % business
+
+    # and the dialogue itself is untouched
+    assert "やい、グレゴリー。" in out
+    assert "待った！" in out

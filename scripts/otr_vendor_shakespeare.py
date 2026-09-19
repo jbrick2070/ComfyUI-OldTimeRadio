@@ -183,6 +183,68 @@ SPEAKER_MARK = "\x01"
 _DIRECTION_BLOCK = re.compile(
     r'(?is)<(div|span|p)\b[^>]*font-size:\s*[6-9]\d%[^>]*>(?P<body>.*?)</\1\s*>')
 
+#: WIKISOURCE'S PROOFREAD LAYOUT MARKS BY CLASS, NOT BY TYPE SIZE. The
+#: Portuguese Hamlet (pt.wikisource, Acto primeiro/Cena I) sets EVERY piece of
+#: apparatus in `div class="tiInherit"` -- 68 of them on one scene page --
+#: and does not vary the type size at all, so `_DIRECTION_BLOCK` returns zero
+#: and the page arrives with no speakers and no directions separated.
+#:
+#: What those 68 blocks hold is all four kinds of apparatus at once:
+#:
+#:   SCENA I                                             a heading
+#:   Elsenor, a explanada do castello                    the setting
+#:   FRANCISCO de sentinella, BERNARDO vem encontrar-se  stage business
+#:   BERNARDO                                            a SPEAKER
+#:
+#: THE EXISTING BARE-LABEL TEST ALREADY SEPARATES THEM, and this is the exact
+#: mirror of the Aozora case: `_is_bare_label` asks "no lowercase, no colon?",
+#: which is meaningless in Japanese and precisely right here -- the speakers
+#: are single all-caps names and every direction carries lowercase words. So
+#: these blocks go through `_strip_direction` (the CONDITIONAL stripper),
+#: unlike the indent blocks below, which go through an unconditional one.
+_TIINHERIT_BLOCK = re.compile(
+    r'(?is)<div[^>]*class="[^"]*tiInherit[^"]*"[^>]*>(?P<body>.*?)</div\s*>')
+
+#: AOZORA / TSUBOUCHI MARKS BY INDENT CLASS, NOT BY TYPE SIZE (measured
+#: 2026-09-19 on Romeo and Juliet, 42773_39853.html). The row was held on a
+#: recorded diagnosis that turned out to be wrong: it said this edition "sets
+#: stage business inline, in the same run as the dialogue, with no markup of
+#: its own". It does not. The page is CLEANLY marked -- it simply uses a
+#: vocabulary neither rule above knows:
+#:
+#:   <div class="burasage" ...>サン　　やい、グレゴリー、...</div>   dialogue
+#:   <div class="jisage_8" ...>...サンプソンとグレゴリーとが...出る。</div>  business
+#:   <div class="jisage_6"><h4>第一場　　ヱローナ。街上。</h4></div>       heading
+#:
+#: So NOTHING fired: no direction was stripped and no speaker was marked, and
+#: 95 marked dialogue lines in act 1 scene 1 collapsed into unattributed prose
+#: -- which is how a one-line part came to "absorb" the Prince's speech. The
+#: lesson the hold text drew is still the right one and is what measured this:
+#: count what the EDITION marks (95 burasage divs, 18 non-heading jisage divs),
+#: never what survived parsing.
+#:
+#: The heading exemption is load-bearing for the same reason it is above:
+#: `extract` locates a scene BY the jisage_6/jisage_7 headings, so a blanket
+#: jisage strip would delete the very anchors it searches for.
+_AOZORA_BUSINESS = re.compile(
+    r'(?is)<div class="jisage_\d+"[^>]*>(?P<body>(?:(?!<h[1-6]\b).)*?)</div\s*>')
+
+#: The speaker label opens the line and is closed by an ideographic space run.
+#: The separator is ONE OR MORE: the edition prints `サン　　` (two) and
+#: `ベン　` (one) in the same scene, and requiring two found 36 of 95.
+#:
+#: A LABEL CAN CONTAIN AN IMAGE. Shift_JIS cannot encode every character, so
+#: Aozora sets the missing ones as `<img class="gaiji" alt="※(濁点付き片仮名ヲ...)">`
+#: -- and Benvolio's label is one of them (`ベン` + a dakuten ヲ). A rule that
+#: stopped at `<` marked 71 of 95 lines and dropped Benvolio from the scene
+#: entirely, which is the same class of defect as the one this fixes: a whole
+#: part missing, and a count is what shows it. The tags are allowed inside the
+#: label and stripped from the captured name, so the label stays the stable
+#: key the manifest speaker_map binds to a roster name.
+_AOZORA_SPEAKER = re.compile(
+    r'(?is)(<div class="burasage"[^>]*>)\s*'
+    r'(?P<who>(?:<img[^>]*>|[^\s　<]){1,10}?)　+')
+
 #: How each publisher marks a speaker. All three converge on small caps; only
 #: the spelling of the markup differs.
 _SPEAKER_SPANS = (
@@ -342,6 +404,31 @@ def mark_speakers(markup):
         return "\n%s%s%s " % (SPEAKER_MARK, full, SPEAKER_MARK)
 
     body = _DIRECTION_BLOCK.sub(_strip_direction, markup)
+    # Same conditional stripper: on this layout a bare all-caps block IS the
+    # speaker, and dropping it would leave the play with nobody to say the
+    # lines.
+    body = _TIINHERIT_BLOCK.sub(_strip_direction, body)
+    # Same order, same reason, for the indent-marked editions: the business
+    # blocks NAME the people who enter, so they are neutralised before any
+    # speaker is read off a dialogue div.
+    #
+    # AN UNCONDITIONAL STRIP, NOT `_strip_direction` (codex, 2026-09-19). That
+    # helper keeps a block that `_is_bare_label` calls a speaker name, and that
+    # test asks "no lowercase and no colon?" -- a question JAPANESE CANNOT FAIL,
+    # because it has no case at all. So every short business line passed it and
+    # was kept: `と劍を拔く。` ("and draws his sword") and `二人ともに入る。`
+    # ("both exit") survived into act 1 scene 1 as speech. The guard is right
+    # where it lives -- the font-size band really does wrap speakers in the
+    # Spanish editions -- and wrong here, because the indent class is
+    # unambiguous: `jisage_N` without a heading is never a speaker.
+    body = _AOZORA_BUSINESS.sub("\n", body)
+    def _mark_indent_speaker(mm):
+        who = re.sub(r"(?is)<[^>]+>", "", mm.group("who")).strip()
+        if not who:
+            return mm.group(0)
+        return "%s\n%s%s%s " % (mm.group(1), SPEAKER_MARK, who, SPEAKER_MARK)
+
+    body = _AOZORA_SPEAKER.sub(_mark_indent_speaker, body)
     for pattern in _SPEAKER_SPANS:
         body = pattern.sub(_mark, body)
     return body
@@ -404,6 +491,35 @@ EDITION_LABELS = {
     # of them. An outside pass reported the scene heading as unfindable because
     # the ruby splits it -- true of the RAW page, and no longer true after
     # `to_text`, which is why the label here is the plain contiguous string.
+    # RUSCONI, FOUND BY THE 2026-09-19 URL HUNT. it.wikisource serves one ACT
+    # per page (`.../Atto_terzo`), so the act is scoped by the URL and only the
+    # scene heading is needed. Every label below was read OFF the page by the
+    # hunt, never inferred from the Folio -- and the last row is why that
+    # matters: this edition prints As You Like It's standard act 2 scene 5 as
+    # `SCENA VI`, because the act skips `SCENA IV` entirely.
+    ("it", "as_you_like_it", "3.2"): (None, None, "SCENA II"),
+    ("it", "comedy_of_errors", "3.1"): (None, None, "SCENA I"),
+    ("it", "hamlet", "1.1"): (None, None, "SCENA I"),
+    ("it", "king_lear", "1.1"): (None, None, "SCENA I"),
+    ("it", "midsummer", "3.1"): (None, None, "SCENA I"),
+    ("it", "midsummer", "3.2"): (None, None, "SCENA II"),
+    ("it", "much_ado", "2.3"): (None, None, "SCENA III"),
+    ("it", "much_ado", "3.1"): (None, None, "SCENA I"),
+    ("it", "romeo_juliet", "2.2"): (None, None, "SCENA II"),
+    ("it", "twelfth_night", "1.5"): (None, None, "SCENA V"),
+    ("it", "twelfth_night", "2.5"): (None, None, "SCENA VI"),
+    # Found by the 2026-09-19 URL hunt, with the page's own heading recorded
+    # off the page rather than inferred: Menendez y Pelayo's Macbeth is served
+    # one ACT per page (`.../Acto_I`), so the act is already scoped by the URL
+    # and only the scene heading is needed. Moratin's Hamlet is a Gutenberg
+    # whole-work text, so it needs both.
+    ("es", "macbeth", "1.3"): (None, None, "ESCENA III"),
+    ("es", "hamlet", "1.1"): (None, "ACTO PRIMERO", "ESCENA PRIMERA"),
+    # pt.wikisource serves ONE SCENE PER PAGE (`.../Acto_primeiro/Cena_I`), so
+    # the act is already scoped by the URL and the only label to find is the
+    # scene's own heading, which the page prints as `SCENA I` in a tiInherit
+    # block alongside the setting, the business and every speaker name.
+    ("pt", "hamlet", "1.1"): (None, None, "SCENA I"),
     ("ja", "romeo_juliet", "1.1"): (None, "\u7b2c\u4e00\u5e55", "\u7b2c\u4e00\u5834"),
     ("ja", "romeo_juliet", "2.2"): (None, "\u7b2c\u4e8c\u5e55", "\u7b2c\u4e8c\u5834"),
 
