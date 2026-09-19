@@ -238,11 +238,17 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-The pipeline is proven end to end and **16 scenes are vendored** across es, fr,
-it, ja and pt, with 95 leads hunted and every unvendored cell carrying a named
-next step in `leads.json`. Adding a scene is mechanical: read the edition's own
-act/scene label into `EDITION_LABELS`, add the row, run
-`scripts/otr_vendor_shakespeare.py --write`.
+The pipeline is proven end to end and **16 scenes are vendored: fr 12, es 3,
+it 1** (measured from the manifest 2026-09-19, not remembered). All 95 leads are
+hunted and every unvendored cell carries a named next step in `leads.json`.
+Adding a scene is mechanical: read the edition's own act/scene label into
+`EDITION_LABELS`, add the row, run `scripts/otr_vendor_shakespeare.py --write`.
+
+**A SHIPPED RULE IS NOT A VENDORED SCENE, and this row said otherwise for half a
+day.** The Japanese and Portuguese extractor rules ship and are pinned by a
+regression fixture (`f446d484`) -- and **ja, zh and pt still vendor ZERO scenes**,
+because each of those rows is separately held on a thin or wrong extraction. The
+two facts read as one and are not. Quote the manifest, never the rule inventory.
 
 What remains is two per-edition extractor rules, both specified and neither
 built. State, diagnoses and the measured counts live in
@@ -264,7 +270,22 @@ harmful: anchoring on `<p>` took tempest from 142 speeches to 6. Twelve act-page
 URLs are verified and recorded.
 
 Both touch shared extractor code every edition runs through, so each needs a
-blast-radius check across all 16 vendored scenes before its push.
+blast-radius check before its push: run the vendor script with no flags (it is
+check-only by default) and diff the per-scene speech/speaker counts. The
+2026-09-19 before-state, for that diff:
+
+```
+es as_you_like_it 3.2  144/6    fr king_lear    1.1   84/10   fr tempest       1.2  143/8
+es comedy_of_errors 3.1 56/9    fr macbeth      1.3   51/8    fr tempest       3.1   25/3
+es romeo_juliet   2.2   55/3    fr much_ado     2.3   82/7    fr twelfth_night 1.5  120/6
+fr as_you_like_it 3.2  145/6    fr much_ado     3.1   26/4    fr twelfth_night 2.5   87/8
+fr comedy_of_errors 3.1 61/9    fr romeo_juliet 2.2   56/3    it macbeth       1.3   51/8
+fr hamlet        1.1    60/4
+```
+
+Two rows print in that check and are deliberately NOT vendored: `es/macbeth 1.3`
+is THIN at 3 speeches, and `it/tempest 1.2` is the 142/13 the Italian hold note
+calls polluted. Extractable is not vendored; confirm against the manifest.
 
 **Then production OCR of the 23 page-scan cells**, unblocked by the 2026-09-19
 ruling that one model's OCR counts as verbatim. Parallel model work, not coding.

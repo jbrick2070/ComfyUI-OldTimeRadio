@@ -15,7 +15,12 @@ repo.
 ## Where the corpus stands
 
 - `config/source_banks/shakespeare/translations/manifest.json` — **16 scenes
-  vendored** and passing. `tests/test_verbatim_corpus.py` is green at 128.
+  vendored: fr 12, es 3, it 1.** `tests/test_verbatim_corpus.py` is green at 128.
+  **ja, zh and pt vendor ZERO**, even though the Japanese and Portuguese
+  extractor rules ship and are tested — those rows are separately held. A
+  shipped rule is not a vendored scene; quote the manifest, not the rule
+  inventory. This exact conflation went into the plan on 2026-09-19 and had to
+  be corrected.
 - `config/source_banks/shakespeare/translations/leads.json` — **95 rows**, of
   which **18 carry a `hold` note** saying why that cell is not vendored. Every
   unvendored cell has a named next step. There are no unhunted cells left.

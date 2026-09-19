@@ -47,6 +47,51 @@ def _mark_zh_speaker(mm):
 body = _ZH_SPEAKER.sub(_mark_zh_speaker, body)
 ```
 
+## 3A. VERIFIED AGAINST THE REAL PAGE 2026-09-19, and one item above is WRONG
+
+The rules in section 3 were re-measured against the fetched markup before any
+code was written. They hold, with one material correction and one addition.
+
+**`第` IS DEMETRIUS, NOT A HEADING FRAGMENT.** It is claimed 21 times, and
+section 4's heading guard was proposed partly to catch it. It must not. The
+edition abbreviates every character to its first character or two, and the prose
+spells each one out elsewhere, which is how this is checkable rather than
+guessable:
+
+| mark | full spelling in the prose | character |
+|---|---|---|
+| 黑 | 黑美霞 | Hermia |
+| 莱 | 莱散特 | Lysander |
+| 第 | 第米屈律斯 | **Demetrius** |
+| 海 | 海冷娜 | Helena |
+| 波 | 波顿 | Bottom |
+| 迫 | 迫克 | Puck |
+| 奥 | 奥白朗 | Oberon |
+| 蒂 | 蒂妲妮霞 | Titania |
+| 衮 史 斯 弗 司 | 衮斯 史纳格 斯诺脱 弗鲁脱 司他巫林 | the mechanicals |
+| 豆 蛛 芥 飞 | 豆花 蛛网 芥子 飞蛾 | the fairies |
+| 四仙 / 四仙合 | — | the four fairies, collective |
+
+**Written STRICTLY (`^第.*[幕场場]$`) the heading guard never fires once on this
+page. Written loosely as "starts with 第" it deletes Demetrius and 21 speeches
+with him.** The strict form is kept as cheap insurance; the loose form is a
+build-breaker that would look like a clean parse.
+
+**Measured counts, whole act page (the URL serves 第三幕, so this is act-wide;
+section 2's 65/14 is scene 3.1 alone and both are consistent):**
+
+| what | count |
+|---|---|
+| speaker marks the edition sets | 178 across 19 names |
+| names that are not real characters | 0 |
+| centred stage-direction blocks opening `【` | 18 |
+| claimed speakers sitting inside a direction block | 0 |
+| spans `mark_speakers` currently claims | 0 |
+
+Zero over-claiming is the half that matters, because it is the half the Italian
+set failed. The `len(name) < 2` guard was also tested directly rather than read:
+`_marked_name` on a real single-character name returns the empty string.
+
 ## 4. What Would Trip It
 
 1. **`_marked_name` Length Guard**: `otr_vendor_shakespeare.py` contains `if len(name) < 2: return ""`. This rejects all single-character Chinese speaker names (`波`, `衮`, `蒂`, etc.). It must be adjusted to allow 1-character CJK names.
