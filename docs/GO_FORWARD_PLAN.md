@@ -39,10 +39,6 @@ proven wrong. Aesthetic drift is closed
 
 Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **A5. 16 GB foley / mime without GGUF.** Official LTX 2.5 safetensors do not
-  fit 16 GB (measured). `otr_16gb_video`, `otr_16gb_foley` and `otr_16gb_mime`
-  still load the Q3 GGUF; cloud deluxe already ships `cloud_ltx25_foley_plus`.
-  Stay on Q3, move those three to cloud, or drop them.
 * **Gallery.** Comfy lists one graph; the 21 shipping variants sit in
   `workflows/variants/`, which the template scanner does not read. Promoting
   them changes what the gallery shows tomorrow.

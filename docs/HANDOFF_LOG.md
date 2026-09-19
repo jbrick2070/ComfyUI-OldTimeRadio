@@ -1,3 +1,62 @@
+## 2026-09-19 -- two forks closed by ruling; thirteen AMD denials fixed; the guard that catches the next one
+
+Did: A1 (canonical writer on 8 GB) closed -- operator: *"canonical is good,
+  we're all good with canonical, but I can shift it around if I want."*
+  Rested on measurement: all 22 shipped graphs have identical node sets and
+  link tables (21 nodes, 58 links; only dropdown values differ); canonical is
+  4060-proven out of the box twice at 4.2 GB peak with 5 of 5 banks
+  published; all four Mac graphs published 2026-09-13 on canonical's own
+  unquantized Qwen3.5-4B. The image model is not an 8 GB-vs-Mac split -- all
+  eight small-VRAM graphs ship `sd15`, only canonical ships `z_image_turbo`.
+  A5 (16 GB foley / mime without GGUF) closed -- operator: *"maybe it was a
+  red herring, we accept GGUF for mime and foley and move on."* The research
+  he commissioned found ONE non-GGUF ungated candidate that fits on disk,
+  `DmitryDB/LTX-2.5-ComfyUI-Quants` NVFP4 (DiT 12.641 GiB, projected Gemma-4
+  TE 11.197 GiB), and the repo's own README refuses the inference the
+  research drew: *"File size is not complete-workflow peak VRAM"*; 16 GiB
+  numbers *"not yet published"*; validated as a loader smoke on an RTX 4090
+  against ComfyUI branch `origin/ltx25`, not a release; *"no perceptual-quality
+  ranking is claimed yet."* The TE alone peaked at 11.93 GiB in their own
+  runtime report; the DiT is ~2 GiB heavier than the Q3 it would replace;
+  their int8-convrot is 20.15 GiB and comfyicu's own NVFP4 distilled DiT is
+  17.44 GiB, both off the table. Nothing has changed since the standing
+  ruling in `eng_ltx25.py` (*"we are running on the Q3, that's the safe
+  one"*); the ruling holds and the three graphs stay on Q3.
+  Then the AMD receipt: `59c90558` fixed the generator prose that said
+  "Nothing in this repo has an AMD receipt", and a Fable pass found THIRTEEN
+  more shipped sentences saying the same across five files -- including a
+  profile `display_name` in `config/` that PRINTS INTO THE LOG of every run,
+  and `apple/AGENT_INSTALL.md`, the page written for an agent. All fixed in
+  `b9b3b66f` with `tests/test_shipped_docs_do_not_deny_a_receipt.py`, which
+  fails when a shipped page pairs a denial phrase with a machine class the
+  matrix marks proven. README's Mac row gained the four published graphs.
+Found in review: the profile `status` field records PROMOTION, not proof --
+  `otr_amd_still` reads `draft` with a stranger's finished episode behind
+  it, and reading `status` alone produced two false statements in one
+  session ("AMD has never run", "Mac is not proven"). Fable checked the Mac
+  half and found NO shipped page claiming Mac unproven; that one came from
+  an internal doc and a code comment. Every wrong sentence asserted a fact
+  about PROOF: a stale procedure fails loudly when run, a stale proof claim
+  is simply believed.
+Current step: `apple/ROCM.md` is a call-for-testers written before the
+  receipt with the receipt bolted on top, and still carries "Neither has a
+  receipt here" (:79) and "Nobody here has run either" (:118, :155) that the
+  guard's phrase list misses. Being rewritten to `MAC.md`'s shape, with the
+  guard widened, off a four-reader grounding pass (image-engine truth, every
+  CLI flag the page tells a stranger to run, the hand-page proof sentences,
+  the receipt facts from primary sources).
+Next: the ROCM.md rewrite plus `apple/IMAGE_MODELS.md:68` (`z_image_turbo`
+  vs the 16 GB profiles' `lumina_image`); the Gallery fork now reads as "the
+  variants ARE the filtered dropdown Comfy cannot draw, and they are
+  invisible where a user picks"; the cloud auth-order defect (`69250d27`)
+  remains the one known bug on a shipped lane; six Google profiles are
+  draft with zero receipts.
+Models: driver Claude Opus 5, then Fable 5.1 from the `/model` switch; Fable
+  5.1 on the apple/ consolidation judgment; Sonnet 5 readers in the
+  grounding workflow; HF Hub read directly for the LTX candidate.
+Commits: `586a7440` (A1), `59c90558` (generator), `b9b3b66f` (thirteen
+  sentences + guard), then this docs chunk -- see `git log`.
+
 ## 2026-09-18 (evening) -- native-language Shakespeare performs a real translator's words
 
 Did: Four scenes vendored (`it/macbeth 1.3` Rusconi, `fr/hamlet 1.1` and
