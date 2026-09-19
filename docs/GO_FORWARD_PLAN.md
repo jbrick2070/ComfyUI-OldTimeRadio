@@ -72,7 +72,15 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   `config/profiles/google_still_1act.json` (67332dc5): Gemini image for
   stills, `still_flat` to composite them (CPU, no models), Google TTS,
   Lyria, Flash / Flash-Lite writers, no Veo. Dry run resolves all 17
-  overrides. If Veo ever comes back it is his call between 8-second clips
+  overrides, and the first live leg -- English Hamlet 1.1 -- published
+  `troubled_mind_20260919_124119__anim__stfl__gimg__gtts__sspr__gasa__lyra_final.mp4`
+  in 218 s with every beat on its own Gemini still, no floors, no 429s:
+  **the Google lane works every day at Tier 1 in this shape.** Cheapest
+  stills for the next legs: `OTR_GOOGLE_IMAGE_MODEL_ID=gemini-3.1-flash-lite-image`
+  (in the catalog, 1K only). His Ultra plan does not reach the API (it is
+  Flow's consumer pool; the G-Labs tool spends it by logging in as him,
+  which is a no); the honest Veo path is the Increase Requests tab on his
+  quota page. If Veo ever comes back it is his call between 8-second clips
   (one call per beat, 8/day fits) and a disclosed opt-in model rotation,
   which collides with the no-fallback law as a default.
   **The fork, once video renders:** which profile ships -- `google_veo_low_1act`
