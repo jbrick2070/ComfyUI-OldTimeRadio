@@ -39,9 +39,6 @@ proven wrong. Aesthetic drift is closed
 
 Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **Gallery.** Comfy lists one graph; the 21 shipping variants sit in
-  `workflows/variants/`, which the template scanner does not read. Promoting
-  them changes what the gallery shows tomorrow.
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
@@ -61,6 +58,14 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   past hand-verified leads (fewer manual label lookups, more leads per
   session), or it is a verified-dead symbol per the repo's rip-or-wire rule.
   His call; a grep receipt either way before acting.
+* **Gallery -- LAST, by ruling (operator 2026-09-19).** Comfy lists one graph;
+  the 21 shipping variants sit in `workflows/variants/`, which the template
+  scanner does not read. They are the filtered hardware dropdown Comfy cannot
+  draw, and they are invisible where a user picks -- so this matters. But it
+  goes after every other bug on this page: *"this should be last on the list
+  when we have all other bugs -- the floor is moving."* The graphs are still
+  being regenerated; promoting them into the gallery now ships churn to
+  strangers. Reopen when section 1 above it is empty.
 
 ## 2. CODE -- decided, in order
 

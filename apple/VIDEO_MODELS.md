@@ -196,12 +196,13 @@ On any other graph the same Vidu combo is in the dropdown if you want to spend c
 
 Choosing by hand instead, the short version: **on 8 GB, start at
 `ltx098_low_video`** -- it is what the 8 GB graph ships and the safe local
-diffusion pick. The Wan pair, all four HuMo lanes, both H3 lanes and
-`ltx23_low_audio_in` run out of memory on 8 GB. **On 16 GB the LTX 2.5 lanes,
+diffusion pick. All four HuMo lanes, both H3 lanes and `ltx23_low_audio_in` run
+out of memory on 8 GB, and the Wan pair does not fit there either. **On 16 GB the LTX 2.5 lanes,
 both Wan lanes, all four HuMo lanes and `h3_low_video` all fit.** On a Mac,
 `ltx098_low_video` and `animatediff15_lightning_video` are the two proven
 diffusion lanes; the still and visualizer lanes work there too, and the rest of
-the local list is CUDA only.
+the local list is CUDA only -- except `humo17_high_audio_in_wide`, which fits
+on paper and is unmeasured on a Mac. On unified memory that is not a free try.
 
 One lane is in the list and fits neither card: **`ltx23_high_video` runs out of
 memory on 8 GB and on 16 GB both.** It is selectable because the menu shows

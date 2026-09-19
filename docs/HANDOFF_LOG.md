@@ -12,7 +12,7 @@ Did: A1 (canonical writer on 8 GB) closed -- operator: *"canonical is good,
   red herring, we accept GGUF for mime and foley and move on."* The research
   he commissioned found ONE non-GGUF ungated candidate that fits on disk,
   `DmitryDB/LTX-2.5-ComfyUI-Quants` NVFP4 (DiT 12.641 GiB, projected Gemma-4
-  TE 11.197 GiB), and the repo's own README refuses the inference the
+  TE 10.43 GiB -- 11,197,310,236 bytes), and the repo's own README refuses the inference the
   research drew: *"File size is not complete-workflow peak VRAM"*; 16 GiB
   numbers *"not yet published"*; validated as a loader smoke on an RTX 4090
   against ComfyUI branch `origin/ltx25`, not a release; *"no perceptual-quality

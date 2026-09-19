@@ -43,7 +43,11 @@ SHIPPED = sorted((REPO / "apple").glob("*.md")) + [REPO / "README.md"]
 #: contained one of these.
 DENIAL = re.compile(
     r"no receipts?\b|has none\b|never (?:once )?(?:been )?(?:run|executed|touched)"
-    r"|nobody has published|never run on|has never|no .{0,16}receipt\b",
+    r"|nobody has published|never run on|has never|no .{0,16}receipt\b"
+    # Added 2026-09-19 after the first run of this guard let two more through
+    # on apple/ROCM.md: "Neither has a receipt here" (:79) and "Nobody here has
+    # run either" (:118, :155). Same defect, different spelling.
+    r"|neither has (?:a receipt|run)|nobody (?:here )?has (?:run|tried)",
     re.IGNORECASE,
 )
 
@@ -59,10 +63,13 @@ CLASS_WORDS = {
 
 #: Sentences that trip the rule and are TRUE. Keep the reason with the text.
 ALLOWED = (
-    # ROCm's own scope note: the two LAB profiles genuinely have no receipt --
-    # only `otr_amd_still` does. Keeping them distinct is the proven/measured
-    # discipline, not an oversight.
-    "still read `UNVERIFIED on hardware` in their own files and genuinely are",
+    # ROCm's own scope note: the two LAB profiles (`otr_amd16_rocm`,
+    # `otr_amd8_rocm`) genuinely have not run -- only `otr_amd_still` has.
+    # Keeping them distinct is the proven/measured discipline, not an
+    # oversight. The sentence names the tier it scopes, on a line that also
+    # carries the class word, which is exactly the shape this rule cannot
+    # tell from a denial.
+    "neither has run on hardware and their own files say so",
     # The writer table's Llama row. "Nobody has published an episode with it
     # yet" is about that MODEL and is true; the machine words on the line are
     # the model's own fit tags (`mac16 nv8 nv16 nv24`), not a claim about the

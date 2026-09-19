@@ -3,7 +3,7 @@
 Every beat of the episode shows something. The **image engine** is the model that
 draws that still picture; the video lane then takes the still and makes it move.
 
-Two engines are one-click: pick them and they fetch themselves. The other three
+Three engines are one-click: pick them and they fetch themselves. The other two
 local ones want files you download by hand. That is the only part of this page
 most people need.
 
@@ -65,8 +65,8 @@ is exactly what you see below.
 | Dropdown | Download | Fetches itself? | What it is |
 |---|---|---|---|
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
-| `z_image_turbo` | 19.3 GiB | **yes** | The default in the 16 GB NVIDIA graphs. Eight steps a still, so it is quick once the weights are down -- but they are the largest download of any image engine here. |
-| `lumina_image` | 10.4 GiB | no | Lumina-Image 2.0. |
+| `z_image_turbo` | 19.3 GiB | **yes** | The canonical graph's saved pick, and the AMD graph's -- the one with a Radeon receipt. Eight steps a still, so it is quick once the weights are down -- but they are the largest download of any image engine here. |
+| `lumina_image` | 9.7 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model plus a 5.2 GB text encoder. |
 | `flux_gen1` | 13.0 GiB | no | FLUX.1-dev, the first engine this pack ever had. Its licence is non-commercial. |
 | `ideogram4_local` | 17.3 GiB | no | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. |
 
@@ -110,11 +110,12 @@ still missing.
 
 ## Which ones download themselves, and which do not
 
-Only **`sd15`** and **`z_image_turbo`**. Pick either, and a node inside the graph
-fetches it at queue time -- no account, no token, no script to run. Nothing else
-does.
+**`sd15`**, **`z_image_turbo`** and **`lumina_image`**. Pick any of the three and
+a node inside the graph fetches it at queue time -- no account, no token, no
+script to run. `lumina_image` joined them on 2026-09-16 and is what the 16 GB
+NVIDIA graphs ship, so the default 16 GB path now downloads itself.
 
-The other three local engines (`lumina_image`, `flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
+The other two local engines (`flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
 
 [MACHINES.md](MACHINES.md) section 2 has the per-machine grid -- which of these
 has actually been run on 8 GB, on 16 GB, on a Mac, on CPU, and which will run out
@@ -146,9 +147,10 @@ In the order it actually happens.
 Your role's video lane draws its own frames. See the second section -- this is
 correct behaviour, not a miss.
 
-**It stops and names a file.** You picked one of the four manual engines. For
-and the folder. For the other three, section 3 ships no manifest by design --
-the refusal message itself is the only place that information appears.
+**It stops and names a file.** You picked one of the two manual local engines,
+`flux_gen1` or `ideogram4_local`. The refusal names the exact filename and the
+folder it belongs in, and for these two that message is the only place that
+information appears -- section 3 ships no manifest for them, by design.
 
 ComfyUI-GGUF. Install the pack, restart ComfyUI, queue again.
 
