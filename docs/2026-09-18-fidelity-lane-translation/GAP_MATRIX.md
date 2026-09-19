@@ -10,25 +10,25 @@ Generated from `config/source_banks/shakespeare/translations/leads.json` against
 
 | Scene | French | Italian | Spanish | Portuguese | Japanese | Hindi | Mandarin |
 |---|---|---|---|---|---|---|---|
-| macbeth 1.3 | HAVE-URL | HAVE-URL | HAVE-URL | HOLD-RIGHTS | HAVE-URL | HOLD-RIGHTS | HAVE-URL |
-| tempest 1.2 | HAVE-URL | HAVE-URL | HAVE-URL | HOLD-RIGHTS | HAVE-URL | HOLD-RIGHTS | HAVE-URL |
-| tempest 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | HOLD-RIGHTS | HAVE-URL | HOLD-RIGHTS | HAVE-URL |
+| macbeth 1.3 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | HAVE-URL |
+| tempest 1.2 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | HAVE-URL |
+| tempest 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | HAVE-URL |
 | midsummer 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | HAVE-URL |
 | midsummer 3.2 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | HAVE-URL |
 | twelfth_night 1.5 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | HAVE-URL | NO LEAD | HAVE-URL |
 | twelfth_night 2.5 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | HAVE-URL | NO LEAD | HAVE-URL |
-| much_ado 2.3 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | HOLD-RIGHTS | HAVE-URL |
-| much_ado 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | HOLD-RIGHTS | HAVE-URL |
+| much_ado 2.3 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | NEED-URL | HAVE-URL |
+| much_ado 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | NEED-URL | HAVE-URL |
 | as_you_like_it 3.2 | HAVE-URL | HAVE-URL | BLOCKED | NO LEAD | NEED-URL | HAVE-URL | HAVE-URL |
-| hamlet 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | HOLD-RIGHTS | HAVE-URL |
-| king_lear 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HOLD-RIGHTS | NEED-URL | HOLD-RIGHTS | HAVE-URL |
+| hamlet 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | NEED-URL | HAVE-URL |
+| king_lear 1.1 | HAVE-URL | HAVE-URL | HAVE-URL | HAVE-URL | NEED-URL | NEED-URL | HAVE-URL |
 | romeo_juliet 2.2 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | BLOCKED | NO LEAD | HAVE-URL |
-| comedy_errors 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | HOLD-RIGHTS | HAVE-URL |
+| comedy_errors 3.1 | HAVE-URL | HAVE-URL | HAVE-URL | NO LEAD | NEED-URL | NEED-URL | HAVE-URL |
 
 ## Tally
 
-- HAVE-URL     66 of 98
-- NEED-URL     6 of 98
-- HOLD-RIGHTS  12 of 98
+- HAVE-URL     70 of 98
+- NEED-URL     14 of 98
+- HOLD-RIGHTS  0 of 98
 - BLOCKED      2 of 98
 - NO LEAD      12 of 98
