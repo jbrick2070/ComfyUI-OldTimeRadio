@@ -476,3 +476,91 @@ def test_a_whole_work_is_named_as_such_not_as_heading_less():
 def test_a_page_with_no_act_heading_still_says_headings_not_found():
     r = C.assess(_clean_report(headings_present=False, act_headings=0))
     assert any("headings not found" in x for x in r.reasons)
+
+
+# --------------------------------------------------------------------------- #
+# the vendored scenes, read back through the helper production calls
+# --------------------------------------------------------------------------- #
+#: The four vendored scenes, keyed by the source_ref THE SHIPPING BANK EMITS.
+#: These strings are copied from `curated_scenes.sample.json` and `banks.json`,
+#: and that is the whole point: the first cut of these tests asked with
+#: `macbeth__act1_scene3`, a shape the corpus accepted and production never
+#: sends. Every test passed against a lookup that could not fire on a real
+#: render. A fixture invented to match the code proves the code matches the
+#: fixture.
+VENDORED = [
+    ("it", "folger-macbeth:act1-scene3-witches", "Carlo Rusconi"),
+    ("es", "folger-as-you-like-it:act3-scene2-rosalind-orlando",
+     "Jos\u00e9 Arnaldo M\u00e1rquez"),
+    ("fr", "folger-hamlet:act1-scene1-platform-watch",
+     "Fran\u00e7ois-Victor Hugo"),
+    ("fr", "folger-lear:act1-scene1-love-test", "Fran\u00e7ois-Victor Hugo"),
+]
+
+
+def _corpus_root():
+    from pathlib import Path
+    return str(Path(__file__).resolve().parent.parent / "config"
+               / "source_banks" / "shakespeare" / "translations")
+
+
+@pytest.mark.parametrize("iso, source_ref, translator", VENDORED)
+def test_a_vendored_scene_resolves_and_its_bytes_verify(iso, source_ref,
+                                                        translator):
+    """The lookup a render performs, against the real files on disk.
+
+    `vendored_text` re-hashes the file and refuses a mismatch, so this also
+    proves the manifest signs the bytes that are STORED -- the first cut wrote
+    `text + "\n"` and signed `text`, and every scene was refused.
+    """
+    text, row = C.vendored_text(_corpus_root(), iso, source_ref)
+    assert text, "the scene resolved to no text"
+    assert row is not None and row["iso"] == iso
+    assert row["translator"].startswith(translator.split()[0])
+
+
+def test_the_refs_the_bank_actually_emits_are_the_ones_that_resolve():
+    """Guard the shape, not just the outcome.
+
+    Every shipping ref is `folger-<play>:act<N>-scene<M>-<slug>`, and two plays
+    are named differently on either side -- the bank says `lear` and
+    `comedy-errors` where the corpus says `king_lear` and `comedy_of_errors`.
+    A silent miss there is a vendored scene that never loads and never says why.
+    """
+    assert C._scene_key_from_ref(
+        "folger-macbeth:act1-scene3-witches") == ("macbeth", "1.3")
+    assert C._scene_key_from_ref(
+        "folger-lear:act1-scene1-love-test") == ("king_lear", "1.1")
+    assert C._scene_key_from_ref(
+        "folger-comedy-errors:act3-scene1-locked-door") == ("comedy_of_errors",
+                                                            "3.1")
+    # the corpus's own short form still parses -- the vendoring script uses it
+    assert C._scene_key_from_ref("macbeth__act1_scene3") == ("macbeth", "1.3")
+    # and an unparseable ref is a miss, never a guess
+    assert C._scene_key_from_ref("folger-macbeth") == ("", "")
+    assert C._scene_key_from_ref("") == ("", "")
+
+
+def test_a_language_with_no_vendored_scene_is_a_quiet_miss():
+    """Ninety-odd of the cells have no vendored scene and never will today.
+    A miss returns empty and the model translation ships -- it is the NORMAL
+    answer, not a failure, and must never raise."""
+    assert C.vendored_text(_corpus_root(), "ja", "folger-macbeth:act1-scene3-witches") == ("", None)
+    assert C.vendored_text(_corpus_root(), "it", "folger-hamlet:act9-scene9-nothing") == ("", None)
+
+
+def test_tampered_bytes_are_refused_rather_than_performed():
+    """The integrity check is the whole reason the manifest carries a hash: a
+    corpus whose text has drifted from what was reviewed must not be spoken."""
+    import io
+    import os
+    import shutil
+    import tempfile
+    root = _corpus_root()
+    with tempfile.TemporaryDirectory() as tmp:
+        shutil.copytree(root, tmp, dirs_exist_ok=True)
+        victim = os.path.join(tmp, "it", "macbeth_1_3.txt")
+        body = io.open(victim, encoding="utf-8").read()
+        io.open(victim, "w", encoding="utf-8", newline="\n").write(
+            body + "MACBETH: A line no translator wrote.\n")
+        assert C.vendored_text(tmp, "it", "folger-macbeth:act1-scene3-witches") == ("", None)

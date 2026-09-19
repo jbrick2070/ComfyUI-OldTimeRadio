@@ -443,6 +443,25 @@ class TestTheWiringIsThere:
         # and the cast mint is untouched (Opus r2 MF4)
         assert "cast_seed, cast_seed_source = _resolve_cast_rng_seed()" in src
 
+    def test_the_writer_actually_looks_for_a_vendored_translation(self):
+        """A helper nothing calls is this repo's most repeated defect, and it is
+        invisible to every other check: the helper's own tests pass, the suite is
+        green, and the feature does not exist at runtime. So assert the CALL, at
+        its real site -- the one question source inspection is the right tool for.
+        """
+        from nodes import OTR_LedgerScriptWriter as W
+        src = inspect.getsource(W.OTR_LedgerScriptWriter)
+        assert "_OTRVC.vendored_text(" in src, "the vendored corpus is never consulted"
+        assert "except _OTRVC.CorpusError" in src, (
+            "a bare `except Exception` here swallows the one error the corpus "
+            "refuses to swallow, and every bug inside the helper with it")
+        # The receipt must describe what was PERFORMED. `setdefault` kept the
+        # English receipt and nested the vendored facts under one key, leaving
+        # raw_sha256 / speakers / seed / beats naming the cut that was replaced.
+        assert "meta[\"verbatim_passage\"] = dict(_vreceipt)" in src, (
+            "the ledger must carry the vendored receipt, not the English one")
+        assert "setdefault(\"verbatim_passage\", {})[\"vendored\"]" not in src
+
     def test_the_voice_hook_projects_verbatim_rows_before_any_engine_cleaner(self):
         from nodes import _otr_voice_node_common as V
         src = inspect.getsource(V)

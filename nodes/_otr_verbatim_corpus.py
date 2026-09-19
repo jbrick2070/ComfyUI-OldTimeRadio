@@ -29,6 +29,7 @@ Nothing in this module opens a socket or a model.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -685,7 +686,98 @@ __all__ = [
     "READY", "REQUIRED_MANIFEST_FIELDS", "SCHEMA_VERSION",
     "SPEAKER_LABEL_PATTERNS", "TRANSCRIPTION_PENDING_MARKERS",
     "US_PUBLICATION_BEFORE", "CorpusError", "LeadReport", "assess",
-    "count_speaker_labels",
+    "count_speaker_labels", "vendored_text",
     "dialogue_ratio", "find_pending_markers", "headings_present",
     "load_manifest", "publication_reasons", "select_scene", "strip_tracking",
 ]
+
+
+# --------------------------------------------------------------------------- #
+# the vendored text, read at render time
+# --------------------------------------------------------------------------- #
+
+#: Where the bank's play slug and the corpus's play key genuinely differ. Every
+#: other pair differs only by hyphen-versus-underscore, which is handled below.
+#: Measured against the fourteen refs in `curated_scenes.sample.json` and
+#: `banks.json` -- not guessed, because a play that silently fails to map is a
+#: vendored scene that never loads and never says why.
+_PLAY_ALIASES = {
+    "lear": "king_lear",
+    "comedy_errors": "comedy_of_errors",
+}
+
+#: The two ref spellings that reach this function. The first is what the
+#: SHIPPING bank actually emits; the second is the corpus's own short form,
+#: used by the vendoring script and the leads file.
+_REF_SHAPES = (
+    re.compile(r"^(?:folger-)?(?P<play>[a-z0-9][a-z0-9-]*)"
+               r":act(?P<act>\d+)-scene(?P<scene>\d+)(?:-[a-z0-9-]+)?$"),
+    re.compile(r"^(?P<play>[a-z0-9_]+?)"
+               r"__act(?P<act>\d+)_scene(?P<scene>\d+)$"),
+)
+
+
+def _scene_key_from_ref(source_ref):
+    """``("macbeth", "1.3")`` from a scene ref, or ``("", "")``.
+
+    THE SHIPPING REF IS `folger-macbeth:act1-scene3-witches`, NOT
+    `macbeth__act1_scene3`. This accepted only the second shape, so every real
+    render missed, `vendored_text` returned ("", None), and the whole vendored
+    lane was a no-op that no test caught -- because the tests asked with the
+    short form too. A helper that is green on a key production never sends is
+    the defect this repo repeats most.
+
+    Anything that matches neither shape yields ("", "") and the caller keeps
+    the model translation: a ref we cannot parse is not a reason to guess.
+    """
+    text = str(source_ref or "").strip().lower()
+    for shape in _REF_SHAPES:
+        match = shape.match(text)
+        if not match:
+            continue
+        play = match.group("play").replace("-", "_")
+        return (_PLAY_ALIASES.get(play, play),
+                "%s.%s" % (match.group("act"), match.group("scene")))
+    return "", ""
+
+
+def vendored_text(root, iso, source_ref, min_confidence=0.8):
+    """``(text, row)`` for a vendored scene, or ``("", None)``.
+
+    THE NORMAL ANSWER IS ("", None) AND IT IS NOT A FAILURE. A scene with no
+    vendored translation keeps the model translation that already ships; the
+    lane never refuses an episode for want of a real translator's words.
+
+    Never raises for a corpus-shaped reason. A malformed manifest is a
+    CorpusError from `load_manifest` -- that one IS loud, because a wrong
+    vendored scene would publish one translator's words under another's name.
+    """
+    play, scene = _scene_key_from_ref(source_ref)
+    if not play or not str(iso or "").strip():
+        return "", None
+    manifest = os.path.join(str(root or ""), MANIFEST_NAME)
+    if not os.path.isfile(manifest):
+        return "", None
+    row = select_scene(load_manifest(manifest), iso=iso, play=play,
+                       scene=scene, min_confidence=min_confidence)
+    if not row:
+        return "", None
+    path = os.path.join(str(root or ""), str(row.get("file") or ""))
+    # A FILE WE CANNOT DECODE IS A FILE WE CANNOT VERIFY, which is the quiet
+    # miss, not an error: the sha256 below would refuse it anyway. OSError is
+    # not enough -- `read()` raises UnicodeDecodeError on bytes that are not
+    # UTF-8, and that is a ValueError, so it escapes an OSError handler and
+    # would kill the render instead of falling back to the model. This repo
+    # mangles encodings often enough to make that a real path, not a theory.
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            text = handle.read()
+    except (OSError, UnicodeDecodeError):
+        return "", None
+    # THE BYTES ARE THE ONES THE MANIFEST SIGNED. A file edited after
+    # vendoring is a different translation than the row describes, and the
+    # row is what the credits will name.
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if digest != str(row.get("raw_sha256") or ""):
+        return "", None
+    return text, row

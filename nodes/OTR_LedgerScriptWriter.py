@@ -3777,7 +3777,101 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # translation. Guarded on the EMPTY instruction, not the stamp:
         # English stamps `en` and must stay byte-identical. Loud on failure;
         # an English verbatim row on a native episode is the defect itself.
-        if _verbatim_plan is not None:
+        # A REAL TRANSLATOR'S WORDS WHEN WE HAVE THEM. Before translating with
+        # the model, look for a vendored scene for this (language, play,
+        # scene): Rusconi's 1838 Italian Macbeth rather than the writer's
+        # rendering of it. The passage is RE-PLANNED from the vendored text so
+        # the cut, the speakers and the beat count come from the same selector
+        # that handles the English source -- nothing downstream learns a second
+        # shape.
+        #
+        # THE NORMAL ANSWER IS "no vendored scene" AND IT IS NOT A FAILURE.
+        # Four scenes are vendored out of ninety-eight cells; everything else
+        # keeps the model translation that already ships, per scene, per
+        # language. A miss never costs an episode.
+        _vendored_row = None
+        if _verbatim_plan is not None and _EPLANG.native_authoring_instruction(meta):
+            try:
+                from . import _otr_verbatim_corpus as _OTRVC
+            except ImportError:  # pragma: no cover -- flat load
+                import _otr_verbatim_corpus as _OTRVC  # type: ignore
+            _vendored_root = str(
+                Path(__file__).resolve().parent.parent / "config"
+                / "source_banks" / str(resolved.get("source_bank") or "")
+                / "translations")
+            # CATCH THE CORPUS'S OWN ERROR, NOT EVERY ERROR. A malformed
+            # manifest is the one thing `vendored_text` refuses to swallow, and
+            # a bare `except Exception` here swallowed it at the only
+            # production caller -- along with any TypeError or AttributeError
+            # inside the helper, which would then read as "no vendored scene"
+            # forever. A corpus that cannot be parsed falls back to the model
+            # loudly; a bug in our own code is allowed to surface.
+            try:
+                _vendored_text, _vendored_row = _OTRVC.vendored_text(
+                    _vendored_root, _EPLANG.iso_from_meta(meta),
+                    str(resolved.get("source_ref") or ""))
+            except _OTRVC.CorpusError as exc:
+                _vendored_text, _vendored_row = "", None
+                log.warning("[OTR_LedgerScriptWriter] vendored corpus is "
+                            "unreadable (%s); using the model translation",
+                            str(exc)[:160])
+            if _vendored_text and _vendored_row:
+                try:
+                    from . import _otr_verbatim_lane as _OTRVL_V
+                except ImportError:  # pragma: no cover -- flat load
+                    import _otr_verbatim_lane as _OTRVL_V  # type: ignore
+                _replanned, _vreceipt = _OTRVL_V.plan_verbatim_passage(
+                    source_text=_vendored_text,
+                    source_meta=dict(resolved.get("source_meta") or {}),
+                    num_characters=int(resolved["num_characters"]),
+                    act_count=int(resolved.get("act_count") or 1),
+                    # THE SCENE'S REF, NOT THE PAGE'S URL. The passage seed is
+                    # derived as f"{seed}|{source_ref}", so handing it the
+                    # Wikisource URL would seed the vendored cut differently
+                    # from the English one -- a second shape, which is exactly
+                    # what re-planning through this selector exists to avoid.
+                    source_ref=str(resolved.get("source_ref") or ""),
+                )
+                if _replanned is not None:
+                    _verbatim_plan = _replanned
+                    # THE RECEIPT DESCRIBES WHAT WAS PERFORMED. `setdefault`
+                    # kept the ENGLISH receipt here and nested the vendored
+                    # facts under one key -- so `raw_sha256`, `speakers`,
+                    # `seed`, `beat_count` and `beats` all still named the
+                    # English cut that was just replaced. Consumers read
+                    # FIELDS, not comments: the compose loop zips
+                    # `_verbatim_beat_ids` (built from the VENDORED plan)
+                    # against `verbatim_passage["beats"]`, and a stale English
+                    # beats array of a different length makes `zip` silently
+                    # truncate -- beat ids stamped onto the wrong records.
+                    # Replace the receipt; keep provenance beside it.
+                    meta["verbatim_passage"] = dict(_vreceipt)
+                    meta["verbatim_passage"]["vendored"] = {
+                        "translator": _vendored_row.get("translator", ""),
+                        "first_published":
+                            _vendored_row.get("translation_first_published", ""),
+                        "source_url": _vendored_row.get("source_url", ""),
+                        "raw_sha256": _vendored_row.get("raw_sha256", ""),
+                        "file": _vendored_row.get("file", ""),
+                    }
+                    log.info(
+                        "[OTR_LedgerScriptWriter] verbatim passage VENDORED: "
+                        "%s (%s), %s beat(s) -- the model translation is NOT "
+                        "used for this scene",
+                        _vendored_row.get("translator"),
+                        _vendored_row.get("translation_first_published"),
+                        _vreceipt.get("beat_count"))
+                else:
+                    _vendored_row = None
+                    log.warning(
+                        "[OTR_LedgerScriptWriter] vendored scene did not "
+                        "re-plan (%s); using the model translation",
+                        # `unavailable_receipt` stores this as "reason"; the
+                        # old key never existed, so this line always printed
+                        # "no reason" -- the one diagnostic that matters here.
+                        _vreceipt.get("reason") or "no reason")
+
+        if _verbatim_plan is not None and _vendored_row is None:
             _vt_instruction = _EPLANG.native_authoring_instruction(meta)
             if _vt_instruction:
                 try:

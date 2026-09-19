@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """Turn a located lead into a vendored scene file the writer can perform.
 
-    python scripts/otr_vendor_shakespeare.py --check       # what is extractable
+    python scripts/otr_vendor_shakespeare.py               # what is extractable
     python scripts/otr_vendor_shakespeare.py --write       # vendor them
 
 WHAT THIS IS FOR. `leads.json` records where a translation LIVES; nothing in
@@ -10,7 +10,7 @@ normalises the speaker labels to `NAME:`, writes
 `config/source_banks/shakespeare/translations/<iso>/<play>_<scene>.txt`, and
 adds the manifest row `_otr_verbatim_corpus.load_manifest` validates.
 
---check WRITES NOTHING. It reports, per lead, whether the target act and scene
+Running it with no flag WRITES NOTHING. It reports, per lead, whether the target act and scene
 are actually on the page -- because a lead can name the right work and the
 wrong page. Measured on the first run: `it/tempest 3.1` pointed at
 `La_tempesta_(Shakespeare-Maffei)/Atto_primo`, which holds Act I only, so
@@ -86,6 +86,10 @@ def to_text(markup):
     """
     body = re.sub(r"(?is)<(script|style|template)\b.*?</\1>", " ", markup)
     body = re.sub(r"(?s)<!--.*?-->", " ", body)
+    # READ WHO SPEAKS OFF THE PAGE BEFORE THE PAGE IS THROWN AWAY. Every edition
+    # in the set marks its speakers; once the tags are gone that fact cannot be
+    # recovered, only guessed at -- see `mark_speakers`.
+    body = mark_speakers(body)
     body = re.sub(r"(?i)</(div|p|li|tr|h[1-6]|span)\s*>", "\n", body)
     body = re.sub(r"(?i)<br\s*/?>", "\n", body)
     body = re.sub(r"(?s)<[^>]+>", "", body)
@@ -94,11 +98,92 @@ def to_text(markup):
     # vendored Macbeth as "(&#91; 9&#93; )", which the announcer would have
     # READ ALOUD as "ampersand hash ninety-one".
     body = html.unescape(body)
-    # Footnote markers are editorial apparatus, not the translator's words.
+    # Footnote markers and page breaks are the EDITION's apparatus, not the
+    # translator's words, and every one of them is READ ALOUD if it survives.
+    # Three forms are in this corpus and the first cut caught only one:
+    #   [9]                  -- the bracketed footnote
+    #   (19)                 -- Hugo's parenthesised note, five of them in Lear
+    #   [p. 39 modifica ]    -- Wikisource's page-break link, INSIDE a speech,
+    #                           which the announcer would read as "p 39 modifica"
     body = re.sub(r"\[\s*\d{1,3}\s*\]", "", body)
+    body = re.sub(r"\[\s*p\.\s*\d{1,4}\s*modifica\s*\]", "", body, flags=re.I)
+    body = re.sub(r"\(\s*\d{1,3}\s*\)", "", body)
     body = re.sub(r"\(\s*\)", "", body)
     body = re.sub(r"[ \t ]+", " ", body)
     return re.sub(r"\n\s*\n+", "\n", body)
+
+
+#: Wraps a speaker name the PUBLISHER marked, so the label rules below read a
+#: fact off the page instead of guessing one from prose.
+SPEAKER_MARK = "\x01"
+
+#: A stage direction / sound cue, set smaller by every edition in the set.
+_DIRECTION_BLOCK = re.compile(
+    r'(?is)<(div|span|p)\b[^>]*font-size:\s*9[05]%[^>]*>(?P<body>.*?)</\1\s*>')
+
+#: How each publisher marks a speaker. All three converge on small caps; only
+#: the spelling of the markup differs.
+_SPEAKER_SPANS = (
+    # Wikisource (Hugo): class="sc", the name often rendered lowercase.
+    re.compile(r'(?is)<span\b[^>]*class="sc"[^>]*>(?P<name>[^<]{1,40})</span>'),
+    # Gutenberg (Marquez): an inline small-caps style, name carries its period.
+    re.compile(r'(?is)<span\b[^>]*font-variant:\s*(?:all-)?small-caps[^>]*>'
+               r'(?P<name>[^<]{1,40})</span>'),
+    # Wikisource (Rusconi): an italic name, with the ordinal as a superscript --
+    # `1<sup>a</sup> <i>Strega</i>` is "1a Strega", three distinct witches.
+    # THE PARENTHETICAL IS PART OF THE LABEL, NOT THE SPEECH. An aside prints
+    # as `<i>Macbeth</i> (<i>fra se</i>).`, and requiring the period to follow
+    # the name directly missed every one of them -- Macbeth's "Thane di Glamis
+    # e di Cawdor!" stayed inside Angus's speech. The qualifier is matched so
+    # the label is found, and dropped because it is stage business.
+    re.compile(r'(?is)(?P<ord>\d\s*<sup>\s*[ao]\s*</sup>\s*)?'
+               r'<i>(?P<name>[^<]{1,40})</i>'
+               r'\s*(?:\((?:<[^>]+>|[^()<])*\))?\s*\.'),
+)
+
+
+def mark_speakers(markup):
+    """Tag the speaker names the EDITION marked, and drop its stage business.
+
+    WHY THIS EXISTS. The first cut threw the markup away and then guessed the
+    speakers back out of the plain text, with a rule that a name must RECUR.
+    That guess cast sound cues as people (FANFARES got a voice in King Lear)
+    and, far worse, MISSED Hugo's inline labels -- he prints them lowercase
+    with a comma qualifier, `cordelia , a part.`, which the comma rule
+    discarded, leaving Cordelia's aside INSIDE Goneril's speech. A speech
+    count cannot see a wrong mouth; that is why this reads the page instead.
+
+    ORDER MATTERS AND IS NOT OBVIOUS. A stage direction NAMES the people who
+    enter, and marks them the same way: `<div style="font-size:90%">Fanfares.
+    Entrent <span class="sc">Macbeth</span>...`. So the direction blocks are
+    neutralised FIRST -- their text is kept as narration, their speaker markup
+    is not -- and only the spans that survive are speakers. Reversing these two
+    steps casts every entrance as a speaking part.
+    """
+    def _strip_direction(match):
+        # DROP THE DIRECTION, DO NOT KEEP IT AS NARRATION. Keeping the words
+        # put them back in a mouth: an unlabelled line merges into the PENDING
+        # speech, so `GLOCESTER: ... Le roi vient. Fanfares. Entrent` had
+        # Glocester announcing his own trumpets, and Lear reading "A Cordelia."
+        # aloud. A vendored file is the translator's SPOKEN text labelled by
+        # speaker; stage business is the edition's apparatus and is not
+        # performed. Same rule for the qualifier on a label ("a part",
+        # "montrant Edmond") -- it was never dialogue either.
+        return "\n"
+
+    def _mark(match):
+        # `groupdict` rather than `group("ord")`: only the Rusconi pattern has
+        # that group, and asking the others for it by name is an error.
+        name = match.group("name").strip()
+        ordinal = re.sub(r"(?s)<[^>]+>|\s+", "",
+                         match.groupdict().get("ord") or "")
+        full = ("%s %s" % (ordinal, name)).strip()
+        return "\n%s%s%s " % (SPEAKER_MARK, full, SPEAKER_MARK)
+
+    body = _DIRECTION_BLOCK.sub(_strip_direction, markup)
+    for pattern in _SPEAKER_SPANS:
+        body = pattern.sub(_mark, body)
+    return body
 
 
 def _fold(text):
@@ -241,7 +326,13 @@ def main():
         text = to_text(html)
         lines = text.splitlines()
         body, reason = extract(lines, *EDITION_LABELS[key])
-        labels, speakers = CORPUS.speaker_label_stats(body) if body else (0, 0)
+        # MEASURE THE ARTIFACT, NOT AN INTERMEDIATE. The gate counts `NAME:`
+        # labels, and the extracted body does not carry them yet -- since the
+        # speakers became publisher MARKS the raw body scores almost nothing,
+        # and King Lear read as 27 speeches where the stored file has 87. Count
+        # the normalised text, which is the text that will be written.
+        labels, speakers = (CORPUS.speaker_label_stats(normalise_labels(body))
+                            if body else (0, 0))
         if not body:
             print("  NO    %-3s %-16s %-5s  %s" % (key + (reason,)))
             continue
@@ -296,8 +387,32 @@ def _label_candidates(body):
     return counts
 
 
+#: A name the PUBLISHER marked, sitting at the head of its line.
+_MARKED_LABEL = re.compile(
+    r"^%s(?P<name>[^%s\n]{1,40})%s\s*" % (SPEAKER_MARK, SPEAKER_MARK,
+                                          SPEAKER_MARK))
+
+
+def _marked_name(line):
+    """The speaker name the edition itself marked on this line, or "".
+
+    A MARKED NAME IS A FACT AND SKIPS EVERY GUESS BELOW. The heuristics exist
+    only for a page whose markup we have not taught, and each of them costs a
+    real speaker: the comma rule drops Hugo's `cordelia , a part.`, and the
+    recurrence rule drops anyone who speaks once. Neither may veto the page.
+    """
+    match = _MARKED_LABEL.match(line)
+    if not match:
+        return ""
+    name = match.group("name").strip().rstrip(".:　").strip()
+    return name.upper() if name else ""
+
+
 def _name_of(line):
     """The speaker name this line opens with, or "" -- shape rules only."""
+    marked = _marked_name(line)
+    if marked:
+        return marked
     for shape in _LABEL_SHAPES:
         m = shape.match(line)
         if not m:
@@ -314,7 +429,15 @@ def _name_of(line):
 
 
 def normalise_labels(body):
-    """Rewrite every speaker label to `NAME:` and join it to its speech."""
+    """Rewrite every speaker label to `NAME:` and join it to its speech.
+
+    WHEN THE PAGE MARKED ITS SPEAKERS, THE PAGE WINS AND THE GUESSES ARE OFF.
+    The recurrence rule below is a stand-in for a fact, and it costs a real
+    part every time it fires -- a character who speaks once is demoted to
+    narration. It is worth paying only on a publisher whose markup we have not
+    taught yet, so it applies to an UNMARKED page and never to a marked one.
+    """
+    marked = SPEAKER_MARK in body
     recurring = {n for n, c in _label_candidates(body).items() if c >= 2}
     out, pending = [], None
     for raw in body.splitlines():
@@ -323,8 +446,15 @@ def normalise_labels(body):
             continue
         matched = None
         name = _name_of(line)
-        # ONLY A RECURRING NAME IS A SPEAKER -- see `_label_candidates`.
-        if name and name in recurring:
+        if marked:
+            # A marked page has exactly one kind of label, and a line without
+            # the mark is narration however much it looks like a name.
+            marked_name = _marked_name(line)
+            if marked_name:
+                rest = line[_MARKED_LABEL.match(line).end():].strip()
+                matched = (marked_name, rest)
+        elif name and name in recurring:
+            # ONLY A RECURRING NAME IS A SPEAKER -- see `_label_candidates`.
             for shape in _LABEL_SHAPES:
                 m = shape.match(line)
                 if not m:
@@ -342,7 +472,10 @@ def normalise_labels(body):
             out.append(line)                  # heading / stage direction
     if pending:
         out.append("%s: %s" % pending)
-    return "\n".join(l for l in out if l.strip())
+    # The sentinel is scaffolding, never text. Any that survives here sat mid
+    # line -- a name inside narration -- and must not reach a performer.
+    body_out = "\n".join(l for l in out if l.strip())
+    return body_out.replace(SPEAKER_MARK, "")
 
 
 def write_rows(rows):
@@ -360,8 +493,14 @@ def write_rows(rows):
         rel = os.path.join(iso, "%s_%s.txt" % (play, scene.replace(".", "_")))
         dest = os.path.join(OUT_ROOT, rel)
         os.makedirs(os.path.dirname(dest), exist_ok=True)
-        io.open(dest, "w", encoding="utf-8", newline="\n").write(text + "\n")
-        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        # SIGN THE BYTES THAT ARE STORED, not the ones in hand. The first cut
+        # wrote `text + "\n"` and hashed `text`, so the manifest signed a
+        # different file than it named and `vendored_text` refused every scene
+        # at the integrity check -- correctly. An off-by-one-newline is exactly
+        # what that check is for; it just happened to be catching me.
+        stored = text + "\n"
+        io.open(dest, "w", encoding="utf-8", newline="\n").write(stored)
+        digest = hashlib.sha256(stored.encode("utf-8")).hexdigest()
         by_key[key] = {
             "iso": iso, "play": play, "scene": scene,
             "file": rel.replace("\\", "/"),

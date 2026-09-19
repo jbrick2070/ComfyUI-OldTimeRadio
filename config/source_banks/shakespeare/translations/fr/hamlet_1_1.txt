@@ -1,9 +1,4 @@
 SCÈNE I.
-[Elseneur. — Une plate-forme devant le château (1)
-.]
-Francisco
-est en faction. Bernardo
-vient à lui.
 BERNARDO: Qui est là ?
 FRANCISCO: Non, répondez-moi, vous ! Halte ! faites-vous reconnaître — vous-même.
 BERNARDO: Vive le roi !
@@ -14,27 +9,27 @@ BERNARDO: — Minuit vient de sonner ; va te mettre au lit, Francisco.
 FRANCISCO: — Grand merci de venir ainsi me relever. Le froid est aigre, — et je suis transi jusqu’au cœur.
 BERNARDO: — Avez-vous eu une faction tranquille ?
 FRANCISCO: Pas même une souris qui ait remué !
-BERNARDO: Allons, bonne nuit ! — si vous rencontrez Horatio et Marcellus, — mes camarades de garde, dites-leur de se dépêcher. Entrent Horatio et Marcellus .
+BERNARDO: Allons, bonne nuit ! — si vous rencontrez Horatio et Marcellus, — mes camarades de garde, dites-leur de se dépêcher.
 FRANCISCO: — Je pense que je les entends. Halte ! Qui va là !
 HORATIO: — Amis de ce pays.
 MARCELLUS: Hommes liges du roi danois.
 FRANCISCO: — Bonne nuit !
 MARCELLUS: Ah ! adieu, honnête soldat ; — qui vous a relevé ?
-FRANCISCO: Bemardo a pris ma place. — Bonne nuit ! Francisco sort.
+FRANCISCO: Bemardo a pris ma place. — Bonne nuit !
 MARCELLUS: Holà ! Bernardo !
 BERNARDO: Réponds donc. — Est-ce Horatio qui est là ?
 HORATIO: Un peu.
 BERNARDO: — Bienvenu, Horatio ! Bienvenu, bon Marcellus !
-MARCELLUS: — Eh bien ! cet être a-t-il reparu cette nuit (2) ?
+MARCELLUS: — Eh bien ! cet être a-t-il reparu cette nuit ?
 BERNARDO: — Je n’ai rien vu.
 MARCELLUS: Horatio dit que c’est uniquement notre imagination, — et il ne veut pas se laisser prendre par la croyance — à cette terrible apparition que deux fois nous avons vue. — Voilà pourquoi je l’ai pressé — de faire, avec nous, cette nuit une minutieuse veillée, — afin que, si la vision revient encore, — il puisse confirmer nos regards et lui parler.
 HORATIO: — Bah ! bah ! elle ne paraîtra pas.
 BERNARDO: Asseyez-vous un moment, — que nous rebattions encore une fois vos oreilles, — si bien fortifiées contre notre histoire, — du récit de ce que nous avons vu deux nuits.
 HORATIO: Soit ! asseyons-nous, — et écoutons ce que Bernardo va nous dire.
 BERNARDO: — C’était justement la nuit dernière, — alors que cette étoile, là-bas, qui va du pôle vers l’ouest, — avait terminé son cours pour illuminer cette partie du ciel — où elle flamboie maintenant. Marcellus et moi, — la cloche tintait alors une heure…
-MARCELLUS: — Paix, interromps-toi !… Regarde ! Le voici qui revient. Le Spectre entre.
+MARCELLUS: — Paix, interromps-toi !… Regarde ! Le voici qui revient.
 BERNARDO: — Avec la même forme, semblable au roi qui est mort.
-MARCELLUS: — Tu es un savant : parle-lui, Horatio (3) .
+MARCELLUS: — Tu es un savant : parle-lui, Horatio .
 BERNARDO: — Ne ressemble-t-il pas au roi ? Regarde-le bien, Horatio.
 HORATIO: — Tout à fait ! Je suis labouré par la peur et par l’étonnement.
 BERNARDO: — Il voudrait qu’on lui parlât.
@@ -43,7 +38,6 @@ HORATIO: — Qui es-tu, toi qui usurpes cette heure de la nuit — et cette form
 MARCELLUS: — Il est offensé.
 BERNARDO: Vois, il s’en va fièrement.
 HORATIO: — Arrête ; parle ! je te somme de parler ; parle !
-LE SPECTRE SORT: 
 MARCELLUS: — Il est parti, et ne veut pas répondre.
 BERNARDO: — Eh bien, Horatio, vous tremblez et vous êtes tout pâle : — ceci n’est-il rien de plus que de l’imagination ? — Qu’en pensez-vous ?
 HORATIO: — Devant mon Dieu, je n’aurais pu le croire, — sans le témoignage sensible et évident — de mes propres yeux.
@@ -54,15 +48,14 @@ HORATIO: — Quel sens particulier donner à ceci ? Je n’en sais rien, — mai
 MARCELLUS: — Eh bien, asseyons-nous, et que celui qui le sait me dise — pourquoi ces gardes si strictes et si rigoureuses — fatiguent ainsi toutes les nuits les sujets de ce royaume. — Pourquoi tous ces canons de bronze fondus chaque jour, — et toutes ces munitions de guerre achetées à l’étranger ? — Pourquoi ces presses faites sur les charpentiers de navire, dont la rude tâche — ne distingue plus le dimanche du reste de la semaine ? — Quel peut être le but de cette activité toute haletante, — qui fait de la nuit la compagne de travail du jour ? — Qui pourra m’expliquer cela ?
 HORATIO: Je puis le faire, — du moins, d’après la rumeur qui court. Notre feu roi, — dont l’image vient de vous apparaître, — fut, comme vous savez, provoqué à un combat par Fortinbras de Norwége, — que stimulait une orgueilleuse émulation. — Dans ce combat, notre vaillant Hamlet — (car cette partie du monde connu l’estimait pour tel) — tua ce Fortinbras. En vertu d’un contrat bien scellé, — dûment ratifié par la justice et par les hérauts, — Fortinbras perdit avec la vie toutes les terres — qu’il possédait et qui revinrent au vainqueur. — Contre ce gage, une portion équivalente — avait été risquée par notre roi, à charge d’être réunie — au patrimoine de Fortinbras, — si celui-ci eût triomphé. Ainsi les biens de Fortinbras, d’après le traité — et la teneur formelle de certains articles, — ont dû échoir à Hamlet. Maintenant, mon cher, le jeune Fortinbras, — écervelé, tout plein d’une ardeur fougueuse, — a ramassé çà et là, sur les frontières de Norwége, — une bande d’aventuriers sans feu ni lieu, — enrôlés, moyennant les vivres et la paie, pour quelque entreprise — hardie ; or il n’a d’autre but — (et cela est prouvé à notre gouvernement) — que de reprendre sur nous, par un coup de main — et par des moyens violents, les terres susdites, — ainsi perdues par son père. Et voilà, je pense, — la cause principale de nos préparatifs, — la raison des gardes qu’on nous fait monter, et le grand motif — de tant d’activité et du tumulte que vous voyez dans le pays.
 BERNARDO: — Je pense que ce ne peut être autre chose ; tu as raison. — Cela pourrait bien expliquer pourquoi cette figure prodigieuse — passe toute armée à travers nos postes, si semblable au roi — qui était et qui est encore l’occasion de ces guerres.
-HORATIO: — C’est un phénomène qui trouble l’œil de l’esprit. — À l’époque la plus glorieuse et la plus florissante de Rome, — un peu avant que tombât le tout-puissant Jules-César, — les tombeaux laissèrent échapper leurs hôtes, et les morts en linceul — allèrent, poussant des cris rauques, dans les rues de Rome. — On vit aussi des astres avec des queues de flamme, des rosées de sang, — des signes désastreux dans le soleil ; et l’astre humide — sous l’influence duquel est l’empire de Neptune — s’évanouit dans une éclipse, à croire que c’était le jour du jugement. — Ces mêmes signes précurseurs d’événements terribles, — messagers toujours en avant des destinées, — prologue des catastrophes imminentes, — le ciel et la terre les ont fait apparaître — dans nos climats à nos compatriotes. Le Spectre reparaît. — Mais, chut ! Regardez, là ! il revient encore ! — Je vais lui barrer le passage, dût-il me foudroyer. Arrête, illusion ! — Si tu as un son, une voix dont tu fasses usage, — parle-moi ! — S’il y a à faire quelque bonne action — qui puisse contribuer à ton soulagement et à mon salut, — parle-moi ! — Si tu es dans le secret de quelque fatalité nationale, — qu’un avertissement pourrait peut-être prévenir, — oh ! parle ! — Ou si tu as enfoui pendant ta vie — dans le sein de la terre un trésor extorqué, — ce pourquoi, dit-on, vous autres esprits vous errez souvent après la mort, — dis-le-moi. Le coq chante. Arrête et parle… Retiens-le, Marcellus.
+HORATIO: — C’est un phénomène qui trouble l’œil de l’esprit. — À l’époque la plus glorieuse et la plus florissante de Rome, — un peu avant que tombât le tout-puissant Jules-César, — les tombeaux laissèrent échapper leurs hôtes, et les morts en linceul — allèrent, poussant des cris rauques, dans les rues de Rome. — On vit aussi des astres avec des queues de flamme, des rosées de sang, — des signes désastreux dans le soleil ; et l’astre humide — sous l’influence duquel est l’empire de Neptune — s’évanouit dans une éclipse, à croire que c’était le jour du jugement. — Ces mêmes signes précurseurs d’événements terribles, — messagers toujours en avant des destinées, — prologue des catastrophes imminentes, — le ciel et la terre les ont fait apparaître — dans nos climats à nos compatriotes. — Mais, chut ! Regardez, là ! il revient encore ! — Je vais lui barrer le passage, dût-il me foudroyer. Arrête, illusion ! — Si tu as un son, une voix dont tu fasses usage, — parle-moi ! — S’il y a à faire quelque bonne action — qui puisse contribuer à ton soulagement et à mon salut, — parle-moi ! — Si tu es dans le secret de quelque fatalité nationale, — qu’un avertissement pourrait peut-être prévenir, — oh ! parle ! — Ou si tu as enfoui pendant ta vie — dans le sein de la terre un trésor extorqué, — ce pourquoi, dit-on, vous autres esprits vous errez souvent après la mort, — dis-le-moi. Arrête et parle… Retiens-le, Marcellus.
 MARCELLUS: — Le frapperai-je de ma pertuisane ?
 HORATIO: — Oui, s’il ne veut pas s’arrêter.
 BERNARDO: Il est ici !
 HORATIO: Il est ici !
-LE SPECTRE SORT: 
 MARCELLUS: — Il est parti ! — Nous avons tort de faire à un être si majestueux — ces menaces de violence ; — car il est, comme l’air, invulnérable, — et nos vains coups ne seraient qu’une méchante moquerie.
 BERNARDO: — Il allait parler quand le coq a chanté.
 HORATIO: — Et alors, il a tressailli comme un être coupable — à une effrayante sommation. J’ai ouï dire — que le coq, qui est le clairon du matin, — avec son cri puissant et aigu, — éveille le dieu du jour ; et qu’à ce signal, — qu’ils soient dans la mer ou dans le feu, dans la terre ou dans l’air, — les esprits égarés et errants regagnent en hâte — leurs retraites ; et la preuve — nous en est donnée par ce que nous venons de voir.
 MARCELLUS: — Il s’est évanoui au chant du coq. — On dit qu’aux approches de la saison — où l’on célèbre la naissance de notre Sauveur, — l’oiseau de l’aube chante toute la nuit, — et alors, dit-on, aucun esprit n’ose s’aventurer dehors. — Les nuits sont saines ; alors pas d’étoile qui frappe, — pas de fée qui jette des sorts, pas de sorcière qui ait le pouvoir de charmer, — tant cette époque est sanctifiée et pleine de grâce !
 HORATIO: — C’est aussi ce que j’ai ouï dire, et j’en crois quelque chose. — Mais, voyez, le matin, vêtu de son manteau roux, — s’avance sur la rosée de cette haute colline, là à l’orient. — Finissons notre faction, et, si vous m’en croyez, — faisons part de ce que nous avons vu cette nuit — au jeune Hamlet ; car, sur ma vie, — cet esprit, muet pour nous, lui parlera. — Consentez-vous à cette confidence, — aussi impérieuse à notre dévouement que conforme à notre devoir ?
-MARCELLUS: — Faisons cela, je vous prie ! je sais où, ce matin, — nous avons le plus de chance de le trouver. Ils sortent. ‌
+MARCELLUS: — Faisons cela, je vous prie ! je sais où, ce matin, — nous avons le plus de chance de le trouver. ‌
