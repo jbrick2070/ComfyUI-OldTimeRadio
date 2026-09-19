@@ -762,7 +762,8 @@
       "verified_to_scene": "2026-09-18 operator: proofread Act I transcription, dialogue visible, stated as translated FROM ENGLISH in 1869",
       "label_style": "capitano. / nostromo. -- name, full stop, rendered in small caps",
       "note": "Death year was marked CONFIRM in the spec and is now confirmed 1885 (Treccani). Verse alternative to Rusconi prose.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Mir. Se foste voi,"
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Mir. Se foste voi,",
+      "hold": "POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT and it extracts at 142 speeches / 13 speakers, which is exactly the healthy-looking shape the Rusconi hold notes warn about. Reading the WRITTEN FILE rather than the count: 'JOHNSON' is a footnote author, 'LE ISOLE DIABOLICHE' is a footnote title, and 'CHE FOSTI ’N TERRA PER NOI CROCIFISSO' is a quoted line -- three of the 13 'speakers' are not people. The five real parts also appear twice, once abbreviated (PROSP 63, MIR 34, AR 21, FERD 10, CAL 6) and once in full with a single line each, which is the printed CAST LIST being read as five one-line characters. This row was vendored by a --write on 2026-09-19 and pulled straight back out: it had been extractable all along and simply never written, so nothing guarded it. Waiting on the same per-edition Rusconi rule as the other 11 Italian cells; when that lands, re-check by reading the speaker list, never by the count that hid this."
     },
     {
       "iso": "it",
@@ -777,7 +778,8 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Mir. Se foste voi,"
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA II.; first line: Mir. Se foste voi,",
+      "hold": "POLLUTED, held 2026-09-19. The URL and the scene label are RIGHT and it extracts at 142 speeches / 13 speakers, which is exactly the healthy-looking shape the Rusconi hold notes warn about. Reading the WRITTEN FILE rather than the count: 'JOHNSON' is a footnote author, 'LE ISOLE DIABOLICHE' is a footnote title, and 'CHE FOSTI ’N TERRA PER NOI CROCIFISSO' is a quoted line -- three of the 13 'speakers' are not people. The five real parts also appear twice, once abbreviated (PROSP 63, MIR 34, AR 21, FERD 10, CAL 6) and once in full with a single line each, which is the printed CAST LIST being read as five one-line characters. This row was vendored by a --write on 2026-09-19 and pulled straight back out: it had been extractable all along and simply never written, so nothing guarded it. Waiting on the same per-edition Rusconi rule as the other 11 Italian cells; when that lands, re-check by reading the speaker list, never by the count that hid this."
     },
     {
       "iso": "it",
@@ -1285,7 +1287,8 @@
       "form": "prose",
       "url_is": "act_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found. The source is good; the extractor is not ready for it."
+      "note": "Operator hunt 2026-09-18: Act III fully transcribed as NATIVE HTML, not OCR. The best-shaped Mandarin lead found. The source is good; the extractor is not ready for it.",
+      "hold": "CANNOT BIND, held 2026-09-19 -- an EDITION DIFFERENCE, not a parse fault. The Chinese text extracts cleanly at 65 speeches across 14 speakers, every one of them a real character, and 13 of the 14 bind to the English sidecar. 史 (史納格, Snug) is the fourteenth and has TWO speeches here, while in the Folger sidecar for this scene Snug never speaks -- he appears only in the entry and exit directions, so the roster built from speakers does not carry him and the binding test refuses the row. Do not resolve this by binding 史 to another character: he is a distinct person and that would put his lines in someone else's mouth, which is the one failure this corpus cannot afford. It needs an operator ruling on what a translation's EXTRA speaker binds to when the English scene has no such speaking part. The sibling scene 3.2 binds completely and is vendored."
     },
     {
       "iso": "zh",
