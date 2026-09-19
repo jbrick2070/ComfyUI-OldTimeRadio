@@ -15621,7 +15621,14 @@ CJK and Devanagari keep the zero-width join. Words are tried longest-first and
 the EARLIEST match wins. NUMBER-then-WORD is kept only for words that join
 without a gap. Knowingly traded away: glued `ACT1` and Latin number-then-word
 headings, neither of which appears in any lead, fixture or language row.
-Covered by `tests/test_scene_resolver.py` and `tests/test_verbatim_corpus.py`.
+Covered by `tests/test_verbatim_corpus.py`. (It read "`tests/test_scene_resolver.py`
+and `tests/test_verbatim_corpus.py`" until 2026-09-19, when `_otr_scene_resolver.py`
+was ripped as dead code and took its test file with it. The rip's grep receipt
+checked production CALLERS and found none, correctly -- but never asked whether
+the deleted TESTS were the only harness for a still-live function, and they were:
+these three fault patterns are in `_labelled`, whose match POSITION `headings_present`
+slices a window from. They are ported to the surviving file, asserted against
+`_labelled` directly, which is where they always belonged.)
 
 ## PBUG-20260918-08 -- the output budget is counted in English source words
 

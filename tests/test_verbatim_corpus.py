@@ -463,6 +463,67 @@ def test_an_ordinal_word_heading_is_read(text, scene):
     assert C.headings_present(text, scene) is True
 
 
+# --------------------------------------------------------------------------- #
+# PBUG-20260918-07: the MATCH POSITION, not merely the match
+#
+# These three fault patterns used to be pinned in `tests/test_scene_resolver.py`
+# THROUGH `resolve_scene`, and that file was deleted on 2026-09-19 with the
+# module. The faults were never in the resolver: they are in `_labelled`, which
+# is still live -- `headings_present` slices `raw[act_hit.start():act_hit.end()
+# + _HEADING_WINDOW]`, so a match that lands one character late silently moves
+# the window, and `scripts/otr_shakespeare_corpus_gate.py` calls it on every
+# fetched lead. Deleting the extractor removed the only coverage of that.
+#
+# So they are ported to the LIVE function, which is a better test than the one
+# that was lost: it asserts the behaviour at the site production depends on,
+# instead of through a consumer that no longer exists.
+#
+# WHAT KEEPS THESE PASSING is the ordering logic inside `_labelled` -- words
+# tried LONGEST FIRST, and the EARLIEST match across all words winning. The
+# word tuples are still declared in the hazardous order (`act` before `acte`,
+# `scena` before `escena`), so anything that "simplifies" that logic back to
+# first-word-that-matches-anywhere brings all three defects back at once.
+# --------------------------------------------------------------------------- #
+
+
+def test_a_shorter_heading_word_cannot_eat_a_longer_ones_prefix():
+    """`scena` is literally the last five letters of `escena`, and it is listed
+    first. Matching the short word INSIDE the long one starts the match one
+    character late and drops the leading E from every Spanish scene heading.
+
+    Invisible to a boolean: `headings_present` was correct throughout while the
+    position was wrong, which is why this asserts `.start()` and not truth.
+    """
+    raw = C._fold("ESCENA PRIMERA")
+    hit = C._labelled(raw, C._SCENE_WORDS, "1")
+    assert hit is not None
+    assert hit.start() == 0, "matched inside 'escena', losing its leading E"
+
+
+def test_prose_containing_a_heading_word_does_not_score_as_a_heading():
+    """The French `action` contains `acti`, and `act` + the bare roman `i`
+    matched all 24 occurrences on the real cached Macbeth lead -- ordinary
+    prose scoring as act headings, so a five-act play measured as two. A Latin
+    heading word now requires a separator before its number."""
+    prose = "l'action se passe en France. " * 4
+    assert C._labelled(C._fold(prose), C._ACT_WORDS, "1") is None
+    assert C.act_headings_found(prose) == 0
+
+
+def test_a_trailing_end_of_act_marker_does_not_steal_the_anchor():
+    """`act` is a literal prefix of `acte`, so a closing `FIN DU PREMIER ACTE.`
+    used to match before the real `ACTE PREMIER` heading above it and drag the
+    heading window to the bottom of the page."""
+    page = ("ACTE PREMIER\n\nSCÈNE I\n\n"
+            "PREMIÈRE SORCIÈRE: Quand nous reverrons-nous ?\n\n"
+            "FIN DU PREMIER ACTE.")
+    hit = C._labelled(C._fold(page), C._ACT_WORDS, "1")
+    assert hit is not None
+    assert hit.start() == 0, "anchored on the closing marker, not the heading"
+    # and the window built from that position still finds the scene
+    assert C.headings_present(page, "1.1") is True
+
+
 def test_a_whole_work_is_named_as_such_not_as_heading_less():
     """Seven leads are the right play at book granularity; calling them
     heading-less sent a reader looking for the wrong fault."""
