@@ -42,16 +42,28 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
 
-* **`nodes/_otr_scene_resolver.py` -- rip it or wire it (new 2026-09-18).**
-  Built for an automated act/scene extraction + confidence-scored alignment
-  design that the vendored-Shakespeare row below never ended up using -- the
-  shipped pipeline reads each edition's own act/scene label by hand instead
-  (`EDITION_LABELS`), which cannot silently vendor the wrong scene the way a
-  computed alignment score could. Zero production callers, same as before
-  this note was written. Either it still has a role once vendoring scales
-  past hand-verified leads (fewer manual label lookups, more leads per
-  session), or it is a verified-dead symbol per the repo's rip-or-wire rule.
-  His call; a grep receipt either way before acting.
+* **The canonical word counter is ASCII-only, and fixing it moves every
+  episode's numbers.** `WORD_RE` in `_otr_text_metrics.py` is
+  `[A-Za-z][A-Za-z0-9'...]*`, so an accented word counts as several: `révéler`
+  is THREE words, `corazón` and `naïve` are two. Measured on the vendored
+  corpus, French and Spanish inflate 5.1-7.8% (`king_lear_1_1` reads 2,979
+  where it holds 2,748); Italian is -0.7%, because its accents sit word-final
+  and merely truncate rather than split.
+  **The fork is the blast radius, not the regex.** A Unicode-aware class is one
+  line, but it is SHARED code and it does not stay on the translation lane:
+  **69 of 157 English source files change too**, up to -2,430 words on one
+  Gutenberg text, because English prose carries `naïve`, `café` and accented
+  proper names.
+  **Nothing is gated on it, which is why this is a decide row and not a bug
+  fix.** Word targets are a REQUEST, not a gate (standing directive), and no
+  validator refuses an over-cap beat -- grepped: `BEAT_WORD_HARD_MAX` is read
+  only by `chunk_speech`/`beat_cost`, which share the same counter and
+  therefore still agree with each other, so selection can never cost a speech
+  differently from how execution cuts it. The visible symptom is three chunks
+  in the whole corpus running 81 words against a cap of 80.
+  So: a real defect whose only effect is that ledger word counts on accented
+  text are wrong, against a change that rewrites the numbers on every English
+  episode. One word from him settles it.
 
 ### The registry push -- one batch, at the bottom, by ruling (operator 2026-09-19)
 
@@ -106,9 +118,10 @@ each lead's page and records the edition's own act/scene label by hand
 (`EDITION_LABELS` in the vendor script) -- simpler, and it cannot silently
 vendor the wrong scene the way a computed alignment score could.
 `alignment_confidence` in the manifest is a stamped constant, not a measured
-score; nothing currently computes one. `_otr_scene_resolver.py` has zero
-production callers now, same as before -- see the new fork in section 1: does
-it still have a role, or is it a rip.
+score; nothing currently computes one. `_otr_scene_resolver.py` was RIPPED on
+2026-09-19 (operator: "if it's dead code let's rip it, I approve") -- 324 lines
+plus a 415-line test, zero production callers, nothing newly orphaned by its
+removal.
 
 **What is actually vendored: four scenes, three languages.**
 `it/macbeth 1.3` (Rusconi), `fr/hamlet 1.1` and `fr/king_lear 1.1` (Hugo),
