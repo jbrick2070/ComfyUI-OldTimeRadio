@@ -1376,6 +1376,48 @@ class CastLock:
                     and canonical_bank_gender(getattr(e, "gender", "")) == gender
                     for e in (bank_entries or ())
                 )
+                # REUSE HER OWN LANGUAGE'S VOICE BEFORE TAKING A MAN'S. When
+                # the row DOES carry this gender but every one of them is
+                # already spoken for, the old path fell to the gender-agnostic
+                # draw -- a uniform pick over the whole language pool, most of
+                # which is the other gender. Measured on the default Spanish
+                # shape (3 voices, 3 rows, so reuse is off): the announcer
+                # takes `ef_dora`, and ANA -- a woman -- was stamped `em_alex`
+                # and presented MALE. That is the operator's own complaint
+                # inverted, in a language he has not heard yet.
+                #
+                # A woman sharing the narrator's voice is worse than two
+                # distinct women and far better than a woman with a man's
+                # voice, so the same-gender reuse is tried first and the
+                # gender-agnostic draw stays as the last resort it was written
+                # to be. The distinctness line above reports the sharing.
+                reused = None
+                if gender and lang_can_serve and not allow_voice_reuse:
+                    try:
+                        reused = assign_voice_for_slot(
+                            role="char_voice", engine=target_engine,
+                            char_id=char_id, gender=gender,
+                            timbre=tuple(slot_timbre), age_band=slot_age,
+                            episode_seed=episode_seed,
+                            casting_policy_version=CASTING_POLICY_VERSION,
+                            allow_voice_reuse=True,
+                            used_voice_ref_ids=used,
+                            bank=bank_entries, language=language,
+                        )
+                    except VoiceCastingError:
+                        reused = None
+                if reused is not None:
+                    _stamp_row(entry, reused, fallback="gender_reused_in_lang")
+                    _mark_used(reused)
+                    gated += 0 if _delivered_commercial_clean(
+                        entry, reused) else 1
+                    report.append(
+                        f"  {char_id}: {reused.voice_ref_id} "
+                        f"({reused.engine}, every {language!r} {gender} voice "
+                        f"already cast -- reused in-language rather than "
+                        f"crossing gender)"
+                    )
+                    continue
                 borrowed = None
                 if gender and language != "en" and not lang_can_serve:
                     try:
@@ -1458,18 +1500,45 @@ class CastLock:
         # -- and the standing rule is no gates on models. The line exists so
         # the collision is READ, by whoever reads the log, instead of being
         # inferred from a bearded man sounding like a woman.
-        stamped_ids = [
-            str(e.get("voice_ref_id") or "") for e in cast
-            if isinstance(e, dict) and not _is_announcer_entry(e)
-            and id(e) in stamped_this_lock and e.get("voice_ref_id")
+        # THE ANNOUNCER IS COUNTED, and excluding him was the hole a contrarian
+        # pass found in the first cut of this line. Under `allow_voice_reuse`
+        # -- which every thin row turns on -- the announcer's reference is
+        # deliberately NOT marked used (see the guard above), so a French
+        # episode with a narrator and ONE female lead puts both on `ff_siwis`.
+        # With the announcer excluded and a `> 1` floor, that shape reported
+        # nothing at all: the count saw a single character row and fell
+        # silent. "The narrator and the heroine are the same person" is the
+        # operator's own complaint relocated, not a corner case -- announcer
+        # plus one same-gender lead is a typical cast.
+        #
+        # Announcer-vs-character collisions are named separately from
+        # character-vs-character ones because they mean different things: the
+        # first is a narrator who sounds like the cast, the second is a cast
+        # that sounds like itself. Both are report lines, never gates -- a thin
+        # row collides legitimately and the standing rule is no gates on
+        # models.
+        stamped = [
+            e for e in cast
+            if isinstance(e, dict) and id(e) in stamped_this_lock
+            and e.get("voice_ref_id")
         ]
-        if len(stamped_ids) > 1:
-            distinct = len(set(stamped_ids))
+        char_ids = [str(e.get("voice_ref_id"))
+                    for e in stamped if not _is_announcer_entry(e)]
+        ann_ids = {str(e.get("voice_ref_id"))
+                   for e in stamped if _is_announcer_entry(e)}
+        if stamped:
+            all_ids = char_ids + sorted(ann_ids)
             line = ("  voice distinctness: %d distinct voice(s) across %d "
-                    "character row(s)" % (distinct, len(stamped_ids)))
-            if distinct == 1:
+                    "stamped row(s) (%d character, %d announcer)"
+                    % (len(set(all_ids)), len(all_ids), len(char_ids),
+                       len(ann_ids)))
+            if len(char_ids) > 1 and len(set(char_ids)) == 1:
                 line += (" -- VOICE COLLISION: every character on one voice "
-                         "(%s)" % stamped_ids[0])
+                         "(%s)" % char_ids[0])
+            shared = ann_ids & set(char_ids)
+            if shared:
+                line += (" -- ANNOUNCER COLLISION: the narrator shares %s "
+                         "with a character" % ", ".join(sorted(shared)))
             report.append(line)
 
         # LEDGER COMPLETENESS FOR THE TIER, and this sweep is why the three fields

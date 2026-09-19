@@ -245,7 +245,7 @@ def test_a_whole_cast_on_one_voice_is_reported_as_a_collision():
         language="fr")
     assert all(e["voice_ref_id"] == "ff_siwis" for e in led["cast"])
     joined = "\n".join(report)
-    assert "1 distinct voice(s) across 2 character row(s)" in joined
+    assert "1 distinct voice(s) across 2 stamped row(s)" in joined, joined
     assert "VOICE COLLISION" in joined
 
 
@@ -297,6 +297,79 @@ def test_a_gender_the_language_does_serve_never_borrows_english():
         assert rows["c1"]["voice_ref_id"] != "af_heart", (seed, rows["c1"])
         assert rows["c2"]["voice_ref_id"] in {"em_alex", "em_santa"}, seed
         assert "has no 'es' voice" not in "\n".join(report), seed
+        # AND SHE STAYS A WOMAN. Spanish carries a female voice; it is simply
+        # on the announcer row. Sharing the narrator's voice beats taking a
+        # man's -- the old path stamped `em_alex` here and presented MALE.
+        assert rows["c1"]["presentation_gender"] == "female", (
+            seed, rows["c1"])
+        assert rows["c1"]["voice_ref_id"] == "ef_dora", (seed, rows["c1"])
+        assert rows["c1"]["voice_cast_fallback"] == "gender_reused_in_lang", (
+            seed, rows["c1"])
+
+
+def test_the_narrator_sharing_a_character_voice_is_reported():
+    """THE HOLE THE FIRST CUT OF THE DISTINCTNESS LINE HAD.
+
+    Under `allow_voice_reuse` -- which every thin language row turns on -- the
+    announcer's reference is deliberately not marked used, so a French episode
+    with a narrator and ONE female lead puts both on `ff_siwis`. The first cut
+    excluded the announcer and required more than one character row, so that
+    shape reported NOTHING: it saw a single character and fell silent. A
+    narrator plus one same-gender lead is a typical cast, not a corner case.
+    """
+    from nodes.cast_lock import CastLock
+    bank = (
+        _entry("ff_siwis", gender="female", language="fr"),
+        _entry("am_adam", gender="male", language=None),
+    )
+    led = {
+        "meta": {"episode_seed": 5, "episode_language": "fr"},
+        "cast": [
+            {"char_id": "announcer", "name": "ANNOUNCER", "gender": "female"},
+            {"char_id": "c1", "name": "OPHELIE", "gender": "female"},
+        ],
+        "lines": [],
+    }
+    report: list = []
+    CastLock()._auto_registry(
+        led, led["cast"], "default", False, report,
+        bank_entries=bank, target_engine="kokoro",
+        announcer_engine="kokoro", language="fr")
+    rows = {e["char_id"]: e for e in led["cast"]}
+    assert rows["announcer"]["voice_ref_id"] == "ff_siwis"
+    assert rows["c1"]["voice_ref_id"] == "ff_siwis"
+    joined = "\n".join(report)
+    assert "voice distinctness:" in joined, joined
+    assert "ANNOUNCER COLLISION" in joined, joined
+    assert "ff_siwis" in joined
+
+    # And the clean case says nothing alarming. Note the announcer's own
+    # gender is drawn from the SEED, not from its row (a documented 50/50
+    # mix), so this pins the shape where the narrator and the character land
+    # on different voices: an Italian male character beside a female narrator.
+    bank2 = (
+        _entry("if_sara", gender="female", language="it"),
+        _entry("im_nicola", gender="male", language="it"),
+    )
+    led2 = {
+        "meta": {"episode_seed": 5, "episode_language": "it"},
+        "cast": [
+            {"char_id": "announcer", "name": "ANNOUNCER", "gender": "female"},
+            {"char_id": "c1", "name": "ORAZIO", "gender": "male"},
+        ],
+        "lines": [],
+    }
+    report2: list = []
+    CastLock()._auto_registry(
+        led2, led2["cast"], "default", False, report2,
+        bank_entries=bank2, target_engine="kokoro",
+        announcer_engine="kokoro", language="it")
+    rows2 = {e["char_id"]: e for e in led2["cast"]}
+    assert rows2["c1"]["voice_ref_id"] == "im_nicola", rows2["c1"]
+    assert rows2["c1"]["presentation_gender"] == "male"
+    joined2 = "\n".join(report2)
+    assert "voice distinctness: 2 distinct voice(s)" in joined2, joined2
+    assert "COLLISION" not in joined2, joined2
 
 
 def test_caption_wrap_policies():
