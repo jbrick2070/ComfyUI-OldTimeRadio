@@ -405,6 +405,32 @@ EDITION_LABELS = {
     # `to_text`, which is why the label here is the plain contiguous string.
     ("ja", "romeo_juliet", "1.1"): (None, "\u7b2c\u4e00\u5e55", "\u7b2c\u4e00\u5834"),
     ("ja", "romeo_juliet", "2.2"): (None, "\u7b2c\u4e8c\u5e55", "\u7b2c\u4e8c\u5834"),
+
+    # --- Hugo's French set. He numbers scenes CONTINUOUSLY through a play and
+    # prints no act headings at all, which is why every act slot here is None
+    # and the scene numbers do not look like the Folger ones: his SCENE XII is
+    # Folger 3.2. Located by an outside pass, then each one PROVED by running
+    # the extractor against the live page -- the cast that came back is the
+    # cast of the scene (three witches for Macbeth 1.3, Romeo, Juliet and the
+    # Nurse for the balcony, Miranda, Prospero, Ariel and Caliban for Tempest
+    # 1.2). Nothing here was accepted on the strength of a heading alone.
+    ("fr", "as_you_like_it", "3.2"): (None, None, "SC\u00c8NE XII."),
+    ("fr", "comedy_of_errors", "3.1"): (None, None, "SC\u00c8NE V."),
+    ("fr", "macbeth", "1.3"): (None, None, "SC\u00c8NE III."),
+    ("fr", "midsummer", "3.1"): (None, None, "SC\u00c8NE IV."),
+    ("fr", "midsummer", "3.2"): (None, None, "SC\u00c8NE V."),
+    ("fr", "much_ado", "2.3"): (None, None, "SC\u00c8NE V."),
+    ("fr", "much_ado", "3.1"): (None, None, "SC\u00c8NE VI."),
+    ("fr", "romeo_juliet", "2.2"): (None, None, "SC\u00c8NE VII."),
+    ("fr", "tempest", "1.2"): (None, None, "SC\u00c8NE II."),
+    ("fr", "tempest", "3.1"): (None, None, "SC\u00c8NE V."),
+    ("fr", "twelfth_night", "1.5"): (None, None, "SC\u00c8NE V."),
+    ("fr", "twelfth_night", "2.5"): (None, None, "SC\u00c8NE X."),
+
+    # --- Spanish, the two that proved out. Marquez and Menendez y Pelayo both
+    # reset per act, so these carry an act heading where Hugo carries none.
+    ("es", "comedy_of_errors", "3.1"): (None, "ACTO III.", "ESCENA I."),
+    ("es", "romeo_juliet", "2.2"): (None, "ACTO II.", "ESCENA II."),
 }
 
 

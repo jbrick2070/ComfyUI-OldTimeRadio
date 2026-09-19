@@ -54,10 +54,11 @@
       "translator_death_date": 1903,
       "translation_first_published": 1883,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://es.wikisource.org/wiki/La_comedia_de_las_equivocaciones",
+      "url": "https://es.wikisource.org/wiki/Comedia_de_equivocaciones_(M%C3%A1rquez_tr.)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: NATIVE searchable Spanish HTML with all acts -- the best-shaped Spanish source found, no transcription needed."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: NATIVE searchable Spanish HTML with all acts -- the best-shaped Spanish source found, no transcription needed. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "es",
@@ -161,9 +162,11 @@
       "translator_death_date": 1912,
       "translation_first_published": 1881,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://es.wikisource.org/wiki/Romeo_y_Julieta_(Men%C3%A9ndez_y_Pelayo_tr.)",
+      "url": "https://es.wikisource.org/wiki/Romeo_y_Julieta_(Men%C3%A9ndez_y_Pelayo_tr.)/Acto_II",
       "form": "prose",
-      "url_is": "landing_or_whole_work"
+      "url_is": "whole_work_single_page",
+      "note": "Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "es",
@@ -229,10 +232,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Comme_il_vous_plaira_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -242,10 +246,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/La_Com%C3%A9die_des_erreurs_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -300,7 +305,9 @@
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "url": "https://fr.wikisource.org/wiki/Macbeth_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work"
+      "url_is": "whole_work_single_page",
+      "note": "Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -310,10 +317,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Le_Songe_d%E2%80%99une_nuit_d%E2%80%99%C3%A9t%C3%A9_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -323,10 +331,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Le_Songe_d%E2%80%99une_nuit_d%E2%80%99%C3%A9t%C3%A9_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -336,10 +345,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Beaucoup_de_bruit_pour_rien_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -349,10 +359,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Beaucoup_de_bruit_pour_rien_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -362,10 +373,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Rom%C3%A9o_et_Juliette_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -375,10 +387,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/La_Temp%C3%AAte_(Shakespeare,_trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -388,10 +401,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/La_Temp%C3%AAte_(Shakespeare,_trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -401,10 +415,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Le_soir_des_rois_ou_ce_que_vous_voudrez_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "fr",
@@ -414,10 +429,11 @@
       "translator_death_date": 1873,
       "translation_first_published": "1865-1872",
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://fr.wikisource.org/wiki/%C5%92uvres_compl%C3%A8tes_de_Shakespeare/Hugo,_1865-1872",
+      "url": "https://fr.wikisource.org/wiki/Le_soir_des_rois_ou_ce_que_vous_voudrez_(trad._Hugo)",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
-      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting."
+      "url_is": "whole_work_single_page",
+      "note": "Operator hunt 2026-09-18: Hugo's complete Shakespeare covers the whole target list. This is the CORPUS index, not the play page -- resolve to the play, then to the scene. Hugo's own editions number scenes CONTINUOUSLY with no act divisions on some plays, so the act.scene coordinate above may not exist in this edition; check before extracting. Located and heading-verified by an outside research pass, then PROVED here by running the real extractor against the live page before the row was accepted: it returns a scene whose cast matches the play. Rows that extracted badly were not taken.",
+      "hold": "PROVEN TO EXTRACT, waiting on a speaker_map. Verified 2026-09-19 by running the real extractor against the live page: the scene comes back with the right cast and PLANS end to end. What it has not got is the bridge from this edition's labels to the English roster, and without it every label degrades to the gender roll -- which is how a character ends up with the wrong voice. 120 labels across the 14 held scenes. Two label defects to settle first: ACCENT VARIANTS of one character read as several (HERO / HERO-grave / HERO-acute in much_ado 3.1, three spellings of ANTIPHOLUS in comedy_of_errors 3.1), and in twelfth_night 2.5 SONG LYRICS are being read as speaker names ('JE PUIS COMMANDER OU J'ADORE', 'NUL HOMME NE LE DOIT SAVOIR'). The URL and EDITION_LABELS entry are already in place, so re-vendoring is one command once the map exists."
     },
     {
       "iso": "hi",
