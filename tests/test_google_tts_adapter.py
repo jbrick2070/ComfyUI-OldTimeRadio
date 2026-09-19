@@ -158,6 +158,61 @@ def test_response_parser_accepts_live_interactions_steps_audio(monkeypatch):
     assert int(audio["sample_rate"]) == 24000
 
 
+def test_response_parser_accepts_mime_parameters_and_reads_the_rate(monkeypatch):
+    """Measured 2026-09-19 on the first Google lane leg: the live endpoint
+    answers `audio/l16;codec=pcm;rate=24000`, and the old equality check
+    refused every line. The parameters are accepted and the rate parameter
+    is the sample rate when the block carries no explicit one."""
+    _clear_keys(monkeypatch)
+    monkeypatch.setenv("OTR_GOOGLE_API_KEY", "KEY")
+    monkeypatch.setattr(
+        G,
+        "_post_interaction",
+        lambda api_key, payload: {
+            "object": "interaction",
+            "status": "completed",
+            "steps": [{"type": "model_output", "content": [{
+                "type": "audio",
+                "mime_type": "audio/L16;codec=pcm;rate=16000",
+                "data": _pcm_b64(1, 2, 3),
+            }]}],
+        },
+    )
+    audio = AE.get_engine("google_tts").generate_voice("hello", "Kore", None, 1)
+    assert tuple(audio["waveform"].shape) == (1, 1, 3)
+    assert int(audio["sample_rate"]) == 16000
+
+
+def test_response_parser_refuses_a_non_pcm_codec():
+    with pytest.raises(G.GoogleTTSError, match="codec"):
+        G._audio_block("AAAA", {"mime_type": "audio/l16;codec=opus;rate=24000"})
+    # a supplied-but-empty codec is not pcm either
+    with pytest.raises(G.GoogleTTSError, match="codec"):
+        G._audio_block("AAAA", {"mime_type": "audio/l16;codec=;rate=24000"})
+    with pytest.raises(G.GoogleTTSError, match="unsupported"):
+        G._audio_block("AAAA", {"mime_type": "audio/mpeg"})
+    assert G._split_mime("audio/l16;codec=pcm;rate=24000") == (
+        "audio/l16", {"codec": "pcm", "rate": "24000"})
+    # parameter-free shape (the old fixture) still accepted, default rate
+    assert G._audio_block("AAAA", {"mime_type": "audio/l16"})["sample_rate"] == G._SAMPLE_RATE
+
+
+def test_two_stated_sample_rates_must_agree():
+    """codex 2026-09-19: a mislabeled rate plays 1.5x fast and still passes
+    the cache's mismatch guard, so a block rate and a MIME rate that
+    disagree are refused rather than guessed -- under both field aliases."""
+    for key in ("sample_rate", "sampleRate"):
+        with pytest.raises(G.GoogleTTSError, match="two sample rates"):
+            G._audio_block("AAAA", {key: 24000,
+                                    "mime_type": "audio/l16;codec=pcm;rate=16000"})
+        out = G._audio_block("AAAA", {key: 24000,
+                                      "mime_type": "audio/l16;codec=pcm;rate=24000"})
+        assert out["sample_rate"] == 24000
+    with pytest.raises(G.GoogleTTSError, match="not an integer"):
+        G._audio_block("AAAA", {"sample_rate": 24000,
+                                "mime_type": "audio/l16;rate=fast"})
+
+
 def test_key_redacted_from_sanitized_errors(monkeypatch):
     _clear_keys(monkeypatch)
     monkeypatch.setenv("OTR_GOOGLE_API_KEY", "SECRET123")

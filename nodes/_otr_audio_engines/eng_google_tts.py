@@ -252,17 +252,61 @@ def _sample_rate_from(block: dict) -> int:
     return sample_rate
 
 
+def _split_mime(mime_type: str) -> tuple[str, dict]:
+    """``audio/l16;codec=pcm;rate=24000`` -> (``audio/l16``, {codec: pcm, rate: 24000}).
+
+    The live endpoint answers with MIME PARAMETERS (measured 2026-09-19 on
+    the first Google lane leg: gemini-2.5-flash-preview-tts returned exactly
+    that string and the old equality check refused every line). The rate
+    parameter is the provider's own statement of the sample rate."""
+    parts = [p.strip() for p in str(mime_type or "").split(";")]
+    base = parts[0].lower() if parts else ""
+    params: dict = {}
+    for p in parts[1:]:
+        if "=" in p:
+            k, v = p.split("=", 1)
+            params[k.strip().lower()] = v.strip().lower()
+    return base, params
+
+
 def _audio_block(data: str, block: dict) -> dict:
-    mime_type = str(block.get("mime_type") or block.get("mimeType") or "").lower()
-    if mime_type and mime_type not in ("audio/l16", "audio/pcm"):
+    raw_mime = str(block.get("mime_type") or block.get("mimeType") or "")
+    base, params = _split_mime(raw_mime)
+    if base and base not in ("audio/l16", "audio/pcm"):
         raise GoogleTTSError(
             "Google TTS response audio MIME %r is unsupported; expected audio/l16"
-            % mime_type
+            % raw_mime
         )
+    if "codec" in params and params["codec"] != "pcm":
+        raise GoogleTTSError(
+            "Google TTS response audio MIME %r names codec %r; expected pcm"
+            % (raw_mime, params["codec"])
+        )
+    # Two places can state the rate: the block's own sample_rate field and
+    # the MIME rate parameter. Neither is documented as authoritative, and a
+    # mislabeled rate plays 1.5x fast and still passes the cache's mismatch
+    # guard (codex), so when both are present they must agree.
+    block_for_rate = dict(block)
+    explicit = "sample_rate" in block or "sampleRate" in block
+    if "rate" in params:
+        if explicit:
+            stated = _sample_rate_from(block)
+            try:
+                mime_rate = int(params["rate"])
+            except ValueError as exc:
+                raise GoogleTTSError(
+                    "Google TTS response audio MIME rate %r is not an integer"
+                    % params["rate"]) from exc
+            if mime_rate != stated:
+                raise GoogleTTSError(
+                    "Google TTS response states two sample rates: block %d, "
+                    "MIME %r -> %d. Refusing to guess." % (stated, raw_mime, mime_rate))
+        else:
+            block_for_rate["sample_rate"] = params["rate"]
     return {
         "data": data,
-        "sample_rate": _sample_rate_from(block),
-        "mime_type": mime_type or "audio/l16",
+        "sample_rate": _sample_rate_from(block_for_rate),
+        "mime_type": base or "audio/l16",
     }
 
 
