@@ -59,11 +59,23 @@ if ($listening) {
 #
 # These four pairs are exactly the ones with a vendored translation on disk, so
 # every leg performs a real translator's words, sha256-verified at load.
+# THE BANK'S REF IS `folger-lear`, NOT `folger-king-lear`, and getting that
+# wrong cost eight legs before anyone noticed. `_otr_verbatim_corpus` carries a
+# `lear -> king_lear` alias so `vendored_text` RESOLVED the wrong spelling
+# happily; the BANK has no such alias and raised `unknown shakespeare
+# source_ref`, failing in five seconds every fourth leg. Resolving through the
+# corpus is not proof the bank accepts the ref -- check both.
+#
+# `graph` is the workflow to submit. The empty string means the canonical.
+# Foley legs run the shipped foley variant at one act, which is the cheap
+# pressure test: a short episode through the joint-audio seam.
 $pairs = @(
-    @{ lang = "French";  ref = "folger-hamlet:act1-scene1-platform-watch";        who = "hugo_hamlet" },
-    @{ lang = "French";  ref = "folger-king-lear:act1-scene1-love-test";          who = "hugo_lear" },
-    @{ lang = "Italian"; ref = "folger-macbeth:act1-scene3-witches";              who = "rusconi_macbeth" },
-    @{ lang = "Spanish"; ref = "folger-as-you-like-it:act3-scene2-rosalind-orlando"; who = "marquez_ayli" }
+    @{ lang = "French";  ref = "folger-hamlet:act1-scene1-platform-watch";           who = "hugo_hamlet";      graph = "" },
+    @{ lang = "French";  ref = "folger-lear:act1-scene1-love-test";                  who = "hugo_lear";        graph = "" },
+    @{ lang = "Italian"; ref = "folger-macbeth:act1-scene3-witches";                 who = "rusconi_macbeth";  graph = "" },
+    @{ lang = "Spanish"; ref = "folger-as-you-like-it:act3-scene2-rosalind-orlando";  who = "marquez_ayli";     graph = "" },
+    @{ lang = "French";  ref = "folger-hamlet:act1-scene1-platform-watch";           who = "hugo_hamlet_foley"; graph = "workflows\variants\otr_16gb_foley.json" },
+    @{ lang = "Italian"; ref = "folger-macbeth:act1-scene3-witches";                 who = "rusconi_mb_foley";  graph = "workflows\variants\otr_16gb_foley.json" }
 )
 
 $leg = 0
@@ -74,16 +86,23 @@ while ((Get-Date) -lt $deadline) {
         $leg++
         $lang  = $p.lang
         $label = "shx_{0}_{1:d2}" -f $p.who, $leg
-        Note "LEG $leg  language=$lang  ref=$($p.ref)  label=$label"
-        & $py $runner `
-            --comfyui-url $url `
-            --source-bank "shakespeare" `
-            --run-label $label `
-            --act-count 1 `
-            --num-characters 3 `
-            --set "OTR_LedgerScriptWriter.episode_language=$lang" `
-            --set "OTR_LedgerScriptWriter.source_ref=$($p.ref)" `
-            --timeout 0 2>&1 | Tee-Object -FilePath $runlog -Append | Out-Null
+        $graphNote = if ($p.graph) { $p.graph } else { "canonical" }
+        Note "LEG $leg  language=$lang  ref=$($p.ref)  graph=$graphNote  label=$label"
+        $argv = @(
+            $runner,
+            "--comfyui-url", $url,
+            "--source-bank", "shakespeare",
+            "--run-label", $label,
+            "--act-count", "1",
+            "--num-characters", "3",
+            "--set", "OTR_LedgerScriptWriter.episode_language=$lang",
+            "--set", "OTR_LedgerScriptWriter.source_ref=$($p.ref)",
+            "--timeout", "0"
+        )
+        if ($p.graph) {
+            $argv += @("--workflow", (Join-Path $repo $p.graph))
+        }
+        & $py @argv 2>&1 | Tee-Object -FilePath $runlog -Append | Out-Null
         $rc = $LASTEXITCODE
         Note "LEG $leg  rc=$rc"
         # obs is under ComfyUI's OUTPUT root, not the repo. A repo-relative
