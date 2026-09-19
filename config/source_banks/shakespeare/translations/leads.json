@@ -789,12 +789,13 @@
       "translator_death_date": 1885,
       "translation_first_published": 1869,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://it.wikisource.org/wiki/La_tempesta_(Shakespeare-Maffei)/Atto_primo",
+      "url": "https://it.wikisource.org/wiki/La_tempesta_(Shakespeare-Maffei)/Atto_terzo",
       "form": "verse",
       "url_is": "act_page",
       "verified_to_scene": "2026-09-18 operator: proofread Act I transcription, dialogue visible, stated as translated FROM ENGLISH in 1869",
       "label_style": "capitano. / nostromo. -- name, full stop, rendered in small caps",
-      "note": "Death year was marked CONFIRM in the spec and is now confirmed 1885 (Treccani). Verse alternative to Rusconi prose."
+      "note": "Death year was marked CONFIRM in the spec and is now confirmed 1885 (Treccani). Verse alternative to Rusconi prose.",
+      "hold": "SCENE BOUNDARY NOT MARKED BY THE EDITION, held 2026-09-19. The URL was WRONG and is now fixed -- it pointed at /Atto_primo while the cell asks for act THREE, which is why this read as a label-less cell. /Atto_terzo exists and is now recorded. What stops it is the edition itself: Maffei's act-three page prints 'SCENA I' and NO OTHER scene heading, so the act runs as one continuous block. Scoping to ('ATTO TERZO', 'SCENA I') therefore returns the WHOLE ACT -- 117 speeches across 13 characters covering Ferdinand and Miranda, then Stefano, Caliban and Trinculo, then the court party, where Folger's 3.1 is the lovers alone. THE COUNTS CANNOT CATCH THIS AND THE SPEAKER LIST CANNOT EITHER: all 13 are real Tempest characters, correctly claimed. Only the SIZE gives it away, against the French 3.1 at 25 speeches / 3 speakers. That is why no EDITION_LABELS entry was added -- a label that silently returns three scenes is worse than none, because the next reader clears the hold and ships it. Next step: find where scene two begins in the printed text (a stage direction or a location line, not a heading) and teach the extractor that boundary, or record a different Italian edition that marks its scenes."
     },
     {
       "iso": "it",
@@ -1364,7 +1365,8 @@
       "url_is": "whole_work_single_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
       "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
-      "url_found_by": "url hunt 2026-09-19; heading on page 第二場; first line: 親愛的父親，假如你曾經用你的法術"
+      "url_found_by": "url hunt 2026-09-19; heading on page 第二場; first line: 親愛的父親，假如你曾經用你的法術",
+      "hold": "NO TEXT PAGE, held 2026-09-19. The recorded URL is the work's TABLE OF CONTENTS: it prints the act and scene headings as links and carries only a line or two between them, which is why extraction reports 'only 2 lines between headings' rather than failing loudly. The obvious subpages do not exist -- both /第一幕 and /第三幕 return HTTP 404 against zh.wikisource, checked directly. So this translation is INDEXED on Wikisource and not TRANSCRIBED there, which is a different state from 'missing' and from 'needs OCR': there is no scan recorded for it either. Next step is to find whether the text exists on another host, or to record a scan for it; do not re-try the subpage pattern, it was measured."
     },
     {
       "iso": "zh",
@@ -1379,7 +1381,8 @@
       "url_is": "whole_work_single_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
       "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
-      "url_found_by": "url hunt 2026-09-19; heading on page 第一場; first line: 有一類遊戲是很吃力的，但興趣會"
+      "url_found_by": "url hunt 2026-09-19; heading on page 第一場; first line: 有一類遊戲是很吃力的，但興趣會",
+      "hold": "NO TEXT PAGE, held 2026-09-19. The recorded URL is the work's TABLE OF CONTENTS: it prints the act and scene headings as links and carries only a line or two between them, which is why extraction reports 'only 2 lines between headings' rather than failing loudly. The obvious subpages do not exist -- both /第一幕 and /第三幕 return HTTP 404 against zh.wikisource, checked directly. So this translation is INDEXED on Wikisource and not TRANSCRIBED there, which is a different state from 'missing' and from 'needs OCR': there is no scan recorded for it either. Next step is to find whether the text exists on another host, or to record a scan for it; do not re-try the subpage pattern, it was measured."
     },
     {
       "iso": "zh",

@@ -601,6 +601,15 @@ def find_label(lines, label):
 EDITION_LABELS = {
     ("it", "macbeth", "1.3"): (None, "ATTO PRIMO", "SCENA III"),
     ("it", "tempest", "1.2"): (None, "ATTO PRIMO", "SCENA II"),
+    # NO ENTRY FOR ("it", "tempest", "3.1") AND THAT IS DELIBERATE -- see the
+    # row's hold. Maffei's act-three page prints SCENA I and no other scene
+    # heading, so `("ATTO TERZO", "SCENA I")` scopes to the WHOLE ACT: 117
+    # speeches across 13 characters spanning Ferdinand and Miranda, then
+    # Stefano and Caliban, then the court party, where Folger's 3.1 is the
+    # lovers alone. Every one of those 13 is a real Tempest character, so the
+    # speaker list looks perfect and only the SIZE gives it away -- the French
+    # 3.1 is 25 speeches across 3. A label that silently returns three scenes is
+    # worse than no label, because the next reader clears the hold and ships it.
     ("es", "as_you_like_it", "3.2"): (None, "ACTO III", "ESCENA II"),
     # Hugo numbers scenes CONTINUOUSLY and prints no act headings at all, so
     # there is nothing to scope to above the scene.
