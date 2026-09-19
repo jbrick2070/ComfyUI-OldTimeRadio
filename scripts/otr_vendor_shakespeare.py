@@ -93,7 +93,22 @@ def to_text(markup):
     body = mark_speakers(body)
     body = re.sub(r"(?i)</(div|p|li|tr|h[1-6]|span)\s*>", "\n", body)
     body = re.sub(r"(?i)<br\s*/?>", "\n", body)
-    body = re.sub(r"(?s)<[^>]+>", "", body)
+    # A TAG ENDS AT THE FIRST `>` THAT IS NOT INSIDE A QUOTED ATTRIBUTE. The
+    # obvious `<[^>]+>` stops at the first `>` anywhere, and MediaWiki's Parsoid
+    # puts a JSON blob in `data-mw` that contains escaped markup -- so a `>`
+    # lands mid-attribute and the rest of the attribute survives as TEXT.
+    #
+    # Measured on the transcribed Portuguese Hamlet: 16 lines came out over 200
+    # characters, fifty JSON tokens reached the text, and both `ACTO PRIMEIRO`
+    # and the speaker `BERNARDO` were buried at the tail of ~300-character lines
+    # of `"quality":{"wt":"4"}},"i":1}},"</span>"]}'` instead of standing on
+    # their own. That breaks scene location (the act heading is not findable)
+    # and, if vendored, a character reads the JSON ALOUD.
+    #
+    # This is not Portuguese-specific: every Parsoid-rendered Wikisource page
+    # carries `data-mw`, so it was luck of the layout that the first four
+    # editions came out clean. Quoted runs are now skipped wholesale.
+    body = re.sub(r"(?s)<(?:[^>\"']|\"[^\"]*\"|'[^']*')*>", "", body)
     # UNESCAPE EVERYTHING, not a hand-list. The hand-list missed `&#91;` and
     # `&#93;` -- Wikisource's footnote brackets -- and they survived into the
     # vendored Macbeth as "(&#91; 9&#93; )", which the announcer would have

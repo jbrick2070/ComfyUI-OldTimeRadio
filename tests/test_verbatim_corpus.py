@@ -787,6 +787,48 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_a_tag_ends_at_the_first_unquoted_angle_bracket():
+    """`<[^>]+>` stops at the first `>` ANYWHERE, including one inside a quoted
+    attribute -- and MediaWiki's Parsoid puts a JSON blob in `data-mw` that
+    contains escaped markup, so the rest of the attribute survives as TEXT.
+
+    Measured on the transcribed Portuguese Hamlet before the fix: 16 lines over
+    200 characters, FIFTY JSON tokens reaching the text, and both the act
+    heading `ACTO PRIMEIRO` and the speaker `BERNARDO` buried at the tail of
+    ~300-character lines instead of standing on their own. That breaks scene
+    location outright, and anything vendored would have a character reading
+    `"quality":{"wt":"4"}},"i":1}}` ALOUD.
+
+    Not a Portuguese problem: every Parsoid-rendered Wikisource page carries
+    `data-mw`. The first four editions came out clean by luck of layout.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_tags",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    parsoid = ('<p data-mw=\'{"parts":[{"x":"&lt;span&gt;"},"</span>"]}\'>'
+               'ACTO PRIMEIRO</p>')
+    out = vendor.to_text(parsoid)
+    assert "ACTO PRIMEIRO" in out
+    assert "wt" not in out and "parts" not in out, (
+        "attribute JSON leaked into the spoken text: %r" % out)
+
+    # a `>` inside an ordinary quoted attribute must not end the tag either
+    assert "link" in vendor.to_text('<a title="a > b">link</a>')
+    assert "b\"" not in vendor.to_text('<a title="a > b">link</a>')
+
+    # and the ordinary cases still strip. NOTE a `class="sc"` span is a
+    # SPEAKER, so it comes back wrapped in SPEAKER_MARK rather than bare --
+    # that is `mark_speakers` doing its job, not tag residue.
+    marked = vendor.to_text('<span class="sc">Macbeth</span>')
+    assert marked.strip() == vendor.SPEAKER_MARK + "Macbeth" + vendor.SPEAKER_MARK
+    assert vendor.to_text("<p><i>entra Rosse</i></p>").strip() == "entra Rosse"
+
+
 def test_a_held_lead_carries_its_reason_and_is_not_vendored():
     """A HOLD is a located, correct source the extractor cannot read SAFELY yet.
 
