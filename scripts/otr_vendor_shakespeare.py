@@ -214,6 +214,15 @@ def to_text(markup):
     # vendored Macbeth as "(&#91; 9&#93; )", which the announcer would have
     # READ ALOUD as "ampersand hash ninety-one".
     body = html.unescape(body)
+    # A TYPESETTING SPACER IS NOT A WORD. Wikisource indents each line of a
+    # verse block with `&#65279;` -- a zero-width no-break space inside a
+    # fixed-width span -- purely to hang the line. Unescaped it becomes U+FEFF
+    # sitting at the head of every sung line, invisible in a diff and in a
+    # terminal, and it rode into Ariel's restored songs the moment the poem
+    # exemption above let them through. Zero-width is not zero-risk: it is a
+    # character in the string a voice engine is handed. Same reasoning as the
+    # footnote markers below -- if it is not the translator's word, it goes.
+    body = body.replace("﻿", "").replace("​", "")
     # Footnote markers and page breaks are the EDITION's apparatus, not the
     # translator's words, and every one of them is READ ALOUD if it survives.
     # Three forms are in this corpus and the first cut caught only one:
@@ -248,8 +257,23 @@ SPEAKER_MARK = "\x01"
 #:
 #: 60-99% is the whole band of small type. 100% and above is body text or a
 #: heading and is never apparatus.
+#:
+#: A SUNG VERSE IS SET SMALL AND IS STILL DIALOGUE. Hugo's Tempest prints
+#: Ariel's songs in `<div class="poem" style="font-size:90%">`, squarely inside
+#: this band, so the whole song was stripped as apparatus -- and because the
+#: SPEAKER was marked separately just above it, the scene shipped with six
+#: labelled-but-EMPTY lines: `ARIEL:` followed by nothing, `VOIX ÉPARSES:`
+#: followed by nothing. Ariel sings "Venez sur ces sables jaunes" and the
+#: scattered voices answer, and none of it survived. The label proved the
+#: character was there; the check that a label has a SPEECH behind it did not
+#: exist. A count sees six speakers either way.
+#:
+#: `poem` / `ws-poem` is Wikisource's verse container and is never apparatus, so
+#: it is exempted before the type-size rule is consulted. Small type means
+#: apparatus only when the block is not marked as verse.
 _DIRECTION_BLOCK = re.compile(
-    r'(?is)<(div|span|p)\b[^>]*font-size:\s*[6-9]\d%[^>]*>(?P<body>.*?)</\1\s*>')
+    r'(?is)<(div|span|p)\b(?![^>]*class="[^"]*\b(?:ws-)?poem\b[^"]*")'
+    r'[^>]*font-size:\s*[6-9]\d%[^>]*>(?P<body>.*?)</\1\s*>')
 
 #: WIKISOURCE'S PROOFREAD LAYOUT MARKS BY CLASS, NOT BY TYPE SIZE. The
 #: Portuguese Hamlet (pt.wikisource, Acto primeiro/Cena I) sets EVERY piece of
