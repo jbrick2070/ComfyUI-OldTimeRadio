@@ -167,6 +167,138 @@ def test_announcer_trapdoor_does_not_fall_to_english_pool(monkeypatch):
     assert voice in KOK.ANNOUNCER_VOICE_POOL
 
 
+def test_a_gender_the_language_cannot_serve_borrows_english_same_gender():
+    """Kokoro ships ONE French voice, ff_siwis, and it is female.
+
+    Measured on the real ledger of the first French Hamlet leg (2026-09-19):
+    HORATIO and MARCELLUS both `gender_unservable`, both `ff_siwis`, both
+    presenting female beside a bearded still. The operator heard it in thirty
+    seconds; every structural check had passed, because they count
+    assignments, not genders.
+
+    Operator's call, option A: a gender the language row cannot serve borrows
+    the SAME gender from English. The accent is wrong, the man is a man. A
+    gender the row does serve stays inside the language, and two borrowed men
+    draw two different English men because the borrow shares the used-set.
+    """
+    from nodes.cast_lock import CastLock
+    bank = (
+        _entry("ff_siwis", gender="female", language="fr"),
+        _entry("am_adam", gender="male", language=None),
+        _entry("am_liam", gender="male", language=None),
+        _entry("af_heart", gender="female", language=None),
+    )
+    led = {
+        "meta": {"episode_seed": 7, "episode_language": "fr"},
+        "cast": [
+            {"char_id": "a1", "name": "ANNOUNCER", "gender": "female"},
+            {"char_id": "c1", "name": "HORATIO", "gender": "male"},
+            {"char_id": "c2", "name": "MARCELLUS", "gender": "male"},
+            {"char_id": "c3", "name": "OPHELIA", "gender": "female"},
+        ],
+        "lines": [],
+    }
+    report: list = []
+    CastLock()._auto_registry(
+        led, led["cast"], "default", False, report,
+        bank_entries=bank, target_engine="kokoro", announcer_engine="kokoro",
+        language="fr")
+    rows = {e["char_id"]: e for e in led["cast"]}
+
+    # the men are men, from the English pool, and DISTINCT from each other
+    for cid in ("c1", "c2"):
+        assert rows[cid]["voice_ref_id"] in {"am_adam", "am_liam"}, rows[cid]
+        assert rows[cid]["voice_cast_fallback"] == "gender_borrowed_en"
+        assert rows[cid]["presentation_gender"] == "male"
+    assert rows["c1"]["voice_ref_id"] != rows["c2"]["voice_ref_id"]
+
+    # a gender the row DOES serve never leaves the language
+    assert rows["c3"]["voice_ref_id"] == "ff_siwis"
+    assert rows["c3"]["voice_cast_fallback"] == ""
+    assert rows["c3"]["presentation_gender"] == "female"
+
+    joined = "\n".join(report)
+    assert "borrowed from English, same gender" in joined
+    assert "voice distinctness:" in joined
+    assert "VOICE COLLISION" not in joined
+
+
+def test_a_whole_cast_on_one_voice_is_reported_as_a_collision():
+    """The credits roll says "N VOICES ACCOUNTED FOR" and counts ASSIGNMENTS,
+    so three rows on one voice read as three voices. This is the line that
+    says otherwise -- a report line, not a gate, because a thin language row
+    (Italian: one voice per gender) collides legitimately."""
+    from nodes.cast_lock import CastLock
+    bank = (_entry("ff_siwis", gender="female", language="fr"),)
+    led = {
+        "meta": {"episode_seed": 3, "episode_language": "fr"},
+        "cast": [
+            {"char_id": "c1", "name": "GERTRUDE", "gender": "female"},
+            {"char_id": "c2", "name": "OPHELIA", "gender": "female"},
+        ],
+        "lines": [],
+    }
+    report: list = []
+    CastLock()._auto_registry(
+        led, led["cast"], "default", False, report,
+        bank_entries=bank, target_engine="kokoro", announcer_engine="kokoro",
+        language="fr")
+    assert all(e["voice_ref_id"] == "ff_siwis" for e in led["cast"])
+    joined = "\n".join(report)
+    assert "1 distinct voice(s) across 2 character row(s)" in joined
+    assert "VOICE COLLISION" in joined
+
+
+def test_a_gender_the_language_does_serve_never_borrows_english():
+    """THE LEAK THE FIRST CUT HAD, caught by the cursor lane and reproduced
+    on eight of eight seeds before this test existed.
+
+    The selector raises for TWO reasons: "no gender-matching reference exists"
+    and "all matching references are already used". The borrow tier is for the
+    first only. Spanish is the default shape that trips the second: three
+    voices, three cast rows, so reuse stays off; the announcer takes the one
+    woman (`ef_dora` is tagged preferred_announcer) and marks her used; the
+    next woman then raises for the SECOND reason -- and was handed an English
+    voice, with a report line claiming Spanish had no woman while Dora sat on
+    the announcer row.
+
+    This pins only that the borrow stays confined: a Spanish woman must NOT be
+    stamped `gender_borrowed_en`. It deliberately does not pin what she gets
+    instead -- that is the pre-existing path and a separate ruling.
+    """
+    from nodes.cast_lock import CastLock
+    bank = (
+        _entry("ef_dora", gender="female", language="es",
+               style_tags=("preferred_announcer",)),
+        _entry("em_alex", gender="male", language="es"),
+        _entry("em_santa", gender="male", language="es"),
+        _entry("af_heart", gender="female", language=None),
+        _entry("am_adam", gender="male", language=None),
+    )
+    for seed in (1, 2, 3, 5, 7):
+        led = {
+            "meta": {"episode_seed": seed, "episode_language": "es"},
+            "cast": [
+                {"char_id": "a1", "name": "ANNOUNCER", "gender": "female"},
+                {"char_id": "c1", "name": "ANA", "gender": "female"},
+                {"char_id": "c2", "name": "PABLO", "gender": "male"},
+            ],
+            "lines": [],
+        }
+        report: list = []
+        CastLock()._auto_registry(
+            led, led["cast"], "default", False, report,
+            bank_entries=bank, target_engine="kokoro",
+            announcer_engine="kokoro", language="es")
+        rows = {e["char_id"]: e for e in led["cast"]}
+        assert rows["a1"]["voice_ref_id"] == "ef_dora", seed
+        assert rows["c1"]["voice_cast_fallback"] != "gender_borrowed_en", (
+            seed, rows["c1"])
+        assert rows["c1"]["voice_ref_id"] != "af_heart", (seed, rows["c1"])
+        assert rows["c2"]["voice_ref_id"] in {"em_alex", "em_santa"}, seed
+        assert "has no 'es' voice" not in "\n".join(report), seed
+
+
 def test_caption_wrap_policies():
     latin = CAP.wrap_text("one two three four", max_chars=8, wrap_policy="word_split")
     assert latin[0] == "one two"

@@ -161,7 +161,20 @@ ids (`nodes/_otr_kokoro_voice_prefetch.py`); each admitted row adds its own
 House pool bar (operator): announcer + 2 distinct character voices, do not
 double the budget. Day-1 override admits the thin rows: French (1) and
 Italian (2) reuse inside their own pool. If a cast cannot seat even with
-reuse, fail naming pool size -- never borrow English voices.
+reuse, fail naming pool size.
+
+**One carve-out, ruled 2026-09-19 (operator, option A): a gender the row has NO
+voice for borrows the SAME gender from English.** Kokoro's French row is one
+voice, `ff_siwis`, female -- so every French man was drawn onto her, and the
+operator heard a woman's voice on a bearded Horatio. The borrow is gated on
+"this language carries zero voices of this gender", not on any selector
+failure: a Spanish woman whose only in-language voice is already on the
+announcer row does NOT borrow (measured: the first cut leaked on eight of
+eight seeds). Stamped `voice_cast_fallback = gender_borrowed_en`. The render
+path takes `lang_code` from the episode row, so a borrowed voice still speaks
+with the language's phonemes; the accent is the accepted cost. Do not "fix"
+this back to never-borrow, and do not widen it to any failed draw -- both were
+tried and both are wrong.
 
 | Label | iso | Kokoro `lang_code` | Default voices | G2P | Paint | Admit |
 |---|---|---|---|---|---|---|

@@ -1103,8 +1103,14 @@ class CastLock:
                     % (language, target_engine))
             n_slots = sum(1 for e in cast if isinstance(e, dict))
             if len({e.voice_ref_id for e in lang_pool}) < n_slots:
-                # Thin rows (French 1, Italian 2): reuse in-pool, never borrow
-                # English. The ladder still prefers unused voices first.
+                # Thin rows (French 1, Italian 2): reuse in-pool for a gender
+                # the row CAN serve. The ladder still prefers unused voices
+                # first. A gender the row cannot serve at all is a different
+                # case and is handled in the draw loop below, where it borrows
+                # the same gender from English rather than taking whichever
+                # voice the row happens to have -- this comment used to say
+                # "never borrow English", and that policy is what put a
+                # woman's voice on Horatio (operator 2026-09-19).
                 allow_voice_reuse = True
 
         announcer_ref = None
@@ -1326,6 +1332,81 @@ class CastLock:
             except VoiceCastingError as exc:
                 if target_engine == "google_tts":
                     raise
+                # BORROW THE GENDER FROM ENGLISH BEFORE GIVING UP ON IT
+                # (operator 2026-09-19, option A). Kokoro ships ONE French
+                # voice, ff_siwis, and it is female; every other admitted row
+                # carries at least one voice of each gender. The selector
+                # fails closed on gender by design, so a French male raised
+                # here and the gender-agnostic draw below -- a uniform pick
+                # over the French pool -- handed him Siwis. Measured on the
+                # real ledger of the first French Hamlet leg: HORATIO and
+                # MARCELLUS both `gender_unservable`, both `ff_siwis`, both
+                # presenting female beside a bearded still. The operator heard
+                # it in thirty seconds; every structural check had passed.
+                #
+                # Same gender, English pool, same deterministic ladder, same
+                # used-set -- so two French men draw two DIFFERENT English
+                # men. The timbre is wrong-accented; the man is a man. That is
+                # the trade the operator chose over a woman's voice on a
+                # bearded face, and the render path takes lang_code from the
+                # episode row, not the voice id, so a borrowed voice still
+                # speaks with French phonemes.
+                #
+                # CONFINED EXPLICITLY, NOT BY ASSUMPTION. The selector raises
+                # for TWO reasons -- "no gender-matching reference exists" and
+                # "all matching references are already used" -- and the first
+                # cut of this tier fired on both. The second one is the
+                # default Spanish and Portuguese shape: three voices, three
+                # cast rows, so reuse stays off; the announcer takes the one
+                # woman (`ef_dora` is tagged preferred_announcer) and marks
+                # her used; the next woman raises for the SECOND reason and
+                # was handed an English voice. Measured on the working tree:
+                # eight of eight seeds. That is not the operator's ruling --
+                # it changes two languages he never heard -- and the report
+                # line would have said "has no 'es' voice" while Dora sat on
+                # the announcer row. So the gate is the condition itself:
+                # does the language row carry ANY voice of this gender? Only
+                # when it does not is the English pool consulted. A served
+                # gender whose voices are merely taken keeps the pre-existing
+                # path, whatever its own faults, until someone rules on it.
+                # `other` still falls through -- no English row carries it.
+                lang_can_serve = any(
+                    e.engine == target_engine
+                    and voice_speaks_language(e, language)
+                    and canonical_bank_gender(getattr(e, "gender", "")) == gender
+                    for e in (bank_entries or ())
+                )
+                borrowed = None
+                if gender and language != "en" and not lang_can_serve:
+                    try:
+                        borrowed = assign_voice_for_slot(
+                            role="char_voice",
+                            engine=target_engine,
+                            char_id=char_id,
+                            gender=gender,
+                            timbre=tuple(slot_timbre),
+                            age_band=slot_age,
+                            episode_seed=episode_seed,
+                            casting_policy_version=CASTING_POLICY_VERSION,
+                            allow_voice_reuse=allow_voice_reuse,
+                            used_voice_ref_ids=used,
+                            bank=bank_entries,
+                            language="en",
+                        )
+                    except VoiceCastingError:
+                        borrowed = None
+                if borrowed is not None:
+                    _stamp_row(entry, borrowed, fallback="gender_borrowed_en")
+                    _mark_used(borrowed)
+                    gated += 0 if _delivered_commercial_clean(
+                        entry, borrowed) else 1
+                    report.append(
+                        f"  {char_id}: {borrowed.voice_ref_id} "
+                        f"({borrowed.engine}, gender {gender!r} has no "
+                        f"{language!r} voice -- borrowed from English, "
+                        f"same gender)"
+                    )
+                    continue
                 # The bank cannot serve this row's gender -- 'other' is 20% of
                 # every roll and the bank carries zero rows for it. Previously
                 # the row was reported "NOT cast" and left with NO voice_ref_id,
@@ -1362,6 +1443,34 @@ class CastLock:
                 f"  {char_id}: {ref.voice_ref_id} ({ref.engine}, "
                 f"clean={drawn_clean})"
             )
+
+        # VOICE DISTINCTNESS, reported so a collision can never pass silently.
+        # The credits roll prints "N VOICES ACCOUNTED FOR", and it counts
+        # ASSIGNMENTS: three rows, three stamps, three accounted for -- while
+        # all three were ff_siwis. A structural check that cannot see a
+        # collision is the same blindness as a wrong-mouth scan that only
+        # looks for speakers who survived parsing. This counts DISTINCT ids
+        # across the character rows this lock actually stamped and says so in
+        # the report the leg log carries.
+        #
+        # A REPORT LINE, NOT A GATE. A thin language row collides legitimately
+        # -- Italian has one voice per gender, so two Italian women share one
+        # -- and the standing rule is no gates on models. The line exists so
+        # the collision is READ, by whoever reads the log, instead of being
+        # inferred from a bearded man sounding like a woman.
+        stamped_ids = [
+            str(e.get("voice_ref_id") or "") for e in cast
+            if isinstance(e, dict) and not _is_announcer_entry(e)
+            and id(e) in stamped_this_lock and e.get("voice_ref_id")
+        ]
+        if len(stamped_ids) > 1:
+            distinct = len(set(stamped_ids))
+            line = ("  voice distinctness: %d distinct voice(s) across %d "
+                    "character row(s)" % (distinct, len(stamped_ids)))
+            if distinct == 1:
+                line += (" -- VOICE COLLISION: every character on one voice "
+                         "(%s)" % stamped_ids[0])
+            report.append(line)
 
         # LEDGER COMPLETENESS FOR THE TIER, and this sweep is why the three fields
         # can be read as an enumeration downstream. The claimed row can leave the
