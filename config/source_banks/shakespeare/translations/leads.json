@@ -1168,13 +1168,14 @@
       "translator_death_date": 1930,
       "translation_first_published": 1927,
       "transcription_license": "public domain (Commons labels the scan and the underlying work PD)",
-      "url": "https://commons.wikimedia.org/wiki/File:SSID-11381927_%E5%A6%82%E9%A1%98.pdf",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
       "url_is": "page_scan",
       "edition": "《如願》, 北新書局, first edition March 1927, 231 pages",
       "verified_to_scene": "2026-09-18 operator: printed p.91 carries 第二場 / 林中 with Orlando entering and dialogue following",
       "label_style": "compact bracketed initials, e.g. 【歐】",
-      "note": "THE MANDARIN UNBLOCK. Clears the US test (published 1927) and life+70 (d. 1930) -- the only Chinese Shakespeare found that clears both, where Zhu Shenghao fails the US test and Tian Han fails life+70. Page scan with no text layer: the remaining work is transcription, not another hunt."
+      "note": "THE MANDARIN UNBLOCK. Clears the US test (published 1927) and life+70 (d. 1930) -- the only Chinese Shakespeare found that clears both, where Zhu Shenghao fails the US test and Tian Han fails life+70. Page scan with no text layer: the remaining work is transcription, not another hunt.",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 皆大歡喜 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 皆大歡喜 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     },
     {
       "iso": "zh",
@@ -1184,11 +1185,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 皆大歡喜 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 皆大歡喜 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     },
     {
       "iso": "zh",
@@ -1202,7 +1204,8 @@
       "form": "prose",
       "url_is": "landing_or_whole_work",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: NOT IN 第一輯. The Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) carries comedies only -- 仲夏夜之夢, 威尼斯商人, 無事煩惱, 皆大歡喜, 第十二夜, 終成眷屬, 量罪記, 暴風雨, 冬天的故事 -- and this play is not among them. The matching scan (Index:NCL-002878529) is 第1輯 and has no pagelist for it. A LATER 輯 volume is needed before this cell can be transcribed at all. Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt the first series."
     },
     {
       "iso": "zh",
@@ -1212,10 +1215,11 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource)",
-      "url": "https://zh.wikisource.org/wiki/%E5%93%88%E5%A7%86%E9%9B%B7%E7%89%B9",
+      "url": "https://zh.wikisource.org/zh-hant/%E6%BC%A2%E5%A7%86%E8%90%8A%E8%84%AB/%E7%AC%AC%E4%B8%80%E5%B9%95",
       "form": "prose",
       "note": "PD in CN/EU, published posthumously from 1947 so NOT PD in the US",
-      "url_is": "landing_or_whole_work"
+      "url_is": "act_page",
+      "url_found_by": "url hunt 2026-09-19; heading on page 第一場　厄耳錫諾；城堡前的露臺; first line: 那邊是誰？"
     },
     {
       "iso": "zh",
@@ -1225,10 +1229,12 @@
       "translator_death_date": 1968,
       "translation_first_published": 1922,
       "transcription_license": "no digital copy located",
-      "url": "",
+      "url": "https://zh.wikisource.org/zh-hant/%E6%BC%A2%E5%A7%86%E8%90%8A%E8%84%AB/%E7%AC%AC%E4%B8%80%E5%B9%95",
       "form": "prose",
       "alt_of": "zh/hamlet/1.1",
-      "note": "PD in the US (pre-1931) but not in the EU until 2039"
+      "note": "PD in the US (pre-1931) but not in the EU until 2039",
+      "url_is": "act_page",
+      "url_found_by": "url hunt 2026-09-19; heading on page 第一場　厄耳錫諾；城堡前的露臺; first line: 那邊是誰？"
     },
     {
       "iso": "zh",
@@ -1242,7 +1248,8 @@
       "form": "prose",
       "url_is": "landing_or_whole_work",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: NOT IN 第一輯. The Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) carries comedies only -- 仲夏夜之夢, 威尼斯商人, 無事煩惱, 皆大歡喜, 第十二夜, 終成眷屬, 量罪記, 暴風雨, 冬天的故事 -- and this play is not among them. The matching scan (Index:NCL-002878529) is 第1輯 and has no pagelist for it. A LATER 輯 volume is needed before this cell can be transcribed at all. Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt the first series."
     },
     {
       "iso": "zh",
@@ -1256,7 +1263,8 @@
       "form": "prose",
       "url_is": "landing_or_whole_work",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: NOT IN 第一輯. The Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) carries comedies only -- 仲夏夜之夢, 威尼斯商人, 無事煩惱, 皆大歡喜, 第十二夜, 終成眷屬, 量罪記, 暴風雨, 冬天的故事 -- and this play is not among them. The matching scan (Index:NCL-002878529) is 第1輯 and has no pagelist for it. A LATER 輯 volume is needed before this cell can be transcribed at all. Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt the first series."
     },
     {
       "iso": "zh",
@@ -1281,11 +1289,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/zh-hant/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_%28%E6%9C%B1%E7%94%9F%E8%B1%AA%29/%E4%BB%B2%E5%A4%8F%E5%A4%9C%E4%B9%8B%E5%A4%A2/%E7%AC%AC%E4%B8%89%E5%B9%95",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "act_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "url_found_by": "url hunt 2026-09-19; heading on page 第二場　林中的另一處; first line: 不知道蒂妲妮霞有沒有醒來；等她"
     },
     {
       "iso": "zh",
@@ -1295,11 +1304,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 無事煩惱 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 無事煩惱 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     },
     {
       "iso": "zh",
@@ -1309,11 +1319,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 無事煩惱 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 無事煩惱 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     },
     {
       "iso": "zh",
@@ -1327,7 +1338,8 @@
       "form": "prose",
       "url_is": "landing_or_whole_work",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: NOT IN 第一輯. The Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) carries comedies only -- 仲夏夜之夢, 威尼斯商人, 無事煩惱, 皆大歡喜, 第十二夜, 終成眷屬, 量罪記, 暴風雨, 冬天的故事 -- and this play is not among them. The matching scan (Index:NCL-002878529) is 第1輯 and has no pagelist for it. A LATER 輯 volume is needed before this cell can be transcribed at all. Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt the first series."
     },
     {
       "iso": "zh",
@@ -1337,11 +1349,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/zh-hant/%E6%9A%B4%E9%A2%A8%E9%9B%A8",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "whole_work_single_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "url_found_by": "url hunt 2026-09-19; heading on page 第二場; first line: 親愛的父親，假如你曾經用你的法術"
     },
     {
       "iso": "zh",
@@ -1351,11 +1364,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/zh-hant/%E6%9A%B4%E9%A2%A8%E9%9B%A8",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "whole_work_single_page",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "url_found_by": "url hunt 2026-09-19; heading on page 第一場; first line: 有一類遊戲是很吃力的，但興趣會"
     },
     {
       "iso": "zh",
@@ -1365,11 +1379,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 第十二夜 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 第十二夜 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     },
     {
       "iso": "zh",
@@ -1379,11 +1394,12 @@
       "translator_death_date": 1944,
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
-      "url": "https://zh.wikisource.org/zh-hans/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_(%E6%9C%B1%E7%94%9F%E8%B1%AA)",
+      "url": "https://zh.wikisource.org/wiki/Index:NCL-002878529_%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86.pdf",
       "form": "prose",
-      "url_is": "landing_or_whole_work",
+      "url_is": "page_scan",
       "us_public_domain_basis": "URAA-exempt, stated on zh.wikisource: 1996年1月1日，这部作品在原著作國家或地區屬於公有領域，之前在美國從未出版，其作者1944年逝世 -- already public domain in China on the URAA date of 1996-01-01 (d. 1944 + China's life+50 = 1995), and never previously published in the US, so US copyright was never restored and the 1947 publication date does not block it. Verified by fetching the page 2026-09-18.",
-      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014)."
+      "note": "Operator hunt 2026-09-18. CORPUS index -- resolve to the play, then the scene. Some plays are already native HTML rather than scans. Life+70 clears on its own (d. 1944 + 70 = 2014).",
+      "transcription_checked": "2026-09-19: the Zhu Shenghao collection index 莎士比亞戲劇全集 (朱生豪) lists this play as 第十二夜 in 第一輯, but ONLY 仲夏夜之夢 is built -- every other title is a redlink, including its act paths. The matching ProofreadPage book Index:NCL-002878529 is 第1輯 at progress 需要OCR / 0%: 84 Page: leaves exist, all front matter plus 仲夏夜之夢 (PDF 25-105), and 第十二夜 is an empty heading with no pagelist. So the SCAN exists and the text does not. Needs machine transcription (operator ruling same day: one model's OCR counts as verbatim). Variants already tried and missing: traditional and simplified titles, with and without the (朱生豪) suffix, and the collection child paths. Do not re-hunt."
     }
   ]
 }
