@@ -42,6 +42,25 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
 
+* **`google_tts` refuses a cast row with no gender; `my_story` leaves an
+  unstated gender empty by design.** Measured 2026-09-19 on the second live
+  leg of `google_veo_low_1act`: the canonical's bank is `roll`, the roll
+  landed on `my_story`, two of three characters (Stomp, Whiskers) carried
+  `gender: None` because the operator's story never states one -- and
+  `_otr_my_story.py:26` says so on purpose ("a gender they did not state is
+  never guessed from a name"). `cast_lock.py:1282` then raises
+  `VoiceCastingError ... NO FALLBACK` for `google_tts`, where the Kokoro
+  path takes the gender-agnostic draw and ships. Two rules that are each
+  right collide only on this lane. The fork: (a) let `google_tts` take the
+  same seeded gender-agnostic draw Kokoro takes when the SOURCE deliberately
+  left gender empty (provider voices are gendered, so the pick is a coin
+  the seed flips -- deterministic, disclosed in the report line); or (b)
+  keep the refusal and have `my_story` say up front that a Google-voiced
+  run needs every character's gender stated in the story. (a) ships more
+  episodes; (b) never puts a voice on a character the author left open.
+  The lane test moved on with `--source-bank original` (LLM-owned cast, the
+  40/40/20 draw always sets a gender). One word from him picks it.
+
 * **The Comfy key rides a V1 hidden input, and ComfyUI copies V1 inputs into
   error history.** Since the 2026-09-19 credential rip, nine nodes (writer,
   ShotLock, meta-brief prompt, stills, video, music, both voice nodes, the
