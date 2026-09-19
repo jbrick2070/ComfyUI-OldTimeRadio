@@ -15703,3 +15703,71 @@ bytes -- a CJK title is about three bytes per codepoint, so 150 "characters"
 could be 450 bytes. `_trim_title` budgets in bytes and never ends on a
 combining mark, because slicing `र` from its vowel sign leaves a dotted
 circle. Covered by `tests/test_obs_published_filename.py` (63 tests).
+
+## PBUG-20260919-01 -- Gemini thinking tokens ate the writer's output budget (fixed `904fd0f0`)
+
+**Artifact:** the first live leg of `google_veo_low_1act` on 2026-09-19, the day the
+BYO Google lane ran end to end for the first time. The writer call returned a short
+or empty script with no exception and no error field. The usage block was the only
+witness: `total_thought_tokens` had consumed the budget, and the completion the
+model actually emitted was cut off inside it.
+
+**Cause:** `generation_config.max_output_tokens` bounds THOUGHT tokens plus visible
+output, not visible output alone. The pack set the cap from the script length it
+wanted, so a reasoning model spent the whole allowance thinking and had nothing left
+to say. Compounded by where the truncation is reported: it arrives ONLY as a
+top-level `status: "incomplete"`, not as a per-candidate finish reason, so the code
+reading finish reasons saw a clean answer.
+
+**Fix:** `thinking_level_for()` and `thinking_headroom_tokens()` in
+`nodes/_otr_google_api/llm.py` size the cap as wanted-output plus a per-model
+thinking headroom, and `_output_limit_reason` reads the top-level status. A Sonnet
+pass refuted the first shape of this: reading a NESTED `status: incomplete` as
+truncation refused complete answers, so the nested check moved to
+`_nested_finish_limit` and the top-level one decides.
+
+**Verify:** `tests/test_google_api_thinking_budget.py`; live leg
+`troubled_mind_20260919_124119__anim__stfl__gimg__gtts__sspr__gasa__lyra_final.mp4`
+(English Hamlet 1.1, published in 218 s with every beat scripted).
+
+## PBUG-20260919-02 -- Google TTS answers with a parameterized MIME type (fixed `c2f688de`)
+
+**Artifact:** the same 2026-09-19 lane legs. Google TTS returned audio the pack could
+not decode, on a call that succeeded at the HTTP layer.
+
+**Cause:** the response's audio MIME is `audio/l16;codec=pcm;rate=24000` -- the
+sample rate and codec ride as PARAMETERS on the type, not in a separate field. Code
+that compares the content type as a bare string matches nothing, and code that
+strips to `audio/l16` throws away the rate it needs to build a valid header.
+
+**Fix:** `_split_mime()` in `nodes/_otr_audio_engines/eng_google_tts.py` separates the
+base type from its parameters, and `_audio_block` reads codec and rate off them.
+
+**Verify:** the live legs above carry Google-voiced beats end to end; two episodes in
+`otr/obs/` from the first day of the lane.
+
+## PBUG-20260919-03 -- HTTP 429 had no retry, and the first retry budget reset per attempt (fixed `11dac456`)
+
+**Artifact:** `fire_clay_20260919_105543__anim__gveo__gimg__gtts__orig__gasa__lyra_final.mp4`
+got 2 of 8 beats from Veo; `brass_glass_20260919_111547__rfrc__...` got 0 of 8. Both
+published, both mostly empty of video, because every shot 429'd.
+
+**Cause:** Google returns HTTP 429 for a per-minute rate limit as well as for a spent
+quota, and the pack treated it as terminal at every poster. Tier 1 gives each Veo
+model 2 requests per minute and 10 per day against an episode's ~16 Veo calls, so the
+lane could not clear a single episode without waiting.
+
+**Fix:** `_quota_retry` and `new_quota_budget()` in `nodes/_otr_google_api/client.py`
+apply bounded backoff at every poster. **Two reviewer catches are the durable part.**
+codex found the budget was re-created inside each outer attempt, so a call could wait
+up to twelve times while appearing to honour a four-wait budget -- a budget
+constructed inside the loop it is meant to bound is not a budget. codex also found
+Cancel was not honoured during a sleep, fixed with `_interruptible_sleep()`. Sonnet
+then found `download_media` was never wrapped at all.
+
+**Verify:** `tests/test_google_api_quota_backoff.py`. The quota shape was then measured
+directly with backoff off: `veo-3.1-fast-generate-preview` and
+`veo-3.1-generate-preview` accepted, `veo-3.1-lite-generate-preview` 429 -- the limit
+is PER MODEL. That measurement is what settled Google as a stills-only lane
+(`config/profiles/google_still_1act.json`, `67332dc5`), which is a quota fact and not
+a code defect.

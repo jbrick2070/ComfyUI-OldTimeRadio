@@ -141,7 +141,8 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   markup**, including one written here.
   **WHAT IS BUILT:** the Japanese and Portuguese rules ship (f446d484,
   reviewed, with a regression fixture). **WHAT IS SPECIFIED AND NOT BUILT:**
-  the Chinese rule -- `tmp/zh_diagnosis.md` names the markup, counts 65
+  the Chinese rule -- [the diagnosis](2026-09-19-shakespeare-vendoring/chinese_edition_diagnosis.md)
+  names the markup, counts 65
   marked speeches against 0 the pipeline currently sees, and flags that
   `_marked_name`'s `len(name) < 2` guard would silently drop every
   single-character Chinese speaker (波, 衮, 蒂 are most of the cast).
@@ -237,43 +238,40 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-**The pipeline is built, wired and proven end to end (2026-09-18).** A real
-translator's words now reach a performed beat: `scripts/otr_vendor_shakespeare.py`
-extracts a scene by the EDITION'S OWN markup (speakers, stage business and
-footnote chrome are read off the page's own HTML, not guessed from prose),
-`nodes/_otr_verbatim_corpus.py` resolves and sha256-verifies it by the ref the
-shipping bank actually emits, `nodes/_otr_passage_selector.py` reads its
-`NAME:` layout alongside Folger's two (measured inert on all 81 English
-sources), and a manifest `speaker_map` bridges each edition label to the
-existing English gender ladder -- so a voice lands on the right character and
-the printed credits name the translator beside the source licence. Receipt:
-[HANDOFF_LOG](HANDOFF_LOG.md).
+The pipeline is proven end to end and **16 scenes are vendored** across es, fr,
+it, ja and pt, with 95 leads hunted and every unvendored cell carrying a named
+next step in `leads.json`. Adding a scene is mechanical: read the edition's own
+act/scene label into `EDITION_LABELS`, add the row, run
+`scripts/otr_vendor_shakespeare.py --write`.
 
-**THE ORIGINAL DESIGN BELOW WAS SUPERSEDED, NOT COMPLETED.** This row used to
-describe an automated `_otr_scene_resolver.py` + alias table + "anchor-matching
-alignment by English opening/closing speaker with a confidence score." None of
-that shipped. What shipped instead: the operator's own verification pass reads
-each lead's page and records the edition's own act/scene label by hand
-(`EDITION_LABELS` in the vendor script) -- simpler, and it cannot silently
-vendor the wrong scene the way a computed alignment score could.
-`alignment_confidence` in the manifest is a stamped constant, not a measured
-score; nothing currently computes one. `_otr_scene_resolver.py` was RIPPED on
-2026-09-19 (operator: "if it's dead code let's rip it, I approve") -- 324 lines
-plus a 415-line test, zero production callers, nothing newly orphaned by its
-removal.
+What remains is two per-edition extractor rules, both specified and neither
+built. State, diagnoses and the measured counts live in
+[2026-09-19-shakespeare-vendoring](2026-09-19-shakespeare-vendoring/).
 
-**What is actually vendored: four scenes, three languages.**
-`it/macbeth 1.3` (Rusconi), `fr/hamlet 1.1` and `fr/king_lear 1.1` (Hugo),
-`es/as_you_like_it 3.2` (Marquez). Zero for ja, zh, pt, hi -- entirely
-unstarted, not blocked on anything but locating and hand-verifying a lead.
+**The Chinese rule.** Speaker is 1-4 CJK characters plus U+3000 at a paragraph
+head; block business is a centred div opening with a fullwidth black bracket;
+headings match `^第.*[幕场場]$` and must be exempted or the scene anchors break.
+The page marks 65 speeches across 14 characters in Midsummer 3.1 and
+`mark_speakers` claims 0. **The trap, found independently by two models:**
+`_marked_name` rejects `len(name) < 2` and most of this cast is one character
+(波, 衮, 蒂), so the rule can mark every speaker correctly and still drop them
+all downstream.
 
-**Next action: vendor the next scene.** The pipeline is proven, so this is now
-mechanical per scene, not a design question: open the lead, read off its
-edition's own act/scene label (`EDITION_LABELS`), add the row, run
-`scripts/otr_vendor_shakespeare.py --write`. Named traps, still live:
-LiberLiber's Italian set is Raponi and still in copyright; "A transcribir"
-means no text exists; Aozora's canonical text is Shift_JIS with ruby markup;
-a `utm_source` parameter is proof the lead was never opened.
+**The Italian Rusconi rule.** Abbreviated marks (`Orl.`, `Ber.`) followed by a
+period at a paragraph head. The generic name shapes claim these correctly and
+also claim stage directions and spoken text. The obvious fix is measured
+harmful: anchoring on `<p>` took tempest from 142 speeches to 6. Twelve act-page
+URLs are verified and recorded.
+
+Both touch shared extractor code every edition runs through, so each needs a
+blast-radius check across all 16 vendored scenes before its push.
+
+**Then production OCR of the 23 page-scan cells**, unblocked by the 2026-09-19
+ruling that one model's OCR counts as verbatim. Parallel model work, not coding.
+
+Live traps: LiberLiber's Italian set is Raponi and still in copyright;
+"A transcribir" means no text exists; Aozora's canonical text is Shift_JIS with
+ruby markup; a `utm_source` parameter is proof the lead was never opened.
 
 ## 3. TEST -- only after 1 and 2 are empty
 
