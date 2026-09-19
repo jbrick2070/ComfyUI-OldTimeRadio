@@ -58,6 +58,15 @@ dependencies = [
     # resolves a requirement set all-or-nothing. Landed in code on 2026-09-02
     # and unreachable from a registry install until this line existed.
     "kokoro-onnx>=0.6.1; python_version >= '3.13' and python_version < '3.14'",
+    # The Japanese row's MeCab dictionary (PBUG-20260918-06). misaki[ja] pulls
+    # `unidic`, whose wheel contains a DOWNLOADER and no dictionary, so a
+    # registry install reaches its first Japanese line and dies in
+    # fugashi.Tagger() on a mecabrc that was never fetched. unidic-lite carries
+    # its dictionary inside the wheel -- nothing is downloaded at render time.
+    # Exactly the cold-install shape this block exists for: the fix landed in
+    # requirements.txt and in code the same day and was unreachable from a
+    # registry install until this line existed.
+    "unidic-lite>=1.0.8",
     # pyloudnorm is imported by scene_sequencer to master every episode to
     # -14 LUFS. Its import is try/except with a deliberate fallback, so a
     # missing install does not crash -- it quietly ships a differently
