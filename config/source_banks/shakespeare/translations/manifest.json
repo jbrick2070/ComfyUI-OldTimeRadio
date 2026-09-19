@@ -1218,6 +1218,38 @@
       }
     },
     {
+      "iso": "ja",
+      "play": "romeo_juliet",
+      "scene": "2.2",
+      "file": "ja/romeo_juliet_2_2.txt",
+      "translator": "坪内逍遙 Tsubouchi Shōyō",
+      "translator_death_date": 1935,
+      "translation_first_published": 1933,
+      "transcription_license": "Aozora Bunko per-file licence",
+      "source_url": "https://www.aozora.gr.jp/cards/000264/files/42773_39853.html",
+      "revision_id": "sha256:76bd3006ce04f7f7",
+      "raw_sha256": "76bd3006ce04f7f76e4e59691cb1133abf4daca9242e47c0394214a89f382215",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "第二幕 / 第二場",
+      "speaker_labels": 55,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "ヂュリ": {
+          "spoken": "JULIET",
+          "roster": "JULIET"
+        },
+        "ロミオ": {
+          "spoken": "ROMEO",
+          "roster": "ROMEO"
+        },
+        "乳母": {
+          "spoken": "NURSE",
+          "roster": "NURSE"
+        }
+      }
+    },
+    {
       "iso": "zh",
       "play": "hamlet",
       "scene": "1.1",
