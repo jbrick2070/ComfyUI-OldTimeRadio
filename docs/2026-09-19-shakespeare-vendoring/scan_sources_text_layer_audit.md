@@ -56,6 +56,45 @@ four pages, as did the Chinese `第2輯`. That matches what an outside pass
 reported independently. Those 19 cells are the real OCR work and the
 2026-09-19 ruling is what governs them.
 
+## CORRECTION, measured later the same day: "extraction, not transcription" was too optimistic
+
+The table above is right that the text is machine-readable. The inference drawn
+from it -- that these cells therefore need extraction rather than transcription
+-- does not follow, and a second probe shows why.
+
+Fed through the EXISTING pipeline (strip the running header, hand the lines to
+`extract` exactly as an HTML page is handed to it), `pt/macbeth 1.3` returns the
+**correct scene span**: 6,853 characters, starting at `SCENA III`, ending where
+it should. The boundary logic works on a PDF with no changes at all.
+
+**The labels do not.** It found five "speakers", all of them fragments of
+dialogue: `Parte`, `vosso sangue estancou-se`, `Segundo parece, os camaristas`.
+Because:
+
+```
+ACTO III SCENA IV 95 MACBETH Onde ? LENNOX Aqui ,meu bom senhor; o que é que
+```
+
+**The text layer flattens the page.** A speaker name arrives INLINE, with no
+colon, no period and no line break -- and every rule in `mark_speakers` and
+`_LABEL_SHAPES` keys on structure that PDF text extraction discards. The name is
+visually distinct on the page (its own line, centred, small caps) and none of
+that survives `extract_text()`.
+
+So segmenting these needs the CAST KNOWN IN ADVANCE, which is what the first
+prototype quietly did with a hardcoded name list, and is why a speaker missing
+from that list silently glued its line to the previous speaker's.
+
+**That makes it a design question, not a wiring job.** Where does the name list
+come from? The English sidecar roster is the obvious candidate and is already
+loaded -- but it carries `FIRST WITCH` where the Portuguese prints
+`1.ª FEITICEIRA`, and proper nouns match across languages while function names
+do not. A wrong or partial list does not fail loudly; it moves a speech into
+another character's mouth, which is the one failure this corpus cannot afford.
+
+**Budget it as a design round, not as an afternoon.** The boundary half is free
+and already works; the label half is the whole job.
+
 ## A prototype extractor was built and is NOT good enough to ship
 
 Written against `pt/macbeth 1.3` (Domingos Ramos, 1912) to find out what the
