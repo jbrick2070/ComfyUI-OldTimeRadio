@@ -1413,3 +1413,61 @@ def test_no_scene_runs_the_same_speaker_back_to_back_more_than_twice():
         runs = sum(1 for a, b in zip(seq, seq[1:]) if a == b)
         assert runs <= 3, (row["file"], "%d back-to-back runs in %d speeches"
                            % (runs, len(seq)))
+
+
+def test_an_ordinal_indicator_does_not_hide_a_speaker_from_the_runtime():
+    """`ª` IS LOWERCASE TO PYTHON AND IS NOT A LETTER TO A READER.
+
+    U+00AA and U+00BA are how Spanish and Italian print an ordinal, and
+    `str.islower()` is true for both -- so `_is_upper_label` rejected
+    `1ª FAT` and `BRUJA 1.ª` and `parse_speeches` did not return them at all.
+
+    THE FILES WERE RIGHT AND THE CONSUMER COULD NOT READ THEM. The vendored
+    text carried the four Italian fairies and the three Spanish witches
+    correctly labelled, the manifest bound every one to a roster name, and this
+    suite passed -- while at runtime each of those speeches merged into whoever
+    spoke before it. Rusconi's Macbeth escaped only because its transcriber
+    wrote the ordinal as `<sup>a</sup>`, which strips to a plain `A`; the same
+    translator's Midsummer prints the bare `ª` and broke.
+
+    Found by asking a question no test asked: does every speaker_map KEY match
+    a label the parser actually returns? A key matching nothing is silent,
+    because an unmatched key reads as a deliberately unbound label.
+    """
+    from nodes import _otr_passage_selector as PS
+    # A SCENE, not one line: `parse_speeches` detects its layout from the whole
+    # text, so a single line returns nothing whatever the label looks like. The
+    # first draft of this test asserted on one line and failed for that reason
+    # rather than for the defect it was written about.
+    ordinals = ("1\u00aa FAT", "2\u00aa FAT", "BRUJA 1.\u00aa", "1\u00ba MOZO")
+    scene = "\n".join(
+        ["BOT: Estamos todos aqui reunidos esta noche.",
+         "QUIN: Si, y el lugar es comodo para ensayar."]
+        + ["%s: hablo yo ahora y digo lo mio." % label for label in ordinals]
+        + ["TIT: Ven a sentarte conmigo sobre las flores."]) + "\n"
+    got = [s.speaker for s in PS.parse_speeches(scene)]
+    for label in ordinals:
+        assert label in got, (label, got)
+
+    # and the case test still refuses a genuine lowercase name
+    assert not PS._is_upper_label("Bruja 1.\u00aa")
+    assert PS._is_upper_label("BRUJA 1.\u00aa")
+
+
+def test_every_speaker_map_key_matches_a_label_the_parser_returns():
+    """A MAP KEY THAT MATCHES NOTHING IS SILENT, and that is the danger.
+
+    An unmatched key is indistinguishable from a deliberately unbound label --
+    which is a legitimate outcome here, reserved for a translator's own extra
+    speaker. So a typo'd CJK escape, or a label the runtime parser cannot see,
+    reads as a considered editorial decision. Three escapes were wrong by one
+    codepoint on 2026-09-19 and two of them survived a morning looking correct.
+    """
+    from pathlib import Path
+    from nodes import _otr_passage_selector as PS
+    root = Path(_corpus_root())
+    for row in C.load_manifest(str(root / C.MANIFEST_NAME)):
+        text = (root / row["file"]).read_text(encoding="utf-8")
+        present = {s.speaker for s in PS.parse_speeches(text)}
+        for key in C.speaker_bindings(row):
+            assert key in present, (row["file"], key, sorted(present)[:8])

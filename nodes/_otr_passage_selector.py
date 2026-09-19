@@ -335,11 +335,35 @@ def _folger_prefix(line: str) -> tuple[str, str] | None:
     return match.group("name"), line[match.end():].strip()
 
 
+#: AN ORDINAL INDICATOR IS CASE-NEUTRAL TYPOGRAPHY, NOT A LOWERCASE LETTER.
+#: `ª` (U+00AA) and `º` (U+00BA) are how Spanish and Italian print a feminine or
+#: masculine ordinal, and Python calls both `islower()` -- so `1ª FAT` and
+#: `BRUJA 1.ª` failed the all-caps test and the runtime selector did not see
+#: them as speakers at all.
+#:
+#: THE FILES WERE RIGHT AND THE CONSUMER COULD NOT READ THEM, which is the worst
+#: shape this defect comes in. The vendored text carried the four fairies and
+#: the three witches correctly labelled, the manifest bound every one of them to
+#: a roster name, the corpus tests passed -- and `parse_speeches` skipped the
+#: lines, so at RUNTIME each of those speeches merged into whoever spoke before
+#: it. Rusconi's Macbeth escaped only because its transcriber wrote the ordinal
+#: as `<sup>a</sup>`, which strips to a plain `A`; the same translator's
+#: Midsummer prints the bare `ª` and broke.
+#:
+#: Found by a corpus-integrity check asking a question no test asked: does every
+#: speaker_map KEY match a label the parser actually returns? A key that matches
+#: nothing is silent -- it reads as a deliberately unbound label, which is a
+#: legitimate outcome here.
+_ORDINAL_INDICATORS = "ªº"
+
+
 def _is_upper_label(name: str) -> bool:
     # At least one letter, and no lowercase one in ANY alphabet. `[A-Z]` in
     # `_SPEECH_RE` is what made CORDÉLIA invisible; this is the test that
     # regex could not express.
-    return any(ch.isalpha() for ch in name) and not any(ch.islower() for ch in name)
+    letters = [ch for ch in name if ch not in _ORDINAL_INDICATORS]
+    return (any(ch.isalpha() for ch in letters)
+            and not any(ch.islower() for ch in letters))
 
 
 def _colon_prefix(line: str) -> tuple[str, str] | None:
