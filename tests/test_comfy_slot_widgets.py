@@ -13,8 +13,10 @@ Pins the 2026-06-01 contract:
   * The Comfy Credits catalog is always listed after the enable-sentinel
     so a saved cloud graph that stores anthropic/claude-sonnet-5 /
     openai/gpt-5.6-luna / openai/gpt-5.6-sol loads on Comfy Cloud.
-    generate() still fails closed without a Comfy API key. The env flag
-    OTR_ENABLE_COMFY_CREDITS=1 remains a headless opt-in.
+    generate() still fails closed without a Comfy API key. There is no
+    enable flag: OTR_ENABLE_COMFY_CREDITS is read nowhere in production
+    (rip 2026-09-19); the pick plus the queue's api_key_comfy_org is the
+    whole switch.
   * comfy:slot-a|b resolve to a real catalog slug via the bind -> env ->
     recommended chain; the backend tags provider="comfy_credits" and posts
     behind the cost guard with the ComfyUI-injected auth.
@@ -36,14 +38,15 @@ from tests.fixtures.writer_slots import assert_relative_order
 def _clean_lane_state(monkeypatch):
     """Each test starts with no slot bindings / auth / accrued budget.
 
-    OTR_COMFY_API_KEY is a User-env credential on the operator box, so a
-    test that means "no credential" must unpin it or `_bearer()` will
-    silently succeed.
+    OTR_COMFY_API_KEY is a User-env credential on the operator box. Since
+    the 2026-09-19 rip `_bearer()` never reads it, and the fixture keeps
+    the variable set on purpose so a regression back to env-reading
+    would surface as a leaked credential in the no-auth tests.
     """
     occ.clear_slot_bindings()
     occ.clear_auth()
     occ.reset_run_budget()
-    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
+    monkeypatch.setenv("OTR_COMFY_API_KEY", "env-key-that-must-be-ignored")
     yield
     occ.clear_slot_bindings()
     occ.clear_auth()
@@ -57,18 +60,21 @@ def comfy_off(monkeypatch):
 
 @pytest.fixture
 def comfy_on(monkeypatch):
+    """A signed-in queue: the injected key is present. The env flag is set
+    only to prove it is inert -- production reads it nowhere since
+    2026-09-19; the credential is the whole gate."""
     monkeypatch.setenv("OTR_ENABLE_COMFY_CREDITS", "1")
+    occ.set_auth(api_key="fixture-injected-key")
 
 
 # --- enable gate ------------------------------------------------------------
+# `comfy_credits_enabled()` was deleted 2026-09-19 with its only caller: the
+# credential is the gate now (see test_backend_load_rejects_flag_alone_without_auth).
 
 
-def test_lane_disabled_by_default(comfy_off):
-    assert occ.comfy_credits_enabled() is False
-
-
-def test_lane_enabled_with_flag(comfy_on):
-    assert occ.comfy_credits_enabled() is True
+def test_flag_helper_is_gone():
+    assert not hasattr(occ, "comfy_credits_enabled")
+    assert "comfy_credits_enabled" not in occ.__all__
 
 
 # --- slot picker choices ----------------------------------------------------
@@ -296,16 +302,29 @@ def test_backend_load_accepts_signed_in_auth_without_env_flag(comfy_off):
     assert entry["slug"] == occ.COMFY_RECOMMENDED_CREATIVE_DEFAULT
 
 
-def test_backend_load_accepts_env_key_when_flag_off(comfy_off, monkeypatch):
-    """Headless --cpu with sqlite:///:memory: never injects api_key_comfy_org.
-    The first cheap-cloud 1-act died on ComfyCreditsConfigError for that
-    reason. OTR_COMFY_API_KEY is the same credential the media lane already
-    uses."""
+def test_bearer_reads_only_the_injected_key(monkeypatch):
+    """Rip 2026-09-19: the env var is the SUBMITTER's credential
+    (scripts/otr_api.py packs it into extra_data); the server-side backend
+    never reads it. With nothing injected there is no bearer, whatever
+    the environment says."""
     monkeypatch.setenv("OTR_COMFY_API_KEY", "env-headless-key")
+    assert occ._bearer() is None
+    occ.set_auth(api_key="injected")
+    assert occ._bearer() == "injected"
+
+
+def test_backend_load_rejects_flag_alone_without_auth(monkeypatch):
+    """The lane flag opens the dropdowns; it is not a credential. A
+    flag-on queue with no api_key_comfy_org fails closed at load, naming
+    both real paths (app sign-in / headless submitter extra_data)."""
+    monkeypatch.setenv("OTR_ENABLE_COMFY_CREDITS", "1")
+    occ.clear_auth()
     row = types.SimpleNamespace(context_window=8192)
-    entry = occ.ComfyCreditsBackend().load(occ.SLOT_A_ID, row)
-    assert entry["provider"] == "comfy_credits"
-    assert occ._bearer() == "env-headless-key"
+    with pytest.raises(occ.ComfyCreditsConfigError) as ei:
+        occ.ComfyCreditsBackend().load(occ.SLOT_A_ID, row)
+    text = str(ei.value)
+    assert "api_key_comfy_org" in text
+    assert "extra_data.api_key_comfy_org" in text
 
 
 def test_backend_generate_posts_and_extracts(comfy_on, monkeypatch):
@@ -434,7 +453,9 @@ def test_backend_generate_requires_auth(comfy_on, monkeypatch):
     row = types.SimpleNamespace(context_window=8192)
     backend = occ.ComfyCreditsBackend()
     entry = backend.load(occ.SLOT_A_ID, row)
-    # No set_auth() and no OTR_COMFY_API_KEY -> fail closed before any network call.
+    # The injected key is gone by call time (and the env var is never
+    # read) -> fail closed before any network call.
+    occ.clear_auth()
     with pytest.raises(occ.ComfyCreditsConfigError):
         backend.generate(entry, [{"role": "user", "content": "hi"}], max_new_tokens=8)
 

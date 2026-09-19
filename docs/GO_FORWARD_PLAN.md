@@ -42,6 +42,34 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
 
+* **The Comfy key rides a V1 hidden input, and ComfyUI copies V1 inputs into
+  error history.** Since the 2026-09-19 credential rip, nine nodes (writer,
+  ShotLock, meta-brief prompt, stills, video, music, both voice nodes, the
+  validator) declare `"hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"}`.
+  That is the V1 channel: `execution.py:230` puts the key into
+  `input_data_all`, and when a node RAISES, `execution.py:630-653` serializes
+  every input -- hidden included -- into `execution_error.current_inputs`,
+  which lands in `/history`. Before the rip only the writer had this
+  exposure; now every credit-spending host does. ComfyUI's own partner nodes
+  avoid it by being V3 `io.ComfyNode` classes: the same credential arrives
+  through `v3_data` (`execution.py:196-209`), which the error path never
+  serializes. **Codex r2 named this as the pack-side mitigation and it is
+  real.** The fork: convert the nine hosts to V3 (schema order must match the
+  saved widget order byte-for-byte across 63 graphs, and the writer alone is
+  ~3,500 lines), OR add one small V3 credential node that stashes the key per
+  prompt and is wired into every host's `gate_in` (a canonical-graph change
+  plus all variants, and it must return NaN from IS_CHANGED or a cache hit
+  serves a stale key). Both are arc-sized. Interim risk, stated exactly: the
+  reader needs `/history` on the server, and only a queue that both carries
+  a key and raises exposes it. On the desktop boxes the server binds
+  127.0.0.1, so that reader is already on the machine. **On the pod it is
+  not:** `scripts/otr_pod_runtime.sh:458` launches with `--listen 0.0.0.0
+  --enable-cors-header` and `docs/RUNPOD_INSTALL.md` documents reaching it
+  through the RunPod proxy, so on a pod a key-bearing queue that raises
+  exposes the key to anyone the proxy admits (codex r3). Until the V3 shape
+  lands, a pod run that spends Comfy credits should be treated as sharing
+  its key with the proxy's audience. One word from him picks the shape.
+
 * **The canonical word counter is ASCII-only, and fixing it moves every
   episode's numbers.** `WORD_RE` in `_otr_text_metrics.py` is
   `[A-Za-z][A-Za-z0-9'...]*`, so an accented word counts as several: `révéler`

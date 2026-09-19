@@ -71,11 +71,16 @@ blank reminder.
 
 ### Comfy Cloud -- sign into the app
 
-Sign into Comfy. That is the whole instruction.
+Sign into Comfy **with a Comfy API key** (the API-key option on ComfyUI's
+sign-in dialog; a plain email or Google login injects no key). That is the
+whole instruction. The pack reads the same
+`api_key_comfy_org` hidden input ComfyUI's own partner nodes use, and
+nothing else: no key file, no environment variable on the server.
 
-A `comfy.secret` / `comfy_api_key.location` / `OTR_COMFY_API_KEY` is only
-for a headless box that has no login. Do not put one of those on a
-Desktop machine unless you already know you need it.
+Headless box with no login: put the key in `OTR_COMFY_API_KEY` in the
+environment of the machine that *submits* the prompt and submit through
+`scripts/otr_api.py`, which sends it as `extra_data.api_key_comfy_org`
+exactly as the app's sign-in would.
 
 ---
 
@@ -509,7 +514,7 @@ dropdown on **OTR_StableAudioTheme** if that matters to you.
 | mime | _not built_ | | | | | | | |
 | animatediff | _not built_ | | | | | | | |
 
-### Comfy Cloud (opt-in easter egg; needs OTR_COMFY_API_KEY)
+### Comfy Cloud (opt-in easter egg; needs a signed-in Comfy session, or OTR_COMFY_API_KEY on the headless submitter)
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|

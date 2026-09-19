@@ -27,7 +27,7 @@ setting it.
 |---|---|---|
 | **OpenRouter** | OpenRouter, per token | `openrouter.secret`, or a path in `openrouter_api_key.location`, or `OPENROUTER_API_KEY`. |
 | **Google** | Google, per token | `google.secret`, or a path in `google_api_key.location`, or `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY`. |
-| **Comfy Credits** | Your Comfy account's credits | Sign into the Comfy app. Headless only: `comfy.secret`, `comfy_api_key.location`, or `OTR_COMFY_API_KEY`. Credits also need `OTR_ENABLE_COMFY_CREDITS=1`. |
+| **Comfy Credits** | Your Comfy account's credits | Sign into the Comfy app -- that sign-in is the only credential the pack reads (no key file, no server-side env var). Headless only: `OTR_COMFY_API_KEY` on the *submitting* machine, sent by `scripts/otr_api.py` as `extra_data.api_key_comfy_org`. There is no enable flag: the pick plus the key is the whole switch. |
 
 They are not symmetric, and older notes in `docs/` claim they "differ only in who
 pays" — they do not. **OpenRouter and Google are gated purely on a key being

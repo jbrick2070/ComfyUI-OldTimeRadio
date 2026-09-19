@@ -126,7 +126,7 @@ class EngineProfile(BaseModel):
     # dispatch (the cloud engine is dropdown-opt-in, never a default). ---
     partner_row: str = ""            # pinned partner_nodes.yaml key (e.g. cloud_elevenlabs_tts)
     required_param_defaults: dict = Field(default_factory=dict)
-    auth_required: bool = False      # cloud engines need OTR_COMFY_API_KEY (fail-loud)
+    auth_required: bool = False      # cloud engines need the queue's api_key_comfy_org (fail-loud)
     error_policy: str = ""           # "" | fail_loud (cloud = fail_loud, no local fallback)
 
     # --- Cloud-audio-cache chunk 2 (2026-08-08): content-addressed replay

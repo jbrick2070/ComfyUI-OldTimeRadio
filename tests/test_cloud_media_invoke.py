@@ -87,6 +87,10 @@ def rig(monkeypatch, tmp_path):
 
     prompt_id = f"test-prompt-{uuid.uuid4().hex[:8]}"
     with invoke.bind_prompt_id(prompt_id):
+        # What a host node does at the top of its execute: stash the
+        # api_key_comfy_org hidden input for this prompt. The env var set
+        # above is the SUBMITTER's; the server-side lane never reads it.
+        assert invoke.stash_comfy_api_key("test-key-123")
         yield {
             "node_key": node_key, "prompt_id": prompt_id,
             "src": src, "beats": beats, "tmp": tmp_path,
@@ -114,14 +118,18 @@ def test_no_enable_flag_gate(monkeypatch, rig):
 
 
 def test_missing_credentials_fail_loud(monkeypatch, rig):
-    """A dropdown pick without ANY credentials fails LOUD at auth,
-    naming the sources (env key + hidden inputs)."""
-    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
-    backend.teardown_session(rig["prompt_id"])  # drop the keyed session
+    """A dropdown pick on a queue that carries no api_key_comfy_org fails
+    LOUD at auth, naming both real paths. The env var stays set to prove
+    the server-side lane never falls back to it (rip 2026-09-19)."""
+    monkeypatch.setenv("OTR_COMFY_API_KEY", "server-env-must-be-ignored")
+    backend.teardown_session(rig["prompt_id"])  # drops the session AND the stash
     with pytest.raises(CloudMediaError) as ei:
         invoke.invoke_partner_node(rig["node_key"], {}, timeout_s=5)
     assert ei.value.code is CloudErrorCode.AUTH
-    assert "OTR_COMFY_API_KEY" in str(ei.value)
+    text = str(ei.value)
+    assert "api_key_comfy_org" in text
+    assert "extra_data.api_key_comfy_org" in text
+    assert "server-env-must-be-ignored" not in text
 
 
 def test_unknown_node_key(rig):

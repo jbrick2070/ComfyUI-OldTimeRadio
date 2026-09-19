@@ -351,6 +351,11 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
             lines.append("- Google key aliases accepted by existing "
                          "clients: `GEMINI_API_KEY`, `GOOGLE_API_KEY` "
                          "(preferred name: `OTR_GOOGLE_API_KEY`).")
+        if "OTR_COMFY_API_KEY" in keys:
+            lines.append("- `OTR_COMFY_API_KEY` is read by the headless "
+                         "SUBMITTER (`scripts/otr_api.py`) and sent as "
+                         "`extra_data.api_key_comfy_org`; the ComfyUI server "
+                         "never reads it. In the app, sign into Comfy instead.")
     else:
         lines.append("- (none)")
     lines += [

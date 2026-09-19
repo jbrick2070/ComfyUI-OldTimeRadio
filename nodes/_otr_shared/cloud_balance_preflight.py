@@ -299,27 +299,34 @@ def parse_comfy_balance(payload) -> Optional[float]:
     return None
 
 
-def _comfy_bearer() -> str:
-    try:
-        from .cloud_media_backend import resolve_auth
-    except ImportError:  # pragma: no cover
-        from cloud_media_backend import resolve_auth  # type: ignore
-    return resolve_auth().value
+def _comfy_bearer_from(api_key) -> Callable[[], str]:
+    """The queue's own credential: the api_key_comfy_org hidden input the
+    validator received (the only Comfy credential since the 2026-09-19
+    rip). Empty raises, which comfy_balance reports as a warn -- a
+    local-only graph never carries one."""
+    def bearer() -> str:
+        key = str(api_key or "").strip()
+        if not key:
+            raise RuntimeError(
+                "hidden input api_key_comfy_org is empty on this queue")
+        return key
+    return bearer
 
 
-def comfy_balance(*, get_json: Callable = None, bearer: Callable = None) -> BalanceResult:
+def comfy_balance(*, get_json: Callable = None, bearer: Callable = None,
+                  api_key: str = None) -> BalanceResult:
     """Remaining Comfy Credits in USD. A missing number on this host refuses,
-    except when no headless credential exists at queue time -- the app login
-    is injected only at execution, so that case is a warn, not a refusal."""
+    except when the queue carries no credential at all -- that case is a
+    warn, not a refusal, and the lane fails closed at execution instead."""
     getter = get_json or _http_get_json
-    bearer_fn = bearer or _comfy_bearer
+    bearer_fn = bearer or _comfy_bearer_from(api_key)
     try:
         token = bearer_fn()
     except Exception as exc:  # noqa: BLE001 -- AUTH is reported, not raised
         return BalanceResult(
-            None, "no headless Comfy credential at queue time (%s)" % exc,
+            None, "no Comfy API key on this queue (%s)" % exc,
             COMFY_HOST, "warn",
-            "hidden app login is only available at execution; balance unverified")
+            "balance unverified; a Comfy-billed pick will fail closed at execution")
     try:
         status, payload = getter(COMFY_BALANCE_URL, token)
     except Exception as exc:  # noqa: BLE001 -- transport
@@ -593,14 +600,24 @@ def judge_wallet(wallet: str, lines, balance: Optional[BalanceResult]) -> Wallet
                          "ok", "")
 
 
-def collect_verdicts(prompt, unique_id, *, balance_fn=None, **estimate_kwargs) -> list:
-    """One verdict per wallet the prompt touches. Local-only => []."""
+def collect_verdicts(prompt, unique_id, *, balance_fn=None, comfy_api_key=None,
+                     **estimate_kwargs) -> list:
+    """One verdict per wallet the prompt touches. Local-only => [].
+
+    ``comfy_api_key`` is the queue's api_key_comfy_org hidden input; the
+    Comfy wallet is measured with it when no ``balance_fn`` override is
+    given."""
     lines = estimate_lines(prompt, unique_id, **estimate_kwargs)
     wallets = []
     for ln in lines:
         if ln.wallet not in wallets:
             wallets.append(ln.wallet)
-    getter = balance_fn or default_balance
+    if balance_fn is None:
+        def balance_fn(wallet):
+            if wallet == WALLET_COMFY:
+                return comfy_balance(api_key=comfy_api_key)
+            return default_balance(wallet)
+    getter = balance_fn
     verdicts = []
     for wallet in wallets:
         try:

@@ -52,6 +52,7 @@ __all__ = [
     "invoke_partner_node",
     "bind_prompt_id",
     "current_prompt_id",
+    "stash_comfy_api_key",
     "partner_rows",
     "PARTNER_NODES_YAML",
     "WATCHDOG_TICK_S",
@@ -99,6 +100,24 @@ def bind_prompt_id(prompt_id: str):
         yield
     finally:
         _PROMPT_ID_OVERRIDE.reset(token)
+
+
+def stash_comfy_api_key(api_key) -> bool:
+    """Called by every OTR host node that can run a partner engine, at the
+    top of its execute, with its `api_key_comfy_org` hidden input. Binds
+    the key to THIS prompt so the partner calls below (including fan-out
+    workers, which re-attach the prompt id) open their session with it.
+    Best-effort: no key or no Comfy context stores nothing, and the lane
+    then fails closed at resolve_auth -- never here, never for a graph
+    that runs no partner engine."""
+    if not isinstance(api_key, str) or not api_key.strip():
+        return False
+    try:
+        prompt_id = current_prompt_id()
+    except Exception:  # noqa: BLE001 -- unit tests / bare calls have no context
+        return False
+    from .cloud_media_backend import stash_prompt_api_key
+    return stash_prompt_api_key(prompt_id, api_key)
 
 
 def current_prompt_id() -> str:
@@ -373,7 +392,7 @@ async def _call_partner(row: dict, kwargs: dict) -> Any:
     node_cls = _resolve_node_class(row)
     fn_name = row.get("function", "")
     # V3 IO.ComfyNode contract (comfy_api.latest._io): hidden inputs
-    # (api_key_comfy_org / auth_token_comfy_org / unique_id / comfy_usage_source)
+    # (api_key_comfy_org / unique_id / comfy_usage_source)
     # are NOT execute() kwargs -- the framework delivers them via
     # PREPARE_CLASS_CLONE(v3_data) -> cls.hidden (a HiddenHolder). Passing them as
     # kwargs makes execute() raise "unexpected keyword argument 'api_key_comfy_org'"
@@ -543,18 +562,16 @@ def _inject_hidden_inputs(row: dict, inputs: dict, session) -> dict:
     declares. Caller-provided keys are never overridden."""
     kwargs = dict(inputs)
     hidden = (row.get("inputs") or {}).get("hidden") or {}
-    auth = session.auth
-    if auth.kind in ("api_key_env", "api_key_hidden", "api_key_file"):
-        auth_name = "api_key_comfy_org"
-    else:
-        auth_name = "auth_token_comfy_org"
+    # The API key is the only credential kind since the 2026-09-19 rip, so
+    # the partner row must declare the api_key_comfy_org hidden input.
+    auth_name = "api_key_comfy_org"
     if auth_name not in hidden:
         raise CloudMediaError(
             CloudErrorCode.AUTH,
-            f"row declares no hidden input {auth_name!r} for auth kind "
-            f"{auth.kind!r} (hidden inputs: {sorted(hidden)})",
+            f"row declares no hidden input {auth_name!r} "
+            f"(hidden inputs: {sorted(hidden)})",
         )
-    kwargs.setdefault(auth_name, auth.value)
+    kwargs.setdefault(auth_name, session.auth.value)
     if "unique_id" in hidden:
         kwargs.setdefault("unique_id", f"otr-cloud-{uuid.uuid4().hex[:8]}")
     if "comfy_usage_source" in hidden:
@@ -814,7 +831,7 @@ def invoke_partner_node(node_key: str, inputs: dict, *,
     """
     # Operator directive 2026-07-02: NO hidden enable switch -- the user's
     # dropdown pick is the enable. Auth resolves fail-closed downstream
-    # (resolve_auth names all three credential sources when missing).
+    # (resolve_auth: the queue's api_key_comfy_org, nothing else).
     if timeout_s is None or timeout_s <= 0:
         raise CloudMediaError(CloudErrorCode.MALFORMED_CONFIG,
                               f"timeout_s must be > 0, got {timeout_s!r}")

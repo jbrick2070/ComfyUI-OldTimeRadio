@@ -15,7 +15,10 @@ partner_nodes.yaml pinning chunk and resolves its session through this
 table.
 
 Env surface (all read per session-create, never mutated mid-run):
-  OTR_COMFY_API_KEY               auth precedence #1 (headless).
+  (no credential env)             auth is ONLY the api_key_comfy_org hidden
+                                  input ComfyUI injects into the OTR host
+                                  node (app sign-in, or a headless
+                                  submitter's extra_data). Rip 2026-09-19.
   OTR_CLOUD_MEDIA_BUDGET_USD      optional per-run USD ceiling. UNSET =
                                   no local ceiling -- the wallet 402 is
                                   the stop (operator 2026-09-16: do not
@@ -71,6 +74,8 @@ __all__ = [
     "CloudMediaSession",
     "mute_ok_roles",
     "resolve_auth",
+    "NO_CREDENTIAL_HINT",
+    "stash_prompt_api_key",
     "get_or_create_session",
     "peek_session",
     "teardown_session",
@@ -362,43 +367,32 @@ def mute_ok_roles() -> frozenset:
 
 @dataclass(frozen=True)
 class CloudAuth:
-    kind: str  # "api_key_env" | "api_key_hidden" | "bearer_hidden"
+    kind: str  # always "api_key_hidden" since the 2026-09-19 rip
     value: str
 
     def __repr__(self) -> str:  # never leak the secret into logs/ledger
         return f"CloudAuth(kind={self.kind!r}, value=***)"
 
 
-def resolve_auth(
-    hidden_api_key: Optional[str] = None,
-    hidden_auth_token: Optional[str] = None,
-) -> CloudAuth:
-    """Signed-in Comfy first, then a headless key.
+NO_CREDENTIAL_HINT = (
+    "no Comfy API key on this queue (hidden input api_key_comfy_org is "
+    "empty). Sign into Comfy in the app WITH A COMFY API KEY (a plain "
+    "email/Google login injects nothing), or submit headless through "
+    "scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
+    "environment (sent as extra_data.api_key_comfy_org). No request was sent."
+)
 
-    ``OTR_COMFY_API_KEY`` still beats a hidden login (that order already
-    shipped). A leftover ``comfy.secret`` does NOT -- the app login has to
-    just work. Pack files are the headless path when nothing else is set.
-    Missing everything = fail closed, naming every source.
-    """
-    from .api_key_files import KeyFileError, env_key, file_key, missing_key_hint
 
-    env = env_key("comfy")
-    if env:
-        return CloudAuth("api_key_env", env)
-    if hidden_api_key and hidden_api_key.strip():
+def resolve_auth(hidden_api_key: Optional[str] = None) -> CloudAuth:
+    """The ONE credential: the Comfy API key ComfyUI injected into the OTR
+    host node's `api_key_comfy_org` hidden input -- the signed-in app
+    session, or `extra_data.api_key_comfy_org` on a headless POST /prompt
+    (scripts/otr_api.py sends it). No env var, no pack key file, no
+    session bearer (rip 2026-09-19: three sources in two orders was the
+    defect). Missing = fail closed, and the hint names both real paths."""
+    if isinstance(hidden_api_key, str) and hidden_api_key.strip():
         return CloudAuth("api_key_hidden", hidden_api_key.strip())
-    if hidden_auth_token and hidden_auth_token.strip():
-        return CloudAuth("bearer_hidden", hidden_auth_token.strip())
-    try:
-        stored = file_key("comfy")
-    except KeyFileError as exc:
-        raise CloudMediaError(CloudErrorCode.AUTH, str(exc)) from exc
-    if stored:
-        return CloudAuth("api_key_file", stored)
-    raise CloudMediaError(
-        CloudErrorCode.AUTH,
-        "no credentials: %s" % missing_key_hint("comfy"),
-    )
+    raise CloudMediaError(CloudErrorCode.AUTH, NO_CREDENTIAL_HINT)
 
 
 # ---------------------------------------------------------------------------
@@ -690,10 +684,33 @@ SESSION_SWEEP_MAX_AGE_S = 6 * 3600
 
 _TABLE_LOCK = threading.Lock()
 _SESSIONS: dict = {}
+# prompt_id -> (api_key, stashed_at). Every OTR host node that can run a
+# partner engine stashes its api_key_comfy_org hidden input here at the top
+# of its execute (cloud_media_invoke.stash_comfy_api_key); the first partner
+# call under that prompt opens the session with it. Swept with the sessions.
+_PROMPT_API_KEYS: dict = {}
 _LEAK_LOG: Callable[[str], None] = lambda msg: print(f"[cloud_media] {msg}")
 
 
+def stash_prompt_api_key(prompt_id: str, api_key: Optional[str]) -> bool:
+    """Remember the Comfy API key ComfyUI injected into a host node so the
+    partner calls under this prompt can open their session with it. Empty
+    or non-string values store nothing (a local-only graph never has one)
+    and the lane then fails closed at resolve_auth, never here."""
+    if not prompt_id or not isinstance(api_key, str) or not api_key.strip():
+        return False
+    now = time.time()
+    with _TABLE_LOCK:
+        _sweep_locked(now)
+        _PROMPT_API_KEYS[prompt_id] = (api_key.strip(), now)
+    return True
+
+
 def _sweep_locked(now: float) -> None:
+    stale_keys = [pid for pid, (_key, at) in _PROMPT_API_KEYS.items()
+                  if now - at > SESSION_SWEEP_MAX_AGE_S]
+    for pid in stale_keys:
+        _PROMPT_API_KEYS.pop(pid, None)
     stale = [pid for pid, s in _SESSIONS.items()
              if now - s.created_at > SESSION_SWEEP_MAX_AGE_S]
     for pid in stale:
@@ -709,9 +726,11 @@ def _sweep_locked(now: float) -> None:
 def get_or_create_session(
     prompt_id: str,
     hidden_api_key: Optional[str] = None,
-    hidden_auth_token: Optional[str] = None,
     **session_kwargs,
 ) -> CloudMediaSession:
+    """Open (or reuse) the prompt's session. The credential is the explicit
+    ``hidden_api_key`` when a caller has it in hand, else the key the host
+    node stashed for this prompt_id; nothing else is consulted."""
     if not prompt_id:
         raise CloudMediaError(CloudErrorCode.MALFORMED_CONFIG,
                               "empty prompt_id")
@@ -719,7 +738,8 @@ def get_or_create_session(
         _sweep_locked(time.time())
         sess = _SESSIONS.get(prompt_id)
         if sess is None:
-            auth = resolve_auth(hidden_api_key, hidden_auth_token)
+            stashed = _PROMPT_API_KEYS.get(prompt_id)
+            auth = resolve_auth(hidden_api_key or (stashed[0] if stashed else None))
             sess = CloudMediaSession(prompt_id, auth, **session_kwargs)
             _SESSIONS[prompt_id] = sess
         return sess
@@ -735,6 +755,7 @@ def teardown_session(prompt_id: str) -> None:
     if open reservations remain -- those are ORPHANED_JOB territory."""
     with _TABLE_LOCK:
         sess = _SESSIONS.pop(prompt_id, None)
+        _PROMPT_API_KEYS.pop(prompt_id, None)
     if sess is not None:
         for r in sess.open_reservations():
             _LEAK_LOG(

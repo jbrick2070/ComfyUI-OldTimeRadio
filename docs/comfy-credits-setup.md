@@ -9,8 +9,10 @@ lanes expose the same frontier catalog — they differ only in **who pays**.
 - **OpenRouter lane** → billed to your `OPENROUTER_API_KEY`.
 - **Comfy Credits lane** → billed to the prepaid credits of the Comfy account whose API key you sign in with.
 
-The lane is **opt-in and default-off**. With it disabled, nothing changes: the
-dropdowns, the offline baseline, and the byte-identical audio path are untouched.
+The lane is **off until you pick it**: leave both selectors on a local model
+and nothing changes -- the offline baseline and the byte-identical audio path
+are untouched. There is no enable flag (removed 2026-09-19); the pick plus the
+queue's Comfy API key is the whole switch.
 
 ## Enable it
 
@@ -18,26 +20,29 @@ dropdowns, the offline baseline, and the byte-identical audio path are untouched
    account and use the API-key option on ComfyUI's sign-in dialog (see
    ComfyUI's *Partner Nodes Overview*), then `Settings → Credits` to top up
    (prepaid -- no surprise charges). A key works on any host, `localhost` or
-   not. The writer reads only the API key ComfyUI injects
-   (`api_key_comfy_org`); it does **not** request the logged-in session token,
-   because the Comfy Registry security scan flags any third-party pack that
-   declares that hidden input (2026-09-02). A plain email / Google sign-in
-   without an API key therefore does not enable this lane.
-2. **Set the OTR opt-in flag**, then restart ComfyUI in a fresh terminal so the
-   process sees it:
+   not. **That sign-in is the only credential the pack reads** -- the same
+   `api_key_comfy_org` hidden input ComfyUI's own partner nodes use. The pack
+   keeps no key file and reads no environment variable on the server
+   (rip 2026-09-19: three credential sources in two resolution orders was a
+   defect, not a convenience). It does **not** request the logged-in session
+   token, because the Comfy Registry security scan flags any third-party pack
+   that declares that hidden input (2026-09-02). A plain email / Google
+   sign-in without an API key therefore does not enable this lane.
 
-   ```
-   setx OTR_ENABLE_COMFY_CREDITS 1
-   ```
-
-3. On the **1. Story Writer** node, two pickers appear:
+   **Headless (no app sign-in):** put the key in `OTR_COMFY_API_KEY` in the
+   environment of the machine that *submits* the prompt and submit through
+   `scripts/otr_api.py`. The submitter sends it as
+   `extra_data.api_key_comfy_org` and ComfyUI injects it into every node
+   exactly as the app's sign-in would. The ComfyUI server itself never reads
+   that variable.
+2. On the **1. Story Writer** node, two pickers are always present:
    `comfy_slot_a_model` (creative) and `comfy_slot_b_model` (technical). Pick a
    model in each. Then set `creative_writing_model` to **`comfy:slot-a`** and/or
    `technical_model` to **`comfy:slot-b`** to route that slot through Comfy
    Credits. Leaving the selector on a local model id keeps that slot local.
 
-When the lane is disabled the pickers show **`(enable Comfy Credits)`** and the
-`comfy:slot-a/b` handles are absent from the selectors.
+The pickers lead with a **`(enable Comfy Credits)`** sentinel row -- the
+placeholder value older saved graphs carry -- followed by the pinned catalog.
 
 ## Recommended defaults
 

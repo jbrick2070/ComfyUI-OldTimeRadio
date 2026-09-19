@@ -2189,8 +2189,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         _slot_a_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("a")
         _slot_b_choices = _otr_model_catalog.openrouter_catalog_dropdown_choices("b")
         # Comfy Credits slot pickers (2026-06-01). Choices come from the
-        # PINNED partner-node catalog (network-free); the lane shows the
-        # "(enable Comfy Credits)" sentinel until OTR_ENABLE_COMFY_CREDITS=1.
+        # PINNED partner-node catalog (network-free); the "(enable Comfy
+        # Credits)" sentinel row leads the list so older saved graphs still
+        # load. There is no enable flag: the pick plus the queue's
+        # api_key_comfy_org is the whole switch (rip 2026-09-19).
         _comfy_slot_a_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("a")
         _comfy_slot_b_choices = _otr_model_catalog.comfy_catalog_dropdown_choices("b")
         _google_slot_a_choices = _otr_model_catalog.google_api_catalog_dropdown_choices("a")
@@ -2701,8 +2703,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # to comfy:slot-a/b but does NOT activate the lane -- it is used
                 # only when creative_writing_model / technical_model selects
                 # that handle. Choices come from the pinned partner-node catalog
-                # (network-free); shows "(enable Comfy Credits)" until
-                # OTR_ENABLE_COMFY_CREDITS=1.
+                # (network-free); the "(enable Comfy Credits)" sentinel row is
+                # the placeholder older saved graphs carry. No enable flag.
                 "comfy_slot_a_model": (
                     _comfy_slot_a_choices,
                     {

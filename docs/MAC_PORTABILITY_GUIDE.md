@@ -566,8 +566,9 @@ credential:
 ```
 RenderError: shot shot_music_opening_001 engine 'word_razzle' failed to render;
 fallbacks are disabled (FailureKind.CRASH_BEFORE_LOAD) -- fix the engine or its
-inputs: cloud media: auth -- no credentials: set OTR_COMFY_API_KEY, or run with
-a logged-in Comfy account
+inputs: cloud media: auth -- no Comfy API key on this queue (hidden input
+api_key_comfy_org is empty). Sign into Comfy in the app, or submit headless
+through scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's environment
 ```
 
 Its registry row `["cuda", "cpu", "mps"]` with `practical_without_gpu: True` and
@@ -1016,7 +1017,7 @@ not all the same one:
 
 | lane | credential it actually measures |
 | --- | --- |
-| every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- `OTR_COMFY_API_KEY`, or a **logged-in ComfyUI Desktop session** |
+| every `cloud_*` row, `elevenlabs`, `sonilo` | Comfy Cloud -- the queue's `api_key_comfy_org` hidden input: a **signed-in ComfyUI session**, or `OTR_COMFY_API_KEY` in the environment of a headless *submitter* running `scripts/otr_api.py` (the server never reads it) |
 | `google_omni_video`, `google_veo_video`, `google_image`, `google_tts`, `google_lyria` | a direct BYO Google API key -- these do not touch Comfy Cloud at all |
 
 The compliance matrix's "Cloud lanes" section records exactly how far this was

@@ -546,9 +546,9 @@ class _CloudVideoBase:
     def assert_usable(self, host_caps, profile, request_template=None):
         # NO enable-flag check (operator directive 2026-07-02): the dropdown
         # pick is the enable. Credentials resolve fail-closed at invoke time
-        # (resolve_auth names OTR_COMFY_API_KEY / logged-in Comfy hidden
-        # inputs) -- hidden auth only exists in the prompt context, so a
-        # resolve-time env check would wrongly block logged-in desktop users.
+        # (resolve_auth reads the queue's api_key_comfy_org hidden input,
+        # which only exists in the prompt context) -- so a resolve-time
+        # check here would wrongly block signed-in desktop users.
         from .._otr_shared.ffmpeg import resolve_ffmpeg
         from .._otr_shared.ffprobe import resolve_ffprobe
         # The gate asks the SAME question the canonicalizer will, through the

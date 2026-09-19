@@ -1730,6 +1730,11 @@ def run_live(report: ProbeReport, frozen: dict, *, only: set[str]) -> int:
         prompt_id = report.data["run_id"]
         try:
             with bind_prompt_id(prompt_id):
+                # This probe is its own submitter (no ComfyUI server, so no
+                # hidden input): stash the key from ITS environment, the
+                # same thing scripts/otr_api.py sends as extra_data.
+                from nodes._otr_shared.cloud_media_invoke import stash_comfy_api_key
+                stash_comfy_api_key(os.environ.get("OTR_COMFY_API_KEY", ""))
                 outcomes["A2"] = run_cell_a2(
                     report, frozen, run_dir, init_image=init_image,
                     upstream=outcomes.get("A1", DEPENDENCY_BLOCKED))

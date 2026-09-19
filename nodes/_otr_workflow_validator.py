@@ -59,13 +59,17 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DEFAULT_WORKFLOW_PATH = _REPO_ROOT / "workflows" / "otr_canonical.json"
 
 
-def _queue_time_readiness_gates(prompt, unique_id):
-    """$0 cloud-slug refusal, then wallet vs estimate, then weight downloads."""
+def _queue_time_readiness_gates(prompt, unique_id, comfy_api_key=None):
+    """$0 cloud-slug refusal, then wallet vs estimate, then weight downloads.
+
+    ``comfy_api_key`` is this queue's own api_key_comfy_org hidden input --
+    the only Comfy credential since the 2026-09-19 rip -- so the balance
+    check measures the wallet the run will actually spend from."""
     from ._otr_shared.cloud_slug_preflight import ensure_prompt_cloud_slugs
     from ._otr_shared.cloud_balance_preflight import ensure_prompt_cloud_balance
     from ._otr_visual_assets import ensure_prompt_visual_assets
     ensure_prompt_cloud_slugs(prompt, unique_id)
-    ensure_prompt_cloud_balance(prompt, unique_id)
+    ensure_prompt_cloud_balance(prompt, unique_id, comfy_api_key=comfy_api_key)
     ensure_prompt_visual_assets(prompt, unique_id)
 
 
@@ -373,14 +377,21 @@ class WorkflowValidator:
                 }),
             },
             # Hidden runtime context adds no serialized widget slots or links.
-            "hidden": {"prompt": "PROMPT", "unique_id": "UNIQUE_ID"},
+            "hidden": {
+                "prompt": "PROMPT", "unique_id": "UNIQUE_ID",
+                # The queue's Comfy API key (app sign-in or a headless
+                # submitter's extra_data) -- threaded into the balance
+                # preflight so it measures the wallet this run spends from.
+                "api_key_comfy_org": "API_KEY_COMFY_ORG",
+            },
         }
 
     @classmethod
     def IS_CHANGED(cls, workflow_json_path: str, validate_anyway: bool,
                    strict_unknown_types: bool, profile_id: str = "",
                    master_hash: str = "", generated_by: str = "",
-                   prompt=None, unique_id=None) -> str | float:
+                   prompt=None, unique_id=None,
+                   api_key_comfy_org=None) -> str | float:
         """Re-run on any change to the inputs OR to the workflow JSON
         on disk. mtime + path is the canonical change signal. Uses the
         SAME repo-root resolution as `_load_workflow` (GATE B S2 defect
@@ -628,7 +639,8 @@ class WorkflowValidator:
                  strict_unknown_types: bool,
                  profile_id: str = "",
                  master_hash: str = "",
-                 generated_by: str = "", prompt=None, unique_id=None):
+                 generated_by: str = "", prompt=None, unique_id=None,
+                 api_key_comfy_org=None):
         # The stamp assertion + env export run FIRST whenever profile_id is
         # non-empty -- validate_anyway only skips the CONTRACT check below,
         # never this (decision doc section 4; CI rejects snapshots shipping
@@ -659,7 +671,7 @@ class WorkflowValidator:
             msg = ("OTR_WorkflowValidator: validate_anyway=False -- contract "
                    "check skipped." + (f" {stamp_msg}" if stamp_msg else ""))
             log.info(msg)
-            _queue_time_readiness_gates(prompt, unique_id)
+            _queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)
             return (msg,)
 
         from ._workflow_validation import validate_workflow_contract
@@ -727,7 +739,7 @@ class WorkflowValidator:
             + (f" | {stamp_msg}" if stamp_msg else "")
         )
         log.info(msg)
-        _queue_time_readiness_gates(prompt, unique_id)
+        _queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)
         return (msg,)
 
 

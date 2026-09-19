@@ -68,7 +68,8 @@ class VisualAssetValidatorTests(unittest.TestCase):
         preflight.ensure_prompt_cloud_slugs = lambda prompt, unique_id: None
         balance = ModuleType(
             "_asset_validator_seam.nodes._otr_shared.cloud_balance_preflight")
-        balance.ensure_prompt_cloud_balance = lambda prompt, unique_id: None
+        balance.ensure_prompt_cloud_balance = (
+            lambda prompt, unique_id, comfy_api_key=None: None)
         self.import_stubs = patch.dict(sys.modules, {
             package.__name__: package, nodes.__name__: nodes,
             validation.__name__: validation, assets.__name__: assets,
@@ -118,7 +119,11 @@ class VisualAssetValidatorTests(unittest.TestCase):
 
     def test_hidden_context_adds_no_widgets(self):
         inputs = self.cls.INPUT_TYPES()
-        self.assertEqual(inputs["hidden"], {"prompt": "PROMPT", "unique_id": "UNIQUE_ID"})
+        # api_key_comfy_org joined 2026-09-19: the queue's Comfy key, threaded
+        # into the balance preflight. Hidden inputs are never widgets.
+        self.assertEqual(inputs["hidden"], {
+            "prompt": "PROMPT", "unique_id": "UNIQUE_ID",
+            "api_key_comfy_org": "API_KEY_COMFY_ORG"})
         self.assertEqual(list(inputs["required"]),
                          ["workflow_json_path", "validate_anyway", "strict_unknown_types"])
         self.assertEqual(list(inputs["optional"]), ["profile_id", "master_hash", "generated_by"])

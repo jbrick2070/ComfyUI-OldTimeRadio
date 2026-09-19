@@ -88,7 +88,6 @@
         "sage_attention": false,
         "extra_args": [],
         "env": {
-            "OTR_ENABLE_COMFY_CREDITS": "1",
             "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
         }
     }

@@ -37,12 +37,9 @@ LANES = {
         "location": "openrouter_api_key.location",
         "env": ("OPENROUTER_API_KEY",),
     },
-    "comfy": {
-        "label": "Comfy Cloud",
-        "secret": "comfy.secret",
-        "location": "comfy_api_key.location",
-        "env": ("OTR_COMFY_API_KEY",),
-    },
+    # No "comfy" lane (rip 2026-09-19): the Comfy credential is ONLY the
+    # api_key_comfy_org hidden input ComfyUI injects -- app sign-in, or a
+    # headless submitter's extra_data. Never an env var or a pack file.
 }
 
 
@@ -122,14 +119,6 @@ def resolve_lane_key(lane: str) -> str | None:
 def missing_key_hint(lane: str) -> str:
     spec = LANES[lane]
     env = ", ".join(spec["env"])
-    if lane == "comfy":
-        return (
-            "No Comfy Cloud credential. Sign into Comfy in the app. That is "
-            "the default and it just works. On a headless box with no login, "
-            "put a key on the first line of %s, or a path on the first line "
-            "of %s, or set %s. No request was sent."
-            % (spec["secret"], spec["location"], env)
-        )
     return (
         "No %s API key. Two ways to enter it, both in this pack folder: "
         "put the key on the first line of %s, or put the path to your own "

@@ -520,8 +520,10 @@ def test_validator_calls_slug_check_before_visual_assets():
         "ensure_prompt_cloud_balance")
     assert names.index("ensure_prompt_cloud_balance") < names.index(
         "ensure_prompt_visual_assets")
+    # The third argument is the queue's api_key_comfy_org hidden input,
+    # threaded into the balance gate since the 2026-09-19 credential rip.
     calls = [line.strip() for line in src.splitlines()
-             if line.strip() == "_queue_time_readiness_gates(prompt, unique_id)"]
+             if line.strip() == "_queue_time_readiness_gates(prompt, unique_id, api_key_comfy_org)"]
     assert len(calls) == 2
 
 

@@ -1872,10 +1872,11 @@ def validate_model_id(
     # Path 1 missed). Name the env var + setup guide.
     if normalized.startswith("comfy:"):
         raise UnknownModelError(
-            f"{normalized!r} is a Comfy Credits remote model, but the lane "
-            f"is not enabled. Set OTR_ENABLE_COMFY_CREDITS=1 and log in to a "
-            f"Comfy account with credits, then restart ComfyUI in a fresh "
-            f"terminal. See "
+            f"{normalized!r} is a Comfy Credits remote model that this "
+            f"catalog does not carry. Sign into Comfy in the app with a "
+            f"Comfy API key (or submit headless through scripts/otr_api.py "
+            f"with OTR_COMFY_API_KEY in the submitter's environment), pick "
+            f"a comfy:slot-* handle the writer lists, and re-queue. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
             f"main/docs/comfy-credits-setup.md."
         )

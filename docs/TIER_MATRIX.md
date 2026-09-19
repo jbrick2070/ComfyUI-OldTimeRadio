@@ -63,7 +63,7 @@ means the lanes need no video weights.
 | mime | _not built_ | | | | | | | |
 | animatediff | _not built_ | | | | | | | |
 
-### Comfy Cloud (opt-in easter egg; needs OTR_COMFY_API_KEY)
+### Comfy Cloud (opt-in easter egg; needs a signed-in Comfy session, or OTR_COMFY_API_KEY on the headless submitter)
 
 | tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
 |---|---|---|---|---|---|---|---|---|

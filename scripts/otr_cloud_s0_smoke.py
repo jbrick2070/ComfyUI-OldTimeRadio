@@ -119,11 +119,15 @@ def _run_leg(node_key: str, inputs: dict, est_usd: float,
              timeout_s: float) -> int:
     from nodes._otr_shared import cloud_media_backend as backend
     from nodes._otr_shared.cloud_media_invoke import (
-        bind_prompt_id, invoke_partner_node)
+        bind_prompt_id, invoke_partner_node, stash_comfy_api_key)
 
     prompt_id = f"s0-smoke-{uuid.uuid4().hex[:8]}"
     try:
         with bind_prompt_id(prompt_id):
+            # This script is its own submitter (no ComfyUI server, so no
+            # hidden input): it stashes the key from ITS environment, the
+            # same thing scripts/otr_api.py sends as extra_data.
+            stash_comfy_api_key(os.environ.get("OTR_COMFY_API_KEY", ""))
             result = invoke_partner_node(
                 node_key, inputs, timeout_s=timeout_s,
                 estimated_usd=est_usd)

@@ -91,7 +91,9 @@ def test_readme_heading_names_the_three_lanes_and_two_files():
     assert "openrouter.secret" in text and "openrouter_api_key.location" in text
     assert "sign into" in text.lower()
     assert "headless" in text.lower()
-    assert "comfy.secret" in text and "comfy_api_key.location" in text
+    # Rip 2026-09-19: the README must no longer advertise a Comfy key file
+    # or a server-side env var -- the sign-in IS the credential.
+    assert "comfy.secret" not in text and "comfy_api_key.location" not in text
 
 
 def test_google_broken_pointer_disables_the_lane(monkeypatch, tmp_path):
@@ -122,45 +124,36 @@ def test_openrouter_broken_pointer_is_disabled(monkeypatch, tmp_path):
     assert isinstance(catalog, dict)
 
 
-def test_openrouter_and_comfy_use_the_same_recipe(monkeypatch, tmp_path):
+def test_openrouter_file_recipe_still_works(monkeypatch, tmp_path):
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
     _enable_files(monkeypatch, tmp_path)
     (tmp_path / "openrouter.secret").write_text("or-key\n", encoding="utf-8")
-    (tmp_path / "comfy.secret").write_text("comfy-key\n", encoding="utf-8")
     assert keys.resolve_lane_key("openrouter") == "or-key"
-    assert keys.resolve_lane_key("comfy") == "comfy-key"
-    auth = cmb.resolve_auth(None, None)
-    assert auth.kind == "api_key_file" and auth.value == "comfy-key"
-    logged_in = cmb.resolve_auth("hidden-from-app", None)
+
+
+def test_comfy_has_no_key_file_lane(monkeypatch, tmp_path):
+    """Rip 2026-09-19: a leftover comfy.secret is NOT a credential. The
+    Comfy lane reads only the api_key_comfy_org hidden input."""
+    assert "comfy" not in keys.LANES
+    _enable_files(monkeypatch, tmp_path)
+    (tmp_path / "comfy.secret").write_text("comfy-key\n", encoding="utf-8")
+    with pytest.raises(cmb.CloudMediaError):
+        cmb.resolve_auth(None)
+    logged_in = cmb.resolve_auth("hidden-from-app")
     assert logged_in.kind == "api_key_hidden" and logged_in.value == "hidden-from-app"
 
 
-def test_file_key_injects_as_api_key_not_auth_token():
+def test_injected_key_lands_on_api_key_hidden_input_only():
     from nodes._otr_shared.cloud_media_backend import CloudAuth
     from nodes._otr_shared.cloud_media_invoke import _inject_hidden_inputs
 
     class _Sess:
-        auth = CloudAuth("api_key_file", "file-key")
+        auth = CloudAuth("api_key_hidden", "queue-key")
 
     row = {"inputs": {"hidden": {
         "api_key_comfy_org": "APIKEY",
         "auth_token_comfy_org": "TOKEN",
     }}}
     out = _inject_hidden_inputs(row, {}, _Sess())
-    assert out["api_key_comfy_org"] == "file-key"
-    assert out.get("auth_token_comfy_org") != "file-key"
-
-
-def test_comfy_broken_pointer_raises_from_bearer(monkeypatch, tmp_path):
-    from nodes import _otr_comfy_backend as occ
-    from nodes._otr_shared.api_key_files import KeyFileError
-
-    monkeypatch.delenv("OTR_COMFY_API_KEY", raising=False)
-    occ.clear_auth()
-    _enable_files(monkeypatch, tmp_path)
-    (tmp_path / "comfy_api_key.location").write_text(
-        str(tmp_path / "missing.txt") + "\n", encoding="utf-8"
-    )
-    with pytest.raises(KeyFileError, match="not a file"):
-        occ._bearer()
+    assert out["api_key_comfy_org"] == "queue-key"
+    assert "auth_token_comfy_org" not in out

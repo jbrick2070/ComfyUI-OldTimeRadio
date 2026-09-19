@@ -29,9 +29,11 @@ def _clean_state(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_CLOUD_MEDIA_CACHE_DIR", str(tmp_path / "cache"))
     with cmb._TABLE_LOCK:
         cmb._SESSIONS.clear()
+        cmb._PROMPT_API_KEYS.clear()
     yield
     with cmb._TABLE_LOCK:
         cmb._SESSIONS.clear()
+        cmb._PROMPT_API_KEYS.clear()
 
 
 # -- flags -----------------------------------------------------------------
@@ -57,32 +59,55 @@ def test_mute_ok_roles_parses(monkeypatch):
 # -- auth broker -----------------------------------------------------------
 
 
-def test_auth_env_beats_hidden(monkeypatch):
+def test_auth_is_only_the_injected_key(monkeypatch):
+    """Rip 2026-09-19: the hidden api_key_comfy_org is the ONE credential.
+    An env var on the server box is ignored; there is no env kind, no file
+    kind and no bearer kind left to resolve to."""
     monkeypatch.setenv("OTR_COMFY_API_KEY", "comfyui-envkey")
-    auth = cmb.resolve_auth("hidden-key", "hidden-token")
-    assert auth.kind == "api_key_env" and auth.value == "comfyui-envkey"
-
-
-def test_auth_hidden_api_key_beats_bearer():
-    auth = cmb.resolve_auth("hidden-key", "hidden-token")
+    auth = cmb.resolve_auth("hidden-key")
     assert auth.kind == "api_key_hidden" and auth.value == "hidden-key"
 
 
-def test_auth_bearer_last():
-    auth = cmb.resolve_auth(None, "hidden-token")
-    assert auth.kind == "bearer_hidden"
-
-
-def test_auth_missing_fails_closed():
+def test_auth_missing_fails_closed_naming_both_real_paths(monkeypatch):
+    monkeypatch.setenv("OTR_COMFY_API_KEY", "ignored-on-the-server")
     with pytest.raises(cmb.CloudMediaError) as ei:
-        cmb.resolve_auth(None, None)
+        cmb.resolve_auth(None)
     assert ei.value.code is cmb.CloudErrorCode.AUTH
-    assert "OTR_COMFY_API_KEY" in str(ei.value)
+    text = str(ei.value)
+    assert "api_key_comfy_org" in text
+    assert "extra_data.api_key_comfy_org" in text
+    assert "ignored-on-the-server" not in text
+
+
+def test_auth_blank_is_missing():
+    with pytest.raises(cmb.CloudMediaError):
+        cmb.resolve_auth("   ")
 
 
 def test_auth_repr_never_leaks():
-    auth = cmb.resolve_auth("supersecret", None)
+    auth = cmb.resolve_auth("supersecret")
     assert "supersecret" not in repr(auth)
+
+
+def test_stashed_prompt_key_opens_the_session():
+    """The host node stashes its hidden input; the first partner call under
+    that prompt opens the session with it and needs no explicit key."""
+    assert cmb.stash_prompt_api_key("prompt-stash", "stashed-key")
+    sess = cmb.get_or_create_session("prompt-stash")
+    assert sess.auth.value == "stashed-key"
+    cmb.teardown_session("prompt-stash")
+    with cmb._TABLE_LOCK:
+        assert "prompt-stash" not in cmb._PROMPT_API_KEYS
+
+
+def test_stash_ignores_empty_and_non_string():
+    assert not cmb.stash_prompt_api_key("prompt-e", None)
+    assert not cmb.stash_prompt_api_key("prompt-e", "")
+    assert not cmb.stash_prompt_api_key("prompt-e", 42)
+    assert not cmb.stash_prompt_api_key("", "key")
+    with pytest.raises(cmb.CloudMediaError) as ei:
+        cmb.get_or_create_session("prompt-e")
+    assert ei.value.code is cmb.CloudErrorCode.AUTH
 
 
 # -- provider ids + semaphores ----------------------------------------------

@@ -14,7 +14,7 @@ canonical JSON change; every `workflows/**/*.json` already carries the validator
 
 | Wallet | Spends when | Remaining query | Unit |
 | --- | --- | --- | --- |
-| `comfy` | `comfy:slot-*` writer; any `cloud_*` / `sonilo` / `ideo` engine | `GET https://api.comfy.org/customers/balance`, bearer from `cloud_media_backend.resolve_auth` (`OTR_COMFY_API_KEY` or pack key file) | `*_micros` are CENTS: `remaining_usd = effective_balance_micros / 100` (falls back to `amount_micros`). Display credits = USD x 211 (`ComfyUI_frontend` `comfyCredits.ts`). Never `$0.01/credit`. |
+| `comfy` | `comfy:slot-*` writer; any `cloud_*` / `sonilo` / `ideo` engine | `GET https://api.comfy.org/customers/balance`, bearer is the queue's own `api_key_comfy_org` hidden input, threaded from `OTR_WorkflowValidator` (app sign-in, or a headless submitter's `extra_data`; no env var or key file since 2026-09-19) | `*_micros` are CENTS: `remaining_usd = effective_balance_micros / 100` (falls back to `amount_micros`). Display credits = USD x 211 (`ComfyUI_frontend` `comfyCredits.ts`). Never `$0.01/credit`. |
 | `openrouter` | `openrouter:slot-*` writer | `GET https://openrouter.ai/api/v1/key` with the generation key; `data.limit_remaining` when not null. Uncapped key -> `GET /api/v1/credits` (`total_credits - total_usage`). A 401/403 there is a warn, never a refusal. | USD |
 | `google` | `google_api:slot-*` writer; `google_*` engines | **None.** The Gemini API key has no remaining-dollar endpoint. Estimate and log only. No Cloud Billing code. | USD (estimate) |
 

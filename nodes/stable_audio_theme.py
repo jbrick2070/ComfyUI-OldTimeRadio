@@ -180,6 +180,10 @@ class StableAudioTheme:
                     ),
                 }),
             },
+            # The queue's Comfy API key (app sign-in, or a headless
+            # submitter's extra_data) -- the only credential the cloud
+            # music rows can spend with (rip 2026-09-19).
+            "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
         }
 
     @classmethod
@@ -190,7 +194,10 @@ class StableAudioTheme:
 
     # ------------------------------------------------------------------ #
     def generate(self, script_json, engine, ledger_json="", gate_in="",
-                 music_style="", stereo_policy="mono_safe"):
+                 music_style="", stereo_policy="mono_safe",
+                 api_key_comfy_org=None):
+        from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
+        stash_comfy_api_key(api_key_comfy_org)
         # CANONICAL REPLAY (campaign item 0): the cues are inside the frozen
         # master; no music model loads. The manifest is "" on purpose -- node 7
         # takes its replay branch BEFORE the cue-pair check.

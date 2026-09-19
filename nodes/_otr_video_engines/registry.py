@@ -742,8 +742,8 @@ CAPABILITIES = {
         "model_requirements": []},
     # cloud_vidu_q2_pro_fast_720p (2026-07-09): cheap Comfy Cloud Vidu Q2
     # image-to-video row, fixed to viduq2-pro-fast at 720p. Provider-side
-    # render, cpu_ok. Selectable only; missing OTR_COMFY_API_KEY fails loud at
-    # invoke.
+    # render, cpu_ok. Selectable only; a queue with no api_key_comfy_org
+    # fails loud at invoke.
     "cloud_vidu_q2_pro_fast_720p": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,

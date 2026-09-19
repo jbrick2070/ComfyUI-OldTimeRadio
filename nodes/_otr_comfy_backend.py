@@ -11,20 +11,24 @@ Qwen / Mistral / GLM / Kimi / Perplexity). So this backend is, in shape,
   * Catalog: a PINNED constant (`COMFY_LLM_MODELS`) -- the partner node's
     curated model list. No disk cache / refresh script (unlike the
     own-key OpenRouter lane, whose catalog is fetched).
-  * Auth: ComfyUI injects the configured Comfy API key into a node via
-    the hidden input `api_key_comfy_org` when the Desktop session is
-    signed in. Headless `--cpu` with `sqlite:///:memory:` never injects
-    that input, so `_bearer()` also accepts `OTR_COMFY_API_KEY` -- the
-    same credential the cloud media lane already uses. The writer node
-    still captures a hidden input at run() when present via
-    `set_auth(...)`. The logged-in account's session bearer is never
-    requested: the Comfy Registry scan treats a third-party pack
-    declaring that hidden input as credential access and flags the
-    version (PBUG-20260902-04).
-  * Gate: `OTR_ENABLE_COMFY_CREDITS=1` (opt-in, default-off) -- mirrors
-    the OpenRouter enable gate so the offline baseline + the dropdowns
-    stay untouched until the operator opts in (C3 parity, no surprise
-    charges).
+  * Auth: ComfyUI injects the configured Comfy API key into the writer
+    via the hidden input `api_key_comfy_org` -- from the signed-in app
+    session, or from `extra_data.api_key_comfy_org` on a headless
+    POST /prompt (scripts/otr_api.py sends it). The writer captures it
+    at run() via `set_auth(...)`; `_bearer()` reads ONLY that. There is
+    no env var, no pack key file and no second resolver (rip
+    2026-09-19: the pack had three credential sources in two orders,
+    and the lane flag alone satisfied the gate). The logged-in
+    account's session bearer is never requested: the Comfy Registry
+    scan treats a third-party pack declaring that hidden input as
+    credential access and flags the version (PBUG-20260902-04).
+  * Gate: the credential IS the gate. `load()` refuses a Comfy slot the
+    moment `_bearer()` is empty; no env flag can stand in for the key
+    (rip 2026-09-19 -- `comfy_credits_enabled()` was deleted with its
+    only caller). `OTR_ENABLE_COMFY_CREDITS` is read NOWHERE in
+    production any more: the slot pickers list the pinned catalog
+    unconditionally (e9a5b3cb, 2026-09-15); the pick plus the key is
+    the whole switch.
   * Endpoint: the Comfy API base + chat path are env-overridable
     (`OTR_COMFY_API_BASE` / `OTR_COMFY_CHAT_PATH`) so the operator
     confirms the exact proxy surface at the first credit-billed run
@@ -275,15 +279,6 @@ def _float_env(name: str) -> float | None:
         return None
 
 
-def comfy_credits_enabled() -> bool:
-    """C3 gate: the Comfy Credits lane is visible ONLY when the explicit
-    enable flag is set. Login + credits are not detectable at INPUT_TYPES
-    time, so the env flag is the load-visible opt-in; the actual auth token
-    is checked at generate() time. Default-off keeps the offline baseline
-    and the dropdowns untouched (mirrors openrouter_enabled)."""
-    return otr_env.get("OTR_ENABLE_COMFY_CREDITS", "0") == "1"
-
-
 def is_comfy_row_id(repo_id: str) -> bool:
     """True for the two virtual handles `comfy:slot-a|b`."""
     return isinstance(repo_id, str) and repo_id in COMFY_ROW_IDS
@@ -441,12 +436,15 @@ _auth: dict[str, str] = {}
 def set_auth(*, api_key: Any = None) -> None:
     """Record the ComfyUI-injected credential for the credit-billed call.
 
-    ComfyUI fills the writer's hidden input `api_key_comfy_org` (a configured
-    Comfy API key) at execution time. The writer threads it here. Best-effort:
-    a non-string / empty value is ignored. The key is never logged or stamped
-    into run meta."""
-    if isinstance(api_key, str) and api_key:
-        _auth["api_key"] = api_key
+    ComfyUI fills the host node's hidden input `api_key_comfy_org` (a
+    configured Comfy API key) at execution time; the writer and ShotLock
+    thread it here. This is THE queue's credential, so an empty / non-string
+    value CLEARS the previous queue's key rather than keeping it -- a
+    credential-free queue must never spend a stale one (codex finding,
+    2026-09-19). The key is never logged or stamped into run meta."""
+    _auth.clear()
+    if isinstance(api_key, str) and api_key.strip():
+        _auth["api_key"] = api_key.strip()
 
 
 def clear_auth() -> None:
@@ -454,14 +452,9 @@ def clear_auth() -> None:
 
 
 def _bearer() -> str | None:
-    """The credential to send: the configured Comfy API key (via ComfyUI's
-    injected api_key_comfy_org hidden input, or OTR_COMFY_API_KEY in headless
-    environments)."""
-    from ._otr_shared.api_key_files import resolve_lane_key
-
-    if _auth.get("api_key"):
-        return _auth.get("api_key")
-    return resolve_lane_key("comfy")
+    """The credential to send: the Comfy API key ComfyUI injected into the
+    writer's `api_key_comfy_org` hidden input this run. Nothing else."""
+    return _auth.get("api_key") or None
 
 
 # ---------------------------------------------------------------------------
@@ -588,13 +581,16 @@ class ComfyCreditsBackend:
                 f"{repo_id}: 'comfy_credits' lane is not admitted by the "
                 f"profile lane_allowlist {list(policy.lane_allowlist)}."
             )
-        if not comfy_credits_enabled() and not _bearer():
+        if not _bearer():
             raise ComfyCreditsConfigError(
-                f"{repo_id} selected but Comfy Credits has no credential. "
-                f"Queue from a signed-in Comfy account (api_key_comfy_org) "
-                f"or set OTR_COMFY_API_KEY (see "
+                f"{repo_id} selected but this queue carries no Comfy API key. "
+                f"Sign into Comfy in the app WITH A COMFY API KEY (a plain "
+                f"email/Google login injects no api_key_comfy_org), or submit "
+                f"headless through "
+                f"scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
+                f"environment (sent as extra_data.api_key_comfy_org). See "
                 f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/docs/comfy-credits-setup.md)."
+                f"main/docs/comfy-credits-setup.md."
             )
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
@@ -978,7 +974,6 @@ __all__ = [
     "ComfyCreditsConfigError",
     "ComfyCreditsCostCeilingError",
     "ComfyCreditsCallFailedError",
-    "comfy_credits_enabled",
     "is_comfy_row_id",
     "recommended_slug_for_slot",
     "resolve_slug",

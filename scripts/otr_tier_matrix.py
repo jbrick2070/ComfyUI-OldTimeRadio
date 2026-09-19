@@ -44,7 +44,8 @@ _ARCHES = (
     # and no drift test reads it. Proof lives in docs/dropdown_matrix.json.
     ("otr_amd_", "AMD ROCm"),
     ("otr_cpu_", "CPU only"),
-    ("otr_cloud_", "Comfy Cloud (opt-in easter egg; needs OTR_COMFY_API_KEY)"),
+    ("otr_cloud_", "Comfy Cloud (opt-in easter egg; needs a signed-in Comfy session, "
+                   "or OTR_COMFY_API_KEY on the headless submitter)"),
 )
 
 #: Tiers in reading order, named by what the episode is made of.

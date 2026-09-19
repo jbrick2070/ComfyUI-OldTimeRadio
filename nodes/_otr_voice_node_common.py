@@ -430,6 +430,10 @@ def voice_input_types(role, fallback) -> dict:
                 ),
             }),
         },
+        # The queue's Comfy API key (app sign-in, or a headless submitter's
+        # extra_data) -- the only credential the cloud TTS rows
+        # (elevenlabs / sonilo) can spend with (rip 2026-09-19).
+        "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
     }
 
 
@@ -1197,7 +1201,9 @@ class OTRVoiceNodeBase:
 
     # ------------------------------------------------------------------ #
     def generate(self, script_json, ledger_json="", gate_in="",
-                 stereo_policy="mono_safe", **kwargs):
+                 stereo_policy="mono_safe", api_key_comfy_org=None, **kwargs):
+        from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
+        stash_comfy_api_key(api_key_comfy_org)
         # CANONICAL REPLAY (campaign item 0): the frozen master carries every
         # take; nothing renders here. A typed empty AUDIO batch (nodes 3 and 7
         # do not consume it on replay) and an explicit done token.

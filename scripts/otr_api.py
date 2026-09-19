@@ -675,9 +675,17 @@ def submit_prompt(api_prompt: dict, client_id: str | None = None) -> str:
     """
     if client_id is None:
         client_id = str(uuid.uuid4())
+    body_out = {"prompt": api_prompt, "client_id": client_id}
+    comfy_key = os.environ.get("OTR_COMFY_API_KEY", "").strip()
+    if comfy_key:
+        # Headless stand-in for the app's sign-in (rip 2026-09-19): ComfyUI
+        # copies extra_data["api_key_comfy_org"] into every node's
+        # api_key_comfy_org hidden input (execution.py). The SERVER never
+        # reads this env var; only the submitter does, right here.
+        body_out["extra_data"] = {"api_key_comfy_org": comfy_key}
     resp = requests.post(
         f"{COMFYUI_URL}/prompt",
-        json={"prompt": api_prompt, "client_id": client_id},
+        json=body_out,
         timeout=30,
     )
     if resp.status_code != 200:

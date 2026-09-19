@@ -166,8 +166,10 @@ open one.
 
 They download nothing and use no VRAM, so they run on any machine. Selecting one
 in the dropdown is the whole switch -- there is no enable flag. Without a
-credential the render stops and says so. Set `OTR_COMFY_API_KEY` (or be logged
-into Comfy) for the first group, `OTR_GOOGLE_API_KEY` for the Google pair.
+credential the render stops and says so. For the first group, sign into Comfy
+with a Comfy API key (headless: `OTR_COMFY_API_KEY` on the *submitting*
+machine, sent by `scripts/otr_api.py`; the server never reads it);
+`OTR_GOOGLE_API_KEY` for the Google pair.
 Never put a key in a workflow widget.
 
 ---
@@ -192,7 +194,7 @@ six dropdowns by hand:
 
 **On the Comfy Cloud graphs, Vidu is the saved default** -- all three VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **Two deluxe 3-act variations share Sol/Luna writers:** `otr_cloud_deluxe_3act` pins LTX 2.5 Foley (picture + native bed mixed 0.50 under TTS) and `otr_cloud_deluxe_audio_in_3act` pins LTX 2.5 Audio-to-Video (episode audio drives the picture). Wan audio-in stays in the dropdown; it is not the deluxe default. Cheap cloud ships 1/3/5-act; deluxe ships 3-act. Nothing cloud ships longer than that.
 
-On any other graph the same Vidu combo is in the dropdown if you want to spend credits. Pick is the enable; without `OTR_COMFY_API_KEY` (or a signed-in Comfy session) the render stops and says so.
+On any other graph the same Vidu combo is in the dropdown if you want to spend credits. Pick is the enable; without a Comfy API key on the queue (a signed-in Comfy session, or `OTR_COMFY_API_KEY` on the headless submitter) the render stops and says so.
 
 Choosing by hand instead, the short version: **on 8 GB, start at
 `ltx098_low_video`** -- it is what the 8 GB graph ships and the safe local
