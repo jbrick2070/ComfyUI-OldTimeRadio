@@ -920,10 +920,25 @@
       "translator_death_date": 1935,
       "translation_first_published": 1933,
       "transcription_license": "Aozora Bunko per-file licence",
-      "url": "https://www.aozora.gr.jp/cards/000264/card42773.html",
+      "url": "https://www.aozora.gr.jp/cards/000264/files/42773_39853.html",
       "form": "verse",
-      "excluded": "DO NOT USE: the 1933-35 新修 revision was first published in 1933 and fails the US test. The pre-1931 沙翁傑作集 / 沙翁全集 volumes are the ones to use (operator, 2026-09-18).",
-      "url_is": "landing_or_whole_work"
+      "url_is": "whole_work_single_page",
+      "note": "RIGHTS EXCLUSION LIFTED 2026-09-19. The row read 'DO NOT USE: the 1933-35 revision was first published in 1933 and fails the US test', which is a RIGHTS refusal written 2026-09-18 -- the same day the evening ruling established that nothing is refused on rights and that publication years are recorded as DATA and decide nothing (OTR_STANDING_RULINGS.md). The years stay on the row. FIDELITY, the axis that does still govern, is satisfied: Tsubouchi translated directly from English, not through an intermediary, and this is a translation rather than an adaptation. VERIFIED 2026-09-19 by fetching the file: 988 KB of Shift_JIS XHTML, the full play as one page. After the ruby fix it yields 877 speaker-shaped lines across 56 distinct characters. TWO EXTRACTOR TRAPS, both measured. (1) RUBY: every content word is glossed <ruby><rb>word</rb><rp>(</rp><rt>reading</rt><rp>)</rp></ruby>, and a naive tag strip leaves the READING in the text for a voice to perform -- handled now by dropping <rp> and <rt> before the ordinary strip. (2) HEADINGS ARE RUBY-SPLIT: a search for the contiguous string for 'scene one' finds ZERO hits, so scope by the ACT heading (a plain h3) and take the next h4. Also 158 gaiji <img> stand in for archaic kana, so 'Verona' renders short a syllable in the visible label -- cosmetic, and accepted.",
+      "hold": "extracts but does not STOP at the scene boundary. Measured 2026-09-19: act 1 scene 1 returned 322 lines where the window between its heading and the next is about 114, running through the whole of act 1 and ending inside act 2. The scene heading on this page is not a bare label -- it carries the setting, e.g. the scene number followed by two ideographic spaces and 'Verona. A street.' -- so the next-heading-of-the-same-shape rule does not recognise the following scene and the cut never closes. The tell is in the cast: the balcony scene came back with Mercutio, the Nurse, Friar Laurence, Tybalt and the Prince in it, and act 1 scene 1 came back with Juliet. SECOND DEFECT, same page: stage directions are inline and unstripped -- Romeo's line contains 'at this time Juliet appears at the upper window', which would be performed in his voice. Needs a boundary rule that matches a heading PREFIX rather than the whole line, and a direction rule for this edition. The ruby and encoding fixes of the same day are what got it this far and are not in question."
+    },
+    {
+      "iso": "ja",
+      "play": "romeo_juliet",
+      "scene": "1.1",
+      "translator": "坪内逍遙 Tsubouchi Shōyō",
+      "translator_death_date": 1935,
+      "translation_first_published": 1933,
+      "transcription_license": "Aozora Bunko per-file licence",
+      "url": "https://www.aozora.gr.jp/cards/000264/files/42773_39853.html",
+      "form": "verse",
+      "url_is": "whole_work_single_page",
+      "note": "The scene an outside pass actually opened and quoted: its first line is Sampson's, and the cast of the street brawl is present. Same single-page file as the 2.2 row. VERIFIED 2026-09-19 by fetching the file: 988 KB of Shift_JIS XHTML, the full play as one page. After the ruby fix it yields 877 speaker-shaped lines across 56 distinct characters. TWO EXTRACTOR TRAPS, both measured. (1) RUBY: every content word is glossed <ruby><rb>word</rb><rp>(</rp><rt>reading</rt><rp>)</rp></ruby>, and a naive tag strip leaves the READING in the text for a voice to perform -- handled now by dropping <rp> and <rt> before the ordinary strip. (2) HEADINGS ARE RUBY-SPLIT: a search for the contiguous string for 'scene one' finds ZERO hits, so scope by the ACT heading (a plain h3) and take the next h4. Also 158 gaiji <img> stand in for archaic kana, so 'Verona' renders short a syllable in the visible label -- cosmetic, and accepted.",
+      "hold": "extracts but does not STOP at the scene boundary. Measured 2026-09-19: act 1 scene 1 returned 322 lines where the window between its heading and the next is about 114, running through the whole of act 1 and ending inside act 2. The scene heading on this page is not a bare label -- it carries the setting, e.g. the scene number followed by two ideographic spaces and 'Verona. A street.' -- so the next-heading-of-the-same-shape rule does not recognise the following scene and the cut never closes. The tell is in the cast: the balcony scene came back with Mercutio, the Nurse, Friar Laurence, Tybalt and the Prince in it, and act 1 scene 1 came back with Juliet. SECOND DEFECT, same page: stage directions are inline and unstripped -- Romeo's line contains 'at this time Juliet appears at the upper window', which would be performed in his voice. Needs a boundary rule that matches a heading PREFIX rather than the whole line, and a direction rule for this edition. The ruby and encoding fixes of the same day are what got it this far and are not in question."
     },
     {
       "iso": "ja",

@@ -787,6 +787,45 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+def test_a_ruby_gloss_is_a_pronunciation_guide_and_is_not_spoken():
+    """Japanese editions annotate a kanji with how to READ it, and nobody says
+    the annotation out loud.
+
+        <ruby><rb>誓言</rb><rp>（</rp><rt>せいごん</rt><rp>）</rp></ruby>
+
+    `<rb>` is the word, `<rt>` is the pronunciation, `<rp>` holds the fallback
+    brackets a ruby-less browser shows. Strip tags naively and all three
+    survive, so a line reads `誓言（せいごん）` -- the word followed by its own
+    pronunciation -- and a voice performs both.
+
+    Measured on Tsubouchi Shoyo's Romeo and Juliet (Aozora Bunko), where nearly
+    every content word is glossed: one line came out as
+    `威權（ゐけん）相如（あひし）く二名族（めいぞく）が、`. With `<rp>` and
+    `<rt>` removed the same page yields 877 speaker-shaped lines across 56
+    distinct characters, which is a whole language unblocked.
+    """
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        "_otr_vendor_shakespeare_ruby",
+        os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                     "scripts", "otr_vendor_shakespeare.py"))
+    vendor = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(vendor)
+
+    glossed = ("<p><ruby><rb>誓言</rb><rp>（</rp>"
+               "<rt>せいごん</rt><rp>）</rp></ruby>"
+               "じゃ</p>")
+    out = vendor.to_text(glossed)
+    assert "誓言" in out, "the WORD was dropped"
+    assert "せいごん" not in out, "the READING would be spoken"
+    assert "（" not in out and "）" not in out, "ruby brackets survived"
+
+    # a real parenthetical that is NOT ruby is untouched -- Tsubouchi writes
+    # plain-language glosses in parentheses and those are his own words.
+    plain = vendor.to_text("<p>あ（本文）</p>")
+    assert "（" in plain
+
+
 def test_a_small_type_block_that_is_a_bare_name_is_kept_as_a_speaker():
     """Some transcribers set the SPEAKER in small type too.
 

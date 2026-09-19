@@ -67,8 +67,25 @@ def fetch(url):
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(request, timeout=45) as response:
         raw = response.read()
-        charset = response.headers.get_content_charset() or "utf-8"
-    body = raw.decode(charset, errors="replace")
+        charset = response.headers.get_content_charset()
+    # ASK THE DOCUMENT WHEN THE SERVER DOES NOT SAY. Falling straight back to
+    # UTF-8 silently mojibakes any page that is not UTF-8, and `errors=
+    # "replace"` means it never raises -- it just returns a page where every
+    # heading is unfindable. Measured on Aozora Bunko, which serves Tsubouchi's
+    # Shakespeare as Shift_JIS with NO charset in the HTTP header: the act
+    # heading was present in the bytes and matched ZERO times after decoding,
+    # so the whole Japanese lane looked unparseable when it was merely misread.
+    if not charset:
+        head = raw[:4096]
+        found = re.search(
+            br"""(?is)<meta[^>]+charset\s*=\s*["']?\s*([A-Za-z0-9_\-]+)""", head)
+        charset = found.group(1).decode("ascii", "replace") if found else "utf-8"
+    try:
+        body = raw.decode(charset, errors="replace")
+    except LookupError:
+        # An encoding name Python does not know is a bad guess, not a reason to
+        # die -- fall back rather than lose the page.
+        body = raw.decode("utf-8", errors="replace")
     io.open(path, "w", encoding="utf-8", newline="\n").write(body)
     return body
 
@@ -86,6 +103,20 @@ def to_text(markup):
     """
     body = re.sub(r"(?is)<(script|style|template)\b.*?</\1>", " ", markup)
     body = re.sub(r"(?s)<!--.*?-->", " ", body)
+    # A RUBY GLOSS IS A PRONUNCIATION GUIDE, NOT WORDS ANYONE SAYS. Japanese
+    # editions annotate a kanji with its reading:
+    #     <ruby><rb>誓言</rb><rp>（</rp><rt>せいごん</rt><rp>）</rp></ruby>
+    # `<rb>` is the word, `<rt>` is how to pronounce it, and `<rp>` holds the
+    # fallback brackets a ruby-less browser would show. Strip tags naively and
+    # all three survive, so the line becomes `誓言（せいごん）` -- the word
+    # followed by its own pronunciation, which a voice READS ALOUD. Measured on
+    # Tsubouchi's Romeo and Juliet, where nearly every content word is glossed:
+    # `威權（ゐけん）相如（あひし）く二名族（めいぞく）が、` is one line's worth.
+    #
+    # `<rp>` first, then `<rt>`, then the wrapper tags fall to the ordinary
+    # strip -- which leaves exactly `<rb>`, the text that is actually spoken.
+    body = re.sub(r"(?is)<rp\b[^>]*>.*?</rp\s*>", "", body)
+    body = re.sub(r"(?is)<rt\b[^>]*>.*?</rt\s*>", "", body)
     # READ WHO SPEAKS OFF THE PAGE BEFORE THE PAGE IS THROWN AWAY. Every edition
     # in the set marks its speakers; once the tags are gone that fact cannot be
     # recovered, only guessed at -- see `mark_speakers`.
@@ -354,6 +385,13 @@ EDITION_LABELS = {
     ("fr", "hamlet", "1.1"): (None, None, "SC\u00c8NE I"),
     ("fr", "king_lear", "1.1"): (None, None, "SC\u00c8NE I"),
     ("zh", "midsummer", "3.1"): (None, None, "\u7b2c\u4e00\u573a"),
+    # Tsubouchi on Aozora: one page per play, so no play label is needed, and
+    # the act and scene headings are plain h3/h4 once the ruby glosses are out
+    # of them. An outside pass reported the scene heading as unfindable because
+    # the ruby splits it -- true of the RAW page, and no longer true after
+    # `to_text`, which is why the label here is the plain contiguous string.
+    ("ja", "romeo_juliet", "1.1"): (None, "\u7b2c\u4e00\u5e55", "\u7b2c\u4e00\u5834"),
+    ("ja", "romeo_juliet", "2.2"): (None, "\u7b2c\u4e8c\u5e55", "\u7b2c\u4e8c\u5834"),
 }
 
 
