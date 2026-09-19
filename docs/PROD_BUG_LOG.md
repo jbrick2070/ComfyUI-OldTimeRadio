@@ -15557,3 +15557,91 @@ it had been row-owned since the multilingual work.
 the NUMERAL rather than an English ordinal word. English is byte-identical,
 pinned by `tests/test_announcer_work_frame.py`. The work's own TITLE is never
 translated.
+
+## PBUG-20260918-06 -- the Japanese row cannot speak: an empty MeCab dictionary
+
+**Verified by a live leg.** The Japanese leg of the seven-language Shakespeare
+sweep died at `t=229s`, `RC=1`:
+`ERROR node 81 (OTR_BatchCharacterVoices) raised RuntimeError`, the traceback
+ending in `fugashi.Tagger.__init__` with
+`param.cpp(69) [ifs] no such file or directory: ...\unidic\dicdir\mecabrc`.
+Spanish had passed on the same server minutes earlier, so this is the row, not
+the box.
+
+**Cause, and it is two faults stacked.** `misaki[ja]` declares `unidic`, whose
+wheel contains NO dictionary -- it is a downloader, and `python -m unidic
+download` fetches roughly 770 MB as a separate step nobody runs. So the
+package is present, importable, and empty. The failure surfaces at the VOICE
+NODE mid-render rather than at boot, because the tagger is built when
+`KPipeline` is constructed for the episode's `lang_code`.
+
+**The second fault is what cost the time.** Installing `unidic-lite` beside it
+changes NOTHING: fugashi prefers `unidic` whenever it imports and never falls
+back, so the empty package shadows the good one and the error is
+byte-identical before and after. The install looks like it failed. Both halves
+are needed, in order: `pip uninstall -y unidic` then `pip install unidic-lite`.
+
+**Fix.** `unidic-lite>=1.0.8` is declared in `requirements.txt` -- it carries
+its dictionary inside the wheel, so nothing is fetched at render time, which
+is the same offline-first reason GGUF auto-download was cut. Because a
+requirements line cannot uninstall the shadow on someone else's box,
+`_kokoro_backends._mecab_dictionary_error` rewords this one failure at the
+point it is raised and names BOTH commands and why the uninstall is not
+optional. Every other `KPipeline` RuntimeError, and this signature on any
+non-Japanese row, is returned untouched -- those stay exactly as loud as they
+were. Covered by four cases in `tests/test_kokoro_backends.py`.
+
+**Proven.** `海の水は塩辛い` phonemizes to `ɯmʲi no mʲizɨ βa ɕiokaɾai.` and
+`KPipeline(lang_code="j")` builds. Blast radius: the Japanese row only; no
+other language row loads MeCab.
+
+## PBUG-20260918-07 -- prose scored as act headings; a five-act play measured as two
+
+**Verified against a real cached page**, `fr.wikisource.org/wiki/Macbeth_
+(trad._Hugo)` as fetched by `scripts/otr_shakespeare_corpus_gate.py`.
+
+**Cause.** `_otr_verbatim_corpus._labelled` allowed `{0,4}` separator
+characters between a heading WORD and its number. The bare English `act` is a
+literal substring of the French `action`, so `act` + the roman `i` matched
+`acti`-on -- 24 times on that one page, against 3 real occurrences of `ACTE`,
+none of which was a heading. Two further faults rode along: `_labelled`
+returned on the first WORD in the tuple that matched anywhere rather than the
+earliest POSITION, so a trailing `FIN DU PREMIER ACTE.` stole the anchor from
+the heading above it; and the NUMBER-then-WORD order, which exists for CJK's
+`第1幕`, let `SCENE III.` pair with a following `ACT II.` and invent an act 3.
+
+**Why it was invisible.** `headings_present` returns a BOOLEAN and was correct
+throughout -- the damage only shows where the match POSITION is used, which is
+what an extractor does. A sibling defect in `_SCENE_WORDS` (Italian `scena`
+matching inside Spanish `escena`, one character late) was refuted when tested
+against `headings_present` and confirmed only when tested against extraction.
+
+**Fix.** A Latin heading word now requires 1-4 separators before its number;
+CJK and Devanagari keep the zero-width join. Words are tried longest-first and
+the EARLIEST match wins. NUMBER-then-WORD is kept only for words that join
+without a gap. Knowingly traded away: glued `ACT1` and Latin number-then-word
+headings, neither of which appears in any lead, fixture or language row.
+Covered by `tests/test_scene_resolver.py` and `tests/test_verbatim_corpus.py`.
+
+## PBUG-20260918-08 -- the output budget is counted in English source words
+
+**Verified by a live leg.** The Hindi leg of the seven-language sweep died at
+`t=69s`, `RC=1`, at `OTR_LedgerScriptWriter`:
+`no decodable top-level JSON object found: line 1 column 1 (char 0)` after
+both attempts -- the shape of a reply that ran out of room before it closed
+its JSON, not of a model that cannot translate Devanagari.
+
+**Cause.** `_otr_verbatim_translation._output_budget` multiplies ENGLISH
+source words by a flat 4 tokens. The output is not English, and a script that
+costs more per source word than the source did is truncated mid-JSON.
+
+**Fix, and why it GROWS rather than predicts.** The true tokens-per-source-word
+ratio depends on the writer's tokenizer and the target script, and the writers
+here are GGUF with no tokenizer file on disk to measure against, so a
+per-language constant would be a guess dressed as a measurement. A failed
+batch is retried at larger budgets (x1, x3, x6) while -- and only while -- the
+error looks like truncation. A reply that came back WHOLE and merely wrong
+breaks out immediately, because more room cannot help and climbing would
+triple the time to the same refusal. The first rung is byte-identical to the
+previous single call, so every language that already fit pays nothing.
+Covered by `tests/test_verbatim_translation.py`.

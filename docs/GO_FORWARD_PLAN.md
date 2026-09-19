@@ -97,6 +97,31 @@ the 19th-century convention is the ordinal WORD; the plan said those pages
 were heading-less landing pages, and that was wrong. Both are fixed, and the
 verdicts now distinguish "wrong page" from "right work, wrong granularity".
 
+**`nodes/_otr_scene_resolver.py` EXISTS AND IS DELIBERATELY NOT WIRED YET --
+this is the row that says what it is waiting for** (2026-09-18; the repo's
+"wire it in the same change or write the row" rule). It resolves `act.scene`
+to a span and refuses rather than guessing, and its arrival already paid for
+itself: building it against the real cached French Macbeth exposed
+PBUG-20260918-07 in `_labelled`, where the bare English `act` matched inside
+the French word `action` 24 times and a five-act play measured as two.
+
+THREE THINGS BLOCK THE WIRING, and none is the resolver's own correctness:
+1. **It must not hand chrome to the performance.** Its span stops at the next
+   HEADING, so an end-of-act marker such as `FIN DU PREMIER ACTE.` rides
+   inside the extracted text. Wired as-is that becomes a SPOKEN line -- the
+   exact defect PBUG-20260918-04 already shipped once. A test asserts the gap
+   on purpose and says to delete itself when the trim lands.
+2. **The coordinate may not exist in the edition.** François-Victor Hugo
+   numbers scenes CONTINUOUSLY with no act divisions (`SCÈNE I.` through
+   `SCÈNE XXIV.` on the cached Macbeth, zero act headings). Asking that page
+   for "1.3" is not a miss to fix in the resolver; it is the alias table
+   below, and wiring before it exists would silently vendor a WRONG scene
+   that looks right.
+3. **Nothing it would feed is built.** There is no vendored tree and no
+   plan-step read, so a wired resolver would have no consumer today.
+
+So the wiring lands WITH the alias table, not before it.
+
 **Next action: resolve a lead to its SCENE.** For the seven whole-work pages
 that is a RANGE inside a text already fetched and already rights-cleared --
 locate the act heading, then the scene heading under it, then the next scene
