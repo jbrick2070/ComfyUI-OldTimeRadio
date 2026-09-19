@@ -51,20 +51,20 @@ TIT: Ti prego, gentil mortale, continua il tuo canto, il mio orecchio è così a
 BOT: Mi sembra, signora, che avreste ben poca ragione per farlo: ma è però vero che la ragione e l’amore van di rado in compagnia. Peccato che qualche onesto vicino non tenti di renderli amici! Io saprei celiare come ogni altro al bisogno.
 TIT: Tu sei savio al pari che bello.
 BOT: No, no: ma se avrò bastante ingegno per escire da questo bosco avrò raggiunto il mio intento. Tit. Non desiderare di uscire da questo bosco; qui restar devi, il voglia tu o no. Io sono uno spirito al disopra del vulgo; l’estate obbedisce al mio impero; ed io ti amo. Vieni dunque con me: avrai Fate per servirti, e per andare a cercarti mille gioielli preziosi in fondo al mare: esse canteranno mentre tu dormirai sopra un dolce letto di giunchi; e purificare saprò sì bene i rozzi elementi del tuo corpo mortale, che avrai il volo e la leggerezza di uno spirito aereo. — Fior-di-piselli! Tela-di-ragno! Tarlo! Seme-di-mostarda.
-FAT: Son pronta.
-FAT: Anch’io.
-FAT: Io pure.
-FAT: Dove s’ha a andare?
+1ª FAT: Son pronta.
+2ª FAT: Anch’io.
+3ª FAT: Io pure.
+4ª FAT: Dove s’ha a andare?
 TIT: Siate gentili e cortesi con quest’amabile mortale. Danzate ne’ suoi passeggi, alimentatelo di fragranti albicocche e di grappoli vermigli, di verdi fichi e di dolci more: togliete alle mormoranti api il loro miele, e nudate le loro cosce della cera per farne fanali notturni, che accenderete nelle lucciole, onde con ciò si rischiari il coricarsi e l’alzarsi del mio amante: togliete poi le ali colorate da leggerissime farfalle, per allontanare i raggi della luna dai suoi occhi addormiti. Inchinatevi davanti a lui, Silfi, e corteggiatelo.
-FAT: Salve, mortale.
-FAT: Salve!
-FAT: Salve!
-FAT: Salve!
+1ª FAT: Salve, mortale.
+2ª FAT: Salve!
+3ª FAT: Salve!
+4ª FAT: Salve!
 BOT: Tributo una sincera riconoscenza alle signorie vostre: ma di grazia, quali sono i vostri nomi?
-FAT: Tela-di-ragno.
+1ª FAT: Tela-di-ragno.
 BOT: Desidero far con voi maggior conoscenza, buona signora. Se mi taglio un dito non avrò più paura di nulla col vostro sussidio. — E il vostro nome qual è, onesta donzella?
-FAT: Fior-di-piselli.
+2ª FAT: Fior-di-piselli.
 BOT: Vi prego di rammemorarmi a monna Corteccia vostra madre, e a messer Gambo vostro genitore. Dolce Fior-di-piselli, desidererò di far maggior conoscenza anche con voi. — Il vostro nome ora, signora?
-FAT: Seme-di-mostarda.
+3ª FAT: Seme-di-mostarda.
 BOT: Buona Semenza-di-mostarda, conosco la vostra egregia pazienza: quel codardo gigante, quel roast-beef divoratore ha inghiottiti molti discendenti della vostra schiatta. Vi do fede che i vostri parenti mi hanno fatto versar lagrime prima di ora; ma sarò giulivo di stringere con voi pure maggior conoscenza, mio dolce Seme-di-mostarda.
 TIT: Animo, seguitelo e indicategli il mio pergolato. La luna sembrami ci guardi con occhio umido; e allorchè essa piange, piange i teneri fiori o deplora qualche violata verginità. Incatenate la lingua del mio amante e conducetelo in silenzio.

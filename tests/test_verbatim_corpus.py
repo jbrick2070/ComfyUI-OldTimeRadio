@@ -707,9 +707,21 @@ _KNOWN_UNBOUND = {
     # play-within-the-play these are Pyramus and Thisbe, not Bottom and Flute.
     # Binding a role to its actor would merge two speakers into one voice.
     "PIR", "TIS",
-    # "Fata" -- a fairy. The English scene names its fairies individually, so
-    # there is no single counterpart and a guess would invent one.
-    "FAT",
+    # `FAT` WAS HERE AND IT WAS A PARSING BUG WEARING A TRANSLATOR'S CLOTHES.
+    # The entry claimed the English scene names its fairies individually so no
+    # single counterpart existed. The truth was that `_RUSCONI_HEAD` only
+    # matched a `<sup>` ordinal, and this page writes a bare `1ª`, so all FOUR
+    # fairies collapsed into one label -- eleven lines in one mouth, including
+    # three separate greetings and the fairies naming themselves in turn. The
+    # Chinese translation of the same scene bound all four individually on the
+    # same day, which is what exposed it. They are now `1ª FAT` through
+    # `4ª FAT` and bound by the names they speak: Cobweb, Peaseblossom,
+    # Mustardseed, Moth.
+    #
+    # THE LESSON IS THE SHAPE OF THE MISTAKE. This list is for gaps somebody
+    # CHOSE, and an entry written to excuse a defect looks identical to one
+    # written to honour a translator. Before adding a label here, check whether
+    # another edition of the same scene has more speakers than yours.
 }
 
 

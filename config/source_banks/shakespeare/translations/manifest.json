@@ -903,13 +903,13 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo",
-      "revision_id": "sha256:07da7bb8f7c2933c",
-      "raw_sha256": "07da7bb8f7c2933c65b905644976013f9fba03cc08221f62f7d3940ff757bb85",
+      "revision_id": "sha256:bead0b83028fd603",
+      "raw_sha256": "bead0b83028fd603f6bddb852281e5e73f9514bad614e488dbe21463759b5576",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA I",
       "speaker_labels": 66,
-      "distinct_speakers": 10,
+      "distinct_speakers": 13,
       "speaker_map": {
         "BOT": {
           "spoken": "BOTTOM",
@@ -934,6 +934,22 @@
         "TIT": {
           "spoken": "TITANIA",
           "roster": "TITANIA"
+        },
+        "1ª FAT": {
+          "spoken": "COBWEB",
+          "roster": "COBWEB"
+        },
+        "2ª FAT": {
+          "spoken": "PEASEBLOSSOM",
+          "roster": "PEASEBLOSSOM"
+        },
+        "3ª FAT": {
+          "spoken": "MUSTARDSEED",
+          "roster": "MUSTARDSEED"
+        },
+        "4ª FAT": {
+          "spoken": "MOTE",
+          "roster": "MOTE"
         }
       }
     },
@@ -947,8 +963,8 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/Il_Sogno_di_una_notte_d%27estate/Atto_terzo",
-      "revision_id": "sha256:e1faabd6a0ecdb7b",
-      "raw_sha256": "e1faabd6a0ecdb7b85929477f13feb7023ee68a890560197969b6d0f9b886855",
+      "revision_id": "sha256:0be1c80f251758db",
+      "raw_sha256": "0be1c80f251758db217da231211a33ccc8e0fb4301ce434272711e86b38c41ff",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA II",
@@ -991,8 +1007,8 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/Molto_strepito_per_nulla/Atto_secondo",
-      "revision_id": "sha256:ff5107ac3f017ab0",
-      "raw_sha256": "ff5107ac3f017ab0713281892ed8f0128c52f636bcb03d03d25a20ad28b185e3",
+      "revision_id": "sha256:630dd7f75ef19441",
+      "raw_sha256": "630dd7f75ef1944160bddaa454930894e4b399c1b98b6e413b9338cb01b47170",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA III",
@@ -1103,8 +1119,8 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/La_tempesta_%28Shakespeare-Rusconi%29/Atto_primo",
-      "revision_id": "sha256:f74dcd87d23eb1a6",
-      "raw_sha256": "f74dcd87d23eb1a60978f1e3a6e14a5eed81f4414b0dfa96a9cc374fb6f27978",
+      "revision_id": "sha256:ab0da5a3af8b5590",
+      "raw_sha256": "ab0da5a3af8b559075931f0aacd0dd8a9cf672b835378a881757795f5eec6ec4",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ATTO PRIMO / SCENA II",
@@ -1143,8 +1159,8 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_primo",
-      "revision_id": "sha256:1a1fbf16b44fc3d2",
-      "raw_sha256": "1a1fbf16b44fc3d2495538ea57d937ca9cac3cb2f9787ce664758dac6d324d3d",
+      "revision_id": "sha256:24ff52a2866aea25",
+      "raw_sha256": "24ff52a2866aea254b6ac949894d0e81dff026453ea418a84b81a062bd778aac",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA V",
@@ -1187,8 +1203,8 @@
       "translation_first_published": 1838,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://it.wikisource.org/wiki/La_dodicesima_notte_o_quel_che_vorrete/Atto_secondo",
-      "revision_id": "sha256:a9bc75c6c25ebed5",
-      "raw_sha256": "a9bc75c6c25ebed53799db4862917bbd98af5dda49eed56558e4bda03db9aabf",
+      "revision_id": "sha256:0237937fb7b91ab6",
+      "raw_sha256": "0237937fb7b91ab6835c5d35151d486595f80a0d1b59baf629468c001f0e133d",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA VI",
@@ -1367,8 +1383,8 @@
       "translation_first_published": 1947,
       "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
       "source_url": "https://zh.wikisource.org/zh-hant/%E8%8E%8E%E5%A3%AB%E6%AF%94%E4%BA%9E%E6%88%B2%E5%8A%87%E5%85%A8%E9%9B%86_%28%E6%9C%B1%E7%94%9F%E8%B1%AA%29/%E4%BB%B2%E5%A4%8F%E5%A4%9C%E4%B9%8B%E5%A4%A2/%E7%AC%AC%E4%B8%89%E5%B9%95",
-      "revision_id": "sha256:d576a487b34322b4",
-      "raw_sha256": "d576a487b34322b4156c09e9039dcf426f8cd1ef3c2878f9e186bfefe88d4ebb",
+      "revision_id": "sha256:f12fbb677e8b258f",
+      "raw_sha256": "f12fbb677e8b258f3492e1083c16b4ba1e7a4b9b470dccf91e18251e31554400",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "第二場",

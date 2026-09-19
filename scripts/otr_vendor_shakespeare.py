@@ -104,6 +104,50 @@ def to_text(markup):
     """
     body = re.sub(r"(?is)<(script|style|template)\b.*?</\1>", " ", markup)
     body = re.sub(r"(?s)<!--.*?-->", " ", body)
+    # THE SITE'S OWN FOOTER IS NOT DIALOGUE, AND IT REACHES THE STAGE WHEN THE
+    # SCENE IS THE LAST ONE ON ITS PAGE. `extract` ends a scene at the NEXT
+    # heading of the same shape; when there is no next heading it runs to the
+    # end of the document and swallows everything after the play -- the
+    # footnotes, `Estratto da <url>`, the licence blurb, `Informativa sulla
+    # privacy`, `Dichiarazione sui cookie`, `Aggiungi lingue`.
+    #
+    # IT IS INVISIBLE TO EVERY COUNT, which is why it shipped in five Italian
+    # scenes before a reviewer read the file tails. None of that text carries a
+    # `NAME:` label, so `normalise_labels` appends it to the PENDING speaker --
+    # and the last character of the scene delivers the privacy policy as the
+    # end of their closing speech. Speech and speaker counts do not move by one.
+    # Same class as the `[p. 39 ]` page markers, with a far larger payload.
+    #
+    # KEEP THE ARTICLE, NOT THE PAGE. Naming chrome containers one at a time
+    # does not converge -- the first cut stripped `printfooter`, `<footer>` and
+    # the `footer-*` lists and the tail still carried `Ricerca Ricerca ...
+    # Aggiungi lingue Aggiungi argomento`, because that furniture is scattered
+    # through the header and the navigation as well as the foot.
+    #
+    # The article body is BRACKETED: MediaWiki opens it with
+    # `<div class="mw-parser-output">` and closes the readable part at
+    # `<div class="printfooter">`. Cut to that span and every piece of site
+    # chrome is outside it at once, in any language and any skin. Either marker
+    # missing leaves the body untouched, so a page that does not use them is
+    # never truncated by this.
+    start = re.search(r'(?is)<div[^>]*class="[^"]*mw-parser-output[^"]*"[^>]*>', body)
+    if start:
+        body = body[start.end():]
+    stop = re.search(r'(?is)<div[^>]*class="[^"]*printfooter[^"]*"', body)
+    if stop:
+        body = body[:stop.start()]
+    # THE EDITOR'S FOOTNOTES ARE INSIDE THE ARTICLE AND ARE STILL NOT DIALOGUE.
+    # Bracketing to the article body removes the site's furniture and leaves
+    # these, which sit in `<ol class="references">` under a `Note` heading and
+    # land on the last speaker for the same reason: no `NAME:` label, so
+    # `normalise_labels` appends them to whoever spoke last. Benedick was
+    # closing his scene with `Note Allusione al vecchio proverbio che le vecchie
+    # zitelle si dannano`, and Prospero's scene ended on the word `Warburton`.
+    # A footnote is the EDITION talking about the play, never a character in it.
+    body = re.sub(r"(?is)<ol[^>]*class=\"[^\"]*references[^\"]*\"[^>]*>.*?</ol\s*>",
+                  " ", body)
+    body = re.sub(r"(?is)<div[^>]*class=\"[^\"]*mw-heading[^\"]*\"[^>]*>\s*"
+                  r"<h[1-6][^>]*id=\"Note\"[^>]*>.*?</h[1-6]>\s*</div\s*>", " ", body)
     # A SECTION EDIT LINK IS SITE FURNITURE AND A VOICE WILL READ IT ALOUD.
     # MediaWiki puts `<span class="mw-editsection">[ 編輯 ]</span>` after every
     # heading. Tag-stripped it becomes three lines -- `[`, `編輯`, `]` -- sitting
@@ -350,9 +394,25 @@ _SPEAKER_SPANS = (
 #: a neighbouring paragraph while looking for the first italic tag.
 _RUSCONI_PARAGRAPH = re.compile(
     r'(?is)(?P<open><p\b[^>]*>)(?P<body>.*?)</p\s*>')
+#: THE ORDINAL IS NOT ALWAYS A `<sup>`, AND ASSUMING IT WAS MERGED FOUR
+#: CHARACTERS INTO ONE. Rusconi's Macbeth page writes the witches as
+#: `1<sup>a</sup> <i>Strega</i>.`, so a `<sup>`-only pattern split them
+#: correctly and looked finished. His Midsummer page -- same collection, same
+#: translator, different transcriber -- writes `1ª <i>Fat</i>.` with a BARE
+#: feminine ordinal and no tag at all. The ordinal group then failed to match,
+#: the `1ª ` was swallowed by the discarded prefix, and Peaseblossom, Cobweb,
+#: Moth and Mustardseed all arrived as one speaker called `FAT` -- eleven lines
+#: in one mouth, including three separate `Salve!` greetings and the fairies
+#: NAMING THEMSELVES one after another.
+#:
+#: It was nearly written off as a translator's choice. The Chinese translation
+#: of the SAME SCENE, vendored the same day, binds all four individually, which
+#: is what settles it: four characters exist in that scene and a rule that
+#: returns one is wrong. When two editions of one scene disagree about how many
+#: people are in it, suspect the parser before the translator.
 _RUSCONI_HEAD = re.compile(
     r'(?is)^(?P<prefix>(?:(?!<i\b)[^<()]|<(?!i\b)[^>]*>)*?)'
-    r'(?P<ord>\d\s*<sup>\s*[ao]\s*</sup>\s*)?'
+    r'(?P<ord>\d\s*(?:<sup>\s*[ao]\s*</sup>|[ªº])\s*)?'
     r'<i>(?P<name>[^<()]{1,40})</i>'
     r'(?:\s*\([^()]{0,200}\))?\s*\.')
 
