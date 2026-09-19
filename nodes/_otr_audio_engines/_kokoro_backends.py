@@ -264,6 +264,47 @@ def _remove_stale_npz(voices_dir: str, keep: str) -> None:
 # --------------------------------------------------------------------------- #
 # Backends
 # --------------------------------------------------------------------------- #
+#: The MeCab failure reads as a missing FILE, which sends the reader looking
+#: for a corrupt install rather than a missing dictionary package.
+_MECAB_SIGNATURES = ("mecabrc", "failed initializing mecab")
+
+#: Rows whose G2P loads MeCab. No other language row touches it, so a MeCab
+#: failure on any other row is something else and must not be reworded.
+_MECAB_LANG_CODES = ("j",)
+
+
+def _mecab_dictionary_error(error: Exception, lang_code: str) -> Exception:
+    """Reword ONLY the empty-dictionary failure; return ``error`` otherwise.
+
+    `misaki[ja]` declares `unidic`, whose wheel ships no dictionary at all --
+    it downloads ~770 MB on a separate `python -m unidic download` step that
+    nobody runs, so the Japanese row dies at the voice node with a path that
+    does not exist. Worse, fugashi PREFERS `unidic` whenever it imports and
+    never falls back, so installing `unidic-lite` beside it changes nothing
+    and the error does not move. Both halves are named here because finding
+    the second one cost a live leg (PBUG-20260918-06).
+
+    Every other RuntimeError is returned untouched: KPipeline failures stay
+    exactly as loud and as literal as they were.
+    """
+    text = str(error).lower()
+    if str(lang_code or "").strip().lower() not in _MECAB_LANG_CODES:
+        return error
+    if not any(signature in text for signature in _MECAB_SIGNATURES):
+        return error
+    return RuntimeError(
+        "Japanese voices need a MeCab dictionary and the installed one is "
+        "empty. `misaki[ja]` pulls `unidic`, which ships a downloader rather "
+        "than a dictionary. Fix it with BOTH of these, in this order:\n"
+        "    pip uninstall -y unidic\n"
+        "    pip install unidic-lite\n"
+        "The uninstall is not optional -- fugashi prefers `unidic` whenever "
+        "it is importable, so `unidic-lite` alone leaves this error "
+        "unchanged. `unidic-lite` carries its dictionary inside the wheel, so "
+        "nothing is downloaded at render time.\n"
+        "Original error: %s" % error)
+
+
 class TorchKokoroBackend:
     """The pre-2026-09-02 synthesis path, moved verbatim.
 
@@ -299,7 +340,18 @@ class TorchKokoroBackend:
                 kwargs["repo_id"] = "hexgrad/Kokoro-82M"
         except (TypeError, ValueError):
             kwargs["repo_id"] = "hexgrad/Kokoro-82M"
-        self._pipeline = KPipeline(**kwargs)
+        try:
+            self._pipeline = KPipeline(**kwargs)
+        except RuntimeError as error:
+            reworded = _mecab_dictionary_error(error, self.lang_code)
+            if reworded is error:
+                # Not ours to explain. Re-raise the ORIGINAL untouched rather
+                # than `raise error from error`, which would hang a
+                # self-referential __cause__ on an exception this code has no
+                # opinion about -- "errors stay exactly as loud" means the
+                # metadata too, not only the message.
+                raise
+            raise reworded from error
 
     def synthesize(self, text: str, voice_id: str, speed: float):
         import numpy as np

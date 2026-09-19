@@ -130,6 +130,32 @@ kokoro>=0.7.16; python_version < "3.13"
 # The ONNX model (326 MB) is fetched once at boot by the prefetch, never mid-render.
 kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 
+# 2026-09-18, found by the Japanese leg of the seven-language sweep dying at
+# t=229s inside fugashi.Tagger() -- PBUG-20260918-06.
+#
+# THE JAPANESE ROW NEEDS A MECAB DICTIONARY, AND THE ONE misaki ASKS FOR SHIPS
+# EMPTY. `misaki[ja]` declares `unidic`, whose wheel contains NO dictionary --
+# it is a downloader, and `python -m unidic download` fetches ~770 MB after
+# the install. Until that runs, fugashi points at an empty `unidic/dicdir`
+# and every Japanese line raises RuntimeError: "no such file or directory:
+# ...unidic\dicdir\mecabrc". The render dies at the voice node, not at boot.
+#
+# `unidic-lite` carries its dictionary INSIDE the wheel (~50 MB, no download,
+# no network at render time), which is the shape this project wants -- the
+# offline-first rule and the same reason GGUF auto-download was cut.
+#
+# THE TRAP, MEASURED THE SAME DAY: installing unidic-lite does NOT fix a box
+# that already has `unidic`. fugashi prefers `unidic` when it is importable
+# and never falls back, so the empty package SHADOWS the good one and the
+# error is identical before and after. `pip uninstall unidic` is the other
+# half of the fix, and a box that got `unidic` transitively (misaki[ja],
+# transformers[ja]) needs it. Proven here: 海の水は塩辛い then phonemized to
+# ɯmʲi no mʲizɨ βa ɕiokaɾai.
+#
+# Blast radius: the Japanese row only. No other language row loads MeCab, and
+# the seven non-ja rows rendered unchanged.
+unidic-lite>=1.0.8
+
 # pyloudnorm was declared NOWHERE -- not here, not in pyproject.toml -- while
 # `scene_sequencer.py` imports it to measure integrated loudness and master
 # every episode to -14 LUFS. Its import sits in a try/except with a

@@ -406,3 +406,44 @@ def test_backends_module_cannot_reach_the_network_and_imports_nothing_heavy_at_t
     top = [n for n in importlib.import_module(kb.__name__).__dict__
            if n in ("torch", "numpy", "onnxruntime", "kokoro", "kokoro_onnx")]
     assert top == [], "heavy modules bound at module top: %s" % top
+
+
+# --- PBUG-20260918-06: the Japanese row's empty MeCab dictionary -------------
+# The seven-language sweep's Japanese leg died at t=229s inside
+# fugashi.Tagger() with a path that does not exist, because misaki[ja] pulls
+# `unidic` (a downloader, not a dictionary). These pin the two halves that
+# actually cost time: the message must name the UNINSTALL as well as the
+# install, and it must never reword an error it did not diagnose.
+
+_MECAB_ERROR = RuntimeError(
+    "Failed initializing MeCab. ... param.cpp(69) [ifs] no such file or "
+    r"directory: C:\...\site-packages\unidic\dicdir\mecabrc")
+
+
+def test_mecab_message_names_both_halves_of_the_fix():
+    out = kb._mecab_dictionary_error(_MECAB_ERROR, "j")
+    assert out is not _MECAB_ERROR
+    text = str(out)
+    # Installing unidic-lite ALONE leaves the error unchanged, because fugashi
+    # prefers `unidic` whenever it imports. A message that named only the
+    # install would send the reader in a circle.
+    assert "pip uninstall -y unidic" in text
+    assert "pip install unidic-lite" in text
+    assert "not optional" in text
+    assert "Original error" in text and "mecabrc" in text
+
+
+def test_a_mecab_failure_on_a_non_japanese_row_is_left_alone():
+    # No other language row loads MeCab, so this signature on `z` or `b` means
+    # something else entirely and must keep its own words.
+    for lang_code in ("z", "b", "e", "f", ""):
+        assert kb._mecab_dictionary_error(_MECAB_ERROR, lang_code) is _MECAB_ERROR
+
+
+def test_other_kpipeline_failures_stay_exactly_as_loud():
+    other = RuntimeError("CUDA error: device-side assert triggered")
+    assert kb._mecab_dictionary_error(other, "j") is other
+
+
+def test_the_japanese_row_is_the_only_one_that_loads_mecab():
+    assert kb._MECAB_LANG_CODES == ("j",)
