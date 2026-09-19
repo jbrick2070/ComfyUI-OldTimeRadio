@@ -298,3 +298,35 @@ def test_a_salutation_the_source_itself_carries_is_never_stripped():
         "MI SEÑOR: no lo olvides"
     assert VT.strip_echoed_label("ANA: no lo olvides", "ANA",
                                  "forget it not") == "no lo olvides"
+
+
+# --- PBUG-20260918-08: the output budget is counted in ENGLISH source words --
+# The Hindi leg died at t=69s with "no decodable top-level JSON object found:
+# line 1 column 1 (char 0)" -- the shape of a reply that ran out of room before
+# it closed its JSON, not of a model that cannot translate Devanagari. The
+# budget climbs on THAT shape only.
+
+def test_a_reply_cut_off_mid_json_is_read_as_out_of_room():
+    for message in ("no decodable top-level JSON object found: line 1 column 1",
+                    "Unterminated string starting at: line 2 column 9",
+                    "Expecting ',' delimiter: line 4 column 3",
+                    "Expecting value: line 1 column 1 (char 0)"):
+        assert VT._looks_out_of_room(message), message
+
+
+def test_a_whole_reply_that_is_merely_wrong_is_not_read_as_out_of_room():
+    # These come back COMPLETE and fail on content. More room cannot help, and
+    # climbing would spend three budgets arriving at the same refusal.
+    for message in ("line 2 came back in English, not the target language",
+                    "expected 3 line(s), got 2",
+                    "line 1 came back empty (or as a bare speaker label)",
+                    "", None):
+        assert not VT._looks_out_of_room(message), message
+
+
+def test_the_first_budget_rung_is_the_unchanged_one():
+    # Every language that already fit must pay nothing for this change: the
+    # first attempt uses exactly the budget it always did.
+    assert VT._OUTPUT_BUDGET_GROWTH[0] == 1
+    assert list(VT._OUTPUT_BUDGET_GROWTH) == sorted(VT._OUTPUT_BUDGET_GROWTH)
+    assert len(set(VT._OUTPUT_BUDGET_GROWTH)) == len(VT._OUTPUT_BUDGET_GROWTH)

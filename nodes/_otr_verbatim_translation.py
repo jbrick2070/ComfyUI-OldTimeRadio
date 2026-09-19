@@ -56,6 +56,35 @@ DEFAULT_MAX_SOURCE_WORDS = 120
 _OUTPUT_TOKENS_PER_SOURCE_WORD = 4
 _OUTPUT_TOKENS_FLOOR = 96
 
+#: Output-budget rungs, tried in order while the failure looks like the reply
+#: RAN OUT OF ROOM. The first rung is the budget as it has always been, so
+#: every language that already fit behaves byte-identically and pays nothing.
+#: See the long note in `translate_entries` -- this grows rather than predicts
+#: because the true tokens-per-source-word ratio depends on the writer's
+#: tokenizer and the target script, and a GGUF writer ships no tokenizer file
+#: to measure against.
+_OUTPUT_BUDGET_GROWTH = (1, 3, 6)
+
+#: What a reply cut off mid-JSON leaves behind. A batch that came back WHOLE
+#: and merely wrong -- the wrong number of lines, an untranslated row, a bare
+#: speaker label -- is not short of room, and re-asking with a bigger budget
+#: would just spend three times as long arriving at the same refusal.
+_TRUNCATION_SIGNATURES = (
+    "no decodable top-level json object",
+    "unterminated",
+    "expecting ',' delimiter",
+    "expecting ':' delimiter",
+    "expecting value",
+    "expecting property name",
+    "unexpected end of",
+)
+
+
+def _looks_out_of_room(error: Any) -> bool:
+    """Is this failure the shape of a reply that was cut off mid-JSON?"""
+    text = str(error or "").lower()
+    return any(signature in text for signature in _TRUNCATION_SIGNATURES)
+
 _SYSTEM = (
     "You translate a fixed passage of stage dialogue for a radio "
     "performance. Return JSON only: {\"texts\": [\"...\", ...]} with EXACTLY "
@@ -235,32 +264,64 @@ def translate_entries(
             nonlocal attempts
             attempts = number
 
-        try:
-            # LLM slot: creative -- performing a fixed passage in the episode
-            # language is voice work, not extraction.
-            result = structured_call(
-                prompt=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": _user_prompt(entries, indices)},
-                ],
-                schema=TranslatedTexts,
-                slot_fn=creative_fn,
-                base_temperature=0.2,
-                structural_retry_temperature=0.1,
-                repair_prompt_factory=make_dispatching_repair_factory(),
-                post_validator=_check,
-                max_new_tokens=_output_budget(entries, indices),
-                max_attempts=max_attempts,
-                helper_name="verbatim_translation",
-                on_attempt_complete=_count,
-            )
-        except StructuredCallFailedError as exc:
+        # THE BUDGET IS COUNTED IN ENGLISH SOURCE WORDS, AND THE OUTPUT IS NOT
+        # ENGLISH (PBUG-20260918-08). A flat tokens-per-source-word multiplier
+        # assumes the target costs what the source costs. Devanagari does not:
+        # the Hindi leg died at t=69s with "no decodable top-level JSON object
+        # found: line 1 column 1 (char 0)" after both attempts -- the shape of
+        # a generation that ran out of room before it closed its JSON, not of
+        # a model that cannot translate.
+        #
+        # The honest fix is to GROW rather than to predict. The true ratio
+        # depends on the writer's tokenizer and the target script, and this
+        # box has no tokenizer file to measure (the writers are GGUF), so any
+        # per-language constant would be a guess dressed as a measurement.
+        # Each rung retries the whole batch with more room; a script that fits
+        # never pays for the later rungs, and English is byte-identical.
+        budget = _output_budget(entries, indices)
+        last_exc: "StructuredCallFailedError | None" = None
+        result = None
+        rungs_tried = 0
+        for growth in _OUTPUT_BUDGET_GROWTH:
+            rungs_tried += 1
+            try:
+                # LLM slot: creative -- performing a fixed passage in the
+                # episode language is voice work, not extraction.
+                result = structured_call(
+                    prompt=[
+                        {"role": "system", "content": system},
+                        {"role": "user",
+                         "content": _user_prompt(entries, indices)},
+                    ],
+                    schema=TranslatedTexts,
+                    slot_fn=creative_fn,
+                    base_temperature=0.2,
+                    structural_retry_temperature=0.1,
+                    repair_prompt_factory=make_dispatching_repair_factory(),
+                    post_validator=_check,
+                    max_new_tokens=budget * growth,
+                    max_attempts=max_attempts,
+                    helper_name="verbatim_translation",
+                    on_attempt_complete=_count,
+                )
+                break
+            except StructuredCallFailedError as exc:
+                last_exc = exc
+                attempts_total += attempts or 1
+                if not _looks_out_of_room(exc.last_error):
+                    # Whole reply, wrong content. More room cannot help, and
+                    # climbing would triple the time to the same refusal.
+                    break
+        if result is None:
             raise RuntimeError(
                 "[verbatim_translation] the passage could not be translated "
                 f"(batch of {want} line(s) starting at entry {indices[0]}; "
-                f"{exc.attempts} attempt(s); last error: {exc.last_error}). "
+                f"{last_exc.attempts} attempt(s) at each of "
+                f"{rungs_tried} output budget(s) tried, the last of them "
+                f"{budget * _OUTPUT_BUDGET_GROWTH[rungs_tried - 1]} tokens; "
+                f"last error: {last_exc.last_error}). "
                 "An English verbatim row cannot ship on a native episode."
-            ) from exc
+            ) from last_exc
         attempts_total += attempts or 1
         for i, text in zip(indices, result.texts):
             cleaned = strip_echoed_label(str(text), entries[i].speaker,
