@@ -6,7 +6,7 @@
   "edition_label": "ESCENA II.",
   "source_pages": "10–28",
   "speeches_visible_in_scene": 140,
-  "speeches_transcribed": 140,
+  "speeches_transcribed": 142,
   "speaker_map": {
     "MIR.": {"spoken": "Miranda", "roster": "MIRANDA"},
     "PRÓS.": {"spoken": "Próspero", "roster": "PROSPERO"},
@@ -58,5 +58,5 @@
   ],
   "illegible": [],
   "confidence": "high",
-  "confidence_note": "Read from 400 dpi page renders with enlarged 800 dpi checks for older accenting, diaereses, song cues, and final asides; 140 printed speech/cue labels were counted and 140 speech lines transcribed."
+  "confidence_note": "Read from 400 dpi page renders with enlarged 800 dpi checks for older accenting, diaereses, song cues, and final asides; 140 printed speech/cue labels were counted. The single printed CANCION DE ARIEL cue spans three sung portions interrupted by two Voces esparcidas responses, yielding 142 transcript lines."
 }
