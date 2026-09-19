@@ -237,7 +237,10 @@ class TestStageDirectionsAndQualifiers:
 class TestAgainstTheRealCorpus:
     def test_the_corpus_is_actually_present(self):
         # Without this the corpus tests pass vacuously on an empty directory.
-        assert len(_corpus_files()) == 14
+        # 14 -> 15 on 2026-09-19: `romeo_juliet__act1_scene1` was fetched so the
+        # Japanese Tsubouchi scene had an English roster to bind its twelve
+        # speakers to. A FILE COUNT, nothing about the layout rules.
+        assert len(_corpus_files()) == 15
 
     def test_no_spoken_text_anywhere_carries_a_bracket(self):
         for path in _corpus_files():
@@ -362,7 +365,11 @@ class TestColonLayout:
         with a curly quote at column 0 and are not prefixes at all. If this
         count ever moves, the gate below needs re-arguing, not re-tuning."""
         files = _english_source_files()
-        assert len(files) == 81, len(files)
+        # 81 -> 82 on 2026-09-19 for the same added sidecar. THE MEASUREMENT
+        # THIS GATE RESTS ON DID NOT MOVE: the column-0 label set is still
+        # exactly {christmas_carol_marley: STAVE I}, checked below, so the
+        # argument stands and only the tally was re-pinned.
+        assert len(files) == 82, len(files)
         hits = {p: _column_zero_colon_labels(p.read_text(encoding="utf-8"))
                 for p in files}
         found = {p.name: labels for p, labels in hits.items() if labels}
