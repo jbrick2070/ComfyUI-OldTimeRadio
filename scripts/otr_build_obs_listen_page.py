@@ -19,7 +19,6 @@ Re-run it any time; it rebuilds from whatever is in the folder now:
 """
 from __future__ import annotations
 
-import glob
 import html
 import json
 import os

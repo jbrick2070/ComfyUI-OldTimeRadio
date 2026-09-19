@@ -35,7 +35,6 @@ import os
 import uuid
 import re
 import shutil
-import unicodedata
 from pathlib import Path
 
 import logging
