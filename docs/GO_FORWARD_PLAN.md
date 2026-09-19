@@ -41,9 +41,7 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 * **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
   from `.githooks/pre-push`. Changes how both boxes push.
-* **Native-language science feeds for SciFi News Pro.** The lane reads the
-  English feed and authors natively. Which feeds, and whether the dossier
-  extraction stays English, is his call before any code.
+
 * **`nodes/_otr_scene_resolver.py` -- rip it or wire it (new 2026-09-18).**
   Built for an automated act/scene extraction + confidence-scored alignment
   design that the vendored-Shakespeare row below never ended up using -- the
@@ -142,7 +140,10 @@ be withdrawn). The morning after begins in `otr/obs/`, not the editor.
 8 GB ship set (held until the physical 8 GB wave) · `scene_coherence_check`
 stays inert · no IP-Adapter on AnimateDiff · do not ping the Radeon tester ·
 `stable_audio_3` listing `cpu` (re-read the published `--cpu` leg log before
-editing the capability test).
+editing the capability test) · **native-language science feeds for SciFi News
+Pro -- OUT OF SCOPE (operator 2026-09-19: "forget it, delete, out of scope").
+The lane reads the English feed and authors natively, and that is the shipped
+behaviour. Do not reopen it as a feed-selection question.**
 
 ## Constraints specific to this plan
 
