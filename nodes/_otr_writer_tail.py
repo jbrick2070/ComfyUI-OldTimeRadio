@@ -1095,6 +1095,7 @@ class WriterTailMixin:
                 act=_src_meta.get("act"),
                 scene=_src_meta.get("scene"),
                 episode_title=final_title,
+                episode_meta=meta,
             )
             # The intro row is found HERE rather than threaded: the tail does
             # not carry `first_announcer_id` (it is a compose-loop local), and

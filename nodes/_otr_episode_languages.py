@@ -86,6 +86,9 @@ _REQUIRED_SPOKEN = (
     "coda_public_domain_us", "coda_cc0", "coda_research_only", "coda_synthetic",
     "coda_named_public_domain_us", "coda_named_cc0", "coda_named_research_only",
     "coda_licensed_named", "attribution_named", "attribution_anonymous",
+    # The announcer's WORK phrase joiners. The work's TITLE is the work's own;
+    # the words AROUND it are the episode's.
+    "work_by", "work_act", "work_act_scene", "work_subtitle",
 )
 _REQUIRED_CREDITS = (
     "models_header", "production_ledger_header", "cast_voices_header",

@@ -38,7 +38,11 @@
         "coda_named_research_only": "Tonight's tale draws on {work_title}, by {author}, a source cleared for research use only.",
         "coda_licensed_named": "Tonight's scene was drawn from {author}'s {work_title}.",
         "attribution_named": "Tonight's story is by {name}.",
-        "attribution_anonymous": "Tonight's story comes from one of our listeners."
+        "attribution_anonymous": "Tonight's story comes from one of our listeners.",
+        "work_by": "{frame}, by {author}",
+        "work_act": "{frame}, Act {act}",
+        "work_act_scene": "{frame}, Act {act}, Scene {scene}",
+        "work_subtitle": "{frame}, an episode we call \"{subtitle}\""
       },
       "credits": {
         "models_header": "MODELS",
@@ -81,14 +85,39 @@
       "engines": {
         "kokoro": {
           "lang_code": "b",
-          "lang_code_character_pool": ["a", "b"],
+          "lang_code_character_pool": [
+            "a",
+            "b"
+          ],
           "voices": [
-            "bf_alice", "bf_emma", "bf_isabella", "bf_lily",
-            "bm_daniel", "bm_fable", "bm_george", "bm_lewis",
-            "af_alloy", "af_aoede", "af_bella", "af_heart", "af_jessica",
-            "af_kore", "af_nicole", "af_nova", "af_river", "af_sarah", "af_sky",
-            "am_adam", "am_echo", "am_eric", "am_fenrir", "am_liam",
-            "am_michael", "am_onyx", "am_puck", "am_santa"
+            "bf_alice",
+            "bf_emma",
+            "bf_isabella",
+            "bf_lily",
+            "bm_daniel",
+            "bm_fable",
+            "bm_george",
+            "bm_lewis",
+            "af_alloy",
+            "af_aoede",
+            "af_bella",
+            "af_heart",
+            "af_jessica",
+            "af_kore",
+            "af_nicole",
+            "af_nova",
+            "af_river",
+            "af_sarah",
+            "af_sky",
+            "am_adam",
+            "am_echo",
+            "am_eric",
+            "am_fenrir",
+            "am_liam",
+            "am_michael",
+            "am_onyx",
+            "am_puck",
+            "am_santa"
           ]
         }
       },
@@ -129,7 +158,11 @@
         "coda_named_research_only": "El relato de esta noche se basa en {work_title}, de {author}, una fuente autorizada solo para uso de investigación.",
         "coda_licensed_named": "La escena de esta noche fue tomada de {work_title}, de {author}.",
         "attribution_named": "La historia de esta noche es de {name}.",
-        "attribution_anonymous": "La historia de esta noche viene de uno de nuestros oyentes."
+        "attribution_anonymous": "La historia de esta noche viene de uno de nuestros oyentes.",
+        "work_by": "{frame}, de {author}",
+        "work_act": "{frame}, acto {act}",
+        "work_act_scene": "{frame}, acto {act}, escena {scene}",
+        "work_subtitle": "{frame}, un episodio que llamamos \"{subtitle}\""
       },
       "credits": {
         "models_header": "MODELOS",
@@ -172,7 +205,11 @@
       "engines": {
         "kokoro": {
           "lang_code": "e",
-          "voices": ["ef_dora", "em_alex", "em_santa"]
+          "voices": [
+            "ef_dora",
+            "em_alex",
+            "em_santa"
+          ]
         }
       },
       "admission": {
@@ -212,7 +249,11 @@
         "coda_named_research_only": "A história desta noite se baseia em {work_title}, de {author}, uma fonte liberada apenas para uso em pesquisa.",
         "coda_licensed_named": "A cena desta noite foi tirada de {work_title}, de {author}.",
         "attribution_named": "A história desta noite é de {name}.",
-        "attribution_anonymous": "A história desta noite vem de um dos nossos ouvintes."
+        "attribution_anonymous": "A história desta noite vem de um dos nossos ouvintes.",
+        "work_by": "{frame}, de {author}",
+        "work_act": "{frame}, ato {act}",
+        "work_act_scene": "{frame}, ato {act}, cena {scene}",
+        "work_subtitle": "{frame}, um episódio que chamamos de \"{subtitle}\""
       },
       "credits": {
         "models_header": "MODELOS",
@@ -255,7 +296,11 @@
       "engines": {
         "kokoro": {
           "lang_code": "p",
-          "voices": ["pf_dora", "pm_alex", "pm_santa"]
+          "voices": [
+            "pf_dora",
+            "pm_alex",
+            "pm_santa"
+          ]
         }
       },
       "admission": {
@@ -295,7 +340,11 @@
         "coda_named_research_only": "Il racconto di stasera si basa su {work_title}, di {author}, una fonte autorizzata solo per uso di ricerca.",
         "coda_licensed_named": "La scena di stasera è tratta da {work_title}, di {author}.",
         "attribution_named": "La storia di stasera è di {name}.",
-        "attribution_anonymous": "La storia di stasera viene da uno dei nostri ascoltatori."
+        "attribution_anonymous": "La storia di stasera viene da uno dei nostri ascoltatori.",
+        "work_by": "{frame}, di {author}",
+        "work_act": "{frame}, atto {act}",
+        "work_act_scene": "{frame}, atto {act}, scena {scene}",
+        "work_subtitle": "{frame}, un episodio che chiamiamo \"{subtitle}\""
       },
       "credits": {
         "models_header": "MODELLI",
@@ -338,7 +387,10 @@
       "engines": {
         "kokoro": {
           "lang_code": "i",
-          "voices": ["if_sara", "im_nicola"]
+          "voices": [
+            "if_sara",
+            "im_nicola"
+          ]
         }
       },
       "admission": {
@@ -378,7 +430,11 @@
         "coda_named_research_only": "Le récit de ce soir s'appuie sur {work_title}, de {author}, une source réservée à la recherche.",
         "coda_licensed_named": "La scène de ce soir est tirée de {work_title}, de {author}.",
         "attribution_named": "L'histoire de ce soir est de {name}.",
-        "attribution_anonymous": "L'histoire de ce soir nous vient de l'un de nos auditeurs."
+        "attribution_anonymous": "L'histoire de ce soir nous vient de l'un de nos auditeurs.",
+        "work_by": "{frame}, de {author}",
+        "work_act": "{frame}, acte {act}",
+        "work_act_scene": "{frame}, acte {act}, scène {scene}",
+        "work_subtitle": "{frame}, un épisode que nous appelons \"{subtitle}\""
       },
       "credits": {
         "models_header": "MODÈLES",
@@ -421,7 +477,9 @@
       "engines": {
         "kokoro": {
           "lang_code": "f",
-          "voices": ["ff_siwis"]
+          "voices": [
+            "ff_siwis"
+          ]
         }
       },
       "admission": {
@@ -461,7 +519,11 @@
         "coda_named_research_only": "आज रात की कहानी {author} की {work_title} पर आधारित है, जो केवल शोध उपयोग के लिए स्वीकृत स्रोत है।",
         "coda_licensed_named": "आज रात का दृश्य {author} की {work_title} से लिया गया है।",
         "attribution_named": "आज रात की कहानी {name} की है।",
-        "attribution_anonymous": "आज रात की कहानी हमारे एक श्रोता की ओर से आई है।"
+        "attribution_anonymous": "आज रात की कहानी हमारे एक श्रोता की ओर से आई है।",
+        "work_by": "{frame}, {author} की",
+        "work_act": "{frame}, अंक {act}",
+        "work_act_scene": "{frame}, अंक {act}, दृश्य {scene}",
+        "work_subtitle": "{frame}, एक कड़ी जिसे हम \"{subtitle}\" कहते हैं"
       },
       "credits": {
         "models_header": "मॉडल",
@@ -504,7 +566,12 @@
       "engines": {
         "kokoro": {
           "lang_code": "h",
-          "voices": ["hf_alpha", "hf_beta", "hm_omega", "hm_psi"]
+          "voices": [
+            "hf_alpha",
+            "hf_beta",
+            "hm_omega",
+            "hm_psi"
+          ]
         }
       },
       "admission": {
@@ -544,7 +611,11 @@
         "coda_named_research_only": "今夜の物語は、{author}の『{work_title}』に基づいています。研究目的にのみ許可された資料です。",
         "coda_licensed_named": "今夜の一場面は、{author}の『{work_title}』から取られました。",
         "attribution_named": "今夜の物語は、{name}の作です。",
-        "attribution_anonymous": "今夜の物語は、リスナーのお一人から寄せられました。"
+        "attribution_anonymous": "今夜の物語は、リスナーのお一人から寄せられました。",
+        "work_by": "{frame}、{author}作",
+        "work_act": "{frame} 第{act}幕",
+        "work_act_scene": "{frame} 第{act}幕第{scene}場",
+        "work_subtitle": "{frame}、「{subtitle}」と題した一話"
       },
       "credits": {
         "models_header": "モデル",
@@ -587,12 +658,20 @@
       "engines": {
         "kokoro": {
           "lang_code": "j",
-          "voices": ["jf_alpha", "jf_gongitsune", "jf_nezumi", "jf_tebukuro", "jm_kumo"]
+          "voices": [
+            "jf_alpha",
+            "jf_gongitsune",
+            "jf_nezumi",
+            "jf_tebukuro",
+            "jm_kumo"
+          ]
         }
       },
       "admission": {
         "source_bank_exclusions": [],
-        "readiness_extras": ["misaki[ja]"],
+        "readiness_extras": [
+          "misaki[ja]"
+        ],
         "min_voice_count": 3
       }
     },
@@ -627,7 +706,11 @@
         "coda_named_research_only": "今晚的故事取材于{author}的《{work_title}》，这是一份仅限研究使用的资料。",
         "coda_licensed_named": "今晚的这场戏取自{author}的《{work_title}》。",
         "attribution_named": "今晚的故事由{name}创作。",
-        "attribution_anonymous": "今晚的故事来自我们的一位听众。"
+        "attribution_anonymous": "今晚的故事来自我们的一位听众。",
+        "work_by": "{frame}，{author}著",
+        "work_act": "{frame} 第{act}幕",
+        "work_act_scene": "{frame} 第{act}幕第{scene}场",
+        "work_subtitle": "{frame}，我们称之为《{subtitle}》的一集"
       },
       "credits": {
         "models_header": "模型",
@@ -671,14 +754,22 @@
         "kokoro": {
           "lang_code": "z",
           "voices": [
-            "zf_xiaobei", "zf_xiaoni", "zf_xiaoxiao", "zf_xiaoyi",
-            "zm_yunjian", "zm_yunxi", "zm_yunxia", "zm_yunyang"
+            "zf_xiaobei",
+            "zf_xiaoni",
+            "zf_xiaoxiao",
+            "zf_xiaoyi",
+            "zm_yunjian",
+            "zm_yunxi",
+            "zm_yunxia",
+            "zm_yunyang"
           ]
         }
       },
       "admission": {
         "source_bank_exclusions": [],
-        "readiness_extras": ["misaki[zh]"],
+        "readiness_extras": [
+          "misaki[zh]"
+        ],
         "min_voice_count": 3
       }
     }

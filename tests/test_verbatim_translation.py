@@ -234,3 +234,67 @@ def test_every_row_formats_every_credit_template_without_error():
             assert "Work" in line and "Author" in line, (row.iso, status)
         assert "Ada" in SI.attribution_sentence("Ada", episode_meta=meta)
         assert SI.attribution_sentence("", episode_meta=meta).strip()
+
+
+# --------------------------------------------------------------------------- #
+# the model echoes the speaker label back (live proof 2026-09-18)
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("returned, speaker, want", [
+    # The live defect: the label was TRANSLATED, so it matches no plan string.
+    ("ANTÍFON DE EFESO: Ve, vete. Traedme un pico de hierro.",
+     "ANTIPHOLUS OF EPHESUS", "Ve, vete. Traedme un pico de hierro."),
+    ("BALTHASAR: Ten paciencia, señor.", "BALTHASAR", "Ten paciencia, señor."),
+    ("Balthasar: Ten paciencia.", "BALTHASAR", "Ten paciencia."),
+    ("船長：老大！", "BOATSWAIN", "老大！"),
+    # Label only -> empty, so the validator retries. Returning the raw label
+    # here is what shipped "ANA:" as a spoken row (post-QA, 2026-09-18).
+    ("ANA: ", "ANA", ""),
+])
+def test_an_echoed_label_is_stripped(returned, speaker, want):
+    assert VT.strip_echoed_label(returned, speaker) == want
+
+
+@pytest.mark.parametrize("text", [
+    "Escucha: no hay nadie aquí.",            # ordinary prose with a colon
+    "Te lo digo así: vete.",
+    "No hay ningún dos puntos aquí.",
+    "Mi señor, atended: la hora llega.",
+])
+def test_ordinary_prose_with_a_colon_is_untouched(text):
+    assert VT.strip_echoed_label(text, "ANA") == text
+
+
+def test_the_strip_runs_inside_the_translation_and_reaches_the_entries():
+    entries = _entries("Go, get thee gone.", "Have patience, sir.")
+    slot = _Slot([{"texts": ["ANTÍFON: Ve, vete.", "BALTASAR: Ten paciencia."]}])
+    out, _ = VT.translate_entries(entries, language_instruction=RULE,
+                                  creative_fn=slot, max_source_words=100)
+    assert [e.text for e in out] == ["Ve, vete.", "Ten paciencia."]
+
+
+def test_the_prompt_forbids_the_label_in_words_too():
+    assert "never repeat the speaker's name" in VT._SYSTEM
+
+
+def test_a_label_only_reply_is_empty_so_the_validator_retries():
+    """It used to ship "ANA:" as the whole spoken row: the structural check
+    ran on the RAW reply, found it non-empty, and the strip happened after."""
+    assert VT.strip_echoed_label("ANA: ", "ANA") == ""
+    entries = _entries("Speak now.")
+    slot = _Slot([{"texts": ["ANA: "]}, {"texts": ["Habla ahora."]}])
+    out, _ = VT.translate_entries(entries, language_instruction=RULE,
+                                  creative_fn=slot)
+    assert [e.text for e in out] == ["Habla ahora."]
+    assert len(slot.calls) == 2, "the label-only reply must be retried"
+
+
+def test_a_salutation_the_source_itself_carries_is_never_stripped():
+    """Only a prefix the MODEL added goes; if the English line opens with a
+    label-shaped salutation, the translation is entitled to one too."""
+    assert VT.strip_echoed_label("MI SEÑOR: no lo olvides", "ANA",
+                                 "MY LORD: forget it not") == \
+        "MI SEÑOR: no lo olvides"
+    assert VT.strip_echoed_label("ANA: no lo olvides", "ANA",
+                                 "forget it not") == "no lo olvides"

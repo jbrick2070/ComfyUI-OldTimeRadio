@@ -27,6 +27,8 @@ performed text and no later rewriter may paraphrase it either.
 from __future__ import annotations
 
 import hashlib
+import re
+import unicodedata
 from dataclasses import replace
 from typing import Any, Callable, Sequence
 
@@ -60,7 +62,10 @@ _SYSTEM = (
     "one string per numbered line, in the same order. Translate each line "
     "faithfully into the episode language: keep its sense, its register and "
     "roughly its length; keep every proper name as written; add nothing, "
-    "drop nothing, merge nothing, and write no notes or speaker labels."
+    "drop nothing, merge nothing, and write no notes. Each string is the "
+    "SPOKEN WORDS ONLY -- never repeat the speaker's name or a colon at the "
+    "start of a line; the name is already known and repeating it makes the "
+    "voice read it aloud."
 )
 
 
@@ -70,6 +75,75 @@ class TranslatedTexts(BaseModel):
 
 def _sha256(text: str) -> str:
     return hashlib.sha256(str(text or "").encode("utf-8")).hexdigest()
+
+
+#: A speaker label the model echoed back into the line it was asked to
+#: translate. The user prompt shows `N. SPEAKER: text` and says to return the
+#: texts alone; live proof 2026-09-18 (el_pico_de_hierro_es) shows the model
+#: returning "ANTÍFON DE EFESO: Ve, vete..." anyway -- and it TRANSLATED the
+#: name, so matching the plan's speaker string is not enough. TTS reads the
+#: label aloud and the caption burns it, so the strip is deterministic and
+#: never left to prompt wording.
+_ECHOED_LABEL = re.compile(r"^\s*([^\n:：]{1,40})[:：][ \t　]*")
+
+
+def _fold(text: str) -> str:
+    stripped = unicodedata.normalize("NFD", str(text or "").casefold())
+    return "".join(c for c in stripped if not unicodedata.combining(c)).strip()
+
+
+def _is_label_shaped(text: str, speaker: str = "") -> bool:
+    """Does ``text`` OPEN with something shaped like a speaker label?
+
+    True for the plan's own speaker (folded, so an accented or case-shifted
+    spelling matches) and for a short prefix before a colon carrying NO
+    lowercase -- "no lowercase" rather than "mostly uppercase" because
+    Chinese, Japanese and Devanagari have no case at all, and an uppercase
+    RATIO scores those labels zero.
+    """
+    match = _ECHOED_LABEL.match(str(text or ""))
+    if not match:
+        return False
+    prefix = match.group(1).strip()
+    if not any(c.isalpha() for c in prefix):
+        return False
+    return (not any(c.islower() for c in prefix)
+            or _fold(prefix) == _fold(speaker))
+
+
+def strip_echoed_label(text: str, speaker: str = "", source_text: str = "") -> str:
+    """Remove a leading speaker label from one translated line.
+
+    Strips when the prefix is the plan's own speaker (folded, so an accented
+    or case-shifted spelling still matches) OR is shaped like a label -- a
+    short run before the colon carrying NO lowercase. "No lowercase" rather
+    than "mostly uppercase" because Chinese, Japanese and Devanagari have no
+    case at all, and an uppercase RATIO scores those labels zero.
+
+    A line that merely contains a colon later is untouched, and so is
+    ordinary sentence-case prose before one.
+
+    ``source_text`` is the ENGLISH line this one translates, and it is the
+    discriminator that keeps a real salutation: if the source itself opens
+    with a LABEL-SHAPED prefix ("MY LORD: ..."), the translation is entitled
+    to one too and nothing is stripped. Only a prefix the model ADDED goes.
+    The source is judged by the same shape rule as the translation, so an
+    ordinary "Look: here they come" in the source does not disable the strip.
+    """
+    raw = str(text or "")
+    match = _ECHOED_LABEL.match(raw)
+    if not match:
+        return raw.strip()
+    if source_text and _is_label_shaped(str(source_text), speaker):
+        return raw.strip()
+    if not _is_label_shaped(raw, speaker):
+        return raw.strip()
+    # An empty remainder means the model returned ONLY a label. Returning the
+    # raw label here shipped "ANA:" as the whole spoken line, because the
+    # structural check had already run on the UNSTRIPPED text and passed it.
+    # The strip now happens inside that check (see `translate_entries`), so
+    # "" is the honest answer and the validator turns it into a retry.
+    return raw[match.end():].strip()
 
 
 def batch_entries(entries: Sequence[Any], *, max_source_words: int) -> list[list[int]]:
@@ -139,13 +213,20 @@ def translate_entries(
     for indices in batches:
         want = len(indices)
 
-        def _check(result: TranslatedTexts, want: int = want) -> str | None:
+        def _check(result: TranslatedTexts, want: int = want,
+                   indices: Sequence[int] = indices) -> str | None:
             if len(result.texts) != want:
                 return (f"returned {len(result.texts)} strings for {want} "
                         "numbered lines; return exactly one per line")
-            for n, text in enumerate(result.texts, 1):
-                if not str(text or "").strip():
-                    return f"line {n} came back empty"
+            # Validate what will actually SHIP -- the stripped line. Checking
+            # the raw reply let "ANA: " pass as non-empty and then ship the
+            # bare label as the whole spoken row.
+            for n, (index, text) in enumerate(zip(indices, result.texts), 1):
+                shipped = strip_echoed_label(
+                    str(text), entries[index].speaker, entries[index].text)
+                if not shipped.strip():
+                    return (f"line {n} came back empty (or as a bare speaker "
+                            "label); return the spoken words")
             return None
 
         attempts = 0
@@ -182,7 +263,9 @@ def translate_entries(
             ) from exc
         attempts_total += attempts or 1
         for i, text in zip(indices, result.texts):
-            translated[i] = replace(entries[i], text=" ".join(str(text).split()))
+            cleaned = strip_echoed_label(str(text), entries[i].speaker,
+                                         entries[i].text)
+            translated[i] = replace(entries[i], text=" ".join(cleaned.split()))
     receipt = {
         "receipt_version": RECEIPT_VERSION,
         "entries": len(entries),
@@ -219,6 +302,7 @@ __all__ = [
     "RECEIPT_VERSION",
     "TranslatedTexts",
     "batch_entries",
+    "strip_echoed_label",
     "translate_entries",
     "translate_plan",
 ]

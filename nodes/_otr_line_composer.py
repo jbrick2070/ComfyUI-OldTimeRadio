@@ -1632,7 +1632,7 @@ def _spoken_ordinal(value) -> str:
 
 def build_work_frame(
     *, work_title: str, author: str = "", act=None, scene=None,
-    episode_title: str = "",
+    episode_title: str = "", episode_meta=None,
 ) -> str:
     """The announcer's WORK phrase, assembled in Python and never composed.
 
@@ -1669,19 +1669,32 @@ def build_work_frame(
     work = clean_one_line(work_title)
     if not work:
         return ""
+    # THE JOINERS ARE ROW DATA (live proof 2026-09-18, el_pico_de_hierro_es):
+    # the Python-owned WORK sentence already spoke Spanish while this frame
+    # sat inside it saying "by William Shakespeare", so the announcer read an
+    # English preposition mid-line. The work's TITLE stays the work's own.
+    spoken = spoken_chrome(episode_meta)
     frame = work
     named_author = clean_one_line(author)
     if named_author:
         # "Nonsense Novels" alone means nothing to a modern listener; the
         # author is what makes it a real book rather than a phrase.
-        frame = f"{frame}, by {named_author}"
+        frame = spoken["work_by"].format(frame=frame, author=named_author)
 
-    act_word = _spoken_ordinal(act)
-    scene_word = _spoken_ordinal(scene)
+    # An ENGLISH ordinal word inside a native sentence is the same defect as
+    # the preposition, so a non-English row speaks the numeral it can read.
+    # Keyed on the ISO, never on a template string: comparing to the English
+    # template flips this silently if that template is ever edited, or if a
+    # row legitimately reuses the same wording.
+    native = _episode_iso(episode_meta) != _EPLANG.ENGLISH_ISO
+    act_word = str(int(act)) if native and _is_small_index(act) else _spoken_ordinal(act)
+    scene_word = (str(int(scene)) if native and _is_small_index(scene)
+                  else _spoken_ordinal(scene))
     if act_word and scene_word:
-        return f"{frame}, Act {act_word}, Scene {scene_word}"
+        return spoken["work_act_scene"].format(
+            frame=frame, act=act_word, scene=scene_word)
     if act_word:
-        return f"{frame}, Act {act_word}"
+        return spoken["work_act"].format(frame=frame, act=act_word)
 
     subtitle = clean_one_line(episode_title)
     # A subtitle that merely restates the work is noise ("The Canterville
@@ -1689,8 +1702,23 @@ def build_work_frame(
     # case- and punctuation-insensitive because the two fields are authored by
     # different producers.
     if subtitle and _loose_key(subtitle) != _loose_key(work):
-        return f'{frame}, an episode we call "{subtitle}"'
+        return spoken["work_subtitle"].format(frame=frame, subtitle=subtitle)
     return frame
+
+
+def _episode_iso(episode_meta) -> str:
+    """The ledger's language iso, or English for Off / legacy / unreadable."""
+    try:
+        return _EPLANG.iso_from_meta(episode_meta)
+    except Exception:  # noqa: BLE001 -- a label never costs an episode
+        return _EPLANG.ENGLISH_ISO
+
+
+def _is_small_index(value) -> bool:
+    try:
+        return 1 <= int(value) < len(_SPOKEN_ORDINALS)
+    except (TypeError, ValueError):
+        return False
 
 
 def _loose_key(text: str) -> str:
