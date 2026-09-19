@@ -590,8 +590,7 @@
       "url_is": "act_page",
       "edition": "Teatro completo di Shakspeare; Wikisource transcribes 1858",
       "note": "Operator hunt 2026-09-18: Rusconi's complete prose Shakespeare covers the whole target list. CORPUS index -- resolve to the play, then the scene.",
-      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ant. Buon Angelo, bisogna",
-      "hold": "NO ENGLISH SIDECAR, held 2026-09-19. The Rusconi rule reads this scene cleanly -- 32 speeches across 8 real speakers (ANT. DI E, ANT, BALD, LUCIA, DROM, ADR, ANG, DROM. DI S), no directions and no footnotes among them -- so the EXTRACTOR is not what stops it. There is no `sources/comedy_of_errors__act3_scene1.txt`, so there is no roster to bind the labels to and the binding test cannot pass. Note the two twin pairs: `ANT. DI E` is Antipholus of Ephesus against a bare `ANT`, and `DROM. DI S` is Dromio of Syracuse against a bare `DROM` -- when the sidecar lands, those four must bind to four DIFFERENT characters or the play's whole joke lands in the wrong mouths."
+      "url_found_by": "url hunt 2026-09-19; heading on page SCENA I.; first line: Ant. Buon Angelo, bisogna"
     },
     {
       "iso": "it",

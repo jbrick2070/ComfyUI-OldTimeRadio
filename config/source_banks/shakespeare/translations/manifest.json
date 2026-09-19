@@ -747,6 +747,54 @@
     },
     {
       "iso": "it",
+      "play": "comedy_of_errors",
+      "scene": "3.1",
+      "file": "it/comedy_of_errors_3_1.txt",
+      "translator": "Carlo Rusconi",
+      "translator_death_date": 1889,
+      "translation_first_published": 1838,
+      "transcription_license": "CC BY-SA 3.0 + GFDL (Wikisource transcription; the translation itself is public domain)",
+      "source_url": "https://it.wikisource.org/wiki/La_commedia_degli_equivochi/Atto_terzo",
+      "revision_id": "sha256:7d3adb5ac7f87be6",
+      "raw_sha256": "7d3adb5ac7f87be63da06aba8f0e5878b311ffa6492a254a0c99f605bc5afd9e",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 32,
+      "distinct_speakers": 8,
+      "speaker_map": {
+        "ANT. DI E": {
+          "spoken": "ANTIPHOLUS OF EPHESUS",
+          "roster": "ANTIPHOLUS OF EPHESUS"
+        },
+        "ANT": {
+          "spoken": "ANTIPHOLUS OF EPHESUS",
+          "roster": "ANTIPHOLUS OF EPHESUS"
+        },
+        "DROM. DI S": {
+          "spoken": "DROMIO OF SYRACUSE",
+          "roster": "DROMIO OF SYRACUSE"
+        },
+        "BALD": {
+          "spoken": "BALTHASAR",
+          "roster": "BALTHASAR"
+        },
+        "LUCIA": {
+          "spoken": "LUCE",
+          "roster": "LUCE"
+        },
+        "ADR": {
+          "spoken": "ADRIANA",
+          "roster": "ADRIANA"
+        },
+        "ANG": {
+          "spoken": "ANGELO",
+          "roster": "ANGELO"
+        }
+      }
+    },
+    {
+      "iso": "it",
       "play": "hamlet",
       "scene": "1.1",
       "file": "it/hamlet_1_1.txt",

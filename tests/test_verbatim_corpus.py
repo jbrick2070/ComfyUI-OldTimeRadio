@@ -701,6 +701,14 @@ _ENGLISH_STEM = {
 _KNOWN_UNBOUND = {
     "ANTIPHOLUS", "DROMIO", "ANTÍFOLO",
     "AMIPHOLUS D’ÉPHÈSE",
+    # Rusconi's abbreviation of the same ambiguity. He marks the Syracusan twin
+    # explicitly as `Drom. di S`, so a bare `Drom` is PROBABLY the Ephesian --
+    # and probably is not good enough in the one play whose entire plot is two
+    # pairs of identical twins being mistaken for each other. Note the contrast
+    # with `ANT`, which IS bound: this scene's English roster carries only one
+    # Antipholus, so that label is not ambiguous at all. Ambiguity is judged
+    # against the SCENE's roster, not against the play's cast list.
+    "DROM",
     # Snug speaks in Rusconi's and Zhu Shenghao's Midsummer 3.1 and never
     # speaks in the Folger sidecar, where he appears only in the entry and
     # exit directions. Two translators, independently, gave him lines.
