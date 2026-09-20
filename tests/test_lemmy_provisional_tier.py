@@ -608,6 +608,29 @@ def test_the_writer_stage_bark_preset_SURVIVES_the_normalizer(pin_provisional):
     assert _rows(out)["c02"]["voice_preset"] == "v2/en_speaker_8"
 
 
+def test_a_provisional_stamp_keeps_the_writer_preset_whatever_engine_auditions_it(pin_provisional):
+    """A STATED TENSION, PINNED SO IT CANNOT MOVE QUIETLY (2026-09-20).
+
+    The Lime fix (2026-09-17) clears a leftover Bark `v2/` preset on a
+    non-bark stamp; the test above pins that Lemmy's writer-stage preset
+    survives a provisional (audition) stamp. `_stamp` reconciles them by
+    skipping the clear on `fallback == "provisional_route"` -- for EVERY
+    engine, including kokoro, which is a real shipped provisional route for
+    Lemmy. So a kokoro-spoken Lemmy row carries `v2/en_speaker_8`, which the
+    Lime comment says a kokoro row must not. Measured: kokoro's dispatch
+    reads `voice_ref_id`, never `voice_preset`, so the kept value changes no
+    audio; which contract should win is the operator's call and is recorded
+    in the ship note. This test makes the current answer explicit.
+    """
+    row = _locked_lemmy(pin_provisional, "kokoro", KOKORO_REF, "bank_voice_id",
+                        "kokoro_builtin")
+    assert row["voice_engine"] == "kokoro"
+    assert row["voice_cast_fallback"] == "provisional_route"
+    assert row["voice_preset"] == "v2/en_speaker_8"          # kept, by the carve-out
+    ref_field, voice_ref = _dispatch_identity("kokoro", row)
+    assert ref_field == "voice_ref_id" and voice_ref == KOKORO_REF  # the preset is inert here
+
+
 # ---------------------------------------------------------------------------
 # 8. CASTLOCK -- preserve_ledger. The canonical graph runs auto_registry, so a
 #    stamp wired only there is invisible in half of production.

@@ -86,3 +86,22 @@ wants an owner, and the pair in #14 is variance to watch, not a regression.
 * **#12 unchanged** -- the audition wavs the receipt names are not on this
   box; environmental.
 * Remaining, unchanged: #1, #3-#8, #10, #12-#14 as classified above.
+
+## One design call for the operator (not a defect; from Sonnet on `8d064235`)
+
+Two contracts meet on the cast row's `voice_preset`: the Lime rule
+(2026-09-17: a row spoken by kokoro/google/elevenlabs must not carry a
+leftover Bark `v2/` preset) and the Lemmy rule (2026-08-16: the writer-stage
+preset is Lemmy's identity and CastLock leaves it alone). The #11 fix keeps
+the preset on every provisional (audition) stamp, so a Lemmy row auditioned
+through kokoro -- a real shipped route -- keeps `v2/en_speaker_8` on a
+kokoro-spoken row. Measured: only bark's dispatch reads `voice_preset`,
+kokoro reads `voice_ref_id`, and the credits prefer `voice_engine` /
+`voice_ref_id`, so the kept value changes no audio and no credit line; it is
+a ledger-hygiene inconsistency, pinned as such by
+`test_a_provisional_stamp_keeps_the_writer_preset_whatever_engine_auditions_it`.
+Sonnet also could not find any production reader that needs the preset to
+survive a non-bark stamp (the "two-stage" behaviour lives in the pinned
+test and a docstring, now corrected). The options are: leave it (today);
+or let Lime win everywhere and retire the survival test. Neither blocks a
+ship.

@@ -1951,6 +1951,20 @@ class CastLock:
         # what `test_the_writer_stage_bark_preset_SURVIVES_the_normalizer`
         # pinned and the Lime fix above then broke. The Lime rows are policy
         # and deterministic stamps, never provisional, so they still clear.
+        #
+        # THE CARVE-OUT IS ENGINE-BLIND, AND THAT IS A STATED TENSION, NOT
+        # AN OVERSIGHT. Lemmy's shipped provisional routes include kokoro
+        # (`config/cast_pools.py`, provisional_native_routes), so a
+        # kokoro-spoken Lemmy row keeps the `v2/` preset here, which the
+        # Lime comment above says a kokoro row must not. Two contracts meet
+        # on one field: Lime's ledger hygiene and Lemmy's upstream-owned
+        # identity. Measured 2026-09-20 (Sonnet, on 8d064235): nothing but
+        # bark's dispatch reads `voice_preset`, kokoro reads `voice_ref_id`,
+        # and the credits prefer `voice_engine` / `voice_ref_id`, so the
+        # kept value changes no audio and no credit. Which contract wins is
+        # the operator's design call (ship note, 2026-09-19); until it is
+        # made, the provisional stamp keeps the preset for every engine and
+        # `test_a_provisional_stamp_keeps_the_writer_preset...` pins that.
         if (str(getattr(ref, "engine", "") or "") != "bark"
                 and fallback != "provisional_route"):
             leftover = str(entry.get("voice_preset") or "")
