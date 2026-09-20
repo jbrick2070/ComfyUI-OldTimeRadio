@@ -173,6 +173,7 @@ nodes/_otr_audio_engines/eng_indextts2.py
 # paths; docs/ appears only inside error-message STRINGS). Readers get all of
 # it on GitHub, where the README's relative links actually resolve.
 CLAUDE.md
+AGENTS.md
 BUG_LOG.md
 BUG_LOG_2026-06.md
 session_handoff.md
