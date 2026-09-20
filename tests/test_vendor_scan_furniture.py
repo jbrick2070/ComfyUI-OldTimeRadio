@@ -444,7 +444,7 @@ def test_a_fold_binds_a_printed_form_only_when_its_target_is_in_the_scene():
         scan.FOLDS.clear()
     # populated from the command line, validated against the roster, recorded
     source = inspect.getsource(scan.main)
-    assert "FOLDS.clear()" in source and "not in this scene" in source
+    assert "FOLDS.clear()" in source and "parse_folds(" in source
     assert '"folds"' in source, "a fold that is not recorded is not provenance"
 
 
@@ -513,3 +513,145 @@ def test_known_limit_the_head_band_is_read_first_when_the_two_overlap():
     stripped = scan.strip_running_titles(pages)
     assert not any("TITULO" in page for page in stripped)
     assert all("RODAPE" in page for page in stripped)
+
+
+def test_a_misprinted_heading_word_is_still_decoration_beside_a_folio():
+    """The 1914 Tempestade, pages 48, 96 and 158: `SOENA II A TEMPESTADE 31`.
+
+    The optical reader returned the recto head with one letter wrong on three
+    pages. The heading peel keyed on the spelling `SCENA`, so the row's
+    identity stayed `SOENA II A TEMPESTADE`, never voted, never matched, and
+    on page 48 the whole head shipped at the end of a Prospero speech --
+    found by two reviewers after the scene was pushed. Beside a folio the
+    heading word is decoration whatever the scanner made of it; away from a
+    folio the spelling still governs, so a bare misprint is not invented into
+    a heading.
+    """
+    scan = _scan()
+    parts = scan._edge_folio_parts
+    assert parts("SOENA II A TEMPESTADE 31") == ("TEMPESTADE", True)
+    assert parts("SOENA II TEMPESTADE 79") == ("TEMPESTADE", True)
+    assert parts("10 A TEMPESTADE AOTO I") == ("TEMPESTADE", True)
+    # no folio: the loose form does not apply, and the row is what it was
+    assert parts("SOENA II A TEMPESTADE") == ("SOENA II A TEMPESTADE", False)
+    # a speaker beside a folio is still the speaker
+    assert parts("31 MACBETH") == ("MACBETH", True)
+
+    # end to end: nine good heads carry the vote and the misprinted tenth is
+    # removed by where it sits, with the speaker below it untouched
+    def page(head, n):
+        return "\n".join([head, "primeira linha %d" % n, "segunda linha %d" % n,
+                          "PRÓSPERO", "Meu gentil Ariel, escuta ao ouvido %d." % n,
+                          "MIRANDA", "Sim, senhor %d." % n, "ultima linha %d" % n])
+    pages = [page("SCENA II A TEMPESTADE %d" % (20 + n), n) for n in range(9)]
+    pages.append(page("SOENA II A TEMPESTADE 31", 9))
+    out = scan.strip_running_titles(pages)
+    assert out[-1].splitlines()[0] == "", out[-1]
+    assert "PRÓSPERO" in out[-1] and "Meu gentil Ariel" in out[-1]
+
+
+def test_a_song_heading_is_a_cue_for_the_singer():
+    """The 1914 Tempestade, page 51: `Canto de Áriel` on a line of its own.
+
+    Ramos does not label Ariel's songs `ÁRIEL`; he heads them `Canto de
+    Áriel`. The own-line cue rule reads a line by whether the WHOLE of it
+    resolves, which that heading does not, so the song and its chorus were
+    stored inside the Prospero speech before it and shipped -- a voice engine
+    would have sung Ariel's song in Prospero's voice. The heading names the
+    singer, and only a name that resolves makes it a cue.
+    """
+    scan = _scan()
+    roster = {"PROSPERO", "ARIEL", "MIRANDA"}
+    span = "\n".join([
+        "PRÓSPERO", "¿Então, escravo ? ¡ vai ! (Sai Caliban.)",
+        "Ariel torna á scena, invisível, a tocar e a cantar;",
+        "Canto de Áriel", "Desembarca nesta areia dourada", "depois, dai-vos as mãos :",
+        "ARIEL", "¡ Escuta, escuta ! eu oiço o cantar do galo",
+        "Canto de Ninguém", "esta fica onde está",
+    ])
+    pairs = scan.speeches_from_span(span, roster)
+    got = [(scan.resolve(label, roster), speech) for label, speech in pairs]
+    assert [name for name, _ in got] == ["PROSPERO", "ARIEL", "ARIEL"], got
+    assert got[0][1].startswith("¿Então, escravo ?") and got[0][1].endswith("a cantar")
+    assert got[1][1].startswith("Desembarca nesta areia dourada"), got[1]
+    assert "Canto de Áriel" not in " ".join(s for _, s in got)   # a cue, never text
+    assert "Canto de Ninguém" in got[2][1]                        # nobody is not a singer
+
+
+def test_a_fold_is_declared_under_the_key_the_resolver_looks_up():
+    """Review found the declared form and the looked-up form were two keys.
+
+    `--fold "FERNANDO.=FERDINAND"` was stored under `FERNANDO.`, looked up
+    under `FERNANDO`, accepted, and inert -- no error, no binding. One
+    function now makes the key on both sides. Review also reproduced
+    `MIRANDA -> FERDINAND` from a mistyped declaration: a fold is for a form
+    the resolver cannot reach, so a form it binds exactly is refused, and the
+    exact pass runs before the fold in any case. Two targets for one form
+    refuse rather than letting the last one win, and nothing is kept unless
+    every declaration passes.
+    """
+    scan = _scan()
+    tempest = {"FERDINAND", "MIRANDA", "PROSPERO"}
+    for spec in ("FERNANDO.=FERDINAND", "Férnando (aparte)=ferdinand",
+                 " FERNANDO = FERDINAND "):
+        folds, why = scan.parse_folds([spec], tempest)
+        assert folds == {"FERNANDO": "FERDINAND"} and not why, (spec, folds, why)
+    for bad in (["FERNANDO"], ["=FERDINAND"], ["FERNANDO="], ["FERNANDO=KENT"],
+                ["MIRANDA=FERDINAND"], ["FERNANDO=FERDINAND", "FERNANDO=MIRANDA"]):
+        folds, why = scan.parse_folds(bad, tempest)
+        assert folds == {} and why, (bad, folds, why)
+    # the same declaration twice is one declaration
+    assert scan.parse_folds(["FERNANDO=FERDINAND"] * 2, tempest) == (
+        {"FERNANDO": "FERDINAND"}, "")
+    # and even a fold that reaches the map cannot move an exact name
+    scan.FOLDS.clear()
+    scan.FOLDS["MIRANDA"] = "FERDINAND"
+    try:
+        assert scan.resolve("MIRANDA", tempest) == "MIRANDA"
+    finally:
+        scan.FOLDS.clear()
+
+
+def test_the_running_head_vote_is_taken_on_the_whole_volume_not_the_window():
+    """Astra, on `76f88d8c`: the window disarmed the guard it was meant to keep.
+
+    The 1912 Macbeth prints `SCENA III` at the edge of twelve pages, so the
+    whole volume votes it a running head and `main` refuses to guess the
+    boundary without `--end-label`. Asked of pages 33-46 the vote was one,
+    the guard stood down, the finder stopped at the running head on page 44,
+    and 41 speeches of 48 were stored as a whole scene at confidence 1.0.
+    The vote is a property of the book, so it is taken before the window.
+    """
+    import inspect
+    scan = _scan()
+    head = "SCENA III 3%d\nMACBETH\nfala %d.\nBANQUO\nresposta %d."
+    volume = ([head % (n, n, n) for n in range(6)]
+              + ["prosa %d\nmais prosa %d." % (n, n) for n in range(6)])
+    assert "SCENA III" in scan.recurring_headings(volume)
+    assert "SCENA III" not in scan.recurring_headings(volume[2:4])  # the window cannot see it
+    source = inspect.getsource(scan.main)
+    assert source.index("recurring_headings(") < source.index("slice_pages("), (
+        "the running-head vote must be taken on the whole volume, before the window")
+
+
+def test_a_window_edge_is_not_evidence_the_scene_ended():
+    """Astra: page 58 of the Clark Tempest alone returned 814 characters of a
+    4,822-character scene with no error, and `--write` would have stored it
+    READY at confidence 1.0.
+
+    `extract` ends a scene at the next heading of the same shape or, finding
+    none, at the end of its input. On a whole volume that is the end of the
+    book; on a window it is wherever the caller stopped reading.
+    """
+    import inspect
+    scan = _scan()
+    lines = ["ESCENA PRIMERA .", "FERNANDO.", "Hay ejercicios penosos.", "MIRANDA.",
+             "Ay, no trabajeis tanto.", "", ""]
+    ran_off = "\n".join(l for l in lines if l.strip())
+    assert scan.window_truncates(ran_off, lines, False)            # the window cut it
+    assert scan.window_truncates(ran_off, lines, True) == ""       # the book ended there
+    closed = lines + ["ESCENA II.", "PROSPERO.", "Ya."]
+    assert scan.window_truncates(ran_off, closed, False) == ""     # a heading closed it
+    assert scan.window_truncates("", lines, False) == ""
+    source = inspect.getsource(scan.main)
+    assert "window_truncates(" in source, "the refusal is not wired where the window is read"

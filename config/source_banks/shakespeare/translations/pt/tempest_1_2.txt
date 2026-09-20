@@ -83,7 +83,7 @@ PRÓSPERO: Sacode-o. Levanta-te ; veremos agora o meu escravo Cáliban que nunca
 MIRANDA: É um vilão, senhor, que eu não gosto de encarar
 PRÓSPERO: Mas que, tal qual é, não podemos dispensar : êle acende o lume, racha a lenha, e os seus serviços sãonos úteis. ¡ Olá, escravo ! ¡ Caliban ! Tu, pó, ¿ ouves ?
 CÁLIBAN: (dentro) Ha bastante lenha aquí
-PRÓSPERO: Anda cá, ¿ouves ? ha aquí outro serviço para ti : ¡vem, cágado ! ¿ então ? (Volta Áriel transformado em ninfa.) ¡ Aparição encantadora ! Meu gentil Ariel, escuta ao ouvido. SOENA II A TEMPESTADE 31
+PRÓSPERO: Anda cá, ¿ouves ? ha aquí outro serviço para ti : ¡vem, cágado ! ¿ então ? (Volta Áriel transformado em ninfa.) ¡ Aparição encantadora ! Meu gentil Ariel, escuta ao ouvido
 ARIEL: Meu senhor, assim se fará. (Sai.)
 PRÓSPERO: Tu, peçonhento escravo, gerado pelo proprio diabo na tua peçonhenta mãe, anda cá (11)
 CÁLIBAN: Venha sobre vós ambos o mais nocivo rocio que jamais minha mãe aspergíu com penas de côrvo mergulhadas em repulsivo pântano ! Que um sôpro do ábrego vos toque e vos cubra de pústulas todo o corpo !
@@ -95,7 +95,8 @@ PRÓSPERO: ¡Vil escravo, que nenhum assômo de bondade mostrará, e que só é 
 CÁLIBAN: Ensinastes-me a falar; de isso, o meu único proveito, é saber amaldiçoar. ¡ Que a peste rubra (12) vos rôa, por me haverdes ensinado a vossa lingua !
 PRÓSPERO: ¡Fóra de aquí, raça de feiticeira ! ¡ e á lenha, depressa! que outras coisas tens para fazer. ¿ Encolhes os hombros, malicia ? Se não obedeces ao que te mando, ou o fazes de má vontade, atormentar-te-ei com cãi bras tais, que os ossos, com a dôr, te farão rugir de modo que as proprias feras tremerão ao ouvir-te
 CÁLIBAN: Não, tem dó. (Aparte.) Não posso deixar de obedecer-lhe : é tal o poder de que dispõe que dominaría a Sétebos , o deus de minha mãe, e o faría seu vassalo
-PRÓSPERO: ¿Então, escravo ? ¡ vai ! (Sai Caliban.) Ariel torna á scena, invisível, a tocar e a cantar; Fernando vem-no seguindo. Canto de Áriel Desembarca nesta areia dourada depois, dai-vos as mãos : as indómitas vagas se acalmarão quando vos saüdardes e beijardes : pisa ligeiro aquí e alêm ; espíritos gentís, entoai o côro. Côro (dispersamente) ¡ Escuta, escuta ! Bau-au, Próspero ,escravo :¿Então ?¡vai !» cão de guarda ladra : Bau-au
+PRÓSPERO: ¿Então, escravo ? ¡ vai ! (Sai Caliban.) Ariel torna á scena, invisível, a tocar e a cantar; Fernando vem-no seguindo
+ARIEL: Desembarca nesta areia dourada depois, dai-vos as mãos : as indómitas vagas se acalmarão quando vos saüdardes e beijardes : pisa ligeiro aquí e alêm ; espíritos gentís, entoai o côro. Côro (dispersamente) ¡ Escuta, escuta ! Bau-au, Próspero ,escravo :¿Então ?¡vai !» cão de guarda ladra : Bau-au
 ARIEL: ¡ Escuta, escuta ! eu oiço o cantar do airoso galo que diz : có -k'ri-cô
 FERNANDO: ¿Onde será esta música ? ¿no ar ou na terra ? Cessou : certamente pertence a alguma divindade da ilha. Sentado numa riba, chorando ainda o naufragio do rei meu pai, essa harmonía chegou aos meus ouvidos, vinda do mar, e acalmou com os seus harmoniosos sons a furia das aguas e a minha dôr : então seguí-a, ou, melhor dito, ela arrastou-me. Cessou. Ei-la de novo
 ARIEL: (canta) Num fundo de cinco braças jaz teu pai ; de seus ossos corais são feitos ; seus olhos tornaram-se pérolas : nada de êle desapareceu , mas transformou-se no mar em riqueza e raridade. Ninfas do mar tocai de hora em hora o dobre de finados : Côro : din-dão

@@ -1633,12 +1633,12 @@
       "translation_first_published": 1914,
       "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
       "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/68/William_Shakespeare_-_A_Tempestade_%28trad._Domingos_Ramos%2C_1914%29.pdf",
-      "revision_id": "sha256:d95f6e8cc610b1c0",
-      "raw_sha256": "d95f6e8cc610b1c0948747576b475f23361e3ae6b9a85761c64acb58ceefed59",
+      "revision_id": "sha256:1323d5f02b7e5ba7",
+      "raw_sha256": "1323d5f02b7e5ba7547c960e923925063beb8417219de85824093be6dc52bc9b",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "SCENA II",
-      "speaker_labels": 137,
+      "speaker_labels": 138,
       "distinct_speakers": 5,
       "speaker_map": {
         "MIRANDA": {

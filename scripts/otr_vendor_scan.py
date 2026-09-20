@@ -196,6 +196,19 @@ _STAGE_OPENER = re.compile(
     r"ENTRAN|ENTRA\b|SALEN|SALE|VANSE|VASE|"
     r"ENTER|EXEUNT|EXIT)\b")
 
+#: A SONG IS A SPEECH WITH A DIFFERENT HEADING. The 1914 Tempestade does not
+#: label Ariel's songs `ÁRIEL`; it heads them `Canto de Áriel` on a line of
+#: their own (page 51). The own-line cue rule in `speeches_from_span` reads a
+#: line by whether the WHOLE of it resolves, which that heading does not, so
+#: the song and its chorus were stored inside the Prospero speech before it
+#: and shipped -- a voice engine would have sung Ariel's song in Prospero's
+#: voice. Found by review after the push. The heading names the singer, so
+#: it is a cue for the singer: a song word, a preposition, and a name -- and
+#: only when the name resolves to someone in the scene.
+_SONG_HEADING = re.compile(
+    r"(?i)^(?:canto|canção|cancao|canción|cancion|canzone|chanson|song)\s+"
+    r"(?:de|di|d'|of)\s+(?P<who>[^\n]{2,30}?)\s*[.:]?$")
+
 #: A SWALLOWED SPEAKER LABEL, BY ITS SHAPE. A lower-case letter running
 #: straight into capitals inside one token is not a word in Spanish,
 #: Portuguese or Italian -- it is a broken word welded onto the name of the
@@ -525,6 +538,55 @@ PLACE_NAMES = {
 }
 
 
+def label_key(token: str) -> str:
+    """The comparison form of a printed speaker label.
+
+    ONE FUNCTION, BECAUSE TWO SPELLINGS OF IT WERE TWO KEYS. The lookup in
+    `resolve` stripped a stage qualifier and the trailing stop; a `--fold`
+    declaration did not, so `--fold "FERNANDO.=FERDINAND"` was stored under
+    `FERNANDO.`, looked up under `FERNANDO`, accepted and inert -- no error
+    and no binding. Every printed form, from the page or from the command
+    line, comes through here.
+    """
+    return fold(_LABEL_QUALIFIER.sub("", token)).strip(" .")
+
+
+def parse_folds(specs, roster: set[str]):
+    """``(folds, "")`` from `--fold PRINTED=ROSTER` specs, or ``({}, why)``.
+
+    EVERY DECLARATION IS CHECKED BEFORE ANY IS KEPT, so a refusal leaves
+    nothing half-applied. Four shapes are refused, each loudly: a spec with
+    no `=` or an empty side; a target who is not in this scene's roster (a
+    typo, or a fold copied from another scene -- either would bind a speech
+    to someone not on the stage); a printed form the resolver already binds
+    exactly, which is a character's own name and would move every one of
+    their speeches (review reproduced `MIRANDA -> FERDINAND` from one
+    mistyped declaration); and one printed form declared with two targets,
+    which a dict would settle silently by whichever came last. The printed
+    side is normalised by `label_key`, the same function the lookup uses.
+    """
+    exact = {fold(name) for name in roster}
+    folds: dict[str, str] = {}
+    for spec in specs:
+        printed, sep, target = spec.partition("=")
+        printed, target = label_key(printed), target.strip().upper()
+        if not sep or not printed or not target:
+            return {}, ("--fold wants PRINTED=ROSTER, e.g. FERNANDO=FERDINAND; got %r"
+                        % spec)
+        if target not in roster:
+            return {}, ("REFUSING: --fold %s names %r, who is not in this scene's "
+                        "roster %s" % (spec, target, sorted(roster)))
+        if printed in exact:
+            return {}, ("REFUSING: --fold %s renames %s, whom the resolver already "
+                        "binds exactly; a fold is for a form it cannot reach"
+                        % (spec, printed))
+        if folds.get(printed, target) != target:
+            return {}, ("REFUSING: --fold declares %s twice, as %s and as %s"
+                        % (printed, folds[printed], target))
+        folds[printed] = target
+    return folds, ""
+
+
 def resolve(token: str, roster: set[str]) -> str | None:
     """The English roster name this printed label stands for, or None.
 
@@ -533,14 +595,20 @@ def resolve(token: str, roster: set[str]) -> str | None:
     so none of them becomes a speaker.
     """
     folded = {fold(n): n for n in roster}
-    key = fold(_LABEL_QUALIFIER.sub("", token)).strip(" .")
-    # A DECLARED FOLD WINS, AND ONLY WHEN ITS TARGET IS IN THIS SCENE. The
-    # roster check is not belt and braces: it is what keeps a fold declared
-    # for one scene from binding a name in another.
-    if key in FOLDS and FOLDS[key] in roster:
-        return FOLDS[key]
+    key = label_key(token)
     if key in folded:
         return folded[key]
+    # A DECLARED FOLD IS CONSULTED ONLY AFTER THE EXACT PASS FINDS NOTHING,
+    # and only when its target is in this scene. Exact first, because a fold
+    # exists for a printed form the resolver cannot reach; a form it binds
+    # exactly is somebody's own name, and a fold that moved it would put
+    # every one of that character's speeches in another mouth. `parse_folds`
+    # refuses such a declaration; this order is what makes that refusal a
+    # courtesy rather than the only thing standing. The roster check is not
+    # belt and braces: it is what keeps a fold declared for one scene from
+    # binding a name in another.
+    if key in FOLDS and FOLDS[key] in roster:
+        return FOLDS[key]
 
     # A TITLE IS NOT A NAME. `DUQUE DE BORGONHA` is Burgundy, whom Folger lists
     # by the place alone, so the title comes off before anything else is tried.
@@ -602,12 +670,30 @@ def clean_label(token: str) -> str:
 #: `SCENA II A TEMPESTADE 9`, `10 A TEMPESTADE ACTO I`. The word, a numeral
 #: or spelled ordinal, an optional stop. Used only to peel the identity of an
 #: edge row down to its title; never to find a scene.
-_HEADING_TOKEN = (r"(?:ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)\s*"
-                  r"(?:[IVXLC]{1,6}|\d{1,3}|PRIMEIR[OA]|SEGUND[OA]|TERCEIR[OA]|"
-                  r"QUART[OA]|QUINT[OA]|PRIMER[OA]|SEGUNDO|TERCERO|CUARTO|QUINTO)"
-                  r"\s*[.,]?")
+_HEADING_NUMERAL = (r"(?:[IVXLC]{1,6}|\d{1,3}|PRIMEIR[OA]|SEGUND[OA]|TERCEIR[OA]|"
+                    r"QUART[OA]|QUINT[OA]|PRIMER[OA]|SEGUNDO|TERCERO|CUARTO|QUINTO)")
+_HEADING_TOKEN = (r"(?:ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)\s*" + _HEADING_NUMERAL
+                  + r"\s*[.,]?")
 _LEADING_HEADING = re.compile(r"^" + _HEADING_TOKEN + r"\s+(?P<rest>.+)$", re.I)
 _TRAILING_HEADING = re.compile(r"^(?P<rest>.+?)[\s,]+" + _HEADING_TOKEN + r"$", re.I)
+
+#: THE SCANNER MISPRINTS THE HEADING WORD, AND BESIDE A FOLIO THE PEEL MUST
+#: NOT CARE. The 1914 Tempestade's recto head is `SCENA II A TEMPESTADE 31`,
+#: and on pages 48, 96 and 158 the optical reader returns it as `SOENA II`
+#: -- one letter off. The strict token above does not fire, the row's
+#: identity stays `SOENA II A TEMPESTADE`, and it neither votes nor matches:
+#: on page 48 the whole head shipped at the END of a Prospero speech, found
+#: by two reviewers after the scene was pushed. A misprint is rare by
+#: nature, so a spelling test is the wrong test: the row is furniture
+#: because of WHERE it sits (an edge row beside a folio) and WHAT is left
+#: when the decoration comes off (the voted title). So beside a folio, any
+#: short capitalised word followed by a numeral is a heading token. Away
+#: from a folio the strict spelling still governs, so a bare misprint is
+#: never invented into a heading.
+_LOOSE_HEADING_TOKEN = r"(?:[A-ZÀ-Þ]{3,8})\s*" + _HEADING_NUMERAL + r"\s*[.,]?"
+_LOOSE_LEADING_HEADING = re.compile(r"^" + _LOOSE_HEADING_TOKEN + r"\s+(?P<rest>.+)$")
+_LOOSE_TRAILING_HEADING = re.compile(
+    r"^(?P<rest>.+?)[\s,]+" + _LOOSE_HEADING_TOKEN + r"$")
 
 
 def _edge_folio_parts(text):
@@ -664,10 +750,14 @@ def _edge_folio_parts(text):
         # before this guard existed. What remains after a peel must not be
         # heading-shaped, or the peel does not happen.
         lead = _LEADING_HEADING.match(title)
+        if not lead and folio_attached:
+            lead = _LOOSE_LEADING_HEADING.match(title)
         if lead and lead.group("rest").strip() \
                 and not _HEADING_SHAPED.match(lead.group("rest").strip()):
             title, peeled = lead.group("rest"), True
         trail = _TRAILING_HEADING.match(title)
+        if not trail and folio_attached:
+            trail = _LOOSE_TRAILING_HEADING.match(title)
         if trail and trail.group("rest").strip() \
                 and not _HEADING_SHAPED.match(trail.group("rest").strip()):
             title, peeled = trail.group("rest"), True
@@ -1013,6 +1103,23 @@ def strip_running_titles(pages: list[str]) -> list[str]:
     return out
 
 
+def _window_bounds(spec: str, n_pages: int):
+    """``(first, last, "")`` for a `START-END` window, or ``(None, None, why)``."""
+    first, _, last = spec.partition("-")
+    try:
+        first = int(first)
+        last = int(last) if last.strip() else first
+    except ValueError:
+        return None, None, ("--pages wants START-END as page indexes, e.g. 244-255; "
+                            "got %r" % spec)
+    if first > last:
+        return None, None, "--pages %s runs backwards" % spec
+    if not 0 <= first < n_pages or last >= n_pages:
+        return None, None, ("--pages %s is outside this volume's 0..%d"
+                            % (spec, n_pages - 1))
+    return first, last, ""
+
+
 def slice_pages(pages: list[str], spec: str):
     """``(pages, why)`` for a `START-END` page window, or ``(None, why)``.
 
@@ -1030,20 +1137,40 @@ def slice_pages(pages: list[str], spec: str):
     store a wrong scene quietly, which is the failure this corpus cannot
     afford.
     """
-    first, _, last = spec.partition("-")
-    try:
-        first = int(first)
-        last = int(last) if last.strip() else first
-    except ValueError:
-        return None, ("--pages wants START-END as page indexes, e.g. 244-255; "
-                      "got %r" % spec)
-    if first > last:
-        return None, "--pages %s runs backwards" % spec
-    if not 0 <= first < len(pages) or last >= len(pages):
-        return None, ("--pages %s is outside this volume's 0..%d"
-                      % (spec, len(pages) - 1))
+    first, last, why = _window_bounds(spec, len(pages))
+    if why:
+        return None, why
     return pages[first:last + 1], ("restricted to pages %d-%d of the volume"
                                    % (first, last))
+
+
+def window_truncates(body: str, lines: list[str],
+                     window_reaches_volume_end: bool) -> str:
+    """Why a page window's edge cannot stand in for the scene's end, or "".
+
+    A WINDOW'S LAST LINE IS WHERE THE CALLER STOPPED READING, NOT WHERE THE
+    SCENE STOPPED. `extract` ends a scene at the next heading of the same
+    shape and, finding none, at the end of its input. On a whole volume that
+    is the end of the book and a legitimate boundary; on a window it is an
+    arbitrary page. The Clark Tempest 3.1 asked for page 58 alone returned
+    814 characters of a 4,822-character scene with no error, and `--write`
+    would have stored the fragment as READY at confidence 1.0. The scene
+    ran to the end of its input exactly when nothing non-blank follows the
+    last occurrence of its final line; a heading that closed it always
+    follows the body, so a closed scene cannot be mistaken for this. A
+    window that reaches the volume's last page is the whole-volume case and
+    is allowed.
+    """
+    if window_reaches_volume_end or not body.strip():
+        return ""
+    last = body.rstrip().splitlines()[-1].rstrip()
+    tail = [line.rstrip() for line in lines]
+    at = max((i for i, line in enumerate(tail) if line == last), default=-1)
+    if at < 0 or any(line.strip() for line in tail[at + 1:]):
+        return ""
+    return ("the scene runs to the last line of the page window with no heading "
+            "to close it -- the window's edge is not evidence the scene ended; "
+            "widen --pages or pass --end-label")
 
 
 def speeches_from_span(span: str, roster: set[str]) -> list[tuple[str, str]]:
@@ -1072,6 +1199,12 @@ def speeches_from_span(span: str, roster: set[str]) -> list[tuple[str, str]]:
         tok = m.group("tok").strip()
         if tok and resolve(tok, roster):
             own_line.append((m.start("tok"), m.end("tok"), tok))
+            continue
+        # `Canto de Áriel`: the singer's name, on the heading's span, so the
+        # heading is the cue and never part of anyone's text.
+        song = _SONG_HEADING.match(tok)
+        if song and resolve(song.group("who"), roster):
+            own_line.append((m.start("tok"), m.end("tok"), song.group("who").strip()))
 
     marks, rejected = [], collections.Counter()
     # ONE PRINTED SPELLING PER CHARACTER. A scanned page is not consistent about
@@ -1176,6 +1309,11 @@ def main(argv=None) -> int:
                          "and `ACTO I - SCENA III` as its RUNNING HEADER, and "
                          "asking for the latter returned act two.")
     args = ap.parse_args(argv)
+    # CLEARED ON ENTRY, NOT ON THE WAY TO THE ROSTER. A stale map from an
+    # earlier call in the same process is a fold nobody declared for this
+    # scene, and every early return between here and the roster used to leave
+    # one standing.
+    FOLDS.clear()
 
     leads = json.loads(io.open(os.path.join(BASE, "leads.json"),
                                encoding="utf-8").read())["leads"]
@@ -1190,6 +1328,17 @@ def main(argv=None) -> int:
     url = str(lead.get("url") or "").strip()
     print("[scan] %s" % urllib.parse.unquote(url)[:96])
     pages = strip_running_titles(pdf_text(url, reading_order=args.reading_order))
+    # THE RUNNING-HEAD VOTE IS TAKEN ON THE WHOLE VOLUME, HERE, BEFORE ANY
+    # WINDOW. The guard below asks whether the scene's own label is printed at
+    # the edge of `_ECHO_FLOOR` or more pages; taken on the window, it was
+    # asked of a handful of pages and answered no -- Macbeth 1.3 on pages
+    # 33-46 stored 41 speeches of 48 at confidence 1.0, cut at the running
+    # head on page 44, with the whole-volume vote at twelve and the window's
+    # at one. Same principle as the slice comment below, applied to the
+    # second vote as well as the first.
+    running_heads = recurring_headings(pages)
+    volume_pages = len(pages)
+    window_reaches_volume_end = True
     # SLICE AFTER THE FURNITURE VOTE, NEVER BEFORE. `running_titles` decides
     # what is furniture by how often a line repeats across the WHOLE volume,
     # so a handful of pages cannot tell a running head from a speaker: on a
@@ -1201,6 +1350,8 @@ def main(argv=None) -> int:
             print("[scan] %s" % why)
             return 2
         print("[scan] %s" % why)
+        _, last, _ = _window_bounds(args.pages, volume_pages)
+        window_reaches_volume_end = last == volume_pages - 1
     print("[scan] %d page(s) of text layer" % len(pages))
 
     if args.probe:
@@ -1238,7 +1389,7 @@ def main(argv=None) -> int:
     # fragment of under four lines, so a fifty-line truncation ships silently.
     # The caller knows the real boundary, so ask for it rather than infer it.
     if (not args.end_label
-            and _normalise_heading(args.scene_label) in recurring_headings(pages)):
+            and _normalise_heading(args.scene_label) in running_heads):
         print("[scan] %s is this volume's RUNNING HEAD, printed at the edge of "
               "%d or more pages -- so the scene finder would stop at the next "
               "page rather than the next scene, and store the fragment as a "
@@ -1256,28 +1407,22 @@ def main(argv=None) -> int:
         print("[scan] no scene: %s" % reason)
         return 1
     print("[scan] scene span: %d chars" % len(body))
+    why = window_truncates(body, lines, window_reaches_volume_end)
+    if why:
+        print("[scan] REFUSING: %s" % why)
+        return 1
 
     roster = roster_for(args.stem)
     if not roster:
         print("[scan] no English roster at %s" % args.stem)
         return 1
-    # EVERY FOLD TARGET IS CHECKED AGAINST THIS SCENE'S ROSTER BEFORE A LINE IS
-    # READ. A fold that names a character who is not in the scene is either a
-    # typo or a fold copied from another scene, and both would bind a speech
-    # to someone who is not on the stage. Refused, loudly, before anything is
-    # extracted.
-    FOLDS.clear()
-    for spec in args.fold:
-        printed, sep, target = spec.partition("=")
-        printed, target = fold(printed.strip()), target.strip().upper()
-        if not sep or not printed or not target:
-            print("[scan] --fold wants PRINTED=ROSTER, e.g. FERNANDO=FERDINAND; got %r" % spec)
-            return 2
-        if target not in roster:
-            print("[scan] REFUSING: --fold %s names %r, who is not in this scene's "
-                  "roster %s" % (spec, target, sorted(roster)))
-            return 2
-        FOLDS[printed] = target
+    # EVERY FOLD IS CHECKED BEFORE ANY IS KEPT -- `parse_folds` names the four
+    # refusals. Nothing reaches the module map until all of them pass.
+    folds, why = parse_folds(args.fold, roster)
+    if why:
+        print("[scan] %s" % why)
+        return 2
+    FOLDS.update(folds)
     if FOLDS:
         print("[scan] folds for this scene: %s"
               % ", ".join("%s -> %s" % kv for kv in sorted(FOLDS.items())))
