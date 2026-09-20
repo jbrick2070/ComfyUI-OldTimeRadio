@@ -15,6 +15,10 @@ node set `source_bank` to `my_story` and type your idea into `custom_premise`;
 rest. Leave them blank and the pack rolls a show of its own: tonight's news, a
 public-domain book, a scene of Shakespeare, or original fiction.
 
+**It speaks English, Español, Português, Italiano, Français, हिन्दी, 日本語 and 中文.** One `episode_language`
+switch on the same node carries the writing, the voices and the captions;
+[apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) says how each one performs.
+
 Change nothing else in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
 plus about 25 GB of free disk. No account, no API key, nothing paid. If a step
