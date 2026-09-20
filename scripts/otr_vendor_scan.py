@@ -140,10 +140,25 @@ _HEADING_SHAPED = re.compile(r"(?i)^(?:ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)\b.{0,26
 #: is the extractor's line-breaking, not the book's, and it differs per volume:
 #: the Macbeth prints `SCENA III` whole and the Rei Lear splits it. Rejoined
 #: before anything looks for a heading.
+#:
+#: THE NUMERAL LINE CARRIES THE PRINTER'S PUNCTUATION, AND DEMANDING A BARE
+#: NUMERAL MADE THE RULE FIRE ON NOTHING. A book sets its heading with a stop
+#: -- `ESCENA` over `V .`, `ACTO` over `PRIMERO .`, `ACTO` over `QUINTO ,` --
+#: and an end-anchored `[ \t]*$` rejects every one of them. Measured across the
+#: corpus's scanned volumes, the old form rejoined ZERO headings in either
+#: Spanish book, so every split heading in both was invisible to the scene
+#: finder; tolerating the trailing stop rejoins 12 in the Clark volume and 19
+#: in the Macpherson. Both Portuguese volumes are unaffected at 0 before and 0
+#: after, which is what makes this safe to widen: the two scenes already
+#: vendored from them cannot move.
+#:
+#: The numeral alternation is unchanged and is what keeps this narrow -- only a
+#: roman, a small integer or a spelled ordinal may follow the heading word, so
+#: a line of dialogue under a stray `ESCENA` is still not rejoined.
 _SPLIT_HEADING = re.compile(
     r"(?im)^[ \t]*(ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)[ \t]*\n[ \t]*"
     r"([IVXLC]{1,6}|\d{1,2}|PRIMEIR[OA]|SEGUND[OA]|TERCEIR[OA]|QUART[OA]|"
-    r"QUINT[OA]|PRIMER[OA])[ \t]*$")
+    r"QUINT[OA]|PRIMER[OA])[ \t.,;:]*$")
 
 #: A BARE STAGE DIRECTION, WHICH THIS LAYOUT CANNOT DISTINGUISH FROM A SPEECH.
 #: Entrances and exits are printed as their own line with no parentheses, so

@@ -212,6 +212,36 @@ def test_a_broken_word_is_rejoined_only_onto_a_lower_case_continuation():
     assert join("Anglo-\nSaxao") == "Anglo-\nSaxao"
 
 
+def test_a_split_heading_rejoins_through_the_printer_s_trailing_stop():
+    """NOT A FURNITURE RULE -- the other page-text rule of the same script.
+
+    A book sets its heading with a stop after the numeral. Demanding a bare
+    numeral made the rejoin fire on NOTHING in either Spanish scanned volume,
+    so every split heading in both was invisible to the scene finder and
+    `es/twelfth_night 1.5` could not be located at all -- the volume prints
+    `ESCENA` over `V .` and the trailing period defeated the match.
+
+    The numeral alternation is what keeps this narrow: only a roman, a small
+    integer or a spelled ordinal may follow, so a line of dialogue under a
+    stray heading word is still never rejoined.
+    """
+    scan = _scan()
+    join = lambda text: scan._SPLIT_HEADING.sub(r"\1 \2", text)
+
+    # the shapes that were being rejected, one per real volume
+    assert join("ESCENA\nV .") == "ESCENA V"
+    assert join("ACTO\nPRIMERO .") == "ACTO PRIMERO"
+    assert join("ACTO\nQUINTO ,") == "ACTO QUINTO"
+    assert join("ESCENA\nII.") == "ESCENA II"
+
+    # the shape that already worked keeps working
+    assert join("SCENA\nI") == "SCENA I"
+
+    # and dialogue under a heading word is still left alone
+    assert join("ESCENA\nUma camara no palacio.") == "ESCENA\nUma camara no palacio."
+    assert join("ACTO\nprimeiro que tudo .") == "ACTO\nprimeiro que tudo ."
+
+
 def test_the_rejoin_is_applied_where_the_pages_are_read():
     """A regex nothing calls is not a rule. Assert the real call site.
 
