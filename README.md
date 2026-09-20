@@ -1,3 +1,5 @@
+<p align="center"><strong>English · Español · Português · Italiano · Français · हिन्दी · 日本語 · 中文</strong></p>
+
 # ComfyUI-OldTimeRadio
 
 ## Install and run it
