@@ -158,7 +158,21 @@ def _line_units(text: str) -> list[str]:
     # One space between words inside a line: a stripped stage direction leaves
     # a run of spaces behind ("behind.   Thanks"), and a ledger line is not the
     # place to carry the parser's scars. Words untouched.
-    return [" ".join(ln.split()) for ln in str(text or "").split("\n") if ln.strip()]
+    #
+    # AN IDEOGRAPHIC SPACE IS PART OF THE EDITION, NOT A PARSER'S SCAR.
+    # `str.split()` treats U+3000 as whitespace, so this line turned every
+    # one in a Japanese speech into an ASCII space before any cut was made
+    # (agy located the mutation in `_line_tokens`; it was here, one function
+    # earlier). A line that carries CJK collapses only ASCII spaces and tabs.
+    units = []
+    for ln in str(text or "").split("\n"):
+        if not ln.strip():
+            continue
+        if CJK_RUN_RE.search(ln):
+            units.append(_ASCII_WS.sub(" ", ln).strip(" \t\r"))
+        else:
+            units.append(" ".join(ln.split()))
+    return units
 
 
 #: A CJK LINE HAS NO SPACES TO CUT AT, SO IT IS CUT AT ITS PUNCTUATION. Every
@@ -172,13 +186,24 @@ def _line_units(text: str) -> list[str]:
 #: pieces re-join with NOTHING between them, so the line's bytes survive
 #: exactly; a space would be the one thing the edition never printed. A line
 #: with no CJK in it never takes this path and cuts exactly as it always did.
-_CJK_SENTENCE_CUT = re.compile(r"(?<=[。！？!?])")
-_CJK_CLAUSE_CUT = re.compile(r"(?<=[、，；：;:])")
+#: A CLOSING QUOTE OR BRACKET STAYS WITH ITS SENTENCE. `「あゝ、ロミオ！」` cut
+#: straight after the mark left `」` to open the next beat (agy, on
+#: 96346118); the cut waits for the closing mark when one follows.
+_CJK_CLOSERS = "」』”’）)]"
+_CJK_SENTENCE_CUT = re.compile(
+    r"(?<=[。！？!?])(?![" + _CJK_CLOSERS + r"])|(?<=[。！？!?][" + _CJK_CLOSERS + r"])")
+_CJK_CLAUSE_CUT = re.compile(r"(?<=[、，；：;:])(?![" + _CJK_CLOSERS + r"])")
+#: THE IDEOGRAPHIC SPACE IS PART OF THE EDITION, NOT A WORD BOUNDARY.
+#: `str.split()` treats U+3000 as whitespace, so a Japanese line that
+#: carried one took the whitespace path and came back re-joined with an
+#: ASCII space -- 57 such lines in the vendored CJK texts (agy). Only an
+#: ASCII space or tab routes a CJK line to the whitespace path.
+_ASCII_WS = re.compile(r"[ \t]+")
 
 
 def _line_tokens(line: str) -> tuple[list[str], str]:
     """``(pieces, joiner)``: what a line may be cut into, and what re-joins it."""
-    if not CJK_RUN_RE.search(line) or len(line.split()) > 1:
+    if not CJK_RUN_RE.search(line) or len(_ASCII_WS.split(line.strip())) > 1:
         return line.split(), " "
     for cut in (_CJK_SENTENCE_CUT, _CJK_CLAUSE_CUT):
         pieces = [p for p in cut.split(line) if p]

@@ -72,6 +72,25 @@ Shakespeare bank is "English only and refuse[s]", written the morning of
 (lines ~3794-3903) is the truth. The tooltip is corrected in the next code
 commit after the leg's receipt, not during it.
 
+**RECEIPT -- THE QUEST IS DONE (2026-09-20 00:28).** Two legs, both
+published, and the difference between them is the whole lesson:
+* Leg 1 (23:29-23:57) published
+  `shedding_rose_ja_20260919_233730__arch__stmo__lumi__koko__sspr__g412__sa3_final.mp4`
+  -- Japanese, Shakespeare bank, 12 beats -- and its writer had logged
+  `vendored scene did not re-plan (a 2-word passage cannot fill 12 beats);
+  using the model translation`. A machine translation under the translator's
+  credit. KEPT in `otr/obs` as the receipt of PBUG-20260919-04.
+* Leg 2 (23:58-00:28, on `96346118`) published
+  `abandoned_rose_ja_20260920_000727__vart__stmo__lumi__koko__sspr__g412__sa3_final.mp4`
+  (64 MB); its writer logged `verbatim passage VENDORED: 坪内逍遙 Tsubouchi
+  Shōyō (1933), 12 beat(s) -- the model translation is NOT used for this
+  scene`, and the ledger's `verbatim_passage.vendored` carries the
+  translator, 1933, the Aozora URL and the text's sha256. Fourteen of its
+  eighteen lines are Tsubouchi's Japanese. That is the native episode.
+The two files look identical from the outside; only the log line and the
+ledger block tell them apart -- see the memory note "native claim needs the
+VENDORED log line".
+
 ## 2026-09-19 -- A MANGLED NATIVE TEXT BEATS A CLEAN AI TRANSLATION
 
 Operator, unprompted, while the panel was pricing fail-closed gates that would

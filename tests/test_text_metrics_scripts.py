@@ -64,6 +64,22 @@ def test_cjk_is_counted_by_its_characters_at_two_per_word():
     assert TM.canonical_word_count("한국어 문장") == 3        # 5 hangul -> 3
     assert TM.canonical_word_count("Romeo と Juliet") == 3   # 2 Latin + 1 kana
     assert TM.canonical_word_count("。、！？「」") == 0
+    assert TM.canonical_word_count("人々") == 1              # the iteration mark is a letter of the script
+
+
+def test_the_cut_keeps_the_editions_bytes_and_its_closing_quotes():
+    """agy, on 96346118: an ideographic space routed a line to the whitespace
+    path and came back with ASCII spaces; a sentence cut orphaned `」`."""
+    from nodes import _otr_passage_selector as PS
+    spaced = ("あゝ、ロミオ！\u3000何故あなたはロミオぢゃ！" * 10).strip()
+    chunks = PS.chunk_speech(spaced, cap=20)
+    assert len(chunks) > 1 and "".join(chunks) == spaced, chunks
+    assert all("\u3000" in c or c.endswith("！") for c in chunks)
+    quoted = ("「あゝ、ロミオ！」と叫んだ。" * 15).strip()
+    chunks = PS.chunk_speech(quoted, cap=20)
+    assert len(chunks) > 1 and "".join(chunks) == quoted, chunks
+    assert not any(c.startswith("」") for c in chunks), chunks
+    assert all(c.endswith(("。", "」")) for c in chunks[:-1]), chunks
 
 
 def test_the_vendored_japanese_balcony_scene_now_plans():

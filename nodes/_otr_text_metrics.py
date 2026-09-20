@@ -38,8 +38,12 @@ WORD_RE = re.compile(r"[^\W\d_](?:[^\W_]|['\u2018\u2019-])*")
 #: about 560 characters. CJK punctuation (U+3000-303F) is not in the class and
 #: is never counted. The ratio is a proxy for spoken length, the only thing a
 #: word count is used for here; it is not a claim about Japanese morphology.
+#: U+3005-3007 (the iteration mark in 人々, 〆, 〇) are letters of the same
+#: script and sit just outside the kana block; left out, 々 counted as a
+#: Latin word of its own (agy, on 96346118).
 CJK_RUN_RE = re.compile(
-    "[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uac00-\ud7af\uff66-\uff9f]+")
+    "[\u3005-\u3007\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff"
+    "\uac00-\ud7af\uff66-\uff9f]+")
 CJK_CHARS_PER_WORD = 2
 
 
