@@ -12,17 +12,16 @@ choice, not an unfinished one -- see the end of this page.
 
 ---
 
-## The two choices
+## The choices
 
 | `upscale_engine` | What it does | What it needs from you |
 |---|---|---|
 | **`off`** -- ships this way | Leaves the composite's own resize in charge | Nothing |
 | **`spandrel_esrgan`** | Runs Real-ESRGAN x2plus over each eligible clip, one frame at a time, then fits the result to the canvas | One 64 MB file you download by hand |
 
-**Those are the only two.** The dropdown is built from the pack's live upscale
-registry, so a third would appear by itself the day one ships. Today the list
-is two long, and this page is short for that reason rather than because it is
-unfinished.
+**Those are the ones that ship.** The dropdown is built from the pack's live upscale
+registry, so a new engine would appear by itself the day one ships. Today the list
+is short for that reason rather than because it is unfinished.
 
 There is a second box beside it, `upscale_device`, covered below.
 
@@ -90,7 +89,7 @@ download above is the path.
 
 ## The device box
 
-`upscale_device` is a typed box, not a menu. It accepts exactly four shapes:
+`upscale_device` is a typed box, not a menu. It accepts these shapes:
 
 | Value | Meaning |
 |---|---|
@@ -109,27 +108,27 @@ there cannot break anything.
 
 `cpu` is the default because it works on every machine, not because it is fast.
 If you have a GPU with room, that is where this belongs. Check your machine's
-row in [MACHINES.md](MACHINES.md) section 2 first.
+row in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) first.
 
 ---
 
 ## You turned it on and nothing happened
 
-Three things make the pack skip the model on purpose. All three say so in the
+These make the pack skip the model on purpose. Each one says so in the
 ComfyUI console, so read it before assuming a break.
 
-1. **Every clip already stated how it must be enlarged.** The AnimateDiff
-   lanes -- `animatediff15_lightning_video`,
-   `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` --
-   declare their own clean full-frame enlargement, and the upscaler is not
-   allowed to overrule it. On an episode made entirely of those, the engine is
-   not even loaded. The log line begins `upscale SKIPPED: no model-eligible
-   clip`.
-2. **The clip is already as big as the canvas.** Upscaling it 2x and shrinking
-   it back would change pixels without getting anywhere, so the composite takes
-   the ordinary path instead and logs `model skip (source ... >= canvas ...)`.
-3. **The segment is not a real clip.** The procedural floor, the black gap fill
-   and the credits roll never go through the model.
+- **Every clip already stated how it must be enlarged.** The AnimateDiff
+  lanes -- `animatediff15_lightning_video`,
+  `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video` --
+  declare their own clean full-frame enlargement, and the upscaler is not
+  allowed to overrule it. On an episode made entirely of those, the engine is
+  not even loaded. The log line begins `upscale SKIPPED: no model-eligible
+  clip`.
+- **The clip is already as big as the canvas.** Upscaling it 2x and shrinking
+  it back would change pixels without getting anywhere, so the composite takes
+  the ordinary path instead and logs `model skip (source ... >= canvas ...)`.
+- **The segment is not a real clip.** The procedural floor, the black gap fill
+  and the credits roll never go through the model.
 
 When it *does* run, it says so: `upscale MODEL PATH for ...` names the engine,
 the device and the geometry, and `upscale engine LOADED:` names the exact

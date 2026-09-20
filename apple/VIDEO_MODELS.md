@@ -79,10 +79,10 @@ written yourself -- see [EXTENDING.md](EXTENDING.md).
 | `still_motion` | the same slow pan. These two do the same thing today |
 | `still_word` | a flat hold like `still_flat`, but the still is a word card built from the spoken line |
 
-The four `viz_` lanes react to audio and mint no image. The four `still_` lanes
+The `viz_` lanes react to audio and mint no image. The `still_` lanes
 do the opposite: they draw nothing themselves and display the picture your
 **image** dropdown mints, so the image engine is what decides how they look.
-All eight are CPU and ffmpeg only.
+All of them are CPU and ffmpeg only.
 
 `still_pan` and `still_motion` are not a real choice -- they run the identical
 pan. Pick either.
@@ -95,7 +95,7 @@ pan. Pick either.
 | `animatediff15_lightning_video` | the same graph on a distilled 8-step module -- much faster, and the only AnimateDiff lane proven on Apple Silicon. Marked experimental | manual weights + ComfyUI-AnimateDiff-Evolved |
 | `animatediff15_v3_stillin_lab_video` | the haunted lane started from a plate instead of empty noise. A lab variant | manual weights + ComfyUI-AnimateDiff-Evolved |
 
-These three write their own picture from text. Like the visualizers they mint no
+These write their own picture from text. Like the visualizers they mint no
 still, so **your image dropdown is idle when one of them is selected** -- they
 just do not carry the label, which is reserved for the audio-reactive family.
 
@@ -137,7 +137,7 @@ change the sound**, below.
 | `humo17_high_audio_in_wide` | the smaller checkpoint, landscape | manual weights |
 
 This is the talking-head path: it takes a portrait and the beat's voice track
-and moves the mouth to it. All four are large downloads and all four want a
+and moves the mouth to it. Every HuMo lane is a large download and wants a
 16 GB card.
 
 ### MiniMax H3
@@ -166,7 +166,7 @@ open one.
 
 They download nothing and use no VRAM, so they run on any machine. Selecting one
 in the dropdown is the whole switch -- there is no enable flag. Without a
-credential the render stops and says so. For the first group, sign into Comfy
+credential the render stops and says so. For the Comfy partner rows, sign into Comfy
 with a Comfy API key (headless: `OTR_COMFY_API_KEY` on the *submitting*
 machine, sent by `scripts/otr_api.py`; the server never reads it);
 `OTR_GOOGLE_API_KEY` for the Google pair (or `google.secret` /
@@ -208,15 +208,15 @@ six dropdowns by hand:
 
 **The pack default is the three viz lanes on `otr_canonical.json`.** That is the GPU-friendly first run: no video weights, no Comfy credits. Local machine graphs keep the local lane in the table above.
 
-**On the Comfy Cloud graphs, Vidu is the saved default** -- all three VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **Two deluxe 3-act variations share Sol/Luna writers:** `otr_cloud_deluxe_3act` pins LTX 2.5 Foley (picture + native bed mixed 0.50 under TTS) and `otr_cloud_deluxe_audio_in_3act` pins LTX 2.5 Audio-to-Video (episode audio drives the picture). Wan audio-in stays in the dropdown; it is not the deluxe default. Cheap cloud ships 1/3/5-act; deluxe ships 3-act. Nothing cloud ships longer than that.
+**On the Comfy Cloud graphs, Vidu is the saved default** -- the VideoDirector slots plus `OTR_VideoRenderBatch.engine` pin `cloud_vidu_q2_pro_fast_720p`. **The deluxe 3-act graphs share Sonnet 5 / Luna writers:** `otr_cloud_deluxe_3act` pins LTX 2.5 Foley (picture + native bed mixed 0.50 under TTS) and `otr_cloud_deluxe_audio_in_3act` pins LTX 2.5 Audio-to-Video (episode audio drives the picture). Wan audio-in stays in the dropdown; it is not the deluxe default. Cheap cloud ships 1/3/5-act; deluxe ships 3-act. Nothing cloud ships longer than that.
 
 On any other graph the same Vidu combo is in the dropdown if you want to spend credits. Pick is the enable; without a Comfy API key on the queue (a signed-in Comfy session, or `OTR_COMFY_API_KEY` on the headless submitter) the render stops and says so.
 
 Choosing by hand instead, the short version: **on 8 GB, start at
 `ltx098_low_video`** -- it is what the 8 GB graph ships and the safe local
-diffusion pick. All four HuMo lanes, both H3 lanes and `ltx23_low_audio_in` run
+diffusion pick. The HuMo lanes, both H3 lanes and `ltx23_low_audio_in` run
 out of memory on 8 GB, and the Wan pair does not fit there either. **On 16 GB the LTX 2.5 lanes,
-both Wan lanes, all four HuMo lanes and `h3_low_video` all fit.** On a Mac,
+both Wan lanes, the HuMo lanes and `h3_low_video` all fit.** On a Mac,
 `ltx098_low_video` and `animatediff15_lightning_video` are the two proven
 diffusion lanes; the still and visualizer lanes work there too, and the rest of
 the local list is CUDA only -- except `humo17_high_audio_in_wide`, which fits
@@ -228,7 +228,8 @@ every registered engine rather than hiding the ones that do not fit -- being in
 the list is not a recommendation.
 
 Exact download sizes, the per-machine grid and the repository each file comes
-from are in [MACHINES.md](MACHINES.md), sections 2 and 3.
+from are in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and
+[the manual-weights list](MACHINES.md#where-do-the-manual-weights-come-from).
 
 ---
 
@@ -262,12 +263,12 @@ writing your own prompts anywhere near these lanes, do the same.
 **The render stops naming a node class you have never heard of.** Two different
 causes look the same on screen, and the error text is what tells them apart:
 
-- **Somebody else's node pack.** There are three: **ComfyUI-AnimateDiff-Evolved**
-  for the three AnimateDiff lanes, **ComfyUI-GGUF** for the LTX 2.3, LTX 2.5 and
-  Wan lanes, and **ComfyUI-LTXVideo** as well, specifically for the two LTX 2.3
+- **Somebody else's node pack.** **ComfyUI-AnimateDiff-Evolved**
+  for the AnimateDiff lanes, **ComfyUI-GGUF** for the LTX 2.3, LTX 2.5 and
+  Wan lanes, and **ComfyUI-LTXVideo** as well, specifically for the LTX 2.3
   lanes (`ltx23_low_audio_in`, `ltx23_high_video`). The error names the pack and
   its URL. Install it into `custom_nodes/`, restart, queue again.
-- **ComfyUI itself.** The three LTX 2.5 lanes and the two MiniMax H3 lanes use
+- **ComfyUI itself.** The LTX 2.5 lanes and the MiniMax H3 lanes use
   node classes that ship inside ComfyUI's own code rather than a separate pack.
   If your ComfyUI predates them, the error says to update ComfyUI -- and, on
   rare occasions, that an older ComfyUI-GGUF needs a small patch -- instead of
@@ -275,16 +276,16 @@ causes look the same on screen, and the error text is what tells them apart:
 
 **The render stops naming a missing file.** The lane needs weights that do not
 fetch themselves. Every lane on this page except `ltx098_low_video` and the
-hosted ones is in that position. [MACHINES.md](MACHINES.md) section 3 says which
+hosted ones is in that position. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
 repository and which folder. The error names the file and never quietly
 substitutes another one.
 
-**It says the weights are gated.** The three LTX 2.5 lanes need you to accept a
+**It says the weights are gated.** The LTX 2.5 lanes need you to accept a
 licence on the model's page while signed in to Hugging Face, then log in
-locally. [INSTALL.md](INSTALL.md) section 7.
+locally. [INSTALL.md](INSTALL.md#hugging-face-login).
 
 **It runs out of memory.** The lane is bigger than your card. Check your row in
-[MACHINES.md](MACHINES.md) section 2 and step down -- on 8 GB that almost always
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and step down -- on 8 GB that almost always
 means `ltx098_low_video`, and from there the still and visualizer lanes always
 work.
 

@@ -1,8 +1,8 @@
 # Apple Silicon
 
 It works, and the short version is that you do not have to do anything special.
-Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Queue. Four
-ship, and each has published an episode on a Mac mini M4 / 16 GB:
+Install as in [INSTALL.md](INSTALL.md), open a Mac graph, press Queue. Every
+Mac graph has published an episode on a Mac mini M4 / 16 GB:
 
 ```
 workflows/variants/otr_mac16_low.json          procedural lanes, no weights
@@ -17,7 +17,7 @@ canonical itself also runs — it names no vendor and resolves your device at ru
 time — but these pick the lanes that have receipts here.
 
 (Each graph is cut from the profile of the same name in `config/profiles/`.
-`otr_mac_mps` is a separate lab profile, not the parent of these four.)
+`otr_mac_mps` is a separate lab profile, not the parent of these graphs.)
 
 What runs on a Mac and what does not is the **Mac 16 GB** column in
 [MACHINES.md](MACHINES.md). That table is generated from the same data the code
@@ -48,13 +48,13 @@ factor on a 16 GB machine, and it is the cheapest thing you can change.
 
 ## Images
 
-Two of the Mac graphs mint stills and ship **SD 1.5** for it —
+The Mac still and video graphs mint stills and ship **SD 1.5** for it --
 `otr_mac16_still` and `otr_mac16_video` — one 2 GB checkpoint, ungated, no
 account, fetched on first use. `otr_mac16_low`, the one to start with, draws its
 own frames and never fetches an image model at all. `otr_mac16_animatediff`
 renders from the prompt alone, and its SD 1.5 checkpoint is a MANUAL fetch --
-a node pack supplies code, not 2 GB of weights. [MACHINES.md](MACHINES.md)
-section 3 names the files that lane needs and where each goes.
+a node pack supplies code, not 2 GB of weights. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from)
+names the files that lane needs and where each goes.
 
 Z-Image-Turbo is what the NVIDIA graphs use and is a ~19 GB download; leaving it
 selected on a Mac with a still-consuming video lane starts that download. If you
@@ -62,8 +62,8 @@ did not mean to, that is the usual cause.
 
 ## Video
 
-The Mac graph ships **three procedural lanes** — they draw their own frames and
-download nothing. All four `still_*` lanes are proven here too, plus the
+The Mac graph ships **procedural lanes** -- they draw their own frames and
+download nothing. Every `still_*` lane is proven here too, plus the
 AnimateDiff Lightning lane.
 
 **LTX 0.9.8 is a swap, not a default.** It is real video diffusion and it is
@@ -76,7 +76,7 @@ selects, so that half costs you nothing extra.
 3.12 or earlier runs Kokoro on torch and is the multilingual path. 3.13 runs
 English through `kokoro-onnx` on the CPU automatically; this pack does not use
 that backend for non-English rows. 3.14 has no Kokoro build and is refused
-rather than half working. Details in [INSTALL.md](INSTALL.md) section 5 and
+rather than half working. Details in [INSTALL.md](INSTALL.md#python-versions) and
 [MULTILINGUAL.md](MULTILINGUAL.md).
 
 Kokoro is the shipped voice on every platform. The cloning engines need a

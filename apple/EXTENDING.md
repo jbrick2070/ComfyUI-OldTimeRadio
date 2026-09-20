@@ -1,6 +1,6 @@
 # Adding to OTR
 
-Four things you can add: an **engine** (a way of rendering video, images, speech,
+What you can add: an **engine** (a way of rendering video, images, speech,
 music or an upscale), a **source bank** (a place stories come from), a
 **writer LLM** (the model that writes the script), and an **episode language**
 (a registry row that binds writing, voices, captions and credits). They are
@@ -48,8 +48,8 @@ says whether what you built will actually work. The writer page is
   still-consuming lane. This confuses everyone once.
 
 - **A new engine id trips fixtures, not just tests.** Regenerate the generated
-  documents, add a shortcode, and pick one of the **five** bookend rosters in
-  `render_driver.py` — `ENGINES`, `BOUNDED`, `SELF_COMPOSED`, `NOT_TEXT_DRIVEN`,
+  documents, add a shortcode, and pick one of the bookend rosters in
+  `render_driver.py` -- `ENGINES`, `BOUNDED`, `SELF_COMPOSED`, `NOT_TEXT_DRIVEN`,
   `KNOWN_RED`. They are asserted disjoint, so exactly one is right.
 
 - **Green tests are not a lane.** The proof is one real render through
@@ -67,14 +67,14 @@ says whether what you built will actually work. The writer page is
 
 ## Adding an engine
 
-### 1. Copy the closest sibling
+### Copy the closest sibling
 
 Adapters live in `nodes/_otr_video_engines/`, `_otr_image_engines/`,
 `_otr_audio_engines/` and `_otr_upscale_engines/`. Start from the engine most
 like yours rather than from scratch — the class contract is easier to read from a
 working example than from prose.
 
-### 2. Declare it
+### Declare it
 
 Your class needs a `name` — the internal id, assigned in the class body, because
 that is what the tooling reads:
@@ -88,21 +88,21 @@ Then `@register` it, and add its `CAPABILITIES` row in that namespace's
 `registry.py`. The row is where `device_backends`, `model_requirements` and the
 rest are declared.
 
-### 3. Import it, guarded
+### Import it, guarded
 
 Add it to the namespace's `__init__.py` in the same try/except style as its
 siblings. An adapter nothing imports is registered nowhere and simply does not
 exist at runtime — which is this repo's most repeated defect, because every test
 still passes.
 
-### 4. Fail closed
+### Fail closed
 
 If your weights are missing, refuse by name before anything loads. Do not
 substitute, do not degrade quietly, and do not let the render get hours in before
 discovering it. The error text is documentation that reaches the one person who
 needs it.
 
-### 5. Run the gates
+### Run the gates
 
 [PREFLIGHT.md](PREFLIGHT.md), the section for your namespace.
 
@@ -119,7 +119,7 @@ Gemma, use a cloud slot. That is not the same as what the pack ships.
 (NVIDIA NF4, Mac / CPU full). There is no GGUF writer row; a transformers
 twin already exists.
 
-The full checklist -- on-machine cache path, catalog row, seven gates -- is
+The full checklist -- on-machine cache path, catalog row, the gates -- is
 [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to
 read the badge, is [WRITERS.md](WRITERS.md).
 
@@ -178,8 +178,10 @@ def fetch_source(*, bank, technical_model, source_ref="",
 def interpret_source(*, bank, payload, technical_fn, model_id): ...
 ```
 
-**Five keywords on the fetcher, four on the interpreter.** Older notes in `docs/`
-show a three-keyword fetcher; that signature raises `TypeError` on its first
+The writer calls the fetcher with `bank`, `technical_model`, `source_ref`,
+`load_config` and `policy`, and the interpreter with `bank`, `payload`,
+`technical_fn` and `model_id`. Older notes in `docs/`
+show a shorter fetcher; that signature raises `TypeError` on its first
 real call. If you are unsure, the binding check below proves it without running
 your code.
 
@@ -201,7 +203,7 @@ clone.
 - **Fill the ledger completely.** Downstream steps read fields, not intentions;
   speech, slicing, video direction, captions and credits all consume what you
   wrote. A missing field is a broken render, not a missing nicety.
-- **`speaker_role` is one of exactly five values** — `character`, `announcer`,
+- **`speaker_role` is one of** `character`, `announcer`,
   `music_open`, `music_close`, `music_inter`. Not free text; anything else
   raises, including the retired `sfx`.
 - **Do not filter content.** Adaptation lanes carry the author's own language as

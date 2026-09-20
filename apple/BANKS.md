@@ -9,11 +9,11 @@ Everything else on that node adjusts an episode. This one picks the show.
 You do not have to choose. The shipped graphs are set to **roll (any eligible
 bank)**, which picks one for you each run -- which is the right setting for
 "give me an episode" and the wrong one for "I want to hear the Shakespeare
-lane", because a roll will land somewhere else four times out of five.
+lane", because a roll will usually land somewhere else.
 
 ---
 
-## The six
+## The banks
 
 | Bank | What it makes | Where the material comes from |
 |---|---|---|
@@ -31,24 +31,20 @@ selecting it does nothing. It is there to tell you the door exists --
 
 ### Language compatibility
 
-Every bank works on every language row. `original`, `my_story`,
-`media_archive`, `scifi_news_pro` and `public_domain` are authored in the
-language; `shakespeare` performs its selected passage from a vendored
-translator's public-domain text when the corpus holds the scene, and
-translated by the writer otherwise -- speakers and cut unchanged either way,
-with the receipt on the ledger. A roll on a non-English
-row may draw any bank. The full one-switch behaviour is in
+Every bank is admitted for every language row. How Shakespeare and Public
+Domain perform the author's own words in another language is in
 [MULTILINGUAL.md](MULTILINGUAL.md).
 
 ---
 
 ## The two that need something from you
 
-**My Story** reads four boxes on the writer node -- `story_characters`,
-`story_plot`, `story_setting`, `story_author`. Leave them empty and you get a
-generic episode, because there is nothing to build from.
+**My Story** reads `story_characters`, `story_plot`, `story_setting` and
+`story_author` on the writer node. Leave them empty and the pack writes the
+standing premise that ships with it (since 2026-09-13), so a rolled My Story
+run still has something to perform. Anything you type wins over it.
 
-**Those four boxes are not ignored by the other banks -- they are refused.** If
+**Those fields are not ignored by the other banks -- they are refused.** If
 you type into any of them while a different source is selected, the run stops
 with a message naming the fields and telling you to either select My Story or
 clear them. That is deliberate: the alternative is an episode that renders
@@ -67,7 +63,7 @@ Original need nothing from the network.
 
 ---
 
-## Two of them adapt. The rest invent. The difference is not cosmetic
+## Shakespeare and Public Domain adapt. The rest invent. The difference is not cosmetic
 
 This is the thing most worth understanding before you pick, because two banks
 that both "use a source" treat it in opposite ways.
@@ -83,7 +79,7 @@ faithful to. If you pick this bank expecting a retelling of the archive item you
 fed it, you will get an invented story that the item inspired. That is working
 as designed; it is just not adaptation.
 
-What follows applies to the two fidelity lanes.
+What follows applies to the fidelity lanes.
 
 What that means in practice, quoting the rules the packs actually carry:
 
@@ -118,12 +114,13 @@ and attributing the difference to your change.
 
 ## If an episode comes out wrong for the bank
 
-Nearly always one of three things, in this order:
+Nearly always one of these, in this order:
 
-1. **You were on a roll and did not notice.** Check which bank the episode
-   actually used; the ledger records it.
-2. **My Story with empty boxes.** There was nothing to build from.
-3. **An RSS bank with no network.** It could not fetch a source.
+- **You were on a roll and did not notice.** Check which bank the episode
+  actually used; the ledger records it.
+- **My Story with empty boxes, and you expected your own idea.** The standing
+  premise ran instead. Type into the fields.
+- **An RSS bank with no network.** It could not fetch a source.
 
 ---
 

@@ -21,7 +21,7 @@ says which shipped graph is which.
 
 ---
 
-## The ten
+## The styles
 
 The dropdown lists style *ids*, alphabetically, with the roll sitting on top.
 
@@ -46,10 +46,10 @@ it.
 
 ## roll (any style)
 
-`roll (any style)` is the first row of the dropdown, and every graph that ships
+`roll (any style)` sits at the top of the dropdown, and every graph that ships
 with this pack -- the canonical and every variant -- is saved on it. It
 is a command, not a style: at run time it draws one of the ids above at
-equal odds, 10% each, and the episode uses that.
+equal odds, and the episode uses that.
 
 Drop a fresh **OTR_LedgerScriptWriter** on the canvas yourself and it starts on
 `sci_fi_radio` instead. Only the saved graphs ship on the roll.
@@ -59,7 +59,7 @@ Two consequences worth knowing:
 - **A roll is not a fair comparison.** If you are judging any other change,
   pin the same style on both runs or you are looking at two different shows.
 - **The roll can land on `visual_storybased`**, which behaves differently from
-  the other nine.
+  a pack loaded from disk.
 
 ---
 
@@ -77,11 +77,11 @@ draw their own frames from the audio do not.
 | `otr_16gb_video`, `otr_8gb_video`, `otr_mac16_video`, `otr_16gb_foley`, `otr_16gb_mime` | the LTX lanes | **Yes, everywhere.** |
 | `otr_16gb_animatediff`, `otr_8gb_animatediff`, `otr_mac16_animatediff` | the AnimateDiff lanes | **Yes, everywhere.** These mint no still but write their own styled prompt and their own negative. |
 
-[MACHINES.md](MACHINES.md) section 1 names the variant file for your machine.
+[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the variant file for your machine.
 If you are on the canonical and want to see a style, the change you want is on
 **OTR_VideoDirector**: switch `announcer_video_model`, `music_video_model` and
 `character_video_model` off the `viz_` lanes. Check the lane against your
-hardware in [MACHINES.md](MACHINES.md) section 2 first.
+hardware in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) first.
 
 ---
 
@@ -96,7 +96,7 @@ full style pack out of it and freezes it into the episode's ledger.
 - **It does not add a pass.** The same reflection step runs on every episode;
   picking this one just asks it for more (a 1024-token budget instead of 512).
 - **If that pass fails**, the episode does not fall back to a generic look and
-  does not stop. It draws one of the other nine, copies that pack, and records
+  does not stop. It draws another shipped pack, copies that pack, and records
   what happened -- `status: "floor"` with the style it borrowed. The dynamic
   lane can never be re-selected as its own fallback.
 - **It is the one style that can differ run to run** with the same dropdown
@@ -107,7 +107,7 @@ full style pack out of it and freezes it into the episode's ledger.
 ## The pool is not scoped to the bank
 
 Every one of them is available to every source bank. The roll draws from the
-same ten whichever bank writes the episode, so yes, a Shakespeare adaptation can
+same pool whichever bank writes the episode, so yes, a Shakespeare adaptation can
 come out as a cartoon. If you do not want that, pin the style.
 
 What *is* scoped per bank is a different thing with a confusingly similar name:
@@ -168,15 +168,15 @@ under **Rolled:** -- so a style you did not choose announces itself on screen.
 
 ## When it comes out wrong
 
-Nearly always one of three things, in this order:
+Nearly always one of these, in this order:
 
-1. **You picked a style and the picture did not change.** Your video lanes are
-   audio-reactive. See [Where you actually see it](#where-you-actually-see-it).
-   This is the answer far more often than anything else on this page.
-2. **You were on the roll and did not notice.** Every shipped graph is. Read
-   the code in the filename.
-3. **The look changes between two runs on the same setting.** You are on
-   `visual_storybased`, which is written fresh each episode by design.
+- **You picked a style and the picture did not change.** Your video lanes are
+  audio-reactive. See [Where you actually see it](#where-you-actually-see-it).
+  This is the answer far more often than anything else on this page.
+- **You were on the roll and did not notice.** Every shipped graph is. Read
+  the code in the filename.
+- **The look changes between two runs on the same setting.** You are on
+  `visual_storybased`, which is written fresh each episode by design.
 
 A style you typed wrong does not silently fall back to something else -- it
 stops the run and names the ids that exist.
@@ -195,16 +195,16 @@ Packs live inside the installed pack, one flat file each:
 custom_nodes/ComfyUI-OldTimeRadio/nodes/visual_styles/<your_style_id>.json
 ```
 
-### The steps
+### How to add one
 
-1. **Copy the shipped pack closest to what you want.** Do not start from a
-   blank file -- every key is required and the validator is strict.
-   `cartoon.json` is the plainest; `sci_fi_radio.json` is the house look.
-2. **Rename the file.** The filename *is* the id: `pulp_woodcut.json` must
-   declare `"style_id": "pulp_woodcut"`, and a mismatch is refused by name.
-   Lowercase letters, digits and underscores only.
-3. **Rewrite the values, keep the keys.** Leave `"schema_version": "v2"` alone.
-4. **Restart ComfyUI.** The folder is read once, at startup.
+- **Copy the shipped pack closest to what you want.** Do not start from a
+  blank file -- every key is required and the validator is strict.
+  `cartoon.json` is the plainest; `sci_fi_radio.json` is the house look.
+- **Rename the file.** The filename *is* the id: `pulp_woodcut.json` must
+  declare `"style_id": "pulp_woodcut"`, and a mismatch is refused by name.
+  Lowercase letters, digits and underscores only.
+- **Rewrite the values, keep the keys.** Leave `"schema_version": "v2"` alone.
+- **Restart ComfyUI.** The folder is read once, at startup.
 
 Your id is then in the `visual_style` dropdown, in alphabetical order, and in
 the roll at the same odds as everything else.
@@ -216,12 +216,12 @@ anything is off. The ones that catch people:
 
 - **Every key must be present, and no extra keys are allowed.** Presence and
   non-emptiness are different rules, though. The newer look/subject fields --
-  the ones step 3 above is really asking you to rewrite -- must be non-empty,
+  the look/subject fields you rewrite -- must be non-empty,
   with one exception: `scene_instruction_look` may be an empty string. The
-  four older tail fields (`positive_tail`, `image_grade_tail`,
+  older tail fields (`positive_tail`, `image_grade_tail`,
   `broadcast_tail`, `era_tail`) and `label` must be present but are never
-  checked for emptiness -- three of the shipped packs (`cartoon.json`,
-  `anime.json`, `paper_origami.json`) ship today with `image_grade_tail`,
+  checked for emptiness -- `cartoon.json`,
+  `anime.json` and `paper_origami.json` ship today with `image_grade_tail`,
   `broadcast_tail` and `era_tail` all set to `""`, and that validates fine.
   `negative_tail` (what the style should *avoid* drawing) and `checkpoint` are
   optional outright -- leave them out of the file and nothing complains.

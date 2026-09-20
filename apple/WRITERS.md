@@ -31,14 +31,13 @@ The Comfy Cloud graphs and the shipping CPU graph use the same cheap pair
 Leaving those two dropdowns alone is still the right answer there.
 
 **Qwen3.5-4B** is the only writer here with a finished episode to its name on
-all three of an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
+an 8 GB NVIDIA card, a 16 GB NVIDIA card and a 16 GB Mac, and it
 downloads itself. It is also what the AMD graph ships, and the Radeon episode of
 2026-09-14 ran that graph unedited -- but [MACHINES.md](MACHINES.md) still marks
 this writer's AMD cell `?`, because the tester's artifacts attest the engines
 that emit their own ids (`still_motion`, `kokoro`, `z_image_turbo`,
-`viz_mxc_cpu`), not the model that wrote the script. So the list of three above
-stays three. Leaving both slots alone is a good answer on every one of those
-machines, AMD included.
+`viz_mxc_cpu`), not the model that wrote the script. Leaving both slots alone
+is a good answer on every one of those machines, AMD included.
 The 16 GB+
 NVIDIA graphs -- the pack's flagship tier -- ship the bigger `gemma-4-12b-it`
 instead; leaving those two slots alone is still a good answer there, but it
@@ -146,7 +145,7 @@ numbers.
 ## The sampling knobs
 
 Three widgets on the same node adjust how the model picks its words. They ship
-tuned, and the honest advice is to leave all three alone.
+tuned, and the honest advice is to leave them alone.
 
 | Widget | Ships at | Range | What it does |
 |---|---|---|---|
@@ -241,7 +240,7 @@ model than the one the graph names.
 ---
 
 Which writers have actually been proven on which hardware -- as opposed to
-which ones fit on paper -- is in [MACHINES.md](MACHINES.md) section 2.
+which ones fit on paper -- is in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine).
 
 ---
 

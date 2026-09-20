@@ -1,6 +1,6 @@
 # Install
 
-From "I have ComfyUI" to "the OTR nodes are in the menu." Ten minutes, most of it
+From "I have ComfyUI" to "the OTR nodes are in the menu." Most of it
 waiting on pip.
 
 If you only read one line: install the pack, make sure `ffmpeg` and `ffprobe` are
@@ -8,7 +8,7 @@ on your PATH, restart ComfyUI, and look for `[OldTimeRadio]` in the console.
 
 ---
 
-## 1. Get the pack
+## Get the pack
 
 **Through the Node Manager** (easiest). In ComfyUI, open **Extensions -> Node
 Manager** and search for **old time radio**, then install it. The registry id is
@@ -31,7 +31,7 @@ bundle: it has the nodes, the workflows and this folder, but not `docs/`, not
 `tests/`, and not most of `scripts/`. Anything in this folder that asks you to
 run a script says so explicitly and tells you which install you need.
 
-## 2. Install the Python libraries
+## Python libraries
 
 Into **ComfyUI's own interpreter**, not a system Python and not a different
 virtual environment. If you use the portable build that means the Python inside
@@ -41,14 +41,14 @@ the portable folder; if you made a venv for ComfyUI, activate it first.
 python -m pip install -r requirements.txt
 ```
 
-Manager usually does this for you. If it did, skip **this step only** — do not
-skip step 3. A missing ffprobe does not stop the nodes loading, and since the
+Manager usually does this for you. If it did, skip **this step only** -- do not
+skip ffmpeg. A missing ffprobe does not stop the nodes loading, and since the
 2026-09-11 PyAV fallback it no longer stops a normal episode either -- the pack
 reads durations through PyAV when no binary resolves. Some optional engines
 still refuse without a real ffprobe, which is why the instruction is still to
 install both.
 
-## 3. ffmpeg and ffprobe
+## ffmpeg and ffprobe
 
 **Both.** Not just ffmpeg. Episodes are muxed, captioned and published through
 ffmpeg, and several steps probe a file's duration with ffprobe first. The
@@ -77,8 +77,8 @@ cannot do it.
   build from johnvansickle.com into `/usr/local/bin`) or set `OTR_FFMPEG` to one.
 
 If you cannot install system-wide, `ffdl install` fetches both binaries into
-your user profile — `ffmpeg-downloader` comes down with the requirements in step
-2 and provides the fetcher.
+your user profile -- `ffmpeg-downloader` comes down with the requirements above
+and provides the fetcher.
 
 Check both answer. On macOS or Linux:
 
@@ -102,7 +102,7 @@ choose which binary runs on your machine.)
 roll need a real TTF; a headless server image often has none at all.
 `fonts-dejavu-core` is enough.
 
-## 4. Restart ComfyUI and read the console
+## Restart ComfyUI and read the console
 
 Restart fully -- the Node Manager's "reload" is not enough for a new pack.
 
@@ -123,7 +123,7 @@ pack. The fix is to install the library it names, into ComfyUI's interpreter.
 library never zeroes out the pack. Look for the pack being in the wrong folder,
 or for a crash during ComfyUI's startup, before any node loaded.
 
-## 5. Python versions
+## Python versions
 
 | Your Python | Voices | Notes |
 |---|---|---|
@@ -138,7 +138,7 @@ you need with ComfyUI's own Python:
 `<ComfyUI Python> -m pip install "misaki[zh]"`. See
 [MULTILINGUAL.md](MULTILINGUAL.md).
 
-## 6. Weights: what you do not have to do
+## Weights: what you do not have to do
 
 **One thing the pack deletes, so you are not surprised by it.** On every
 ComfyUI start, and again after each publish, it sweeps
@@ -164,16 +164,16 @@ What comes down on that first run is about **12 GB**:
 | Music — its text encoder | 1.11 GiB | `Comfy-Org/stable-audio-3` |
 | Voices — Kokoro | a few hundred MB | with the Python package |
 
-The canonical's three video lanes are procedural — they draw their own frames
-and consume no still image — so the image model its dropdowns name stays
+The canonical's procedural video lanes draw their own frames
+and consume no still image -- so the image model its dropdowns name stays
 **dormant** and is not downloaded. Switch a video lane to one that consumes a
 still and the image weights are fetched then, not before.
 
-Everything else — the lanes you have to fetch by hand, which repository each file
-comes from, and which folder to put it in — is in
-[MACHINES.md](MACHINES.md), section 3.
+Everything else -- the lanes you have to fetch by hand, which repository each file
+comes from, and which folder to put it in -- is in
+[MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
 
-## 7. A Hugging Face account, only if you want the gated lanes
+## Hugging Face login
 
 Most of what this pack uses is ungated. A few of the heavier video lanes are not,
 and for those you accept the licence on the model's Hugging Face page while
@@ -196,11 +196,11 @@ If that volume is short of room, set `HF_HOME` yourself **before launching
 ComfyUI**. Setting it later does not move the cache, it adds a second one, and
 you end up with two copies of everything.
 
-## 8. Node packs, only for some lanes
+## Node packs, only for some lanes
 
 Most lanes need nothing beyond this pack. A few build their graph out of classes
 that belong to someone else's pack, and those are listed per engine in
-[MACHINES.md](MACHINES.md), section 1 — with which of the shipped machine
+[MACHINES.md](MACHINES.md#which-graph-do-i-open) -- with which of the shipped machine
 graphs needs which. If you pick one of those lanes without its pack, the render
 stops with an error naming the pack and its URL.
 

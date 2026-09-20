@@ -8,7 +8,7 @@ not in the registry bundle.
 
 ---
 
-## 1. Size the pod
+## Size the pod
 
 | What you want to run | Start with |
 |---|---|
@@ -30,7 +30,7 @@ For the heavy lanes, also give yourself:
 Those figures cover the whole stack — weights, writer cache, isolated voice
 runtime, page cache and output room. No single engine wants 100 GiB by itself.
 
-## 2. Provision
+## Provision
 
 One bootstrap does everything: finds the template's real ComfyUI tree, pins
 ComfyUI core and the partner packs, repairs the CUDA mismatch these images
@@ -59,7 +59,7 @@ The class keys are `8gb`, `12gb`, `16gb` and `amd` — the names in
 Read the receipt it prints before launching anything. It is the difference
 between "the weights are there" and "the weights were attempted."
 
-## 3. Weights that need a licence click
+## Weights that need a licence click
 
 Some of the heavy video lanes are gated. Accept the licence on each model's
 Hugging Face page while signed in, then `hf auth login` on the pod. **More than
@@ -67,9 +67,9 @@ one owner may be involved** — a lane can need clicks on two different accounts
 so do not assume one acceptance covers the set.
 
 Which files, from which repository, into which folder:
-[MACHINES.md](MACHINES.md) section 3.
+[MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
 
-## 4. Launch and prove it
+## Launch and prove it
 
 Start ComfyUI, load `workflows/otr_canonical.json`, set the dropdowns for the
 lane you rented the box for, and queue one episode.
@@ -82,14 +82,14 @@ should read the log. **That rule does not apply to the first run**, which is
 still downloading tens of gigabytes and then writing a whole script before it
 draws anything. Do not kill a healthy first fetch because `otr/obs/` is empty.
 
-## 5. Pull your work off before you stop the pod
+## Pull your work off before you stop the pod
 
 Copy `otr/obs/` down first. Then stop it. A stopped pod's disk is not a place to
 keep anything you want.
 
 ---
 
-## Two things worth knowing
+## Worth knowing
 
 **The registry install works now.** Older notes say ComfyUI-Manager cannot
 install this pack reliably; that stopped being true at `2.0.0-alpha.30`. On a pod

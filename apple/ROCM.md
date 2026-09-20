@@ -39,7 +39,7 @@ that are different *because* it is AMD.
 
 ## What one receipt does and does not say
 
-It covers the **still tier on a 32 GB RDNA4 card under Linux**. Four engines
+It covers the **still tier on a 32 GB RDNA4 card under Linux**. These engines
 carry **proven** in the AMD column, each attested by a file the tester
 published rather than by their summary: `viz_mxc_cpu` and `still_motion` from
 the per-beat engine ids in their `qa_report.json`, `kokoro` and `z_image_turbo`
@@ -57,7 +57,7 @@ answering it once is not the same as knowing.
 
 **And it is dated.** The run was at `0b38424`, more than a hundred commits
 back, and the shipped graphs have been regenerated since -- the writer lost one
-inert widget and was reordered, and seven more came out of other nodes in the
+inert widget and was reordered, and other nodes dropped widgets in the
 same window. What is proven is that the
 PIPELINE and every engine this graph selects run on ROCm -- not that today's
 file, byte for byte, has been through a Radeon.
@@ -106,7 +106,7 @@ and ROCm arrives as CUDA, which is how it scored the tester's episode.
 About 31 GB in total for a complete episode, of which the image model is
 19.3 GiB -- this graph's `still_motion` lane consumes a still, which is what
 makes that download live. Every file, with its repository and destination
-folder, is in [MACHINES.md](MACHINES.md) section 3.
+folder, is in [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from).
 `scripts/otr_fetch_lane_weights.py --list` shows the lanes,
 and `... z_image` / `... stable_audio_3` only save you the wait. All of it
 exists only in a GitHub clone -- `scripts/` is not in the registry package.
@@ -124,7 +124,7 @@ and fails, so take a static build there. Check with
 
 Kokoro is the shipped voice on every platform and is what the tester's episode
 used. The cloning engines need a Windows-only installer and are not available
-here. [INSTALL.md](INSTALL.md) section 5 has the Python-version rules; nothing
+here. [INSTALL.md](INSTALL.md#python-versions) has the Python-version rules; nothing
 in them is AMD-specific.
 
 ---
@@ -159,8 +159,8 @@ git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio custom_nodes/ComfyU
 python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_rocm_probe.py
 ```
 
-It prints about thirty lines and stops -- no weights, no render, nothing written
-outside the checkout. Three of those lines decide whether the rest is worth your
+It prints a short receipt and stops -- no weights, no render, nothing written
+outside the checkout. These lines decide whether the rest is worth your
 time: `vendor()` must come back `amd` (if it says `nvidia` or `unknown` the pack
 cannot tell your card from a GeForce and that is a bug to fix first);
 `is_amd()` is what device resolution branches on, and it has executed on one
@@ -216,7 +216,7 @@ model, so skip it.
 ## The receipts behind this page
 
 Commit `0fc0fb90` records the run above from the tester's own artifacts, marks
-the four proven engines in `docs/dropdown_matrix.json`, and fixes the bug they
+the proven engines in `docs/dropdown_matrix.json`, and fixes the bug they
 hit: `scripts/otr_fetch_lane_weights.py` resolved the models directory through
 an import that only works inside a running ComfyUI, swallowed the failure, and
 returned a hardcoded Windows path -- on Ubuntu. An explicit
