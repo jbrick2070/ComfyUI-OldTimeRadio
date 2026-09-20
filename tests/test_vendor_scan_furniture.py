@@ -253,13 +253,16 @@ def test_a_hanging_cue_joins_the_row_it_labels_not_the_page_bottom():
 def test_a_row_is_measured_from_its_first_baseline_not_its_last():
     """Chaining near-neighbours walks a row down the page one step at a time.
 
-    Three words at 100, 102 and 104 are within 3 points of their PREDECESSOR
+    Three words at 100, 104 and 108 are within the span of their PREDECESSOR
     at every step, so a chaining rule swallows all three into one row even
-    though the span is 4. The row is anchored on its first baseline instead.
+    though the total drop is 8. The row is anchored on its first baseline
+    instead. (The span is adaptive -- `max(3.0, 0.45 * median word height)`,
+    about 6.2 at this synthetic font's 13.7pt box -- so the fixture keeps
+    each 4pt step inside it and the 8pt whole outside it.)
     """
     scan = _scan()
     doc, page = _one_page_pdf([
-        (30, 100, "alpha"), (80, 102, "beta"), (130, 104.5, "gamma"),
+        (30, 100, "alpha"), (80, 104, "beta"), (130, 108, "gamma"),
     ])
     rows = scan.rows_from_coordinates(page)
     doc.close()

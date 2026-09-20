@@ -269,7 +269,18 @@ def pdf_text(url: str, reading_order: str = "flat") -> list[str]:
 #: four scene pages: clustering on `y0` splits 73 image-verified printed rows,
 #: because a comma and a capital do not share a box top. Clustering on the
 #: MEDIAN CHARACTER BASELINE splits none and merges none.
-_ROW_BASELINE_SPAN = 3.0
+#:
+#: THE SPAN IS ADAPTIVE, AND THE FLOOR IS THE OLD FIXED VALUE. A hanging cue
+#: can sit 3.29 points off its own dialogue (Clark page 133) or 3.66 (page
+#: 182), and a fixed 3.0 leaves both cues on a row of their own. Measured:
+#: `max(3.0, 0.45 * median word height)` is 4.37-4.50 on Clark, joins both
+#: cues, changes NOTHING on the four Tempest pages (identical partitions,
+#: 130 image-verified verse rows kept), and stays under the 5.445 nearest-row
+#: gap. On Macpherson it is about 3.53 and still misses four image-verified
+#: cue joins (pages 322, 346, 358, 431), so that volume is NOT certified by
+#: this rule -- which is one more reason the reader stays opt-in.
+_ROW_BASELINE_FLOOR = 3.0
+_ROW_BASELINE_FRACTION = 0.45
 
 #: A word whose own characters jump further than this is not one word: the
 #: extractor fused the end of one printed row onto the start of the next.
@@ -280,14 +291,63 @@ _ROW_BASELINE_SPAN = 3.0
 _FUSED_WORD_JUMP = 4.5
 
 
-def _word_baseline(word_block) -> float:
-    """The median baseline of a word's characters, or None if it has none."""
-    origins = [ch["origin"][1] for span in word_block.get("spans", ())
-               for ch in span.get("chars", ())]
-    if not origins:
-        return None
-    origins.sort()
-    return origins[len(origins) // 2]
+def _median(values) -> float:
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2]
+
+
+def _word_baselines(page) -> tuple[list, list]:
+    """``(words, baselines)`` -- PyMuPDF's own word tuples, each with the
+    median baseline of ITS OWN characters and nothing else's.
+
+    ONE TEXTPAGE, SO THE TWO VIEWS AGREE. Ask a page for `words` and for
+    `rawdict` in two separate calls and each builds its own TextPage, and the
+    two number their blocks differently -- on Clark page 59 the words started
+    at block 0 while the raw blocks started at 1, which broke every join by
+    index. Build the TextPage ONCE with the word flags and read both views
+    from it: then the block, line and word numbers on a word tuple address
+    exactly the characters that spell it. Measured across all five scanned
+    volumes, 302,837 words, zero mismatches.
+
+    WHY NOT GEOMETRY. The first shipped version of this looked up glyphs by
+    the word's bounding box, and a word box is tall: it reaches into the
+    printed row above. On Clark page 59 the word `que` (baseline 100.3)
+    collected four characters of the line above (91.9) and took THEIR median,
+    an 8.4 point error that moved it into the wrong row; on the same page
+    `gusano,` moved out of Prospero's row into Miranda's. The page still had
+    exactly 38 rows and every word survived, so neither the row count nor
+    word conservation could see it. 14,689 words across 1,274 pages were
+    off by more than a point. Ownership is by identity, never by proximity.
+    """
+    import pymupdf
+
+    tp = page.get_textpage(flags=pymupdf.TEXTFLAGS_WORDS)
+    words = page.get_text("words", textpage=tp)
+    raw = page.get_text("rawdict", textpage=tp)
+    # (block, line) -> [median baseline of each whitespace-separated run]
+    per_line = {}
+    for b_no, block in enumerate(raw.get("blocks", ())):
+        for l_no, line in enumerate(block.get("lines", ())):
+            runs, run = [], []
+            # ACCUMULATE ACROSS SPANS. A word can change font or size in its
+            # middle (an italic cue, a damaged glyph), and a run that resets
+            # at each span boundary never sees the whole word.
+            for span in line.get("spans", ()):
+                for ch in span.get("chars", ()):
+                    if ch.get("c", "").isspace():
+                        if run:
+                            runs.append(_median(run))
+                            run = []
+                    else:
+                        run.append(ch["origin"][1])
+            if run:
+                runs.append(_median(run))
+            per_line[(b_no, l_no)] = runs
+    baselines = []
+    for x0, y0, x1, y1, text, b_no, l_no, w_no in words:
+        runs = per_line.get((b_no, l_no), ())
+        baselines.append(runs[w_no] if w_no < len(runs) else (y0 + y1) / 2.0)
+    return words, baselines
 
 
 def rows_from_coordinates(page) -> list[str]:
@@ -304,94 +364,46 @@ def rows_from_coordinates(page) -> list[str]:
     matched by any table of names, so reading order is upstream of every other
     rule in this file.
 
-    THE RULE, AND EVERY PART OF IT WAS MEASURED RATHER THAN CHOSEN. Take each
-    word's MEDIAN CHARACTER BASELINE; sort by baseline then by x; open a row at
-    the first word and keep adding while the baseline stays within
-    `_ROW_BASELINE_SPAN` OF THE ROW'S FIRST BASELINE -- never of the previous
-    word, because chaining near-neighbours walks a row down the page one small
-    step at a time. On the Clark Tempest's four scene pages this splits zero
-    printed rows and merges zero; the widest row spans 2.4 points and the
-    closest neighbouring rows sit 5.4 apart.
+    THE RULE. Take each word's MEDIAN CHARACTER BASELINE, from its own
+    characters only (`_word_baselines`); sort by baseline, then by x, keeping
+    source order for ties rather than sorting on the text; open a row at the
+    first word and keep adding while the baseline stays within the adaptive
+    span OF THE ROW'S FIRST BASELINE -- never of the previous word, because
+    chaining near-neighbours walks a row down the page one small step at a
+    time. On the Clark Tempest's four scene pages this splits zero printed
+    rows and merges zero; the widest row spans 2.4 points and the closest
+    neighbouring rows sit 5.4 apart.
 
     WHAT IT IS NOT. It is not certified across every volume, and the
-    measurements say so plainly: a hanging cue on Clark page 133 sits 3.29
-    points off its dialogue, page 182 has another at 3.12, and the Macpherson
-    volume carries six pages of rotated tables. It is therefore OPT-IN --
-    `reading_order="coordinates"` -- and the flattened path remains the
-    default until a volume is proven. Do not flip the default globally; prove
-    a volume and pin it.
+    measurements say so plainly: Macpherson still splits four image-verified
+    cue rows under the adaptive span, and it carries six pages of rotated
+    tables. It is therefore OPT-IN -- `reading_order="coordinates"` -- and
+    the flattened path remains the default until a volume is proven. Do not
+    flip the default globally; prove a volume and pin it.
 
     A PDF "LINE" IS NOT A PRINTED ROW EITHER, which is why this works on words
     rather than on `get_text("dict")` lines: Clark page 42 puts Alonso's speech
     and Sebastian's reply in one PDF line whose word baselines are 177.6 and
     185.5 apart.
     """
-    words = []
-    index = _baseline_index(page)
-    for x0, y0, x1, y1, text, *_ in page.get_text("words"):
-        # THE WORD UNITS ARE PYMUPDF'S OWN, NOT A RE-SPLIT OF THE GLYPHS.
-        # Re-splitting a span on its whitespace looks equivalent and is not:
-        # the raw layer carries a space the rendered text does not, so
-        # `SHAKSPEARE.` came back as `SHAKSPEARE .` and a token that every
-        # downstream rule matches on exactly was quietly changed. Measured,
-        # that broke word conservation on 180 of the Clark volume's 204 pages.
-        # Taking the tokens from `words` and only the BASELINE from the raw
-        # layer changes the ORDER of the page and nothing else.
-        baseline = _word_baseline_from(index, x0, y0, x1, y1)
-        words.append((baseline if baseline is not None else (y0 + y1) / 2.0,
-                      x0, text))
-    words.sort(key=lambda w: (w[0], w[1]))
+    words, baselines = _word_baselines(page)
+    if not words:
+        return []
+    heights = sorted(w[3] - w[1] for w in words)
+    span = max(_ROW_BASELINE_FLOOR, _ROW_BASELINE_FRACTION * _median(heights))
+    order = sorted(range(len(words)), key=lambda i: (baselines[i], words[i][0]))
     rows, row, anchor = [], [], None
-    for baseline, x, text in words:
-        if anchor is None or baseline - anchor <= _ROW_BASELINE_SPAN:
+    for i in order:
+        baseline, x0, text = baselines[i], words[i][0], words[i][4]
+        if anchor is None or baseline - anchor <= span:
             anchor = baseline if anchor is None else anchor
-            row.append((x, text))
+            row.append((x0, i, text))
         else:
-            rows.append(" ".join(t for _, t in sorted(row)))
-            row, anchor = [(x, text)], baseline
+            rows.append(" ".join(t for _, _, t in sorted(row)))
+            row, anchor = [(x0, i, text)], baseline
     if row:
-        rows.append(" ".join(t for _, t in sorted(row)))
+        rows.append(" ".join(t for _, _, t in sorted(row)))
     return rows
-
-
-def _baseline_index(page) -> dict:
-    """``{int(y): [(x, baseline)]}`` for every glyph origin on the page.
-
-    JOINED BY GEOMETRY, NOT BY INDEX, AND THAT IS DELIBERATE. The obvious join
-    is `page.get_text("words")`'s own block and line numbers against the raw
-    layer's blocks and lines. They do not agree: on Clark page 59 the words
-    start at block 0 while the raw blocks start at 1, because the two
-    disagree about whether a non-text block occupies a number. Measured, that
-    mismatch sent 156 of 254 words to the bounding-box fallback -- the very
-    metric this function exists to avoid -- and quietly split the page into 51
-    rows where it has 38. A geometric join cannot drift with a PyMuPDF
-    version, so it is the one used.
-    """
-    index = {}
-    for block in page.get_text("rawdict").get("blocks", ()):
-        for line in block.get("lines", ()):
-            for span in line.get("spans", ()):
-                for ch in span.get("chars", ()):
-                    if ch.get("c", "").isspace():
-                        continue
-                    x, y = ch["origin"]
-                    index.setdefault(int(y), []).append((x, y))
-    return index
-
-
-def _word_baseline_from(index, x0, y0, x1, y1) -> float | None:
-    """The median glyph baseline inside a word's box, or None if it has none."""
-    found = []
-    for bucket in range(int(y0) - 1, int(y1) + 2):
-        for x, y in index.get(bucket, ()):
-            if x0 - 0.5 <= x <= x1 + 0.5 and y0 - 1.0 <= y <= y1 + 1.0:
-                found.append(y)
-    return _median(found) if found else None
-
-
-def _median(values) -> float:
-    ordered = sorted(values)
-    return ordered[len(ordered) // 2]
 
 
 def fused_words(page) -> list[str]:
@@ -402,13 +414,25 @@ def fused_words(page) -> list[str]:
     whose speech a fragment belongs to -- which is the one judgement this lane
     refuses to make silently. A caller that sees these knows the page needs a
     human or an image check before its speakers can be trusted.
+
+    THE RUN CROSSES SPAN BOUNDARIES. The first version reset at every span
+    and therefore found none of the 32 measured fused tokens, because the
+    fusion IS a font change: the second half of the word is set in the next
+    row's face. It flagged nine pages of rotated tables instead. Rotated
+    lines are skipped -- their glyph origins climb by design.
     """
+    import pymupdf
+
     out = []
-    for block in page.get_text("rawdict").get("blocks", ()):
+    tp = page.get_textpage(flags=pymupdf.TEXTFLAGS_WORDS)
+    for block in page.get_text("rawdict", textpage=tp).get("blocks", ()):
         for line in block.get("lines", ()):
+            direction = line.get("dir", (1, 0))
+            if abs(direction[0]) < 0.9:            # rotated: origins climb by design
+                continue
+            run = []
             for span in line.get("spans", ()):
-                chars, run = span.get("chars", ()), []
-                for ch in chars:
+                for ch in span.get("chars", ()):
                     if ch.get("c", "").isspace():
                         run = []
                         continue
@@ -517,6 +541,24 @@ def clean_label(token: str) -> str:
     return _LABEL_QUALIFIER.sub("", token).strip(" .,;:").upper()
 
 
+
+def _edge_folio_parts(text):
+    """Comparison identity only: never alter a page's line topology."""
+    text = text.strip()
+    hit = re.fullmatch(r"([0-9]{1,3})\s+(.+)", text)
+    if hit:
+        folio, title = hit.groups()
+    else:
+        hit = re.fullmatch(r"(.+?)\s+([0-9]{1,3})", text)
+        if not hit:
+            return text, False
+        title, folio = hit.groups()
+    if title.strip(" .,:;").upper() in {"ACTO", "ATTO", "ACT", "SCENA", "ESCENA", "SCENE"}:
+        return text, False
+    if not (title.isupper() or _HEADING_SHAPED.match(title)):
+        return text, False
+    return title.strip(), True
+
 def running_titles(pages: list[str]) -> set[str]:
     """Short lines that repeat across the volume: the book's own furniture.
 
@@ -558,7 +600,7 @@ def running_titles(pages: list[str]) -> set[str]:
     for page in pages:
         lines = page.splitlines()
         for edge in _page_edges(lines):
-            texts = [lines[i].strip() for i in sorted(edge)]
+            texts = [_edge_folio_parts(lines[i])[0] for i in sorted(edge)]
             forms = set(texts)
             forms.update("%s %s" % pair for pair in zip(texts, texts[1:]))
             for form in forms:
@@ -615,7 +657,7 @@ def recurring_headings(pages: list[str]) -> set[str]:
         # counted twice -- and a heading on two short pages then cleared a floor
         # of three that the same heading on two ordinary pages could not.
         edges = _page_edges(lines)
-        texts = {lines[i].strip() for edge in edges for i in edge}
+        texts = {_edge_folio_parts(lines[i])[0] for edge in edges for i in edge}
         for text in texts:
             if _HEADING_SHAPED.match(text):
                 seen[_normalise_heading(text)] += 1
@@ -705,6 +747,7 @@ def _strip_one_edge(lines: list[str], edge: list[int], forms: set[str],
     while step < len(edge):
         i = edge[step]
         text = lines[i].strip()
+        identity, attached_folio = _edge_folio_parts(text)
         if _FOLIO.match(text):
             lines[i] = ""
             step += 1
@@ -724,8 +767,8 @@ def _strip_one_edge(lines: list[str], edge: list[int], forms: set[str],
         # A surviving header copy of the scene's own label is answered by
         # passing `--end-label`, which states the boundary instead of inferring
         # it -- see the note in `main`.
-        if (_ACT_LINE.match(text) and band_carries_folio
-                and _normalise_heading(text) in echoed):
+        if (_ACT_LINE.match(identity) and band_carries_folio
+                and _normalise_heading(identity) in echoed):
             lines[i] = ""
             step += 1
             continue
@@ -744,7 +787,7 @@ def _strip_one_edge(lines: list[str], edge: list[int], forms: set[str],
                 step += 2
                 title_taken = True
                 continue
-        if text in forms:
+        if identity in forms and not _HEADING_SHAPED.match(identity):
             lines[i] = ""
             step += 1
             title_taken = True
@@ -803,8 +846,11 @@ def strip_running_titles(pages: list[str]) -> list[str]:
         # page number, so a flag computed inside the second call would see a
         # band that no longer has one and spare furniture the first walk had
         # already judged.
-        folios = [any(_FOLIO.match(lines[i].strip()) for i in edge)
-                  for edge in edges]
+        folios = [any(_FOLIO.match(lines[i].strip()) or (
+                          _edge_folio_parts(lines[i])[1] and (
+                              _edge_folio_parts(lines[i])[0] in forms or
+                              _normalise_heading(_edge_folio_parts(lines[i])[0]) in echoed))
+                      for i in edge) for edge in edges]
         # ONE BAND, ONE BUDGET. Where the two windows overlap they are the same
         # physical band read from both ends, so the second reading inherits the
         # first's spend; where they are disjoint they are two bands and each
