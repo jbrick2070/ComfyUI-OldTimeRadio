@@ -536,6 +536,9 @@ def test_a_misprinted_heading_word_is_still_decoration_beside_a_folio():
     assert parts("SOENA II A TEMPESTADE") == ("SOENA II A TEMPESTADE", False)
     # a speaker beside a folio is still the speaker
     assert parts("31 MACBETH") == ("MACBETH", True)
+    # and a word that merely ENDS in a numeral letter is not a heading: the
+    # Macpherson collection title, measured by review, must keep its last word
+    assert parts("16 DRAMAS DE SHAKE PEARL .") == ("DRAMAS DE SHAKE PEARL", True)
 
     # end to end: nine good heads carry the vote and the misprinted tenth is
     # removed by where it sits, with the speaker below it untouched
@@ -576,6 +579,12 @@ def test_a_song_heading_is_a_cue_for_the_singer():
     assert got[1][1].startswith("Desembarca nesta areia dourada"), got[1]
     assert "Canto de Áriel" not in " ".join(s for _, s in got)   # a cue, never text
     assert "Canto de Ninguém" in got[2][1]                        # nobody is not a singer
+    # the French elision attaches the name to the preposition (review found
+    # the first cut demanded a space there): `Chanson d'Ariel` is the same cue
+    french = scan.speeches_from_span(
+        "PROSPERO\nCome here.\nChanson d'Ariel\nDance softly now.\nMIRANDA\nI hear you.",
+        roster)
+    assert [scan.resolve(l, roster) for l, _ in french] == ["PROSPERO", "ARIEL", "MIRANDA"], french
 
 
 def test_a_fold_is_declared_under_the_key_the_resolver_looks_up():
@@ -600,6 +609,12 @@ def test_a_fold_is_declared_under_the_key_the_resolver_looks_up():
                 ["MIRANDA=FERDINAND"], ["FERNANDO=FERDINAND", "FERNANDO=MIRANDA"]):
         folds, why = scan.parse_folds(bad, tempest)
         assert folds == {} and why, (bad, folds, why)
+    # a form ANY pass already reaches is refused, not only an exact name: the
+    # stem rule binds EDMUNDO to EDMUND, and a fold may not redirect it
+    lear = {"EDMUND", "KENT", "LEAR"}
+    assert scan.resolve("EDMUNDO", lear) == "EDMUND"
+    folds, why = scan.parse_folds(["EDMUNDO=KENT"], lear)
+    assert folds == {} and "EDMUND" in why, (folds, why)
     # the same declaration twice is one declaration
     assert scan.parse_folds(["FERNANDO=FERDINAND"] * 2, tempest) == (
         {"FERNANDO": "FERDINAND"}, "")
@@ -653,5 +668,12 @@ def test_a_window_edge_is_not_evidence_the_scene_ended():
     closed = lines + ["ESCENA II.", "PROSPERO.", "Ya."]
     assert scan.window_truncates(ran_off, closed, False) == ""     # a heading closed it
     assert scan.window_truncates("", lines, False) == ""
+    # A VERSE LINE REPEATED LATER IN THE WINDOW IS NOT THE SCENE'S END. The
+    # first cut anchored on the closing line's text and refused this closed
+    # scene; the test is the body being the SUFFIX of the window, and only that.
+    body = "A\nB\nC"
+    assert scan.window_truncates(body, ["X", "A", "B", "C", "HEADING II", "D", "C", ""], False) == ""
+    assert scan.window_truncates(body, ["X", "A", "B", "C", ""], False)
+    assert scan.window_truncates(body, ["X", "A", "B", "C", "", "HEADING II"], False) == ""
     source = inspect.getsource(scan.main)
     assert "window_truncates(" in source, "the refusal is not wired where the window is read"

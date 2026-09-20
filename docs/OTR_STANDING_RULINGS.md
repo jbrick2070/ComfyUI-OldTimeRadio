@@ -22,6 +22,34 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-19 EVENING -- THE SCAN LANE IS PARKED. CUT LOSSES, SHIP v2.x
+
+Operator, after a day of lanes on the scanned-volume corpus: **"im ode iwth
+rabit hole we liit what we have have sonnet do te fina claup pases cut our
+losses so we cna shuip and i hgave soem creidts lefdt for regresion testing
+before we ship and i poset in redit abut v 2.x of otr."** Plainly: I am
+done with the rabbit hole; we limit what we have; Sonnet does the final
+cleanup passes; cut our losses so we can ship; the remaining credits go to
+regression testing before the ship and the Reddit post about v2.x.
+
+**WHAT THIS CLOSES.** No new prompts, lanes or arcs on the scan lane. The
+corpus ships at what it is -- 43 vendored scenes, four of them from page
+scans -- and the open rows below are PARKED, not open: unbound-speaker
+emission, the `scan_editions.json` registry, the Macpherson furniture
+floor, the Spanish cells (eight proven boundaries, none vendored), and the
+NotebookLM segments (a writing project, not a shipping gate). A window
+that reopens one of these is chasing, and the 2026-08-04 story-quality
+ruling names what chasing costs.
+
+**WHAT REMAINS BEFORE THE SHIP, in order.** (1) The fix already in the
+tree from the last review round is pushed -- it is correctness, not
+chasing. (2) Sonnet runs the final cleanup pass on the pushed diff; a
+finding becomes a commit, a taste note does not. (3) The FULL suite is
+run and diffed against a same-HEAD baseline, and every new failure is
+explained or fixed -- section 7A's condition for any publish. (4) The
+version bump is HIS: state the gap and the number (`2.1.x`, third digit
+only), and bump when he says so. (5) The Reddit post is his.
+
 ## 2026-09-19 -- A MANGLED NATIVE TEXT BEATS A CLEAN AI TRANSLATION
 
 Operator, unprompted, while the panel was pricing fail-closed gates that would

@@ -207,7 +207,7 @@ _STAGE_OPENER = re.compile(
 #: only when the name resolves to someone in the scene.
 _SONG_HEADING = re.compile(
     r"(?i)^(?:canto|canção|cancao|canción|cancion|canzone|chanson|song)\s+"
-    r"(?:de|di|d'|of)\s+(?P<who>[^\n]{2,30}?)\s*[.:]?$")
+    r"(?:(?:de|di|of)\s+|d['’]\s*)(?P<who>[^\n]{2,30}?)\s*[.:]?$")
 
 #: A SWALLOWED SPEAKER LABEL, BY ITS SHAPE. A lower-case letter running
 #: straight into capitals inside one token is not a word in Spanish,
@@ -565,7 +565,6 @@ def parse_folds(specs, roster: set[str]):
     which a dict would settle silently by whichever came last. The printed
     side is normalised by `label_key`, the same function the lookup uses.
     """
-    exact = {fold(name) for name in roster}
     folds: dict[str, str] = {}
     for spec in specs:
         printed, sep, target = spec.partition("=")
@@ -576,10 +575,23 @@ def parse_folds(specs, roster: set[str]):
         if target not in roster:
             return {}, ("REFUSING: --fold %s names %r, who is not in this scene's "
                         "roster %s" % (spec, target, sorted(roster)))
-        if printed in exact:
+        # ANY FORM THE RESOLVER ALREADY REACHES IS REFUSED, by whichever pass
+        # reaches it -- not only an exact name. The first cut refused exact
+        # names alone, and review showed a fold consulted before the title,
+        # place, stem and ordinal passes could still redirect `EDMUNDO`,
+        # which the stem rule binds to EDMUND, to whoever the declaration
+        # named. Resolved with the map empty, so an earlier declaration in
+        # the same list cannot mask a later one.
+        held = dict(FOLDS)
+        FOLDS.clear()
+        try:
+            bound = resolve(printed, roster)
+        finally:
+            FOLDS.update(held)
+        if bound is not None:
             return {}, ("REFUSING: --fold %s renames %s, whom the resolver already "
-                        "binds exactly; a fold is for a form it cannot reach"
-                        % (spec, printed))
+                        "binds to %s; a fold is for a form it cannot reach"
+                        % (spec, printed, bound))
         if folds.get(printed, target) != target:
             return {}, ("REFUSING: --fold declares %s twice, as %s and as %s"
                         % (printed, folds[printed], target))
@@ -689,8 +701,11 @@ _TRAILING_HEADING = re.compile(r"^(?P<rest>.+?)[\s,]+" + _HEADING_TOKEN + r"$", 
 #: when the decoration comes off (the voted title). So beside a folio, any
 #: short capitalised word followed by a numeral is a heading token. Away
 #: from a folio the strict spelling still governs, so a bare misprint is
-#: never invented into a heading.
-_LOOSE_HEADING_TOKEN = r"(?:[A-ZÀ-Þ]{3,8})\s*" + _HEADING_NUMERAL + r"\s*[.,]?"
+#: never invented into a heading. THE SPACE BEFORE THE NUMERAL IS REQUIRED:
+#: measured over 21,380 edge rows, allowing none let `PEARL` read as `PEAR`
+#: plus a Roman `L` on a Macpherson collection title. A printed head always
+#: has the space.
+_LOOSE_HEADING_TOKEN = r"(?:[A-ZÀ-Þ]{3,8})\s+" + _HEADING_NUMERAL + r"\s*[.,]?"
 _LOOSE_LEADING_HEADING = re.compile(r"^" + _LOOSE_HEADING_TOKEN + r"\s+(?P<rest>.+)$")
 _LOOSE_TRAILING_HEADING = re.compile(
     r"^(?P<rest>.+?)[\s,]+" + _LOOSE_HEADING_TOKEN + r"$")
@@ -1154,19 +1169,23 @@ def window_truncates(body: str, lines: list[str],
     is the end of the book and a legitimate boundary; on a window it is an
     arbitrary page. The Clark Tempest 3.1 asked for page 58 alone returned
     814 characters of a 4,822-character scene with no error, and `--write`
-    would have stored the fragment as READY at confidence 1.0. The scene
-    ran to the end of its input exactly when nothing non-blank follows the
-    last occurrence of its final line; a heading that closed it always
-    follows the body, so a closed scene cannot be mistaken for this. A
-    window that reaches the volume's last page is the whole-volume case and
-    is allowed.
+    would have stored the fragment as READY at confidence 1.0.
+
+    THE TEST IS STRUCTURAL, NOT TEXTUAL. `extract` builds the body as the
+    non-blank, right-stripped lines from the scene heading to the boundary,
+    so the scene ran to the end of its input exactly when the body is the
+    SUFFIX of the window's non-blank lines. A heading that closed the scene
+    is a non-blank line after the body, and then the body is not the suffix.
+    The first cut anchored on the closing line's TEXT, and a verse line
+    repeated later in the window made it refuse a scene a heading had
+    closed -- review reproduced that before anyone hit it. A window that
+    reaches the volume's last page is the whole-volume case and is allowed.
     """
     if window_reaches_volume_end or not body.strip():
         return ""
-    last = body.rstrip().splitlines()[-1].rstrip()
-    tail = [line.rstrip() for line in lines]
-    at = max((i for i, line in enumerate(tail) if line == last), default=-1)
-    if at < 0 or any(line.strip() for line in tail[at + 1:]):
+    scene = [line.rstrip() for line in body.splitlines() if line.strip()]
+    window = [line.rstrip() for line in lines if line.strip()]
+    if window[-len(scene):] != scene:
         return ""
     return ("the scene runs to the last line of the page window with no heading "
             "to close it -- the window's edge is not evidence the scene ended; "
