@@ -189,7 +189,16 @@ def _line_units(text: str) -> list[str]:
 #: A CLOSING QUOTE OR BRACKET STAYS WITH ITS SENTENCE. `「あゝ、ロミオ！」` cut
 #: straight after the mark left `」` to open the next beat (agy, on
 #: 96346118); the cut waits for the closing mark when one follows.
-_CJK_CLOSERS = "」』”’）)]"
+#: ESCAPED, BECAUSE THE FIRST CUT WAS NOT. The closers include `]`, and an
+#: unescaped `]` inside a character class closes the class, so the lookahead
+#: read "not followed by a closer AND a literal ]" -- never true -- and the
+#: closer-keep never kept anything; its test was green only because the
+#: packer's boundaries happened to fall on opening quotes (Cursor, on
+#: f1f6a840). `re.escape` makes `]` and `)` literal inside the class.
+#: CHUNKER_VERSION stays v1 on purpose: English boundaries are unchanged
+#: (asserted), and no CJK plan ever succeeded before 96346118, so no stored
+#: receipt names CJK chunk pairs that could move.
+_CJK_CLOSERS = re.escape("」』”’）)]")
 _CJK_SENTENCE_CUT = re.compile(
     r"(?<=[。！？!?])(?![" + _CJK_CLOSERS + r"])|(?<=[。！？!?][" + _CJK_CLOSERS + r"])")
 _CJK_CLAUSE_CUT = re.compile(r"(?<=[、，；：;:])(?![" + _CJK_CLOSERS + r"])")

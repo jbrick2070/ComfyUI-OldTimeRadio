@@ -76,6 +76,15 @@ def test_the_cut_keeps_the_editions_bytes_and_its_closing_quotes():
     assert len(chunks) > 1 and "".join(chunks) == spaced, chunks
     assert all("\u3000" in c or c.endswith("！") for c in chunks)
     quoted = ("「あゝ、ロミオ！」と叫んだ。" * 15).strip()
+    # THE PIECES, NOT ONLY THE CHUNKS. The first cut of this test looked at
+    # chunk starts and was green while every piece boundary orphaned `」`,
+    # because the packer's boundaries happened to fall on `「` (Cursor, on
+    # f1f6a840). The sentence cut must keep the closer with its sentence.
+    pieces, joiner = PS._line_tokens(quoted)
+    # the quoted exclamation is a sentence of its own and keeps its closer;
+    # the narration after it is the next piece
+    assert joiner == "" and pieces == ["「あゝ、ロミオ！」", "と叫んだ。"] * 15, pieces[:4]
+    assert not any(p.startswith(("」", "』", "）")) for p in pieces), pieces[:3]
     chunks = PS.chunk_speech(quoted, cap=20)
     assert len(chunks) > 1 and "".join(chunks) == quoted, chunks
     assert not any(c.startswith("」") for c in chunks), chunks

@@ -401,7 +401,7 @@ surface that paints it. Renaming the key is a systemic break for a cosmetic win.
 
 **Row 4 leftover Bark `v2/` is cleared** on a non-bark `_stamp`. The two
 CastLock pins (`test_auto_registry_stamps_voice_refs`,
-`test_kokoro_castlock_spoken_rows_have_no_bark_presets`) are the contract.
+`test_kokoro_castlock_policy_rows_have_no_bark_presets`) are the contract.
 
 **Row 7 wrap/font are wired.** `_otr_captions.wrap_text` honors `word_split` /
 `unicode_grapheme` / `cjk_chars`. ASS SDH + TITLE faces follow `font_policy`.

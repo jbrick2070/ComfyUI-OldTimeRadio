@@ -28,7 +28,7 @@ CastLock leftover Bark `v2/` after a kokoro `auto_registry` stamp is
 also not a live row: `_stamp` already clears a `v2/` preset when the
 stamped engine is not bark. The contract is
 `test_auto_registry_stamps_voice_refs` and
-`test_kokoro_castlock_spoken_rows_have_no_bark_presets`.
+`test_kokoro_castlock_policy_rows_have_no_bark_presets`.
 
 ---
 

@@ -36,11 +36,12 @@ Pro** -- and there is one per act break, so `act_count` 1 gives none and
 | **`sonilo`** | A Comfy account and credits | Hosted -- no GPU of yours |
 | **`google_lyria`** | A Google API key. Paid, and preview-only | Hosted -- no GPU of yours |
 
-**Stable Audio 3 is what every shipped graph but the CPU preset uses**, and it
-is the right answer on any machine with a GPU: it downloads itself, and its
-licence permits commercial use.
+**Stable Audio 3 is what every local GPU graph uses**, and it is the right
+answer on any machine with a GPU: it downloads itself, and its licence permits
+commercial use. The cloud graphs score with **`sonilo`** instead, because they
+run nothing on your own card -- see [CLOUD.md](CLOUD.md).
 
-**The CPU preset is that exception**, and it is on MusicGen -- Stable Audio 3
+**The CPU preset is the other exception**, and it is on MusicGen -- Stable Audio 3
 declares CUDA and Metal only, so a machine with no GPU has to use something
 else. Worth knowing if you go that way: **MusicGen's weights are
 non-commercial** (CC-BY-NC). Fine for listening; not for anything you sell.

@@ -88,11 +88,13 @@ rather than borrowing an English voice.
 
 Every bank is admitted for every language row, so the default roll is safe
 unattended. Shakespeare and Public Domain still perform the author's own
-words: in a non-English run they use a real translator's public-domain text
-when the corpus holds that scene (the manifest under
-`config/source_banks/shakespeare/translations` is the list), and otherwise the writer
-model's own translation of the selected passage, which the ledger records as
-such. Pin `source_bank` only when you want a particular lane.
+words. In a non-English run, Shakespeare uses a real translator's
+public-domain text when the corpus holds that scene (the manifest under
+`config/source_banks/shakespeare/translations` is the list) and otherwise the
+writer model's own translation of the selected passage; Public Domain has no
+vendored translations today, so its passage is always the writer's
+translation. The ledger records which it was. Pin `source_bank` only when you
+want a particular lane.
 
 Captions are native when the written line is native. They are not a separate
 translation track: an English line leaked by the writer remains English in the

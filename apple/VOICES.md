@@ -6,10 +6,12 @@ engine casts from. Both are set on the node titled **3 - Cast Lock**, and the
 engine is named a second time on **4a - Character Voices** and **4b - Announcer
 Voice**.
 
-You do not have to choose any of it. Every graph that ships -- the canonical and
-every saved variant -- arrives set to **Kokoro** on every voice slot, with
-the **`kokoro_builtin`** bank behind it. That is the combination every published
-episode used.
+You do not have to choose any of it. Every local graph that ships -- the
+canonical and every saved variant that runs on your own machine -- arrives set
+to **Kokoro** on every voice slot, with the **`kokoro_builtin`** bank behind it.
+That is the combination every published episode used. The cloud graphs are the
+exception: they cast through **ElevenLabs on Comfy Cloud** (`cloud_elevenlabs`),
+which is a paid, hosted voice -- see [CLOUD.md](CLOUD.md).
 
 ---
 

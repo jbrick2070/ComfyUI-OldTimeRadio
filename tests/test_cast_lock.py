@@ -265,11 +265,17 @@ def test_auto_registry_stamps_voice_refs():
         assert row.get("tts_model") != "bark", row
 
 
-def test_kokoro_castlock_spoken_rows_have_no_bark_presets():
+def test_kokoro_castlock_policy_rows_have_no_bark_presets():
     """Lime pending_20260917_051904 leftover: writer stamped Bark on
     Stomp/Tiptoe/Whiskers, CastLock was supposed to overwrite. A kokoro
-    lock must not leave v2/* on spoken rows -- and must not remap those
-    presets as a silent fallback."""
+    lock must not leave v2/* on ordinary spoken rows -- and must not remap
+    those presets as a silent fallback.
+
+    RENAMED 2026-09-20 from "...spoken_rows...": the rows here are policy
+    and deterministic stamps. A Lemmy row auditioned through kokoro on the
+    provisional route KEEPS its writer-stage preset by design (see
+    tests/test_lemmy_provisional_tier.py, the stated-tension test), so the
+    old name claimed more than this test proves."""
     from nodes.cast_lock import CastLock
 
     cast = [
