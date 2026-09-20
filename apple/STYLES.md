@@ -36,7 +36,7 @@ The dropdown lists style *ids*, alphabetically, with the roll sitting on top.
 | `shakespeare_stage_realism` | Photoreal theatre. A candlelit period stage, real costume detail, rich stage contrast, warm candle colour, composed like a live production. |
 | `storybook_engraving` | A hand-tinted engraved plate. Fine ink crosshatching, hand-coloured costume, warm parchment ground. |
 | `video_art` | Analogue video feedback. Phosphor bloom, prismatic halos, saturated additive rainbow over velvety charcoal darks, layered temporal planes. |
-| `visual_storybased` | Not a fixed look -- see [the tenth one](#the-tenth-one-is-not-a-look) below. |
+| `visual_storybased` | Not a fixed look -- see [the story-based one](#the-story-based-one-is-not-a-look) below. |
 
 `sci_fi_radio` is also the fallback: an episode whose ledger carries no style at
 all is drawn this way, so it is the one look you can get without ever choosing
@@ -85,7 +85,7 @@ hardware in [MACHINES.md](MACHINES.md) section 2 first.
 
 ---
 
-## The tenth one is not a look
+## The story-based one is not a look
 
 `visual_storybased` has no pack on disk. Instead the writer reads the finished
 script and invents a look for that one episode -- a nine-field card covering the
@@ -220,7 +220,7 @@ anything is off. The ones that catch people:
   with one exception: `scene_instruction_look` may be an empty string. The
   four older tail fields (`positive_tail`, `image_grade_tail`,
   `broadcast_tail`, `era_tail`) and `label` must be present but are never
-  checked for emptiness -- three of the nine shipped packs (`cartoon.json`,
+  checked for emptiness -- three of the shipped packs (`cartoon.json`,
   `anime.json`, `paper_origami.json`) ship today with `image_grade_tail`,
   `broadcast_tail` and `era_tail` all set to `""`, and that validates fine.
   `negative_tail` (what the style should *avoid* drawing) and `checkpoint` are

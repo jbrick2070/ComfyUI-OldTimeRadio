@@ -64,7 +64,7 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `act_count` | 1 for a short one, 3 for a full show with act breaks. Ships at 1. |
 | `custom_premise` | A sentence or two of your own. Blank means the source bank decides. |
 | `source_bank` | Where the story comes from — ships on *roll*, which picks any eligible bank. |
-| `visual_style` | How it looks — ships on *roll*, which picks any of the ten. |
+| `visual_style` | How it looks — ships on *roll*, which picks any of them. |
 | `creativity` | `balanced` by default. |
 | `episode_language` | One switch for writing, Kokoro casting, caption labels/wrapping/fonts, and audience-facing credits. See [MULTILINGUAL.md](MULTILINGUAL.md). |
 

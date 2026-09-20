@@ -375,7 +375,7 @@ What `otr_canonical` ships, and why:
 - **Voices:** `kokoro` on both slots. It is the only one-click voice on every
   platform, which is why it is the default. The voice engines come with a Manager
   install, except one: the IndexTTS2 voice cloner ships in the GitHub tree only.
-  Two of the six, **Chatterbox and Dia, assume Windows** -- they run in their own
+  Two of them, **Chatterbox and Dia, assume Windows** -- they run in their own
   venv and install through PowerShell scripts with no shell twin. Point
   `OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter to run them
   elsewhere; nothing here has proven that path.
