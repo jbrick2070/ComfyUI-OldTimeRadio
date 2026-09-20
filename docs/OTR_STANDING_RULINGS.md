@@ -54,10 +54,12 @@ only), and bump when he says so. (5) The Reddit post is his.
 Operator: *"man i hoie we have at least oen native jaasnbe ripisode if not
 let s make tyaht our final quetys"* and *"thsi si an eucvtaional project we
 cn subit to teh foklger so donbt be woirrie sbaout rights ok."* Measured
-before acting: `otr/obs` already holds a Japanese-language episode
-(`signal_lost_嘘の夜明け_ja_20260918_190917`, the original bank, Kokoro), so
-Japanese TTS is proven end to end -- but no SHAKESPEARE episode has ever
-been rendered in Japanese, and the corpus holds exactly the cells for one:
+before acting: `otr/obs` already held a Japanese-language episode
+(`signal_lost_嘘の夜明け_ja_20260918_190917`, Kokoro), so Japanese TTS was
+proven end to end -- its ledger later showed it was the Shakespeare bank
+under a MACHINE translation, one of the twelve quarantined below -- but no
+Shakespeare episode had ever been performed from a translator's Japanese,
+and the corpus holds exactly the cells for one:
 Tsubouchi Shōyō's Romeo and Juliet 1.1 and 2.2 (1933). The quest is
 therefore the balcony scene in Tsubouchi's Japanese through the canonical
 graph: `scripts\otr_headless_canonical.ps1 -Profile otr_16gb_still -Set
@@ -90,6 +92,21 @@ published, and the difference between them is the whole lesson:
 The two files look identical from the outside; only the log line and the
 ledger block tell them apart -- see the memory note "native claim needs the
 VENDORED log line".
+
+**QUARANTINE (operator, 2026-09-20 ~01:30):** *"delete all unclean
+Shakespeare international from my obs and episodes folder, I only want
+those using real native translations, no AI."* Measured off every episode
+ledger: twelve Shakespeare-bank episodes carried a `verbatim_passage.
+translation` receipt and no `vendored` block -- the 09-18 seven-language
+sweep (es x3, it, fr, pt, hi, ja, zh), one unfinished `pending` Japanese
+dir, leg 1 above (`shedding_rose_ja`; its defect lines are quoted in
+PBUG-20260919-04) and `le_serment_du_rivage_fr_20260919_023151`. All
+twelve, with their eleven obs files (2.4 GB), were MOVED -- not deleted --
+to `output/otr/_quarantine_model_translated_20260920/`; the operator
+empties it. Everything vendored (the 09-19 es/it/fr set, `abandoned_rose_ja`)
+and everything English stayed. This is the one time an obs file was moved
+by a window, and it was on the operator's explicit order, by ledger
+criterion, into a folder he can see.
 
 ## 2026-09-19 -- A MANGLED NATIVE TEXT BEATS A CLEAN AI TRANSLATION
 
