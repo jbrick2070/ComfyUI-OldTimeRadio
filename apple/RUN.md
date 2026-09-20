@@ -7,7 +7,7 @@ shows.
 
 ---
 
-## 1. Open the workflow
+## Open the workflow
 
 **Workflow → Browse Templates → EXTENSIONS → comfyui-old-time-radio** (named
 after the pack's folder, so a git clone lists it as **ComfyUI-OldTimeRadio**).
@@ -19,12 +19,12 @@ file.)
 
 If you would rather have a graph pre-set for your hardware, drag one of the saved
 variants in `workflows/variants/` onto the canvas instead —
-[MACHINES.md](MACHINES.md) section 1 names the file for your machine. Those do
+[MACHINES.md](MACHINES.md#which-graph-do-i-open) names the file for your machine. Those do
 not appear under Browse Templates; they are files you drag.
 
-## 2. Press Queue
+## Press Queue
 
-The first run downloads about 12 GB (see [INSTALL.md](INSTALL.md) section 6) and
+The first run downloads about 12 GB (see [INSTALL.md](INSTALL.md#weights-what-you-do-not-have-to-do)) and
 then writes, casts, performs, scores and cuts an episode. Later runs skip the
 download.
 
@@ -33,7 +33,7 @@ language model producing a full script before a single frame is drawn. On a
 16 GB NVIDIA card a short episode is minutes, not seconds; on CPU it is a long
 wait, and that is the model, not a hang.
 
-## 3. Find it
+## Find it
 
 ```
 <your ComfyUI output folder>/otr/obs/
@@ -81,26 +81,10 @@ could adjust.
 
 ## Making a multilingual episode
 
-Set `episode_language` on **OTR_LedgerScriptWriter**. The admitted rows are
-English, Spanish, Portuguese, Italian, French, Hindi, Japanese and Mandarin.
-Keep both voice engines on **Kokoro**; non-English rows refuse other engines
-rather than borrowing an English voice.
-
-Every bank is admitted for every language row, so the default roll is safe
-unattended. Shakespeare and Public Domain still perform the author's own
-words. In a non-English run, Shakespeare uses a real translator's
-public-domain text when the corpus holds that scene (the manifest under
-`config/source_banks/shakespeare/translations` is the list) and otherwise the
-writer model's own translation of the selected passage; Public Domain has no
-vendored translations today, so its passage is always the writer's
-translation. The ledger records which it was. Pin `source_bank` only when you
-want a particular lane.
-
-Captions are native when the written line is native. They are not a separate
-translation track: an English line leaked by the writer remains English in the
-caption and may sound accented when performed by a non-English Kokoro voice.
-The complete behaviour, Python-version limits and add-your-own-language recipe
-are in [MULTILINGUAL.md](MULTILINGUAL.md).
+Set `episode_language` on **OTR_LedgerScriptWriter**. Keep the voice engines
+on **Kokoro**. The admitted rows, the voice pools, and how Shakespeare and
+Public Domain perform in another language are in
+[MULTILINGUAL.md](MULTILINGUAL.md).
 
 ## Writing your own story
 
@@ -120,7 +104,7 @@ The engine dropdowns live on **OTR_VideoDirector** (video and images),
 **OTR_CastLock** and the voice nodes (speech), and **OTR_StableAudioTheme**
 (music). The canonical ships:
 
-- **Video:** three procedural lanes that draw their own frames — nothing to
+- **Video:** procedural lanes that draw their own frames -- nothing to
   download, and they work on every machine including CPU.
 - **Images:** Z-Image-Turbo, sitting **dormant**, because those three video lanes
   consume no still. Switch one to a still-consuming lane and the image weights
@@ -130,7 +114,7 @@ The engine dropdowns live on **OTR_VideoDirector** (video and images),
 - **Music:** Stable Audio 3.
 
 Before you change one, check it against your machine in
-[MACHINES.md](MACHINES.md) section 2 — it says what runs where, how big the
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) -- it says what runs where, how big the
 download is, and whether it needs another node pack.
 
 ---
@@ -139,20 +123,20 @@ download is, and whether it needs another node pack.
 
 **The render stops naming a missing class.** The lane you picked needs a
 third-party node pack. The error names the pack and its URL; install it into
-`custom_nodes/`, restart, try again. [MACHINES.md](MACHINES.md) section 1 lists
+`custom_nodes/`, restart, try again. [MACHINES.md](MACHINES.md#which-graph-do-i-open) lists
 which lanes these are.
 
 **The render stops naming a missing file.** The lane you picked needs weights
-that do not download themselves. [MACHINES.md](MACHINES.md) section 3 says which
+that do not download themselves. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
 repository it comes from and which folder it goes in. The error names the file;
 it never quietly substitutes a different one.
 
 **It refuses before downloading, saying the writer will not fit.** You picked a
-language model bigger than your card's ceiling. Pick a smaller one — the writer
-column in [MACHINES.md](MACHINES.md) section 2 shows which fit your machine.
+language model bigger than your card's ceiling. Pick a smaller one -- the writer
+column in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) shows which fit your machine.
 
 **No mp4, and the log mentions ffmpeg or ffprobe.** See
-[INSTALL.md](INSTALL.md) section 3 — you need both binaries, and the bundled
+[INSTALL.md](INSTALL.md#ffmpeg-and-ffprobe) -- you need both binaries, and the bundled
 wheel supplies only one of them.
 
 **Captions are blank boxes on Linux.** Install a monospace TTF.

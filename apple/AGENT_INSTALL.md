@@ -1,7 +1,7 @@
 # Installing OTR with an AI coding agent
 
-**You do not need this file.** The five steps in the README are the normal path
-and most people should just follow them: install from Extensions -> Node Manager, put
+**You do not need this file.** The install path in the README is the normal one
+and most people should just follow it: install from Extensions -> Node Manager, put
 ffmpeg on PATH, restart, open the template, press Queue. This page exists for
 people who would rather hand the job to Claude Code, Codex, Cursor, Gemini CLI,
 Copilot or any other agent with a terminal -- and for the agent itself, which is
@@ -29,7 +29,7 @@ You are installing a ComfyUI custom node pack. The user wants a working install
 and a first episode, not a tour. Work in this order; each step has a command
 that PROVES it rather than a claim that it worked.
 
-### 0. Find the real ComfyUI, and its real Python
+### Find the real ComfyUI, and its real Python
 
 Everything downstream depends on getting these two right, and on most machines
 there is more than one candidate. **The Python that matters is the one ComfyUI
@@ -47,15 +47,15 @@ Verify before continuing:
 <ComfyUI Python> -c "import sys, torch; print(sys.executable); print(sys.version); print(torch.__version__, torch.cuda.is_available())"
 ```
 
-Record all four values. If `torch` does not import, you have the wrong Python --
+Record each printed line. If `torch` does not import, you have the wrong Python --
 find the right one before doing anything else. **On an Apple Silicon machine
 `torch.cuda.is_available()` is correctly `False`; check `torch.backends.mps.is_available()`
 instead.**
 
 The Python version decides the voice backend, and this is not a preference:
 
-* **3.10, 3.11, 3.12** -> the torch `kokoro` package and all eight admitted
-  episode languages (`requirements.txt` pins it to
+* **3.10, 3.11, 3.12** -> the torch `kokoro` package and every admitted
+  language (`requirements.txt` pins it to
   `python_version < "3.13"`).
 * **3.13** (what Desktop and the portable build ship) -> `kokoro-onnx`, on the
   CPU, about six times faster than realtime. This is the English path;
@@ -69,7 +69,7 @@ For a multilingual install, also read [MULTILINGUAL.md](MULTILINGUAL.md);
 Japanese and Mandarin have language-specific readiness extras that are not an
 English-install tax.
 
-### 1. Install the pack
+### Install the pack
 
 Prefer the registry unless the user asked for the git tree:
 
@@ -96,7 +96,7 @@ ComfyUI will never look, and the failure appears much later as skipped nodes.
 retired on 2026-09-13 and is frozen -- do not clone it. An old clone of `main`
 from before 2026-09-13 is a v1.7 tree: re-clone rather than pull.
 
-### 2. ffmpeg AND ffprobe, and a current build
+### ffmpeg AND ffprobe, and a current build
 
 Both binaries, on PATH. Every episode is mixed, captioned and muxed through
 them, and the final mux copies the master audio into the MP4 losslessly, which
@@ -109,7 +109,9 @@ brew install ffmpeg                 # macOS
 
 On Debian/Ubuntu, **check the version first**: 22.04's apt build is 4.4 and
 fails. Take a static build. The floor is 6.1, where FFmpeg's MP4 muxer gained
-PCM; measured across three machines, 4.4.2 fails while 7.0.2, 8.0.1 and 9.0 pass.
+PCM; measured on 2026-09-13 by running this pack's own probe on four builds
+across three machines: 4.4.2 fails; 7.0.2-static, 8.0.1 and 9.0 pass. No 6.x
+build has been run, so the floor is documented rather than measured.
 
 ```
 ffmpeg -version; ffprobe -version
@@ -125,7 +127,7 @@ build cannot write it. Your job is only to make both binaries reachable.
 On Linux also install one monospace font for the burned captions
 (`fonts-dejavu-core` is enough).
 
-### 3. Restart ComfyUI fully, then read the console
+### Restart ComfyUI fully, then read the console
 
 A reload is not enough; the process must restart. Then verify:
 
@@ -149,7 +151,7 @@ Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShel
   `prestartup_script.py` died. **Do not chase missing libraries for this
   outcome** -- a dependency problem cannot produce a total zero.
 
-### 4. Run one episode
+### Run one episode
 
 **Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio.** The
 entry is named after the pack's folder, so on a git clone it reads
@@ -163,7 +165,7 @@ nothing: every dropdown already holds a working value.
 The first run downloads about 12 GB -- the writer, the music model and its text
 encoder, and the Kokoro voices. Later runs skip it.
 
-### 5. Prove it -- and this is the only proof that counts
+### Prove it -- and this is the only proof that counts
 
 The finish line is a finished `.mp4` in:
 

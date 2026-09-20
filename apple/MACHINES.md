@@ -4,7 +4,7 @@ Every figure here is read from the code that uses it, so this page cannot drift 
 
 Three questions, in the order people ask them.
 
-## 1. Which graph do I open?
+## Which graph do I open?
 
 **On a first run, open the canonical.** It names no vendor anywhere and resolves your device at run time, it is the one graph in Browse Templates, and it fetches no video or image weights -- which is why every machine class below can run it. The per-machine rows are a STEP UP once that has worked: each one is the canonical with its dropdowns pinned to heavier lanes, so the first queue on one of them downloads whatever those lanes need.
 
@@ -34,7 +34,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `wan22_high_fast` | ComfyUI-GGUF |
 | `wan22_high_video` | ComfyUI-GGUF |
 
-## 2. Will this engine run on my machine?
+## Will this engine run on my machine?
 
 **Video -- procedural, no video weights**
 
@@ -150,11 +150,11 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
 
-## 3. Where do the manual weights come from?
+## Where do the manual weights come from?
 
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
-Two engines can share one group and still download different amounts, because they draw different files from it. **The size in section 2 is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- section 2 still has the figure.
+Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the grid still has the figure.
 
 ### h3_operator_only &mdash; 59.1 GiB total
 
@@ -257,7 +257,7 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; section 3 above names every file, the repository it comes from and the folder it goes in.
+it yourself; the manual-weights list above names every file, the repository it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

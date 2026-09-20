@@ -28,7 +28,7 @@ restart ComfyUI, pick `org/name` on both writer slots, set Quant and the VRAM
 ceiling for your hardware.
 
 1. **Find the real cache.** Default is `ComfyUI/models/huggingface` when
-   `HF_HOME` is unset -- [INSTALL.md](INSTALL.md) section 7. Setting `HF_HOME`
+   `HF_HOME` is unset -- [INSTALL.md](INSTALL.md#hugging-face-login). Setting `HF_HOME`
    later does not move an existing cache; it adds a second one.
 2. **The snapshot has to be complete.** A config-only folder is not a model.
    There must be a weight blob (`.safetensors` or `.bin`, or a shard index
@@ -69,40 +69,40 @@ snapshot only through `hf_repo_id` plus `implied_quant_policy`. Qwen itself
 is one row (`implied_quant_policy="platform"`). Do not invent a second HF
 repo for the same weights.
 
-### The seven gates
+### The gates
 
 Run these in order. Each one has caught a real failure in this repo.
 
-**Gate 1 -- the weights are actually on disk (or will download by name).** A
+**Weights on disk (or will download by name).** A
 dropdown entry is a promise. Auto-download on first Queue is the designed
 path when the snapshot is missing. Do not silently substitute a different
 model to satisfy a selection.
 
-**Gate 2 -- the VRAM tier is honest.** `vram_fit_tier` is `PASS`, `WARN`,
+**The VRAM tier is honest.** `vram_fit_tier` is `PASS`, `WARN`,
 `UNKNOWN`, or `FAIL`. PASS means soak-tested inside the ceiling. WARN means
 not soak-tested; **it stays in the dropdown** (operator 2026-09-06). What a
 tier owes the user is honesty at the moment of choosing -- the badge number
 and truthful `notes` -- not absence. Ripping a row is an explicit decision
 about a specific model. UNKNOWN / FAIL do not ship.
 
-**Gate 3 -- it loads under the Quant the pick claims.** For Qwen that is
+**It loads under the Quant the pick claims.** For Qwen that is
 platform policy: NF4 on NVIDIA, `none` on Mac / CPU -- one picker row, not
 two. Watch resident VRAM, not the file size. An unquantized load must not
 inherit a ceiling sized for 4-bit.
 
-**Gate 4 -- it generates free-form prose.**
+**It generates free-form prose.**
 
-**Gate 5 -- it generates constrained JSON.** This is the gate that actually
+**It generates constrained JSON.** This is the gate that actually
 fails, and prose passing tells you nothing about it. The hard-constraint
 machinery is opt-in per call. Verify the specific call your new row will make
 actually binds a schema.
 
-**Gate 6 -- the chat template accepts the roles OTR sends.** OTR sends a
+**The chat template accepts the roles OTR sends.** OTR sends a
 system + user pair. Gemma-2 rejects the system role; the generate path
 already folds that. Qwen 3.5 4B needs `enable_thinking=False` on every
 generate call -- one Hugging Face repo, one picker row.
 
-**Gate 7 -- the context window is the file's truth.** Declare what the
+**The context window is the file's truth.** Declare what the
 artifact supports, not what a model card claims. KV cache is not free.
 
 ### Field contract

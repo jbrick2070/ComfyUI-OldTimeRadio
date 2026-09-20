@@ -30,7 +30,7 @@ image node for a model dropdown, that is why you cannot find one.
 
 ## First check whether a picture is being drawn at all
 
-Seven of the video lanes draw their own frames and never touch the still. If the
+These video lanes draw their own frames and never touch the still. If the
 role you care about is on one of them, its image engine sits idle, nothing
 downloads, and changing the pick changes nothing:
 
@@ -38,8 +38,8 @@ downloads, and changing the pick changes nothing:
 `animatediff15_lightning_video`, `animatediff15_v3_haunted_video`,
 `animatediff15_v3_stillin_lab_video`
 
-The four `viz_` lanes say so in the dropdown itself -- the canonical's saved
-value reads `viz_mxc_cpu (16:9) (audio-reactive, no scene image)`. The three
+The `viz_` lanes say so in the dropdown itself -- the canonical's saved
+value reads `viz_mxc_cpu (16:9) (audio-reactive, no scene image)`. The
 AnimateDiff lanes animate from their own checkpoint instead.
 
 **The canonical graph has all three video roles on `viz_` lanes.** It also has
@@ -57,7 +57,7 @@ paired with `z_image_turbo` fetches about 19 GiB before it can draw anything.
 
 ## The engines you can pick
 
-Twelve, plus an escape hatch. The dropdown lists them by their plain id, which
+The dropdown lists them by their plain id, which
 is exactly what you see below.
 
 ### Local -- runs on your own machine
@@ -66,8 +66,8 @@ is exactly what you see below.
 |---|---|---|---|
 | `sd15` | 2.0 GiB | **yes** | Stable Diffusion 1.5. The small one, and the only local engine proven on a 16 GB Mac. Native 512; the pack fits every request down to 768 on the long side, because past that it starts drawing two heads. |
 | `z_image_turbo` | 19.3 GiB | **yes** | The canonical graph's saved pick, and the AMD graph's -- the one with a Radeon receipt. Eight steps a still, so it is quick once the weights are down -- but they are the largest download of any image engine here. |
-| `lumina_image` | 9.7 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model plus a 5.2 GB text encoder. |
-| `flux_gen1` | 13.0 GiB | no | FLUX.1-dev, the first engine this pack ever had. Its licence is non-commercial. |
+| `lumina_image` | 10.4 GiB | **yes** | Lumina-Image 2.0. **The default in the 16 GB NVIDIA graphs** (`otr_16gb_still`, `otr_16gb_video`). Fetches the ungated Comfy-Org split set on first use, same path as `sd15` -- a 5.2 GB model plus a 5.2 GB text encoder. |
+| `flux_gen1` | 13.0 GiB | no | FLUX.1-dev. Its licence is non-commercial. |
 | `ideogram4_local` | 17.3 GiB | no | Typography specialist -- built for the `still_word` card, where the script's own words go on screen. Measured at about 95 seconds a card against `z_image_turbo`'s 12, and its licence is non-commercial. |
 
 ### Hosted -- no weights, you supply an account
@@ -85,7 +85,7 @@ is exactly what you see below.
 These download nothing and use no video memory. They cost money instead, per
 picture. [CLOUD.md](CLOUD.md) covers the keys and how to set them.
 
-All seven hosted rows check credentials at the same point in the pipeline: per
+Every hosted row checks credentials at the same point in the pipeline: per
 still, while the dispatcher renders each shot -- which is after the script is
 written and the voices are recorded. Picking `google_image` over a Comfy
 partner row does not buy you an earlier warning; set the key you need before
@@ -117,7 +117,7 @@ NVIDIA graphs ship, so the default 16 GB path now downloads itself.
 
 The manual local engines (`flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
 
-[MACHINES.md](MACHINES.md) section 2 has the per-machine grid -- which of these
+[MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) has the per-machine grid -- which of these
 has actually been run on 8 GB, on 16 GB, on a Mac, on CPU, and which will run out
 of memory.
 
@@ -144,15 +144,15 @@ blank fails loudly -- it never borrows the engine from the slot next to it.
 In the order it actually happens.
 
 **Nothing downloaded and the picture never changes when I change the engine.**
-Your role's video lane draws its own frames. See the second section -- this is
-correct behaviour, not a miss.
+Your role's video lane draws its own frames. See
+[First check whether a picture is being drawn at all](#first-check-whether-a-picture-is-being-drawn-at-all)
+-- this is correct behaviour, not a miss.
 
 **It stops and names a file.** You picked one of the manual local engines,
 `flux_gen1` or `ideogram4_local`. The refusal names the exact filename and the
 folder it belongs in, and for these two that message is the only place that
-information appears -- section 3 ships no manifest for them, by design.
-
-ComfyUI-GGUF. Install the pack, restart ComfyUI, queue again.
+information appears -- [MACHINES.md](MACHINES.md#no-manifest-ships-for-these)
+ships no manifest for them, by design.
 
 **A hosted pick failed partway through.** No credentials. Every hosted row --
 `google_image` included -- discovers this at the same point, when the dispatcher

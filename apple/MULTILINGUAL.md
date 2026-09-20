@@ -80,7 +80,7 @@ non-English row instead of borrowing an English voice.
 
 The admitted Kokoro pools are:
 
-- English (`b` announcer, `a` and `b` character pool): 28 voices
+- English (`b` announcer, `a` and `b` character pool):
 - Spanish (`e`): `ef_dora`, `em_alex`, `em_santa`
 - Portuguese (`p`): `pf_dora`, `pm_alex`, `pm_santa`
 - Italian (`i`): `if_sara`, `im_nicola`
@@ -164,7 +164,7 @@ The dropdown is registry-driven. A real admitted row appears without a writer
 code change and without editing a workflow JSON. The work is in two data files,
 the language-specific dependencies, tests and one live proof.
 
-### 1. Confirm that Kokoro can actually speak it
+### Confirm that Kokoro can actually speak it
 
 This registry mirrors `kokoro` 0.9.4 `LANG_CODES`. A new row needs a real
 Kokoro language code and real voice files. Adding a label for a language Kokoro
@@ -173,7 +173,7 @@ does not serve creates a menu entry that cannot speak; that is not support.
 If a different TTS engine is required, add and qualify that engine first. The
 day-one registry admits Kokoro only.
 
-### 2. Add a row to `config/episode_languages.json`
+### Add a row to `config/episode_languages.json`
 
 Copy the closest existing row. Every row needs:
 
@@ -181,9 +181,8 @@ Copy the closest existing row. Every row needs:
 - `admitted`, `native_header` and `row_revision`;
 - `authoring`: `spoken_name`, `writer_instruction`, `visual_prompt_iso`,
   `title_instruction`;
-- `spoken`: every station/announcer string carried by the English row --
-  the eight chrome strings plus the ten spoken credit sentences (the
-  provenance coda templates and the two My Story attribution templates,
+- `spoken`: every station/announcer string carried by the English row
+  (the provenance coda templates and the My Story attribution templates,
   with their `{work_title}` / `{author}` / `{name}` placeholders);
 - `credits`: every heading and label carried by the English row;
 - `captions`: `font_policy`, `wrap_policy`, `cps_policy`;
@@ -211,7 +210,7 @@ Increment `row_revision` whenever an admitted row's audience text, voice list,
 font policy or admission contract changes. Replays use that revision and the
 row hash as their drift receipt.
 
-### 3. Add every Kokoro voice to `config/voice_reference_bank.json`
+### Add every Kokoro voice to `config/voice_reference_bank.json`
 
 Copy a Kokoro voice entry and give it:
 
@@ -228,7 +227,7 @@ The startup prefetch reads the admitted registry rows, so a correctly listed
 voice joins the startup fetch automatically. It must still exist in Kokoro's
 real model repository.
 
-### 4. Make admission fail before generation
+### Make admission fail before generation
 
 Keep `min_voice_count` no larger than the row's real roster. The readiness
 token format implemented today is `misaki[<adapter>]`; the gate imports
@@ -241,7 +240,7 @@ another row, or if any required spoken/credit/caption string is absent.
 Do not add `Off` as a row. Do not infer language from a voice name. Do not let a
 missing row, voice or dependency degrade to English.
 
-### 5. Run the focused contract
+### Run the focused contract
 
 At minimum, run:
 
@@ -256,7 +255,7 @@ At minimum, run:
 Then run the full project regression and the shared Bug Bible regression. A
 unit test that selects the new row proves the row, not the full path.
 
-### 6. Publish one canonical episode
+### Publish one canonical episode
 
 The qualifying proof is a one-act run through
 `workflows/otr_canonical.json`, with:

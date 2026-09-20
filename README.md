@@ -16,7 +16,7 @@
 <p align="center">
   <a href="https://youtu.be/AOn21EG9u-U"><img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_episode_still.jpg" alt="A frame from THE SHIVERING GAUGE: two men over developing tanks in a film lab, drawn in the storybook-engraving style, with a speaker-labelled caption burned in. Click to watch the episode." width="760"></a>
 </p>
-<p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">▶ Hear a complete episode first — ninety seconds</a></strong></p>
+<p align="center"><strong><a href="https://youtu.be/AOn21EG9u-U">Hear a complete episode first -- ninety seconds</a></strong></p>
 <p align="center"><em><strong>The Shivering Gauge</strong>: a film archivist and his apprentice racing
 vinegar syndrome through one night in the lab. Written, cast, performed, scored,
 drawn and cut on one machine, from a Library of Congress feed. Its sound effects
@@ -33,11 +33,10 @@ from; pictures to watch while you listen;
 burned captions and a credit roll. One workflow, one press of **Queue**, and a
 finished `.mp4` lands in your output folder.
 
-One `episode_language` switch now carries the show through English, Spanish,
-Portuguese, Italian, French, Hindi, Japanese or Mandarin: native authoring
-instruction, Kokoro casting, caption labels/wrapping/fonts and audience-facing
-credits. Captions mirror the written line rather than translating it, so writer
-language adherence still matters. See
+One `episode_language` switch carries writing, Kokoro casting, captions and
+audience-facing credits. Captions mirror the written line rather than
+translating it. The admitted rows, the voice pools, and how Shakespeare and
+Public Domain perform in another language are in
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md).
 
 Every model runs on your own machine: no account, no API key, no paid service,
@@ -108,15 +107,18 @@ environment of the machine that *submits* the prompt and submit through
 `scripts/otr_api.py`, which sends it as `extra_data.api_key_comfy_org`
 exactly as the app's sign-in would.
 
+What those lanes turn on, and how to pick a hosted writer, is
+[apple/CLOUD.md](apple/CLOUD.md).
+
 ---
 
 ## Make an episode
 
-**New to ComfyUI? This is a five-minute read and then a button.** You need a
+**New to ComfyUI? This is a short read and then a button.** You need a
 working ComfyUI (Desktop, portable or a git install -- any of them), about
 **25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
-service, or a single one of the saved graphs further down this page:
+service, or any of the saved graphs further down this page:
 those are per-machine presets you can grow into. Installing the pack and
 pressing **Queue** is the whole path.
 
@@ -125,11 +127,11 @@ pressing **Queue** is the whole path.
 | NVIDIA, 16 GB or more | Minutes for a one-act show. Every default is proven here, and all but the heaviest video lanes are open to you. |
 | NVIDIA, 10 to 15 GB | Minutes. The defaults are proven both above and below you, so run the canonical as shipped. No pre-set graph exists for this class yet. |
 | NVIDIA, 8 GB | Minutes. Proven on an RTX 4060 laptop; the heaviest video lanes are not for you. |
-| Apple Silicon, 16 GB | **It runs.** All four Mac graphs published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
+| Apple Silicon, 16 GB | **It runs.** Every Mac graph published a finished episode on a 16 GB M4 on 2026-09-13 -- the writer is the same Qwen3.5-4B the canonical ships, unquantized, unchanged. Tens of minutes. Read [apple/MAC.md](apple/MAC.md) first anyway: memory is unified, so an out-of-memory here can reboot the machine, and the fit has no margin for anything else running. |
 | No GPU at all | About twenty minutes, and it works -- measured, not assumed. Start ComfyUI with `--cpu`. |
 | AMD | **It runs.** First full episode off a Radeon on 2026-09-14 -- RDNA4 (R9700), Ubuntu 24.04, ROCm 7.2, clean pass. Still tier only, and RDNA3 / Windows / 8 GB are untested. [apple/ROCM.md](apple/ROCM.md) has the receipt and what is still open. |
 
-**1. Install the pack.** In ComfyUI, open **Extensions -> Node Manager** and search
+**Install the pack.** In ComfyUI, open **Extensions -> Node Manager** and search
 for **old time radio** (registry id `comfyui-old-time-radio`, publisher `fluxus`).
 Or clone it into `custom_nodes/`:
 
@@ -146,7 +148,7 @@ no Kokoro voice build yet. `main` is the branch: it is the default and the only
 one that moves. An older clone of `main` from before 2026-09-13 is a v1.7 tree
 and wants re-cloning rather than pulling.
 
-**2. Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
+**Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 On Debian or Ubuntu take a static build -- 22.04's apt ffmpeg is too old to
 write the MP4 this pack makes -- and install one monospace font
@@ -162,13 +164,13 @@ wheel that comes down with the requirements typically does not.
 [apple/INSTALL.md](apple/INSTALL.md) has the version floor and what was
 measured where.
 
-**3. Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
+**Restart ComfyUI fully** and look for `[OldTimeRadio]` in the console and an
 **OldTimeRadio** category in the node menu. The first restart after installing
 fetches the Kokoro voices (a few hundred MB, and on Python 3.13 the ONNX model
 with them) so the default voice is ready before you ever queue -- if the console
 pauses on `[OldTimeRadio]` lines, that is what it is doing.
 
-**4. Load the show.** **Workflow → Browse Templates → EXTENSIONS →
+**Load the show.** **Workflow → Browse Templates → EXTENSIONS →
 comfyui-old-time-radio** (the entry is named after the pack's folder, so a git
 clone lists it as **ComfyUI-OldTimeRadio**). There is exactly one entry,
 **`otr_canonical`**. Open it and press **Queue**. (If the gallery lists it but opening it fails, drag
@@ -177,7 +179,7 @@ instead -- same graph, and it has happened.) You do not have to change anything:
 holds a working value, and the ones set to *roll* pick for themselves, so two runs
 in a row give you two different shows.
 
-**5. Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run
+**Wait, then look in `<your ComfyUI output folder>/otr/obs/`.** The first run
 downloads about **12 GB** -- the writer, the music model and its text encoder, and
 the Kokoro voices -- and then writes, casts, performs, scores and cuts an episode.
 Later runs skip the download. On a 16 GB NVIDIA card a short episode is minutes;
@@ -208,13 +210,13 @@ nodes is held per process, so two runs in flight can read each other's. On a
 machine with more than one GPU, start ComfyUI with `CUDA_VISIBLE_DEVICES` set to
 the card you want.
 
-The long form of all five steps, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
+The long form of the install, with the traps: [apple/INSTALL.md](apple/INSTALL.md)
 and [apple/RUN.md](apple/RUN.md).
 
 **Would rather hand it to an AI agent?** [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md)
 is written for one -- Claude Code, Codex, Cursor, Gemini CLI, whatever you use --
 with a prompt to paste, a verification command for every step, and the traps that
-waste an agent's time. It is an alternative to the five steps above, not a
+waste an agent's time. It is an alternative to the path above, not a
 requirement: nothing here needs an agent.
 
 ### The widgets worth touching
@@ -228,9 +230,10 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `act_count` | `1` for a short show, `3` for a full one with act breaks. Ships at 1. **This is what moves the clock** -- episodes here run about one to four minutes, and three acts is roughly three times the render, not three times the fun. |
 | `custom_premise` | A sentence or two of your own. Blank means the source decides. |
 | `source_bank` | Where the story comes from. Ships on *roll*, which picks any eligible bank. |
-| `visual_style` | How it looks -- one of ten. Ships on *roll*. |
+| `visual_style` | How it looks. Ships on *roll*. The ids are in [apple/STYLES.md](apple/STYLES.md). |
 | `creativity` | `balanced` by default. |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
+| `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
 
 Pin `source_bank` and `visual_style` when you want to compare two runs; a rolled
 bank and a rolled style change more than anything else you could adjust.
@@ -240,7 +243,7 @@ ids, so that is the value to pick) and put your idea in `custom_premise`. The
 `story_characters`, `story_plot`, `story_setting` and `story_author` fields on the
 same node take the rest. That bank exists to produce your idea rather than adapt
 something. Since 2026-09-13 the roll can land on it like any other bank: a run
-that arrives with all four fields blank writes a standing premise that ships
+that arrives with those fields blank writes a standing premise that ships
 with the pack, so it always has something to perform. Anything you type wins
 over it.
 
@@ -251,37 +254,28 @@ over it.
 Everything under `apple/` is in the pack, whichever way you installed it. (The
 folder name is historical; the guides cover every platform.)
 
-| Everyone | |
+| Page | The question it answers |
 |---|---|
-| [apple/INSTALL.md](apple/INSTALL.md) | Getting the nodes loading: ffmpeg, Python versions, what downloads itself. |
-| [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | The same install, written for an AI coding agent to run. Optional. |
-| [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
-| [apple/BANKS.md](apple/BANKS.md) | The source banks. This is the control that decides what kind of episode you get. |
-| [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) | The one episode-language switch, captions, Kokoro voices, and adding a language of your own. |
-| [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
-
-| Choosing what it uses | |
-|---|---|
-| [apple/WRITERS.md](apple/WRITERS.md) | The LLM that writes the script, and the two slots it fills. |
-| [apple/VOICES.md](apple/VOICES.md) | Who speaks, which engine says it, and which ones need a download. |
-| [apple/MUSIC.md](apple/MUSIC.md) | The theme and the cues between scenes. |
-| [apple/IMAGE_MODELS.md](apple/IMAGE_MODELS.md) | The still pictures each beat is built from. |
-| [apple/VIDEO_MODELS.md](apple/VIDEO_MODELS.md) | How a beat becomes moving picture, and what each lane costs. |
-| [apple/STYLES.md](apple/STYLES.md) | The look of an episode, and adding a style pack of your own. |
-| [apple/UPSCALERS.md](apple/UPSCALERS.md) | The optional upscale step, and why it ships off. |
-
-| If it applies to you | |
-|---|---|
-| [apple/MAC.md](apple/MAC.md) | Apple Silicon, and the one warning that matters there. |
-| [apple/RUNPOD.md](apple/RUNPOD.md) | Renting a GPU for the lanes your own card cannot hold. |
-| [apple/ROCM.md](apple/ROCM.md) | AMD. The first Radeon episode landed 2026-09-14 on RDNA4 under Linux; the page carries that receipt and the gaps still open. |
-| [apple/CLOUD.md](apple/CLOUD.md) | The optional paid writer lanes. Off by default; you do not need them. |
-
-| Adding to it | |
-|---|---|
-| [apple/EXTENDING.md](apple/EXTENDING.md) | Adding an engine, source bank, writer LLM, or episode language of your own. |
-| [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | The seven gates for adding a writer LLM. You can pick anything; this is also what the pack ships. |
-| [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | The checks that say whether what you built will actually work. |
+| [apple/INSTALL.md](apple/INSTALL.md) | How do I get the nodes loading? |
+| [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | Can an AI agent do that install for me? |
+| [apple/RUN.md](apple/RUN.md) | Where does the first episode land, and what if it does not? |
+| [apple/BANKS.md](apple/BANKS.md) | What kind of episode do I get? |
+| [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) | How does the language switch work? |
+| [apple/MACHINES.md](apple/MACHINES.md) | What runs on my machine, and where do the weights come from? |
+| [apple/WRITERS.md](apple/WRITERS.md) | Which language model writes the script? |
+| [apple/VOICES.md](apple/VOICES.md) | Who speaks, and which engine says it? |
+| [apple/MUSIC.md](apple/MUSIC.md) | Why is the theme this genre, and why is there no music? |
+| [apple/IMAGE_MODELS.md](apple/IMAGE_MODELS.md) | What draws the still pictures? |
+| [apple/VIDEO_MODELS.md](apple/VIDEO_MODELS.md) | How does a beat become moving picture? |
+| [apple/STYLES.md](apple/STYLES.md) | How does the episode look? |
+| [apple/UPSCALERS.md](apple/UPSCALERS.md) | Why is the upscale step off? |
+| [apple/MAC.md](apple/MAC.md) | What is different on Apple Silicon? |
+| [apple/ROCM.md](apple/ROCM.md) | What is different on AMD? |
+| [apple/RUNPOD.md](apple/RUNPOD.md) | How do I rent a GPU for a lane my card cannot hold? |
+| [apple/CLOUD.md](apple/CLOUD.md) | How do I turn on a paid writer? |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | How do I add an engine, bank, writer, or language? |
+| [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | Will what I built actually work? |
+| [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | How do I add a writer LLM? |
 
 The development record -- bug logs, measurements, design notes -- lives under
 `docs/` in the
@@ -305,7 +299,7 @@ it never rewrites.
 | `scifi_news_pro` | A live science feed, turned into science-fiction radio. |
 | `media_archive` | Media RSS and archive items, turned into restoration-adventure episodes. |
 | `public_domain` | A faithful radio adaptation of a public-domain source text. |
-| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. In another language it performs a real translator's public-domain text when the corpus holds that scene (the manifest under `config/source_banks/shakespeare/translations` is the list), and otherwise the writer model's translation of the selected passage, which the ledger records as such. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
+| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. How another language performs that text is in [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
 | `original` | No source at all: original fiction seeded from an entropy draw. |
 | `my_story` | Your idea, characters, plot and setting. Rolled like any other bank; a blank run writes the standing premise that ships with the pack. |
 
@@ -329,16 +323,13 @@ from.
 
 ### The look
 
-The visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
-production look), `anime`, `archival_documentary`, `cartoon`, `paper_origami`,
-`recur_frac`, `shakespeare_stage_realism`, `storybook_engraving`, `video_art`,
-and `visual_storybased`, which is minted from the story rather than loaded from
-a pack -- which is why you will not find it among the nine files in
-`nodes/visual_styles/`, and why a rolled run lands on it about a tenth of the
-time.
+The visual styles, rolled or pinned on `visual_style`, live in
+[apple/STYLES.md](apple/STYLES.md). `visual_storybased` is minted from the
+story rather than loaded from a pack -- which is why you will not find it
+among the files in `nodes/visual_styles/`.
 
 **A style only shows where there is a picture to style.** It drives the stills
-and the video-diffusion lanes. The three procedural lanes the canonical ships
+and the video-diffusion lanes. The procedural lanes the canonical ships
 draw their frames from the audio and never read it -- so on a default run the
 style is written into the episode's filename and changes nothing you can see.
 Switch a video role to a `still_*` or diffusion lane, or pin an image engine,
@@ -365,24 +356,22 @@ engine you did not pick.
 
 What `otr_canonical` ships, and why:
 
-- **Video:** three procedural, audio-reactive lanes -- `viz_mxc_cpu`, `viz_green`,
+- **Video:** procedural, audio-reactive lanes -- `viz_mxc_cpu`, `viz_green`,
   `viz_camera` -- one per role. They draw their own frames, download nothing, and
   run on every machine including CPU. Real video diffusion (LTX, Wan, HuMo,
   AnimateDiff, MiniMax H3) and the `still_*` family are all one dropdown away.
-- **Images:** `z_image_turbo`, sitting **dormant**. The three procedural video
+- **Images:** `z_image_turbo`, sitting **dormant**. The procedural video
   lanes consume no still, so the image weights are never fetched on a default run.
   Switch a video role to a still-consuming lane and they download then.
 - **Voices:** `kokoro` on both slots. It is the only one-click voice on every
   platform, which is why it is the default. The voice engines come with a Manager
   install, except one: the IndexTTS2 voice cloner ships in the GitHub tree only.
-  Two of them, **Chatterbox and Dia, assume Windows** -- they run in their own
+  Chatterbox and Dia assume Windows -- they run in their own
   venv and install through PowerShell scripts with no shell twin. Point
   `OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter to run them
   elsewhere; nothing here has proven that path.
 - **Music:** `stable_audio_3`. Commercially clean and ungated. MusicGen remains
   selectable and is noncommercial.
-
-### How it fits together
 
 Audio is the source of truth. The script is written, cast and performed into one
 frozen 48 kHz master, and that master defines the timeline; video is rendered to
@@ -401,19 +390,10 @@ source bank -> LedgerScriptWriter -> LedgerFreezeCascade -> CastLock
 Renders are deterministic for a given request hash, and every episode carries a
 ledger (`episode_canon.json`) recording what actually ran.
 
----
-
-## Changing what renders it
-
 The engine dropdowns live on **OTR_VideoDirector** (video and image roles),
 **OTR_CastLock** (the two voice slots) and **OTR_StableAudioTheme** (music). The
-writer dropdowns are on **OTR_LedgerScriptWriter**.
-
-You never need all the weights in this workflow. One graph ships, and its
-dropdowns decide what it loads -- and therefore what you have to download.
-
-**What the canonical selects, and what it costs.** Everything here is either
-already in the pack or fetches itself; a default run downloads no manual file.
+writer dropdowns are on **OTR_LedgerScriptWriter**. You never need every weight
+in this workflow: one graph ships, and its dropdowns decide what it loads.
 
 | role | the canonical ships | what it costs |
 |---|---|---|
@@ -423,31 +403,19 @@ already in the pack or fetches itself; a default run downloads no manual file.
 | music | `stable_audio_3` | fetches once |
 | writer | `Qwen/Qwen3.5-4B` | fetches once, about 8.7 GiB |
 
-**The three kinds of video, because that is what the choice really is.**
-*Procedural* lanes draw frames from the audio and need no weights at all -- that
-is what ships. *Still* lanes mint one image per beat and animate it, so they
-wake the image model. *Diffusion* lanes generate real video, and are the
-expensive end in both download and render time.
+**The image trap.** With the procedural video lanes the `z_image_turbo` default
+costs nothing. Pick a `still_*` or `ltx098_low_video` lane and it wakes up: a
+19 GB download, and on a 16 GB Mac an out-of-memory. If you did not mean to
+spend that, set the three image dropdowns to `sd15` (2 GB, same job) at the
+same time. Both fetch themselves; the only thing that changes is which one
+you spend.
 
-**Every engine, what it weighs, and whether it runs on your machine** is in
-[apple/MACHINES.md](apple/MACHINES.md): section 2 prices each choice across five
-machine classes, and section 3 names every hand-fetched file and the folder it
-goes in.
-
-Two things to know before you change a dropdown:
-
-- **The image trap.** With the procedural video lanes the `z_image_turbo` default
-  costs nothing. Pick a `still_*` or `ltx098_low_video` lane and it wakes up: a
-  19 GB download, and on a 16 GB Mac an out-of-memory. If you did not mean to
-  spend that, set the three image dropdowns to `sd15` (2 GB, same job) at the
-  same time. Both fetch themselves; the only thing that changes is which one
-  you spend.
-- **The writer is the biggest single download** and, on a Mac, the biggest single
-  memory user. `Qwen/Qwen3.5-4B` is the default because it is ungated,
-  Apache-2.0, and the smallest row proven everywhere.
-  [apple/MACHINES.md](apple/MACHINES.md) section 2 says which other writers fit
-  your machine, and the pack refuses before downloading if you pick one that
-  will not.
+**The writer is the biggest single download** and, on a Mac, the biggest single
+memory user. `Qwen/Qwen3.5-4B` is the default because it is ungated,
+Apache-2.0, and the smallest row proven everywhere.
+[apple/MACHINES.md](apple/MACHINES.md) says which other writers fit
+your machine, and the pack refuses before downloading if you pick one that
+will not.
 
 ---
 
@@ -484,80 +452,10 @@ CUDA and Metal only. MusicGen is noncommercial (see
 [Licence](#licence-and-credits)), so on that preset alone, change the music
 dropdown on **OTR_StableAudioTheme** if that matters to you.
 
-<!-- BEGIN GENERATED: tier-matrix -->
-### 8 GB NVIDIA
+Which file to open, what each engine costs, and every hand-fetched weight:
+[apple/MACHINES.md](apple/MACHINES.md).
 
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_8gb_low` | Qwen3.5-4B | bnb_nf4 | viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_8gb_still` | Qwen3.5-4B | bnb_nf4 | still_motion | sd15 | none | nothing | shipping |
-| **video** | `otr_8gb_video` | Qwen3.5-4B | bnb_nf4 | ltx098_low_video | sd15 | auto | nothing | shipping |
-| foley | _not built_ | | | | | | | |
-| mime | _not built_ | | | | | | | |
-| **animatediff** | `otr_8gb_animatediff` | Qwen3.5-4B | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
-
-### 16 GB NVIDIA
-
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_16gb_low` | gemma-4-12b-it | bnb_nf4 | viz_mxc_cpu / viz_mxc_mandala / viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_16gb_still` | gemma-4-12b-it | bnb_nf4 | still_motion | lumina_image | none | nothing | shipping |
-| **video** | `otr_16gb_video` | gemma-4-12b-it | bnb_nf4 | ltx25_high_video | lumina_image | manual | ComfyUI-GGUF | shipping |
-| **foley** | `otr_16gb_foley` | gemma-4-12b-it | bnb_nf4 | ltx25_high_foley_plus | lumina_image | manual | ComfyUI-GGUF | shipping |
-| **mime** | `otr_16gb_mime` | gemma-4-12b-it | bnb_nf4 | ltx25_high_mime | lumina_image | manual | ComfyUI-GGUF | shipping |
-| **animatediff** | `otr_16gb_animatediff` | gemma-4-12b-it | bnb_nf4 | animatediff15_v3_haunted_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
-
-### Apple Silicon, 16 GB
-
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_mac16_low` | Qwen3.5-4B | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
-| **still** | `otr_mac16_still` | Qwen3.5-4B | none | still_motion | sd15 | none | nothing | shipping |
-| **video** | `otr_mac16_video` | Qwen3.5-4B | none | ltx098_low_video | sd15 | auto | nothing | shipping |
-| foley | _not built_ | | | | | | | |
-| mime | _not built_ | | | | | | | |
-| **animatediff** | `otr_mac16_animatediff` | Qwen3.5-4B | none | animatediff15_lightning_video | none (dormant) | manual | ComfyUI-AnimateDiff-Evolved | shipping |
-
-### AMD ROCm
-
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| low | _not built_ | | | | | | | |
-| **still** | `otr_amd_still` | Qwen3.5-4B | none | still_motion | z_image_turbo | none | nothing | draft |
-| video | _not built_ | | | | | | | |
-| foley | _not built_ | | | | | | | |
-| mime | _not built_ | | | | | | | |
-| animatediff | _not built_ | | | | | | | |
-
-### CPU only
-
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| **low** | `otr_cpu_low` | claude-sonnet-5 / gpt-5.6-luna | none | viz_mxc_cpu / viz_green / viz_camera | none (dormant) | none | nothing | shipping |
-| still | _not built_ | | | | | | | |
-| video | _not built_ | | | | | | | |
-| foley | _not built_ | | | | | | | |
-| mime | _not built_ | | | | | | | |
-| animatediff | _not built_ | | | | | | | |
-
-### Comfy Cloud (opt-in easter egg; needs a signed-in Comfy session, or OTR_COMFY_API_KEY on the headless submitter)
-
-| tier | graph | writer | quant | lanes (announcer / music / character) | image | weights | also install | status |
-|---|---|---|---|---|---|---|---|---|
-| **low_1act** | `otr_cloud_low_1act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **low** | `otr_cloud_low` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **low_5act** | `otr_cloud_low_5act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_vidu_q2_pro_fast_720p | cloud_luma_photon_flash | manual | nothing | shipping |
-| **deluxe_3act** | `otr_cloud_deluxe_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_foley_plus | cloud_flux_pro | manual | nothing | shipping |
-| **deluxe_audio_in_3act** | `otr_cloud_deluxe_audio_in_3act` | claude-sonnet-5 / gpt-5.6-luna | none | cloud_ltx25_audio_in | cloud_flux_pro | manual | nothing | shipping |
-<!-- END GENERATED: tier-matrix -->
-
-Weights marked **auto** download themselves the first time you queue;
-**manual** means you fetch the file yourself, and
-[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
-it comes from and the folder it goes in; **none** means those lanes need no
-video weights. (In a git clone there is also a `<graph>.launch.md` beside each
-graph. Those are headless commands built on `scripts/`, so neither they nor the
-scripts are in a Manager install.) Every
+Every
 `shipping` graph above has put a finished episode into `otr/obs/` on the
 hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
 8 GB rows on a physical RTX 4060 laptop, which by now
@@ -566,33 +464,21 @@ on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
 ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
 yet promoted -- it is a status, not a verdict on proof: the AMD stills graph
-reads `draft` and has an outside tester's published episode behind it. What each
-machine class runs, engine by engine,
-is in [apple/MACHINES.md](apple/MACHINES.md).
+reads `draft` and has an outside tester's published episode behind it.
 
 `scripts/otr_provision.py` needs the **git clone**: `scripts/` is not in a
 Manager install. The saved graphs in `workflows/variants/` need nothing but a
 drag, and the weights a graph selects download at queue time whenever the pack
 can fetch them itself.
 
----
-
-## Node packs some lanes need
-
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
 node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
-
-| If you select | Install |
-|---|---|
-| `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `animatediff15_lightning_video` -- including the three `otr_*_animatediff` graphs | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) |
-| `ltx23_*`, `ltx25_*`, `wan22_*` | [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md) |
-
+The AnimateDiff lanes want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
+`ltx23_*`, `ltx25_*` and `wan22_*` want [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
+-- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md).
 If you pick one of these lanes without its pack, the render stops with an error
-that names the pack and its URL. The AnimateDiff lanes are also the one place
-where weights do not fetch themselves: the SD 1.5 checkpoint, the motion module
-and the adapter are a hand fetch, and [apple/MACHINES.md](apple/MACHINES.md)
-section 3 names each file, its repository and its folder.
+that names the pack and its URL.
 
 ---
 
@@ -629,20 +515,13 @@ works on every platform.
 
 The weights that do **not** fetch themselves -- every hand-fetched file, its
 repository, its size, and the folder under `models/` it goes in -- are listed in
-[apple/MACHINES.md](apple/MACHINES.md) section 3. Where no manifest exists, the
+[apple/MACHINES.md](apple/MACHINES.md). Where no manifest exists, the
 engine refuses by name before anything else runs, and that refusal is the install
 instruction.
 
----
-
-## If your card cannot hold a writer
-
 The script step alone can run on OpenRouter, Google, or Comfy Credits; voices,
 music, images and video stay local either way. It costs money and it is off
-until you turn it on. It exists so a machine that cannot hold a local writer can
-still make episodes -- and it takes the largest model in the graph out of your
-VRAM budget, which is the whole reason on an 8 GB card.
-[apple/CLOUD.md](apple/CLOUD.md) has the three switches.
+until you turn it on. [apple/CLOUD.md](apple/CLOUD.md) has the switches.
 
 ---
 
@@ -678,11 +557,11 @@ is in the wrong folder or ComfyUI crashed during startup before any node loaded.
 library. Install it into ComfyUI's own interpreter.
 
 **The render stops naming a missing class** (`ADE_*`, `UnetLoaderGGUF`, `LTXV*`).
-The lane you picked needs a node pack from the table above; the message names it.
+The lane you picked needs a node pack; the message names it.
 
 **The render stops naming a missing file.** The lane needs weights that do not
 fetch themselves. The message names the file; it never quietly substitutes
-another. [apple/MACHINES.md](apple/MACHINES.md) section 3 says where it comes from.
+another. [apple/MACHINES.md](apple/MACHINES.md) says where it comes from.
 
 **It refuses before downloading, saying the writer will not fit.** You picked a
 language model bigger than your card's ceiling. Pick a smaller one.
@@ -703,7 +582,7 @@ licence click on Hugging Face plus a login; every default weight is ungated.
 
 **On a Mac, a 20 GB download starts the moment you queue.** The image dropdowns
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
-all three to `sd15` first.
+the image dropdowns to `sd15` first.
 
 **The episode plays but has no captions.** Your ffmpeg can write the audio
 but cannot burn text: captions need the `ass` filter and libx264, and the
@@ -763,7 +642,7 @@ and published a finished episode. Nobody on the project owns a Radeon, so what
 is proven is the still tier on that one card: RDNA3, Windows and the 8 GB AMD
 profile are still unmeasured. The profile ships `draft` because `status`
 records promotion, not proof.
-[apple/ROCM.md](apple/ROCM.md) has the graph, two lab profiles, a five-minute
+[apple/ROCM.md](apple/ROCM.md) has the graph, the lab profiles, a five-minute
 probe that downloads nothing, and the open questions. The first episode off a
 Radeon earns its author the AMD column in
 [apple/MACHINES.md](apple/MACHINES.md).
@@ -772,12 +651,8 @@ Radeon earns its author the AMD column in
 
 ## Adding to it
 
-Three things you can add: an **engine** -- a way of rendering video, images,
-speech, music or an upscale -- a **source bank**, a place stories come from, and
-a **writer LLM**, the model that writes the script. An engine is a Python
-adapter in this repo; a bank can be a folder of your own that this repo never
-sees; a writer is either a snapshot in your Hugging Face cache or a curated
-catalog row. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe,
+You can add an **engine**, a **source bank**, a **writer LLM**, or an
+**episode language**. [apple/EXTENDING.md](apple/EXTENDING.md) is the recipe,
 [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) is the writer-LLM page,
 and [apple/PREFLIGHT.md](apple/PREFLIGHT.md) is the checklist, and the rule
 underneath both is the same one the rest of the pack lives by: **green tests are
@@ -809,7 +684,7 @@ off-by-default pieces carry restricted terms:
 - `h3_low_video` / `h3_low_audio_in` (MiniMax H3) -- a personal, non-transferable
   authorization the maintainer obtained directly from MiniMax. It does not carry to
   your install.
-- The three AnimateDiff lanes are declared not commercially clean. The haunted
+- The AnimateDiff lanes are declared not commercially clean. The haunted
   lane's motion module publishes no licence grant at all; fine for personal use,
   not cleared for commercial redistribution.
 - `musicgen` and `indextts2` carry non-commercial terms; `bark`'s are unconfirmed.

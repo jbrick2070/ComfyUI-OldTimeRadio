@@ -2,8 +2,8 @@
 
 Two separate things decide how your cast sounds. The **engine** is the software
 that turns written lines into speech. The **bank** is the pool of voices that
-engine casts from. Both are set on the node titled **3 - Cast Lock**, and the
-engine is named a second time on **4a - Character Voices** and **4b - Announcer
+engine casts from. Both are set on **Cast Lock** (`OTR_CastLock`), and the
+engine is named a second time on **Character Voices** and **Announcer
 Voice**.
 
 You do not have to choose any of it. Every local graph that ships -- the
@@ -15,15 +15,15 @@ which is a paid, hosted voice -- see [CLOUD.md](CLOUD.md).
 
 ---
 
-Multilingual episodes use those same controls. Kokoro now carries eight
-language rows; [MULTILINGUAL.md](MULTILINGUAL.md) names the voices, source-bank
-limits, captions and Python-version boundary.
+Multilingual episodes use those same controls.
+[MULTILINGUAL.md](MULTILINGUAL.md) names the voices, captions and
+Python-version boundary.
 
 ## Bank versus engine
 
-A **bank** is a set of voices: Kokoro's fifty-four built-in voices across eight
-languages,
-Bark's ten speaker presets, a shelf of reference recordings for the cloning
+A **bank** is a set of voices: Kokoro's built-in voices across every admitted
+language,
+Bark's speaker presets, a shelf of reference recordings for the cloning
 engines, or a hosted provider's catalogue.
 
 An **engine** is what performs them.
@@ -42,13 +42,13 @@ separate dropdowns and can hold different values.
 
 | Engine | What it is | How you get it | Size | Where it runs |
 |---|---|---|---|---|
-| **`kokoro`** | Fifty-four preset voices: 28 English and 26 across Spanish, Portuguese, Italian, French, Hindi, Japanese and Mandarin. The shipped default. | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; non-English needs Python 3.10-3.12 |
-| **`bark`** | Ten preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
+| **`kokoro`** | Built-in voices for every admitted language. The shipped default. The pools are in [MULTILINGUAL.md](MULTILINGUAL.md). | **Automatic** | 0.3 GiB | NVIDIA, Apple Silicon, or CPU-only machines; non-English needs Python 3.10-3.12 |
+| **`bark`** | Preset speaker voices, more theatrical and less predictable | **Automatic** | 4.2 GiB | NVIDIA. **Read the Mac warning below.** |
 | **`chatterbox`** | Clones a voice from a reference recording you supply | Its own Windows installer | 3.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`dia`** | Clones a voice from a reference recording you supply | Its own Windows installer | 6.0 GiB | 16 GB+ NVIDIA, Windows |
 | **`indextts2`** | Clones a voice, with emotion control. Characters only -- it cannot read the announcer. | Its own Windows installer | 11.1 GiB | 16 GB+ NVIDIA, Windows |
-| **`elevenlabs`** | Hosted. Twenty-one library voices. | Comfy account and credits | -- | anywhere |
-| **`google_tts`** | Hosted. Thirty prebuilt Gemini voices. | Your own Google API key | -- | anywhere |
+| **`elevenlabs`** | Hosted. The ElevenLabs library voices. | Comfy account and credits | -- | anywhere |
+| **`google_tts`** | Hosted. The prebuilt Gemini voices. | Your own Google API key | -- | anywhere |
 
 **Automatic** means the weights arrive on their own the first time they are
 needed and you do nothing. Kokoro is fetched earlier still -- at ComfyUI
@@ -69,7 +69,7 @@ Kokoro pipeline and therefore require Python 3.10 through 3.12. Japanese and
 Mandarin also check their `misaki[ja]` / `misaki[zh]` readiness extras when
 selected. See [MULTILINGUAL.md](MULTILINGUAL.md).
 
-### The three cloning engines need two things, not one
+### The cloning engines need two things, not one
 
 `chatterbox`, `dia` and `indextts2` do not have voices of their own. They copy a
 voice out of a recording, so each needs:
@@ -114,12 +114,12 @@ and only those.
 
 | Bank | The voices | Character engines | Announcer engines |
 |---|---|---|---|
-| **`kokoro_builtin`** *(shipped)* | Kokoro's 54 voices, filtered by episode language before casting | `kokoro` | `kokoro` |
-| **`bark_legacy`** | Bark's 10 speaker presets | `bark` | `bark` |
+| **`kokoro_builtin`** *(shipped)* | Kokoro's voices, filtered by episode language before casting | `kokoro` | `kokoro` |
+| **`bark_legacy`** | Bark's speaker presets | `bark` | `bark` |
 | **`default`** | The reference recordings for the cloning engines | `indextts2`, `chatterbox`, `dia` | `chatterbox`, `dia` |
 | **`default_clean`** | The same recordings, minus IndexTTS2 | `chatterbox`, `dia` | `dia` |
-| **`elevenlabs_cloud`** | 21 ElevenLabs library voices | `elevenlabs` | `elevenlabs` |
-| **`google_tts`** | 30 prebuilt Gemini voices | `google_tts` | `google_tts` |
+| **`elevenlabs_cloud`** | The ElevenLabs library voices | `elevenlabs` | `elevenlabs` |
+| **`google_tts`** | The prebuilt Gemini voices | `google_tts` | `google_tts` |
 
 `default_clean` exists for one reason: IndexTTS2's model licence is
 non-commercial, so that bank routes the cast to the two permissively licensed
@@ -144,15 +144,15 @@ genuinely gone -- the render still reaches the same gender-blind fallback,
 just without the reuse step first.
 
 So the language pool's size is the real backstop, not a code guarantee. This matters most on
-`bark_legacy`, which has ten presets -- six male, four female -- so a cast
-with more than four women will draw at least one male-column voice for a
-female character. Kokoro's twenty-eight English voices (thirteen male, fifteen
-female) do not run out in practice. French has one admitted voice and Italian
-has two, so reuse inside those languages is expected.
+`bark_legacy`, whose speaker presets are more male-column than female-column,
+so a large female cast will draw at least one male-column voice. Kokoro's
+English pool does not run out in practice. French and Italian are thin
+pools, so reuse inside those languages is expected. The admitted voices
+are in [MULTILINGUAL.md](MULTILINGUAL.md).
 
 The **announcer is one voice for the whole episode**, drawn by the episode's
-own seed. English draws from a curated four-voice British pool: `bm_george`,
-`bm_fable`, `bf_emma`, `bf_lily`. Two are male and two female, so the
+own seed. English draws from a curated British pool: `bm_george`,
+`bm_fable`, `bf_emma`, `bf_lily`. The pool is split by gender, so the
 narrator's gender lands roughly evenly across English episodes and never
 changes mid-show. Non-English episodes draw an announcer only from their
 selected language row.
@@ -168,21 +168,21 @@ know before you do it.
 [MACHINES.md](MACHINES.md) has the full grid -- what runs where, what it costs
 to download, and whether it needs an installer.
 
-**Second: the engine is named in three places and all three must agree.**
+**Second: the engine is named on Cast Lock and again on each voice node, and those widgets must agree.**
 
 | Node | Widget |
 |---|---|
-| **3 - Cast Lock** | `char_voice_engine` |
-| **4a - Character Voices** | `engine` |
-| **3 - Cast Lock** | `announcer_voice_engine` |
-| **4b - Announcer Voice** | `engine` |
+| **Cast Lock** | `char_voice_engine` |
+| **Character Voices** | `engine` |
+| **Cast Lock** | `announcer_voice_engine` |
+| **Announcer Voice** | `engine` |
 
 Change one and not the other and the render stops with *"the two
 character-engine controls disagree"* (or the announcer twin of it), naming both
 values. This guard exists because without it the ledger and the credits said one
 engine while a different one was actually speaking.
 
-For a non-English episode, all four values in the table must be `kokoro`.
+For a non-English episode, every engine widget in the table must be `kokoro`.
 Cast Lock rejects every other day-one combination before speech begins.
 
 Note the asymmetry in `auto`:
@@ -227,7 +227,7 @@ The message names the script. On macOS or Linux there is no installer to run --
 pick a different engine.
 
 **A missing `.wav`, or a voice that cannot be resolved.** A cloning engine with
-no reference recordings on disk. See "The three cloning engines need two
+no reference recordings on disk. See "The cloning engines need two
 things" above.
 
 **A named Kokoro voice file is missing.** The startup fetch did not run or could
@@ -237,7 +237,7 @@ once threw away a finished episode.
 
 **Source bank does not pick the TTS engine.** My Story, Sci-Fi News, Shakespeare,
 and the rest can all use Kokoro, Bark, Google TTS, or any other voice engine
-the Cast Lock + 4a/4b widgets name. Set those five widgets to the SAME engine
+the Cast Lock + 4a/4b widgets name. Set those widgets to the SAME engine
 or the agreement guard stops the render. `voice_bank` on Cast Lock is the
 voice *pool* (kokoro_builtin / bark_legacy / google_tts), not the writer's
 `source_bank`.
