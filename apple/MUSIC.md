@@ -40,7 +40,7 @@ Pro** -- and there is one per act break, so `act_count` 1 gives none and
 is the right answer on any machine with a GPU: it downloads itself, and its
 licence permits commercial use.
 
-**The CPU preset is the seventeenth**, and it is on MusicGen -- Stable Audio 3
+**The CPU preset is the twenty-second**, and it is on MusicGen -- Stable Audio 3
 declares CUDA and Metal only, so a machine with no GPU has to use something
 else. Worth knowing if you go that way: **MusicGen's weights are
 non-commercial** (CC-BY-NC). Fine for listening; not for anything you sell.
