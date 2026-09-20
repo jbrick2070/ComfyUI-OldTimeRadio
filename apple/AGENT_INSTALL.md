@@ -92,9 +92,8 @@ Clone it **into the ComfyUI `custom_nodes/` directory**, and use the ComfyUI
 Python for the pip install. A system pip installs the libraries somewhere
 ComfyUI will never look, and the failure appears much later as skipped nodes.
 
-`main` is the default branch and the only one that moves. `v2.0-alpha` was
-retired on 2026-09-13 and is frozen -- do not clone it. An old clone of `main`
-from before 2026-09-13 is a v1.7 tree: re-clone rather than pull.
+`main` is the default branch and the only one that moves. A clone made before
+2026-09-13 wants re-cloning rather than pulling.
 
 ### ffmpeg AND ffprobe, and a current build
 

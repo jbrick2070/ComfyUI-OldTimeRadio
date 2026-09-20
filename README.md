@@ -145,8 +145,8 @@ is the most common way an install fails, and it fails much later, as nodes that
 quietly refuse to load. Python 3.10 through 3.13 are fine for English;
 multilingual Kokoro needs the torch path on 3.10 through 3.12. Python 3.14 has
 no Kokoro voice build yet. `main` is the branch: it is the default and the only
-one that moves. An older clone of `main` from before 2026-09-13 is a v1.7 tree
-and wants re-cloning rather than pulling.
+one that moves. A clone made before 2026-09-13 wants re-cloning rather than
+pulling.
 
 **Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.

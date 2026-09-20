@@ -20,11 +20,8 @@ Manager** and search for **old time radio**, then install it. The registry id is
 git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 ```
 
-`main` is the branch: it is the default and where the work lands.
-`v2.0-alpha` was retired on 2026-09-13 and no longer moves, so clone `main`
-plainly and ignore it. This was not true before 2026-09-13 -- `main`
-sat 5,029 commits behind and served a v1.7 tree -- so if you cloned it before
-then, clone again rather than pull.
+`main` is the branch: it is the default and where the work lands. If you
+cloned before 2026-09-13, clone again rather than pull.
 
 **What you get is not the same either way.** A Manager install is a trimmed
 bundle: it has the nodes, the workflows and this folder, but not `docs/`, not

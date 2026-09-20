@@ -91,10 +91,8 @@ keep anything you want.
 
 ## Worth knowing
 
-**The registry install works now.** Older notes say ComfyUI-Manager cannot
-install this pack reliably; that stopped being true at `2.0.0-alpha.30`. On a pod
-you still want the git clone, but for the reason above — the scripts — not
-because Manager is broken.
+**The registry install works.** On a pod you still want the git clone, but for
+the reason above — the scripts — not because Manager is broken.
 
 **Do not put licensed local-only weights on rented hardware.** If a model came to
 you under terms that assume your own machine, a rented box is not your own
