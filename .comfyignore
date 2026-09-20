@@ -6,6 +6,7 @@ kibitz-runs/
 .github/
 .claude/
 .cursor/
+secrets/
 
 # 2026-08-22: throwaway probe/smoke scripts, never shipped node functionality.
 # comfy-cli's security scan flagged exec() calls and semicolon-statements here

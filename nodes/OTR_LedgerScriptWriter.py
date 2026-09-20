@@ -6373,7 +6373,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         )
         _PL.stamp_word_counts(led)
         log.info(
-            "[OTR_LedgerScriptWriter] §6.G word counts: "
+            "[OTR_LedgerScriptWriter] 6.G word counts: "
             "character=%d announcer=%d total=%d",
             meta.get("character_word_count", 0),
             meta.get("announcer_word_count", 0),

@@ -319,6 +319,7 @@ workflows/*__ORIGINAL_*.json
 # _tmp_openrouter.secret was sitting untracked and unignored in a PUBLIC repo.
 *.secret
 _tmp_*.secret
+secrets/
 *_api_key.location
 
 # Session scratch is disposable by definition -- probes, one-shot launchers and
