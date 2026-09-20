@@ -3000,8 +3000,14 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "same thing and says so on the ledger.\n\n"
                             "Every language here speaks through Kokoro. The "
                             "Shakespeare and Public Domain banks perform the "
-                            "author's own words, so they are English only and "
-                            "refuse before anything is generated."
+                            "author's own words: in English as written; in "
+                            "another language, a real translator's "
+                            "public-domain text when the corpus holds that "
+                            "scene (config/source_banks/<bank>/translations "
+                            "-- 43 Shakespeare scenes in six languages "
+                            "today), and otherwise the writer model's own "
+                            "translation of the selected passage, which the "
+                            "ledger says so."
                         ),
                     },
                 ),
