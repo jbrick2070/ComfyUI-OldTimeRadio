@@ -1,0 +1,38 @@
+[canonical-api] workflow=/Users/rentamac/Documents/otr-mac/repo/workflows/otr_canonical.json
+[canonical-api] run_label=mac-font-final-20260910 (label only -- the writer names the episode)
+[otr_api] RESOLVED PROFILE otr_mac_mps (Apple Silicon MPS -- VERIFIED on an M4 / 16 GB (2026-09-08: six episodes in otr/obs/). Press Run and it works with NO downloads: the three visual lanes are procgen (viz_mxc_cpu / viz_green / viz_camera), voices are kokoro, music is stable_audio_3. The image roles name sd15 -- INERT under this wiring, because no viz_* lane consumes a still, and the engine that mints one the moment you switch a lane to still_flat / still_pan / still_word (fetch its 2.1 GB checkpoint first). For local video diffusion swap a lane to ltx098_low_video and read docs/MAC_PORTABILITY_GUIDE.md section 7. 16 GB is the floor and it is tight; a 32 GB Mac has more headroom but nothing above has been measured there.) -- 16 overrides:
+  role_overrides.announcer_visual=viz_mxc_cpu
+  role_overrides.music_visual=viz_green
+  role_overrides.character_visual=viz_camera
+  role_overrides.announcer_image=sd15
+  role_overrides.music_image=sd15
+  role_overrides.character_image=sd15
+  slot_overrides.voice_bank=kokoro_builtin
+  slot_overrides.cast_voice_policy=auto_registry
+  slot_overrides.char_voice_engine=kokoro
+  slot_overrides.announcer_voice_engine=kokoro
+  slot_overrides.music_engine=stable_audio_3
+  slot_overrides.video_render_engine=viz_camera
+  features.burn_captions=True
+  features.caption_style=sdh_standard
+  seed_policy.request_seed=42
+  seed_policy.seed_mode=request_hash
+[canonical-api] preflight: 1 required model(s) visible to the server: v1-5-pruned-emaonly-fp16.safetensors
+[canonical-api] comfy_url=http://127.0.0.1:8188
+[canonical-api] prompt_nodes=23
+[canonical-api] prompt_dump=/Users/rentamac/Documents/otr-mac/logs/font_replay/prompt.json
+[canonical-api] applied:
+  profile=otr_mac_mps
+  OTR_LedgerScriptWriter.replay_from='/Users/rentamac/Documents/otr-mac/logs/font_replay/bundles/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731'
+[canonical-api] QUEUED prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df
+[canonical-api] t=0s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=queued
+[canonical-api] t=0s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=20s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=40s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=60s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=80s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=100s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=120s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=140s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=pending
+[canonical-api] t=160s prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df status=success
+[canonical-api] RESULT SUCCESS prompt_id=8c11b8e5-8872-4e22-bb47-4149a68920df

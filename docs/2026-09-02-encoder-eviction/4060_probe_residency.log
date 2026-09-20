@@ -1,0 +1,22 @@
+PROBE_START Wed 09/02/2026  3:08:19.26 
+WARNING:root:Error while calling comfy_entrypoint in C:\OTR-CleanRoom\ComfyUI_windows_portable\ComfyUI\comfy_extras\nodes_replacements.py: type object 'PromptServer' has no attribute 'instance'
+aimdo_enabled=False vram_state=VRAMState.NORMAL_VRAM
+[start] free=7106MB alloc=0MB reserved=0MB 642 MiB(smi) loaded=[]
+encode took 28.7s
+[A1 after encode (clip referenced)] free=1297MB alloc=5599MB reserved=5870MB 6555 MiB(smi) loaded=['Flux2TEModel_[loaded=5445MB dyn=False]']
+[A2 after del clip + gc + soft_empty_cache] free=6966MB alloc=104MB reserved=116MB 801 MiB(smi) loaded=[]
+[A3 after free_memory(64GiB)] free=6966MB alloc=104MB reserved=116MB 801 MiB(smi) loaded=[]
+[A4 after unload_all_models] free=6966MB alloc=104MB reserved=116MB 801 MiB(smi) loaded=[]
+[A5 after del cond] free=6966MB alloc=104MB reserved=116MB 801 MiB(smi) loaded=[]
+[B before load_models_gpu(['Flux2TEModel_'])] free=6966MB alloc=104MB reserved=116MB 782 MiB(smi) loaded=[]
+[B after load_models_gpu(['Flux2TEModel_'])] free=1450MB alloc=5460MB reserved=5468MB 6134 MiB(smi) loaded=['Flux2TEModel_[loaded=5307MB dyn=False]']
+[B before load_models_gpu(['Flux2'])] free=6966MB alloc=104MB reserved=116MB 783 MiB(smi) loaded=[]
+[B after load_models_gpu(['Flux2'])] free=4464MB alloc=2606MB reserved=2684MB 3351 MiB(smi) loaded=['Flux2[loaded=2592MB dyn=False]']
+  0%|          | 0/2 [00:00<?, ?it/s] 50%|█████     | 1/2 [00:02<00:02,  2.42s/it]100%|██████████| 2/2 [00:03<00:00,  1.62s/it]100%|██████████| 2/2 [00:03<00:00,  1.74s/it]
+[B before load_models_gpu(['AutoencoderKL'])] free=4458MB alloc=2606MB reserved=2684MB 3358 MiB(smi) loaded=['Flux2[loaded=2592MB dyn=False]']
+[B after load_models_gpu(['AutoencoderKL'])] free=4294MB alloc=2770MB reserved=2834MB 3508 MiB(smi) loaded=['AutoencoderKL[loaded=160MB dyn=False]', 'Flux2[loaded=2592MB dyn=False]']
+WARNING:OTR.video.wrapper_bridge:[OTR video] LOUD VRAM reclaim (flux2_klein post-decode): detached 0 resident model(s) (encoder eviction; no unload_all_models)
+B render (480, 832, 3) took 17.7s (2 steps)
+[B after render] free=6958MB alloc=104MB reserved=4832MB 5392 MiB(smi) loaded=[]
+PROBE_DONE
+PROBE_END Wed 09/02/2026  3:09:21.21 exit=0 

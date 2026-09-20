@@ -74,6 +74,7 @@ scripts/yoga_watchdog.py
 # engines' fail-closed errors point operators at -- these MUST ship):
 !scripts/_otr_chatterbox_install.ps1
 !scripts/_otr_chatterbox_worker.py
+!scripts/_otr_dia_worker.py
 !scripts/_otr_indextts2_worker.py
 !scripts/_otr_indextts2_install.ps1
 !scripts/_otr_idx_download_weights.py

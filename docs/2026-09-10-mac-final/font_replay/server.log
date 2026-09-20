@@ -1,0 +1,195 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[32m[INFO][0m setup plugin alembic.autogenerate.checkconstraint_byname
+[1m[33m[WARNING][0m Could not autodetect AIMDO implementation, assuming Nvidia
+[32m[INFO][0m comfy-aimdo unsupported operating system: Darwin
+[32m[INFO][0m NOTE: comfy-aimdo currently only supports Windows and Linux
+[32m[INFO][0m Adding extra search path checkpoints /Users/rentamac/ComfyUI-Shared/models/checkpoints
+[32m[INFO][0m Adding extra search path classifiers /Users/rentamac/ComfyUI-Shared/models/classifiers
+[32m[INFO][0m Adding extra search path clip_vision /Users/rentamac/ComfyUI-Shared/models/clip_vision
+[32m[INFO][0m Adding extra search path configs /Users/rentamac/ComfyUI-Shared/models/configs
+[32m[INFO][0m Adding extra search path controlnet /Users/rentamac/ComfyUI-Shared/models/controlnet
+[32m[INFO][0m Adding extra search path controlnet /Users/rentamac/ComfyUI-Shared/models/t2i_adapter
+[32m[INFO][0m Adding extra search path diffusers /Users/rentamac/ComfyUI-Shared/models/diffusers
+[32m[INFO][0m Adding extra search path diffusion_models /Users/rentamac/ComfyUI-Shared/models/diffusion_models
+[32m[INFO][0m Adding extra search path embeddings /Users/rentamac/ComfyUI-Shared/models/embeddings
+[32m[INFO][0m Adding extra search path gligen /Users/rentamac/ComfyUI-Shared/models/gligen
+[32m[INFO][0m Adding extra search path hypernetworks /Users/rentamac/ComfyUI-Shared/models/hypernetworks
+[32m[INFO][0m Adding extra search path latent_upscale_models /Users/rentamac/ComfyUI-Shared/models/latent_upscale_models
+[32m[INFO][0m Adding extra search path loras /Users/rentamac/ComfyUI-Shared/models/loras
+[32m[INFO][0m Adding extra search path model_patches /Users/rentamac/ComfyUI-Shared/models/model_patches
+[32m[INFO][0m Adding extra search path audio_encoders /Users/rentamac/ComfyUI-Shared/models/audio_encoders
+[32m[INFO][0m Adding extra search path photomaker /Users/rentamac/ComfyUI-Shared/models/photomaker
+[32m[INFO][0m Adding extra search path style_models /Users/rentamac/ComfyUI-Shared/models/style_models
+[32m[INFO][0m Adding extra search path text_encoders /Users/rentamac/ComfyUI-Shared/models/text_encoders
+[32m[INFO][0m Adding extra search path upscale_models /Users/rentamac/ComfyUI-Shared/models/upscale_models
+[32m[INFO][0m Adding extra search path background_removal /Users/rentamac/ComfyUI-Shared/models/background_removal
+[32m[INFO][0m Adding extra search path frame_interpolation /Users/rentamac/ComfyUI-Shared/models/frame_interpolation
+[32m[INFO][0m Adding extra search path geometry_estimation /Users/rentamac/ComfyUI-Shared/models/geometry_estimation
+[32m[INFO][0m Adding extra search path optical_flow /Users/rentamac/ComfyUI-Shared/models/optical_flow
+[32m[INFO][0m Adding extra search path detection /Users/rentamac/ComfyUI-Shared/models/detection
+[32m[INFO][0m Adding extra search path vae /Users/rentamac/ComfyUI-Shared/models/vae
+[32m[INFO][0m Adding extra search path vae_approx /Users/rentamac/ComfyUI-Shared/models/vae_approx
+[32m[INFO][0m Adding extra search path TTS /Users/rentamac/ComfyUI-Shared/models/TTS
+[32m[INFO][0m Adding extra search path huggingface /Users/rentamac/ComfyUI-Shared/models/huggingface
+[32m[INFO][0m Adding extra search path clip /Users/rentamac/ComfyUI-Shared/models/clip
+[32m[INFO][0m Adding extra search path unet /Users/rentamac/ComfyUI-Shared/models/unet
+[32m[INFO][0m Setting output directory to: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output
+[32m[INFO][0m OldTimeRadio prestartup: HF_HOME=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/models/huggingface | safetensors_conversion mocked EARLY
+[32m[INFO][0m [OldTimeRadio] mps detected: forcing PyTorch (SDPA) attention. ComfyUI's sub-quadratic default produces structurally wrong output on Metal -- measured on Stable Audio 3, spectral flatness 0.43 (noise) vs 0.16 (music) with every other input identical.
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.7 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: Potential Error in code: Torch already imported, torch should never be imported before this point.
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['adaln', 'apply_rope', 'apply_rope1', 'apply_rope1_', 'apply_rope_', 'apply_rope_split_half', 'apply_rope_split_half1', 'apply_rope_split_half1_', 'apply_rope_split_half_', 'convrot_w4a4_linear', 'dequantize_convrot_w4a4_weight', 'dequantize_int8_convrot_weight', 'dequantize_int8_convrot_weight_dtype', 'dequantize_int8_embedding', 'dequantize_int8_simple', 'dequantize_int8_simple_dtype', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'dequantize_w4a8_int8_weight', 'gemv_awq_w4a16', 'int8_linear', 'na3d', 'prepare_int4_weight_for_int8_linear', 'quantize_and_rotate_rowwise', 'quantize_convrot_w4a4_weight', 'quantize_int8_convrot_weight', 'quantize_int8_rowwise', 'quantize_int8_tensorwise', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'quantize_w4a8_int8_weight', 'rms_adaln', 'rms_rope', 'rms_rope1', 'rms_rope1_', 'rms_rope_', 'rms_rope_split_half', 'rms_rope_split_half1', 'rms_rope_split_half1_', 'rms_rope_split_half_', 'rotate_int8_convrot_weight', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8', 'w4a8_int8_linear']}
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend hip: {'available': False, 'disabled': False, 'unavailable_reason': 'PyTorch ROCm/HIP runtime not available', 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': False, 'disabled': True, 'unavailable_reason': 'Extension file not found: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/.venv/lib/python3.13/site-packages/comfy_kitchen/backends/cuda/_C.abi3.so', 'capabilities': []}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 16384 MB, total RAM 16384 MB
+[32m[INFO][0m pytorch version: 2.12.1
+[32m[INFO][0m Mac Version (26, 6, 2)
+[32m[INFO][0m Set vram state to: SHARED
+[32m[INFO][0m Device: mps
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m Python version: 3.13.12 (main, Feb 12 2026, 01:06:02) [Clang 21.1.4 ]
+[32m[INFO][0m ComfyUI version: 0.34.6
+[32m[INFO][0m comfy-aimdo version: 0.4.15
+[32m[INFO][0m comfy-kitchen version: 0.2.31
+[32m[INFO][0m comfyui-frontend-package version: 1.49.6
+[32m[INFO][0m comfyui-workflow-templates version: 0.11.55
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.10
+[32m[INFO][0m comfy-kitchen version: 0.2.31
+[32m[INFO][0m comfy-aimdo version: 0.4.15
+[32m[INFO][0m [Prompt Server] web root: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/.venv/lib/python3.13/site-packages/comfyui_frontend_package/static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m No OpenGL_accelerate module loaded: No module named 'OpenGL_accelerate'
+[32m[INFO][0m [hf_token] No HF_TOKEN found in env or HKCU -- public repos only
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/websocket_image_save.py
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/ComfyUI-GGUF
+[32m[INFO][0m    0.0 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/ComfyUI-AnimateDiff-Evolved
+[32m[INFO][0m    0.1 seconds: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8188
+[32m[INFO][0m got prompt
+[32m[INFO][0m OTR_WorkflowValidator: workflow_json_path widget empty; resolved to canonical _DEFAULT_WORKFLOW_PATH=/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/workflows/otr_canonical.json
+[32m[INFO][0m OTR_WorkflowValidator: OK -- 23 nodes, 62 links, strict_unknown_types=True, path='/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/custom_nodes/comfyui-old-time-radio/workflows/otr_canonical.json', widget_vector_drift=0
+[1m[33m[WARNING][0m [OTR.assets] replay uses frozen bundle assets, not live dropdowns
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_ledger.json (8 lines, 197 words)
+[32m[INFO][0m [Ledger] replay workspace signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459 imported from /Users/rentamac/Documents/otr-mac/logs/font_replay/bundles/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731 (source signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731, 1 asset(s))
+[1m[33m[WARNING][0m [OTR_LedgerScriptWriter] REPLAY of signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731 -> workspace signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459 (bundle /Users/rentamac/Documents/otr-mac/logs/font_replay/bundles/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731)
+[1m[33m[WARNING][0m [OTR_LedgerFreezeCascade] REPLAY: pass-through, no freeze, no model (workspace 5c0f80024ea7478abfdd8ca796ea3385)
+[1m[33m[WARNING][0m [OTR_CastLock] REPLAY: cast preserved as frozen (revision 1), no voice assignment, no model
+[1m[33m[WARNING][0m [BatchCharacterVoices] REPLAY: pass-through, no TTS
+[1m[33m[WARNING][0m [AnnouncerVoice] REPLAY: pass-through, no TTS
+[1m[33m[WARNING][0m [OTR_StableAudioTheme] REPLAY: pass-through, no music model
+[32m[INFO][0m [SceneSequencer] REPLAY: frozen master 72.67s @ 48000Hz, 2 ch from /Users/rentamac/Documents/otr-mac/logs/font_replay/bundles/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731/audio/pending_20260907_213438_master.wav
+[32m[INFO][0m [OTR_AudioEnhance] Input: 48000Hz 2ch 3488064 samples (72.7s)
+[32m[INFO][0m [OTR_AudioEnhance] Resampled 48000Hz -> 48000Hz (3488064 samples)
+[32m[INFO][0m [OTR_AudioEnhance] Channels: 2 -> 2
+[32m[INFO][0m [OTR_AudioEnhance] Bass warmth 0.15 applied
+[32m[INFO][0m [OTR_AudioEnhance] LPF at 16000Hz applied (chirp cleanup)
+[32m[INFO][0m [OTR_AudioEnhance] Haas delay 0.8ms applied
+[32m[INFO][0m [OTR_AudioEnhance] Tape emulation 'subtle' applied
+[32m[INFO][0m [OTR_AudioEnhance] Stereo width 0.30 applied
+[32m[INFO][0m [OTR_AudioEnhance] Normalize deferred to EpisodeAssembler (post-crossfade)
+[32m[INFO][0m [OTR_AudioEnhance] Output: 48000Hz 2ch 3488064 samples (72.7s) spatial=0.30 Haas=0.8ms warmth=0.15
+[32m[INFO][0m [OTR_AudioEnhance] schema-l3 ledger update: phase_ms=354 gate=post_audio_enhance dur=72.7s
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_ledger.json (8 lines, 197 words)
+[32m[INFO][0m [OTR_EpisodeAssembler] REPLAY: master read with the stdlib reader (frozen master 72.67s @ 48000Hz, 2 ch); torchaudio said: TorchCodec is required for load_with_torchcodec. Please install torchcodec to use this function.
+[1m[33m[WARNING][0m [OTR_EpisodeAssembler] REPLAY: frozen master copied and verified -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_ledger.json (freeze_timestamp=2026-09-08T04:46:08.024710+00:00, rows=0, music=0, mirrors=2, master_sha=0fc98272a689)
+[32m[INFO][0m [Video] Starting render: 72.7s audio -> 1817 frames @ 25fps (1920x1080)
+[32m[INFO][0m [Video] Encoder: CPU libx264
+[32m[INFO][0m [Video] Launching ffmpeg: /Users/rentamac/Library/Application Support/ffmpeg-downloader/ffmpeg/ffmpeg -y -f rawvideo -vcodec rawvideo ...
+[32m[INFO][0m [Video] Encoding: frame 0/1817 (0%) -- 0.2s elapsed
+[32m[INFO][0m [Video] Encoding: frame 250/1817 (13%) -- 3.1s elapsed
+[32m[INFO][0m [Video] Encoding: frame 500/1817 (27%) -- 6.6s elapsed
+[32m[INFO][0m [Video] Encoding: frame 750/1817 (41%) -- 10.0s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1000/1817 (55%) -- 12.7s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1250/1817 (68%) -- 15.4s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1500/1817 (82%) -- 18.0s elapsed
+[32m[INFO][0m [Video] Encoding: frame 1750/1817 (96%) -- 21.6s elapsed
+[32m[INFO][0m [Video] Encode complete: 1817 frames in 22.6s (80.4 fps)
+[32m[INFO][0m [Video] Saved: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724.mp4 (17.5 MB, 72.7s, 1817 frames total)
+[32m[INFO][0m [Video] Treatment saved: signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_treatment.txt
+[32m[INFO][0m [Ledger] per-episode dir moved signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459 -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724 (attempt 1)
+[32m[INFO][0m [Ledger] ledger file moved signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_ledger.json -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json
+[32m[INFO][0m [Ledger] renamed signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459 -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724 (dir_moved=True, durable_paths_rebased=11, memory_paths_rebased=11)
+[32m[INFO][0m [Video] post-rename mp4 path: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724.mp4 -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724.mp4
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (8 lines, 197 words)
+[32m[INFO][0m [OTR_ShotLock] post-audio ledger overlay from signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (freeze_timestamp=2026-09-08T04:46:08.024710+00:00, rows=0, music=2, mirrors=2, master_sha=0fc98272a689)
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (8 lines, 197 words)
+[1m[33m[WARNING][0m [OTR_ShotLock] REPLAY: planned section reused (revision 1, 8 shot(s)), no LLM
+[1m[33m[WARNING][0m [OTR_MetaBriefImagePromptGen] REPLAY: pass-through, no LLM
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (8 lines, 197 words)
+[1m[33m[WARNING][0m [OTR_ImageGenDispatcher] replay: 0 imported image row(s) verified on disk, nothing minted
+[32m[INFO][0m [story_brief:ltx_scene_open] status=ok brief_chars=176 terms=setting=3/lighting=3/atmosphere=3
+[1m[33m[WARNING][0m [OTR_MasterAudioMux] LOUD re-resolve: master audio path stale (episode dir renamed after capture); '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav' -> '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav' (same file, post-rename dir)
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (pre-render: all stills minted) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] pre-render residue free: ran=['unload_llm', '_unload_bark', 'gc.collect', 'soft_empty_cache'] failed=[] free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @0.000+10.000s -> slice_a7a9d77cd0ee1ef1.wav (beat music_opening_001)
+[32m[INFO][0m [OTR video] viz_green 1472x832 x250 frames -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_green_h2tx58pk.mp4
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (inter-beat viz_green->viz_mxc_cpu) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] inter-beat reclaim viz_green->viz_mxc_cpu: free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @9.500+12.767s -> slice_ca57f9957969e521.wav (beat b001)
+[32m[INFO][0m [OTR video] viz_mxc_cpu 1472x832 x319 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_mxc_q9nno9fj.mp4
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (inter-beat viz_mxc_cpu->viz_camera) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] inter-beat reclaim viz_mxc_cpu->viz_camera: free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @22.267+8.879s -> slice_d7d2e9074f0b0881.wav (beat b002)
+[32m[INFO][0m [OTR video] viz_camera 1472x832 x222 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_camera_coqd975t.mp4
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @31.147+7.929s -> slice_a70652c4dbfb86c9.wav (beat b003)
+[32m[INFO][0m [OTR video] viz_camera 1472x832 x198 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_camera_biosunyc.mp4
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @39.075+7.804s -> slice_84bafc1db32e2324.wav (beat b004)
+[32m[INFO][0m [OTR video] viz_camera 1472x832 x195 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_camera_hrhem5fu.mp4
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @46.880+10.888s -> slice_1b8c7c565f8b90b1.wav (beat b005)
+[32m[INFO][0m [OTR video] viz_camera 1472x832 x272 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_camera_uvfnw3ai.mp4
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (inter-beat viz_camera->viz_mxc_cpu) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] inter-beat reclaim viz_camera->viz_mxc_cpu: free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @57.767+7.413s -> slice_fd0c16a9aef706d6.wav (beat b006)
+[32m[INFO][0m [OTR video] viz_mxc_cpu 1472x832 x185 frames (audio=True) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_mxc_sjf22vkv.mp4
+[32m[INFO][0m [VRAMLevers] free_otr_pipeline_residue (inter-beat viz_mxc_cpu->viz_green) OK: unload_llm, _unload_bark, gc.collect, soft_empty_cache | allocated nan -> nan MB, reserved nan -> nan MB, free=nan MB
+[1m[33m[WARNING][0m [OTR video] inter-beat reclaim viz_mxc_cpu->viz_green: free_gb_after=nan
+[32m[INFO][0m [OTR.render_driver] per-beat audio: sliced signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav @64.680+7.988s -> slice_df44df9880de497a.wav (beat music_closing_001)
+[32m[INFO][0m [OTR video] viz_green 1472x832 x200 frames -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_viz_green_7k9adqbi.mp4
+[32m[INFO][0m [OTR video] persisted 8 clip(s) to episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/clips/
+[1m[33m[WARNING][0m [OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open beat music_opening_001 role=music_visual rendered on 'viz_green' (exists=True) -- NOT an LTX engine; the open is the procgen/still floor (soft open). Expected one of ('ltx25_foley_plus', 'ltx25_mime', 'ltx25_video', 'ltx_8gb', 'ltx_audio_in', 'ltx_video'). Set OTR_LTX_OPEN_STRICT=1 to fail the build.
+[1m[33m[WARNING][0m [OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open beat b001 role=announcer_visual rendered on 'viz_mxc_cpu' (exists=True) -- NOT an LTX engine; the open is the procgen/still floor (soft open). Expected one of ('ltx25_foley_plus', 'ltx25_mime', 'ltx25_video', 'ltx_8gb', 'ltx_audio_in', 'ltx_video'). Set OTR_LTX_OPEN_STRICT=1 to fail the build.
+[1m[33m[WARNING][0m [OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open beat b006 role=announcer_visual rendered on 'viz_mxc_cpu' (exists=True) -- NOT an LTX engine; the open is the procgen/still floor (soft open). Expected one of ('ltx25_foley_plus', 'ltx25_mime', 'ltx25_video', 'ltx_8gb', 'ltx_audio_in', 'ltx_video'). Set OTR_LTX_OPEN_STRICT=1 to fail the build.
+[1m[33m[WARNING][0m [OTR.render_driver] LTX-OPEN HEALTH (BUG-LOCAL-413): radio-open beat music_closing_001 role=music_visual rendered on 'viz_green' (exists=True) -- NOT an LTX engine; the open is the procgen/still floor (soft open). Expected one of ('ltx25_foley_plus', 'ltx25_mime', 'ltx25_video', 'ltx_8gb', 'ltx_audio_in', 'ltx_video'). Set OTR_LTX_OPEN_STRICT=1 to fail the build.
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (8 lines, 197 words)
+[32m[INFO][0m [Ledger] disk-only assembler mirrors: preserved=0 rejected=0 existing=2
+[32m[INFO][0m [Ledger] saved signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json (8 lines, 197 words)
+[1m[33m[WARNING][0m [OTR_VideoRenderBatch] audio_motion: stamped 8 profile(s) (8 ok) -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json saved=True
+[1m[33m[WARNING][0m [OTR_VideoRenderBatch] mode=episode ok=True -> node_episode_report.json
+[32m[INFO][0m [SceneAwareScopes] 1817 frames @ 1920x1080 25fps -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/_shared/tmp/otr_scopes_signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_20260910_011826.mp4
+[32m[INFO][0m [OTR_SilentComposite] assembled 8 beats -> 1817 frames @25fps 1920x1080 silent; budget 1817 OK
+[32m[INFO][0m [PostUpscaleProcgenBlend] PostUpscaleProcgenBlend: bypass=True, copied signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent.mp4 -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended.mp4
+[32m[INFO][0m [OTR_CaptionBurn] captions burned (style=sdh_standard) :: captions: 13 events from 6 speech lines -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned.ass (style=sdh_standard, margin_v=90) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned.mp4
+[32m[INFO][0m [OTR_CreditsRoll] appended 21.6s console (hero='THE LANTERN BURNS BRIGHT WHILE SLANDER HIDES' backdrop=body final frame) -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_with_credits.mp4
+[1m[33m[WARNING][0m [OTR_MasterAudioMux] LOUD re-resolve: master audio path stale (episode dir renamed after capture); '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav' -> '/Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/audio/signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav' (same file, post-rename dir)
+[1m[33m[WARNING][0m [OTR_MasterAudioMux] LOUD publish: final episode -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs/the_lantern_burns_bright_while_slander_h_20260910_011724__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4 (159640319 bytes; video copy + AAC-320k viewing audio; archival PCM byte-identical final: /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/episodes/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724/signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_with_credits_final.mp4)
+[32m[INFO][0m [OTR_MasterAudioMux] duration_check v=94.320s a=72.668s tail_budget=21.6s (declared) OK
+[32m[INFO][0m [OTR_MasterAudioMux] audio_mode=master_copy
+[32m[INFO][0m [OTR_MasterAudioMux] audio_byte_identical OK (9b63471d1fc0)
+[32m[INFO][0m [OTR_MasterAudioMux] obs_publish OK -> /Users/rentamac/ComfyUI-Installs/ComfyUI/ComfyUI/output/otr/obs/the_lantern_burns_bright_while_slander_h_20260910_011724__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4
+[32m[INFO][0m [OTR_MasterAudioMux] stamped ledger signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_ledger.json: final_audio_path -> signal_lost_the_lantern_burns_bright_while_slander_h_20260907_214731_replay_20260910_011723_829459_master.wav; final_video_path -> signal_lost_the_lantern_burns_bright_while_slander_h_20260910_011724_silent_procgen_blended_captioned_with_credits_final.mp4; obs_final_path -> the_lantern_burns_bright_while_slander_h_20260910_011724__cart__vcam__none__koko__sspr__q354b__sa3_final.mp4
+[32m[INFO][0m [32mPrompt executed in 147.28 seconds[0m
