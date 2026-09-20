@@ -1352,9 +1352,6 @@ def fallback_announcer_intro(script_brief: str, *, episode_meta=None) -> str:
     return f"{head} {spoken['tonight_label']}: {brief}" if brief else head
 
 
-WORK_LINE_PREFIX = "a scene from "
-
-
 def _work_line(work_title: str, *, episode_meta=None) -> str:
     """Render the announcer's WORK context value, or "" to omit the label.
 
