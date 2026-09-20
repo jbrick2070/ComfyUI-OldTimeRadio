@@ -1,5 +1,7 @@
 # Manual panel prompts -- the Spanish scanned lane
 
+> **SUPERSEDED IN PART -- read this first.** Section 1 below says the two Portuguese Tempestade cells "ARE ready"; the ADDENDUM at the bottom, written hours later, measured them and they are not. The HEAD named below is seventeen commits stale and the footer's "nothing has been pushed" was true only when written. Current briefs are the `PROMPT_*.md` files in this folder; see README.md.
+
 Written 2026-09-19 for the operator to paste by hand into Grok/Composer, agy and
 Codex. Each brief is scoped to a DIFFERENT question and each is briefed to
 REFUTE, per the 2026-09-11 contrarian rule. Repo root on every box:
@@ -369,6 +371,4 @@ report reads `SCENA II TEMPESTADE x5`, `TEMPESTADE PROSPERO x3` and
 
 ## WHAT I AM DOING WHILE THESE RUN
 
-Nothing is being vendored. Every one of the twelve cells is now blocked on one
-of the questions above, which is the honest state and is a change from the
-handoff. No code has been written and nothing has been pushed.
+Written before any code landed. Since then, on `main`: the hyphen/label weld fix, the split-heading widening, the opt-in coordinate reader, `--pages` addressing, and both vendored Portuguese scenes regenerated. See README.md in this folder.

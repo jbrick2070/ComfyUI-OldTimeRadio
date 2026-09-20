@@ -9,13 +9,13 @@ Is there a design choice with more than one defensible answer?
 
 - **YES** (new capability, schema/ledger, canonical workflow, reasonable disagreement) -> full four-round kibitz (`kibitz-plugin:kibitz`) BEFORE code. Unsure = YES.
 - **NO** (grep-and-fix, rename, wiring conformance, one right answer) -> no arc. Skip the four-round kibitz, not Composer. The All-coding block below is the floor.
-- **Floor on every coding change:** Composer QA before push, then Sonnet. A self-review does not count.
+- **Floor on every coding change:** push the green chunk, THEN Composer QA on the pushed diff, then Sonnet. A self-review does not count. (Operator 2026-09-19: "never hold back commit or push"; QA reviews what is already on `main`.)
 - **This window is Cursor.** Do not run `cursor-agent -p` as that reviewer -- same family. If a CLI lane is needed, send it to **agy** (`agy -p='...' --dangerously-skip-permissions`) or `codex exec`. Ground every result against the real files. Operator 2026-09-17; also in `CLAUDE.md`.
 - **Big design (YES above):** get an independent opinion from a **frontier** model before code. Unsure = YES. That is the design seat; do not skip it and go straight to Composer.
 - **All coding (operator 2026-09-17 -- hard. "thats my law any code change always get a composer qa"):**
   1. Write the diff.
   2. Spawn **Composer QA** (Task, Composer, briefed to REFUTE) until **HOLDS / MUST-FIX: none**. Fix every must-fix and re-spawn Composer. Do not stop at PARTIAL.
-  3. **Do not `git push` until that HOLDS.** A self-review does not count. Do not push first and QA after.
+  3. **Push first. QA never gates the push (operator 2026-09-19, reversing the 09-17 clause).** A finding becomes the next commit. A self-review still does not count.
   4. Then spawn **Sonnet** (Task, `claude-sonnet-5-thinking-max`, briefed to REFUTE) until **HOLDS / MUST-FIX: none**. Fix every must-fix and re-spawn Sonnet. Do not stop at PARTIAL.
   5. A missing live proof is ONE NEXT RISK, not a reason to stay PARTIAL.
 - Every round ends with a contrarian briefed to REFUTE. Default REFUTED when ungrounded.

@@ -109,7 +109,8 @@
   * **NO -- one verifiable right answer: wiring conformance, a grep-and-fix, a stale comment,
     a rename, an `/object_info` check, a deterministic edit** -> NO arc. An arc pressure-tests
     DESIGN; there is nothing to pressure-test. Still run Composer QA
-    (then Sonnet) before the push -- the 2026-09-17 law above. The
+    (then Sonnet) on the pushed diff -- the 2026-09-17 law above, as
+    amended 2026-09-19: push green first, QA what is on `main`. The
     thing you skip is the four-round arc, not Composer.
   * **ONE CLEAN FINISHED-DIFF REVIEW IS ENOUGH (operator directive 2026-08-20 --
     amended 2026-09-17).** Do not multiply reviewers past Composer-then-Sonnet
@@ -122,7 +123,8 @@
   * **UNSURE** -> treat it as YES. The arc is $0 and a missed design flaw is not.
 - **ONE CLI REVIEW ON EVERY CODING CHANGE (operator directive 2026-09-07 -- hard).**
   Operator: *"you can update claude.md so that we do 1 cli review as needed for all
-  coding."* Before pushing a code change, run it past ONE local CLI lane. Not an
+  coding."* Every code change gets ONE local CLI lane -- on the pushed diff,
+  per the 2026-09-19 amendment above; it never gates the push. Not an
   arc, not a panel -- one reader, every time.
   * **The lanes:** `cursor-agent -p --force "<prompt>"` (all-round, the one that
     has actually caught things -- **only when Cursor is NOT the driver**),

@@ -252,14 +252,38 @@ script on purpose: the HTML path reads speakers off the edition's own markup,
 and a PDF text layer has none, so the two share nothing at the speaker-marking
 step. They do share scene boundaries, so `extract` is imported rather than
 reimplemented.
-* It anchors on the ENGLISH ROSTER: every all-caps run is a candidate and only a
-  candidate resolving to that scene's Folger cast is accepted, so the cast list
-  filters out running heads, folios and translator initials at once.
-* **Pass `--end-label` whenever the volume prints its scene label across the top
-  of every page**, which is most of them. Without it the scene finder stops at
-  the next PAGE rather than the next SCENE and stores the fragment as a whole
-  scene at `alignment_confidence: 1.0`. The script now refuses that run and says
-  so; `--probe` lists a volume's headings so the boundary can be read off.
+* **THE SPEAKER HALF IS THE OPEN WORK, AND ITS BEHAVIOUR IS RULED, NOT
+  DESIGNED.** Today every all-caps run is matched against the scene's Folger
+  roster and a run that resolves to nobody is DISCARDED, its text merged into
+  the previous speaker. The 2026-09-19 standing ruling (a mangled native text
+  beats a clean AI translation; gates refuse MISATTRIBUTION, never IMPERFECTION)
+  makes that merge indefensible: an unresolvable cue must be EMITTED as its own
+  speaker under the name as printed, left unbound, costing a voice and never
+  the dialogue. The Spanish editions abbreviate (`FER .`, `Fer.`, `Prós.`) and
+  Clark splits an honorific across the row (`D . PED.`, 25 times in one scene),
+  so a perfect `--pages` span currently returns ZERO speeches. The roster stays
+  the filter for WRONG-MOUTH attribution; it stops being a filter for dropping
+  lines. Grok's detector spec and Terra's runtime trace are the two open briefs.
+* **A SCENE IS ADDRESSED BY ITS PAGES. `--pages START-END`, measured off
+  `--probe`, is the boundary tool; `--end-label` is the fallback for a volume
+  that needs it, not the story.** A line index moves whenever a rule changes,
+  and a heading label does not identify a scene at all -- the Spanish volumes
+  print `ESCENA PRIMERA .` five, six and ten times each, and `find_label`'s
+  exact pass beats a nearer chromed match, which returned King Lear 2.1 for
+  1.1 and a 78,766-character Tempest spanning two plays. Measured 2026-09-19:
+  all eight Spanish windows return their scene with the COMPLETE English roster
+  speaking, and the page window rescues the cell the BOOK misprints (Clark
+  labels Twelfth Night 2.5 as `ESCENA II.`). A bad window fails loudly.
+* **Reading order was wrong underneath all of it, and an opt-in reader fixes
+  it.** `page.get_text()` emits Clark's marginal cues at the page BOTTOM and
+  threw `vel!` into the witches' speech in the vendored Macbeth. Commit
+  `ae792152` rebuilds rows from glyph baselines (`reading_order="coordinates"`),
+  reproduces an image-verified row count exactly and conserves every word on
+  1,450 pages; it stays opt-in because it re-admits joined `<folio> <title>`
+  rows the furniture walk does not yet know. The hyphen weld (`horri-` +
+  `BANQUO`) and the split-heading rejoin (`ESCENA` over `V .`, which fired zero
+  times on either Spanish volume) are fixed and shipped; both vendored
+  Portuguese scenes were regenerated and the corpus glue census is zero.
 * Page furniture is removed by POSITION, never by token -- a play's title is
   usually also a character in it. `tests/test_vendor_scan_furniture.py` holds
   the thirteen shapes that earned their place, four of them neuter-proven, plus
@@ -287,12 +311,19 @@ shared-code change, the whole set costs three minutes.
 
 **WHAT IS LEFT, AND NONE OF IT IS BOOKKEEPING ANY MORE.**
 
-* **27 page-scan cells, and 12 of them are ready to run TODAY.** Ten carry a
-  direct PDF URL and a proven text layer -- 8 es (king_lear 1.1, midsummer 3.1
-  and 3.2, much_ado 2.3 and 3.1, tempest 3.1, twelfth_night 1.5 and 2.5) and 2
-  pt (tempest 1.2 and 3.1). Two more, pt midsummer 3.1 and 3.2, point at a
-  `Galeria:` page and need the same imageinfo resolve the Spanish rows just
-  had. Corpus 41 -> up to 53.
+* **27 page-scan cells. NONE is vendor-ready until the speaker half ships;
+  eight have PROVEN BOUNDARIES.** This row said "12 ready to run TODAY" on
+  the morning of 2026-09-19 and every one of the twelve fell to a probe that
+  afternoon. The 8 es cells (king_lear 1.1, midsummer 3.1 and 3.2, much_ado
+  2.3 and 3.1, tempest 3.1, twelfth_night 1.5 and 2.5) have measured page
+  windows and complete casts at the boundary; they wait only on unbound
+  emission above. The 2 pt Tempestade cells (1.2 and 3.1) are blocked on
+  Ferdinand printing as `FERNANDO` -- eight characters, refused by the
+  PREFIX test, not the length floor -- and on a four-line edge band the
+  furniture walk halts on. The 2 pt Midsummer cells resolve through
+  imageinfo to a real text layer and then Castilho divides the play into
+  QUADROS with continuous scene numbers, the French Hugo non-alignment
+  again. Corpus 41 -> up to 53 still, by a longer road.
   **START WITH `--probe`, ALWAYS.** Each volume words its headings differently:
   the Portuguese print `ACTO PRIMEIRO` / `SCENA III`, the Spanish Obras
   dramaticas spells its ordinals (`ACTO SEGUNDO`, `ESCENA PRIMERA`) and holds
