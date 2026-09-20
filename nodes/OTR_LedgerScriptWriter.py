@@ -2326,7 +2326,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     "tooltip": (
                         "For My Story, enter your idea here and optionally "
                         "add characters, plot, setting and who it is by. "
-                        "At least one creative field must contain text. "
+                        "Leave every creative field blank and the standing "
+                        "premise that ships with the pack is written instead, "
+                        "so a rolled My Story run never refuses. "
                         "Other banks keep their own source and premise rules."
                     ),
                 }),

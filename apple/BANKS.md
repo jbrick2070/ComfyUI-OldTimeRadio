@@ -33,8 +33,10 @@ selecting it does nothing. It is there to tell you the door exists --
 
 Every bank works on every language row. `original`, `my_story`,
 `media_archive`, `scifi_news_pro` and `public_domain` are authored in the
-language; `shakespeare` performs its selected passage translated, speakers and
-cut unchanged, and records both hashes on the ledger. A roll on a non-English
+language; `shakespeare` performs its selected passage from a vendored
+translator's public-domain text when the corpus holds the scene, and
+translated by the writer otherwise -- speakers and cut unchanged either way,
+with the receipt on the ledger. A roll on a non-English
 row may draw any bank. The full one-switch behaviour is in
 [MULTILINGUAL.md](MULTILINGUAL.md).
 
