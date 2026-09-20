@@ -340,3 +340,6 @@ scripts/_tmp_*
 # two fill the remaining scratch shapes so a .bak / .orig cannot return.
 *.bak
 *.orig
+# .comfyignore already drops .claude/ from the registry zip (agent exhaust).
+# Keep it out of git status the same way.
+.claude/
