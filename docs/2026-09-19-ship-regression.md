@@ -49,6 +49,26 @@ file is that explanation. The bump itself is his call (third digit only).
   twelve; the two the day's code could have touched -- the word counter and
   the chunker -- were measured byte-identical on English.
 
-## The final-HEAD run
+## The final-HEAD run (2026-09-20 00:05, tree at `cd97b3e5`)
 
-(recorded below by the window that runs it)
+RC=2; **fourteen** nodeids not in `EXPECTED_FAILED_NODEIDS`, not twelve -- the
+first table above was read from a truncated listing. The full set is the
+twelve rows above plus:
+
+| # | nodeid | note |
+|---|---|---|
+| 13 | `test_llm_slot_sweep.py::test_every_llm_call_site_has_slot_tag` | a static sweep for LLM call sites without a slot tag; failed in BOTH of today's full runs; not among the twelve re-run at `cc62b2c1`, so its age is not proven -- but no LLM call site was added today (the day's code is the scan lane, the word counter and the chunker) |
+| 14a | `test_comfy_credential_rip.py::test_llm_hosts_capture_the_key_through_set_auth` | present only in the final run |
+| 14b | `test_ltx_8gb_canonical_canvas.py::test_the_8gb_variant_workflow_agrees_with_the_declaration` | present only in the first run |
+
+14a and 14b swapped between two runs of the same tree with no code change
+between them that touches credentials or the 8 GB LTX variant -- run-to-run
+variance (the second run happened while a headless leg held the GPU and its
+environment). Both are environment-shaped, neither is on the shipping still
+lane, and neither is in today's diff. The known-fail guard still hides their
+assertion lines; `%TEMP%\full_suite_final.log` holds the run.
+
+So the ship condition stands as written above, with fourteen explained
+rather than twelve: ten cannot reach a shipped still-lane episode, two (#2,
+#11) deserve one look before the version string burns, #13 is a sweep that
+wants an owner, and the pair in #14 is variance to watch, not a regression.
