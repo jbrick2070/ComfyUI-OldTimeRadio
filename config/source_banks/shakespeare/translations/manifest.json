@@ -1511,6 +1511,65 @@
     },
     {
       "iso": "pt",
+      "play": "king_lear",
+      "scene": "1.1",
+      "file": "pt/king_lear_1_1.txt",
+      "translator": "Domingos Ramos",
+      "translator_death_date": 1932,
+      "translation_first_published": 1919,
+      "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/William_Shakespeare_-_Rei_Lear_%28trad._Domingos_Ramos%2C_1919%29.pdf",
+      "revision_id": "sha256:eee769a12d97daf8",
+      "raw_sha256": "eee769a12d97daf88579f695297ae4db8bf97009183624117f10504697d9b7c6",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "ACTO PRIMEIRO / SCENA I",
+      "speaker_labels": 80,
+      "distinct_speakers": 9,
+      "speaker_map": {
+        "KENT": {
+          "spoken": "KENT",
+          "roster": "KENT"
+        },
+        "GLOUCESTER": {
+          "spoken": "GLOUCESTER",
+          "roster": "GLOUCESTER"
+        },
+        "EDMUNDO": {
+          "spoken": "EDMUND",
+          "roster": "EDMUND"
+        },
+        "REI LEAR": {
+          "spoken": "LEAR",
+          "roster": "LEAR"
+        },
+        "GONERIL": {
+          "spoken": "GONERIL",
+          "roster": "GONERIL"
+        },
+        "CORDÉLIA": {
+          "spoken": "CORDELIA",
+          "roster": "CORDELIA"
+        },
+        "REGANE": {
+          "spoken": "REGAN",
+          "roster": "REGAN"
+        },
+        "DUQUE DE BORGONHA": {
+          "spoken": "BURGUNDY",
+          "roster": "BURGUNDY"
+        },
+        "REI DE FRANÇA": {
+          "spoken": "FRANCE",
+          "roster": "FRANCE"
+        }
+      },
+      "transcription_method": "pdf_text_layer",
+      "transcription_date": "2026-09-19",
+      "extractor": "scripts/otr_vendor_scan.py"
+    },
+    {
+      "iso": "pt",
       "play": "macbeth",
       "scene": "1.3",
       "file": "pt/macbeth_1_3.txt",
@@ -1519,12 +1578,12 @@
       "translation_first_published": 1912,
       "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
       "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/50/William_Shakespeare_-_Macbeth_%28trad._Domingos_Ramos%2C_1912%29.pdf",
-      "revision_id": "sha256:7fd2db31a038f33f",
-      "raw_sha256": "7fd2db31a038f33f7e1edb8cfb56b954d4d2bcdda5bdbc74410e25bef62fc07e",
+      "revision_id": "sha256:134f2892062c1d4e",
+      "raw_sha256": "134f2892062c1d4e133d6512765c9bb0e6a0fc96229d344f530f034a09bc93f9",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO PRIMEIRO / SCENA III",
-      "speaker_labels": 49,
+      "speaker_labels": 47,
       "distinct_speakers": 8,
       "speaker_map": {
         "1.ª FEITICEIRA": {
