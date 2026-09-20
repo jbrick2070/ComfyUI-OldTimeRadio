@@ -285,6 +285,35 @@ def test_the_coordinate_reader_is_opt_in_and_flat_is_the_default():
         "a page whose words straddle rows must be named, not shipped quietly")
 
 
+def test_a_page_window_is_the_only_stable_address_in_a_scanned_volume():
+    """NOT A FURNITURE RULE -- the addressing rule of the same script.
+
+    A line index moves whenever a furniture rule or a PyMuPDF version
+    changes, and a heading label does not identify a scene on its own: the
+    Spanish volumes print `ESCENA PRIMERA .` five, six and ten times each, so
+    asking by name returns whichever copy the matcher reaches first. That is
+    how a request for King Lear 1.1 returned Act 2 Scene 1, and how the
+    Tempest's act 3 came back spanning two plays.
+
+    A bad window fails loudly rather than storing a wrong scene quietly.
+    """
+    scan = _scan()
+    pages = ["page %d" % n for n in range(20)]
+
+    got, why = scan.slice_pages(pages, "5-8")
+    assert got == ["page 5", "page 6", "page 7", "page 8"], got
+    assert "5-8" in why or "5-8" in why.replace(" ", "")
+
+    # a single page is a window of one
+    assert scan.slice_pages(pages, "5")[0] == ["page 5"]
+
+    # and every bad shape refuses rather than guessing
+    for bad in ("8-5", "19-20", "-3", "abc", "5-x"):
+        got, why = scan.slice_pages(pages, bad)
+        assert got is None, (bad, got)
+        assert why, bad
+
+
 def test_a_split_heading_rejoins_through_the_printer_s_trailing_stop():
     """NOT A FURNITURE RULE -- the other page-text rule of the same script.
 

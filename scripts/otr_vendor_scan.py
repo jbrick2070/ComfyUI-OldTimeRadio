@@ -826,6 +826,39 @@ def strip_running_titles(pages: list[str]) -> list[str]:
     return out
 
 
+def slice_pages(pages: list[str], spec: str):
+    """``(pages, why)`` for a `START-END` page window, or ``(None, why)``.
+
+    THE PAGE IS THE ONLY STABLE ADDRESS IN A SCANNED VOLUME. A line index
+    moves the moment a furniture rule or a PyMuPDF version changes, and a
+    heading label does not identify a scene on its own: this corpus's volumes
+    print `ESCENA PRIMERA .` five, six and ten times each, so asking for one
+    by name returns whichever copy the matcher reaches first -- which is how a
+    request for King Lear 1.1 came back with Act 2 Scene 1, and a request for
+    the Tempest's act 3 came back spanning two plays.
+
+    A BAD WINDOW FAILS LOUDLY AND THAT IS THE DESIGN. Ask for pages the
+    volume does not have and the run stops; ask for the wrong ones and the
+    scene heading is simply not in them, so `extract` refuses. Neither can
+    store a wrong scene quietly, which is the failure this corpus cannot
+    afford.
+    """
+    first, _, last = spec.partition("-")
+    try:
+        first = int(first)
+        last = int(last) if last.strip() else first
+    except ValueError:
+        return None, ("--pages wants START-END as page indexes, e.g. 244-255; "
+                      "got %r" % spec)
+    if first > last:
+        return None, "--pages %s runs backwards" % spec
+    if not 0 <= first < len(pages) or last >= len(pages):
+        return None, ("--pages %s is outside this volume's 0..%d"
+                      % (spec, len(pages) - 1))
+    return pages[first:last + 1], ("restricted to pages %d-%d of the volume"
+                                   % (first, last))
+
+
 def speeches_from_span(span: str, roster: set[str]) -> list[tuple[str, str]]:
     """``[(printed label, speech)]`` for every resolvable speaker in the span."""
     span = _RUNNING_HEADER.sub(" ", span)
@@ -920,6 +953,15 @@ def main(argv=None) -> int:
     ap.add_argument("--act-label", default=None)
     ap.add_argument("--scene-label", required=True)
     ap.add_argument("--end-label", default=None)
+    ap.add_argument("--pages", default=None, metavar="START-END",
+                    help="restrict the search to these PDF page indexes, "
+                         "zero-based and inclusive, e.g. 244-255. THE PAGE IS "
+                         "THE ONLY STABLE ADDRESS IN A SCANNED VOLUME: a line "
+                         "index moves whenever a furniture rule or a PyMuPDF "
+                         "version changes, and a heading label does not "
+                         "identify a scene on its own -- this corpus's "
+                         "volumes print `ESCENA PRIMERA .` five, six and ten "
+                         "times each. Measured per scene from --probe.")
     ap.add_argument("--write", action="store_true")
     ap.add_argument("--probe", action="store_true",
                     help="list the act/scene headings this book actually prints "
@@ -944,6 +986,17 @@ def main(argv=None) -> int:
     url = str(lead.get("url") or "").strip()
     print("[scan] %s" % urllib.parse.unquote(url)[:96])
     pages = strip_running_titles(pdf_text(url))
+    # SLICE AFTER THE FURNITURE VOTE, NEVER BEFORE. `running_titles` decides
+    # what is furniture by how often a line repeats across the WHOLE volume,
+    # so a handful of pages cannot tell a running head from a speaker: on a
+    # five-page window the floor is 4 and the play's lead clears it. Strip on
+    # the whole book, then narrow.
+    if args.pages:
+        pages, why = slice_pages(pages, args.pages)
+        if pages is None:
+            print("[scan] %s" % why)
+            return 2
+        print("[scan] %s" % why)
     print("[scan] %d page(s) of text layer" % len(pages))
 
     if args.probe:
