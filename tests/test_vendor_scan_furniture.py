@@ -419,7 +419,7 @@ def test_a_folio_may_carry_the_printers_stop_and_a_comma_may_join_the_headings()
 
 
 def test_a_fold_binds_a_printed_form_only_when_its_target_is_in_the_scene():
-    """NOT A FURNITURE RULE -- the one declared alias the operator allowed.
+    """NOT A FURNITURE RULE -- the one declared binding the operator allowed.
 
     Domingos Ramos prints Ferdinand as FERNANDO: eight letters, past the
     length floor, refused on the prefix test because neither name starts

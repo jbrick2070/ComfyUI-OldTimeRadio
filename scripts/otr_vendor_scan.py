@@ -84,8 +84,11 @@ FUNCTION_NAMES = {
 }
 
 #: A FOLD IS A PRINTED FORM THAT IS ONE PERSON, DECLARED FOR ONE SCENE. Filled
-#: by `--fold PRINTED=ROSTER` on the command line and consulted before every
-#: other rule in `resolve`. It is scoped to the invocation -- one command
+#: by `--fold PRINTED=ROSTER` on the command line, validated by `parse_folds`,
+#: and consulted in `resolve` after the exact pass and before every other
+#: rule (a form the resolver already reaches is refused at declaration, so
+#: the order is what keeps a mistyped fold from moving a character's own
+#: name). It is scoped to the invocation -- one command
 #: vendors one scene -- which is what keeps it the edition-scoped exact map
 #: the operator allowed and not the global alias table he forbade; the same
 #: entries will come from a per-scene registry keyed `(sha256, scene)` once
@@ -1173,12 +1176,14 @@ def window_truncates(body: str, lines: list[str],
 
     THE TEST IS STRUCTURAL, NOT TEXTUAL. `extract` builds the body as the
     non-blank, right-stripped lines from the scene heading to the boundary,
-    so the scene ran to the end of its input exactly when the body is the
-    SUFFIX of the window's non-blank lines. A heading that closed the scene
-    is a non-blank line after the body, and then the body is not the suffix.
-    The first cut anchored on the closing line's TEXT, and a verse line
-    repeated later in the window made it refuse a scene a heading had
-    closed -- review reproduced that before anyone hit it. A window that
+    so a scene that ran to the end of its input is always the SUFFIX of the
+    window's non-blank lines, and a heading that closed it is a non-blank
+    line after the body, which breaks the suffix. The one way a closed scene
+    still refuses is its WHOLE body recurring verbatim at the window's tail
+    -- a refusal, never a stored fragment, and it fires on no real volume.
+    The first cut anchored on the closing line's TEXT alone, and a single
+    verse line repeated later in the window made it refuse a scene a heading
+    had closed; review reproduced that before anyone hit it. A window that
     reaches the volume's last page is the whole-volume case and is allowed.
     """
     if window_reaches_volume_end or not body.strip():

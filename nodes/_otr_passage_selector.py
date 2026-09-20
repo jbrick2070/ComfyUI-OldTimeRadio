@@ -54,7 +54,7 @@ from dataclasses import dataclass
 from typing import Mapping
 
 from ._otr_episode_budget import BEAT_WORD_HARD_MAX
-from ._otr_text_metrics import canonical_word_count
+from ._otr_text_metrics import CJK_RUN_RE, canonical_word_count
 
 __all__ = [
     "PassageError",
@@ -161,6 +161,32 @@ def _line_units(text: str) -> list[str]:
     return [" ".join(ln.split()) for ln in str(text or "").split("\n") if ln.strip()]
 
 
+#: A CJK LINE HAS NO SPACES TO CUT AT, SO IT IS CUT AT ITS PUNCTUATION. Every
+#: cut in this module fell at a space -- `line.split()` -- which a Japanese or
+#: Chinese speech never has. Tsubouchi's balcony scene planned or did not plan
+#: depending on the seed: a window that drew Juliet's 180-word speech hit
+#: `_halve`, which found one "word", could not cut it, and the whole vendored
+#: translation fell back to the model's. Sentence marks first, then clause
+#: marks, then -- only if a line has neither -- the characters themselves,
+#: which at two characters per word is at worst a cut inside one word. The
+#: pieces re-join with NOTHING between them, so the line's bytes survive
+#: exactly; a space would be the one thing the edition never printed. A line
+#: with no CJK in it never takes this path and cuts exactly as it always did.
+_CJK_SENTENCE_CUT = re.compile(r"(?<=[。！？!?])")
+_CJK_CLAUSE_CUT = re.compile(r"(?<=[、，；：;:])")
+
+
+def _line_tokens(line: str) -> tuple[list[str], str]:
+    """``(pieces, joiner)``: what a line may be cut into, and what re-joins it."""
+    if not CJK_RUN_RE.search(line) or len(line.split()) > 1:
+        return line.split(), " "
+    for cut in (_CJK_SENTENCE_CUT, _CJK_CLAUSE_CUT):
+        pieces = [p for p in cut.split(line) if p]
+        if len(pieces) > 1:
+            return pieces, ""
+    return list(line), ""
+
+
 def _split_long_line(line: str, cap: int) -> list[str]:
     """A single line over the cap splits at word boundaries. Every word
     survives, in order. None in the Folger corpus; the colon-layout
@@ -168,13 +194,24 @@ def _split_long_line(line: str, cap: int) -> list[str]:
     (Banquo's "Qual distanza v'ha ancora" is one) take this path."""
     pieces: list[str] = []
     piece: list[str] = []
-    for token in line.split():
-        piece.append(token)
-        if canonical_word_count(" ".join(piece)) >= cap:
-            pieces.append(" ".join(piece))
+    tokens, joiner = _line_tokens(line)
+    for token in tokens:
+        # CLOSE THE PIECE BEFORE THE TOKEN THAT WOULD OVERSHOOT, not after.
+        # With one-word tokens the two are the same cut; with a CJK token
+        # that is a whole sentence, closing afterwards handed a beat more
+        # words than the cap the chunker promises never to exceed.
+        if piece and canonical_word_count(joiner.join(piece + [token])) > cap:
+            pieces.append(joiner.join(piece))
             piece = []
+        if (not piece and canonical_word_count(token) > cap
+                and len(_line_tokens(token)[0]) > 1):
+            # ONE SENTENCE LONGER THAN A BEAT is cut again at its clause
+            # marks, and a clause longer than a beat at its characters.
+            pieces.extend(_split_long_line(token, cap))
+            continue
+        piece.append(token)
     if piece:
-        pieces.append(" ".join(piece))
+        pieces.append(joiner.join(piece))
     return pieces
 
 
@@ -673,9 +710,12 @@ def _halve(group: list[str]) -> tuple[list[str], list[str]]:
             if best_gap is None or gap < best_gap:
                 best, best_gap = i, gap
         return group[:best], group[best:]
-    words = group[0].split() if group else []
+    # A SPACELESS LINE HALVES AT ITS PUNCTUATION, not at a space it has not
+    # got: `_line_tokens` hands back the pieces and the joiner that restores
+    # the line's own bytes. An English line halves at its middle word as before.
+    words, joiner = _line_tokens(group[0]) if group else ([], " ")
     mid = len(words) // 2
-    return ([" ".join(words[:mid])] if mid else []), ([" ".join(words[mid:])] if words[mid:] else [])
+    return ([joiner.join(words[:mid])] if mid else []), ([joiner.join(words[mid:])] if words[mid:] else [])
 
 
 def _cut_into(text: str, parts: int, cap: int) -> list[str]:
