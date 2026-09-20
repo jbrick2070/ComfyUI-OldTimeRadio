@@ -347,6 +347,39 @@ def test_a_split_heading_rejoins_through_the_printer_s_trailing_stop():
     assert join("ACTO\nprimeiro que tudo .") == "ACTO\nprimeiro que tudo ."
 
 
+def test_a_swallowed_label_has_a_shape_and_the_write_refuses_it():
+    """NOT A FURNITURE RULE -- the write gate of the same script.
+
+    The corpus shipped this defect twice, invisible to every count:
+    `horriBANQUO` (1912 Macbeth) and `AfasKent` (1919 Rei Lear), each a
+    broken word welded onto the next speaker's name, each filing a whole
+    speech under the wrong character. A lower-case letter never runs
+    straight into capitals inside a token in these languages, so the weld
+    is refusable by shape. It is checked on speech BODIES only: a label may
+    carry capitals and punctuation of its own.
+    """
+    import inspect
+    scan = _scan()
+    weld = scan._INTERIOR_WELD.search
+
+    # the two that shipped
+    assert weld("Nunca vi assim um dia tao bello e tao horriBANQUO Que distancia")
+    assert weld("a flecha ja partiu. AfasKent Nao ; deixai-a")
+
+    # ordinary prose, a sentence-opening capital, an accented capital name,
+    # and a title-case label spelling are all left alone
+    for clean in ("tao bello e tao horrivel! Que distancia fazem",
+                  "Nada, meu senhor. REI LEAR fala.",
+                  "Quem vem la? Entram Ross e Angus.",
+                  "MIRANDA fala; Prospero escuta."):
+        assert not weld(clean), clean
+
+    # and it is enforced at the write, not merely defined
+    source = inspect.getsource(scan.main)
+    assert "_INTERIOR_WELD" in source and "REFUSING to write" in source, (
+        "the weld gate is defined but the write does not consult it")
+
+
 def test_the_rejoin_is_applied_where_the_pages_are_read():
     """A regex nothing calls is not a rule. Assert the real call site.
 

@@ -175,6 +175,23 @@ _STAGE_OPENER = re.compile(
     r"ENTRAN|ENTRA\b|SALEN|SALE|VANSE|VASE|"
     r"ENTER|EXEUNT|EXIT)\b")
 
+#: A SWALLOWED SPEAKER LABEL, BY ITS SHAPE. A lower-case letter running
+#: straight into capitals inside one token is not a word in Spanish,
+#: Portuguese or Italian -- it is a broken word welded onto the name of the
+#: person who speaks next. See the refusal in `main`, which is where this is
+#: enforced and where the two shipped instances are named.
+#:
+#: TWO SHAPES, BECAUSE THE EDITIONS DISAGREE ABOUT CASE. The 1912 Macbeth
+#: sets its labels in capitals, so the weld reads `horriBANQUO` -- a
+#: lower-case letter then a run of capitals. The 1919 Rei Lear sets them in
+#: Title Case, so it reads `AfasKent` -- one capital, then lower-case resumes.
+#: A pattern that demands two capitals catches the first and misses the
+#: second, which is exactly how the second shipped after the first was
+#: fixed. The capital must begin a real word (another capital, or two more
+#: lower-case letters), so a lone stray capital inside OCR noise is not a
+#: refusal.
+_INTERIOR_WELD = re.compile(r"[a-zà-ÿ][A-ZÀ-Þ](?:[A-ZÀ-Þ]|[a-zà-ÿ]{2})")
+
 #: A WORD CARRYING CYRILLIC IS A SCANNER ARTIFACT, NOT A WORD. The optical
 #: reader on these volumes resolves some capitals to their Cyrillic lookalikes,
 #: so the running title comes through as `МАСВЕТH` -- М А С В Е Т in Cyrillic
@@ -765,6 +782,11 @@ def _strip_one_edge(lines: list[str], edge: list[int], forms: set[str],
             lines[i] = ""
             step += 1
             continue
+        if attached_folio and identity in forms and not _HEADING_SHAPED.match(identity):
+            lines[i] = ""
+            step += 1
+            title_taken = True
+            continue
         # AN ACT LINE IS FREE LIKE A FOLIO, AND DOES NOT COUNT AS THE ONE TITLE,
         # because the 1912 Macbeth heads its pages with THREE pieces of one
         # running head -- `ACTO I`, `SCENA III`, `19` -- and spending the single
@@ -1132,6 +1154,33 @@ def main(argv=None) -> int:
     print("[scan] %d speeches / %d distinct labels" % (len(pairs), len(counts)))
     for label, n in counts.most_common():
         print("        %-22s x%-3d -> %s" % (label, n, resolve(label, roster)))
+
+    # A SWALLOWED LABEL IS THE ONE DEFECT THIS CORPUS HAS SHIPPED TWICE, AND
+    # IT COSTS ONE REGEX TO REFUSE. Both instances were a word the typesetter
+    # broke welded onto the speaker label that followed it -- `horriBANQUO` in
+    # the 1912 Macbeth and `AfasKent` in the 1919 Rei Lear -- and each ate a
+    # label, filed a whole speech under the wrong character, and left a
+    # nonsense word for a voice engine to read aloud. Both shipped at
+    # `alignment_confidence: 1.0` and neither was visible to any count.
+    #
+    # In the languages this lane vendors, a lower-case letter is never
+    # followed directly by an upper-case one inside a token, so the weld has
+    # a shape and the shape is refusable. Measured over all 41 vendored
+    # scenes: two hits before the fixes, zero after. It runs on the SPEECH
+    # BODIES only -- a label may legitimately carry capitals and punctuation
+    # (`D . PED`, `1.ª FEITICEIRA`).
+    welds = [(label, m.group(0)) for label, speech in pairs
+             for m in [_INTERIOR_WELD.search(speech)] if m]
+    if welds:
+        print("[scan] REFUSING to write: %d speech(es) carry a swallowed "
+              "label -- a lower-case letter running straight into capitals, "
+              "which is how a speaker's name gets eaten and their speech "
+              "filed under the previous character:" % len(welds))
+        for label, hit in welds[:6]:
+            print("        %-22s ...%s..." % (label, hit))
+        print("[scan] read the page: the capitals are almost certainly the "
+              "next speaker's cue.")
+        return 1
 
     if not args.write:
         print("[scan] (no --write; nothing stored)")
