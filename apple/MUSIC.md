@@ -36,7 +36,7 @@ Pro** -- and there is one per act break, so `act_count` 1 gives none and
 | **`sonilo`** | A Comfy account and credits | Hosted -- no GPU of yours |
 | **`google_lyria`** | A Google API key. Paid, and preview-only | Hosted -- no GPU of yours |
 
-**Stable Audio 3 is what sixteen of the seventeen shipped graphs use**, and it
+**Stable Audio 3 is what twenty-one of the twenty-two shipped graphs use**, and it
 is the right answer on any machine with a GPU: it downloads itself, and its
 licence permits commercial use.
 

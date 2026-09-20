@@ -2464,9 +2464,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "cast this run.\n"
                             "  never include -- keep LEMMY out this "
                             "run.\n\n"
-                            "'always' / 'never' consume one of the "
-                            "num_characters slots, exactly as a natural "
-                            "roll does."
+                            "'always' consumes one of the num_characters "
+                            "slots, exactly as a natural roll does; "
+                            "'never' leaves every slot to the cast."
                         ),
                     },
                 ),
@@ -3794,9 +3794,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # shape.
         #
         # THE NORMAL ANSWER IS "no vendored scene" AND IT IS NOT A FAILURE.
-        # Four scenes are vendored out of ninety-eight cells; everything else
-        # keeps the model translation that already ships, per scene, per
-        # language. A miss never costs an episode.
+        # Forty-three scenes are vendored today (six languages; read the
+        # manifest rather than this number); everything else keeps the model
+        # translation that already ships, per scene, per language. A miss
+        # never costs an episode.
         _vendored_row = None
         if _verbatim_plan is not None and _EPLANG.native_authoring_instruction(meta):
             try:

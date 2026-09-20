@@ -294,7 +294,7 @@ and is **not** part of a Manager install. Nothing in this file depends on it.
 
 ### The story
 
-Five source banks roll automatically; a sixth takes your own premise. Each bank is
+Six source banks roll automatically -- My Story among them, writing the standing premise when you leave its fields blank; a seventh dropdown row, `custom_source_bank`, is the signpost for adding your own. Each bank is
 independent -- its own story pack, its own fetch -- and each fails closed: a bad
 source, a context overflow or a broken contract stops the run rather than shipping
 a degraded story. The language model writes every line of prose; Python validates,
@@ -305,7 +305,7 @@ it never rewrites.
 | `scifi_news_pro` | A live science feed, turned into science-fiction radio. |
 | `media_archive` | Media RSS and archive items, turned into restoration-adventure episodes. |
 | `public_domain` | A faithful radio adaptation of a public-domain source text. |
-| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
+| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. In another language it performs a real translator's public-domain text when the corpus holds that scene (43 scenes across Spanish, French, Italian, Portuguese, Japanese and Mandarin), and otherwise the writer model's translation of the selected passage, which the ledger records as such. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
 | `original` | No source at all: original fiction seeded from an entropy draw. |
 | `my_story` | Your idea, characters, plot and setting. Rolled like any other bank; a blank run writes the standing premise that ships with the pack. |
 

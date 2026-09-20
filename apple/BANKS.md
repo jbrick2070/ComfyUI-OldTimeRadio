@@ -18,7 +18,7 @@ lane", because a roll will land somewhere else four times out of five.
 | Bank | What it makes | Where the material comes from |
 |---|---|---|
 | **Sci-Fi News Pro** `scifi_news_pro` | Science-fiction audio drama | A science news article, pulled live over RSS |
-| **Shakespeare / Folger** `shakespeare` | Shakespeare radio adaptation | A scene from the Folger texts |
+| **Shakespeare / Folger** `shakespeare` | Shakespeare radio adaptation | A scene from the Folger texts in English; in another language, a vendored public-domain translator's text when the corpus holds the scene |
 | **Public Domain** `public_domain` | Public-domain radio adaptation | A public-domain source text |
 | **Media RSS / Archive** `media_archive` | Archive-*inspired* radio drama -- invented, not adapted | An archive / media-history item, pulled live over RSS |
 | **My Story** `my_story` | A radio drama from your idea | The four **My Story** boxes on the writer node |

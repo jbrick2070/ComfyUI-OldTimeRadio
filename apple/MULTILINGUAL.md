@@ -121,10 +121,14 @@ Every source bank works on every language row.
   an English draft. A My Story prompt typed in English still yields a native
   episode; SciFi News Pro keeps its news source as published and writes the new
   story natively.
-- `shakespeare` performs its passage TRANSLATED: the selected passage is
-  translated once, in order, speakers and cut unchanged, and then performed
-  verbatim exactly as the English lane performs Folger's text. The ledger's
-  `verbatim_passage.translation` receipt carries both hashes.
+- `shakespeare` performs its passage from a real translator's public-domain
+  text when the corpus holds that scene (43 scenes in six languages under
+  `config/source_banks/shakespeare/translations`; the ledger's
+  `verbatim_passage.vendored` receipt names the translator, the year and the
+  text's hash). Otherwise it performs the passage TRANSLATED: the selected
+  passage is translated once, in order, speakers and cut unchanged, and then
+  performed verbatim exactly as the English lane performs Folger's text. The
+  ledger's `verbatim_passage.translation` receipt carries both hashes.
 - `public_domain` adapts natively through the same writer seams.
 - The announcer's spoken credit line (the source acknowledgement, and the My
   Story attribution) is authored per row in `config/episode_languages.json`
