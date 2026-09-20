@@ -347,6 +347,77 @@ def test_a_split_heading_rejoins_through_the_printer_s_trailing_stop():
     assert join("ACTO\nprimeiro que tudo .") == "ACTO\nprimeiro que tudo ."
 
 
+def test_the_identity_of_an_edge_row_is_its_title():
+    """The coordinate reader joins a running head into ONE row, and the
+    1914 Tempestade prints a three-part head: `SCENA II A TEMPESTADE 9` on
+    the recto, `10 A TEMPESTADE ACTO I` on the verso. A rule that peels only
+    the folio leaves a string that starts with a heading word and is barred
+    from the vote -- measured, 38 of them inside act 1 scene 2's dialogue.
+    Folio and heading are decoration; the title is the identity. A leading
+    article is peeled too, because the scanner drops the `A` on a third of
+    the pages and two spellings of one title are two keys.
+    """
+    scan = _scan()
+    parts = scan._edge_folio_parts
+    assert parts("SCENA II A TEMPESTADE 9") == ("TEMPESTADE", True)
+    assert parts("10 A TEMPESTADE ACTO I") == ("TEMPESTADE", True)
+    assert parts("98 A TEMPESTADE ACTO 111") == ("TEMPESTADE", True)   # OCR III
+    assert parts("A TEMPESTADE") == ("TEMPESTADE", False)     # plain line, same key
+    assert parts("8 REI LEAR") == ("REI LEAR", True)
+    # what must NOT change
+    assert parts("ACTO 1") == ("ACTO 1", False)               # a heading's own numeral
+    assert parts("MACBETH") == ("MACBETH", False)
+    assert parts("Fala numero 12") == ("Fala numero 12", False)   # prose stays prose
+
+
+def test_a_heading_is_peeled_only_when_a_title_is_left():
+    """THE 1912 MACBETH'S OLDEST HAZARD, RE-ENTERED FROM A NEW SIDE.
+
+    Its recto head is two headings and a folio on one row, `ACTO I- SCENA
+    III 17`. Peeling the scene half left `ACTO I-`, which qualified for the
+    act-line FREE branch of the walk -- the one that spends no budget -- so
+    the walk carried on into the page and spent the budget on the first
+    `MACBETH` it met, which was the speaker. It cost a label in a shipped
+    scene before this guard existed. A peel that leaves another heading is
+    not a peel.
+
+    The proof that this holds on the book itself is not a fixture: both
+    vendored Domingos Ramos scenes re-extract BYTE FOR BYTE under the
+    coordinate reader after the rule landed, where the unguarded peel had
+    cost Macbeth one label. A synthetic page cannot stand in for that --
+    repeat the same dialogue on every page and the floor makes all of it
+    furniture -- so this test pins the identity and the commit cites the
+    measurement.
+    """
+    scan = _scan()
+    for head in ("ACTO I- SCENA III 17", "ACTO II - SCENA III 9", "ACTO I, SCENA II."):
+        identity, _ = scan._edge_folio_parts(head)
+        assert scan._HEADING_SHAPED.match(identity), (head, identity)
+        assert not identity.rstrip(" -,").endswith(("I-", "ACTO I", "ACTO II")), (head, identity)
+
+
+def test_a_three_part_running_head_is_stripped_and_the_speaker_below_it_is_not():
+    """The Tempestade band, end to end, on both page sides."""
+    scan = _scan()
+    pages = []
+    for n in range(9, 45):
+        head = ("SCENA II A TEMPESTADE %d" % n) if n % 2 else ("%d A TEMPESTADE ACTO I" % n)
+        pages.append("%s\nMIRANDA\nFala %d.\nPRÓSPERO\nResposta." % (head, n))
+    for n, page in enumerate(scan.strip_running_titles(pages), 9):
+        kept = [l for l in page.splitlines() if l.strip()]
+        assert "TEMPESTADE" not in page, (n, kept[:2])
+        assert kept and kept[0] == "MIRANDA", (n, kept[:2])
+
+
+def test_a_folio_may_carry_the_printers_stop_and_a_comma_may_join_the_headings():
+    scan = _scan()
+    assert scan._FOLIO.match("198 .")
+    assert scan._FOLIO.match("17")
+    assert not scan._FOLIO.match("198 . Cual nunca")
+    for head in ("ACTO I, SCENA II.", "ACTO I,SCENA II .", "ACTO I - SCENA III 17"):
+        assert scan._RUNNING_HEADER.match(head), head
+
+
 def test_a_swallowed_label_has_a_shape_and_the_write_refuses_it():
     """NOT A FURNITURE RULE -- the write gate of the same script.
 

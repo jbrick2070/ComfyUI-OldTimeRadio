@@ -111,9 +111,13 @@ _CAPS_RUN = re.compile(
     r"(?![a-zà-ɏ])")
 
 #: Running headers and folio numbers repeat on every page and are all-caps.
+#: The separator between act and scene is the printer's: a dash in the 1912
+#: Macbeth (`ACTO I - SCENA III`), a comma in the 1914 Tempestade
+#: (`ACTO I, SCENA II.`, `ACTO I,SCENA II .`). Measured: the comma form
+#: survived into act 1 scene 2's span twice under the coordinate reader.
 _RUNNING_HEADER = re.compile(
-    r"(?im)^.{0,6}(?:ACTO|ATTO|ACT)\s+[IVXLC]+\s*-?\s*"
-    r"(?:SCENA|ESCENA|SCENE)\s+[IVXLC]+\s*\d*\s*$")
+    r"(?im)^.{0,6}(?:ACTO|ATTO|ACT)\s+[IVXLC]+\s*[-,]?\s*"
+    r"(?:SCENA|ESCENA|SCENE)\s+[IVXLC]+\s*[.,]?\s*\d*\s*$")
 
 #: An act heading standing alone on a line -- the shape a recto running head
 #: takes in these volumes. Scene headings are deliberately NOT included; see
@@ -572,22 +576,97 @@ def clean_label(token: str) -> str:
 
 
 
+#: A heading token that may sit BESIDE a running title on one printed row --
+#: `SCENA II A TEMPESTADE 9`, `10 A TEMPESTADE ACTO I`. The word, a numeral
+#: or spelled ordinal, an optional stop. Used only to peel the identity of an
+#: edge row down to its title; never to find a scene.
+_HEADING_TOKEN = (r"(?:ACTO|ATTO|ACT|SCENA|ESCENA|SCENE)\s*"
+                  r"(?:[IVXLC]{1,6}|\d{1,3}|PRIMEIR[OA]|SEGUND[OA]|TERCEIR[OA]|"
+                  r"QUART[OA]|QUINT[OA]|PRIMER[OA]|SEGUNDO|TERCERO|CUARTO|QUINTO)"
+                  r"\s*[.,]?")
+_LEADING_HEADING = re.compile(r"^" + _HEADING_TOKEN + r"\s+(?P<rest>.+)$", re.I)
+_TRAILING_HEADING = re.compile(r"^(?P<rest>.+?)[\s,]+" + _HEADING_TOKEN + r"$", re.I)
+
+
 def _edge_folio_parts(text):
-    """Comparison identity only: never alter a page's line topology."""
+    """Comparison identity only: never alter a page's line topology.
+
+    THE IDENTITY OF AN EDGE ROW IS ITS TITLE. A folio is decoration and so is
+    a heading printed beside it. The 1919 Rei Lear sets `8 / REI LEAR` on two
+    lines and the flat reader kept them apart, so the pair test rejoined them;
+    the coordinate reader sets them on ONE row, `8 REI LEAR`, and this peels
+    the folio off so the row still votes and matches as `REI LEAR`.
+
+    THE 1914 TEMPESTADE PRINTS A THREE-PART HEAD, and that is why the heading
+    is peeled too. Its recto reads `SCENA II A TEMPESTADE 9` and its verso
+    `10 A TEMPESTADE ACTO I`, every page. Under the coordinate reader each
+    arrives as one row, and a rule that peels only the folio leaves
+    `SCENA II A TEMPESTADE`, which starts with a heading word and is
+    therefore barred from the running-title vote -- correctly, for a bare
+    heading; wrongly here. Measured: with the folio-only rule, ZERO running
+    heads were stripped on that volume and 38 of them sat inside act 1 scene
+    2's dialogue, 8 inside act 3 scene 1's. The fix is to keep peeling: a
+    heading token on either end comes off as well, as long as an upper-case
+    title is left standing. `SCENA II` alone has nothing left and is not
+    touched, which is what keeps a real scene heading findable.
+
+    A LEADING ARTICLE IS PEELED FOR THE SAME REASON. The scanner drops the `A`
+    of `A TEMPESTADE` on about a third of its pages, and two spellings of one
+    title are two keys, each of which may miss the floor on its own. One- or
+    two-letter leading words are stripped when a longer title follows, so
+    `A TEMPESTADE` and `TEMPESTADE` vote and match as one. The line itself is
+    never altered by any of this.
+    """
     text = text.strip()
-    hit = re.fullmatch(r"([0-9]{1,3})\s+(.+)", text)
-    if hit:
-        folio, title = hit.groups()
-    else:
-        hit = re.fullmatch(r"(.+?)\s+([0-9]{1,3})", text)
-        if not hit:
+    title, folio_attached, peeled = text, False, False
+    for _ in range(3):
+        before = title
+        hit = re.fullmatch(r"([0-9]{1,3})\s*[.,]?\s+(.+)", title)
+        if hit:
+            title, folio_attached = hit.group(2), True
+        else:
+            hit = re.fullmatch(r"(.+?)\s+([0-9]{1,3})\s*[.,]?", title)
+            if hit:
+                title, folio_attached = hit.group(1), True
+        # `ACTO 1` IS A HEADING, NOT A TITLE PLUS A FOLIO. A bare heading word
+        # left after peeling means the numeral was the heading's own.
+        if title.strip(" .,:;").upper() in {"ACTO", "ATTO", "ACT", "SCENA", "ESCENA", "SCENE"}:
             return text, False
-        title, folio = hit.groups()
-    if title.strip(" .,:;").upper() in {"ACTO", "ATTO", "ACT", "SCENA", "ESCENA", "SCENE"}:
-        return text, False
+        # A HEADING COMES OFF ONLY WHEN A TITLE IS LEFT. `ACTO I- SCENA III`
+        # is two headings and no title, and peeling its scene half left
+        # `ACTO I-`, which qualified for the act-line FREE branch of the
+        # walk -- the one that spends no budget -- so the walk carried on
+        # into the page and spent the budget on the first `MACBETH` it met,
+        # which was the speaker. That is the 1912 Macbeth's oldest hazard,
+        # re-entered from a new side; it cost a label in a shipped scene
+        # before this guard existed. What remains after a peel must not be
+        # heading-shaped, or the peel does not happen.
+        lead = _LEADING_HEADING.match(title)
+        if lead and lead.group("rest").strip() \
+                and not _HEADING_SHAPED.match(lead.group("rest").strip()):
+            title, peeled = lead.group("rest"), True
+        trail = _TRAILING_HEADING.match(title)
+        if trail and trail.group("rest").strip() \
+                and not _HEADING_SHAPED.match(trail.group("rest").strip()):
+            title, peeled = trail.group("rest"), True
+        if title == before:
+            break
+    if not (folio_attached or peeled):
+        # NOTHING WAS ATTACHED. Prose is left exactly as it is, so the pair
+        # test and every earlier rule see the line they always saw. Only an
+        # all-caps line is normalised, and only so that it votes and matches
+        # under the same key as its joined forms on other pages.
+        if not text.isupper():
+            return text, False
+        title = text
+    title = title.strip(" .,:;")
     if not (title.isupper() or _HEADING_SHAPED.match(title)):
         return text, False
-    return title.strip(), True
+    if title.isupper():
+        article = re.match(r"^[A-ZÀ-Þ]{1,2}\s+(?P<rest>[A-ZÀ-Þ].{2,})$", title)
+        if article:
+            title = article.group("rest").strip()
+    return title, folio_attached
 
 def running_titles(pages: list[str]) -> set[str]:
     """Short lines that repeat across the volume: the book's own furniture.
@@ -647,7 +726,12 @@ def running_titles(pages: list[str]) -> set[str]:
 #: glued onto the label behind it, arriving as `III MACBETH` and costing Macbeth
 #: a speech. Both kinds of number are furniture in this position and neither is
 #: ever a line of dialogue.
-_FOLIO = re.compile(r"^(?:\d{1,3}|[IVXLC]{1,6})$")
+#: THE FOLIO MAY CARRY THE PRINTER'S STOP. Clark sets `198 .` and the
+#: coordinate reader keeps the number and its period on one row; an
+#: end-anchored bare numeral let that row through into Much Ado 3.1's
+#: dialogue (measured: the one furniture leak in that cell). Same widening
+#: the split-heading rejoin needed, for the same reason.
+_FOLIO = re.compile(r"^(?:\d{1,3}|[IVXLC]{1,6})\s*[.,]?$")
 _EDGE_DEPTH = 3
 
 #: A page holding no more than this many lines is the page ANNOUNCING something
