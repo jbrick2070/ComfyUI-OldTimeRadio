@@ -16,7 +16,7 @@ is below with a grep receipt.
 | `84a1fbc8` | `.gitignore`; 171 `*.log` under `docs/` and `kibitz-runs/`; `tmp/GPT_SHAKESPEARE_HUNT_3_RESULTS_VERIFIED.md` | Tracked scratch by shape. Already ignored (`*.log`, `/tmp/`) and still in the index. `git rm --cached`. Added `*.bak` and `*.orig` so those shapes cannot return. Did not touch `config/`, `nodes/`, `workflows/`, `tests/`, or `scripts/`. |
 | `03e4b1f6` | `.gitignore` | `.comfyignore` already drops `.claude/` from the registry zip (agent exhaust). Now gitignored too. |
 | `94a5a98a` | `nodes/_otr_line_composer.py` | `WORK_LINE_PREFIX` -- English leftover after the prefix moved to `spoken_chrome` / `config/episode_languages.json`. Grep hits: definition only. No ruling, inventory, or `PROD_BUG_LOG` names it. Wiring it back would re-pin English on every language. Tests that import the module: 412 passed, 1 skipped in 8.92s (20 modules). |
-| `REPORT_HASH` | `docs/2026-09-20-closeout/CLEANUP_PROPOSALS.md` | This receipt. Force-added because `docs/2026-*/` is already gitignored. |
+| `a1057d23` | `docs/2026-09-20-closeout/CLEANUP_PROPOSALS.md` | This receipt. Force-added because `docs/2026-*/` is already gitignored. |
 
 ## Proposed, not done
 
