@@ -72,3 +72,17 @@ So the ship condition stands as written above, with fourteen explained
 rather than twelve: ten cannot reach a shipped still-lane episode, two (#2,
 #11) deserve one look before the version string burns, #13 is a sweep that
 wants an owner, and the pair in #14 is variance to watch, not a regression.
+
+## Closed after the close-out audit (2026-09-20, Composer 2.5 lane)
+
+* **#11 FIXED** -- `cast_lock._stamp` cleared the Lemmy writer-stage bark
+  preset on a provisional (audition) stamp; the clear now skips
+  `fallback == "provisional_route"`. Both the Lime test and the Lemmy test
+  pass. This was the one of the fourteen that could reach a shipped episode.
+* **#2 FIXED** -- the replay test passed the engine positionally into
+  `generate(self, script_json, ledger_json="", ...)`; a stale test, not the
+  code.
+* **#9 FIXED** -- the HF-offline stub takes `**kwargs` through.
+* **#12 unchanged** -- the audition wavs the receipt names are not on this
+  box; environmental.
+* Remaining, unchanged: #1, #3-#8, #10, #12-#14 as classified above.
