@@ -780,10 +780,16 @@ def find_label(lines, label):
     if not want:
         return -1
     for i, line in enumerate(lines):
-        if _fold(line).strip().rstrip(".") == want:
+        text = line
+        m = re.match(r"^\d{1,3}\s+(.+)", text)
+        if m: text = m.group(1)
+        if _fold(text).strip().rstrip(".") == want:
             return i
     for i, line in enumerate(lines):          # tolerate trailing chrome
-        folded = _fold(line).strip()
+        text = line
+        m = re.match(r"^\d{1,3}\s+(.+)", text)
+        if m: text = m.group(1)
+        folded = _fold(text).strip()
         if not folded.startswith(want):
             continue
         rest = folded[len(want):]
