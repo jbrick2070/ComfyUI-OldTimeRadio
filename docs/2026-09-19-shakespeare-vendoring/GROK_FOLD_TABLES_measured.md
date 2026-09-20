@@ -1,5 +1,38 @@
 # Fold tables for the eight Spanish scan cells -- MEASURED (Grok, 2026-09-19)
 
+> **IMAGE VERDICTS, SECOND PASS (Grok, same day, crops in `%TEMP%\otr_p7_fold\crops`).**
+> Every one-occurrence fold below was checked against the rendered page under
+> the ruling's asymmetry: an unbound label costs a voice, a wrong fold costs a
+> speech in the wrong mouth. Three changes to the tables that follow:
+>
+> * **`Per` -> HERMIA, not DEMETRIO** (midsummer 3.2, Macpherson p.424). The
+>   ink is `HER.` -- Hermia asking Demetrius for Lysander. The table had it
+>   as a Demetrius fold; that would have put her speech in his mouth.
+> * **DEMOTED TO UNBOUND** -- ship raw, do not fold: `REQ` (Lear 1.1 p.254,
+>   ink `Reo`/`Reg`, does not settle); `Hek` (midsummer 3.2 p.424, ink is
+>   `Hek` not `HER`, and `clean_label` would collide it with the confirmed
+>   `HEK` row); `DER` (midsummer 3.2 p.432, ink is `DER` not `DEM`, body is
+>   Helena's stature speech).
+> * **`Min` is NO LONGER the weak row.** Clark Tempest p.61 prints `MIR.` on
+>   "Mi indignidad: hacer oferta no oso." The photograph settles what the
+>   alternation argued. `Mır` likewise: U+0131 is a dotted `i` on the page.
+>
+> Confirmed by ink, so folded: `LENT`->KENT, `Gov`->GON, `Dorg`->BORG,
+> `Boar`/`BORA`->BORR, `Han`/`Ham`->HAM, `Tr`->TIT, `Chi`->CHI, `Blen`->ELEN,
+> `HEK`/`Hør`/`UER`->HER, `Lrs`/`Los`->LIS, `Prck`/`Pock`->PUCK, `Der`/`DEN`/
+> `Den`->DEM, `Bur`->BUF (x4), `MAJ`->MAL, `Max`->MAR, `Pes`/`ÞED`->D. PED.
+>
+> **Expected output per cell after these changes** (the golden numbers the
+> emitter is checked against; NOT what today's discard-and-merge extractor
+> produces): Lear 1.1 = 80 speeches, unbound `ALB . Y CORN`, `REQ`;
+> midsummer 3.1 = 65, unbound `AJUS`, `TISBE`, `TisbE`, `Pla`, `Pir`, `PIR`;
+> midsummer 3.2 = 103 (HERMIA 18, DEMETRIUS 20), unbound `Hek`, `DER`;
+> tempest 3.1 = 24; twelfth_night 1.5 = 116; twelfth_night 2.5 = 82;
+> much_ado 2.3 = 78; much_ado 3.1 = 15; the last five carry no unbound row.
+> An unbound label ships RAW, never through `clean_label`; a known fold
+> carries both `spoken` and `roster` (so `D . PED` -> PRINCE/PRINCE). What
+> would overturn any of this: a sharper crop of `DER .` on p.432.
+
 Read-only measurement, coordinate reader (`0b35b419`), the eight official
 page windows. Spoken names are the edition's own PERSONAJES; roster targets
 are the English sidecar `name` fields exactly. `*` marks a one-occurrence
