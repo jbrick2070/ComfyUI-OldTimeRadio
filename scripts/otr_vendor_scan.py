@@ -180,7 +180,28 @@ def fold(text: str) -> str:
 #: A word broken across a printed line. Rejoined, because the hyphen is the
 #: typesetter's and not the translator's -- `por-\ntos` is `portos`, one word,
 #: and a voice engine handed the hyphen reads two.
-_LINE_BREAK_HYPHEN = re.compile(r"(\w)[-‐‑]\s*\n\s*(\w)")
+#:
+#: THE CONTINUATION MUST BE LOWER-CASE, AND THAT GUARD IS THE WHOLE RULE. A
+#: typesetter breaks a word in its middle, so what follows the hyphen is always
+#: the rest of a word. What ELSE can follow it is the next SPEAKER LABEL, when
+#: the break happens to fall on the last line before one -- and rejoining there
+#: destroys both of them at once. Measured in the shipped 1912 Macbeth, which
+#: prints
+#:
+#:     MACBETH
+#:     Nunca vi assim um dia tão bello e tão horri-
+#:     BANQUO
+#:     Que distancia fazem d'aqui a Forres ? ...
+#:
+#: and arrived in the corpus as the single token `horriBANQUO`: Banquo's label
+#: was eaten, so his opening speech was filed under MACBETH, and the nonsense
+#: word was left for a voice engine to read aloud. Requiring a lower-case
+#: continuation refuses that join and leaves the label standing. It also
+#: declines to weld a numbered label (`horri-` over `1.ª FEITICEIRA`) and
+#: declines to swallow the author's own hyphen in a compound broken at its
+#: hyphen (`Anglo-` over `Saxão`), both of which are the right answer for the
+#: same reason: only a lower-case run is the rest of a word.
+_LINE_BREAK_HYPHEN = re.compile(r"(\w)[-‐‑]\s*\n\s*([a-zà-ɏ])")
 
 
 def pdf_text(url: str) -> list[str]:

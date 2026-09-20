@@ -1578,12 +1578,12 @@
       "translation_first_published": 1912,
       "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
       "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/50/William_Shakespeare_-_Macbeth_%28trad._Domingos_Ramos%2C_1912%29.pdf",
-      "revision_id": "sha256:134f2892062c1d4e",
-      "raw_sha256": "134f2892062c1d4e133d6512765c9bb0e6a0fc96229d344f530f034a09bc93f9",
+      "revision_id": "sha256:44e3aac342d82d23",
+      "raw_sha256": "44e3aac342d82d2390c519ea6b07c39093b34cf3b2def4e1ff17c3acd5678b75",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO PRIMEIRO / SCENA III",
-      "speaker_labels": 47,
+      "speaker_labels": 48,
       "distinct_speakers": 8,
       "speaker_map": {
         "1.ª FEITICEIRA": {

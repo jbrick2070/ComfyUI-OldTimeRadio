@@ -180,6 +180,53 @@ def test_known_limit_a_speaker_parked_in_the_edge_band_reads_as_furniture():
         "this test and say so; if it changed by accident, find out why")
 
 
+def test_a_broken_word_is_rejoined_only_onto_a_lower_case_continuation():
+    """NOT A FURNITURE RULE -- a page-text rule of the same script.
+
+    The 1912 Macbeth breaks a word on the last line before a speaker label:
+
+        Nunca vi assim um dia tao bello e tao horri-
+        BANQUO
+        Que distancia fazem d'aqui a Forres ? ...
+
+    The rejoin welded the two into `horriBANQUO`, which ate Banquo's label --
+    filing his opening speech under MACBETH -- and left a nonsense word in the
+    corpus for a voice engine to read aloud. It shipped that way, at
+    `alignment_confidence: 1.0`, and no count could see it.
+
+    A typesetter breaks a word in its middle, so a genuine continuation is
+    always lower-case. That is the whole guard.
+    """
+    scan = _scan()
+    join = lambda text: scan._LINE_BREAK_HYPHEN.sub(r"\1\2", text)
+
+    # the case the rule exists for, and still does
+    assert join("por-\ntos") == "portos"
+    assert join("esta-\nrem sobre ella") == "estarem sobre ella"
+
+    # the case that shipped a defect
+    assert join("tao horri-\nBANQUO") == "tao horri-\nBANQUO"
+    # a numbered label is refused for the same reason
+    assert join("tao horri-\n1.a FEITICEIRA") == "tao horri-\n1.a FEITICEIRA"
+    # and the author's own hyphen in a compound is left alone
+    assert join("Anglo-\nSaxao") == "Anglo-\nSaxao"
+
+
+def test_the_rejoin_is_applied_where_the_pages_are_read():
+    """A regex nothing calls is not a rule. Assert the real call site.
+
+    The test above proves the pattern; only this proves that `pdf_text` is
+    what applies it, which is the difference between a fixed corpus and a
+    fixed constant.
+    """
+    import inspect
+    scan = _scan()
+    source = inspect.getsource(scan.pdf_text)
+    assert "_LINE_BREAK_HYPHEN.sub" in source, (
+        "pdf_text no longer rejoins broken words; the corpus will carry the "
+        "typesetter's hyphens into a voice engine")
+
+
 def test_known_limit_the_head_band_is_read_first_when_the_two_overlap():
     """One band, one title -- and on a short page the head edge claims it.
 
