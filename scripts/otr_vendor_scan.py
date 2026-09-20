@@ -219,7 +219,7 @@ def fold(text: str) -> str:
 _LINE_BREAK_HYPHEN = re.compile(r"(\w)[-‐‑]\s*\n\s*([a-zà-ɏ])")
 
 
-def pdf_text(url: str) -> list[str]:
+def pdf_text(url: str, reading_order: str = "flat") -> list[str]:
     """Every page's text layer, cached by url. Returns one string per page.
 
     PYMUPDF, NOT PYPDF, AND THE DIFFERENCE IS THE WHOLE LANE. Both read this
@@ -245,10 +245,179 @@ def pdf_text(url: str) -> list[str]:
     out = []
     for page in doc:
         try:
-            out.append(_LINE_BREAK_HYPHEN.sub(r"\1\2", page.get_text() or ""))
+            if reading_order == "coordinates":
+                text = "\n".join(rows_from_coordinates(page))
+                # SAY WHERE THE ORDER CANNOT BE TRUSTED. A word whose own
+                # glyphs straddle two printed rows carries two speakers, and
+                # no reordering of intact words repairs it -- so the page is
+                # named here rather than silently shipped.
+                welded = fused_words(page)
+                if welded:
+                    print("[scan] page %d has %d word(s) welded across a row "
+                          "boundary; speakers there are not trustworthy: %s"
+                          % (page.number, len(welded), ", ".join(welded[:4])))
+            else:
+                text = page.get_text() or ""
+            out.append(_LINE_BREAK_HYPHEN.sub(r"\1\2", text))
         except Exception:                      # noqa: BLE001 - a bad page is empty
             out.append("")
     doc.close()
+    return out
+
+
+#: A ROW IS A BASELINE, NOT A BOUNDING BOX. Measured on the Clark Tempest's
+#: four scene pages: clustering on `y0` splits 73 image-verified printed rows,
+#: because a comma and a capital do not share a box top. Clustering on the
+#: MEDIAN CHARACTER BASELINE splits none and merges none.
+_ROW_BASELINE_SPAN = 3.0
+
+#: A word whose own characters jump further than this is not one word: the
+#: extractor fused the end of one printed row onto the start of the next.
+#: Measured example, Clark Otelo page 176: `ramera.Mátame,` carries Othello's
+#: `ramera.` and Desdemona's `Mátame,` in a single token, with a 7.6 point
+#: baseline jump inside it. NOTHING that reorders intact words can repair that,
+#: so it is REPORTED rather than silently reordered -- see `fused_words`.
+_FUSED_WORD_JUMP = 4.5
+
+
+def _word_baseline(word_block) -> float:
+    """The median baseline of a word's characters, or None if it has none."""
+    origins = [ch["origin"][1] for span in word_block.get("spans", ())
+               for ch in span.get("chars", ())]
+    if not origins:
+        return None
+    origins.sort()
+    return origins[len(origins) // 2]
+
+
+def rows_from_coordinates(page) -> list[str]:
+    """The page's printed rows, in reading order, rebuilt from glyph positions.
+
+    WHY THIS EXISTS AT ALL. `page.get_text()` does not return the printed
+    order. On Clark page 59 the marginal cues `MIR.` and `FER.` are emitted at
+    the BOTTOM of the page, detached from the lines they label, so Prospero
+    absorbs two speeches that are not his. On page 36 of the 1912 Macbeth --
+    a scene this repo already vendored -- the syllable `vel!` is thrown to the
+    TOP of the page and lands inside the witches' speech, which is how
+    `horrível` came to be broken and Banquo's opening speech came to be filed
+    under Macbeth. A speaker label moved away from its dialogue cannot be
+    matched by any table of names, so reading order is upstream of every other
+    rule in this file.
+
+    THE RULE, AND EVERY PART OF IT WAS MEASURED RATHER THAN CHOSEN. Take each
+    word's MEDIAN CHARACTER BASELINE; sort by baseline then by x; open a row at
+    the first word and keep adding while the baseline stays within
+    `_ROW_BASELINE_SPAN` OF THE ROW'S FIRST BASELINE -- never of the previous
+    word, because chaining near-neighbours walks a row down the page one small
+    step at a time. On the Clark Tempest's four scene pages this splits zero
+    printed rows and merges zero; the widest row spans 2.4 points and the
+    closest neighbouring rows sit 5.4 apart.
+
+    WHAT IT IS NOT. It is not certified across every volume, and the
+    measurements say so plainly: a hanging cue on Clark page 133 sits 3.29
+    points off its dialogue, page 182 has another at 3.12, and the Macpherson
+    volume carries six pages of rotated tables. It is therefore OPT-IN --
+    `reading_order="coordinates"` -- and the flattened path remains the
+    default until a volume is proven. Do not flip the default globally; prove
+    a volume and pin it.
+
+    A PDF "LINE" IS NOT A PRINTED ROW EITHER, which is why this works on words
+    rather than on `get_text("dict")` lines: Clark page 42 puts Alonso's speech
+    and Sebastian's reply in one PDF line whose word baselines are 177.6 and
+    185.5 apart.
+    """
+    words = []
+    index = _baseline_index(page)
+    for x0, y0, x1, y1, text, *_ in page.get_text("words"):
+        # THE WORD UNITS ARE PYMUPDF'S OWN, NOT A RE-SPLIT OF THE GLYPHS.
+        # Re-splitting a span on its whitespace looks equivalent and is not:
+        # the raw layer carries a space the rendered text does not, so
+        # `SHAKSPEARE.` came back as `SHAKSPEARE .` and a token that every
+        # downstream rule matches on exactly was quietly changed. Measured,
+        # that broke word conservation on 180 of the Clark volume's 204 pages.
+        # Taking the tokens from `words` and only the BASELINE from the raw
+        # layer changes the ORDER of the page and nothing else.
+        baseline = _word_baseline_from(index, x0, y0, x1, y1)
+        words.append((baseline if baseline is not None else (y0 + y1) / 2.0,
+                      x0, text))
+    words.sort(key=lambda w: (w[0], w[1]))
+    rows, row, anchor = [], [], None
+    for baseline, x, text in words:
+        if anchor is None or baseline - anchor <= _ROW_BASELINE_SPAN:
+            anchor = baseline if anchor is None else anchor
+            row.append((x, text))
+        else:
+            rows.append(" ".join(t for _, t in sorted(row)))
+            row, anchor = [(x, text)], baseline
+    if row:
+        rows.append(" ".join(t for _, t in sorted(row)))
+    return rows
+
+
+def _baseline_index(page) -> dict:
+    """``{int(y): [(x, baseline)]}`` for every glyph origin on the page.
+
+    JOINED BY GEOMETRY, NOT BY INDEX, AND THAT IS DELIBERATE. The obvious join
+    is `page.get_text("words")`'s own block and line numbers against the raw
+    layer's blocks and lines. They do not agree: on Clark page 59 the words
+    start at block 0 while the raw blocks start at 1, because the two
+    disagree about whether a non-text block occupies a number. Measured, that
+    mismatch sent 156 of 254 words to the bounding-box fallback -- the very
+    metric this function exists to avoid -- and quietly split the page into 51
+    rows where it has 38. A geometric join cannot drift with a PyMuPDF
+    version, so it is the one used.
+    """
+    index = {}
+    for block in page.get_text("rawdict").get("blocks", ()):
+        for line in block.get("lines", ()):
+            for span in line.get("spans", ()):
+                for ch in span.get("chars", ()):
+                    if ch.get("c", "").isspace():
+                        continue
+                    x, y = ch["origin"]
+                    index.setdefault(int(y), []).append((x, y))
+    return index
+
+
+def _word_baseline_from(index, x0, y0, x1, y1) -> float | None:
+    """The median glyph baseline inside a word's box, or None if it has none."""
+    found = []
+    for bucket in range(int(y0) - 1, int(y1) + 2):
+        for x, y in index.get(bucket, ()):
+            if x0 - 0.5 <= x <= x1 + 0.5 and y0 - 1.0 <= y <= y1 + 1.0:
+                found.append(y)
+    return _median(found) if found else None
+
+
+def _median(values) -> float:
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2]
+
+
+def fused_words(page) -> list[str]:
+    """Words whose own characters straddle two printed rows.
+
+    REPORTED, NEVER REPAIRED HERE. `ramera.Mátame,` on Clark Otelo page 176 is
+    Othello's word welded to Desdemona's, and splitting it is a decision about
+    whose speech a fragment belongs to -- which is the one judgement this lane
+    refuses to make silently. A caller that sees these knows the page needs a
+    human or an image check before its speakers can be trusted.
+    """
+    out = []
+    for block in page.get_text("rawdict").get("blocks", ()):
+        for line in block.get("lines", ()):
+            for span in line.get("spans", ()):
+                chars, run = span.get("chars", ()), []
+                for ch in chars:
+                    if ch.get("c", "").isspace():
+                        run = []
+                        continue
+                    run.append(ch)
+                    if len(run) > 1:
+                        jump = abs(run[-1]["origin"][1] - run[-2]["origin"][1])
+                        if jump > _FUSED_WORD_JUMP:
+                            out.append("".join(c["c"] for c in run))
+                            run = []
     return out
 
 

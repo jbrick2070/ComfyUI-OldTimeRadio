@@ -212,6 +212,79 @@ def test_a_broken_word_is_rejoined_only_onto_a_lower_case_continuation():
     assert join("Anglo-\nSaxao") == "Anglo-\nSaxao"
 
 
+def _one_page_pdf(placements):
+    """A real one-page PDF with text at exact positions. Returns a page.
+
+    Built rather than fixtured because the rule under test is geometric: it
+    only means anything against real glyph origins.
+    """
+    pymupdf = pytest.importorskip("pymupdf")
+    doc = pymupdf.open()
+    page = doc.new_page(width=400, height=300)
+    for x, y, text in placements:
+        page.insert_text((x, y), text, fontsize=10)
+    # reopen from bytes so the page carries a parsed text layer
+    reopened = pymupdf.open("pdf", doc.tobytes())
+    doc.close()
+    return reopened, reopened[0]
+
+
+def test_a_hanging_cue_joins_the_row_it_labels_not_the_page_bottom():
+    """The whole reason the coordinate reader exists.
+
+    A speaker label is printed in the margin, to the LEFT of the first line of
+    its speech and on the same baseline. `page.get_text()` does not
+    necessarily emit it there -- on Clark page 59 it emits the marginal cues
+    at the BOTTOM of the page, detached from their dialogue, so the previous
+    speaker absorbs two speeches that are not his. Rebuilt from baselines, the
+    cue leads its own row.
+    """
+    scan = _scan()
+    doc, page = _one_page_pdf([
+        (30, 100, "MIR."), (80, 100, "Se me antoja"),
+        (30, 120, "FER."), (80, 120, "No, mi noble duena"),
+    ])
+    rows = scan.rows_from_coordinates(page)
+    doc.close()
+    assert rows[0] == "MIR. Se me antoja", rows
+    assert rows[1] == "FER. No, mi noble duena", rows
+
+
+def test_a_row_is_measured_from_its_first_baseline_not_its_last():
+    """Chaining near-neighbours walks a row down the page one step at a time.
+
+    Three words at 100, 102 and 104 are within 3 points of their PREDECESSOR
+    at every step, so a chaining rule swallows all three into one row even
+    though the span is 4. The row is anchored on its first baseline instead.
+    """
+    scan = _scan()
+    doc, page = _one_page_pdf([
+        (30, 100, "alpha"), (80, 102, "beta"), (130, 104.5, "gamma"),
+    ])
+    rows = scan.rows_from_coordinates(page)
+    doc.close()
+    assert len(rows) == 2, rows
+    assert rows[0] == "alpha beta" and rows[1] == "gamma", rows
+
+
+def test_the_coordinate_reader_is_opt_in_and_flat_is_the_default():
+    """It is NOT certified across every volume, so it may not become default.
+
+    Measured exceptions remain: a hanging cue 3.29 points off its dialogue on
+    one Clark page, another at 3.12, six rotated pages in the Macpherson
+    volume, and words whose own glyphs straddle two rows. Prove a volume and
+    pin it; do not flip this globally.
+    """
+    import inspect
+    scan = _scan()
+    assert inspect.signature(scan.pdf_text).parameters[
+        "reading_order"].default == "flat"
+    source = inspect.getsource(scan.pdf_text)
+    assert "rows_from_coordinates" in source, "the reader is not wired in"
+    assert "fused_words" in source, (
+        "a page whose words straddle rows must be named, not shipped quietly")
+
+
 def test_a_split_heading_rejoins_through_the_printer_s_trailing_stop():
     """NOT A FURNITURE RULE -- the other page-text rule of the same script.
 
