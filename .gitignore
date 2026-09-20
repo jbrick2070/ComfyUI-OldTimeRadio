@@ -332,3 +332,11 @@ secrets/
 # anyway. Write the next probe, run it, let it be ignored.
 _tmp_*
 scripts/_tmp_*
+
+# --- 2026-09-20 registry-closeout hygiene ---
+# 171 tracked *.log files and tmp/GPT_SHAKESPEARE_HUNT_3_RESULTS_VERIFIED.md
+# were still in the index. An ignore rule does not untrack; they were
+# git rm --cached this pass. *.log and /tmp/ already exist above. These
+# two fill the remaining scratch shapes so a .bak / .orig cannot return.
+*.bak
+*.orig
