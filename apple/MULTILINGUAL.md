@@ -122,8 +122,8 @@ Every source bank works on every language row.
   episode; SciFi News Pro keeps its news source as published and writes the new
   story natively.
 - `shakespeare` performs its passage from a real translator's public-domain
-  text when the corpus holds that scene (43 scenes in six languages under
-  `config/source_banks/shakespeare/translations`; the ledger's
+  text when the corpus holds that scene (the manifest under
+  `config/source_banks/shakespeare/translations` is the list; the ledger's
   `verbatim_passage.vendored` receipt names the translator, the year and the
   text's hash). Otherwise it performs the passage TRANSLATED: the selected
   passage is translated once, in order, speakers and cut unchanged, and then
@@ -134,8 +134,8 @@ Every source bank works on every language row.
   Story attribution) is authored per row in `config/episode_languages.json`
   under `spoken`, so it is never a translation either.
 
-Language does not choose the music. The source bank does. If eight language
-tests all pin `original`, all eight correctly ask for salsa conjunto. To hear
+Language does not choose the music. The source bank does. If every language
+test pins `original`, every one correctly asks for salsa conjunto. To hear
 different scores, vary the source bank: `media_archive` uses jazz,
 `scifi_news_pro` uses Detroit techno, `original` uses salsa, and `my_story`
 uses its own `music_style` or the house orchestra.

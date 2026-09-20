@@ -142,7 +142,7 @@ Select-String -Pattern OldTimeRadio <comfyui console log>    # Windows PowerShel
   is missing. That is by design: `__init__.py` loads each node in its own
   try/except, so a partial install still works and the skip names its own
   cause. Install the named dependency with the ComfyUI Python. A clean install
-  prints `[OldTimeRadio] OK - All 25 nodes loaded successfully`; a few skips
+  prints `[OldTimeRadio] OK - All <n> nodes loaded successfully` (n is the pack's node count); a few skips
   below that number is a missing library, not a broken pack.
 * **Zero nodes and no `[OldTimeRadio]` lines at all** -> the pack is not being
   loaded. It is in the wrong directory, ComfyUI is not scanning it, or

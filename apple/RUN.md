@@ -89,8 +89,8 @@ rather than borrowing an English voice.
 Every bank is admitted for every language row, so the default roll is safe
 unattended. Shakespeare and Public Domain still perform the author's own
 words: in a non-English run they use a real translator's public-domain text
-when the corpus holds that scene (43 Shakespeare scenes across Spanish,
-French, Italian, Portuguese, Japanese and Mandarin), and otherwise the writer
+when the corpus holds that scene (the manifest under
+`config/source_banks/shakespeare/translations` is the list), and otherwise the writer
 model's own translation of the selected passage, which the ledger records as
 such. Pin `source_bank` only when you want a particular lane.
 

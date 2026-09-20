@@ -47,7 +47,7 @@ it.
 ## roll (any style)
 
 `roll (any style)` is the first row of the dropdown, and every graph that ships
-with this pack -- the canonical and all twenty-one variants -- is saved on it. It
+with this pack -- the canonical and every variant -- is saved on it. It
 is a command, not a style: at run time it draws one of the ten ids above at
 equal odds, 10% each, and the episode uses that.
 

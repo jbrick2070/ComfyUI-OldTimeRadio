@@ -41,7 +41,7 @@ language adherence still matters. See
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md).
 
 Every model runs on your own machine: no account, no API key, no paid service,
-on NVIDIA cards and on Apple Silicon. Two of the six story banks read public
+on NVIDIA cards and on Apple Silicon. Two of the story banks read public
 RSS feeds when they come up, so a default run reaches the internet for tonight's
 news and for the first model download and for nothing else. Paid options exist
 for people who want them, and every one of them stays off until you turn it
@@ -116,7 +116,7 @@ exactly as the app's sign-in would.
 working ComfyUI (Desktop, portable or a git install -- any of them), about
 **25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
-service, or a single one of the twenty-one saved graphs further down this page:
+service, or a single one of the saved graphs further down this page:
 those are per-machine presets you can grow into. Installing the pack and
 pressing **Queue** is the whole path.
 
@@ -256,7 +256,7 @@ folder name is historical; the guides cover every platform.)
 | [apple/INSTALL.md](apple/INSTALL.md) | Getting the nodes loading: ffmpeg, Python versions, what downloads itself. |
 | [apple/AGENT_INSTALL.md](apple/AGENT_INSTALL.md) | The same install, written for an AI coding agent to run. Optional. |
 | [apple/RUN.md](apple/RUN.md) | Your first episode, where it lands, and what to do when it does not. |
-| [apple/BANKS.md](apple/BANKS.md) | The six source banks. This is the control that decides what kind of episode you get. |
+| [apple/BANKS.md](apple/BANKS.md) | The source banks. This is the control that decides what kind of episode you get. |
 | [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) | The one episode-language switch, captions, Kokoro voices, and adding a language of your own. |
 | [apple/MACHINES.md](apple/MACHINES.md) | Which graph to open for your card, what runs where, and where every hand-fetched weight comes from. |
 
@@ -294,7 +294,7 @@ and is **not** part of a Manager install. Nothing in this file depends on it.
 
 ### The story
 
-Six source banks roll automatically -- My Story among them, writing the standing premise when you leave its fields blank; a seventh dropdown row, `custom_source_bank`, is the signpost for adding your own. Each bank is
+Every runnable source bank rolls automatically -- My Story among them, writing the standing premise when you leave its fields blank -- and one dropdown row, `custom_source_bank`, is not a bank but the signpost for adding your own. Each bank is
 independent -- its own story pack, its own fetch -- and each fails closed: a bad
 source, a context overflow or a broken contract stops the run rather than shipping
 a degraded story. The language model writes every line of prose; Python validates,
@@ -305,7 +305,7 @@ it never rewrites.
 | `scifi_news_pro` | A live science feed, turned into science-fiction radio. |
 | `media_archive` | Media RSS and archive items, turned into restoration-adventure episodes. |
 | `public_domain` | A faithful radio adaptation of a public-domain source text. |
-| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. In another language it performs a real translator's public-domain text when the corpus holds that scene (43 scenes across Spanish, French, Italian, Portuguese, Japanese and Mandarin), and otherwise the writer model's translation of the selected passage, which the ledger records as such. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
+| `shakespeare` | A Folger scene, adapted with the author's own language carried as written. In another language it performs a real translator's public-domain text when the corpus holds that scene (the manifest under `config/source_banks/shakespeare/translations` is the list), and otherwise the writer model's translation of the selected passage, which the ledger records as such. The Folger texts are noncommercial (CC BY-NC), and an episode inherits that. |
 | `original` | No source at all: original fiction seeded from an entropy draw. |
 | `my_story` | Your idea, characters, plot and setting. Rolled like any other bank; a blank run writes the standing premise that ships with the pack. |
 
@@ -329,7 +329,7 @@ from.
 
 ### The look
 
-Ten visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
+The visual styles, rolled or pinned on `visual_style`: `sci_fi_radio` (the
 production look), `anime`, `archival_documentary`, `cartoon`, `paper_origami`,
 `recur_frac`, `shakespeare_stage_realism`, `storybook_engraving`, `video_art`,
 and `visual_storybased`, which is minted from the story rather than loaded from
@@ -373,8 +373,8 @@ What `otr_canonical` ships, and why:
   lanes consume no still, so the image weights are never fetched on a default run.
   Switch a video role to a still-consuming lane and they download then.
 - **Voices:** `kokoro` on both slots. It is the only one-click voice on every
-  platform, which is why it is the default. Six voice engines come with a Manager
-  install; the seventh, the IndexTTS2 voice cloner, ships in the GitHub tree only.
+  platform, which is why it is the default. The voice engines come with a Manager
+  install, except one: the IndexTTS2 voice cloner ships in the GitHub tree only.
   Two of the six, **Chatterbox and Dia, assume Windows** -- they run in their own
   venv and install through PowerShell scripts with no shell twin. Point
   `OTR_CHATTERBOX_VENV` or `OTR_DIA_VENV` at your own interpreter to run them
@@ -455,7 +455,7 @@ Two things to know before you change a dropdown:
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **twenty-one generated graphs in
+skip the dropdowns, the pack also ships **a generated graph per machine profile in
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/`** -- one per machine class and episode kind, named
 `otr_<machine>_<tier>.json`. Browse Templates lists only the canonical -- its
 scanner looks one directory deep -- so these are files you **drag onto the
@@ -692,7 +692,7 @@ language model bigger than your card's ceiling. Pick a smaller one.
 If yours lives somewhere unusual, set `OTR_FFMPEG` to the binary's full path.
 
 **`neither kokoro backend is installed` at the first voice line.** Python 3.10 to
-3.12 run Kokoro on torch and serve all eight admitted languages. Python 3.13
+3.12 run Kokoro on torch and serve every admitted language. Python 3.13
 runs English through `kokoro-onnx` on the CPU; non-English rows do not use that
 backend. Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB

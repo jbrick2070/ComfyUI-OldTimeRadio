@@ -3,7 +3,7 @@
 Every beat of the episode shows something. The **image engine** is the model that
 draws that still picture; the video lane then takes the still and makes it move.
 
-Three engines are one-click: pick them and they fetch themselves. The other two
+Most engines are one-click: pick them and they fetch themselves. The manual
 local ones want files you download by hand. That is the only part of this page
 most people need.
 
@@ -115,7 +115,7 @@ a node inside the graph fetches it at queue time -- no account, no token, no
 script to run. `lumina_image` joined them on 2026-09-16 and is what the 16 GB
 NVIDIA graphs ship, so the default 16 GB path now downloads itself.
 
-The other two local engines (`flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
+The manual local engines (`flux_gen1`, `ideogram4_local`) stop the render and tell you the exact filename they want and the folder it belongs in. **That refusal is the install instruction.** It never quietly substitutes another model. They ship no provisioner manifest; the refusal message at queue time is the only place the filename and folder show up.
 
 [MACHINES.md](MACHINES.md) section 2 has the per-machine grid -- which of these
 has actually been run on 8 GB, on 16 GB, on a Mac, on CPU, and which will run out
@@ -147,7 +147,7 @@ In the order it actually happens.
 Your role's video lane draws its own frames. See the second section -- this is
 correct behaviour, not a miss.
 
-**It stops and names a file.** You picked one of the two manual local engines,
+**It stops and names a file.** You picked one of the manual local engines,
 `flux_gen1` or `ideogram4_local`. The refusal names the exact filename and the
 folder it belongs in, and for these two that message is the only place that
 information appears -- section 3 ships no manifest for them, by design.

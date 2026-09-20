@@ -127,7 +127,7 @@ or for a crash during ComfyUI's startup, before any node loaded.
 
 | Your Python | Voices | Notes |
 |---|---|---|
-| 3.10 – 3.12 | Kokoro on torch | The multilingual path; all eight admitted languages. |
+| 3.10 – 3.12 | Kokoro on torch | The multilingual path; every admitted language. |
 | 3.13 | Kokoro through `kokoro-onnx`, on CPU | English works and the ONNX runtime is picked automatically. Non-English rows require the torch path above. |
 | 3.14 and up | Refused | No Kokoro build exists yet. The provisioner refuses rather than installing something that cannot speak. |
 

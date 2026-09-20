@@ -24,7 +24,7 @@ lane", because a roll will land somewhere else four times out of five.
 | **My Story** `my_story` | A radio drama from your idea | The four **My Story** boxes on the writer node |
 | **Original Radio Drama** `original` | Original radio drama | Nothing -- the writer invents it outright |
 
-A seventh entry, **+ Add Your Own** `custom_source_bank`, is a signpost rather
+One more entry, **+ Add Your Own** `custom_source_bank`, is a signpost rather
 than a bank. It is deliberately not runnable and never comes up on a roll;
 selecting it does nothing. It is there to tell you the door exists --
 [apple/EXTENDING.md](EXTENDING.md) is how you walk through it.
@@ -58,7 +58,7 @@ changing the source.
 bank. Typing a premise on the Shakespeare or archive lane is ordinary, not a
 mistake.
 
-**The two RSS banks** -- Sci-Fi News Pro and Media RSS / Archive -- fetch their
+**The RSS banks** -- Sci-Fi News Pro and Media RSS / Archive -- fetch their
 material from the internet at run time. On a machine with no network they
 cannot find a source to adapt. Shakespeare, Public Domain, My Story and
 Original need nothing from the network.

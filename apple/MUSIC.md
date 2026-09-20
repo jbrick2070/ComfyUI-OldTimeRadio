@@ -20,9 +20,9 @@ Two widgets control it, both on **OTR_StableAudioTheme**: `engine` and
 | **interstitial** | 4 seconds | Between acts |
 
 You get an opening and a closing on every episode. **Interstitials only appear
-on the two banks whose writer plans them** -- **My Story** and **Sci-Fi News
+on the banks whose writer plans them** -- **My Story** and **Sci-Fi News
 Pro** -- and there is one per act break, so `act_count` 1 gives none and
-`act_count` 3 gives two. On the other four banks there are exactly two cues.
+`act_count` 3 gives two. On the other banks there are exactly two cues.
 
 ---
 
@@ -36,11 +36,11 @@ Pro** -- and there is one per act break, so `act_count` 1 gives none and
 | **`sonilo`** | A Comfy account and credits | Hosted -- no GPU of yours |
 | **`google_lyria`** | A Google API key. Paid, and preview-only | Hosted -- no GPU of yours |
 
-**Stable Audio 3 is what twenty-one of the twenty-two shipped graphs use**, and it
+**Stable Audio 3 is what every shipped graph but the CPU preset uses**, and it
 is the right answer on any machine with a GPU: it downloads itself, and its
 licence permits commercial use.
 
-**The CPU preset is the twenty-second**, and it is on MusicGen -- Stable Audio 3
+**The CPU preset is that exception**, and it is on MusicGen -- Stable Audio 3
 declares CUDA and Metal only, so a machine with no GPU has to use something
 else. Worth knowing if you go that way: **MusicGen's weights are
 non-commercial** (CC-BY-NC). Fine for listening; not for anything you sell.

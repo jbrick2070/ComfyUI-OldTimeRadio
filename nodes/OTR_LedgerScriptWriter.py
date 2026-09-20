@@ -3004,8 +3004,8 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "another language, a real translator's "
                             "public-domain text when the corpus holds that "
                             "scene (config/source_banks/<bank>/translations "
-                            "-- 43 Shakespeare scenes in six languages "
-                            "today), and otherwise the writer model's own "
+                            "-- the manifest there is the list), and "
+                            "otherwise the writer model's own "
                             "translation of the selected passage, which the "
                             "ledger says so."
                         ),
@@ -3794,10 +3794,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # shape.
         #
         # THE NORMAL ANSWER IS "no vendored scene" AND IT IS NOT A FAILURE.
-        # Forty-three scenes are vendored today (six languages; read the
-        # manifest rather than this number); everything else keeps the model
-        # translation that already ships, per scene, per language. A miss
-        # never costs an episode.
+        # The vendored scenes are whatever the manifest lists; everything else
+        # keeps the model translation that already ships, per scene, per
+        # language. A miss never costs an episode.
         _vendored_row = None
         if _verbatim_plan is not None and _EPLANG.native_authoring_instruction(meta):
             try:

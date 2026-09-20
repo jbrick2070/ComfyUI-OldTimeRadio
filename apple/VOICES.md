@@ -7,7 +7,7 @@ engine is named a second time on **4a - Character Voices** and **4b - Announcer
 Voice**.
 
 You do not have to choose any of it. Every graph that ships -- the canonical and
-all twenty-one saved variants -- arrives set to **Kokoro** on every voice slot, with
+every saved variant -- arrives set to **Kokoro** on every voice slot, with
 the **`kokoro_builtin`** bank behind it. That is the combination every published
 episode used.
 

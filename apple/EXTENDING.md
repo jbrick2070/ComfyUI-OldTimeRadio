@@ -18,10 +18,10 @@ says whether what you built will actually work. The writer page is
 
 ## The one page
 
-- **Four engine namespaces share one recipe**: video, image, audio (speech and
+- **The engine namespaces share one recipe**: video, image, audio (speech and
   music) and upscale. One adapter file, an `@register` decorator, one
   `CAPABILITIES` row, and a guarded import in that namespace's `__init__.py`.
-  Source banks are the fifth kind and are a folder, not an adapter.
+  Source banks are the other kind and are a folder, not an adapter.
 
 - **Registering IS joining the dropdown.** There is no allow-list any more —
   `VALIDATED_ENGINES` was removed in 2026-06-29. Whatever registers appears.

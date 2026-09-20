@@ -3,7 +3,7 @@
 `upscale_engine` lives on the **OTR_SilentComposite** node. That node is the
 one that takes every rendered clip, every still plate and the base video and
 cuts them into one silent timeline at the episode's canvas -- 1920x1080 in the
-canonical graph and in all twenty-one saved variants. The upscale step runs
+canonical graph and in every saved variant. The upscale step runs
 *inside* that assembly, clip by clip, after the clips are rendered and before
 the captions are burned, the credits rolled and the audio muxed back on.
 
@@ -157,7 +157,7 @@ loading it is not the expensive part. The frames are.
 
 ## Off is a legitimate place to leave it
 
-Every graph this pack ships -- the canonical and all twenty-one variants -- sets
+Every graph this pack ships -- the canonical and every variant -- sets
 `upscale_engine` to `off`, and that is the recommendation, not an oversight:
 
 - The composite already resamples and sharpens on the way to the canvas, and

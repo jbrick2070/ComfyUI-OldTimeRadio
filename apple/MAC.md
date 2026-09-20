@@ -48,7 +48,7 @@ factor on a 16 GB machine, and it is the cheapest thing you can change.
 
 ## Images
 
-Two of the four Mac graphs mint stills and ship **SD 1.5** for it —
+Two of the Mac graphs mint stills and ship **SD 1.5** for it —
 `otr_mac16_still` and `otr_mac16_video` — one 2 GB checkpoint, ungated, no
 account, fetched on first use. `otr_mac16_low`, the one to start with, draws its
 own frames and never fetches an image model at all. `otr_mac16_animatediff`
@@ -92,7 +92,7 @@ non-issue — unlike Linux, where a headless image often has none.
 ## The receipts behind this page
 
 Every row above is backed by a named run on a physical Mac mini M4 / 16 GB: the
-four shipping graphs, the AnimateDiff re-tests, and the MPS decode fix that came
+the shipping graphs, the AnimateDiff re-tests, and the MPS decode fix that came
 out of them. Two lab notebooks in the GitHub tree hold the evidence —
 `docs/MAC_LAB_LOG.md` (harness run ids, per-leg logs, MPS allocation numbers,
 tracebacks) and `docs/MAC_PORTABILITY_GUIDE.md` (every measurement and dead end
