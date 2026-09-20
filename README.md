@@ -1,10 +1,25 @@
 # ComfyUI-OldTimeRadio
 
+## Install and run it
+
+1. In ComfyUI open **Extensions -> Node Manager**, search **old time radio**, click **Install**.
+2. Install ffmpeg: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
+3. Restart ComfyUI.
+4. **Workflow -> Browse Templates -> EXTENSIONS -> comfyui-old-time-radio**, open `otr_canonical`.
+5. Press **Queue**. The first run downloads about 12 GB. Your episode is an `.mp4` in
+   `<your ComfyUI output folder>/otr/obs/`.
+
+Change nothing in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
+Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
+plus about 25 GB of free disk. No account, no API key, nothing paid. If a step
+fails, [Make an episode](#make-an-episode) below walks through each one.
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif" alt="Old Time Radio" width="400">
 </p>
 
 <p align="center">
+  <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/install-ComfyUI%20Manager-0a7bbb" alt="Install from ComfyUI Manager"></a>
   <a href="https://registry.comfy.org/nodes/comfyui-old-time-radio"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.comfy.org%2Fnodes%2Fcomfyui-old-time-radio&query=%24.downloads&label=registry%20installs&color=0a7bbb" alt="Registry installs"></a>
   <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/main/pyproject.toml"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2Fjbrick2070%2FComfyUI-OldTimeRadio%2Fmain%2Fpyproject.toml&query=%24.project.version&label=version&color=0a7bbb" alt="Version"></a>
   <a href="https://github.com/jbrick2070/ComfyUI-OldTimeRadio/stargazers"><img src="https://img.shields.io/github/stars/jbrick2070/ComfyUI-OldTimeRadio?color=0a7bbb" alt="GitHub stars"></a>
@@ -474,7 +489,7 @@ can fetch them itself.
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
 node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
-The AnimateDiff lanes want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
+The AnimateDiff lanes, the `otr_nvidia_8gb_haunted` graph among them, want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
 `ltx23_*`, `ltx25_*` and `wan22_*` want [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
 -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md).
 If you pick one of these lanes without its pack, the render stops with an error
