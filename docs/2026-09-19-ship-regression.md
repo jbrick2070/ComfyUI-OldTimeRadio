@@ -1,0 +1,54 @@
+# Ship regression, 2026-09-19 evening -- the full suite before v2.1.x
+
+Operator: the remaining credits go to regression testing before the ship and
+the Reddit post. Section 7A's condition for any publish: the suite diffed
+against a same-HEAD baseline, every new failure explained, THEN bump. This
+file is that explanation. The bump itself is his call (third digit only).
+
+## The numbers
+
+* Full suite at `23497b6e` (+ docs): RC=2, twelve nodeids failed that are not
+  in `EXPECTED_FAILED_NODEIDS`. Log: `%TEMP%\full_suite_ship_baseline.log`.
+* The same twelve run in a worktree at `cc62b2c1` -- the commit this session
+  started from, before any of the day's code -- and **all twelve fail there
+  too.** None was introduced today.
+* Every suite the day's code touches is green at `96346118`: the five corpus
+  suites (237), the counter/chunker/ledger-metric/verbatim set (567 passed,
+  2 skipped), and the ASCII word-count parity measurement (27,600 rows, 0
+  differ).
+* A second full run at final HEAD is recorded below when it lands.
+
+## The twelve, classified from their own assertion lines
+
+| # | nodeid | what the assertion says | class | reaches the shipped still lane? |
+|---|---|---|---|---|
+| 1 | `test_b7_forbidden_sweep.py::test_forbidden_sweep_runs_clean` | test files carry words the B7 sweep treats as runtime markers (`alias`, `shim`), and one absolute `C:/Users/jeffr` path in a test string | test hygiene | no -- and one hit (`test_vendor_scan_furniture.py:422`) was today's, reworded in `96346118`; the rest predate the session |
+| 2 | `test_canonical_replay.py::test_voices_music_and_sequencer_pass_through_on_replay` | `OTRVoiceNodeBase.generate() got multiple values for argument 'ledger_json'` | real signature drift on the REPLAY path (`replay_from`, the A/A null) | the widget ships; a replay would hit this -- **assess before the bump** |
+| 3 | `test_cloud_sku_json_parity.py::...[otr_cloud_low-otr_cloud_deluxe_3act]` | three unexpected widget drifts, first `OTR_VideoDirector.announcer_image_model` | cloud variant drift vs. the expected-drift list | no (cloud SKUs) |
+| 4 | `test_evidence_citation_integrity.py::...still_hashes_to_what_the_record_claims` | cited evidence MISSING from disk: `otr/episodes/lemmy_cross_engine/*.wav` | artifacts deleted from the local output tree; the record still cites them | no |
+| 5 | `test_frame_receipt_conformance.py::...[cloud_ltx25_foley_plus]` | `CloudMediaError: corrupt_output -- partner result missing ['path', 'content_type']` | cloud media backend contract vs. the adapter fixture | no (cloud engine) |
+| 6 | `test_google_omni_video_adapter.py::test_canonicalize_returns_silent_clip_dict` | same `CloudMediaError: corrupt_output` | as 5 | no (Google lane) |
+| 7 | `test_google_veo_video_adapter.py::test_canonicalize_returns_silent_clip_dict` | same | as 5 | no |
+| 8 | `test_google_veo_video_adapter.py::test_existing_google_video_engines_stay_silent` | same | as 5 | no |
+| 9 | `test_hf_env_offline.py::test_request_slot_uses_complete_canonical_cache_without_download` | the test's stub `guarded_auto_download()` rejects `progress_pbar`, which the code now passes | STALE TEST (the code's own comment says the bar is forwarded on purpose) | no -- fix the stub |
+| 10 | `test_lane_preflight_matrix.py::test_g2_canvas_truth` | `animatediff15_lightning_video`, `animatediff15_v3_haunted_video`, `ltx_8gb` declare `render_canvas 512x288` that the declaration overrules; not in `EXPECTED_RED` | profile config-vs-truth on three VIDEO lanes (8 GB / animatediff, the 4060's surface) | no (still lane) |
+| 11 | `test_lemmy_provisional_tier.py::test_the_writer_stage_bark_preset_SURVIVES_the_normalizer` | `'' == 'v2/en_speaker_8'` -- the normalizer drops bark's `voice_preset` | real regression on the Lemmy cameo provisional route | `lemmy_cameo` rolls ~11% on every episode -- **assess before the bump** |
+| 12 | `test_lemmy_provisional_tier.py::test_a_rendered_receipt_names_artifacts_that_exist_and_still_match` | `otr/episodes/lemmy_cross_engine/kokoro_neutral.wav is missing` | as 4 | no |
+
+## What this means for the bump
+
+* Ten of twelve are cloud-lane, artifact-on-disk, or test-hygiene drift that
+  cannot reach an episode rendered on the shipping still lane. They should be
+  either fixed or added to `EXPECTED_FAILED_NODEIDS` + `docs/known-failures.md`
+  with these reasons, so the guard stops reporting them as regressions.
+* Two can reach a shipped episode and deserve one look each before the
+  version string burns: **#2** (a `replay_from` run would raise) and **#11**
+  (a Lemmy cameo on the chatterbox/bark route loses its preset). Neither is on
+  the default path of a fresh install rendering an episode.
+* Nothing in today's commits (`fbfbe0d6` .. `96346118`) moved any of the
+  twelve; the two the day's code could have touched -- the word counter and
+  the chunker -- were measured byte-identical on English.
+
+## The final-HEAD run
+
+(recorded below by the window that runs it)
