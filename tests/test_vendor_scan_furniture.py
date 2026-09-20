@@ -418,6 +418,36 @@ def test_a_folio_may_carry_the_printers_stop_and_a_comma_may_join_the_headings()
         assert scan._RUNNING_HEADER.match(head), head
 
 
+def test_a_fold_binds_a_printed_form_only_when_its_target_is_in_the_scene():
+    """NOT A FURNITURE RULE -- the one declared alias the operator allowed.
+
+    Domingos Ramos prints Ferdinand as FERNANDO: eight letters, past the
+    length floor, refused on the prefix test because neither name starts
+    with the other. Ten of his speeches were discarded and merged into the
+    previous speaker in a scene he opens. A fold names the binding for ONE
+    scene, and the roster check is what keeps it there: the same fold
+    declared for a scene without Ferdinand binds nothing.
+    """
+    import inspect
+    scan = _scan()
+    tempest = {"FERDINAND", "MIRANDA", "PROSPERO"}
+    lear = {"LEAR", "KENT", "CORDELIA"}
+    assert scan.resolve("FERNANDO", tempest) is None          # the defect
+    scan.FOLDS.clear()
+    scan.FOLDS[scan.fold("FERNANDO")] = "FERDINAND"
+    try:
+        assert scan.resolve("FERNANDO", tempest) == "FERDINAND"
+        assert scan.resolve("Fernando (aparte)", tempest) == "FERDINAND"
+        assert scan.resolve("FERNANDO", lear) is None         # not on this stage
+        assert scan.resolve("MIRANDA", tempest) == "MIRANDA"  # nothing else moves
+    finally:
+        scan.FOLDS.clear()
+    # populated from the command line, validated against the roster, recorded
+    source = inspect.getsource(scan.main)
+    assert "FOLDS.clear()" in source and "not in this scene" in source
+    assert '"folds"' in source, "a fold that is not recorded is not provenance"
+
+
 def test_a_swallowed_label_has_a_shape_and_the_write_refuses_it():
     """NOT A FURNITURE RULE -- the write gate of the same script.
 

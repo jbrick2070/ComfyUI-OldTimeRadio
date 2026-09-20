@@ -1624,6 +1624,90 @@
       "extractor": "scripts/otr_vendor_scan.py --reading-order coordinates"
     },
     {
+      "iso": "pt",
+      "play": "tempest",
+      "scene": "1.2",
+      "file": "pt/tempest_1_2.txt",
+      "translator": "Domingos Ramos",
+      "translator_death_date": 1932,
+      "translation_first_published": 1914,
+      "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/68/William_Shakespeare_-_A_Tempestade_%28trad._Domingos_Ramos%2C_1914%29.pdf",
+      "revision_id": "sha256:d95f6e8cc610b1c0",
+      "raw_sha256": "d95f6e8cc610b1c0948747576b475f23361e3ae6b9a85761c64acb58ceefed59",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA II",
+      "speaker_labels": 137,
+      "distinct_speakers": 5,
+      "speaker_map": {
+        "MIRANDA": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "PRÓSPERO": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        },
+        "ARIEL": {
+          "spoken": "ARIEL",
+          "roster": "ARIEL"
+        },
+        "CÁLIBAN": {
+          "spoken": "CALIBAN",
+          "roster": "CALIBAN"
+        },
+        "FERNANDO": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        }
+      },
+      "transcription_method": "pdf_text_layer",
+      "transcription_date": "2026-09-19",
+      "extractor": "scripts/otr_vendor_scan.py --reading-order coordinates",
+      "folds": {
+        "FERNANDO": "FERDINAND"
+      }
+    },
+    {
+      "iso": "pt",
+      "play": "tempest",
+      "scene": "3.1",
+      "file": "pt/tempest_3_1.txt",
+      "translator": "Domingos Ramos",
+      "translator_death_date": 1932,
+      "translation_first_published": 1914,
+      "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
+      "source_url": "https://upload.wikimedia.org/wikipedia/commons/6/68/William_Shakespeare_-_A_Tempestade_%28trad._Domingos_Ramos%2C_1914%29.pdf",
+      "revision_id": "sha256:ecf2c6f35b10f99d",
+      "raw_sha256": "ecf2c6f35b10f99d4e325cb702b7f08fcb111aca05be1464124b7e608963a1b1",
+      "verdict": "READY",
+      "alignment_confidence": 1.0,
+      "edition_label": "SCENA I",
+      "speaker_labels": 25,
+      "distinct_speakers": 3,
+      "speaker_map": {
+        "FERNANDO": {
+          "spoken": "FERDINAND",
+          "roster": "FERDINAND"
+        },
+        "MIRANDA": {
+          "spoken": "MIRANDA",
+          "roster": "MIRANDA"
+        },
+        "PRÓSPERO": {
+          "spoken": "PROSPERO",
+          "roster": "PROSPERO"
+        }
+      },
+      "transcription_method": "pdf_text_layer",
+      "transcription_date": "2026-09-19",
+      "extractor": "scripts/otr_vendor_scan.py --reading-order coordinates",
+      "folds": {
+        "FERNANDO": "FERDINAND"
+      }
+    },
+    {
       "iso": "zh",
       "play": "hamlet",
       "scene": "1.1",

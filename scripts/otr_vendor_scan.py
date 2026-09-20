@@ -83,6 +83,23 @@ FUNCTION_NAMES = {
     "TODAS_ES": "ALL",
 }
 
+#: A FOLD IS A PRINTED FORM THAT IS ONE PERSON, DECLARED FOR ONE SCENE. Filled
+#: by `--fold PRINTED=ROSTER` on the command line and consulted before every
+#: other rule in `resolve`. It is scoped to the invocation -- one command
+#: vendors one scene -- which is what keeps it the edition-scoped exact map
+#: the operator allowed and not the global alias table he forbade; the same
+#: entries will come from a per-scene registry keyed `(sha256, scene)` once
+#: that file exists, and the manifest row records whatever was used.
+#:
+#: The first entry it was built for: Domingos Ramos prints Ferdinand as
+#: `FERNANDO`, which shares three letters with FERDINAND and so fails the
+#: prefix test below -- eight characters, well past the length floor, refused
+#: on shape. The operator ruled that a dedicated proper-name alias is fine
+#: and that it must never be an entry in PLACE_NAMES. Every target is
+#: validated against the scene's English roster before the first line is
+#: read, and a target that is not in it stops the run.
+FOLDS: dict[str, str] = {}
+
 #: The ordinal a translation prints in front of a function name, mapped to the
 #: word Folger puts there. `1.ª FEITICEIRA` is `FIRST WITCH`.
 ORDINALS = {
@@ -517,6 +534,11 @@ def resolve(token: str, roster: set[str]) -> str | None:
     """
     folded = {fold(n): n for n in roster}
     key = fold(_LABEL_QUALIFIER.sub("", token)).strip(" .")
+    # A DECLARED FOLD WINS, AND ONLY WHEN ITS TARGET IS IN THIS SCENE. The
+    # roster check is not belt and braces: it is what keeps a fold declared
+    # for one scene from binding a name in another.
+    if key in FOLDS and FOLDS[key] in roster:
+        return FOLDS[key]
     if key in folded:
         return folded[key]
 
@@ -1118,6 +1140,12 @@ def main(argv=None) -> int:
     ap.add_argument("--act-label", default=None)
     ap.add_argument("--scene-label", required=True)
     ap.add_argument("--end-label", default=None)
+    ap.add_argument("--fold", action="append", default=[], metavar="PRINTED=ROSTER",
+                    help="declare that a printed label is one roster character "
+                         "for THIS scene, e.g. FERNANDO=FERDINAND. Repeatable. "
+                         "The target must be in the scene's English roster or "
+                         "the run stops. Scoped to this invocation, recorded in "
+                         "the manifest row; never a global alias.")
     ap.add_argument("--reading-order", default="flat",
                     choices=("flat", "coordinates"),
                     help="how a page's text is ordered. `flat` is PyMuPDF's "
@@ -1233,6 +1261,26 @@ def main(argv=None) -> int:
     if not roster:
         print("[scan] no English roster at %s" % args.stem)
         return 1
+    # EVERY FOLD TARGET IS CHECKED AGAINST THIS SCENE'S ROSTER BEFORE A LINE IS
+    # READ. A fold that names a character who is not in the scene is either a
+    # typo or a fold copied from another scene, and both would bind a speech
+    # to someone who is not on the stage. Refused, loudly, before anything is
+    # extracted.
+    FOLDS.clear()
+    for spec in args.fold:
+        printed, sep, target = spec.partition("=")
+        printed, target = fold(printed.strip()), target.strip().upper()
+        if not sep or not printed or not target:
+            print("[scan] --fold wants PRINTED=ROSTER, e.g. FERNANDO=FERDINAND; got %r" % spec)
+            return 2
+        if target not in roster:
+            print("[scan] REFUSING: --fold %s names %r, who is not in this scene's "
+                  "roster %s" % (spec, target, sorted(roster)))
+            return 2
+        FOLDS[printed] = target
+    if FOLDS:
+        print("[scan] folds for this scene: %s"
+              % ", ".join("%s -> %s" % kv for kv in sorted(FOLDS.items())))
     pairs = speeches_from_span(body, roster)
     counts = collections.Counter(label for label, _ in pairs)
     print("[scan] %d speeches / %d distinct labels" % (len(pairs), len(counts)))
@@ -1310,6 +1358,11 @@ def main(argv=None) -> int:
         # produced the file it is looking at.
         "extractor": "scripts/otr_vendor_scan.py --reading-order %s"
                      % args.reading_order,
+        # A FOLD IS PROVENANCE. The row says which printed forms were declared
+        # to be which character, so the file can be reproduced from the
+        # command that made it and a reader can see every binding that was
+        # asserted rather than measured.
+        **({"folds": dict(sorted(FOLDS.items()))} if FOLDS else {}),
     }
     man["scenes"] = [s for s in man["scenes"]
                      if (s["iso"], s["play"], s["scene"]) != key]
