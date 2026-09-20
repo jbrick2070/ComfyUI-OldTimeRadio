@@ -1,3 +1,72 @@
+## 2026-09-19 -- HEAD 75cd39dd +handoff (main) -- CODER (the scanned-volume lane: page furniture is removed by WHERE it sits)
+
+Did: Built out `scripts/otr_vendor_scan.py` until two Portuguese scenes were
+  provably right, and the sha above is the second-to-last on the branch; the
+  last is this handoff commit. One root defect wearing several disguises: the
+  lane filtered page furniture by TOKEN, and a play's title is usually also a
+  character in it, so the 1912 Macbeth's page header deleted Macbeth -- it
+  reported `MACBETH x13 resolves to nobody` and gave the title character four
+  speeches out of seventeen. Furniture is now removed by POSITION: each page's
+  head and foot band is walked from the rim inward and abandoned at the first
+  line that is not furniture.
+  **A running head must prove itself TWICE -- printed at a page edge across
+  several pages AND sitting beside a folio on this one.** Neither test survives
+  alone: the folio alone deletes an ordinary act-opening page that happens to
+  carry a number, and recurrence alone deletes the real heading of the 1919 Rei
+  Lear, whose act line is the same string as its header. An earlier rule kept
+  the FIRST act-shaped line in the volume, which a table of contents would have
+  silently stolen.
+  **Scene headings are deliberately NOT blanked.** Blanking them removes the
+  running-head copies AND the real heading that ENDS the scene -- tried and
+  reverted after Lear ran on to 118 speeches and Macbeth absorbed Duncan and
+  Malcolm from the scene after it. The answer is `--end-label`, and `main` now
+  REFUSES a run that needs one instead of storing a fragment at
+  `alignment_confidence: 1.0`.
+  Reverted the adjacent same-speaker merge added earlier the same day: it was
+  compensating for this bug, not fixing anything. When a label is not recognised
+  its text already belongs to whoever spoke last, so merging cannot repair that
+  and only hides the run that would have reported it -- it read 36 speeches
+  against 51 in the French and Italian editions, tidier and further from the
+  truth.
+  Nine Spanish leads pointed at Wikimedia DESCRIPTION pages rather than scans,
+  so the vendor fetched HTML and reported the volume's only heading as
+  `Actions`, the sidebar. Resolved through the imageinfo API: 472 pages of text
+  layer where there had been 18 of wiki chrome.
+  `tests/test_vendor_scan_furniture.py` is new -- 13 tests, four NEUTER-PROVEN
+  (each defect restored one at a time, caught by its own test and no other,
+  source restored byte-for-byte) and two recording KNOWN LIMITS so they cannot
+  be rediscovered later and mistaken for fresh bugs. It exists because six of
+  these rules were broken again by the fix for the next one, twice by a guard
+  that outlived the hazard it was written for.
+  Corpus 39 -> 41 (it 13, fr 12, es 6, zh 5, pt 3, ja 2). pt king_lear 1.1 at
+  80 speeches / 9 speakers against fr and it at 84/10; pt macbeth 1.3 at 47/8
+  against es 48/9, fr 51/8, it 51/8. Lear is four short because Domingos Ramos
+  prints no joint `BOTH` label for the two dukes -- no such token exists
+  anywhere in the span -- which is the translator's choice and ships as he
+  wrote it, per the 2026-09-19 ruling.
+Current step: plan section 2 row 1. 12 scanned cells are ready to run: 10 with
+  a direct PDF and a proven text layer (8 es, 2 pt), plus pt midsummer 3.1/3.2
+  needing the same imageinfo resolve. Corpus 41 -> up to 53.
+Next: `--probe` each volume BEFORE vendoring -- each words its headings
+  differently, and the Spanish Obras dramaticas holds several plays in one
+  472-page file, so an act label alone will not find the right play. Its text
+  layer also misreads numerals (`ACTO 11`, `ACTO IF`, `SCENA IT`).
+Models: four contrarian Sonnet subagent passes on the finished diff, each
+  briefed to REFUTE. The first three each found real defects that changed the
+  code, including TWO the previous fix had introduced; the fourth found a
+  docstring describing a rule the code no longer followed and no defect in
+  behaviour, which is where reviewing stopped. A Codex CLI lane was started
+  first and killed: 654 KB of output without ever reading the file it was
+  briefed on -- check a lane's output for the verdict tokens you asked for, not
+  just its size. No kibitz arc: this is wiring conformance with one verifiable
+  right answer per the 2026-08-17 amendment, not a design fork.
+Suite: 195 passed (test_verbatim_corpus, test_passage_selector,
+  test_vendor_scan_furniture). Full suite and Bug Bible NOT run this session.
+Box: a ComfyUI server is RESIDENT on :8000 (PID 35332), idle with models
+  released, VRAM 1976 MiB at desktop baseline. Reset per CLAUDE.md section 4
+  before any headless run.
+Commits: 75cd39dd. The handoff commit lands on top -- see the kickoff line.
+
 ## 2026-09-19 -- two forks closed by ruling; thirteen AMD denials fixed; the guard that catches the next one
 
 Did: A1 (canonical writer on 8 GB) closed -- operator: *"canonical is good,

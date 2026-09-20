@@ -238,11 +238,33 @@ years are recorded as row DATA only. See
 [standing rulings](OTR_STANDING_RULINGS.md). Fidelity is a separate axis and
 still governs: a translation made from an intermediary is still refused.
 
-**39 scenes are vendored: it 13, fr 12, es 6, zh 5, ja 2, pt 1** (read from the
-manifest 2026-09-19 evening -- this row said 30 an hour earlier, 16 before that
-and 4 before that, so read it rather than quote it). All 95 leads are hunted.
-Adding a scene is mechanical: read the edition's own act/scene label into
-`EDITION_LABELS`, add the row, run `scripts/otr_vendor_shakespeare.py --write`.
+**41 scenes are vendored: it 13, fr 12, es 6, zh 5, pt 3, ja 2** (read from the
+manifest 2026-09-19 late -- this row said 39 earlier that evening, 30 an hour
+before that, 16 before that and 4 before that, so read it rather than quote it).
+All 95 leads are hunted. Adding an HTML scene is mechanical: read the edition's
+own act/scene label into `EDITION_LABELS`, add the row, run
+`scripts/otr_vendor_shakespeare.py --write`.
+
+**THE SCANNED LANE NOW EXISTS -- `scripts/otr_vendor_scan.py`.** This row used to
+say "the vendor script fetches URLs and has no PDF path at all; that seam is the
+work". The seam is built and proven on two Portuguese scenes. It is a SEPARATE
+script on purpose: the HTML path reads speakers off the edition's own markup,
+and a PDF text layer has none, so the two share nothing at the speaker-marking
+step. They do share scene boundaries, so `extract` is imported rather than
+reimplemented.
+* It anchors on the ENGLISH ROSTER: every all-caps run is a candidate and only a
+  candidate resolving to that scene's Folger cast is accepted, so the cast list
+  filters out running heads, folios and translator initials at once.
+* **Pass `--end-label` whenever the volume prints its scene label across the top
+  of every page**, which is most of them. Without it the scene finder stops at
+  the next PAGE rather than the next SCENE and stores the fragment as a whole
+  scene at `alignment_confidence: 1.0`. The script now refuses that run and says
+  so; `--probe` lists a volume's headings so the boundary can be read off.
+* Page furniture is removed by POSITION, never by token -- a play's title is
+  usually also a character in it. `tests/test_vendor_scan_furniture.py` holds
+  the thirteen shapes that earned their place, four of them neuter-proven, plus
+  two recorded KNOWN LIMITS. Read it before changing that file; six of those
+  rules were broken again by the fix for the next one.
 
 **A TRANSLATOR'S OWN CHOICE IS NOT A DEFECT (operator 2026-09-19):** *"maybe
 some of these foreign translators decide to create a new act or a new speech,
@@ -265,12 +287,29 @@ shared-code change, the whole set costs three minutes.
 
 **WHAT IS LEFT, AND NONE OF IT IS BOOKKEEPING ANY MORE.**
 
-* **27 page-scan cells.** Twelve carry a full TEXT LAYER (8 es, 4 pt) and need
-  extraction, not transcription -- see
-  [the audit](2026-09-19-shakespeare-vendoring/scan_sources_text_layer_audit.md),
-  which also records a prototype and the four ways it failed. The other 15 are
-  image-only and are the real OCR work, unblocked by the one-model ruling. The
-  vendor script fetches URLs and has no PDF path at all; that seam is the work.
+* **27 page-scan cells, and 12 of them are ready to run TODAY.** Ten carry a
+  direct PDF URL and a proven text layer -- 8 es (king_lear 1.1, midsummer 3.1
+  and 3.2, much_ado 2.3 and 3.1, tempest 3.1, twelfth_night 1.5 and 2.5) and 2
+  pt (tempest 1.2 and 3.1). Two more, pt midsummer 3.1 and 3.2, point at a
+  `Galeria:` page and need the same imageinfo resolve the Spanish rows just
+  had. Corpus 41 -> up to 53.
+  **START WITH `--probe`, ALWAYS.** Each volume words its headings differently:
+  the Portuguese print `ACTO PRIMEIRO` / `SCENA III`, the Spanish Obras
+  dramaticas spells its ordinals (`ACTO SEGUNDO`, `ESCENA PRIMERA`) and holds
+  SEVERAL PLAYS in one 472-page file, so an act label alone will not find the
+  right play. That volume's text layer also misreads numerals badly -- `ACTO
+  11`, `ACTO 111`, `ACTO IF`, `SCENA IT` -- so do not assume clean romans.
+  The remaining 15 are image-only (9 ja, 6 zh) and are the real OCR work,
+  unblocked by the one-model ruling. See
+  [the audit](2026-09-19-shakespeare-vendoring/scan_sources_text_layer_audit.md).
+* **A LEAD URL POINTING AT A WIKIMEDIA `File:` / `Archivo:` / `Galeria:` PAGE IS
+  NOT A SOURCE, IT IS A PAGE ABOUT ONE.** Nine Spanish rows pointed at
+  description pages, so the vendor fetched HTML, read 18 "pages" of wiki chrome
+  and reported the volume's only heading as `Actions` -- the sidebar. Resolve
+  with the MediaWiki imageinfo API (`action=query&prop=imageinfo&iiprop=url`);
+  the `e/ea` path segments are an md5 of the filename and CANNOT be constructed
+  by hand. Keep the description page on the row as `description_page`, since
+  that is where the licence tag lives.
 * **4 Japanese cells have no published source.** Aozora catalogues Tsubouchi's
   Hamlet, As You Like It and Much Ado as in-progress and 404s every card. Not a
   hunt that ran out of ideas -- re-check the author page, not a search engine.
