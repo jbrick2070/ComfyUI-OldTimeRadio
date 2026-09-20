@@ -146,8 +146,7 @@ decisions are still legible.
 
 ## The set, and how to use it
 
-Upload every `.md` in this folder to one NotebookLM notebook. Suggested
-order (the completeness critic's ordering replaces this line when it lands):
+Upload every `.md` in this folder to one NotebookLM notebook, in this order:
 `README.md` (this), `SCHEMA_speaker_cue_oddities.md`, then Segments 1, 2,
 4, 5, 6, then `SOURCE_the_operator.md`.
 
@@ -164,8 +163,6 @@ order (the completeness critic's ordering replaces this line when it lands):
 | `SOURCE_the_operator.md` | the sourced brief on the operator (every claim cited to a file) | the coding window |
 
 Every source carries a claims register (claim | edition | evidence |
-MEASURED / RULING / INFERRED) and ends with `SOURCES READ: n`. A separate
-verification pass -- one adversarial reader per file, then one critic across
-the set -- is recorded in `VERIFICATION.md` in this folder once it completes;
-until it does, treat the lanes' segments as unverified and the two
-coding-window files as self-reported.
+MEASURED / RULING / INFERRED) and ends with `SOURCES READ: n`. The lanes'
+segments are as the lanes delivered them; the operator's call (2026-09-19,
+late) was to spend nothing further on verifying them.
