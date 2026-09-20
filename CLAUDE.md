@@ -38,16 +38,38 @@
   WE FIXED IT." Do not reopen techno/house cue wording, tempo-error A/Bs,
   groove-prompt order, or the music-lottery seed hunt. IndexTTS2 hang is a
   hang-timeout, not prompt-craft, and stays a separate row.
-- **EVERY CODE CHANGE GETS COMPOSER QA BEFORE THE PUSH (operator
-  directive 2026-09-17 -- hard).** Operator: "thats my law any code
-  change always get a composer qa." Cursor driver: spawn Composer QA
-  (Task, Composer, briefed to REFUTE) on the finished diff. Do not
-  `git push` until it returns HOLDS / MUST-FIX: none. Then Sonnet
-  (Task, `claude-sonnet-5-thinking-max`, REFUTE) until HOLDS. A
-  self-review does not count. Do not push first and QA after. This
-  supersedes the older "Sonnet 5 QA is enough" / "one finished-diff
-  review is enough" / "one CLI lane" floors below for every coding
-  change.
+- **NEVER HOLD BACK A COMMIT OR A PUSH. SONNET QA THE DIFF, ALWAYS
+  (operator directive 2026-09-19 -- hard, and it REVERSES the "QA
+  before the push" half of 2026-09-17 below).** Operator: "alwasy
+  push"; "never hodl back comit or push sonet qa fdiff always."
+  * **A green chunk is pushed the moment it is green.** Not after a
+    reviewer answers, not after a lane comes back, not at the end of
+    the turn. A finished diff sitting in the working tree waiting for
+    a verdict is the defect this directive exists to stop -- it blocks
+    the other box, it goes stale under the next change, and a reviewer
+    writing into that tree can destroy it.
+  * **THEN Sonnet QA on the diff, every time** (Task, Sonnet, briefed
+    to REFUTE, grounded against the real Windows files). It reviews
+    what is ALREADY PUSHED. A finding becomes the next commit, which
+    is what git is for.
+  * **This was written the day a correct, green, byte-attributable fix
+    sat unpushed across a dozen exchanges** waiting for a Composer
+    verdict that was never going to arrive in this window, while the
+    same file was being redesigned around it.
+  * **What is UNCHANGED:** the scoped suite must be green before the
+    push, named files only and never `git add .`, and tags and
+    releases still wait for the operator's eyeball. Pushing is safe;
+    publishing is not.
+- **EVERY CODE CHANGE GETS COMPOSER QA (operator
+  directive 2026-09-17 -- hard; the "BEFORE THE PUSH" clause is
+  SUPERSEDED by 2026-09-19 above, the QA itself is not).** Operator:
+  "thats my law any code change always get a composer qa." Cursor
+  driver: spawn Composer QA (Task, Composer, briefed to REFUTE) on the
+  finished diff, then Sonnet (Task, `claude-sonnet-5-thinking-max`,
+  REFUTE). A self-review does not count. **The review still happens on
+  every coding change; it no longer gates the push.** This supersedes
+  the older "Sonnet 5 QA is enough" / "one finished-diff review is
+  enough" / "one CLI lane" floors below for every coding change.
 - **NO WORD-COUNT CHASING (operator directive 2026-08-03).** "We never chase word count."
   The target words value is a REQUEST, not a gate: no refusals, no hard caps, no shunts. The
   manifest `recommended_word_budget` upper bound is removed for exactly this reason. The only
