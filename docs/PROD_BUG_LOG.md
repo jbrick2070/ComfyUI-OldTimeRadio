@@ -15771,3 +15771,40 @@ directly with backoff off: `veo-3.1-fast-generate-preview` and
 is PER MODEL. That measurement is what settled Google as a stills-only lane
 (`config/profiles/google_still_1act.json`, `67332dc5`), which is a quota fact and not
 a code defect.
+
+## PBUG-20260919-04 -- a Japanese Shakespeare scene counted as two words, so the translator's text was never performed (fixed `96346118`)
+
+**Artifact:** the first native Japanese leg, `tmp/ja_balcony_server.log` line 273, on
+the canonical graph with `source_bank=shakespeare`,
+`source_ref=folger-romeo-juliet:act2-scene2-balcony`, `episode_language=Japanese`:
+`[OTR_LedgerScriptWriter] vendored scene did not re-plan (a 2-word passage cannot
+fill 12 beats); using the model translation`. The vendored row (Tsubouchi Shoyo,
+1933) was selected, read and hash-verified, and then discarded. The episode that
+published from that leg is a machine translation carrying the translator's credit
+line; it is kept in `otr/obs` as the receipt of the defect.
+
+**Cause, two halves, both in the word measure.** `canonical_word_count` was
+`[A-Za-z][A-Za-z0-9'-]*` -- ASCII letters only. A 3,606-character Japanese scene
+counted as two words (its two Latin tokens), and an accented Latin word split at the
+accent, so every it/fr/es/pt ledger row was over-counted as well. Second, every cut in
+the passage chunker fell at a space (`line.split()`), which a Japanese or Chinese line
+never has: the Japanese plan succeeded or failed by SEED, depending on whether the
+window drew Juliet's 180-word single-line speech that `_halve` could not cut.
+
+**Fix (`96346118`).** A word starts with a letter of any script; CJK characters carry
+the count at two per word. On ASCII the pattern is the old one letter for letter --
+measured over 27,600 pure-ASCII rows (every Folger source scene and every English
+ledger row on disk), 0 differ; a stricter continuation was tried first, moved 15
+rows (every one a Folger double dash) and was withdrawn because the freeze auditor
+re-derives English counts. A spaceless CJK line is cut after sentence marks, then
+clause marks, then characters, re-joined with nothing between; the greedy cut closes
+a chunk before the token that would overshoot the cap. All seven CJK cells (ja
+romeo_juliet 1.1, 2.2; zh hamlet 1.1, midsummer 3.1, 3.2, tempest 1.2, 3.1) now plan
+to 12 beats; the balcony scene plans on 50 of 50 seeds.
+
+**Verify:** `tests/test_text_metrics_scripts.py` (ASCII identity against the old
+regex, accented Latin, CJK ratio, the real vendored scene planning, the fifty-seed
+loop, the chunker's cap and byte identity, English chunking unchanged).
+
+**Bible:** portable -- an ASCII-only word regex silently zeroes every non-Latin
+script, and a whitespace chunker cannot cut one; promote at wrap-up with the index row.
