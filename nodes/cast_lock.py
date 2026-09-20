@@ -1941,7 +1941,18 @@ class CastLock:
         # tests that pin this were red at HEAD. Bark's own identity stays:
         # when the stamped engine IS bark, ``voice_preset`` is the spoken
         # id and is left alone (Lemmy's frozen v2/* beside a bark row).
-        if str(getattr(ref, "engine", "") or "") != "bark":
+        #
+        # A PROVISIONAL STAMP IS NOT THE ROW'S IDENTITY EITHER. Lemmy's
+        # writer stage sets the bark preset far upstream and the provisional
+        # route (an audition through chatterbox or another engine) stamps
+        # OVER it for that engine's pass; the bark stage that follows reads
+        # the preset back. Clearing it here on the provisional stamp lost the
+        # cameo's identity on the ~11% of episodes that roll one, which is
+        # what `test_the_writer_stage_bark_preset_SURVIVES_the_normalizer`
+        # pinned and the Lime fix above then broke. The Lime rows are policy
+        # and deterministic stamps, never provisional, so they still clear.
+        if (str(getattr(ref, "engine", "") or "") != "bark"
+                and fallback != "provisional_route"):
             leftover = str(entry.get("voice_preset") or "")
             if leftover.startswith("v2/"):
                 entry["voice_preset"] = ""

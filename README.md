@@ -41,7 +41,7 @@ language adherence still matters. See
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md).
 
 Every model runs on your own machine: no account, no API key, no paid service,
-on NVIDIA cards and on Apple Silicon. Two of the five story banks read public
+on NVIDIA cards and on Apple Silicon. Two of the six story banks read public
 RSS feeds when they come up, so a default run reaches the internet for tonight's
 news and for the first model download and for nothing else. Paid options exist
 for people who want them, and every one of them stays off until you turn it
@@ -116,7 +116,7 @@ exactly as the app's sign-in would.
 working ComfyUI (Desktop, portable or a git install -- any of them), about
 **25 GB of free disk** -- the first run fetches roughly 12 GB of models, and an
 episode's working files need room too -- and one of the machines below. You do not need an account, an API key, a paid
-service, or a single one of the sixteen saved graphs further down this page:
+service, or a single one of the twenty-one saved graphs further down this page:
 those are per-machine presets you can grow into. Installing the pack and
 pressing **Queue** is the whole path.
 
@@ -455,7 +455,7 @@ Two things to know before you change a dropdown:
 
 `otr_canonical` names no vendor anywhere and resolves your device at run time,
 so it is correct as shipped on NVIDIA, Apple Silicon and CPU. If you would rather
-skip the dropdowns, the pack also ships **sixteen generated graphs in
+skip the dropdowns, the pack also ships **twenty-one generated graphs in
 `custom_nodes/ComfyUI-OldTimeRadio/workflows/variants/`** -- one per machine class and episode kind, named
 `otr_<machine>_<tier>.json`. Browse Templates lists only the canonical -- its
 scanner looks one directory deep -- so these are files you **drag onto the

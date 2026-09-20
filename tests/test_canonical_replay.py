@@ -369,7 +369,10 @@ def test_voices_music_and_sequencer_pass_through_on_replay(frozen):
     from nodes.scene_sequencer import SceneSequencer
     sj, _ = _replay_ledger_json(frozen)
     for cls in (BatchCharacterVoices, AnnouncerVoice):
-        audio, log_, done = cls().generate(sj, "kokoro", ledger_json=sj)
+        # `generate(self, script_json, ledger_json="", ...)` -- the engine is
+        # not a positional parameter of the voice base; passing "kokoro"
+        # there bound it to ledger_json and collided with the keyword.
+        audio, log_, done = cls().generate(sj, ledger_json=sj)
         assert done == "replay:passthrough" and audio["waveform"].shape[-1] == 0
     cue_audio, manifest, log_, done = StableAudioTheme().generate(sj, "stable_audio_3", ledger_json=sj)
     assert done == "replay:passthrough" and manifest == ""

@@ -104,7 +104,11 @@ def test_request_slot_uses_complete_canonical_cache_without_download(
     real_auto_download = catalog.auto_download_if_missing
     seen: dict[str, Path] = {}
 
-    def guarded_auto_download(repo_id, *, hub_root):
+    def guarded_auto_download(repo_id, *, hub_root, **kwargs):
+        # The catalog forwards keyword arguments it did not when this stub was
+        # written (`progress_pbar`, see request_slot); a stub that names only
+        # the arguments of its day fails on the first new one, which is a
+        # stale test, not a defect in the cache path it guards.
         seen["hub_root"] = hub_root
 
         def network_forbidden(**_kwargs):
@@ -114,6 +118,7 @@ def test_request_slot_uses_complete_canonical_cache_without_download(
             repo_id,
             hub_root=hub_root,
             _snapshot_download=network_forbidden,
+            **kwargs,
         )
 
     monkeypatch.setattr(catalog, "auto_download_if_missing", guarded_auto_download)

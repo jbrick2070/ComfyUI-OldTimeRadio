@@ -86,11 +86,13 @@ English, Spanish, Portuguese, Italian, French, Hindi, Japanese and Mandarin.
 Keep both voice engines on **Kokoro**; non-English rows refuse other engines
 rather than borrowing an English voice.
 
-For a non-English run, pin `source_bank` to `original`, `my_story`,
-`media_archive` or `scifi_news_pro`. Shakespeare and Public Domain preserve
-their source author's own words and therefore refuse a translation request.
-The default bank roll can draw one of those fidelity lanes, so pinning a
-supported bank is the reliable unattended path.
+Every bank is admitted for every language row, so the default roll is safe
+unattended. Shakespeare and Public Domain still perform the author's own
+words: in a non-English run they use a real translator's public-domain text
+when the corpus holds that scene (43 Shakespeare scenes across Spanish,
+French, Italian, Portuguese, Japanese and Mandarin), and otherwise the writer
+model's own translation of the selected passage, which the ledger records as
+such. Pin `source_bank` only when you want a particular lane.
 
 Captions are native when the written line is native. They are not a separate
 translation track: an English line leaked by the writer remains English in the
