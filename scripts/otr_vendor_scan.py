@@ -292,8 +292,21 @@ _FUSED_WORD_JUMP = 4.5
 
 
 def _median(values) -> float:
+    """The statistical median: the mean of BOTH middles on an even count.
+
+    Taking the upper middle alone looked harmless and was not. A word's
+    characters are an even count about half the time, and on the qualified
+    reconstruction that one-sided pick left 524 word baselines more than a
+    point off across 13 pages -- `ramera.Mátame,` on Otelo 176 has fourteen
+    glyph origins whose two middles are 269.76 and 277.40, and the upper one
+    put it on the wrong row. With the true median every one of 302,837
+    baselines matches the reference exactly and all 1,450 pages agree.
+    """
     ordered = sorted(values)
-    return ordered[len(ordered) // 2]
+    half = len(ordered) // 2
+    if len(ordered) % 2:
+        return ordered[half]
+    return (ordered[half - 1] + ordered[half]) / 2.0
 
 
 def _word_baselines(page) -> tuple[list, list]:
@@ -999,6 +1012,17 @@ def main(argv=None) -> int:
     ap.add_argument("--act-label", default=None)
     ap.add_argument("--scene-label", required=True)
     ap.add_argument("--end-label", default=None)
+    ap.add_argument("--reading-order", default="flat",
+                    choices=("flat", "coordinates"),
+                    help="how a page's text is ordered. `flat` is PyMuPDF's "
+                         "own order and the default; `coordinates` rebuilds "
+                         "each printed row from glyph baselines. The reader is "
+                         "OPT-IN because it is proven per VOLUME, not globally: "
+                         "an independent challenger accepted it for the two "
+                         "Domingos Ramos volumes (zero differing speech bodies "
+                         "against an image-verified reconstruction) and still "
+                         "names four split cue rows in the Macpherson. Prove a "
+                         "volume, then pin this on its rows.")
     ap.add_argument("--pages", default=None, metavar="START-END",
                     help="restrict the search to these PDF page indexes, "
                          "zero-based and inclusive, e.g. 244-255. THE PAGE IS "
@@ -1031,7 +1055,7 @@ def main(argv=None) -> int:
 
     url = str(lead.get("url") or "").strip()
     print("[scan] %s" % urllib.parse.unquote(url)[:96])
-    pages = strip_running_titles(pdf_text(url))
+    pages = strip_running_titles(pdf_text(url, reading_order=args.reading_order))
     # SLICE AFTER THE FURNITURE VOTE, NEVER BEFORE. `running_titles` decides
     # what is furniture by how often a line repeats across the WHOLE volume,
     # so a handful of pages cannot tell a running head from a speaker: on a
@@ -1147,7 +1171,12 @@ def main(argv=None) -> int:
                         for label in counts},
         "transcription_method": "pdf_text_layer",
         "transcription_date": "2026-09-19",
-        "extractor": "scripts/otr_vendor_scan.py",
+        # THE READER IS PART OF THE PROVENANCE. A row vendored under the
+        # coordinate reader is a different extraction from the same text
+        # layer, and the string here is how a later window tells which one
+        # produced the file it is looking at.
+        "extractor": "scripts/otr_vendor_scan.py --reading-order %s"
+                     % args.reading_order,
     }
     man["scenes"] = [s for s in man["scenes"]
                      if (s["iso"], s["play"], s["scene"]) != key]

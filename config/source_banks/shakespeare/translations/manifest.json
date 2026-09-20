@@ -1519,12 +1519,12 @@
       "translation_first_published": 1919,
       "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
       "source_url": "https://upload.wikimedia.org/wikipedia/commons/d/df/William_Shakespeare_-_Rei_Lear_%28trad._Domingos_Ramos%2C_1919%29.pdf",
-      "revision_id": "sha256:f21477547287b49c",
-      "raw_sha256": "f21477547287b49ccae27a30acc26dcf8e54d4b479b453e41d8b0314b737c5a5",
+      "revision_id": "sha256:0a5cf6c35664e25c",
+      "raw_sha256": "0a5cf6c35664e25ca8976eb6d25ebebf0ed2781239c3d0708ca72d52242f2829",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO PRIMEIRO / SCENA I",
-      "speaker_labels": 81,
+      "speaker_labels": 83,
       "distinct_speakers": 9,
       "speaker_map": {
         "KENT": {
@@ -1566,7 +1566,7 @@
       },
       "transcription_method": "pdf_text_layer",
       "transcription_date": "2026-09-19",
-      "extractor": "scripts/otr_vendor_scan.py"
+      "extractor": "scripts/otr_vendor_scan.py --reading-order coordinates"
     },
     {
       "iso": "pt",
@@ -1578,12 +1578,12 @@
       "translation_first_published": 1912,
       "transcription_license": "public domain (Wikimedia Commons scan, PD tag on the file page)",
       "source_url": "https://upload.wikimedia.org/wikipedia/commons/5/50/William_Shakespeare_-_Macbeth_%28trad._Domingos_Ramos%2C_1912%29.pdf",
-      "revision_id": "sha256:44e3aac342d82d23",
-      "raw_sha256": "44e3aac342d82d2390c519ea6b07c39093b34cf3b2def4e1ff17c3acd5678b75",
+      "revision_id": "sha256:21da1d5ee3898b9a",
+      "raw_sha256": "21da1d5ee3898b9aafe87259ca9c44c17bb609264eaa0832707986aaf55ddbe0",
       "verdict": "READY",
       "alignment_confidence": 1.0,
       "edition_label": "ACTO PRIMEIRO / SCENA III",
-      "speaker_labels": 48,
+      "speaker_labels": 49,
       "distinct_speakers": 8,
       "speaker_map": {
         "1.ª FEITICEIRA": {
@@ -1621,7 +1621,7 @@
       },
       "transcription_method": "pdf_text_layer",
       "transcription_date": "2026-09-19",
-      "extractor": "scripts/otr_vendor_scan.py"
+      "extractor": "scripts/otr_vendor_scan.py --reading-order coordinates"
     },
     {
       "iso": "zh",

@@ -10,7 +10,7 @@ EDMUNDO: Não, meu senhor
 GLOUCESTER: É o senhor de Kent, lembra-te sempre dêle como de um bom amigo
 EDMUNDO: Fico pronto a servir vossa senhoria
 KENT: Desejo a vossa amizade e ser-me há agradável levar mais alêm êste nosso conhecimento
-EDMUNDO: Procurarei merecer o vosso afecto, senhor
+EDMUNDO: Procurarei merecer o vosso - afecto, senhor
 GLOUCESTER: Esteve nove anos no estrangeiro e para lá volta. (Fanfarras de trompas, fóra). É o rei que chega
 REI LEAR: Ide buscar os soberanos da França e da Borgonha, Gloucester
 GLOUCESTER: Obedeço, meu senhor. (Sai com Edmundo)
@@ -22,7 +22,9 @@ REGANE: Sou, meu senhor, feita do mesmo metal que mi nha irma e faço minhas as 
 CORDÉLIA: É caso para dizer : pobre Cordélia ! ... e entretanto ... não ; certíssima estou de que o meu amor, é mais rico do que a minha linguagem
 REI LEAR: Ficai vós e os vossos perpétuamente herdeira dêsse vasto têrço do nosso belo reino, têrço que em extensão, valor e beleza nada é inferior ao que eu dei a Goneril.-E vós, alegria minha, nossa terceira filha, não menos amada por isso, vós por quem os vinhedos da França, as pradarias da Borgonha se sacrificam como rivais, para ganhar o vosso joven afecto, que podereis vós dizer para alcançardes o quinhão ainda mais opulento que o de vossas irmās ? Falai (****)
 CORDÉLIA: Nada, meu senhor
-REI LEAR: Nada?! Nada... Do nada, só o nada pode nascer. (*) Continuai ... : Quem tem nada nos lábios, não tem nada no coração
+REI LEAR: Nada?!
+CORDÉLIA: Nada
+REI LEAR: Do nada, só o nada pode nascer. (*) Continuai ... : Quem tem nada nos lábios, não tem nada no coração
 CORDÉLIA: Que infeliz que sou ! não poder conseguir que o meu coração suba até aos meus lábios ! Amo a Vossa Majestade como é meu dever, nem mais nem menos
 REI LEAR: Que dizeis, Cordélia, o que dizeis ? Reparai no que dizeis se não quiserdes arruinar a vossa fortuna
 CORDÉLIA: Meu bom senhor ! Fui por vós gerada, educada e amada e em paga dêsses deveres restituo-vos êsses, por outros deveres que me foram legitimamente impostos. Amo-vos, obedeco-vos, venero-vos sobre tudo e sobre todos. Como podem minhas irmās dizer que não amam a mais ninguém senão a vós, tendo maridos como teem ? Talvez, quando eu me casar, o meu noivo, com a minha palavra leve também metade do meu amor, da minha solicitude, do meu dever. Certamente que não me casaria nunca para não amar absolutamente senão meu pai, como dizem minhas irmās. 1
@@ -33,8 +35,8 @@ CORDÉLIA: Nova, mas sincera, meu senhor
 REI LEAR: Muito bem ! pois que essa franqueza te sirva de dote. Pela sagrada luz do sol, pelos mistérios de Hecate e da Noite, por todas as influências dos astros pelas quais existimos ou deixamos de existir, eu, aqui abdico todo o meu carinho paterno, todo o meu parentesco, todos os meus direitos de sangue e desde este momento tu não passas duma pessoa estranha ao meu coração e à minha pessoa ... O bárbaro scyta, ou êsses homens que comem os filhos para matar a fome estarão tam perto da minha amizade e do meu auxilio como tu
 KENT: Meu bom soberano
 REI LEAR: Silêncio, Kent, não te intrometas entre o dragão e a sua cólera ! Eu que a amava sobre todas ! eu que contava confiar-lhe o meu sossêgo aos seus carinhos ! (Para Cordélia). Fóra daqui ! Longe da minha vista ! Que não tenha eu a paz da sepultura, se não lhe retirar desde já a minha amizade de pai ! Ide chamar a França. ' Quem perderá com isto ?! Ide chamar a Borgonha. - Cornouailles, Albânia,juntai aos dotes das minhas duas filhas éste, que era o dela : que o orgulho a que chama sinceridade a case. Eu vos invisto a ambos conjuntamente no meu poder, na minha soberania, em todas as minhas largas prerrogativas que exornam a majestade. Nós mesmos iremos alternadamente, de més a més, residir nos vossos palácios ; e para isso reservamos um séquito de cem cavaleiros que serão sustentados à vossa custa . Reservamos também o título de rei e as etiquetas que a este nome pertencem ; quanto ao govêrno, à administração das rendas, às outras funções riais, tudo vos entrego, ó filhos muito amados, e para confirmação das minhas palavras, dividi por ambos esta coroa (Entrega-lhes a corda)
-KENT: Rial senhor ! Eu que sempre vos venerei como meu rei , que vos amei como meu pai, que vos segui como meu senhor, invoquei nas minhas orações como meu grande padroeiro ... ta-te
-REI LEAR: O arco já está frouxo, a flecha já partiu. Afas
+KENT: Rial senhor ! Eu que sempre vos venerei como meu rei , que vos amei como meu pai, que vos segui como meu senhor, invoquei nas minhas orações como meu grande padroeiro
+REI LEAR: O arco já está frouxo, a flecha já partiu. Afasta-te
 KENT: Não ; deixai-a ferir-me em pleno coração ; que o seu ferro o trespasse de lado a lado : que Kent seja ousado quando Lear está desvairado. O que quereis fazer ? Pois pensais que a minha lialdade tem mêdo de falar quando o vosso poder se verga à lisonja ?. Presta-se homenagem à sinceridade, quando a majestade se humilha à loucura. Revogai a vossa sentença ; considerai melhor e depois recolhei essa odiosa precipitação : juro-vos pela minha vida que vos digo a verdade : a vossa filha não é a que menos vos ama. Não há corações vazios cujo som abafado não repercuta algum sentimento oco
 REI LEAR: Kent, pela tua vida, cala-te
 KENT: Pela minha vida ! Nunca a considerei senão como um depósito, para me servir dela contra os meus inimigos ; não tenho medo de perdê-la quando a exponha para vos salvar, senhor !
