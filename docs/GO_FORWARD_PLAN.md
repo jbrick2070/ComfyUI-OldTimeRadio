@@ -231,6 +231,26 @@ here that reaches strangers and cannot be taken back.
 
 ### 1. Vendored public-domain Shakespeare translations
 
+**PARKED 2026-09-19 EVENING (operator: "cut our losses so we can ship").** The
+corpus ships as it stands -- **43 scenes: it 13, fr 12, es 6, zh 5, pt 5,
+ja 2** (manifest, 2026-09-19 late). Everything below this banner is the
+record of how the scanned lane got here and what it still lacks; none of it
+is a shipping gate and no window opens a new prompt, lane or arc on it (see
+the top entry of [standing rulings](OTR_STANDING_RULINGS.md)). Parked, in
+order of value if it is ever reopened: unbound-speaker emission in
+`speeches_from_span` (the ruling requires it; Grok's detector spec and
+per-cell golden counts are in `docs/2026-09-19-shakespeare-vendoring/`);
+the eight Spanish windows (boundaries proven, zero cells vendored because
+of that same emission gap); a per-edition `scan_editions.json` registry;
+the Macpherson furniture floor. What DID ship on the last day: the
+operator-authorised `--fold PRINTED=ROSTER` (exact-first, refused for any
+form the resolver reaches, atomic, recorded in the row), the OCR-tolerant
+heading peel beside a folio, the `Canto de Ariel` song cue, the
+whole-volume running-head vote and the window-edge refusal, two review
+rounds (codex + Sonnet, both MUST-FIX then HOLDS on re-measure), and the
+two Portuguese Tempestade cells. The remaining credits go to the ship
+regression, not here.
+
 **RIGHTS ARE NOT A GATE (operator 2026-09-18 evening):** *"I don't want to
 waste anything in rights I'm not publishing these commercially."* Nothing is
 refused on a date, no rights research happens, and translator/publication

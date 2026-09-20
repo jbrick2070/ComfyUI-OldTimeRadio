@@ -50,6 +50,28 @@ explained or fixed -- section 7A's condition for any publish. (4) The
 version bump is HIS: state the gap and the number (`2.1.x`, third digit
 only), and bump when he says so. (5) The Reddit post is his.
 
+**THE FINAL QUEST, added minutes later: one native Japanese episode.**
+Operator: *"man i hoie we have at least oen native jaasnbe ripisode if not
+let s make tyaht our final quetys"* and *"thsi si an eucvtaional project we
+cn subit to teh foklger so donbt be woirrie sbaout rights ok."* Measured
+before acting: `otr/obs` already holds a Japanese-language episode
+(`signal_lost_嘘の夜明け_ja_20260918_190917`, the original bank, Kokoro), so
+Japanese TTS is proven end to end -- but no SHAKESPEARE episode has ever
+been rendered in Japanese, and the corpus holds exactly the cells for one:
+Tsubouchi Shōyō's Romeo and Juliet 1.1 and 2.2 (1933). The quest is
+therefore the balcony scene in Tsubouchi's Japanese through the canonical
+graph: `scripts\otr_headless_canonical.ps1 -Profile otr_16gb_still -Set
+OTR_LedgerScriptWriter.source_bank=shakespeare -Set
+OTR_LedgerScriptWriter.source_ref=folger-romeo-juliet:act2-scene2-balcony
+-Set OTR_LedgerScriptWriter.episode_language=Japanese`, launched
+2026-09-19 23:30. Rights: already not a gate (09-18 ruling); the Folger
+framing changes nothing in code. One stale line found on the way: the
+`episode_language` tooltip in `OTR_LedgerScriptWriter.py` still says the
+Shakespeare bank is "English only and refuse[s]", written the morning of
+09-18 before the translation lane landed; the writer's own binding site
+(lines ~3794-3903) is the truth. The tooltip is corrected in the next code
+commit after the leg's receipt, not during it.
+
 ## 2026-09-19 -- A MANGLED NATIVE TEXT BEATS A CLEAN AI TRANSLATION
 
 Operator, unprompted, while the panel was pricing fail-closed gates that would
