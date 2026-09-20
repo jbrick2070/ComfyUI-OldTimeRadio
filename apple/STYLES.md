@@ -48,7 +48,7 @@ it.
 
 `roll (any style)` is the first row of the dropdown, and every graph that ships
 with this pack -- the canonical and every variant -- is saved on it. It
-is a command, not a style: at run time it draws one of the ten ids above at
+is a command, not a style: at run time it draws one of the ids above at
 equal odds, 10% each, and the episode uses that.
 
 Drop a fresh **OTR_LedgerScriptWriter** on the canvas yourself and it starts on
@@ -106,7 +106,7 @@ full style pack out of it and freezes it into the episode's ledger.
 
 ## The pool is not scoped to the bank
 
-Every one of the ten is available to every source bank. The roll draws from the
+Every one of them is available to every source bank. The roll draws from the
 same ten whichever bank writes the episode, so yes, a Shakespeare adaptation can
 come out as a cartoon. If you do not want that, pin the style.
 
