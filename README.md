@@ -459,7 +459,7 @@ Every
 `shipping` graph above has put a finished episode into `otr/obs/` on the
 hardware its section names, all on 2026-09-13, the day 2.0.0 was published: the
 8 GB rows on a physical RTX 4060 laptop, which by now
-has published documented full OTR episodes through this pack; the 16 GB rows
+has published 11 documented full OTR episodes through this pack; the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
 ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
