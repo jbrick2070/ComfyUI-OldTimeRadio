@@ -54,8 +54,12 @@ bottom, people really care."** Both done in `c0b6aeff`.
   provisional included. The 2026-08-16 "writer-stage preset SURVIVES the
   normalizer" test is retired and replaced by two tests asserting the clear on
   chatterbox and kokoro provisional stamps. Settled by dates: Lime (09-17) and
-  the portable bank (09-01) are newer than the survival rule (08-16), and no
-  non-bark dispatch reads the field. Do not re-add the carve-out.
+  the portable bank (09-01) are newer than the survival rule (08-16), and only
+  bark's dispatch uses the field to choose a voice. The Sonnet QA pass on the
+  pushed diff found the one other reader: the resolved-request builder copies
+  it into every engine's audio-cache key, so a non-bark row misses its cache
+  once (`v2/...` -> "") and re-renders that line -- never different audio.
+  Do not re-add the carve-out.
 * **Next version is `2.3.1`** -- the third digit only, per the 09-13 rule. Before
   the next bump, re-diff the failing set against `c0b6aeff`, not against a
   remembered number.

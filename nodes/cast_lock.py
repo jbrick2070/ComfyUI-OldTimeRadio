@@ -1947,13 +1947,18 @@ class CastLock:
         # preset SURVIVING a chatterbox audition stamp; a 2026-09-01 portable
         # bank test pinned it CLEARED on a kokoro one; the Lime clear of
         # 2026-09-17 is the newest statement of intent. Two reviewers traced
-        # every consumer: nothing but bark's own dispatch reads
-        # `voice_preset`, kokoro reads `voice_ref_id`, the credits prefer
+        # every consumer: only bark's dispatch USES `voice_preset` to choose
+        # a voice; kokoro reads `voice_ref_id`, the credits prefer
         # `voice_engine` / `voice_ref_id`, and no bark stage runs after a
-        # non-bark provisional stamp inside one render. A preset kept on a
-        # row another engine speaks is a stale identity on the ledger and
-        # nothing else, so the newest rule wins everywhere and the 08-16 test
-        # was retired rather than carved around.
+        # non-bark provisional stamp inside one render. One more reader,
+        # found by the QA pass on the pushed diff: `_otr_voice_node_common`
+        # copies the field into every engine's resolved request, where it is
+        # part of the audio-cache key. So a non-bark row's key changes once,
+        # from the leftover `v2/...` to "", which is a single cache miss and
+        # a re-render of that line, never different audio. A preset kept on
+        # a row another engine speaks is a stale identity on the ledger and
+        # a stale cache key, so the newest rule wins everywhere and the
+        # 08-16 test was retired rather than carved around.
         if str(getattr(ref, "engine", "") or "") != "bark":
             leftover = str(entry.get("voice_preset") or "")
             if leftover.startswith("v2/"):
