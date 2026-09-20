@@ -22,6 +22,44 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-20 -- v2.3.0 IS ON THE REGISTRY, WARTS AND ALL. THE PRESET CALL IS CLOSED
+
+Operator: **"clean up the pyproject, clean up the git publishing and publish 2.3
+to the registry warts and all"**; **"admit the failures in the README at the
+bottom, people really care."** Both done in `c0b6aeff`.
+
+* **The receipt.** `pyproject.toml` at `version = "2.3.0"` (Production/Stable,
+  no alpha wording anywhere in the file). The push fired
+  `Publish to Comfy registry` run `35500761671`, green in 28 s. The registry
+  row appeared at 08:53 UTC (01:53 California): `2.3.0`,
+  `NodeVersionStatusPending`, 23 dependencies recorded (equal to
+  requirements.txt). `latest_version` still reads `2.1.4` Active, so a Manager
+  install serves 2.1.4 until Comfy-Org's scan promotes 2.3.0 -- the enum is the
+  only signal (CLAUDE.md 7A). The 2026-09-19 publish run (`35414775268`) had
+  FAILED; its log names no reason beyond the checkout, so the unidic-lite
+  declaration reached the registry only with this version.
+* **"Warts and all" means the suite is red on purpose and the failing SET is
+  explained.** Baseline: 33 nodeids in a worktree at `cc62b2c1`; set-diffed, not
+  counted (`docs/2026-09-19-ship-regression.md`, correction section on top).
+  New since baseline: one environmental disk-space precheck. Fixed since: the
+  B7 sweep, the installed-pack check, the replay test, the HF-offline stub, the
+  Lemmy preset. Shipping as known failures: the cloud-lane fixtures, the
+  receipts naming deleted audition wavs, the four portable-bank route tests
+  (Lemmy cast on kokoro `bm_george` where they expect the portable IndexTTS2
+  route -- NOT diagnosed, predates the session), the 8 GB canvas truth rows, the
+  LLM slot sweep. The README's last section, "Known failures at 2.3.0", says
+  this to an installing reader in classes, never in counts.
+* **THE `voice_preset` DESIGN CALL IS CLOSED: LIME WINS EVERYWHERE.**
+  `cast_lock._stamp` clears a leftover `v2/` Bark preset on ANY non-bark stamp,
+  provisional included. The 2026-08-16 "writer-stage preset SURVIVES the
+  normalizer" test is retired and replaced by two tests asserting the clear on
+  chatterbox and kokoro provisional stamps. Settled by dates: Lime (09-17) and
+  the portable bank (09-01) are newer than the survival rule (08-16), and no
+  non-bark dispatch reads the field. Do not re-add the carve-out.
+* **Next version is `2.3.1`** -- the third digit only, per the 09-13 rule. Before
+  the next bump, re-diff the failing set against `c0b6aeff`, not against a
+  remembered number.
+
 ## 2026-09-19 EVENING -- THE SCAN LANE IS PARKED. CUT LOSSES, SHIP v2.x
 
 Operator, after a day of lanes on the scanned-volume corpus: **"im ode iwth
