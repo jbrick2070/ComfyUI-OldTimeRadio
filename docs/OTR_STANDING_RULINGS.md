@@ -22,6 +22,45 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-19 -- A MANGLED NATIVE TEXT BEATS A CLEAN AI TRANSLATION
+
+Operator, unprompted, while the panel was pricing fail-closed gates that would
+have refused eight Spanish scan cells: **"im noit pa perfetrcuioniust so any
+natiev even tough the chaters may be mushged is beter tahn a ai atrasnation
+thast my standing call dto asking me"** -- I am not a perfectionist, so any
+NATIVE text, even though the characters may be mangled, is better than an AI
+translation. That is the standing call, and it is made INSTEAD of being asked.
+
+**WHAT THIS SETTLES.** The scanned lane was being designed to REFUSE a scene
+whose optical read is imperfect. That is the wrong direction. A page of real
+Jaime Clark with `alguenı` for `alguien` and `Mır` for `Mir` is the
+translator's own work with scanner damage; a clean machine translation of the
+same page is not his work at all. The damaged native text SHIPS.
+
+**SO THE GATES INVERT. They refuse MISATTRIBUTION, never IMPERFECTION.**
+* Mangled glyphs inside dialogue are ACCEPTED. Do not refuse a scene, and do
+  not open a repair pass, because a word lost a letter.
+* A cue the registry cannot resolve is NOT a reason to abort the run. The
+  repo's own older ruling already says what to do instead and it is the right
+  answer here: an unbound label costs a VOICE and never the dialogue. Give the
+  unrecognised cue its own speaker under the name as printed, leave it unbound,
+  and let the voice fall to the roll.
+* What is still refused is a speech landing in ANOTHER character's mouth. That
+  is not imperfection, it is a different play. The present extractor produces
+  it by DISCARDING an unresolved label and merging its text into the previous
+  speaker -- which this ruling makes indefensible, because the merge is chosen
+  behaviour and the mangling is not.
+
+**WHAT IT DOES NOT CHANGE.** Fidelity still governs the SOURCE: a translation
+made from an intermediary is still refused, a renamed cast is still an
+adaptation, and no lane invents dialogue. This ruling is about the quality of
+the OPTICAL READ of a legitimate source, not about which sources qualify. It
+also does not license an AI pass to "clean up" a scan -- that would substitute
+a model's words for the translator's, which is the exact thing being refused.
+
+**AND DO NOT ASK AGAIN.** He said so in the ruling itself. A window that stops
+to ask whether a mangled but native scene may ship has not read this.
+
 ## 2026-09-19 -- ONE MODEL'S OCR COUNTS AS VERBATIM
 
 Operator, asked whether a machine transcription of a page scan is good enough
