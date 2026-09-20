@@ -1265,11 +1265,11 @@ def lemmy_row() -> dict:
     `tts_model="bark"` to say so. It is not a claim about delivery: CastLock
     may resolve the qualified IndexTTS2 route for him instead, and on the
     canonical graph it does. What CastLock's stamp does with the preset,
-    measured 2026-09-20 rather than remembered: on a bark stamp and on a
-    provisional (audition) stamp it is left alone; on a qualified or
-    deterministic stamp by another engine the leftover `v2/` is cleared,
-    because no engine but bark reads it (Lime, 2026-09-17). The old line
-    here said the stamp never touched it, which was true before Lime.
+    measured 2026-09-20 rather than remembered: on a bark stamp it is left
+    alone; on any stamp by another engine -- qualified, deterministic or
+    provisional -- the leftover `v2/` is cleared, because no engine but bark
+    reads it (Lime, 2026-09-17). The old line here said the stamp never
+    touched it, which was true before Lime.
     """
     return {
         "name":                  LEMMY_PROFILE["name"],

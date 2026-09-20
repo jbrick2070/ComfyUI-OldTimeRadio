@@ -229,7 +229,7 @@ tools/
 # nothing a user runs ever reads. EXCLUDING FROM THE BUNDLE IS NOT DELETING
 # FROM GIT, and here that distinction has teeth: `pyproject.toml` publishes the
 # registry card art as a RAW GITHUB URL
-# (.../v2.0-alpha/assets/otr_icon.gif), which the registry fetches from GitHub,
+# (.../main/assets/otr_icon.gif), which the registry fetches from GitHub,
 # never from the zip. A `git rm -r assets/` would therefore blank the listing's
 # icon while this line costs nothing. Do not "finish the job" by deleting them.
 #

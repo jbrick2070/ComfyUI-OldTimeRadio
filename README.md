@@ -40,8 +40,8 @@ Public Domain perform in another language are in
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md).
 
 Every model runs on your own machine: no account, no API key, no paid service,
-on NVIDIA cards and on Apple Silicon. Two of the story banks read public
-RSS feeds when they come up, so a default run reaches the internet for tonight's
+on NVIDIA cards and on Apple Silicon. `media_archive` and `scifi_news_pro`
+read public RSS feeds when they come up, so a default run reaches the internet for tonight's
 news and for the first model download and for nothing else. Paid options exist
 for people who want them, and every one of them stays off until you turn it
 on.
@@ -75,8 +75,8 @@ and speaks every part (Gemini TTS), scores it (Lyria) and draws every still
 locally, so it runs on a laptop with no graphics card. What it does *not* do
 by default is generate video, and the reason is worth knowing before you go
 looking for the switch: on Google's paid **Tier 1**, every Veo model allows
-**2 requests a minute and 10 a day**, while one episode asks for about
-sixteen clips. No arrangement of a Tier 1 key finishes a Veo episode, so the
+**2 requests a minute and 10 a day**, while a single episode's video needs
+run well past that ceiling. No arrangement of a Tier 1 key finishes a Veo episode, so the
 shipped Google presets composite the stills instead (`still_flat`) and never
 call Veo.
 
@@ -192,7 +192,7 @@ it lives; the still is only there so a finished run does not look like one that
 did nothing. The first person outside this project to run it had no still, went
 looking in the UI, found nothing, and only then found the files.
 
-That folder is the finish line, and the console says which of two things
+That folder is the finish line, and the console tells you what
 happened. **`obs_publish OK -> <path>`** names the published file.
 **`obs_publish BLOCKED -- ...`** means the run SUCCEEDED and only the published
 copy was withheld, because the episode's rights receipt did not clear -- the
@@ -439,7 +439,7 @@ own sound carries its beats and the voices and music are muted there.
 **animatediff** is SD 1.5 motion driven by the text prompt alone; it mints
 no still. Kokoro voices on every graph; the upscaler is off.
 
-**Each preset opens at three acts and three characters, and the hardware proof
+**Each machine-tier preset opens at three acts and three characters, and the hardware proof
 behind `shipping` was a one-act episode.** The qualification run smokes every
 graph in a night, which means overriding the act count; the preset itself is
 unchanged and is what you get when you open it. Both facts are true and neither
@@ -580,7 +580,7 @@ Mac where Bark is a memory hazard. Non-English rows admit Kokoro only.
 **A gated model returns HTTP 401.** The LTX 2.5 weights and `gemma-2-2b-it` need a
 licence click on Hugging Face plus a login; every default weight is ungated.
 
-**On a Mac, a 20 GB download starts the moment you queue.** The image dropdowns
+**On a Mac, a 19 GB download starts the moment you queue.** The image dropdowns
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
 the image dropdowns to `sd15` first.
 
@@ -703,3 +703,32 @@ successful render is not a licence receipt.
 Every so often a character named **Lemmy** makes a cameo -- a small tribute
 carried across the project's generations. Born of the machine, still loud on the
 airwaves.
+
+---
+
+## Known failures at 2.3.0
+
+The test suite is not green, and this release ships anyway. The failing tests
+fall into a few classes, and none of them sits on the default path of a fresh
+install rendering an episode on the shipped still lane:
+
+- **Cloud-lane fixtures.** The Google video adapters and a cloud LTX receipt
+  test fail on a partner-result contract the fixture no longer satisfies, and
+  the cloud variant graphs drift from their expected-widget list.
+- **Artifacts that are not on this machine.** Some receipts cite audition
+  wavs under `otr/episodes/lemmy_cross_engine/` by hash. The files were
+  removed from the maintainer's output tree and the receipts still name them.
+- **The portable voice bank.** Its route tests expect a generic Lemmy to be
+  cast on the portable IndexTTS2 route when his qualified route is
+  unavailable; he is cast on a kokoro voice instead. This predates the 2.3.0
+  work and has not been diagnosed.
+- **Profile and sweep checks.** A few 8 GB video profiles declare a canvas
+  their engine overrules, a static sweep finds LLM call sites without a slot
+  tag, and the auto-download disk-space precheck reads this machine's free
+  space.
+
+[docs/known-failures.md](docs/known-failures.md) explains why the
+expected-failure set is kept empty on purpose, and
+[docs/2026-09-19-ship-regression.md](docs/2026-09-19-ship-regression.md)
+classifies each failing test by name. If one of these reaches you in
+practice, open an issue with the episode's ledger attached.

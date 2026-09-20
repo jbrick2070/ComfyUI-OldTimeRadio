@@ -154,7 +154,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 Every file a **manual** row needs: the repository to download it from, and the folder under your ComfyUI `models/` directory to put it in. `gated` means you must accept the model's licence on Hugging Face first, while signed in.
 
-Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the grid still has the figure.
+Two engines can share one group and still download different amounts, because they draw different files from it. **The size in the machine grid above is what YOUR pick costs**; the total on a heading here is the whole group. A heading with no total means that group's manifest predates byte receipts -- the machine grid still has the figure.
 
 ### h3_operator_only &mdash; 59.1 GiB total
 
@@ -257,7 +257,7 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; the manual-weights list above names every file, the repository it comes from and the folder it goes in.
+it yourself; the manual-weights table above names every file, the repository it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

@@ -2,10 +2,7 @@ name: Publish to Comfy registry
 on:
   workflow_dispatch:
   push:
-    # v2 was promoted on 2026-09-13: main is the branch, and releases publish
-    # from it. v2.0-alpha is retired -- kept as a frozen ref so the
-    # raw.githubusercontent URLs pinned to it (the registry card icon, the
-    # README images) keep resolving, never pushed to again.
+    # main is the branch, and releases publish from it.
     branches:
       - main
     paths:

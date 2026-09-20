@@ -140,8 +140,8 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; `apple/MACHINES.md` section 3 names every file, the repository
-it comes from and the folder it goes in.
+it yourself; the manual-weights table in `apple/MACHINES.md` names every
+file, the repository it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 

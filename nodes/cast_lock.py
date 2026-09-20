@@ -1942,31 +1942,19 @@ class CastLock:
         # when the stamped engine IS bark, ``voice_preset`` is the spoken
         # id and is left alone (Lemmy's frozen v2/* beside a bark row).
         #
-        # A PROVISIONAL STAMP IS NOT THE ROW'S IDENTITY EITHER. Lemmy's
-        # writer stage sets the bark preset far upstream and the provisional
-        # route (an audition through chatterbox or another engine) stamps
-        # OVER it for that engine's pass; the bark stage that follows reads
-        # the preset back. Clearing it here on the provisional stamp lost the
-        # cameo's identity on the ~11% of episodes that roll one, which is
-        # what `test_the_writer_stage_bark_preset_SURVIVES_the_normalizer`
-        # pinned and the Lime fix above then broke. The Lime rows are policy
-        # and deterministic stamps, never provisional, so they still clear.
-        #
-        # THE CARVE-OUT IS ENGINE-BLIND, AND THAT IS A STATED TENSION, NOT
-        # AN OVERSIGHT. Lemmy's shipped provisional routes include kokoro
-        # (`config/cast_pools.py`, provisional_native_routes), so a
-        # kokoro-spoken Lemmy row keeps the `v2/` preset here, which the
-        # Lime comment above says a kokoro row must not. Two contracts meet
-        # on one field: Lime's ledger hygiene and Lemmy's upstream-owned
-        # identity. Measured 2026-09-20 (Sonnet, on 8d064235): nothing but
-        # bark's dispatch reads `voice_preset`, kokoro reads `voice_ref_id`,
-        # and the credits prefer `voice_engine` / `voice_ref_id`, so the
-        # kept value changes no audio and no credit. Which contract wins is
-        # the operator's design call (ship note, 2026-09-19); until it is
-        # made, the provisional stamp keeps the preset for every engine and
-        # `test_a_provisional_stamp_keeps_the_writer_preset...` pins that.
-        if (str(getattr(ref, "engine", "") or "") != "bark"
-                and fallback != "provisional_route"):
+        # THIS INCLUDES LEMMY'S PROVISIONAL STAMPS, and the question was
+        # settled by dates (2026-09-20). A 2026-08-16 test pinned the writer
+        # preset SURVIVING a chatterbox audition stamp; a 2026-09-01 portable
+        # bank test pinned it CLEARED on a kokoro one; the Lime clear of
+        # 2026-09-17 is the newest statement of intent. Two reviewers traced
+        # every consumer: nothing but bark's own dispatch reads
+        # `voice_preset`, kokoro reads `voice_ref_id`, the credits prefer
+        # `voice_engine` / `voice_ref_id`, and no bark stage runs after a
+        # non-bark provisional stamp inside one render. A preset kept on a
+        # row another engine speaks is a stale identity on the ledger and
+        # nothing else, so the newest rule wins everywhere and the 08-16 test
+        # was retired rather than carved around.
+        if str(getattr(ref, "engine", "") or "") != "bark":
             leftover = str(entry.get("voice_preset") or "")
             if leftover.startswith("v2/"):
                 entry["voice_preset"] = ""

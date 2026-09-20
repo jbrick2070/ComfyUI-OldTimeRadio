@@ -272,10 +272,9 @@ def test_kokoro_castlock_policy_rows_have_no_bark_presets():
     those presets as a silent fallback.
 
     RENAMED 2026-09-20 from "...spoken_rows...": the rows here are policy
-    and deterministic stamps. A Lemmy row auditioned through kokoro on the
-    provisional route KEEPS its writer-stage preset by design (see
-    tests/test_lemmy_provisional_tier.py, the stated-tension test), so the
-    old name claimed more than this test proves."""
+    and deterministic stamps. Lemmy's provisional rows clear the preset by
+    the same rule (tests/test_lemmy_provisional_tier.py), so the name is
+    narrow only because this test's fixtures are."""
     from nodes.cast_lock import CastLock
 
     cast = [

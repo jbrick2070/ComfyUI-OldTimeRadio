@@ -5,6 +5,38 @@ the Reddit post. Section 7A's condition for any publish: the suite diffed
 against a same-HEAD baseline, every new failure explained, THEN bump. This
 file is that explanation. The bump itself is his call (third digit only).
 
+## Correction and ship state, 2026-09-20 -- read this first
+
+The "twelve" and "fourteen" below were read from a truncated listing. The
+full failing SET, measured by nodeid in a worktree at `cc62b2c1` (the commit
+this work started from), is 33 nodeids; the same measurement of the tree
+before the close-out fixes is 32. What matters is the set difference:
+
+* **New since `cc62b2c1`:**
+  `test_model_catalog_download.py::test_auto_download_disk_space_precheck` --
+  it reads the free space on the maintainer's disk. It fails inside the full
+  run and passed alone on 2026-09-20; environmental, and it ships as a known
+  failure.
+* **Fixed since `cc62b2c1`:** `test_b7_forbidden_sweep.py::
+  test_forbidden_sweep_runs_clean`, `test_installed_pack_not_stale.py::
+  test_the_installed_pack_matches_this_repo`, and at the close-out #2 (the
+  replay test), #9 (the HF-offline stub) and #11 (the Lemmy preset).
+* **The design call at the bottom is CLOSED: Lime wins everywhere.**
+  `cast_lock._stamp` clears a leftover `v2/` preset on ANY non-bark stamp,
+  provisional included. The 2026-08-16 SURVIVES test is retired and replaced
+  by two tests that assert the clear on chatterbox and kokoro provisional
+  stamps, and `test_make_portable_voice_bank.py::
+  test_exact_exception_is_safe_in_preserve_ledger_mode` passes with it.
+* **Shipping as known failures at 2.3.0, unchanged:** #3-#8, #10, #12, #13,
+  the #14 pair, and the four `test_make_portable_voice_bank.py` route tests
+  (`..._does_not_waive_revoked_qualification`, `..._skips_private_route_and_
+  casts_generic_lemmy`, `..._still_fails_closed_with_typo_exception`,
+  `..._on_wrong_engine_is_present_and_fails_closed`). Those four are in the
+  33 at `cc62b2c1`: Lemmy is cast on kokoro `bm_george` where they expect
+  the portable IndexTTS2 route, and the cause has not been diagnosed.
+  The README's "Known failures at 2.3.0" section says the same in plain
+  words for an installing reader.
+
 ## The numbers
 
 * Full suite at `23497b6e` (+ docs): RC=2, twelve nodeids failed that are not

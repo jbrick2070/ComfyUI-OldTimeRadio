@@ -1,13 +1,13 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.1.6"
+version = "2.3.0"
 description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. Optional sound-generating video lanes create the scene's effects instead of using a stock library."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
 # MUST be a STATIC list, kept in sync with requirements.txt by hand. The Comfy
 # Registry reads this literal field -- it does NOT evaluate setuptools' dynamic
-# resolution, which was proven on 2.0.0-alpha.3: `dynamic = ["dependencies"]`
+# resolution, which was proven on an early registry version: `dynamic = ["dependencies"]`
 # published with `dependencies: []` recorded, so a registry install still got
 # no libraries. Every working pack on the registry declares a static list.
 # Torch is deliberately absent: ComfyUI manages its own.
@@ -38,9 +38,9 @@ dependencies = [
     "spandrel~=0.4.1",
     "pydantic>=2.0",
     "PyYAML>=6.0",
-    # THE COLD-INSTALL PAIR (alpha.14). Both were fixed in CODE on 2026-08-29
+    # THE COLD-INSTALL PAIR (2026-08-29). Both were fixed in CODE on 2026-08-29
     # and both were unreachable from a registry install, because the registry
-    # reads only this literal list -- the same lesson alpha.3 vs alpha.4 taught
+    # reads only this literal list -- the same lesson an earlier pair of versions taught
     # when the setuptools dynamic form recorded dependencies: [].
     #
     # kokoro is the DEFAULT announcer voice in the shipped canonical workflow.
@@ -74,16 +74,16 @@ dependencies = [
     # silence is why it went unnoticed for so long.
     "pyloudnorm>=0.1.1",
     # Imported by shipped nodes, declared only in requirements.txt until
-    # alpha.16 (Pillow 16 unguarded sites; aiohttp in __init__.py).
+    # 2026-09 (Pillow 16 unguarded sites; aiohttp in __init__.py).
     #
-    # pycairo is WINDOWS-ONLY as of alpha.17, and the reason is this card's
+    # pycairo is WINDOWS-ONLY since 2026-09, and the reason is this card's
     # node count. pycairo publishes 21 Windows wheels, 1 sdist and zero Linux
     # wheels, so on Linux pip must build from source against libcairo2-dev.
     # Comfy-Org's node-pack-extract boots a headless CPU ComfyUI in a Linux
     # container under `set -e`, installs this pack's requirements, and reads
     # /object_info to publish the node list that Algolia renders as "N Nodes";
     # the build failure killed that boot, which is why
-    # /versions/2.0.0-alpha.16/comfy-nodes returns
+    # an earlier version's /comfy-nodes returned
     # {"comfy_nodes": null, "totalNumberOfPages": 0} while a working pack
     # returns rows. That extractor is independent of Flagged/Active status.
     #
@@ -121,7 +121,7 @@ authors = [
 ]
 keywords = ["comfyui", "comfyui-nodes", "comfyui-custom-node", "text-to-speech", "tts", "radio-drama", "audio-drama", "old-time-radio", "story-generation", "music-generation", "video-generation", "local-ai"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3",
     "License :: OSI Approved :: MIT License",
     "Topic :: Artistic Software",

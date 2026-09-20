@@ -579,8 +579,8 @@ music and `Qwen/Qwen3.5-4B` as the writer. Every one of them is **auto** or
 *How you get it.* **auto** -- fetched on first use, no account.
 **GATED** -- fetches itself once you have accepted the licence on the model page
 and set `HF_TOKEN`. **manual** -- you place the file yourself;
-[apple/MACHINES.md](apple/MACHINES.md) section 3 names each one, the repository
-it comes from and the folder it goes in. **none** -- a hosted service, no
+the manual-weights table in [apple/MACHINES.md](apple/MACHINES.md) names each
+one, the repository it comes from and the folder it goes in. **none** -- a hosted service, no
 weights. **own installer** -- its own install script rather than the model
 provisioner; **(Windows)** marks the three whose installer is PowerShell with no
 shell twin yet. **nothing** -- pure code. Sizes are GiB, from the real artifact
@@ -610,8 +610,8 @@ install it is a step you take by hand and it is labelled as one.
 **auto** -- fetched on first use, no account and no
 token; just pick it and run. **GATED** -- fetches itself, but only after you
 accept a licence on the model page and set `HF_TOKEN`. **manual** -- you fetch
-it yourself; `apple/MACHINES.md` section 3 names every file, the repository
-it comes from and the folder it goes in.
+it yourself; the manual-weights table in `apple/MACHINES.md` names every
+file, the repository it comes from and the folder it goes in.
 **none** -- no weights at all. *no lane* -- the engine is registered but no
 provisioning lane is declared for it, so nothing will fetch it for you.
 
@@ -1006,7 +1006,7 @@ def render_apple(rows: list) -> str:
          "Three questions, in the order people ask them.\n\n"]
 
     # ---------------------------------------------------------------- 1. graph
-    L.append("## 1. Which graph do I open?\n\n")
+    L.append("## Which graph do I open?\n\n")
     L.append("**On a first run, open the canonical.** It names no vendor "
              "anywhere and resolves your device at run time, it is the one graph "
              "in Browse Templates, and it fetches no video or image weights -- "
@@ -1053,20 +1053,20 @@ def render_apple(rows: list) -> str:
         L.append("\n")
 
     # --------------------------------------------------------------- 2. table
-    L.append("## 2. Will this engine run on my machine?\n\n")
+    L.append("## Will this engine run on my machine?\n\n")
     L.append(render_table(rows).strip() + "\n\n")
 
     # ------------------------------------------------------------- 3. weights
-    L.append("## 3. Where do the manual weights come from?\n\n")
+    L.append("## Where do the manual weights come from?\n\n")
     L.append("Every file a **manual** row needs: the repository to download it "
              "from, and the folder under your ComfyUI `models/` directory to "
              "put it in. `gated` means you must accept the model's licence on "
              "Hugging Face first, while signed in.\n\n")
     L.append("Two engines can share one group and still download different "
              "amounts, because they draw different files from it. **The size "
-             "in section 2 is what YOUR pick costs**; the total on a heading "
+             "in the machine grid above is what YOUR pick costs**; the total on a heading "
              "here is the whole group. A heading with no total means that "
-             "group's manifest predates byte receipts -- section 2 still has "
+             "group's manifest predates byte receipts -- the machine grid still has "
              "the figure.\n\n")
     fetcher = _load("scripts/otr_fetch_lane_weights.py", "_odm_fetcher")
     lane_to_engines, unsourced = {}, []
@@ -1125,13 +1125,13 @@ def render_apple(rows: list) -> str:
     # The legend is shared with docs/DROPDOWN_MATRIX.md and the README block,
     # where docs/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
     # .comfyignore excludes docs/ from the bundle, so a shipped reader following
-    # that pointer finds nothing -- and section 3 above answers the question
+    # that pointer finds nothing -- and the weights table above answers the question
     # better anyway, with a repository and a destination folder per file.
     legend = _LEGEND.strip().replace(
-        "`apple/MACHINES.md` section 3 names every file, the repository\n"
-        "it comes from and the folder it goes in.",
-        "section 3 above names every file, the repository it comes from and "
-        "the folder it goes in.")
+        "the manual-weights table in `apple/MACHINES.md` names every\n"
+        "file, the repository it comes from and the folder it goes in.",
+        "the manual-weights table above names every file, the repository it "
+        "comes from and the folder it goes in.")
     L.append(legend + "\n\n")
     L.append("---\n\n")
     L.append("*This page is generated. To change it, edit "

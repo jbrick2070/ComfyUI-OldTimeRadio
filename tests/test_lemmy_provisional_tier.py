@@ -597,38 +597,39 @@ def test_a_row_the_caster_never_reaches_is_left_EXACTLY_as_it_arrived(pin_provis
             "%s changed on a row the caster never re-cast" % field)
 
 
-def test_the_writer_stage_bark_preset_SURVIVES_the_normalizer(pin_provisional):
-    """`voice_preset` is bark's identity, written far upstream by `lemmy_row()`,
-    and this module does not own it. The 2026-08-16 acceptance leg proved the
-    two-stage behaviour that depends on it surviving."""
+def test_a_non_bark_provisional_stamp_clears_the_writer_preset(pin_provisional):
+    """RETIRED CONTRACT, REPLACED 2026-09-20. This test used to pin the writer
+    preset SURVIVING a chatterbox audition stamp (2026-08-16). The newer rules
+    say the opposite -- the portable-bank test of 2026-09-01 and the Lime
+    clear of 2026-09-17 -- and two reviewers found no production reader that
+    needs a Bark preset on a row another engine speaks. Lemmy's identity on a
+    provisional row is his route id and his voice reference, not the preset.
+    """
     pin_provisional({"chatterbox": _provisional("chatterbox", CLONE_REF, "local_wav")})
     out = CastLock().lock(script_json=_ledger(), voice_bank="default_clean",
                           char_voice_engine="chatterbox",
                           cast_voice_policy="auto_registry")[0]
-    assert _rows(out)["c02"]["voice_preset"] == "v2/en_speaker_8"
+    row = _rows(out)["c02"]
+    assert row["voice_engine"] == "chatterbox" and row["voice_cast_fallback"] == "provisional_route"
+    assert row["voice_preset"] == ""                       # the Bark identity does not ride a chatterbox row
+    assert row.get("lemmy_route_id") and row.get("voice_ref_id")   # his identity lives here
 
 
-def test_a_provisional_stamp_keeps_the_writer_preset_whatever_engine_auditions_it(pin_provisional):
-    """A STATED TENSION, PINNED SO IT CANNOT MOVE QUIETLY (2026-09-20).
-
-    The Lime fix (2026-09-17) clears a leftover Bark `v2/` preset on a
-    non-bark stamp; the test above pins that Lemmy's writer-stage preset
-    survives a provisional (audition) stamp. `_stamp` reconciles them by
-    skipping the clear on `fallback == "provisional_route"` -- for EVERY
-    engine, including kokoro, which is a real shipped provisional route for
-    Lemmy. So a kokoro-spoken Lemmy row carries `v2/en_speaker_8`, which the
-    Lime comment says a kokoro row must not. Measured: kokoro's dispatch
-    reads `voice_ref_id`, never `voice_preset`, so the kept value changes no
-    audio; which contract should win is the operator's call and is recorded
-    in the ship note. This test makes the current answer explicit.
+def test_a_kokoro_provisional_stamp_clears_the_writer_preset_too(pin_provisional):
+    """The same rule for every non-bark engine, pinned on the shipped kokoro
+    provisional route: the row speaks through kokoro (its dispatch reads
+    `voice_ref_id`, never `voice_preset`), so the writer's Bark preset is
+    cleared rather than carried as a stale identity. Sonnet and Cursor both
+    reproduced the kept preset on this exact row when a carve-out existed
+    (2026-09-20); this test makes the settled answer explicit.
     """
     row = _locked_lemmy(pin_provisional, "kokoro", KOKORO_REF, "bank_voice_id",
                         "kokoro_builtin")
     assert row["voice_engine"] == "kokoro"
     assert row["voice_cast_fallback"] == "provisional_route"
-    assert row["voice_preset"] == "v2/en_speaker_8"          # kept, by the carve-out
+    assert row["voice_preset"] == ""
     ref_field, voice_ref = _dispatch_identity("kokoro", row)
-    assert ref_field == "voice_ref_id" and voice_ref == KOKORO_REF  # the preset is inert here
+    assert ref_field == "voice_ref_id" and voice_ref == KOKORO_REF
 
 
 # ---------------------------------------------------------------------------
