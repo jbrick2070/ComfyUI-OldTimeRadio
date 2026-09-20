@@ -9,7 +9,13 @@
 5. Press **Queue**. The first run downloads about 12 GB. Your episode is an `.mp4` in
    `<your ComfyUI output folder>/otr/obs/`.
 
-Change nothing in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
+**It performs your story, not only its own.** On the **OTR_LedgerScriptWriter**
+node set `source_bank` to `my_story` and type your idea into `custom_premise`;
+`story_characters`, `story_plot` and `story_setting` on the same node take the
+rest. Leave them blank and the pack rolls a show of its own: tonight's news, a
+public-domain book, a scene of Shakespeare, or original fiction.
+
+Change nothing else in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
 plus about 25 GB of free disk. No account, no API key, nothing paid. If a step
 fails, [Make an episode](#make-an-episode) below walks through each one.
