@@ -37,12 +37,42 @@ NODES = REPO / "nodes"
 OWNER = NODES / "_otr_shared" / "env.py"
 
 #: THE GUARD'S SURFACE MUST EQUAL THE SHIPPED SURFACE (fable, 2026-09-04).
-#: `.comfyignore` excludes `tests/`, `kibitz-runs/` and the probe scripts -- but
-#: NOT `config/` or `tools/`, so eight more `.py` files reach the registry zip
-#: and were outside every guard. A ratchet that cannot see a shipped file cannot
-#: stop that file growing a second `os.environ` read.
+#: A ratchet that cannot see a shipped file cannot stop that file growing a
+#: second `os.environ` read.
+#:
+#: CORRECTED 2026-09-21, after a review found the comment stale and measuring
+#: found a real hole behind it. `.comfyignore` now excludes `tools/` (line
+#: 225), so the old note's reason for walking it no longer holds -- it stays
+#: below as belt-and-braces on developer tooling, not because it ships.
+#: The hole was the other direction: `.comfyignore` pulls individual files
+#: back IN with a leading `!`, and none of those sat under any root here, so
+#: four genuinely shipped files were outside this guard entirely. They are
+#: DERIVED below rather than listed, because a hand-written mirror of
+#: `.comfyignore` is exactly what went stale -- the sibling guard in
+#: `test_registry_prohibited_strings.py` had drifted the same way, in both
+#: directions at once, and was corrected in the same batch.
+def _reincluded_by_comfyignore():
+    """Files `.comfyignore` pulls back in with `!`, as real paths."""
+    path = REPO / ".comfyignore"
+    if not path.is_file():
+        return ()
+    out = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if not line.startswith("!") or line.startswith("!#"):
+            continue
+        rel = line[1:].strip()
+        if not rel.endswith(".py"):
+            continue
+        candidate = REPO / rel
+        if candidate.is_file():
+            out.append(candidate)
+    return tuple(sorted(out))
+
+
 ROOTS = (NODES, REPO / "config", REPO / "tools",
-         REPO / "__init__.py", REPO / "prestartup_script.py")
+         REPO / "__init__.py", REPO / "prestartup_script.py"
+         ) + _reincluded_by_comfyignore()
 
 #: The ``os`` attributes that read or write the process environment. ``environb``
 #: is deliberately absent: it does not exist on Windows and nothing here uses it;
