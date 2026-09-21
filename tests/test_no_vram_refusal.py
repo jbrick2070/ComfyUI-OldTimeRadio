@@ -134,3 +134,68 @@ def test_an_insufficient_reading_does_not_refuse_either(monkeypatch, caplog):
     assert result is None
     assert any("EXCEEDS free" in m for m in caplog.messages), (
         "the shortfall must be reported even though it does not refuse")
+
+
+def test_a_cpu_policy_skips_the_preflight_entirely(monkeypatch, caplog):
+    """The one branch the extraction did not cover directly.
+
+    A cpu-device policy has no VRAM to fit, so the original block was skipped
+    wholesale. The extracted guard is a De Morgan inversion of that condition,
+    which is the kind of rewrite that is correct until it is not -- so pin it
+    rather than reason about it. `mem_get_info` is made to explode: if the
+    guard ever stops short-circuiting, this test fails loudly instead of
+    silently probing on a machine with no GPU.
+    """
+    import logging
+    import pathlib
+    import torch
+
+    import nodes._otr_gguf_backend as gb
+
+    def _must_not_be_called(*_a, **_k):
+        raise AssertionError("a cpu policy must never probe VRAM")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", _must_not_be_called)
+
+    with caplog.at_level(logging.INFO, logger=gb.log.name):
+        result = gb.vram_preflight_report(
+            device="cpu",
+            model_path=pathlib.Path(gb.__file__),
+            n_ctx=4096,
+            eff_kv_rate=0.7,
+            eff_n_gpu_layers=0,
+            test_mode=False,
+        )
+
+    assert result is None
+    assert not any("VRAM Preflight" in m for m in caplog.messages), (
+        "a cpu policy must log nothing about VRAM")
+
+
+def test_an_unavailable_cuda_runtime_skips_the_preflight(monkeypatch, caplog):
+    """Same guard, the other half: cuda requested but not available."""
+    import logging
+    import pathlib
+    import torch
+
+    import nodes._otr_gguf_backend as gb
+
+    def _must_not_be_called(*_a, **_k):
+        raise AssertionError("must not probe when cuda is unavailable")
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", _must_not_be_called)
+
+    with caplog.at_level(logging.INFO, logger=gb.log.name):
+        result = gb.vram_preflight_report(
+            device="cuda",
+            model_path=pathlib.Path(gb.__file__),
+            n_ctx=4096,
+            eff_kv_rate=0.7,
+            eff_n_gpu_layers=-1,
+            test_mode=False,
+        )
+
+    assert result is None
+    assert not any("VRAM Preflight" in m for m in caplog.messages)
