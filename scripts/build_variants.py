@@ -112,6 +112,8 @@ SHIPPING_SET = (
     "otr_16gb_video",
     "otr_16gb_foley",
     "otr_16gb_mime",
+    "otr_32gb_foley",
+    "otr_32gb_mime",
     "otr_16gb_animatediff",
     "otr_mac16_low",
     "otr_mac16_still",
