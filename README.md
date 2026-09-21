@@ -510,8 +510,8 @@ A few engines build their graph out of another pack's nodes. Those are ComfyUI
 node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
 The AnimateDiff lanes -- the graphs `otr_8gb_animatediff.json`,
-`otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, which resolve
-profiles such as `otr_nvidia_8gb_haunted` -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
+`otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, each resolving
+the profile of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
 `ltx23_*`, `ltx25_*` and `wan22_*` want [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
 -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md).
 If you pick one of these lanes without its pack, the render stops with an error

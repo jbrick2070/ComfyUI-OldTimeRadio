@@ -66,5 +66,12 @@ def test_the_readme_documents_the_prerequisite():
     import pathlib
     readme = (pathlib.Path(__file__).resolve().parents[1] / "README.md").read_text("utf-8")
     assert ADE_PACK in readme, "the node-pack prerequisite is undocumented again"
-    assert "otr_nvidia_8gb_haunted" in readme, (
-        "the shipping 8GB profile is not tied to its node-pack requirement")
+    # CORRECTED 2026-09-21. This asserted `otr_nvidia_8gb_haunted`, which no
+    # shipped graph resolves and which `build_variants.SHIPPING_SET` does not
+    # contain -- a leftover from before the 8 GB AnimateDiff profile was
+    # renamed. The stale string pulled a FALSE sentence into the README to
+    # satisfy it, which is the wrong direction: the doc followed the test
+    # instead of the code. Pin the profile the shipped graph actually names.
+    assert "otr_8gb_animatediff" in readme, (
+        "the shipping 8GB AnimateDiff profile is not tied to its node-pack "
+        "requirement")

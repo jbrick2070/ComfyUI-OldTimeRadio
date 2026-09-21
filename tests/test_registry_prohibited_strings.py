@@ -118,3 +118,51 @@ def test_no_shipped_file_names_the_session_bearer_hidden_input():
         "shipped files -- every version carrying it is Flagged: "
         + ", ".join(offenders)
     )
+
+
+def test_the_shipped_set_matches_comfyignore():
+    """The parsers above read two shapes; fail if `.comfyignore` grows a third.
+
+    `_SHIPPED_SCRIPTS` and `_UNSHIPPED_FILES` are derived by reading
+    `.comfyignore` directly rather than mirroring it, because the hand-written
+    mirror they replaced had drifted in both directions at once. That
+    derivation understands exactly two shapes: a `!` re-include naming a plain
+    path, and a literal path with no wildcard.
+
+    This is the check the comment above promises. It does NOT re-implement
+    gitignore -- it asserts the assumptions the parsers rest on, so a future
+    entry in a shape they cannot read fails here instead of silently shrinking
+    the guarded set. A wildcard in a `!` line, or a trailing comment after one,
+    would both slip past `line[1:].strip()` and take a shipped file out of the
+    scan with nothing to say so.
+    """
+    lines = _comfyignore_lines()
+    assert lines, ".comfyignore is empty or unreadable"
+
+    bare = [l for l in lines if l.startswith("!")]
+    assert bare, "no `!` re-includes found; the derivation would be empty"
+
+    for line in bare:
+        rest = line[1:]
+        assert rest == rest.strip(), (
+            "a `!` line has surrounding whitespace, which the parser keeps "
+            "verbatim: %r" % line)
+        assert "#" not in rest, (
+            "a `!` line carries a trailing comment; the parser would treat it "
+            "as part of the path: %r" % line)
+        assert not any(ch in rest for ch in "*?["), (
+            "a `!` line uses a glob, which the parser cannot expand -- the "
+            "files it matches would drop out of the guarded set silently: %r"
+            % line)
+
+    # Every re-included script must be a real file, or the derivation is
+    # naming something that cannot be scanned.
+    for rel in _SHIPPED_SCRIPTS:
+        assert (REPO_ROOT / rel).is_file(), (
+            "%s is re-included by .comfyignore but does not exist" % rel)
+
+    # And every single-file exclusion must be real too, or it is silently
+    # excluding nothing while looking like it excludes something.
+    for rel in _UNSHIPPED_FILES:
+        assert (REPO_ROOT / rel).is_file(), (
+            "%s is excluded by .comfyignore but does not exist" % rel)
