@@ -25,7 +25,7 @@ PROHIBITED = "AUTH_TOKEN" + "_COMFY_ORG"
 
 # Mirrors .comfyignore: these prefixes never ship in the registry bundle.
 _UNSHIPPED_PREFIXES = (
-    "tests/", "kibitz-runs/", ".github/", ".claude/", "docs/",
+    "tests/", "kibitz-runs/", ".github/", ".claude/", ".cursor/", "docs/",
     "kibitz-plugin/", "tmp/",
     # 2026-09-04: developer tooling, excluded from the bundle on a fable
     # pre-publish review -- nothing shipped imports it, and one of its files
@@ -33,12 +33,45 @@ _UNSHIPPED_PREFIXES = (
     # that is not part of the product.
     "tools/",
 )
-# scripts/* is excluded except the three subprocess workers that ship.
-_SHIPPED_SCRIPTS = {
-    "scripts/_otr_chatterbox_worker.py",
-    "scripts/_otr_dia_worker.py",
-    "scripts/_otr_indextts2_worker.py",
-}
+# .comfyignore excludes `scripts/*` and then re-includes individual files
+# with a leading `!`. Both lists below are DERIVED from that file rather than
+# mirrored by hand: the hand-written mirror had drifted in both directions at
+# once -- it named a worker that is not re-included (so does not ship) and
+# omitted two that are (so the guard was not reading two shipped files, which
+# is a false negative in a test whose job is to keep a banned literal out of
+# the bundle).
+#
+# LIMIT, stated rather than left to be discovered: this reads the two shapes
+# .comfyignore actually uses -- a `!` re-include, and a literal path with no
+# wildcard. A future entry using a new glob shape needs this updated, and
+# tests/test_registry_prohibited_strings.py::test_the_shipped_set_matches_comfyignore
+# is what will say so.
+def _comfyignore_lines():
+    path = REPO_ROOT / ".comfyignore"
+    if not path.is_file():
+        return []
+    out = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line and not line.startswith("#"):
+            out.append(line)
+    return out
+
+
+#: Paths .comfyignore pulls back IN with a leading `!`.
+_SHIPPED_SCRIPTS = frozenset(
+    line[1:] for line in _comfyignore_lines()
+    if line.startswith("!") and line[1:].startswith("scripts/")
+)
+
+#: Individual files excluded by an exact path (no wildcard), e.g. the
+#: IndexTTS2 engine, which is excluded as a pair with its worker.
+_UNSHIPPED_FILES = frozenset(
+    line for line in _comfyignore_lines()
+    if not line.startswith(("!", "/"))
+    and not any(ch in line for ch in "*?[")
+    and line.endswith(".py")
+)
 
 
 def _shipped_python_files() -> list[Path]:
@@ -62,6 +95,8 @@ def _shipped_python_files() -> list[Path]:
         if rel.startswith("scripts/") and rel not in _SHIPPED_SCRIPTS:
             continue
         if rel.startswith(_UNSHIPPED_PREFIXES):
+            continue
+        if rel in _UNSHIPPED_FILES:
             continue
         files.append(REPO_ROOT / rel)
     assert files, "git ls-files returned no shipped Python files"
