@@ -1,4 +1,4 @@
-# ComfyUI-OldTimeRadio v1.0 dependencies
+# ComfyUI-OldTimeRadio dependencies
 # IMPORTANT: Do NOT pin torch — ComfyUI manages its own torch version
 # Pin loosely to avoid conflicts with other node packs
 
