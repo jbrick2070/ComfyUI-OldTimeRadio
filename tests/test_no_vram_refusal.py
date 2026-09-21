@@ -15,8 +15,17 @@ configurations --
   * the probe refusal killed the episode when the READING failed, which is
     not evidence about whether the model fits.
 
-This test is a tripwire: it asserts the VRAM path contains no raise, so a
-future "small safety check" cannot quietly reintroduce a gate.
+Two kinds of check live here. The AST tripwire asserts the VRAM path holds
+no `raise`, so a future "small safety check" cannot quietly reintroduce a
+gate. The behavioural tests CALL `vram_preflight_report` with a probe that
+throws and with a reading that falls short, because a review caught an
+earlier test re-implementing the arithmetic inline and grading its own
+copy -- it would have stayed green while the real code regained a guard.
+
+KNOWN LIMIT of the tripwire, worth stating rather than pretending: it
+looks at the lines around each `raise`, so a gate reintroduced inside a
+separately-named helper would evade it. The behavioural tests are the
+real protection; the tripwire is the cheap early warning.
 """
 import ast
 import pathlib
@@ -64,56 +73,64 @@ def test_the_fit_gate_never_raises():
         "refusal. Offending raises: %r" % (offenders,))
 
 
-def test_a_probe_failure_is_survivable_in_source():
-    """The probe's except branch must log and continue, not raise."""
-    src = GGUF.read_text(encoding="utf-8")
-    i = src.index("mem_get_info")
-    window = src[i:i + 1400]
-    assert "PROCEEDING ANYWAY" in window, (
-        "the probe failure path no longer says it proceeds; a guard may have "
-        "been reintroduced")
-    assert "free_gb is not None" in src, (
-        "the estimate comparison must tolerate an unreadable probe rather "
-        "than depending on it")
+def test_a_throwing_probe_does_not_refuse_the_load(monkeypatch, caplog):
+    """CALL the real preflight with a probe that raises.
 
-
-def test_a_throwing_probe_does_not_raise_out_of_the_preflight():
-    """BEHAVIOUR, not source text: make mem_get_info throw and run the block.
-
-    A review pointed out the other tests only string-match the file, so a
-    refactor could satisfy them while still dying. This executes the real
-    preflight arithmetic with a probe that raises, and asserts the code path
-    survives it and still produces the warning that tells the operator what
-    to do next.
+    The test this replaces re-implemented the arithmetic inline and asserted
+    on its own copy, so deleting the guard from the module would not have
+    failed it -- a QA pass caught that. This imports the module function and
+    runs it, which is the only version that can notice.
     """
     import logging
+    import pathlib
+    import torch
+
     import nodes._otr_gguf_backend as gb
 
-    records = []
+    def _boom(*_a, **_k):
+        raise RuntimeError("CUDA driver version is insufficient")
 
-    class _Catch(logging.Handler):
-        def emit(self, record):
-            records.append(record.getMessage())
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "mem_get_info", _boom)
 
-    handler = _Catch()
-    gb.log.addHandler(handler)
-    try:
-        # The exact shape the module uses: probe, then price the request.
-        free_bytes = None
-        try:
-            raise RuntimeError("CUDA driver version is insufficient")
-        except Exception as exc:  # noqa: BLE001 - mirrors the module
-            gb.log.warning(
-                "[GGUFNative] VRAM preflight probe failed (%r) -- "
-                "PROCEEDING ANYWAY, an OOM is the only authority here.", exc)
-        free_gb = (free_bytes / (1024 ** 3)) if free_bytes is not None else None
-        estimated_needed_gb = 13.0
-        # This is the comparison the module guards; an unguarded one would
-        # raise TypeError here on Python 3.
-        refused = free_gb is not None and free_gb < estimated_needed_gb
-    finally:
-        gb.log.removeHandler(handler)
+    with caplog.at_level(logging.INFO, logger=gb.log.name):
+        result = gb.vram_preflight_report(
+            device="cuda",
+            model_path=pathlib.Path(gb.__file__),   # a real file, for st_size
+            n_ctx=4096,
+            eff_kv_rate=0.7,
+            eff_n_gpu_layers=-1,
+            test_mode=False,
+        )
 
-    assert refused is False, "an unreadable probe must not refuse the load"
-    assert any("PROCEEDING ANYWAY" in m for m in records), (
-        "the operator must be told the probe failed and the load continues")
+    assert result is None, "the preflight reports; it must not return a verdict"
+    assert any("PROCEEDING ANYWAY" in m for m in caplog.messages), (
+        "an unreadable probe must say out loud that the load continues")
+
+
+def test_an_insufficient_reading_does_not_refuse_either(monkeypatch, caplog):
+    """A real reading that falls short is still only a recommendation."""
+    import logging
+    import pathlib
+    import torch
+
+    import nodes._otr_gguf_backend as gb
+
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(
+        torch.cuda, "mem_get_info",
+        lambda *_a, **_k: (1 * 1024 ** 3, 32 * 1024 ** 3))
+
+    with caplog.at_level(logging.INFO, logger=gb.log.name):
+        result = gb.vram_preflight_report(
+            device="cuda",
+            model_path=pathlib.Path(gb.__file__),
+            n_ctx=4096,
+            eff_kv_rate=0.7,
+            eff_n_gpu_layers=-1,
+            test_mode=False,
+        )
+
+    assert result is None
+    assert any("EXCEEDS free" in m for m in caplog.messages), (
+        "the shortfall must be reported even though it does not refuse")

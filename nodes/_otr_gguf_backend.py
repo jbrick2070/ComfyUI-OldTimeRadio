@@ -1079,6 +1079,121 @@ def _llamacpp_response_format(response_format: dict | None) -> dict | None:
     return response_format
 
 
+
+def vram_preflight_report(
+    *, device, model_path, n_ctx, eff_kv_rate, eff_n_gpu_layers,
+    test_mode=None,
+):
+    """Measure VRAM and SAY what it finds. Never refuses, never raises.
+
+    Extracted from ``GGUFNativeBackend.load`` so the no-refusal contract
+    can be tested by CALLING it -- a test can make
+    ``torch.cuda.mem_get_info`` throw and assert this returns normally.
+    The test it replaces re-implemented the arithmetic inline and graded
+    its own copy, so it would have stayed green while the real code
+    regained a guard.
+
+    Returns None. Its entire output is the log.
+    """
+    # 2. VRAM preflight REPORT -- it measures and says, it never refuses.
+    # Nothing in this block raises: the estimate stopped raising on
+    # 2026-08-29 ("prove me wrong with an OOM but don't put an artificial
+    # gate") and the probe stopped raising on 2026-09-21 ("I don't want
+    # any VRAM guards -- it can log, it just can't refuse the workflow").
+    # A cpu-device policy skips it outright (no VRAM to fit).
+    #
+    # WHAT IS STILL FORBIDDEN, and is a different thing: a SILENT CONTEXT
+    # DOWNGRADE. The old 4096->2048 fallback truncated the original_concept
+    # JSON mid-generation (root cause behind d526c8b7). The requested
+    # configuration is attempted exactly as asked; only the refusal went.
+    if test_mode is None:
+        test_mode = _bool_env("OTR_TEST_MODE", False)
+    import torch
+    if not (device == "cuda" and torch.cuda.is_available()
+            and not test_mode):
+        return
+    # OPERATOR DIRECTIVE 2026-09-21: "I don't want any VRAM guards."
+    # This used to RAISE when the probe itself failed, which killed the
+    # episode on the strength of a broken reading rather than a real
+    # shortage -- the last refusal in the VRAM path after the estimate
+    # gate (2026-08-29) and the fit gate were both demoted to
+    # recommendations. A probe that cannot answer is not evidence that
+    # the model will not fit; llama.cpp allocates against real hardware
+    # and fails honestly if it does not. So: say it loudly, skip the
+    # arithmetic that needs the reading, and attempt the load.
+    free_bytes = None
+    try:
+        free_bytes, total_bytes = torch.cuda.mem_get_info()
+    except Exception as exc:
+        log.warning(
+            "[GGUFNative] VRAM preflight probe failed (%r) -- "
+            "PROCEEDING ANYWAY, an OOM is the only authority here. "
+            "If the load dies, fix the CUDA runtime, lower "
+            "gguf_n_ctx, pick a smaller quant, or offload layers via "
+            "OTR_GGUF_N_GPU_LAYERS.", exc,
+        )
+    free_gb = (free_bytes / (1024 ** 3)) if free_bytes is not None else None
+    # Estimation: weights + SWA KV cache (~0.7 GB per 1024 context cells)
+    # + safety overhead.
+    #
+    # The weight term MUST come from the file on disk. It was hardcoded to
+    # 12.07 GB -- the size of the Q8_0 -- so the gate refused every OTHER
+    # quant by pricing it as a Q8_0. A 7.12 GB Q4_K_M that fits comfortably
+    # would be rejected for needing VRAM it does not use. The quant is the
+    # one lever we have when a model will not fit; a gate that cannot see
+    # the quant cannot be reasoned with.
+    weights_gb = model_path.stat().st_size / (1024 ** 3)
+    # Per-row KV rate (load_config-threaded or the env>default fallback
+    # resolved above). NO global _KV_GB_PER_1K -- KV is per row.
+    kv_rate = eff_kv_rate
+    kv_gb = (n_ctx / 1024.0) * kv_rate
+    estimated_needed_gb = weights_gb + kv_gb + 0.1
+    log.info(
+        "[GGUFNative] VRAM Preflight: Free=%s | Needed=%.2f GB "
+        "(weights=%.2f from %s, kv=%.2f @ n_ctx=%d)",
+        ("%.2f GB" % free_gb) if free_gb is not None else "UNREADABLE",
+        estimated_needed_gb, weights_gb, model_path.name,
+        kv_gb, n_ctx,
+    )
+    if free_gb is not None and free_gb < estimated_needed_gb:
+        # OPERATOR DIRECTIVE 2026-08-29: "prove me wrong with an OOM
+        # but don't put an artificial gate", and the standing rule it
+        # restates -- "I don't want guards to kill anything, an OOM is
+        # the only killer".
+        #
+        # THIS USED TO RAISE, AND THE ESTIMATE IT RAISED ON IS WRONG
+        # FOR THE ONE CONFIGURATION THAT MAKES A BIG MODEL FIT A SMALL
+        # CARD. `weights_gb` is the WHOLE FILE on disk; it takes no
+        # account of `n_gpu_layers`, which is precisely the lever for
+        # splitting a model across GPU and CPU. A 12B Q4_K_M at
+        # n_gpu_layers=35 puts roughly two thirds of the weights on the
+        # card, but this check priced all of it and refused a load that
+        # would have worked. Refusing a working configuration on an
+        # estimate of a configuration nobody requested is the
+        # definition of an artificial gate.
+        #
+        # So: SAY EVERYTHING THE ERROR SAID, then attempt the load.
+        # llama.cpp allocates against real hardware and will fail
+        # honestly if it truly does not fit -- and that failure is
+        # evidence, where this refusal was only ever arithmetic.
+        #
+        # WHAT IS DELIBERATELY PRESERVED: no silent context downgrade.
+        # The old 4096->2048 fallback truncated generations, which is
+        # why the raise replaced it. Nothing is downgraded here; the
+        # requested configuration is attempted exactly as asked.
+        partial = eff_n_gpu_layers is not None and eff_n_gpu_layers >= 0
+        log.warning(
+            "[GGUFNative] VRAM estimate EXCEEDS free: free %.2f GB < "
+            "needed %.2f GB (n_ctx=%d). PROCEEDING ANYWAY -- an OOM is "
+            "the only authority here. If it fails: lower gguf_n_ctx, "
+            "free VRAM, pick a smaller quant, or offload layers via "
+            "OTR_GGUF_N_GPU_LAYERS.%s",
+            free_gb, estimated_needed_gb, n_ctx,
+            (" NOTE: n_gpu_layers=%d requests a PARTIAL offload, so "
+             "this estimate is an upper bound -- it prices the whole "
+             "file on the GPU." % eff_n_gpu_layers) if partial else "",
+        )
+
 class GGUFNativeBackend:
     """LoaderBackend adapter for in-process llama-cpp-python GGUF inference."""
 
@@ -1230,101 +1345,15 @@ class GGUFNativeBackend:
             or DEFAULT_CONTEXT_WINDOW
         )
 
-        # 2. VRAM preflight REPORT -- it measures and says, it never refuses.
-        # Nothing in this block raises: the estimate stopped raising on
-        # 2026-08-29 ("prove me wrong with an OOM but don't put an artificial
-        # gate") and the probe stopped raising on 2026-09-21 ("I don't want
-        # any VRAM guards -- it can log, it just can't refuse the workflow").
-        # A cpu-device policy skips it outright (no VRAM to fit).
-        #
-        # WHAT IS STILL FORBIDDEN, and is a different thing: a SILENT CONTEXT
-        # DOWNGRADE. The old 4096->2048 fallback truncated the original_concept
-        # JSON mid-generation (root cause behind d526c8b7). The requested
-        # configuration is attempted exactly as asked; only the refusal went.
-        import torch
-        if (_policy.device == "cuda" and torch.cuda.is_available()
-                and not _bool_env("OTR_TEST_MODE", False)):
-            # OPERATOR DIRECTIVE 2026-09-21: "I don't want any VRAM guards."
-            # This used to RAISE when the probe itself failed, which killed the
-            # episode on the strength of a broken reading rather than a real
-            # shortage -- the last refusal in the VRAM path after the estimate
-            # gate (2026-08-29) and the fit gate were both demoted to
-            # recommendations. A probe that cannot answer is not evidence that
-            # the model will not fit; llama.cpp allocates against real hardware
-            # and fails honestly if it does not. So: say it loudly, skip the
-            # arithmetic that needs the reading, and attempt the load.
-            free_bytes = None
-            try:
-                free_bytes, total_bytes = torch.cuda.mem_get_info()
-            except Exception as exc:
-                log.warning(
-                    "[GGUFNative] VRAM preflight probe failed (%r) -- "
-                    "PROCEEDING ANYWAY, an OOM is the only authority here. "
-                    "If the load dies, fix the CUDA runtime, lower "
-                    "gguf_n_ctx, pick a smaller quant, or offload layers via "
-                    "OTR_GGUF_N_GPU_LAYERS.", exc,
-                )
-            free_gb = (free_bytes / (1024 ** 3)) if free_bytes is not None else None
-            # Estimation: weights + SWA KV cache (~0.7 GB per 1024 context cells)
-            # + safety overhead.
-            #
-            # The weight term MUST come from the file on disk. It was hardcoded to
-            # 12.07 GB -- the size of the Q8_0 -- so the gate refused every OTHER
-            # quant by pricing it as a Q8_0. A 7.12 GB Q4_K_M that fits comfortably
-            # would be rejected for needing VRAM it does not use. The quant is the
-            # one lever we have when a model will not fit; a gate that cannot see
-            # the quant cannot be reasoned with.
-            weights_gb = model_path.stat().st_size / (1024 ** 3)
-            # Per-row KV rate (load_config-threaded or the env>default fallback
-            # resolved above). NO global _KV_GB_PER_1K -- KV is per row.
-            kv_rate = eff_kv_rate
-            kv_gb = (n_ctx / 1024.0) * kv_rate
-            estimated_needed_gb = weights_gb + kv_gb + 0.1
-            log.info(
-                "[GGUFNative] VRAM Preflight: Free=%s | Needed=%.2f GB "
-                "(weights=%.2f from %s, kv=%.2f @ n_ctx=%d)",
-                ("%.2f GB" % free_gb) if free_gb is not None else "UNREADABLE",
-                estimated_needed_gb, weights_gb, model_path.name,
-                kv_gb, n_ctx,
-            )
-            if free_gb is not None and free_gb < estimated_needed_gb:
-                # OPERATOR DIRECTIVE 2026-08-29: "prove me wrong with an OOM
-                # but don't put an artificial gate", and the standing rule it
-                # restates -- "I don't want guards to kill anything, an OOM is
-                # the only killer".
-                #
-                # THIS USED TO RAISE, AND THE ESTIMATE IT RAISED ON IS WRONG
-                # FOR THE ONE CONFIGURATION THAT MAKES A BIG MODEL FIT A SMALL
-                # CARD. `weights_gb` is the WHOLE FILE on disk; it takes no
-                # account of `n_gpu_layers`, which is precisely the lever for
-                # splitting a model across GPU and CPU. A 12B Q4_K_M at
-                # n_gpu_layers=35 puts roughly two thirds of the weights on the
-                # card, but this check priced all of it and refused a load that
-                # would have worked. Refusing a working configuration on an
-                # estimate of a configuration nobody requested is the
-                # definition of an artificial gate.
-                #
-                # So: SAY EVERYTHING THE ERROR SAID, then attempt the load.
-                # llama.cpp allocates against real hardware and will fail
-                # honestly if it truly does not fit -- and that failure is
-                # evidence, where this refusal was only ever arithmetic.
-                #
-                # WHAT IS DELIBERATELY PRESERVED: no silent context downgrade.
-                # The old 4096->2048 fallback truncated generations, which is
-                # why the raise replaced it. Nothing is downgraded here; the
-                # requested configuration is attempted exactly as asked.
-                partial = eff_n_gpu_layers is not None and eff_n_gpu_layers >= 0
-                log.warning(
-                    "[GGUFNative] VRAM estimate EXCEEDS free: free %.2f GB < "
-                    "needed %.2f GB (n_ctx=%d). PROCEEDING ANYWAY -- an OOM is "
-                    "the only authority here. If it fails: lower gguf_n_ctx, "
-                    "free VRAM, pick a smaller quant, or offload layers via "
-                    "OTR_GGUF_N_GPU_LAYERS.%s",
-                    free_gb, estimated_needed_gb, n_ctx,
-                    (" NOTE: n_gpu_layers=%d requests a PARTIAL offload, so "
-                     "this estimate is an upper bound -- it prices the whole "
-                     "file on the GPU." % eff_n_gpu_layers) if partial else "",
-                )
+        # The preflight lives in `vram_preflight_report` so its
+        # no-refusal contract can be tested by calling it.
+        vram_preflight_report(
+            device=_policy.device,
+            model_path=model_path,
+            n_ctx=n_ctx,
+            eff_kv_rate=eff_kv_rate,
+            eff_n_gpu_layers=eff_n_gpu_layers,
+        )
 
         # Effective n_batch / n_gpu_layers resolved above (load_config when
         # threaded, else the whitelisted env>default fallback). Device policy:
