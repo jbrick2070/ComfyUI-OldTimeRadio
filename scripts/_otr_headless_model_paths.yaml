@@ -46,6 +46,18 @@ comfyui_desktop:
   # folder key latent_upscale_models (nodes_hunyuan.py); without this mapping
   # the LTX spatial upscaler enum is EMPTY on headless boots.
   latent_upscale_models: C:/ComfyUI-Models/latent_upscale_models/
+  # ADDED 2026-09-21. `animatediff_models` was the one folder key the
+  # C:/ComfyUI-Models migration never took, so on a headless boot the ONLY
+  # copy of the three motion modules was the one bundled inside
+  # custom_nodes/ComfyUI-AnimateDiff-Evolved/models/. The node registers both
+  # that directory AND <models_dir>/animatediff_models (utils_model.py:343-344),
+  # and on this box the second resolves under Documents, which holds nothing --
+  # so the three shipping AnimateDiff graphs were reading their weights out of
+  # a node package instead of the models root. Operator, same day: all local
+  # models belong in C:/ComfyUI-Models, which is the PCIe 5 drive. `sams`
+  # joins for the same reason -- mapped in the Desktop yaml, absent here.
+  animatediff_models: C:/ComfyUI-Models/animatediff_models/
+  sams: C:/ComfyUI-Models/sams/
   vae: C:/ComfyUI-Models/vae/
   audio_encoders: C:/ComfyUI-Models/audio_encoders/
   model_patches: C:/ComfyUI-Models/model_patches/
