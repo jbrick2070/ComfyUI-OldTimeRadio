@@ -120,6 +120,28 @@ _PREFIX_VOICE_TAG_RE = re.compile(
     r"^\s*\[\s*VOICE\s*:\s*[^\]]+\]\s*",
     re.IGNORECASE,
 )
+# A reasoning scaffold word that leaked into the spoken line. Measured
+# 2026-09-21: three announcer lines across 61 episodes opened with a bare
+# `thought`, in Spanish, Portuguese and Japanese episodes, and a voice reads
+# it aloud. This is transport, not prose, so it goes where the VOICE tag goes.
+#
+# DELIBERATELY NARROW. It fires only at the very start, only on the exact
+# scaffold words, and only when a separator or whitespace follows -- so a line
+# that legitimately opens "Thought is the enemy here" keeps its first word,
+# because `is` is not a separator. A trailing colon or dash is eaten with it.
+_PREFIX_SCAFFOLD_RE = re.compile(
+    r"^\s*(?:"
+    # Explicit separator: `analysis:` / `thought -` is transport in any case.
+    r"(?i:thoughts?|thinking|analysis|reasoning|assistant|final\s+answer)"
+    r"\s*[:\-—]\s*"
+    r"|"
+    # No separator: only a LOWERCASE scaffold word followed by something that
+    # is not lowercase. A real sentence capitalises its first word, so
+    # "Thought is the enemy here" keeps it while "thought A luz do..." does
+    # not. Pinned by tests/test_spoken_line_scaffold_prefix.py.
+    r"(?:thoughts?|thinking|analysis|reasoning|assistant)\s+(?=[^\sa-z])"
+    r")"
+)
 _MD_BOLD_ITALIC_RE = re.compile(r"(\*\*|__|\*|_|\x60)")
 _QUOTES_WRAP_RE = re.compile(
     r'^\s*[“”‘’"\']\s*(.*?)\s*[“”‘’"\']\s*$',
@@ -178,12 +200,14 @@ def strip_line_formatting(raw: str, speaker_names=()) -> str:
 
     named_re = _build_named_prefix_re(speaker_names)
     s = _PREFIX_VOICE_TAG_RE.sub("", s, count=1).strip()
+    s = _PREFIX_SCAFFOLD_RE.sub("", s, count=1).strip()
     if named_re is not None:
         s = named_re.sub("", s, count=1).strip()
 
     # Markdown removal can expose transport that was wrapped in emphasis.
     s = _MD_BOLD_ITALIC_RE.sub("", s).strip()
     s = _PREFIX_VOICE_TAG_RE.sub("", s, count=1).strip()
+    s = _PREFIX_SCAFFOLD_RE.sub("", s, count=1).strip()
     if named_re is not None:
         s = named_re.sub("", s, count=1).strip()
     return s
