@@ -97,7 +97,10 @@ choose which binary runs on your machine.)
 
 **On Linux, also install one monospace font.** Burned captions and the credit
 roll need a real TTF; a headless server image often has none at all.
-`fonts-dejavu-core` is enough.
+`fonts-dejavu-core` is enough for Latin scripts. **Japanese and Mandarin need a
+CJK font as well -- `apt install fonts-noto-cjk`. Without one the text still
+renders, as a row of empty boxes, and nothing warns you: measured on a fresh
+container that carried eight DejaVu fonts and zero CJK coverage.**
 
 ## Restart ComfyUI and read the console
 

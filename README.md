@@ -179,7 +179,9 @@ pulling.
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
 On Debian or Ubuntu take a static build -- 22.04's apt ffmpeg is too old to
 write the MP4 this pack makes -- and install one monospace font
-(`fonts-dejavu-core` is enough) for the captions. You do not have to check
+(`fonts-dejavu-core` is enough) for the captions. **For a non-Latin
+`episode_language` -- Japanese or Mandarin -- also install a CJK font
+(`fonts-noto-cjk`), or every character burns as an empty box.** You do not have to check
 versions yourself for the part that would waste a whole render: the pack pushes
 a fifth of a second of silence through your build at the start of every run and
 refuses in about a second if it cannot write the final audio, rather than at the
