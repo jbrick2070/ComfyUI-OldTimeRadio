@@ -177,8 +177,8 @@ is the most common way an install fails, and it fails much later, as nodes that
 quietly refuse to load. Python 3.10 through 3.13 are fine for English;
 multilingual Kokoro needs the torch path on 3.10 through 3.12. Python 3.14 has
 no Kokoro voice build yet. `main` is the branch: it is the default and the only
-one that moves. A clone made before 2026-09-13 wants re-cloning rather than
-pulling.
+one that moves. A clone that still tracks a branch other than `main` wants
+re-cloning rather than pulling.
 
 **Put `ffmpeg` and `ffprobe` on your PATH.** Both binaries, and a current
 build: `winget install Gyan.FFmpeg` on Windows, `brew install ffmpeg` on a Mac.
@@ -276,7 +276,7 @@ bank and a rolled style change more than anything else you could adjust.
 ids, so that is the value to pick) and put your idea in `custom_premise`. The
 `story_characters`, `story_plot`, `story_setting` and `story_author` fields on the
 same node take the rest. That bank exists to produce your idea rather than adapt
-something. Since 2026-09-13 the roll can land on it like any other bank: a run
+something. The roll can land on it like any other bank: a run
 that arrives with those fields blank writes a standing premise that ships
 with the pack, so it always has something to perform. Anything you type wins
 over it.
@@ -756,8 +756,8 @@ canonical ships:
   removed from the maintainer's output tree and the receipts still name them.
 - **The portable voice bank.** Its route tests expect a generic Lemmy to be
   cast on the portable IndexTTS2 route when his qualified route is
-  unavailable; he is cast on a kokoro voice instead. This predates the 2.3.0
-  work and has not been diagnosed.
+  unavailable; he is cast on a kokoro voice instead. This predates the
+  language work and has not been diagnosed.
 - **Profile and sweep checks.** A few 8 GB video profiles declare a canvas
   their engine overrules, a static sweep finds LLM call sites without a slot
   tag, and the auto-download disk-space precheck reads this machine's free
