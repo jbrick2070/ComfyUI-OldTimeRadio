@@ -116,8 +116,21 @@ def test_the_text_encoder_matches():
     _doc, g = _graph()
     _k, n = _node(g, "CLIPLoaderGGUFCPU")
     assert n["inputs"]["clip_name"] == R.LTX25_TEXT_ENCODER_GGUF
-    assert 'classes["te"] = _cpu_pinned_clip_loader(classes["te"])' in (
+    # WAS A SOURCE GREP for the inline call. It broke the day that call became
+    # an overridable hook (so a big-card lane could decline the pin without
+    # copying render_clip), and it would equally have stayed green through a
+    # rewrite that deleted the pin outright, because it only ever read text.
+    # Two behavioural assertions replace it: the hook REACHES the graph, and
+    # the DEFAULT hook genuinely pins. That is the placement the lab's
+    # CLIPLoaderGGUFCPU node is asserting above.
+    assert 'self._wrap_text_encoder(classes["te"])' in (
         inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
+    ), "render_clip no longer routes the text encoder through the hook"
+    _sentinel = type("Sentinel", (), {})
+    _base = eng_ltx25.Ltx25VideoEngine
+    assert _base._wrap_text_encoder(_base.__new__(_base), _sentinel) is not _sentinel, (
+        "the default hook must still pin the encoder to CPU -- the lab golden "
+        "names CLIPLoaderGGUFCPU and every 16 GB lane depends on that placement"
     )
 
 
