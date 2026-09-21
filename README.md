@@ -22,9 +22,10 @@ switch on the same node carries the writing, the voices and the captions;
 [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md) says how each one performs.
 The non-English voices need the torch Kokoro build, which installs on
 Python 3.10 through 3.12. ComfyUI Desktop and the Windows portable build
-ship 3.13, where Kokoro cannot be installed at all and the voices fall back
-to English; the writing and the captions still switch. Use a 3.10-3.12 venv
-if you want to hear another language.
+ship 3.13, where that build cannot be installed, so a non-English
+`episode_language` stops at the first spoken line with a named error rather
+than speaking it in English. Use a 3.10-3.12 venv if you want to hear
+another language.
 
 Change nothing else in the graph. You need an NVIDIA card with 8 GB or more, a 16 GB
 Apple Silicon Mac, or just a CPU (start ComfyUI with `--cpu`; slow but it works),
@@ -492,8 +493,8 @@ Which file to open, what each engine costs, and every hand-fetched weight:
 Every
 `shipping` graph in that table has put a finished episode into `otr/obs/`
 on the hardware its row names, all on 2026-09-13, the day 2.0.0 was published:
-the 8 GB rows on a physical RTX 4060 laptop, which has gone on publishing full
-episodes through this pack ever since; the 16 GB rows
+the 8 GB rows on a physical RTX 4060 laptop, which by now
+has published 11 documented full OTR episodes through this pack; the 16 GB rows
 on an RTX 5080 laptop; the Apple rows on a Mac mini M4 with 16 GB; and the CPU
 row on that same 5080 laptop with
 ComfyUI started in `--cpu` mode, the card present and unused. `draft` means not
@@ -508,8 +509,9 @@ can fetch them itself.
 A few engines build their graph out of another pack's nodes. Those are ComfyUI
 node packs, not Python packages, so `pip` cannot supply them. Install them into
 `custom_nodes/` and restart. Nothing the canonical selects needs any of these.
-The AnimateDiff lanes -- `otr_8gb_animatediff.json`, `otr_16gb_animatediff.json`
-and `otr_mac16_animatediff.json` -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
+The AnimateDiff lanes -- the graphs `otr_8gb_animatediff.json`,
+`otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, which resolve
+profiles such as `otr_nvidia_8gb_haunted` -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
 `ltx23_*`, `ltx25_*` and `wan22_*` want [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
 -- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md).
 If you pick one of these lanes without its pack, the render stops with an error
