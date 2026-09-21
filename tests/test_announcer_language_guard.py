@@ -63,3 +63,16 @@ def test_the_guard_degrades_open_rather_than_killing_a_render():
     assert announcer_line_is_in_language("", {"episode_language": "es"}) is True
     assert announcer_line_is_in_language(
         "anything", {"episode_language": "zz-not-a-row"}) is True
+
+
+@pytest.mark.parametrize("iso,text", [
+    # OUTRO / CODA shaped. These carry NO chrome, because the closing prompts
+    # forbid stock phrases -- an earlier guard demanded chrome and threw lines
+    # like these away, shipping a Python fallback over correct model prose.
+    ("es", "La luz del proyector se apaga, dejando solo el nombre grabado."),
+    ("pt", "O rolo termina e resta apenas o silêncio da sala vazia."),
+    ("fr", "Dans cette chambre illuminée, l'amour sincère dissipe la glace."),
+    ("it", "La grotta tace, e il sogno resta dove nessuno può raggiungerlo."),
+])
+def test_a_native_closing_without_chrome_passes(iso, text):
+    assert announcer_line_is_in_language(text, {"episode_language": iso}) is True

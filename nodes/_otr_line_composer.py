@@ -130,16 +130,19 @@ _PREFIX_VOICE_TAG_RE = re.compile(
 # that legitimately opens "Thought is the enemy here" keeps its first word,
 # because `is` is not a separator. A trailing colon or dash is eaten with it.
 _PREFIX_SCAFFOLD_RE = re.compile(
-    r"^\s*(?:"
-    # Explicit separator: `analysis:` / `thought -` is transport in any case.
-    r"(?i:thoughts?|thinking|analysis|reasoning|assistant|final\s+answer)"
-    r"\s*[:\-—]\s*"
+    # A LOWERCASE scaffold word only, in both branches. A real sentence
+    # capitalises its opening word, so "Analysis: a word he despised" and
+    # "Thought-provoking silence filled the room" keep theirs -- an earlier
+    # version stripped both, because its separator branch ignored case.
+    r"^\s*(?:thoughts?|thinking|analysis|reasoning|assistant|final\s+answer)"
+    r"(?:"
+    # A colon, or a dash with space around it. A bare hyphen is NOT a
+    # separator: "thought-provoking" is one word.
+    r"\s*:\s+|\s+[\-\u2014]\s+"
     r"|"
-    # No separator: only a LOWERCASE scaffold word followed by something that
-    # is not lowercase. A real sentence capitalises its first word, so
-    # "Thought is the enemy here" keeps it while "thought A luz do..." does
-    # not. Pinned by tests/test_spoken_line_scaffold_prefix.py.
-    r"(?:thoughts?|thinking|analysis|reasoning|assistant)\s+(?=[^\sa-z])"
+    # No separator: the next thing must not be lowercase, so "thought A luz
+    # do projetor" strips and "thought is the enemy" does not.
+    r"\s+(?=[^\sa-z])"
     r")"
 )
 _MD_BOLD_ITALIC_RE = re.compile(r"(\*\*|__|\*|_|\x60)")
@@ -1305,6 +1308,23 @@ _NON_LATIN_SCRIPT_RANGES = {
     "hi": ((0x0900, 0x097F),),
 }
 
+#: English function words with LOW collision against the Romance languages the
+#: registry admits. Deliberately excludes "a", "on", "as", "or", "e", "o",
+#: "la", "no", "se", "in", "come" and other forms that are ordinary words in
+#: Spanish, French, Italian or Portuguese -- a false reject here throws away
+#: correct model prose, so the list errs toward missing an English line rather
+#: than accusing a native one. Three distinct hits are required.
+_ENGLISH_FUNCTION_WORDS = frozenset((
+    "the", "and", "with", "that", "this", "these", "those", "from", "they",
+    "their", "them", "which", "would", "could", "should", "have", "has",
+    "had", "were", "been", "what", "when", "where", "while", "about",
+    "into", "through", "after", "before", "of", "to", "is", "was", "are",
+    "its", "his", "her", "him", "she", "you", "your", "not", "but", "for",
+    "at", "by", "an", "if", "then", "than", "there", "will", "must",
+    "just", "only", "also", "very", "more", "most", "some", "any", "over",
+    "out", "up", "down", "off", "again", "still", "because", "between",
+))
+
 #: The chrome keys a native opening or closing is built from. Any one of them
 #: appearing in the text is enough -- the deterministic fallback uses them, so
 #: a genuinely native line passes without the model being told to quote them.
@@ -1337,13 +1357,21 @@ def announcer_line_is_in_language(text, episode_meta=None) -> bool:
             if any(lo <= ord(ch) <= hi for lo, hi in ranges)
         )
         return hits >= 2
-    chrome = dict(getattr(row, "spoken", {}) or {})
     low = text.lower()
+    # FAST ACCEPT: the row's own on-air chrome. An opening is built from these,
+    # so it passes without the model being asked to quote anything.
+    chrome = dict(getattr(row, "spoken", {}) or {})
     for key in _CHROME_MARKER_KEYS:
         marker = str(chrome.get(key) or "").strip().lower()
         if len(marker) >= 4 and marker in low:
             return True
-    return False
+    # Otherwise judge on ENGLISH FUNCTION WORDS, not on chrome. A closing is
+    # told to avoid stock phrases, so demanding chrome there rejected good
+    # native prose and shipped the Python fallback instead -- the guard doing
+    # the exact damage it exists to prevent. The failure this catches was
+    # always an English sentence, so look for English.
+    words = set(re.findall(r"[a-z']+", low))
+    return len(words & _ENGLISH_FUNCTION_WORDS) < 3
 
 
 def _language_complaint(episode_meta=None) -> str:

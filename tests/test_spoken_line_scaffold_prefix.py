@@ -29,7 +29,7 @@ LABELS = ("ANNOUNCER",)
     # An explicit separator is transport whatever the case.
     ("analysis: The lamp fails at midnight.", "The lamp fails at midnight."),
     ("thought: Nightfall.", "Nightfall."),
-    ("Reasoning - the keeper waits.", "the keeper waits."),
+    ("reasoning - the keeper waits.", "the keeper waits."),
 ])
 def test_a_scaffold_prefix_is_removed(raw, expected):
     assert strip_line_formatting(raw, LABELS) == expected
@@ -43,6 +43,12 @@ def test_a_scaffold_prefix_is_removed(raw, expected):
     "Analysis paralysis gripped the crew.",
     "Thinking men do not sail in this weather.",
     "Good evening. This is SIGNAL LOST.",
+    # A QA pass caught these: the separator branch used to ignore case and
+    # amputated the opening clause of ordinary prose.
+    "Analysis: a word he despised, she said.",
+    "Reasoning: it was the only way out.",
+    "Thought-provoking silence filled the room.",
+    "Thought — unbidden — filled her mind.",
 ])
 def test_authored_prose_keeps_its_first_word(line):
     assert strip_line_formatting(line, LABELS) == line
