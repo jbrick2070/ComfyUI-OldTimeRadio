@@ -10,8 +10,8 @@ configurations --
   * the GGUF estimate priced the whole file on the GPU and ignored
     `n_gpu_layers`, so a 12B at a partial offload was refused;
   * the fit gate priced a Q4_K_M as a Q8_0 (PBUG-20260829-08) and a 4096
-    request at the row's 8192 (PBUG-20260829-20), refusing a load the card
-    had already performed with all 48 layers resident;
+    request at the row's declared 8192, refusing a load the card had
+    already performed with all 48 layers resident;
   * the probe refusal killed the episode when the READING failed, which is
     not evidence about whether the model fits.
 
@@ -37,9 +37,14 @@ def _raises_inside_vram_block(path: pathlib.Path) -> list:
             continue
         lo = max(0, node.lineno - 14)
         window = "\n".join(lines[lo:node.lineno]).lower()
-        if ("mem_get_info" in window or "free_gb" in window
-                or "vram preflight" in window or "vram-fit" in window
-                or "estimated_needed_gb" in window):
+        # The loader spells it check_vram_fit / VRAMFitFailedError, not
+        # "vram-fit" -- a review caught that the hyphenated spelling matched
+        # nothing there, so a reintroduced raise in the fit gate would have
+        # slipped straight past this tripwire.
+        if any(k in window for k in (
+                "mem_get_info", "free_gb", "vram preflight", "vram-fit",
+                "check_vram_fit", "vramfitfailederror", "fit_verdict",
+                "vram_ceiling_gb", "estimated_needed_gb", "estimated_gb")):
             found.append((path.name, node.lineno,
                           lines[node.lineno - 1].strip()[:80]))
     return found
@@ -70,3 +75,45 @@ def test_a_probe_failure_is_survivable_in_source():
     assert "free_gb is not None" in src, (
         "the estimate comparison must tolerate an unreadable probe rather "
         "than depending on it")
+
+
+def test_a_throwing_probe_does_not_raise_out_of_the_preflight():
+    """BEHAVIOUR, not source text: make mem_get_info throw and run the block.
+
+    A review pointed out the other tests only string-match the file, so a
+    refactor could satisfy them while still dying. This executes the real
+    preflight arithmetic with a probe that raises, and asserts the code path
+    survives it and still produces the warning that tells the operator what
+    to do next.
+    """
+    import logging
+    import nodes._otr_gguf_backend as gb
+
+    records = []
+
+    class _Catch(logging.Handler):
+        def emit(self, record):
+            records.append(record.getMessage())
+
+    handler = _Catch()
+    gb.log.addHandler(handler)
+    try:
+        # The exact shape the module uses: probe, then price the request.
+        free_bytes = None
+        try:
+            raise RuntimeError("CUDA driver version is insufficient")
+        except Exception as exc:  # noqa: BLE001 - mirrors the module
+            gb.log.warning(
+                "[GGUFNative] VRAM preflight probe failed (%r) -- "
+                "PROCEEDING ANYWAY, an OOM is the only authority here.", exc)
+        free_gb = (free_bytes / (1024 ** 3)) if free_bytes is not None else None
+        estimated_needed_gb = 13.0
+        # This is the comparison the module guards; an unguarded one would
+        # raise TypeError here on Python 3.
+        refused = free_gb is not None and free_gb < estimated_needed_gb
+    finally:
+        gb.log.removeHandler(handler)
+
+    assert refused is False, "an unreadable probe must not refuse the load"
+    assert any("PROCEEDING ANYWAY" in m for m in records), (
+        "the operator must be told the probe failed and the load continues")

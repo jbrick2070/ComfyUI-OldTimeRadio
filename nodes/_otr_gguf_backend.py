@@ -1230,12 +1230,17 @@ class GGUFNativeBackend:
             or DEFAULT_CONTEXT_WINDOW
         )
 
-        # 2. VRAM Gate Preflight Check. S1: FAIL LOUD, never adapt --
-        # the old silent 4096->2048 downgrade truncated the
-        # original_concept JSON mid-generation (root cause behind
-        # d526c8b7); the old "preflight failed (proceeding anyway)"
-        # tolerance loaded blind. Both are raises now. A cpu-device
-        # policy skips the gate outright (no VRAM to fit).
+        # 2. VRAM preflight REPORT -- it measures and says, it never refuses.
+        # Nothing in this block raises: the estimate stopped raising on
+        # 2026-08-29 ("prove me wrong with an OOM but don't put an artificial
+        # gate") and the probe stopped raising on 2026-09-21 ("I don't want
+        # any VRAM guards -- it can log, it just can't refuse the workflow").
+        # A cpu-device policy skips it outright (no VRAM to fit).
+        #
+        # WHAT IS STILL FORBIDDEN, and is a different thing: a SILENT CONTEXT
+        # DOWNGRADE. The old 4096->2048 fallback truncated the original_concept
+        # JSON mid-generation (root cause behind d526c8b7). The requested
+        # configuration is attempted exactly as asked; only the refusal went.
         import torch
         if (_policy.device == "cuda" and torch.cuda.is_available()
                 and not _bool_env("OTR_TEST_MODE", False)):
