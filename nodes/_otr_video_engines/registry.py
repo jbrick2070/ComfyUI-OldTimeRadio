@@ -589,6 +589,20 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # The fast big-card sibling (2026-09-21): identical artifacts to
+    # ltx25_foley_plus_24gb. It differs only in leaving the text encoder
+    # on the GPU, which is a placement decision and not something a
+    # preflight gate asks about, so every field here matches.
+    "ltx25_foley_plus_32gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-q5-gguf",
+                               "gemma4-12b-ltx-2.5-proj-gguf",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

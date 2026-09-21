@@ -1642,6 +1642,8 @@ NO_LANE_REASON = {
     # build, and a 24 GB card is a deliberate choice an operator makes,
     # not a default anything auto-downloads into.
     "ltx25_foley_plus_24gb": "manual_doc",
+    # Identical artifacts to the lane above.
+    "ltx25_foley_plus_32gb": "manual_doc",
     # Voice and music that arrive through the HF cache on first use.
     "kokoro": "hf_cache",
     "bark": "hf_cache",

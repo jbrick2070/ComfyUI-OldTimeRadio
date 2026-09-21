@@ -82,6 +82,7 @@ without that map would play ~4% short.
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
 | ltx25_foley_plus | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_plus_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_foley_plus_32gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_mime | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
@@ -124,6 +125,7 @@ without that map would play ~4% short.
 | humo_14B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | ltx25_foley_plus | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_foley_plus_24gb | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_foley_plus_32gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_mime | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
 | ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
@@ -170,6 +172,7 @@ the engine's own `aspect` column above.
 | humo_14B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | ltx25_foley_plus | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_foley_plus_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_foley_plus_32gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_mime | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -218,6 +221,7 @@ means the adapter sizes itself and IGNORES the request canvas.
 | humo_14B_169 | 832x480 | engine _native_dims |
 | ltx25_foley_plus | 832x480 | declared |
 | ltx25_foley_plus_24gb | 832x480 | declared |
+| ltx25_foley_plus_32gb | 832x480 | declared |
 | ltx25_mime | 832x480 | declared |
 | ltx25_video | 832x480 | declared |
 | ltx_8gb | 512x288 | declared |
@@ -270,6 +274,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 | humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
 | ltx25_foley_plus | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_foley_plus_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_foley_plus_32gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_mime | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_video | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
@@ -319,6 +324,7 @@ and it read exactly like a measured number until someone looked.
 | humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
 | ltx25_foley_plus | - | contract max | none cited |
 | ltx25_foley_plus_24gb | - | contract max | none cited |
+| ltx25_foley_plus_32gb | - | contract max | none cited |
 | ltx25_mime | - | contract max | none cited |
 | ltx25_video | - | contract max | none cited |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
@@ -340,7 +346,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **37**
+* registered engine names: **38**
 * provider-side: **9**
-* local: **28**
-* can chain (strict_first_frame): **10**
+* local: **29**
+* can chain (strict_first_frame): **11**

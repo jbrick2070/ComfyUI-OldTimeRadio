@@ -141,6 +141,8 @@ VIDEO_LANE = {
     "ltx25_foley_plus": "l25f",
     # The Q5 sibling: same lane, less lossy DiT, 24 GB tier.
     "ltx25_foley_plus_24gb": "l24f",
+    # Same lane, text encoder left on the GPU.
+    "ltx25_foley_plus_32gb": "l32f",
     "ltx25_mime": "l25m",
     "ltx25_video": "l25v",
     "ltx_8gb": "lx8g",

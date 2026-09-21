@@ -174,6 +174,9 @@ _ENGINES_WITH_A_SESSION = {
     # the Q5 sibling differs only in which DiT file loads, and a beat
     # session cannot see that.
     "ltx25_foley_plus_24gb",
+    # 2026-09-21 -- inherits the same identity; it differs only in where
+    # the text encoder runs, which a beat session cannot see.
+    "ltx25_foley_plus_32gb",
                                # (engine name differs; recipe + weights match)
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

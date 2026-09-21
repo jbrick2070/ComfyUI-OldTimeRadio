@@ -192,6 +192,8 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     # Same composer as its parent -- the Q5 sibling differs only in
     # which DiT file loads, which a bookend prompt cannot see.
     "ltx25_foley_plus_24gb",
+    # Same composer again: encoder placement is invisible to a prompt.
+    "ltx25_foley_plus_32gb",
     "ltx25_mime",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",

@@ -624,6 +624,22 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     _TERMINAL = "decode"
 
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
+    def _wrap_text_encoder(self, base_cls):
+        """Pin the text encoder to CPU. Overridable, default unchanged.
+
+        Extracted 2026-09-21 so a big-card lane can decline the pin
+        without copying ``render_clip``. EVERY EXISTING LANE GETS THE
+        SAME WRAPPER IT ALWAYS DID -- this returns exactly what the
+        inline call returned, so their behaviour cannot move.
+
+        The pin is not a style choice: a GPU-side encode of the
+        Gemma-4 12B Q5 GGUF transiently wants ~13,760 MB, which against
+        a 15.92 GiB card is a coin flip per shot. It costs ~27 s per
+        encode to delete that risk, and on a card with room it is a
+        cost with nothing bought.
+        """
+        return _cpu_pinned_clip_loader(base_cls)
+
     def _dit_name(self):
         return otr_env.get("OTR_LTX25_DIT", R.LTX25_DIT_GGUF)
 
@@ -1397,7 +1413,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # still gates on the real installed class, so a box without
         # ComfyUI-GGUF fails closed BY NAME at preflight; the resolver never
         # has to know this subclass exists.
-        classes["te"] = _cpu_pinned_clip_loader(classes["te"])
+        classes["te"] = self._wrap_text_encoder(classes["te"])
         image_name = _wb.stage_into_comfy_input(plan["init_image"])
         graph = self._build_graph(plan, image_name, length, width, height)
 
@@ -2801,6 +2817,45 @@ class Ltx25FoleyPlus24gbEngine(Ltx25FoleyPlusEngine):
 
     def _dit_name(self):
         return otr_env.get("OTR_LTX25_DIT_24GB", LTX25_DIT_GGUF_24GB)
+
+
+
+@register
+class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
+    """The 24 GB foley lane with the text encoder left on the GPU.
+
+    Same Q5 weights, same recipe, same mix as ``ltx25_foley_plus_24gb``. The
+    one difference is that this lane does NOT pin the Gemma text encoder to
+    CPU, which its parent does unconditionally and which the adapter measures
+    at 26.6 s for the negative and 27.5 s for the positive -- about a minute
+    per episode spent avoiding a VRAM spike that only a 16 GB card cannot
+    absorb.
+
+    WHY IT IS THE BIG-CARD LANE. The encode transiently wants ~13,760 MB.
+    Sampling separately peaks near 21.6 GiB on Q5. The two do not overlap --
+    ``LTX25_PEAK_DECOMPOSITION_GIB`` records the text encoder at 0.0 during
+    sampling -- so the requirement is the LARGER of the two, not their sum.
+    That is why this is safe to offer at all.
+
+    THE NAME SAYS 32 AND THE MEASUREMENT MAY SAY 24. Both stages are
+    individually inside a 24 GB card on paper, so the honest floor is
+    probably lower than the name. It is named for the card it is being
+    proven on, and the name moves once a leg reports a real peak -- the
+    24 GB lane was mislabelled 32 GB on exactly this kind of reasoning
+    before the decomposition was read properly.
+
+    NOTHING ELSE IS TOUCHED. Its parent keeps the pin, and so does every
+    other lane in the family: the base class's ``_wrap_text_encoder``
+    returns precisely what the inline call returned before the hook existed.
+    """
+
+    name = "ltx25_foley_plus_32gb"
+    engine_version = "1"
+    default_roles = ()
+
+    def _wrap_text_encoder(self, base_cls):
+        # Decline the pin. The spike this avoids is affordable here.
+        return base_cls
 
 
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",

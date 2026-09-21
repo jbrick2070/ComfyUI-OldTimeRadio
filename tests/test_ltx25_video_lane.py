@@ -769,8 +769,22 @@ class TestTheCpuPinnedTextEncoder:
         """The subclass is worthless unless it actually reaches the graph, and
         the swap happens AFTER resolution so ``assert_usable`` still gates on
         the real installed ``CLIPLoaderGGUF``."""
+        # WAS A SOURCE GREP for the inline call, and it broke the day the
+        # call became an overridable hook -- correctly, but it would have
+        # stayed green through a rewrite that removed the pin entirely.
+        # Two assertions replace it: the hook REACHES the graph, and the
+        # default hook genuinely pins.
         src = inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
-        assert 'classes["te"] = _cpu_pinned_clip_loader(classes["te"])' in src
+        assert 'self._wrap_text_encoder(classes["te"])' in src, (
+            "render_clip no longer routes the text encoder through the "
+            "hook, so an override could never reach the graph")
+        sentinel = type("Sentinel", (), {})
+        base = eng_ltx25.Ltx25VideoEngine
+        wrapped = base._wrap_text_encoder(base.__new__(base), sentinel)
+        assert wrapped is not sentinel, (
+            "the DEFAULT hook must still pin the encoder to CPU: every "
+            "16 GB lane depends on it, and a GPU-side encode there is a "
+            "coin flip per shot")
         cands = eng_ltx25.Ltx25VideoEngine()._node_candidates()
         assert cands["te"] == ("CLIPLoaderGGUF",), (
             "the preflight gate must still name the REAL installed class, so a "

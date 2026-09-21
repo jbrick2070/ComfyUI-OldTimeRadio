@@ -65,3 +65,48 @@ def test_the_only_difference_from_the_parent_is_the_weights():
             != parent._dit_name(parent.__new__(parent))), (
         "the Q5 sibling resolves the same DiT as its parent, so it is not a "
         "different lane at all")
+
+
+# --------------------------------------------------------------------------- #
+# the fast sibling, which G2 pins on the same terms
+# --------------------------------------------------------------------------- #
+FAST_ID = "ltx25_foley_plus_32gb"
+
+
+def test_the_fast_sibling_declares_the_same_canvas():
+    """It inherits the canvas and must keep it: only encoder PLACEMENT moves."""
+    fast = eng_ltx25.Ltx25FoleyPlusFast32gbEngine
+    assert FAST_ID in set(vreg.all_engine_names()), FAST_ID
+    assert fast.name == FAST_ID
+    declared = (getattr(fast, "render_canvas", None)
+                or getattr(eng_ltx25.Ltx25FoleyPlusEngine, "render_canvas", None))
+    assert tuple(declared) == DECLARED, (
+        "%s declares %r, this pin says %r" % (FAST_ID, tuple(declared), DECLARED))
+
+
+def test_the_fast_sibling_changes_only_where_the_encoder_runs():
+    """The claim it rests on, asserted rather than trusted.
+
+    It must load the SAME weights as its parent -- the difference is the
+    encoder, not the model -- and it must decline the pin while its parent
+    keeps it.
+    """
+    fast = eng_ltx25.Ltx25FoleyPlusFast32gbEngine
+    parent = eng_ltx25.Ltx25FoleyPlus24gbEngine
+    assert fast.__bases__ == (parent,), fast.__bases__
+
+    own = set(vars(fast)) - {"__module__", "__qualname__", "__doc__"}
+    assert own <= {"name", "engine_version", "default_roles",
+                   "_wrap_text_encoder"}, (
+        "the fast sibling overrides more than its identity and the encoder "
+        "placement: %r" % sorted(own))
+
+    assert (fast._dit_name(fast.__new__(fast))
+            == parent._dit_name(parent.__new__(parent))), (
+        "it must load the SAME DiT as its parent; the lever is the encoder")
+
+    sentinel = type("Sentinel", (), {})
+    assert fast._wrap_text_encoder(fast.__new__(fast), sentinel) is sentinel, (
+        "the fast lane must NOT pin the encoder -- that is its whole point")
+    assert parent._wrap_text_encoder(parent.__new__(parent), sentinel) is not sentinel, (
+        "and its parent must still pin, or a working lane was muddied")
