@@ -136,7 +136,7 @@ of them is worth having.
 
 | | |
 |---|---|
-| **GPU** | RDNA3 (7900 XT / XTX, W7900), RDNA4 (RX 9070 / 9070 XT, and the R9700 that ran), or MI-series. RDNA2 may work; nobody knows |
+| **GPU** | RDNA3 (7900 XT / XTX, W7900), RDNA4 (RX 9070 / 9070 XT, and the R9700 that ran), or MI-series. **Check your card's gfx target, not its tier** -- ROCm grants support per target, so two cards of the same generation can differ: gfx1100 (7900 XT / XTX / GRE) has been supported for years while gfx1102 (7600 XT) waited until 7.14. Look yours up in AMD's [compatibility matrix](https://rocm.docs.amd.com/en/latest/compatibility/compatibility-matrix.html) before buying for this. RDNA2 is the ragged edge: gfx1030 appears via the PRO W6800, while the consumer gfx1031 (6700 XT) and gfx1032 (6600) reach it only through community builds |
 | **VRAM** | 16 GB for the shipped graph, 8 GB for the small lab profile |
 | **OS** | Linux has the receipt. **Windows is untried** and AMD ships a ROCm build of PyTorch for Radeon for it |
 | **ROCm** | 7.2.x is what ran; 6.x is still fine on Linux |
