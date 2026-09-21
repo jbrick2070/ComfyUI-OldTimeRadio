@@ -108,6 +108,54 @@ needs it.
 
 ---
 
+## Adding a video lane that is just new weights
+
+This is the common case and the short one. A **lane** is a value in the video
+engine dropdown, so adding one gives every graph a new option -- the canonical
+included -- without adding a single JSON file. Somebody with a bigger card
+picks it and renders; nobody has to find a special graph.
+
+If your lane is the same recipe on a different build of the same model, it is
+a subclass that changes one thing. The three LTX 2.5 lanes are already built
+this way: `ltx25_foley_plus` subclasses `ltx25_video`, and `ltx25_mime`
+subclasses that.
+
+```python
+@register
+class MyLaneOnBiggerWeights(TheClosestExistingLane):
+    name = "that_lane_bigger"
+
+    def _dit_name(self):
+        return "The-Model-You-Actually-Want.gguf"
+```
+
+Then four things, none of them long:
+
+1. **Name it for the person choosing it.** The id is what they read in the
+   dropdown. If it needs a 32 GB card, say so in the name rather than in a
+   doc they will not open.
+2. **Add its `CAPABILITIES` row** in that namespace's `registry.py`, beside
+   its sibling. Copy the parent's row and point `model_requirements` at your
+   weights. A registered engine with no row is the hole the roster audit
+   exists to catch.
+3. **Reserve the id before you register it, if it cannot render yet.** Put it
+   in the family's reserved tuple -- `LTX25_RESERVED_SIBLING_IDS` for LTX 2.5
+   -- which says the name is spoken for while the weights are still being
+   fetched. An id that is registered but cannot render is a dropdown entry
+   that fails hours into somebody's episode.
+4. **Run the gates**, then the whole suite. A new engine id turns fixtures red
+   that the gate list does not name: the still-plan parity fixture, the asset
+   index, the engine and machine matrices, and two literal roster lists. They
+   are regenerated, not hand-edited, and [PREFLIGHT.md](PREFLIGHT.md) has the
+   commands.
+
+**Do not reach for a new profile and a new variant JSON to do this.** A
+profile is the right tool when the machine's *settings* differ. When the
+difference is which weights load, it is a lane, and a lane costs the user one
+dropdown instead of one download.
+
+---
+
 ## Adding a writer LLM
 
 This is not an engine. There is no `@register` and no adapter file.

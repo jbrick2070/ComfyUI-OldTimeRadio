@@ -308,7 +308,7 @@ folder name is historical; the guides cover every platform.)
 | [apple/ROCM.md](apple/ROCM.md) | What is different on AMD? |
 | [apple/RUNPOD.md](apple/RUNPOD.md) | How do I rent a GPU for a lane my card cannot hold? |
 | [apple/CLOUD.md](apple/CLOUD.md) | How do I turn on a paid writer? |
-| [apple/EXTENDING.md](apple/EXTENDING.md) | How do I add an engine, bank, writer, or language? |
+| [apple/EXTENDING.md](apple/EXTENDING.md) | How do I add an engine, bank, writer, or language? A video lane that is only new weights is the short case, and it is a dropdown entry rather than a new graph. |
 | [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | Will what I built actually work? |
 | [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | How do I add a writer LLM? |
 

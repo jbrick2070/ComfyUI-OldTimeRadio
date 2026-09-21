@@ -99,23 +99,23 @@ def test_acceptance_API_places_HQ_in_all_three_role_slots():
         "character_video_model")] == ["ltx25_high_video (16:9)"] * 3
 
 
-def test_nothing_is_reserved_any_more_and_the_RULE_still_stands():
-    """THE CONSTRUCTION-SITE RULE (operator, 2026-08-19) -- now with nothing
-    left to hold back.
+def test_the_reserved_siblings_are_not_registered_until_they_render():
+    """THE CONSTRUCTION-SITE RULE (operator, 2026-08-19), exercised again.
 
-    This test named BOTH Chunk B siblings when it was written. Both shipped on
-    2026-08-26 (operator: "foley and mime, we need this feature for both"), so
-    the reserved tuple is empty -- and the rule it encodes is unchanged and
-    still tested: an id named in that tuple is spoken for and must NOT be
-    registered until it can actually render an episode.
+    The rule has never changed: an id named in the reserved tuple is spoken
+    for and must NOT be registered until it can actually render an episode.
+    This test was previously asserting the tuple was EMPTY, because both
+    Chunk B siblings had shipped and nothing was pending.
 
-    An EMPTY tuple is a statement, not a leftover. It says "nothing is
-    pending", which is different from the symbol having been deleted, and the
-    next LTX 2.5 sibling reserves its name there first."""
+    Two are pending again as of 2026-09-21: the 32 GB Q5 siblings. Their
+    weights are still being fetched and neither has rendered a frame, so
+    they are named here and registered nowhere. When one renders, it moves
+    out of this tuple and into `@register` in the same change, and this
+    test goes back to naming whatever is left."""
     reserved = set(eng_ltx25.LTX25_RESERVED_SIBLING_IDS)
-    assert reserved == set(), (
-        "something is reserved again -- if it can render, register it; if it "
-        "cannot, this test is the gate that says so: %s" % sorted(reserved))
+    assert reserved == {"ltx25_foley_plus_32gb", "ltx25_mime_32gb"}, (
+        "the reserved set moved without this test moving with it: %s"
+        % sorted(reserved))
     registered = set(vreg.all_engine_names())
     assert not (reserved & registered), (
         "a lane registered while still reserved: %s"

@@ -126,7 +126,15 @@ _LOG = logging.getLogger("OTR.eng_ltx25")
 #: it can actually render an episode. The next LTX 2.5 sibling reserves its name
 #: here first. An empty tuple says "nothing is pending", which is a different
 #: and more useful statement than the symbol having been deleted.
-LTX25_RESERVED_SIBLING_IDS = ()
+#: RESERVED 2026-09-21. The same three-lane family on the less lossy
+#: Q5_K_M build of the SAME DiT, for cards that are not the 16 GB laptop
+#: every LTX 2.5 profile here was tuned for. The foley lane measures a
+#: 14.48 GiB peak against a 14.5 GiB clamp on Q3, and Q5 is about 5 GB
+#: larger, so these are a 32 GB proposition and nothing smaller.
+#: They are RESERVED and not registered because the weights are still
+#: being fetched and neither has rendered a frame -- which is exactly
+#: what this tuple is for.
+LTX25_RESERVED_SIBLING_IDS = ("ltx25_foley_plus_32gb", "ltx25_mime_32gb")
 
 # ---------------------------------------------------------------------------
 # Weight resolution (G1). Every artifact resolves through ComfyUI's
