@@ -1,7 +1,7 @@
 [project]
 name = "comfyui-old-time-radio"
-version = "2.3.1"
-description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. Optional sound-generating video lanes create the scene's effects instead of using a stock library."
+version = "2.3.2"
+description = "Press Queue once: ComfyUI writes or adapts a radio play, casts and performs it with neural voices, composes the score, and cuts a finished episode video -- all locally. No account, no API key, nothing paid. Needs an NVIDIA card with 8 GB or more, a 16 GB Apple Silicon Mac, or a CPU (start ComfyUI with --cpu), plus about 25 GB of free disk; the first run fetches roughly 12 GB of models."
 readme = "README.md"
 license = {file = "LICENSE"}
 requires-python = ">=3.10"
@@ -139,7 +139,12 @@ Issues = "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/issues"
 PublisherId = "fluxus"
 DisplayName = "ComfyUI-OldTimeRadio"
 # Registry card art. Must be a URL (SVG/PNG/JPG/GIF, max 800x400) -- the raw
-# GitHub path on the publish branch. Regenerate with tools/make_registry_icon.py.
+# GitHub path on the publish branch, so editing that file updates the LIVE
+# listing with no version bump. Do NOT regenerate over it with
+# tools/make_registry_icon.py without reading that file's header first: the
+# script has fallen behind the hand-finished card and renders a plainer
+# slide. No node or bank COUNT goes on the art (operator, 2026-09-21) --
+# it was wrong and it rots.
 Icon = "https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/assets/otr_icon.gif"
 
 [tool.pytest.ini_options]
