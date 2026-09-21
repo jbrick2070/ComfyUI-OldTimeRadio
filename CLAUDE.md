@@ -60,6 +60,32 @@
     push, named files only and never `git add .`, and tags and
     releases still wait for the operator's eyeball. Pushing is safe;
     publishing is not.
+- **"NOT PROVEN ON HARDWARE YET" IS NOT A REASON TO HOLD A PUSH
+  (operator directive 2026-09-21 -- hard, and it closes the last
+  loophole in 2026-09-19).** Operator: *"i always ask you to push dont
+  wait, that should be in claude md."*
+  * **A green chunk is pushed. Full stop.** Green means the scoped
+    suite is green and the failure set is diffed against a baseline
+    with every new failure explained. It does NOT mean a live leg has
+    run, a model has downloaded, a pod has booted, or a reviewer has
+    answered.
+  * **The live proof FOLLOWS the push and becomes the next commit.**
+    If the leg fails, that is a commit too -- a fix, or a revert with
+    the reason. Git is the tool for exactly this; the working tree is
+    not.
+  * **This was written the day a suite-green, fixture-complete video
+    lane sat unpushed waiting for an 18 GB download and a two-and-a-
+    half-hour render to finish on a rented pod** -- with the driver
+    citing the repo's own "reserve an id until it can render" rule as
+    the reason. That rule governs whether an id is REGISTERED, which
+    is a code decision made in the diff. It says nothing about when
+    the diff reaches `main`, and reading it as a push gate is the
+    same defect 2026-09-19 already named.
+  * **The reserved-id rule still stands on its own terms:** do not
+    register an id you have no intention of proving. Register it,
+    push it, then prove it -- and if it cannot be proven, unregister
+    it in a commit that says why.
+
 - **EVERY CODE CHANGE GETS COMPOSER QA (operator
   directive 2026-09-17 -- hard; the "BEFORE THE PUSH" clause is
   SUPERSEDED by 2026-09-19 above, the QA itself is not).** Operator:

@@ -170,6 +170,10 @@ _ENGINES_WITH_A_SESSION = {
     "animatediff15_lightning_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "razzle_ltx_8gb",          # 2026-09-17 -- inherits Ltx8gbEngine identity
+    # 2026-09-21 -- inherits Ltx25FoleyPlusEngine identity unchanged;
+    # the Q5 sibling differs only in which DiT file loads, and a beat
+    # session cannot see that.
+    "ltx25_foley_plus_24gb",
                                # (engine name differs; recipe + weights match)
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

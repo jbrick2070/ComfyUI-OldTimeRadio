@@ -126,15 +126,20 @@ _LOG = logging.getLogger("OTR.eng_ltx25")
 #: it can actually render an episode. The next LTX 2.5 sibling reserves its name
 #: here first. An empty tuple says "nothing is pending", which is a different
 #: and more useful statement than the symbol having been deleted.
-#: RESERVED 2026-09-21. The same three-lane family on the less lossy
-#: Q5_K_M build of the SAME DiT, for cards that are not the 16 GB laptop
-#: every LTX 2.5 profile here was tuned for. The foley lane measures a
-#: 14.48 GiB peak against a 14.5 GiB clamp on Q3, and Q5 is about 5 GB
-#: larger, so these are a 32 GB proposition and nothing smaller.
-#: They are RESERVED and not registered because the weights are still
-#: being fetched and neither has rendered a frame -- which is exactly
-#: what this tuple is for.
-LTX25_RESERVED_SIBLING_IDS = ("ltx25_foley_plus_32gb", "ltx25_mime_32gb")
+#: The less lossy build of the SAME DiT, for cards with room for it. The
+#: Q3 file every other lane loads is 12.9 GB; this is 18.1 GB, and with the
+#: fixed 4.68 GiB of activations and allocator context, that is a ~21.6 GiB
+#: peak: a 24 GB card. The text encoder and the VAEs are 0.0 at peak
+#: (LTX25_PEAK_DECOMPOSITION_GIB), so the DiT file size IS the tier.
+#: Overridable the same
+#: way the parent's is, so a bigger or smaller build can be tried without a
+#: code change.
+LTX25_DIT_GGUF_24GB = "LTX-2.5-Distilled-Q5_K_M.gguf"
+
+#: Empty again: both 32 GB siblings render, so they are REGISTERED below
+#: rather than held here. The rule is unchanged -- an id sits in this tuple
+#: only while it cannot yet render an episode.
+LTX25_RESERVED_SIBLING_IDS = ()
 
 # ---------------------------------------------------------------------------
 # Weight resolution (G1). Every artifact resolves through ComfyUI's
@@ -2756,6 +2761,46 @@ def compose_ltx25_mime(self, inputs):
 Ltx25VideoEngine.compose_prompt = compose_ltx25_video
 Ltx25FoleyPlusEngine.compose_prompt = compose_ltx25_foley_plus
 Ltx25MimeEngine.compose_prompt = compose_ltx25_mime
+
+
+
+@register
+class Ltx25FoleyPlus24gbEngine(Ltx25FoleyPlusEngine):
+    """``ltx25_foley_plus`` on the Q5_K_M DiT instead of Q3_K_M.
+
+    Everything the parent does, byte for byte -- the same two-stage graph,
+    the same 97-frame rung, the same audio latent kept and mixed at
+    0.50 / 0.50 -- reading the less lossy build of the same model.
+
+    WHY A LANE AND NOT A PROFILE (operator, 2026-09-21). A lane is a value in
+    the video engine dropdown, so it reaches every graph including the
+    canonical: somebody with a big card sees a 32 GB option and turns it on.
+    A profile would have meant another variant JSON to find, and the graphs
+    in this pack are projections of one shape rather than forks.
+
+    THE CARD IS IN THE NAME ON PURPOSE, AND IT IS 24 AND NOT 32.
+    ``LTX25_PEAK_DECOMPOSITION_GIB`` records the text encoder and the VAEs
+    at 0.0 -- both are freed before sampling -- so the peak is the DiT plus
+    a fixed 4.68 GiB of activations and allocator context. Q3 measures
+    14.48 GiB against a 14.5 GiB clamp; Q5 is 18.1 GB on disk, which puts
+    the peak near 21.6 GiB and inside a 24 GB card with room. A 3090 or a
+    4090 runs this, which is a great deal more people than own a 5090.
+    A genuine 32 GB lane would be Q8_0 at 23.6 GB, and is not this one.
+    There is no guard stopping a 16 GB card from selecting it -- this pack
+    does not gate on models, and an OOM is the honest answer -- so the id
+    has to say what it wants.
+    """
+
+    name = "ltx25_foley_plus_24gb"
+    engine_version = "1"
+
+    #: SELECTABLE, NEVER A DEFAULT, for the parent's reason: this lane changes
+    #: the EPISODE MASTER, and acquiring it by inheritance would re-mix an
+    #: episode nobody asked to re-mix.
+    default_roles = ()
+
+    def _dit_name(self):
+        return otr_env.get("OTR_LTX25_DIT_24GB", LTX25_DIT_GGUF_24GB)
 
 
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",

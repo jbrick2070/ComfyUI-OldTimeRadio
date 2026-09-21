@@ -1637,6 +1637,11 @@ class Lane(NamedTuple):
 #:                 siblings would be telling a stranger it is ready.
 #:   "builtin"  -- pure code. No weights and no service; nothing to obtain.
 NO_LANE_REASON = {
+    # The Q5 sibling of the foley lane. Its DiT is an 18.1 GB manual
+    # fetch rather than a provisioned one -- the parent ships the Q3
+    # build, and a 24 GB card is a deliberate choice an operator makes,
+    # not a default anything auto-downloads into.
+    "ltx25_foley_plus_24gb": "manual_doc",
     # Voice and music that arrive through the HF cache on first use.
     "kokoro": "hf_cache",
     "bark": "hf_cache",

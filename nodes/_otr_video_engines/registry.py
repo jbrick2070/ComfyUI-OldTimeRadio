@@ -574,6 +574,21 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # The two 32 GB siblings (2026-09-21): the same three lanes on the less
+    # lossy Q5_K_M build of the same DiT. Every capability field matches its
+    # parent's because the difference is which file loads, which is not
+    # something a preflight gate asks about. The Q5 artifact is the ONLY row
+    # that differs from the parent's list.
+    "ltx25_foley_plus_24gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-q5-gguf",
+                               "gemma4-12b-ltx-2.5-proj-gguf",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

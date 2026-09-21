@@ -139,6 +139,8 @@ VIDEO_LANE = {
     "humo_1.7B_169": "h17w",
     "humo_14B_169": "h14w",
     "ltx25_foley_plus": "l25f",
+    # The Q5 sibling: same lane, less lossy DiT, 24 GB tier.
+    "ltx25_foley_plus_24gb": "l24f",
     "ltx25_mime": "l25m",
     "ltx25_video": "l25v",
     "ltx_8gb": "lx8g",
