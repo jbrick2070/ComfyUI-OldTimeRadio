@@ -4,6 +4,23 @@ A 1980s broadcast-schematic take on the episode pipeline: a simplified
 process slide with beveled cells, scientific tick marks, and a carrier
 pulse that runs the chain while the master cell scopes a live trace.
 800x400 (the registry ceiling), looping GIF.
+
+DO NOT REGENERATE OVER assets/otr_icon.gif EXPECTING THE SAME PICTURE.
+The shipped card was hand-finished after this script was last committed and
+carries furniture this file does not draw: the LOCAL / OFFLINE flag, the
+REQUEST-HASH DETERMINISTIC footer, and T0-T3 tick labels rather than bare
+digits. Running this writes a plainer slide and silently downgrades the
+registry listing art, which is the one image a stranger sees first.
+
+The card is served live from the `main` branch -- pyproject's `Icon` pins
+`raw.githubusercontent.com/.../main/assets/otr_icon.gif` -- so editing that
+file updates the public listing with NO version bump and no publish.
+
+NO COUNTS ON THE CARD (operator, 2026-09-21): "better to leave things that
+can change like node count out of the image, not just a new number, make it
+future proof." The footer used to read "34 NODES / 5 STORY BANKS"; the pack
+declares 25 nodes, so it was wrong as well as rot-prone. It was removed
+rather than renumbered. Do not add a count back, here or to the art.
 """
 import math
 from PIL import Image, ImageDraw, ImageFont
