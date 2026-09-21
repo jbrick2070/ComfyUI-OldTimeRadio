@@ -1,4 +1,4 @@
-"""The pack reaches the network from FIVE named files, and nowhere else.
+"""The pack reaches the network from the files named here, and nowhere else.
 
 Unlike the environment and the process spawn, this one is a REGISTER, not a
 collapse. The r1 panel's finding, kept verbatim in
@@ -13,7 +13,7 @@ a report. So the collapse was CUT and this guard took its place.
 
 WHAT IT BUYS, and it is the honest version: not a smaller finding count, but a
 list a reviewer can read. Each file says WHY it talks to the network, and both
-directions are asserted -- a sixth file that starts calling out fails here, and
+directions are asserted -- a file that starts calling out fails here, and
 a named file that stops calling out must leave the list rather than sit as
 decoration.
 
@@ -43,7 +43,7 @@ _CONNECTIONS = frozenset({"HTTPConnection", "HTTPSConnection"})
 _CLIENT_MODULES = frozenset({"requests", "httpx"})
 
 
-#: The five files that talk to the network, each with the reason it does.
+#: The files that talk to the network, each with the reason it does.
 NETWORK_CALLERS = {
     "nodes/_otr_comfy_backend.py": (
         "posts a prompt to a local or remote ComfyUI over `requests`; the pack "
@@ -58,6 +58,14 @@ NETWORK_CALLERS = {
     "nodes/_otr_openrouter_backend.py": (
         "the OpenRouter transport -- a catalog GET and a completion POST, the "
         "second of which STREAMS; wrapping it is risk taken for a report line"),
+    "nodes/_otr_shared/cloud_balance_preflight.py": (
+        "reads the wallet before a cloud run -- the Comfy customer balance "
+        "and the two OpenRouter key/credits endpoints -- so a run that "
+        "cannot be paid for is refused before it spends rather than after"),
+    "nodes/_otr_shared/cloud_slug_preflight.py": (
+        "reads a provider's live model catalog, so a slug renamed or "
+        "retired upstream is caught before a render starts instead of "
+        "failing mid-episode"),
     "nodes/_otr_shared/cloud_media_invoke.py": (
         "invokes a cloud media provider and reads the result back over "
         "`urllib.request.urlopen`"),
@@ -91,7 +99,7 @@ def _offenders(tree, rel):
     return out
 
 
-_HINT = ("a sixth file now reaches the network. That is a decision, not a "
+_HINT = ("a file not named here now reaches the network. That is a decision, not a "
          "detail: add it to NETWORK_CALLERS with the reason it cannot go "
          "through an existing caller, or route it through one.")
 

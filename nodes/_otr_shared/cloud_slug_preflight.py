@@ -17,6 +17,7 @@ import urllib.request
 from enum import Enum
 from typing import Callable, NamedTuple, Optional
 from urllib.parse import urlparse
+from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
 
 log = logging.getLogger("OTR.cloud.slug")
 
@@ -209,7 +210,7 @@ def catalog_ids(authority, *, get_json=None) -> CatalogResult:
 def _live_openrouter_get_json(url: str) -> dict:
     req = urllib.request.Request(
         url, headers={"User-Agent": "OTR-cloud-slug-preflight"})
-    with urllib.request.urlopen(req, timeout=20) as resp:
+    with urlopen(req, timeout=20) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 

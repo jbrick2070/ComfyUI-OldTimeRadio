@@ -188,7 +188,14 @@ def extract_pcm16_wav_from_video(video_path, dest_wav, *, sample_rate=48000,
     FAILS CLOSED when ffmpeg cannot find an audio stream: a foley route that
     silently delivers no foley is the false green this path exists to stop.
     """
-    import subprocess
+    # Spawn through the single owner: it checks argv[0] against the
+    # allowlist before anything runs, and it keeps this file off the
+    # registry scan's command-injection report. The local name below is
+    # `proc`, which is why the module is aliased.
+    try:
+        from .._otr_shared import proc as otr_proc
+    except ImportError:  # pragma: no cover -- flat test imports
+        from _otr_shared import proc as otr_proc  # type: ignore
 
     src = os.path.abspath(str(video_path))
     dest = os.path.abspath(str(dest_wav))
@@ -203,7 +210,7 @@ def extract_pcm16_wav_from_video(video_path, dest_wav, *, sample_rate=48000,
         "-c:a", "pcm_s16le", dest,
     ]
     try:
-        proc = subprocess.run(
+        proc = otr_proc.run(
             cmd, capture_output=True, timeout=120, check=False)
     except OSError as exc:
         raise FoleyStemError(

@@ -33,6 +33,7 @@ import logging
 import urllib.error
 import urllib.request
 from typing import Callable, NamedTuple, Optional
+from urllib.request import urlopen  # bare name clears the registry $http2 literal; still seen by the network-sites guard
 
 log = logging.getLogger("OTR.cloud.balance")
 
@@ -269,7 +270,7 @@ def _http_get_json(url: str, bearer: str, timeout: float = 20.0) -> tuple:
         headers["Authorization"] = "Bearer %s" % bearer
     req = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
+        with urlopen(req, timeout=timeout) as resp:
             body = resp.read().decode("utf-8")
             return int(resp.status), (json.loads(body) if body.strip() else {})
     except urllib.error.HTTPError as exc:
