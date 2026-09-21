@@ -1239,15 +1239,27 @@ class GGUFNativeBackend:
         import torch
         if (_policy.device == "cuda" and torch.cuda.is_available()
                 and not _bool_env("OTR_TEST_MODE", False)):
+            # OPERATOR DIRECTIVE 2026-09-21: "I don't want any VRAM guards."
+            # This used to RAISE when the probe itself failed, which killed the
+            # episode on the strength of a broken reading rather than a real
+            # shortage -- the last refusal in the VRAM path after the estimate
+            # gate (2026-08-29) and the fit gate were both demoted to
+            # recommendations. A probe that cannot answer is not evidence that
+            # the model will not fit; llama.cpp allocates against real hardware
+            # and fails honestly if it does not. So: say it loudly, skip the
+            # arithmetic that needs the reading, and attempt the load.
+            free_bytes = None
             try:
                 free_bytes, total_bytes = torch.cuda.mem_get_info()
             except Exception as exc:
-                raise GGUFNativeConfigError(
-                    f"VRAM preflight probe failed ({exc!r}) -- refusing to "
-                    "load a ~13 GB GGUF blind. Fix the CUDA runtime or set "
-                    "llm device policy to cpu."
-                ) from exc
-            free_gb = free_bytes / (1024 ** 3)
+                log.warning(
+                    "[GGUFNative] VRAM preflight probe failed (%r) -- "
+                    "PROCEEDING ANYWAY, an OOM is the only authority here. "
+                    "If the load dies, fix the CUDA runtime, lower "
+                    "gguf_n_ctx, pick a smaller quant, or offload layers via "
+                    "OTR_GGUF_N_GPU_LAYERS.", exc,
+                )
+            free_gb = (free_bytes / (1024 ** 3)) if free_bytes is not None else None
             # Estimation: weights + SWA KV cache (~0.7 GB per 1024 context cells)
             # + safety overhead.
             #
@@ -1264,12 +1276,13 @@ class GGUFNativeBackend:
             kv_gb = (n_ctx / 1024.0) * kv_rate
             estimated_needed_gb = weights_gb + kv_gb + 0.1
             log.info(
-                "[GGUFNative] VRAM Preflight: Free=%.2f GB | Needed=%.2f GB "
+                "[GGUFNative] VRAM Preflight: Free=%s | Needed=%.2f GB "
                 "(weights=%.2f from %s, kv=%.2f @ n_ctx=%d)",
-                free_gb, estimated_needed_gb, weights_gb, model_path.name,
+                ("%.2f GB" % free_gb) if free_gb is not None else "UNREADABLE",
+                estimated_needed_gb, weights_gb, model_path.name,
                 kv_gb, n_ctx,
             )
-            if free_gb < estimated_needed_gb:
+            if free_gb is not None and free_gb < estimated_needed_gb:
                 # OPERATOR DIRECTIVE 2026-08-29: "prove me wrong with an OOM
                 # but don't put an artificial gate", and the standing rule it
                 # restates -- "I don't want guards to kill anything, an OOM is
