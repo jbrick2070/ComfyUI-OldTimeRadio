@@ -1273,6 +1273,97 @@ def _authored_or_one_more_ask(
     return ok2, cleaned2, True
 
 
+#: Scripts whose presence is decidable from the codepoint alone. A row whose
+#: iso is here must show its own script or the line is not in that language.
+_NON_LATIN_SCRIPT_RANGES = {
+    "ja": ((0x3040, 0x30FF), (0x4E00, 0x9FFF), (0x3400, 0x4DBF)),
+    "zh": ((0x4E00, 0x9FFF), (0x3400, 0x4DBF), (0xF900, 0xFAFF)),
+    "hi": ((0x0900, 0x097F),),
+}
+
+#: The chrome keys a native opening or closing is built from. Any one of them
+#: appearing in the text is enough -- the deterministic fallback uses them, so
+#: a genuinely native line passes without the model being told to quote them.
+_CHROME_MARKER_KEYS = (
+    "tonight_label", "sign_on_greeting", "station_id_open", "work_line_prefix",
+    "sign_off_greeting", "station_id_close", "open_on_prefix",
+)
+
+
+def announcer_line_is_in_language(text, episode_meta=None) -> bool:
+    """True when `text` is plausibly in the episode language.
+
+    Never raises and never blocks English: an unreadable row, a missing
+    registry or an English/Off episode all answer True, because this guard
+    exists to catch a WRONG language, not to police prose.
+    """
+    if not text:
+        return True
+    try:
+        row = _EPLANG.row_from_meta(episode_meta)
+    except Exception:
+        return True
+    iso = str(getattr(row, "iso", "") or "").lower()
+    if not iso or iso == _EPLANG.ENGLISH_ISO:
+        return True
+    ranges = _NON_LATIN_SCRIPT_RANGES.get(iso)
+    if ranges:
+        hits = sum(
+            1 for ch in text
+            if any(lo <= ord(ch) <= hi for lo, hi in ranges)
+        )
+        return hits >= 2
+    chrome = dict(getattr(row, "spoken", {}) or {})
+    low = text.lower()
+    for key in _CHROME_MARKER_KEYS:
+        marker = str(chrome.get(key) or "").strip().lower()
+        if len(marker) >= 4 and marker in low:
+            return True
+    return False
+
+
+def _language_complaint(episode_meta=None) -> str:
+    """The second ask, in the words the registry already holds."""
+    base = _ANNOUNCER_COMPLAINT
+    try:
+        row = _EPLANG.row_from_meta(episode_meta)
+        iso = str(getattr(row, "iso", "") or "").lower()
+        # An English (or unresolvable) episode keeps the structural complaint:
+        # the only thing that can be wrong there is the bracket rule, and a
+        # language lecture would be noise the model has to read past.
+        if not iso or iso == _EPLANG.ENGLISH_ISO:
+            return base
+        instruction = str(
+            dict(getattr(row, "authoring", {}) or {}).get(
+                "writer_instruction", "") or "").strip()
+        name = str(
+            dict(getattr(row, "authoring", {}) or {}).get(
+                "spoken_name", "") or "").strip()
+    except Exception:
+        return base
+    if not instruction:
+        return base
+    return (
+        "Your last line was not in the episode language%s. A voice actor "
+        "cast for that language reads this line aloud, so an English line is "
+        "performed in the wrong language. %s Write the same beat again, in "
+        "that language only."
+        % ((" (%s)" % name) if name else "", instruction)
+    )
+
+
+def _language_aware(validator, episode_meta):
+    """Wrap a structural validator with the episode-language check."""
+    def _check(text):
+        ok, cleaned = validator(text)
+        if not ok:
+            return ok, cleaned
+        if not announcer_line_is_in_language(cleaned, episode_meta):
+            return False, ""
+        return True, cleaned
+    return _check
+
+
 def validate_announcer_line(text: str) -> tuple[bool, str]:
     """Check only nonempty, label-free, markup-free row structure.
 
@@ -1573,7 +1664,8 @@ def compose_announcer_intro(
             {"role": "system", "content": system},
             {"role": "user", "content": context + "\nWrite the opening now."},
         ],
-        validate_announcer_line,
+        _language_aware(validate_announcer_line, episode_meta),
+        complaint=_language_complaint(episode_meta),
     )
     if ok:
         return LineResult(
@@ -1852,7 +1944,8 @@ def compose_news_coda(
                 "Write only a transition into the source note."
             )},
         ],
-        validate_news_coda_bridge,
+        _language_aware(validate_news_coda_bridge, episode_meta),
+        complaint=_language_complaint(episode_meta),
     )
     if not ok:
         bridge = ""
@@ -1905,7 +1998,8 @@ def compose_announcer_outro(
             {"role": "system", "content": system},
             {"role": "user", "content": context},
         ],
-        validate_announcer_line,
+        _language_aware(validate_announcer_line, episode_meta),
+        complaint=_language_complaint(episode_meta),
     )
     return (
         LineResult(
