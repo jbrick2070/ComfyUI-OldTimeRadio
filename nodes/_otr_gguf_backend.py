@@ -822,6 +822,17 @@ def _bool_env(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+class ModelsRootUnresolved(RuntimeError):
+    r"""No models root could be resolved, and guessing would create garbage.
+
+    Raised only off Windows, and only after the env vars, an existing
+    ``C:\ComfyUI-Models``, ComfyUI's ``folder_paths`` and the sibling
+    ``models/`` directory have all been tried. Callers that can carry on
+    without weights should catch it; a fetcher should let it out, because
+    downloading gigabytes into a guessed path is worse than stopping.
+    """
+
+
 def _models_root() -> Path:
     r"""Where the weights live: env, then this box's tree, then ComfyUI's own.
 
@@ -861,6 +872,33 @@ def _models_root() -> Path:
             return Path(base).expanduser()
     except Exception:  # noqa: BLE001 -- outside ComfyUI, fall through
         pass
+    # 4. The ComfyUI checkout puts custom_nodes/ beside models/, so when this
+    #    pack sits where it is installed the sibling directory IS the answer.
+    #    This is the step that makes a Linux or Docker box work with no
+    #    environment variable, and it has to come before the Windows literal
+    #    because step 3 is unavailable outside a running ComfyUI -- which is
+    #    exactly when a fetch script calls this.
+    #    os.path rather than pathlib on purpose: Path() binds to the host
+    #    flavour, so a test that simulates POSIX cannot construct one here.
+    sibling = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__)))), "models")
+    if os.path.isdir(sibling):
+        return Path(sibling)
+    # 5. The literal, last. ADDED A GUARD 2026-09-21: returning it
+    #    unconditionally is what put 3.7 GB of AnimateDiff lane weights into a
+    #    directory literally named "C:\ComfyUI-Models" INSIDE the repo on a
+    #    Linux pod. scripts/otr_fetch_lane_weights.py has its own sibling
+    #    fallback for precisely that case and never reached it, because this
+    #    function returned a value instead of declining. On POSIX the literal
+    #    is not an absolute path at all, so it can only ever create garbage.
+    if os.name != "nt":
+        raise ModelsRootUnresolved(
+            "no models root: set OTR_COMFYUI_MODELS_ROOT (or COMFYUI_MODELS_ROOT), "
+            "or run inside ComfyUI so folder_paths is importable. Refusing to "
+            "fall back to the Windows path %r off Windows, because it is "
+            "relative here and would create a directory of that name." % str(legacy)
+        )
     return legacy
 
 
