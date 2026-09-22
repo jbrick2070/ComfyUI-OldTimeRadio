@@ -683,9 +683,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         at graph time instead of at the gate.
         """
         return [
-            ("LTX 2.5 DiT (GGUF)", _resolve("unet", self._dit_name()),
-             _FLOOR_DIT),
-            ("Gemma-4 12B text encoder (GGUF)",
+            ("LTX 2.5 DiT (%s)" % self._weight_family(),
+             _resolve("unet", self._dit_name()), _FLOOR_DIT),
+            ("Gemma-4 12B text encoder (%s)" % self._weight_family(),
              _resolve("text_encoders", self._text_encoder_name()),
              _FLOOR_TEXT_ENCODER),
             ("LTX 2.5 video VAE", _resolve("vae", self._video_vae_name()),
@@ -745,6 +745,44 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "decode": ("VAEDecodeTiled",),
         }
 
+    def _weight_family(self):
+        """What to call these weights in an operator-facing message.
+
+        The labels were hardcoded "GGUF" and inherited unchanged by the native
+        lanes, so a missing native safetensors reported itself as a missing
+        GGUF file -- a message that sends the reader to the wrong folder.
+        """
+        return "GGUF"
+
+    def _missing_node_remedy(self):
+        """The pack to name when a node class is absent, per family.
+
+        A native lane pointed the operator at ComfyUI-GGUF, which it does not
+        use and whose absence is not its problem -- found by the codex QA lane.
+        The remedy has to come from the lane, because the two families fail for
+        opposite reasons.
+        """
+        return " plus ComfyUI-GGUF for the two GGUF loaders"
+
+    def _inspect_te_loader(self, loader_cls):
+        """Is the resolved text-encoder loader LTX 2.5 compatible?
+
+        A SEAM, not a policy: the GGUF family answers with the ComfyUI-GGUF
+        patch inspection, and a lane loading a different class overrides this
+        to say "nothing to inspect".
+
+        IT IS AN INSTANCE METHOD ON PURPOSE. The first version of the native
+        lane skipped the check by patching this module with unittest.mock
+        inside assert_usable, and the codex QA lane reproduced the failure
+        that makes that unsafe: with overlapping calls the restores unwind out
+        of order (A-enter, B-enter, A-exit, B-exit) and the bypass survives
+        both -- after which a GGUF lane's own check silently passes without
+        running. This repo's render routes run in unguarded daemon threads, so
+        that is a live shape, not a theoretical one. An override mutates
+        nothing shared and cannot leak.
+        """
+        return _inspect_ltx25_gguf_patch(loader_cls)
+
     # ---- usability: fail CLOSED, cheapest refusal first ----
     def assert_usable(self, host_caps, profile, request_template=None):
         """Ordered gate, and the order is the contract.
@@ -776,11 +814,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "%s missing required ComfyUI node class(es): %s -- LTX 2.5 "
                 "needs a ComfyUI carrying comfy_extras/nodes_lt.py + "
-                "nodes_lt_audio.py plus ComfyUI-GGUF for the two GGUF loaders; "
-                "update both and restart"
-                % (self.name, ", ".join(sorted(set(absent)))), kind="video")
+                "nodes_lt_audio.py%s; update and restart"
+                % (self.name, ", ".join(sorted(set(absent))),
+                   self._missing_node_remedy()), kind="video")
 
-        loader_path, patch_gaps = _inspect_ltx25_gguf_patch(resolved["te"])
+        loader_path, patch_gaps = self._inspect_te_loader(resolved["te"])
         if patch_gaps:
             patch_path = os.path.realpath(os.path.join(
                 os.path.dirname(__file__), "..", "..", "patches",
@@ -3015,6 +3053,24 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
         """
         return base_cls
 
+    def _inspect_te_loader(self, loader_cls):
+        """Nothing to inspect: this lane loads stock ``CLIPLoader``.
+
+        The inherited check asks whether the installed ``CLIPLoaderGGUF``
+        carries the LTX-2.5 Gemma-4 patch. This lane never loads that class,
+        so the question is not merely irrelevant -- answering it would refuse a
+        lane whose entire purpose is not needing that pack.
+        """
+        return ("", [])
+
+    def _missing_node_remedy(self):
+        """Stock nodes, so the remedy is ComfyUI itself -- never the GGUF pack."""
+        return (" -- these are STOCK ComfyUI nodes, so update ComfyUI itself; "
+                "this lane deliberately does not use ComfyUI-GGUF")
+
+    def _weight_family(self):
+        return "native safetensors"
+
     def _quant_label(self):
         """The quantisation, read off the native filename rather than a GGUF tag.
 
@@ -3048,26 +3104,6 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
             # cards pin, big cards do not.
             "device": self._native_te_device}}
         return g
-
-    def assert_usable(self, host_caps, profile, request_template=None):
-        """The parent gate minus the ComfyUI-GGUF patch check.
-
-        That check asks whether the installed ``CLIPLoaderGGUF`` carries the
-        LTX-2.5 Gemma-4 patch. This lane never loads that class, so the
-        question is not just irrelevant -- asking it would refuse a lane whose
-        entire purpose is not needing that pack.
-        """
-        import unittest.mock as _mock
-        with _mock.patch.object(
-                _mod_self(), "_inspect_ltx25_gguf_patch",
-                lambda _cls: ("", [])):
-            return super().assert_usable(host_caps, profile, request_template)
-
-
-def _mod_self():
-    """This module object, for the targeted patch above."""
-    import sys
-    return sys.modules[__name__]
 
 
 @register

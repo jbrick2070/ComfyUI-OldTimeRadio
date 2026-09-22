@@ -121,6 +121,12 @@ VISUAL_STYLE = {
 #: engine is someone else's job and guessing it would put a wrong-but-plausible
 #: code in a filename, which is worse than the ``unk`` that would announce it.
 VIDEO_LANE = {
+    # Native (non-GGUF) LTX 2.5, 2026-09-22. Without these an episode that
+    # any of them dominates publishes as "unk" -- the video identity missing
+    # from the one artifact the operator actually reads.
+    "ltx25_native_foley_16gb": "n16f",
+    "ltx25_native_foley_24gb": "n24f",
+    "ltx25_native_foley_blackwell": "nbwf",
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
     "animatediff15_lightning_video": "adlt",
