@@ -603,6 +603,50 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # --- NATIVE (non-GGUF) LTX 2.5, 2026-09-22 -------------------------
+    # Same joint-AV model as the GGUF lanes, loaded through STOCK
+    # UNETLoader/CLIPLoader instead of ComfyUI-GGUF. The model_requirements
+    # names are new because the ARTIFACTS are different files, even though
+    # the recipe and the VAEs are shared.
+    #
+    # needs_fp8_te stays False on all three: the "fp8"/"nvfp4" in the DiT
+    # filenames describes the TRANSFORMER's own packing, which the loader
+    # reads from the file. It is not a claim about the text encoder, which is
+    # the separate w4a8 artifact on every tier.
+    "ltx25_native_foley_24gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-fp8-e4m3fn-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # Blackwell-only by the publisher's own wording. The row cannot enforce a
+    # microarchitecture -- device_backends is vendor-level -- so the refusal,
+    # if any, comes from the loader on older silicon. Named here so a reader
+    # of the menu is not surprised by that.
+    "ltx25_native_foley_blackwell": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-nvfp4-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    "ltx25_native_foley_16gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-w4a8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

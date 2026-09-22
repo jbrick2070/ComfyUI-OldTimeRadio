@@ -177,6 +177,14 @@ _ENGINES_WITH_A_SESSION = {
     # 2026-09-21 -- inherits the same identity; it differs only in where
     # the text encoder runs, which a beat session cannot see.
     "ltx25_foley_plus_32gb",
+    # 2026-09-22 -- the NATIVE (non-GGUF) tier lanes. They inherit
+    # Ltx25FoleyPlusEngine's identity for the same reason the GGUF siblings
+    # do: a beat session keys on the engine plus its weight receipts, and
+    # these differ only in WHICH loader reads WHICH file. The recipe, the
+    # 97-frame rung and the joint-AV latent are the inherited ones.
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_foley_16gb",
                                # (engine name differs; recipe + weights match)
     "wan_ti2v",                 # WIRE-W3a, 2026-07-29
     "wan_ti2v",                # WIRE-W3b, 2026-07-29

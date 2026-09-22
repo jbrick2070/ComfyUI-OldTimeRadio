@@ -2929,6 +2929,180 @@ class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
         return base_cls
 
 
+
+#: Native (non-GGUF) LTX 2.5 weights, by hardware tier. Sizes and the tier
+#: notes are the PUBLISHER'S OWN, from joeygambino/LTX-2.5-Quantized's
+#: MANIFEST.json, which also carries a sha256 per file:
+#:
+#:   comfy-w4a8      12.52 GB  "16 GB, no custom node"
+#:   comfy-nvfp4     12.50 GB  "Blackwell only"
+#:   comfy-fp8_e4m3fn 21.48 GB "24 GB+, widest GPU support"
+#:   gemma4 w4a8     10.60 GB  text encoder, 4-bit
+#:
+#: They are quantisations of the Lightricks bf16 originals, served ungated
+#: (verified HTTP 206 anonymously) -- the official repo is gated and needs a
+#: token, which is why the mirror is named here.
+LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-w4a8.safetensors"
+LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
+LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors"
+LTX25_NATIVE_TEXT_ENCODER = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
+
+
+class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
+    """The foley lane on NATIVE safetensors instead of GGUF.
+
+    Everything that makes an episode -- the two-stage recipe, the 97-frame
+    rung, the joint-AV latent, the foley decode and its 0.50/0.50 mix -- is
+    inherited unchanged. What changes is the two LOADER nodes and the files
+    they read.
+
+    NOT REGISTERED ITSELF. It carries no ``name``, so ``@register`` is never
+    applied to it; the per-tier subclasses below are the selectable lanes.
+    This exists so a recipe fix lands on every tier at once.
+
+    THE CPU PIN IS FREE HERE, and that is a real simplification. The GGUF
+    lane needs ``_cpu_pinned_clip_loader`` -- a synthesised subclass -- because
+    ``CLIPLoaderGGUF`` exposes no placement argument. Stock ``CLIPLoader``
+    takes ``device``, so the native lane asks for ``cpu`` as an ordinary widget
+    value and the encoder genuinely lands on the CPU. The cache's liveness
+    check therefore still expects CPU placement, exactly like every pinned
+    lane, so ``_encoder_cache_expects_cpu`` stays True.
+    """
+
+    #: Declared by the tier subclasses. Named here so the base reads complete.
+    _native_dit = None
+
+    def _node_candidates(self):
+        """Stock loaders, everything else inherited.
+
+        ``UNETLoader``/``CLIPLoader`` ship with ComfyUI itself, so this lane
+        has NO third-party node dependency -- which is the operator's stated
+        reason for wanting it. eng_minimax_h3 already proves the pair loads
+        convrot-style safetensors in this stack.
+        """
+        cand = dict(super()._node_candidates())
+        cand["unet"] = ("UNETLoader",)
+        cand["te"] = ("CLIPLoader",)
+        return cand
+
+    def _dit_name(self):
+        return otr_env.get("OTR_LTX25_NATIVE_DIT", self._native_dit)
+
+    def _text_encoder_name(self):
+        return otr_env.get("OTR_LTX25_NATIVE_TE", LTX25_NATIVE_TEXT_ENCODER)
+
+    def _wrap_text_encoder(self, base_cls):
+        """No synthesised subclass -- the stock node takes ``device``.
+
+        Returning the class untouched is not "declining the pin": the pin is
+        requested in the graph instead (``device: "cpu"`` on the ``te`` node),
+        which is the same placement by a cheaper route.
+        """
+        return base_cls
+
+    def _quant_label(self):
+        """The quantisation, read off the native filename rather than a GGUF tag.
+
+        The parent greps for ``Q4_K_M``-style tags, which no native file
+        carries; left inherited it would label every native render "".
+        """
+        base = os.path.basename(str(self._dit_name()))
+        for tag in ("nvfp4", "fp8_e4m3fn", "w4a8", "w4a4", "int8", "mix4x8"):
+            if tag in base:
+                return tag
+        return "native"
+
+    def _build_graph(self, plan, image_name, length, width, height):
+        """Inherit the whole graph, then re-point the two loader nodes.
+
+        A full copy would fork the recipe; this way a change to any other node
+        still reaches this lane.
+        """
+        g = super()._build_graph(plan, image_name, length, width, height)
+        g["unet"] = {"class": "unet", "inputs": {
+            "unet_name": self._dit_name(),
+            # 'default' lets ComfyUI honour whatever the checkpoint declares.
+            # The quantisation lives IN the file; forcing a dtype here would
+            # fight it.
+            "weight_dtype": "default"}}
+        g["te"] = {"class": "te", "inputs": {
+            "clip_name": self._text_encoder_name(),
+            "type": "ltxv",
+            # The placement the GGUF lane has to synthesise a subclass for.
+            "device": "cpu"}}
+        return g
+
+    def assert_usable(self, host_caps, profile, request_template=None):
+        """The parent gate minus the ComfyUI-GGUF patch check.
+
+        That check asks whether the installed ``CLIPLoaderGGUF`` carries the
+        LTX-2.5 Gemma-4 patch. This lane never loads that class, so the
+        question is not just irrelevant -- asking it would refuse a lane whose
+        entire purpose is not needing that pack.
+        """
+        import unittest.mock as _mock
+        with _mock.patch.object(
+                _mod_self(), "_inspect_ltx25_gguf_patch",
+                lambda _cls: ("", [])):
+            return super().assert_usable(host_caps, profile, request_template)
+
+
+def _mod_self():
+    """This module object, for the targeted patch above."""
+    import sys
+    return sys.modules[__name__]
+
+
+@register
+class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
+    """24/32 GB, ANY modern NVIDIA. The publisher's "widest GPU support".
+
+    fp8_e4m3fn at 21.48 GB is the largest native DiT that fits a 24 GB card,
+    and it runs on Ada and Hopper as well as Blackwell -- so this is the lane
+    for a 4090 or a 5090 alike. It is the DEFAULT native choice; the Blackwell
+    lane below is the optimisation, not the baseline.
+    """
+
+    name = "ltx25_native_foley_24gb"
+    engine_version = "1"
+    default_roles = ()
+    _native_dit = LTX25_NATIVE_DIT_WIDE
+
+
+@register
+class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
+    """24/32 GB BLACKWELL. NVFP4, and it is the small one.
+
+    12.50 GB against the wide lane's 21.48 -- so Blackwell does not merely
+    match the other tier, it frees ~9 GB that a larger canvas or a longer rung
+    can spend. What that headroom should actually buy is a MEASUREMENT, not a
+    guess, so the canvas stays inherited until a real leg reports a peak.
+
+    "Blackwell only" is the publisher's own wording. On anything older this
+    lane is expected to refuse or fall back badly, which is why the wide lane
+    above stays the default.
+    """
+
+    name = "ltx25_native_foley_blackwell"
+    engine_version = "1"
+    default_roles = ()
+    _native_dit = LTX25_NATIVE_DIT_BLACKWELL
+
+
+@register
+class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
+    """16 GB, for the 5080 -- so the native family covers the dev box too.
+
+    w4a8 at 12.52 GB is the publisher's 16 GB pick. The existing GGUF 16 GB
+    lane is NOT touched or replaced by this; it stays exactly as qualified.
+    """
+
+    name = "ltx25_native_foley_16gb"
+    engine_version = "1"
+    default_roles = ()
+    _native_dit = LTX25_NATIVE_DIT_16GB
+
+
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
