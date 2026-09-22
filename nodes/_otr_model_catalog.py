@@ -2207,6 +2207,26 @@ def _estimate_resident_gb(
         implied = getattr(curated, "implied_quant_policy", "") or ""
         if implied == "none":
             return download
+        # MEASUREMENT BEATS THE PROJECTION, and the badge reads this same
+        # table -- that is the point of consulting it here.
+        #
+        # FOUND ON A LIVE LEG, 2026-09-21. The Selector printed
+        # "vram_fit=FAIL@25.9 GB" for Qwen3.8-27B while that model was
+        # resident on the card at 17.1 GB, having loaded without complaint.
+        # 25.9 is this function's own download/2, and vram_badge_for's
+        # docstring promises the badge "reports the same figure
+        # _estimate_resident_gb computes, so the badge and the gate cannot
+        # drift apart". Teaching fit_tags_for the measured number without
+        # teaching this one is exactly that drift: the picker said the card
+        # fits and the gate said it does not.
+        #
+        # The divisor models an 8-bit load (bf16 download halved); NF4 is
+        # four bits. It is a safe overestimate for every small row and a
+        # 1.5x overestimate at 27B, which is the difference between a
+        # clean PASS and a FAIL nobody can act on.
+        measured_nf4 = MEASURED_NVIDIA_NF4_GB.get(hf_weights_id(lookup))
+        if measured_nf4:
+            return float(measured_nf4)
         return download / 2.0
     if safetensors_gb_hint is not None and safetensors_gb_hint > 0:
         return float(safetensors_gb_hint) / 2.0

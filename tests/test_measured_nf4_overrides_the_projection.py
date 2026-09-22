@@ -87,3 +87,46 @@ def test_an_unmeasured_row_still_uses_the_projection():
         "nv16-nf4", "nv24-nf4")
     assert catalog.fit_tags_for("Qwen/Qwen3.5-4B") == (
         "mac16-tight", "nv8-nf4", "nv16", "nv24")
+
+
+def test_the_gate_and_the_badge_quote_the_same_number():
+    """The promise that actually broke, now enforced.
+
+    ``vram_badge_for``'s docstring says it "reports the same figure
+    :func:`_estimate_resident_gb` computes, so the badge and the gate cannot
+    drift apart". Teaching ``fit_tags_for`` the measured number without
+    teaching ``_estimate_resident_gb`` broke exactly that, and a LIVE LEG is
+    what found it: the Selector logged ``vram_fit=FAIL@25.9 GB`` for a model
+    that was at that moment resident on the card at 17.1 GB and generating.
+    The picker said the card fits; the gate said it does not; both were
+    reading the same row.
+
+    A user cannot act on that. The load proceeded only because this gate is
+    advisory ("recommendation only; attempting the load") -- on any path that
+    treated it as binding, a measured-good model would have been refused.
+    """
+    for row in catalog.CURATED_LLM_MODELS:
+        if getattr(row, "provider", "local") != "local":
+            continue
+        measured = catalog.MEASURED_NVIDIA_NF4_GB.get(
+            catalog.hf_weights_id(row.repo_id))
+        if not measured:
+            continue
+        est = catalog._estimate_resident_gb(row.repo_id)
+        assert est == measured, (
+            f"{row.repo_id}: the gate prices it at {est} GB while the measured "
+            f"table says {measured} GB. The badge reads the table and the gate "
+            "does not, which is the drift both are documented to prevent.")
+
+
+def test_the_measured_row_is_priced_under_its_own_fit_budget():
+    """The end-to-end claim: picker and gate must AGREE this card can run it.
+
+    Not just that the two numbers match -- that they agree on the verdict.
+    """
+    est = catalog._estimate_resident_gb(BIG_CARD_WRITER)
+    budget = _nv24_budget()
+    assert est <= budget, (
+        f"the gate prices {BIG_CARD_WRITER} at {est} GB against an nv24 budget "
+        f"of {budget} GB, so it would warn on a card the badge advertises")
+    assert "nv24-nf4" in catalog.fit_tags_for(BIG_CARD_WRITER)
