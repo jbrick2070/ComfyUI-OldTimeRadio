@@ -153,7 +153,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
-| `Qwen/Qwen3.8-27B` | **auto** | 51.8 GiB | **no** | **no** | **no** | ? | ? |
+| `Qwen/Qwen3.8-27B` | **auto** | 51.8 GiB | **no** | **24 GB+** | **no** | ? | ? |
 
 ## Where do the manual weights come from?
 
@@ -294,6 +294,10 @@ answers TWO questions in order.
   in a lab test and worked, but no episode has ever used it), fits (nothing
   blocks it and the arithmetic says it fits -- nobody has run it at all),
   **OOM** (expect to exhaust memory), **?** (offered, nobody has measured it).
+  **24 GB+** appears only in the "16 GB+ NVIDIA" column and means what it
+  says: too big for a 16 GB card, fine on the 24 GB end of that same column.
+  It exists because that column spans the 5080 and the 3090, and a writer can
+  land between them.
 
 **The proven/measured split IS the test plan.** "measured" is precisely the list
 of engines to close next, and the distinction was earned: a first pass called

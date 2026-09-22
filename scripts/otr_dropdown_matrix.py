@@ -467,6 +467,32 @@ def conflicts(rows: list) -> list:
     return bad
 
 
+def _writer_tag_verdict(tags, key: str) -> str:
+    """``"fits"`` / ``"**tight**"`` / ``""`` for one machine class.
+
+    MATCH THE TAG FAMILY, NOT THE BARE KEY. ``fit_tags_for`` emits a
+    QUALIFIED tag -- ``nv16-nf4`` when only the quantized load fits,
+    ``mac16-tight`` when it fits but with no margin -- so an exact
+    ``key in tags`` test misses every quantized fit and reports ``**no**``
+    for a machine the arithmetic says is fine.
+
+    THAT WAS LATENT, NOT HARMLESS. Three curated rows carry only ``-nf4``
+    tags for nv16 (Mistral-Nemo, gemma-4-12b, Qwen3.8-27B). The first two
+    were masked because a curated memory RECEIPT outranks this branch and
+    both have one; the third has no receipt, reached this branch, and
+    printed ``**no**`` under "16 GB+ NVIDIA" for a model measured at
+    17.8 GB. Adding a row is what exposed it.
+    """
+    if not tags:
+        return ""
+    for tag in tags:
+        if tag == key or tag == key + "-nf4":
+            return "fits"
+        if tag == key + "-tight" or tag == key + "-tight-nf4":
+            return "**tight**"
+    return ""
+
+
 def _cell(row: dict, key: str) -> str:
     """One machine cell: selectability first, then the memory verdict."""
     reason = row["availability"].get(key, "??")
@@ -491,10 +517,18 @@ def _cell(row: dict, key: str) -> str:
         # offer.
         if key in _WRITER_FIT_KEYS:
             tags = row["fit_tags"]
-            if key in tags:
-                return "fits"
-            if key + "-tight" in tags:
-                return "**tight**"
+            verdict = _writer_tag_verdict(tags, key)
+            if verdict:
+                return verdict
+            # NOT A FIT FOR THIS CLASS -- but this column is "16 GB+", and
+            # its own blurb names the 3090, a 24 GB card. A row that fits
+            # nv24 and not nv16 is not a "no" to everyone reading that
+            # column; saying so is precisely what the note at the top of
+            # _REFUSAL warns against, "a table that implies [your hardware
+            # cannot do this] sends people to buy a machine they already
+            # own."
+            if key == "nv16" and _writer_tag_verdict(tags, "nv24"):
+                return "**24 GB+**"
             return "**no**"
         return "?"
     verdict = row["memory"].get(key, "unknown")
@@ -641,6 +675,10 @@ answers TWO questions in order.
   in a lab test and worked, but no episode has ever used it), fits (nothing
   blocks it and the arithmetic says it fits -- nobody has run it at all),
   **OOM** (expect to exhaust memory), **?** (offered, nobody has measured it).
+  **24 GB+** appears only in the "16 GB+ NVIDIA" column and means what it
+  says: too big for a 16 GB card, fine on the 24 GB end of that same column.
+  It exists because that column spans the 5080 and the 3090, and a writer can
+  land between them.
 
 **The proven/measured split IS the test plan.** "measured" is precisely the list
 of engines to close next, and the distinction was earned: a first pass called
