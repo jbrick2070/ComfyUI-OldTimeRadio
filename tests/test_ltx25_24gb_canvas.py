@@ -97,9 +97,10 @@ def test_the_fast_sibling_changes_only_where_the_encoder_runs():
 
     own = set(vars(fast)) - {"__module__", "__qualname__", "__doc__"}
     assert own <= {"name", "engine_version", "default_roles",
-                   "_wrap_text_encoder"}, (
-        "the fast sibling overrides more than its identity and the encoder "
-        "placement: %r" % sorted(own))
+                   "_wrap_text_encoder", "_encoder_cache_expects_cpu"}, (
+        "the fast sibling overrides more than its identity, the encoder "
+        "placement and the matching cache-liveness expectation: %r"
+        % sorted(own))
 
     assert (fast._dit_name(fast.__new__(fast))
             == parent._dit_name(parent.__new__(parent))), (
@@ -110,3 +111,16 @@ def test_the_fast_sibling_changes_only_where_the_encoder_runs():
         "the fast lane must NOT pin the encoder -- that is its whole point")
     assert parent._wrap_text_encoder(parent.__new__(parent), sentinel) is not sentinel, (
         "and its parent must still pin, or a working lane was muddied")
+
+    # PBUG, found live 2026-09-21: declining the pin without also declining
+    # the liveness check's CPU requirement means the lane's own cache can
+    # NEVER pass its own liveness check -- it writes an entry and then
+    # rejects it on the very next beat, forever. The two flags must move
+    # together, or this exact lane is the exact one that breaks.
+    assert fast._encoder_cache_expects_cpu is False, (
+        "the fast sibling declines the CPU pin but never told its own "
+        "liveness check -- its cache can write an entry and then fail its "
+        "own liveness check on every single read")
+    assert parent._encoder_cache_expects_cpu is True, (
+        "the parent must keep demanding CPU placement, or a working lane "
+        "was muddied")

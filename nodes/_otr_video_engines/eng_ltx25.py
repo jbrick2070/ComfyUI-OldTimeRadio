@@ -624,6 +624,17 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     _TERMINAL = "decode"
 
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
+    #: Whether THIS lane's cache is expected to find its handle on the CPU.
+    #: Read by ``_cached_clip_is_live`` -- default True keeps the liveness
+    #: check's ORIGINAL, unconditional requirement for every lane that has
+    #: always pinned. A lane that overrides ``_wrap_text_encoder`` to decline
+    #: the pin overrides this too, in the SAME change, or its own cache can
+    #: never pass its own liveness check (found live 2026-09-21: every beat
+    #: on ltx25_foley_plus_32gb dropped a cache entry it had just written,
+    #: because the check demanded CPU placement from an encoder that was
+    #: never going to have it).
+    _encoder_cache_expects_cpu = True
+
     def _wrap_text_encoder(self, base_cls):
         """Pin the text encoder to CPU. Overridable, default unchanged.
 
@@ -637,6 +648,10 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         a 15.92 GiB card is a coin flip per shot. It costs ~27 s per
         encode to delete that risk, and on a card with room it is a
         cost with nothing bought.
+
+        A subclass that overrides this to decline the pin MUST also set
+        ``_encoder_cache_expects_cpu = False`` -- the two describe the same
+        fact from two call sites and neither implies the other.
         """
         return _cpu_pinned_clip_loader(base_cls)
 
@@ -1005,14 +1020,29 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 st.st_mtime_ns, name, "ltxv", ("cpu", "cpu"))
 
     @staticmethod
-    def _cached_clip_is_live(out):
-        """Re-assert the CPU-pinned invariant on the CACHED handle.
+    def _cached_clip_is_live(out, expect_cpu=True):
+        """Re-assert the placement invariant THIS LANE actually promises.
 
         Structural only -- no tensor work. A False here does NOT raise: it
-        drops the cache and falls through to a full load, and THAT load runs
-        the pinned loader, which raises :class:`CpuPinnedEncoderPlacementError`
-        if placement is genuinely broken. The loud refusal still happens, at
-        the site that already owns it, instead of being duplicated here.
+        drops the cache and falls through to a full load, and a CPU-pinned
+        lane's load runs the pinned loader, which raises
+        :class:`CpuPinnedEncoderPlacementError` if placement is genuinely
+        broken. The loud refusal still happens, at the site that already owns
+        it, instead of being duplicated here.
+
+        ``expect_cpu`` DEFAULTS TRUE so every existing call site, and every
+        existing test that calls this UNBOUND on the class, keeps its exact
+        original behaviour. The one caller that owns a real instance passes
+        its own ``_encoder_cache_expects_cpu`` -- see that flag's docstring
+        for why the two cannot drift apart without breaking the lane that
+        declined the pin.
+
+        A lane that declined the pin makes no placement promise at all: the
+        model may legitimately sit on whichever device ComfyUI's own memory
+        manager put it, and that device can change between beats without the
+        handle being stale. So the only thing left to verify there is that
+        the handle is still a REAL, materialized model -- not a specific
+        device.
         """
         clip = out[0] if isinstance(out, (tuple, list)) and out else None
         patcher = getattr(clip, "patcher", None)
@@ -1022,6 +1052,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             return False
         load_dev = str(getattr(patcher, "load_device", None) or "")
         off_dev = str(getattr(patcher, "offload_device", None) or "")
+        if not expect_cpu:
+            return bool(load_dev) and bool(off_dev)
         return "cpu" in load_dev and "cpu" in off_dev
 
     def session_identity(self):
@@ -1478,7 +1510,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 stale = "the encoder weight is unresolvable or unstattable"
             elif scope.get("key") != key:
                 stale = "the encoder weight changed under the episode"
-            elif not self._cached_clip_is_live(scope.get("clip")):
+            elif not self._cached_clip_is_live(
+                    scope.get("clip"), expect_cpu=self._encoder_cache_expects_cpu):
                 stale = "the cached encoder failed its CPU-placement check"
             if stale and scope.get("clip") is not None:
                 _LOG.warning("[%s] dropping the cached text encoder -- %s",
@@ -2852,6 +2885,9 @@ class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
     name = "ltx25_foley_plus_32gb"
     engine_version = "1"
     default_roles = ()
+    #: Paired with declining the pin below -- see that flag's own docstring
+    #: on the base class for why the two must move together.
+    _encoder_cache_expects_cpu = False
 
     def _wrap_text_encoder(self, base_cls):
         # Decline the pin. The spike this avoids is affordable here.

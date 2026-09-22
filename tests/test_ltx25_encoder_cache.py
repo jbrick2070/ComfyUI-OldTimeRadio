@@ -375,3 +375,63 @@ def test_the_scope_is_per_instance_not_shared_by_the_class(eng):
         assert eng_ltx25.Ltx25VideoEngine._encoder_scope is None
     finally:
         eng.end_encoder_scope()
+
+
+# --- the bug found live, 2026-09-21: a declined-pin lane never accepted its
+# own cache back --------------------------------------------------------- #
+def test_a_cpu_pinned_clip_is_live_with_the_default_expectation():
+    """expect_cpu defaults True -- every pre-existing call keeps its exact
+    original behaviour, including every test above this one."""
+    assert eng_ltx25.Ltx25VideoEngine._cached_clip_is_live((_Clip(_Patcher()),))
+
+
+def test_a_gpu_resident_clip_is_NOT_live_under_the_default_expectation():
+    """The regression this guards: without passing expect_cpu=False, a
+    GPU-resident handle must still read as not-live -- proving the default
+    truly is unchanged, not just documented as unchanged."""
+    assert not eng_ltx25.Ltx25VideoEngine._cached_clip_is_live(
+        (_Clip(_Patcher(load="cuda:0", offload="cuda:0")),))
+
+
+def test_a_gpu_resident_clip_IS_live_when_the_lane_declined_the_pin():
+    """The actual fix. Found live 2026-09-21: ltx25_foley_plus_32gb wrote a
+    cache entry every beat and then failed its OWN liveness check on the very
+    next read, because the check demanded CPU placement unconditionally. A
+    lane that declined the pin makes no placement promise, so a real,
+    materialized handle on ANY device must read as live."""
+    assert eng_ltx25.Ltx25VideoEngine._cached_clip_is_live(
+        (_Clip(_Patcher(load="cuda:0", offload="cuda:0")),), expect_cpu=False)
+
+
+@pytest.mark.parametrize("patcher", [
+    _Patcher(load=None, offload=None),
+    _Patcher(model=None),
+])
+def test_a_broken_handle_is_NOT_live_even_when_the_lane_declined_the_pin(patcher):
+    """Declining the pin relaxes WHICH device is acceptable, never whether
+    the handle is real. A deallocated or device-less handle is still dead."""
+    assert not eng_ltx25.Ltx25VideoEngine._cached_clip_is_live(
+        (_Clip(patcher),), expect_cpu=False)
+
+
+def test_the_render_clip_call_site_passes_the_instances_own_expectation():
+    """Pin the WIRING, not just the two halves in isolation. A source grep
+    because the call happens deep inside render_clip's control flow, past a
+    real graph-construction path this test suite does not otherwise drive
+    without a live GPU -- the wiring is what a future refactor could sever
+    while leaving both halves individually correct."""
+    import inspect
+    src = inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
+    assert "expect_cpu=self._encoder_cache_expects_cpu" in src, (
+        "render_clip no longer tells the liveness check which placement "
+        "THIS instance actually promises -- every lane that declines the "
+        "pin will fail its own cache's liveness check again")
+
+
+def test_every_existing_lane_still_expects_cpu_placement():
+    """The base declaration, and every family that has always pinned, must
+    keep demanding CPU -- this is the blast-radius pin for the whole fix."""
+    assert eng_ltx25.Ltx25VideoEngine._encoder_cache_expects_cpu is True
+    assert eng_ltx25.Ltx25FoleyPlusEngine._encoder_cache_expects_cpu is True
+    assert eng_ltx25.Ltx25FoleyPlus24gbEngine._encoder_cache_expects_cpu is True
+    assert eng_ltx25.Ltx25MimeEngine._encoder_cache_expects_cpu is True
