@@ -2864,11 +2864,46 @@ class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
     per episode spent avoiding a VRAM spike that only a 16 GB card cannot
     absorb.
 
-    WHY IT IS THE BIG-CARD LANE. The encode transiently wants ~13,760 MB.
-    Sampling separately peaks near 21.6 GiB on Q5. The two do not overlap --
-    ``LTX25_PEAK_DECOMPOSITION_GIB`` records the text encoder at 0.0 during
-    sampling -- so the requirement is the LARGER of the two, not their sum.
-    That is why this is safe to offer at all.
+    THIS CLASS'S OWN SAFETY CLAIM WAS FALSE, FOUND 2026-09-22 AND NOT YET
+    FIXED. It used to say: the encode transiently wants ~13,760 MB, sampling
+    separately peaks near 21.6 GiB on Q5, the two do not overlap, so the
+    requirement is the LARGER of the two, not their sum. That "do not
+    overlap" fact is borrowed from ``LTX25_PEAK_DECOMPOSITION_GIB``, and that
+    table was measured with the encoder CPU-pinned -- i.e. measured on the
+    PARENT, which always pins. This class exists specifically to decline the
+    pin, so it does not get to inherit a measurement whose premise it opts
+    out of.
+
+    THE REAL MECHANISM, read at the source (render_clip, the ``_harvest``
+    comment above the ``keep`` set, and ``wrapper_bridge.run_graph``'s
+    ``keep |= set(ext)``): on a cache MISS the ``te`` node is IN the graph and
+    IS dropped by ``free_after_use`` once ``pos``/``neg`` consume it, BEFORE
+    sampling starts -- genuinely no overlap, exactly as claimed. On a cache
+    HIT the handle arrives as an ``external_results`` entry instead, and
+    ``run_graph`` adds every external to ``keep``, which ``free_after_use``
+    structurally cannot touch. So on a HIT the ~8.86 GiB resident encoder
+    is held ON THE CARD THROUGH SAMPLING -- overlapping the ~21.6 GiB Q5
+    peak by construction, not the ~21.6 GiB alone the docstring used to
+    promise. That is roughly a 30+ GiB peak on a 32.6 GiB card, with no
+    margin left for anything else resident (a writer LLM's unload is
+    ATTEMPTED at several points but never enforced -- see
+    ``free_otr_pipeline_residue`` and ``unload_llm_if_local_resident``,
+    none of which raise on failure).
+
+    WHY THIS WENT UNNOTICED: a separate bug (``_cached_clip_is_live``
+    hardcoding a CPU-only liveness check, fixed 2026-09-22) meant this
+    lane's cache always failed its own liveness check and was evicted every
+    beat, so a cache HIT -- the only path that creates the overlap -- could
+    never actually be reached. Fixing that bug is what makes this one live.
+
+    STANDING RULING: THIS LANE IS EXCLUDED FROM THE ROTATION AND FROM
+    ANY UNATTENDED PRODUCTION USE until the overlap is closed (most likely
+    by moving the cached encoder off the accelerator around the sampling
+    call specifically, keeping the cache's reload-avoidance benefit while
+    restoring the non-overlap property) or the VRAM accounting is corrected
+    to admit the true peak. See
+    ``test_the_cache_hit_path_holds_the_encoder_through_sampling`` in
+    ``tests/test_ltx25_encoder_cache.py`` for the pinned mechanism.
 
     THE NAME SAYS 32 AND THE MEASUREMENT MAY SAY 24. Both stages are
     individually inside a 24 GB card on paper, so the honest floor is

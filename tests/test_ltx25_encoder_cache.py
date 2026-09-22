@@ -435,3 +435,55 @@ def test_every_existing_lane_still_expects_cpu_placement():
     assert eng_ltx25.Ltx25FoleyPlusEngine._encoder_cache_expects_cpu is True
     assert eng_ltx25.Ltx25FoleyPlus24gbEngine._encoder_cache_expects_cpu is True
     assert eng_ltx25.Ltx25MimeEngine._encoder_cache_expects_cpu is True
+
+
+# --- the mechanism the fast lane's safety claim did not account for -------- #
+def test_run_graph_keeps_every_external_result_through_the_whole_run():
+    """The half of the mechanism that lives outside eng_ltx25.py.
+
+    ``keep`` is what makes ``free_after_use`` refuse to drop something --
+    verified structurally, no GPU, no real graph: every id passed as an
+    external result must appear in the ids ``run_graph`` will not free.
+    """
+    import inspect
+    from nodes._otr_video_engines import wrapper_bridge
+    src = inspect.getsource(wrapper_bridge.run_graph)
+    assert "keep |= set(ext)" in src, (
+        "run_graph no longer folds every external result into keep -- if "
+        "this changed, the cache-hit VRAM finding below may no longer hold "
+        "and the docstring warning on Ltx25FoleyPlusFast32gbEngine should "
+        "be re-checked against the new code before it is trusted either way")
+
+
+def test_the_cache_hit_path_holds_the_encoder_through_sampling():
+    """Pins the mechanism named in Ltx25FoleyPlusFast32gbEngine's docstring.
+
+    Found 2026-09-22: on a cache HIT, the text encoder handle is routed as
+    an external_results entry rather than a graph node -- so it lands in
+    run_graph's ``keep`` set (the test above) and cannot be freed before
+    sampling. On a MISS the encoder is an ordinary graph node instead, and
+    free_after_use drops it once pos/neg consume it, BEFORE sampling. Those
+    are two structurally different VRAM lifetimes, and only the MISS one is
+    the "encoder and sampling do not overlap" case the 24gb parent's own
+    peak measurement actually describes.
+
+    This does not run a real graph (no GPU here) -- it pins the SOURCE
+    routing decision that makes the two paths different, which is the fact
+    the whole finding rests on.
+    """
+    import inspect
+    src = inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
+    # HIT: routed as an external, never re-enters the graph.
+    assert 'external["te"] = scope["clip"]' in src
+    assert 'graph.pop("te", None)' in src
+    # MISS: te stays a graph node and is consumed/dropped by the ordinary
+    # free_after_use path, which is what keeps it off the card during
+    # sampling -- the absence of a pop is the signal, so this asserts the
+    # HIT branch's pop is conditional on being inside the hit path, not
+    # unconditional over the whole function.
+    hit_branch = src[src.index('external["te"] = scope["clip"]'):]
+    assert src.index('graph.pop("te", None)') > src.index(
+        'external["te"] = scope["clip"]') - 50, (
+        "the pop must sit right next to the external assignment, inside "
+        "the HIT branch -- if it moved out, re-verify which path actually "
+        "keeps te off the graph on a MISS")
