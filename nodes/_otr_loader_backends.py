@@ -85,14 +85,27 @@ def check_context_window(row: Any) -> None:
     return None
 
 
+#: Qwen rows whose chat template opens a think block unless told not to.
+#: EXACT Hugging Face ids, never a prefix: a startswith("Qwen") test would
+#: sweep up any future Qwen row whose template does not take the argument,
+#: and apply_chat_template raises on an unknown kwarg. Both entries were read
+#: from the published chat_template.jinja -- with add_generation_prompt each
+#: emits a CLOSED think envelope when enable_thinking is false and an OPEN
+#: one otherwise, so the writer reasons out loud if this never fires.
+THINKING_SUPPRESSED_IDS = frozenset({
+    "Qwen/Qwen3.5-4B",
+    "Qwen/Qwen3.8-27B",
+})
+
+
 def chat_template_kwargs(model_id: str) -> dict:
-    """Use Qwen3.5's official direct-response switch on every native surface.
+    """Use Qwen's official direct-response switch on every native surface.
 
     Other models keep their exact previous template arguments. This controls
     template formatting, not sampling or a synthetic prompt rewrite.
     """
     stripped = str(model_id or "").split(" ", 1)[0]
-    if _otr_model_catalog.hf_weights_id(stripped) == "Qwen/Qwen3.5-4B":
+    if _otr_model_catalog.hf_weights_id(stripped) in THINKING_SUPPRESSED_IDS:
         return {"enable_thinking": False}
     return {}
 

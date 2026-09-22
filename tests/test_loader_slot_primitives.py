@@ -215,11 +215,28 @@ def test_every_curated_local_row_is_pass_tier():
     dropdown identities) and Llama 3.2 3B stay WARN because they have
     finished episodes but are not the 08-25 soak-PASS set. A NEW WARN
     (or UNKNOWN/FAIL) row still fails HERE, by name.
+
+    2026-09-21 amends the roster again, for a row the operator asked for by
+    description: the best writer that fits a big card, auto-downloading, no
+    GGUF, present in every graph and default in none. Qwen3.8-27B is WARN
+    because no episode has shipped on it -- three gates passed on an RTX 5090
+    (NF4 load at 17.7 GiB, prose, constrained JSON) and a published episode
+    is a different claim.
+
+    THE 08-25 RULING IS NOT WEAKENED BY THIS, because the harm it names is a
+    dropdown that "promises a load that may not happen on the 16 GB target
+    card". This row promises nothing to a 16 GB card: its badge reads
+    "51.8 GB download, nv24-nf4", so the only machine class it claims is one
+    with 22 GB to give. A 16 GB owner reading that sees a row that does not
+    list their card, which is the badge doing its job rather than a gate
+    doing it for them -- and an OOM from picking it anyway is loud, not a
+    silent wrong render.
     """
     allowed_warn = {
         catalog.DEFAULT_LLM,
         catalog.DEFAULT_LLM_NF4,
         "unsloth/Llama-3.2-3B-Instruct",
+        "Qwen/Qwen3.8-27B",
     }
     offenders = [
         f"{row.repo_id} (tier={row.vram_fit_tier})"

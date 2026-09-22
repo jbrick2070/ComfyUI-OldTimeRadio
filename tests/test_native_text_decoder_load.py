@@ -200,13 +200,27 @@ class RegistryMappingTests(unittest.TestCase):
 
 
 class CatalogOptInTests(unittest.TestCase):
-    def test_only_the_two_reviewed_rows_are_opted_in(self):
+    def test_exactly_the_reviewed_rows_are_opted_in(self):
+        """The opt-in roster, named in full rather than counted.
+
+        Every id here was opted in by a person who checked that the
+        checkpoint actually splits -- ``config.text_config.model_type`` is
+        non-empty -- because the load path RAISES rather than falling back to
+        the composite when it does not. Adding a row to this list is the
+        reviewable act the ``text_only_load`` field exists to force.
+
+        Qwen/Qwen3.8-27B joined 2026-09-21: text_config.model_type is
+        ``qwen3_5_text``, the same key its 4B sibling relies on, so the
+        Transformers conversion registry already strips the prefix and OTR
+        supplies no key_mapping of its own. Measured on the checkpoint, not
+        inferred from the family name.
+        """
         opted = sorted(
             row.repo_id for row in CATALOG.CURATED_LLM_MODELS
             if row.text_only_load == "native_text_decoder")
         self.assertEqual(
             opted,
-            ["Qwen/Qwen3.5-4B", "google/gemma-4-E2B-it"],
+            ["Qwen/Qwen3.5-4B", "Qwen/Qwen3.8-27B", "google/gemma-4-E2B-it"],
         )
 
     def test_the_16gb_canonical_writer_is_not_opted_in(self):

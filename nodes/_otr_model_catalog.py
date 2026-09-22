@@ -231,6 +231,53 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         implied_quant_policy="platform",
     ),
     CuratedModel(
+        repo_id="Qwen/Qwen3.8-27B",
+        requires_auth=False,
+        loader_backend="transformers_multimodal_text_only",
+        # WARN, not PASS: it loads and writes, but no episode has shipped on
+        # it yet. PASS is reserved for a lane with a published receipt.
+        vram_fit_tier="WARN",
+        # 18 shards, 55,563,006,776 bytes / 2**30. Disk, not VRAM -- the NF4
+        # load is a third of this.
+        approx_safetensors_gb=51.75,
+        notes="THE BIG-CARD WRITER. Same qwen3_5 architecture as the 4B "
+        "row, six times the parameters, and it is here because prose "
+        "quality is the only thing it buys. MEASURED on an RTX 5090 "
+        "2026-09-21, all three gates: loads under NF4 in 84s at 17.7 GiB "
+        "resident (17.8 GiB peak) on a 33.7 GiB card; free-form prose at "
+        "22.5 tok/s; LMFE-constrained JSON parsed clean at 27.6 tok/s -- "
+        "that last one is the gate that actually fails for most models, so "
+        "it is the one worth quoting. About 25 percent slower than "
+        "gemma-4-12b-it, which measured 30.7 tok/s median on the same box. "
+        "NF4 IS BAKED INTO THE PICK, not a second Quant knob: unquantized "
+        "this is 51.75 GiB and no consumer card holds it, so the row owns "
+        "the policy rather than letting a widget produce an OOM. "
+        "THINKING TEMPLATE, SUPPRESSED -- it emits an OPEN '<think>' by "
+        "default, exactly like the 4B, so chat_template_kwargs must reach "
+        "every generate call or the writer is forced to reason. "
+        "NOT A DEFAULT ANYWHERE. It is selectable in every graph and "
+        "selected by none of them; a 51.75 GiB download is a deliberate "
+        "choice, never something a first Queue press inherits.",
+        prompt_profile="modern",
+        chat_template_kind="transformers_default",
+        stop_tokens=(),
+        # The config declares 262144. That is the artifact's ceiling, not a
+        # working window: KV cache at that length dwarfs the weights. 8192
+        # matches every other production row and is what the prompts use.
+        context_window=8192,
+        license="apache_2_0",
+        license_audit_status="mit_equivalent",
+        # Vision tower is dead weight for a writer, and this checkpoint CAN
+        # be split -- measured, not assumed: config.text_config.model_type
+        # is "qwen3_5_text", the same key the 4B row relies on, so the
+        # Transformers conversion registry already strips the prefix and OTR
+        # supplies no key_mapping of its own. Checking this was the cheap
+        # step skipped on an earlier candidate that then wasted a 22 GB
+        # download.
+        text_only_load="native_text_decoder",
+        implied_quant_policy="bnb_nf4",
+    ),
+    CuratedModel(
         repo_id="unsloth/Llama-3.2-3B-Instruct",
         requires_auth=False,
         loader_backend="transformers_safetensors",
@@ -1599,6 +1646,33 @@ def _fit_budgets():
     )
 
 
+#: MEASURED NF4 resident on an NVIDIA card, GB, as torch reports it. A real
+#: number here OVERRIDES the halving projection below, and it has to, for the
+#: same reason MEASURED_METAL_BF16_GB overrides the Metal one: the projection
+#: is a single rule of thumb and it is wrong in a direction that costs a user
+#: a writer their card can actually run.
+#:
+#: WHY HALVING IS THE WRONG FACTOR FOR NF4. The download is bf16, two bytes a
+#: parameter. Halving it models ONE byte a parameter, which is 8-bit -- NF4 is
+#: four bits, so the true weight cost is nearer a quarter, and the projection
+#: overstates a large row by close to 2x. That is harmless while every row is
+#: small enough to fit anyway, and it is not harmless at 27B:
+#: `Qwen/Qwen3.8-27B` projects to 25.9 GB against the 22.0 GB nv24 budget and
+#: earns NO tag, while the card measured 17.7 GiB with room to spare.
+#:
+#: This is the defect shape recorded in vram_badge_for's own docstring
+#: (PBUG-20260829-17) -- a number that reads as "your card cannot do this"
+#: when the card can. The cost there "was a user walking away".
+#:
+#: Add a row here whenever someone measures one; never infer one. The figure
+#: is peak resident during a real load, not weights alone.
+MEASURED_NVIDIA_NF4_GB = {
+    # RTX 5090, 2026-09-21: 17.7 GiB resident, 17.8 GiB peak during load, on
+    # a 33.7 GiB card, then prose and constrained JSON generated from it.
+    "Qwen/Qwen3.8-27B": 17.8,
+}
+
+
 #: MEASURED bf16 resident on Apple Silicon, GB, standalone. A real number here
 #: OVERRIDES the linear projection below, and it has to, because the projection
 #: is wrong for at least one shipped row.
@@ -1688,7 +1762,13 @@ def fit_tags_for(repo_id: str) -> tuple:
             continue
         if download_gb <= budget_gb:
             tags.append(name)
-        elif (download_gb / 2.0) <= budget_gb:
+            continue
+        # Measurement beats the rule of thumb. The halving below models an
+        # 8-bit load, not a 4-bit one, so it overstates a big row by ~2x and
+        # silently withholds a tag the card has earned.
+        measured_nf4 = MEASURED_NVIDIA_NF4_GB.get(hf_weights_id(repo_id))
+        nf4_gb = measured_nf4 if measured_nf4 else (download_gb / 2.0)
+        if nf4_gb <= budget_gb:
             tags.append(name + "-nf4")
     return tuple(tags)
 
