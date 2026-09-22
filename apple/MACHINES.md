@@ -153,6 +153,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `google/gemma-4-E4B-it` | **auto** | 9.0 GiB | measured | **proven** | **tight** | ? | ? |
 | `google/gemma-4-12b-it` | **auto** | 23.9 GiB | measured | **proven** | **no** | ? | ? |
 | `mistralai/Mistral-Nemo-Instruct-2407` | **auto** | 24.0 GiB | **no** | **proven** | **no** | ? | ? |
+| `Qwen/Qwen3.8-27B` | **auto** | 51.8 GiB | **no** | **no** | **no** | ? | ? |
 
 ## Where do the manual weights come from?
 
