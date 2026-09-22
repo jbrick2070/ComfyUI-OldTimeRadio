@@ -124,6 +124,11 @@ SHIPPING_SET = (
     "otr_cloud_low_5act",
     "otr_cloud_deluxe_3act",
     "otr_cloud_deluxe_audio_in_3act",
+    # Native (non-GGUF) big-card tiers, 2026-09-22. Draft status until a live
+    # leg completes -- they build a variant so the graph can be run and
+    # measured, which is exactly how the qualification happens.
+    "otr_24gb_native_foley",
+    "otr_32gb_native_foley",
 )
 
 class EmitRefused(RuntimeError):

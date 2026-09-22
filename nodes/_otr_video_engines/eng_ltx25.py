@@ -2972,6 +2972,21 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
     #: Declared by the tier subclasses. Named here so the base reads complete.
     _native_dit = None
 
+    #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
+    #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
+    #:
+    #: MEASURED, not chosen by taste. On the RTX PRO 4500 a CPU-placed encode
+    #: held the process at 701% CPU with the GPU idle for minutes per beat.
+    #: The pin is a SMALL-CARD survival measure -- a GPU-side encode of the
+    #: Gemma-4 12B encoder is what tips a 16 GB card -- so a 24/32 GB lane
+    #: paying it is spending minutes to protect headroom it already has.
+    #:
+    #: ``_encoder_cache_expects_cpu`` MUST track this. The cache's liveness
+    #: check tests for CPU placement, so a lane that stops pinning and does
+    #: not say so writes a cache entry it then rejects on every single read
+    #: (the defect found live on 2026-09-21).
+    _native_te_device = "cpu"
+
     def _node_candidates(self):
         """Stock loaders, everything else inherited.
 
@@ -3028,8 +3043,10 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
         g["te"] = {"class": "te", "inputs": {
             "clip_name": self._text_encoder_name(),
             "type": "ltxv",
-            # The placement the GGUF lane has to synthesise a subclass for.
-            "device": "cpu"}}
+            # The placement the GGUF lane has to synthesise a subclass for,
+            # asked for here as an ordinary widget value. Per tier: small
+            # cards pin, big cards do not.
+            "device": self._native_te_device}}
         return g
 
     def assert_usable(self, host_caps, profile, request_template=None):
@@ -3067,6 +3084,10 @@ class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_WIDE
+    #: 24 GB+ has the headroom; the CPU encode measured minutes per beat.
+    _native_te_device = "default"
+    #: Tracks the line above -- see the base class for why they are one fact.
+    _encoder_cache_expects_cpu = False
 
 
 @register
@@ -3087,6 +3108,10 @@ class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_BLACKWELL
+    #: The smallest DiT of the three (12.50 GB), so this tier has the MOST
+    #: headroom of all -- pinning here would be the least defensible.
+    _native_te_device = "default"
+    _encoder_cache_expects_cpu = False
 
 
 @register
@@ -3101,6 +3126,9 @@ class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
     engine_version = "1"
     default_roles = ()
     _native_dit = LTX25_NATIVE_DIT_16GB
+    #: KEEPS THE PIN, inherited from the base. 16 GB is exactly the class the
+    #: pin was written for, and this lane is the one that would tip without
+    #: it. _encoder_cache_expects_cpu stays True with it.
 
 
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
