@@ -1873,7 +1873,11 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 # publishing. Skip the sample and keep waiting.
                 tries = int(tries) - 1
                 if tries <= 0:
-                    return best
+                    # NEVER RETURN None. `floor_mb` went dead here when the
+                    # None-skip landed, and the caller formats None as
+                    # "-1 MB" -- a worse figure in the diagnostic than the
+                    # 4940 this whole arc exists to stop publishing.
+                    return best if best is not None else floor_mb
                 time.sleep(float(pause_s))
                 continue
             if best is None:
@@ -1899,6 +1903,17 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 # duration.
                 if rose and flat >= 2:
                     return best
+                if flat >= 3 and not rose:
+                    # NOTHING IS COMING. The release starts moving within a
+                    # second of `reset_cast_buffers` returning, so three
+                    # consecutive 1 s reads with no movement at all mean the
+                    # eviction freed nothing -- a repeat call inside one beat,
+                    # say. Waiting out the full cap there is slower than the
+                    # version this replaced, which is a regression rather than
+                    # a fix. This is NOT the old bug: that returned after one
+                    # flat pair 0.5 s apart, which is shorter than the release
+                    # takes to begin.
+                    return best
             else:
                 # A big DROP is not a plateau -- something else took memory,
                 # or the release is still moving. Keep waiting rather than
@@ -1906,7 +1921,14 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 flat = 0
             tries = int(tries) - 1
             if tries <= 0:
-                return best
+                # THE CAP REPORTS WHAT IS FREE NOW, not the peak. A high-water
+                # mark can publish a figure seen for a single read while a
+                # sustained collapse to a fraction of it goes unmentioned, and
+                # this number is logged immediately before the decode runs --
+                # so "what is free now" is the honest answer to the question
+                # being asked. On the normal settled exit above the two are the
+                # same value anyway.
+                return now if now is not None else best
             time.sleep(float(pause_s))
 
     def _total_vram_mb(self):
@@ -1981,23 +2003,36 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             return
 
         # TELEMETRY MUST NOT KILL THE GRAPH. This call sits outside the
-        # eviction's own try/except, and it sleeps, divides and calls into
-        # torch -- a raise here would escape `_harvest` and take the render
-        # with it, over a number that only reaches a log line. Its own
-        # `torch.cuda.synchronize()` is also unbounded and not covered by
-        # `tries`; if the driver wedges there, this except is what keeps the
-        # decode reachable.
+        # eviction's own try/except, and it sleeps and calls into torch -- a
+        # raise here would escape `_harvest` and take the render with it, over
+        # a number that only reaches a log line.
+        #
+        # `Exception`, NOT `BaseException`, and the distinction is load-bearing
+        # rather than stylistic. ComfyUI declares
+        # `InterruptProcessingException(BaseException)`
+        # (`comfy/model_management.py`) specifically so that the `except
+        # Exception` handlers scattered through node code cannot swallow a
+        # user's Cancel. Catching BaseException here is the one thing that
+        # would put this helper in that category. It happens not to intercept
+        # Cancel today, because nothing in this call path reaches one of
+        # ComfyUI's interrupt checkpoints -- but that is an accident of what
+        # the helper calls, not a property to rely on, and BaseException also
+        # eats KeyboardInterrupt on the synchronous diagnostic paths.
+        #
+        # AND AN EARLIER COMMENT HERE CLAIMED THIS GUARDS A DRIVER WEDGE. It
+        # does not and cannot: a wedged `torch.cuda.synchronize()` never
+        # returns and never raises, so no `except` clause of any breadth
+        # rescues the thread. The try cap bounds the polling loop; nothing
+        # bounds the synchronize, and that is an accepted risk, not a handled
+        # one.
         try:
             after_mb = self._settled_free_vram_mb(free_mb)
-        except BaseException as exc:        # noqa: BLE001 -- telemetry only
+        except Exception as exc:            # noqa: BLE001 -- telemetry only
             _LOG.warning(
                 "[OTR video] %s: could not settle the free-VRAM reading (%r); "
                 "reporting the unsettled figure", self.name, exc)
             after_mb = free_mb
-        try:
-            total_mb = self._total_vram_mb()
-        except BaseException:               # noqa: BLE001 -- telemetry only
-            total_mb = None
+        total_mb = self._total_vram_mb()     # already best-effort internally
         _LOG.info(
             "[OTR video] %s: EVICTED before decode -- %.0f MB free -> %.0f MB "
             "(needed %d, total %s, aimdo cast buffers %s)", self.name, free_mb,

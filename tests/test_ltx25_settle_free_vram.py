@@ -134,14 +134,45 @@ def test_a_big_card_that_settles_immediately_still_terminates(settle):
 # the contract on the value itself
 # ---------------------------------------------------------------------------
 
-def test_the_high_water_mark_is_what_is_reported(settle):
-    """The question this answers is "how much did the eviction free", so a
-    later dip by an unrelated process must not lower the reported figure.
-    Stated as an accepted choice, not an accident: a contrarian review asked
-    whether the last reading would be the better answer, and for THIS question
-    it is not."""
-    got, _ = settle([1000, 5000, 7399, 7399, 7399, 2000, 2000])
-    assert got == 7399
+def test_the_cap_reports_what_is_free_now_not_a_stale_peak(settle):
+    """On try-cap exhaustion the CURRENT figure is reported, not the high-water
+    mark.
+
+    A QA pass caught the earlier version of this test being vacuous: its
+    sequence let the loop exit normally at the peak, so `best` and `now` were
+    the same value and the assertion could not tell the two behaviours apart.
+    It also caught the behaviour itself being wrong -- reporting a peak seen
+    for a single read while a sustained collapse to a fraction of it went
+    unmentioned. This number is logged immediately before the decode runs, so
+    what is free NOW is the honest answer to the question being asked.
+
+    This sequence forces the divergence: the peak is never confirmed settled,
+    and the collapse lasts to the cap."""
+    got, _ = settle([1000, 5000, 5000, 100, 100, 100, 100, 100,
+                     100, 100, 100, 100])
+    assert got == 100, "reported a peak the card had left nine samples earlier"
+
+
+def test_an_unreadable_card_reports_the_floor_not_none(settle):
+    """`floor_mb` must come back when nothing can be read.
+
+    It briefly became a dead parameter, so an all-None probe returned None and
+    the caller formats None as "-1 MB" -- a worse figure in the receipt than
+    the under-read this whole helper exists to prevent."""
+    got, _ = settle([None] * 15, floor=1234.0)
+    assert got == pytest.approx(1234.0), "an unreadable card published None"
+
+
+def test_a_card_that_never_moves_does_not_burn_the_whole_cap(settle):
+    """Eviction that frees nothing must not cost the full try cap.
+
+    The rise-then-flats predicate made this case wait out every try, which is
+    SLOWER than the buggy version it replaced. Three still reads at 1 s is
+    already longer than the release takes to begin moving."""
+    slept = []
+    mc_calls = settle([7399.0] * 12)[1].calls
+    assert mc_calls <= 5, (
+        "a card with nothing to release took %d reads" % mc_calls)
 
 
 def test_it_reaches_a_log_line_and_nothing_branches_on_it():
@@ -150,12 +181,44 @@ def test_it_reaches_a_log_line_and_nothing_branches_on_it():
     `_make_room_for_decode` may log, may warn, and must return. If a future
     edit makes the settled figure shorten, skip or refuse a decode, this fails
     and the ruling gets re-read before the change lands."""
+    import ast as _ast
     import inspect
+    import textwrap
 
-    src = inspect.getsource(_engine_cls()._make_room_for_decode
-                            if hasattr(_engine_cls(), "_make_room_for_decode")
-                            else _engine_cls()._settled_free_vram_mb)
-    after = src.split("after_mb", 1)[-1]
-    assert "raise" not in after, (
-        "_make_room_for_decode raises after measuring free VRAM; the operator "
-        "ruling is that only a real OOM decides")
+    cls = _engine_cls()
+    if not hasattr(cls, "_make_room_for_decode"):
+        pytest.skip("no _make_room_for_decode on this engine class")
+    src = textwrap.dedent(inspect.getsource(cls._make_room_for_decode))
+    tree = _ast.parse(src)
+
+    # Where is the measurement? Find the line that assigns `after_mb`.
+    assign_line = None
+    for node in _ast.walk(tree):
+        if isinstance(node, _ast.Name) and node.id == "after_mb" and                 isinstance(getattr(node, "ctx", None), _ast.Store):
+            assign_line = node.lineno if assign_line is None else min(
+                assign_line, node.lineno)
+    assert assign_line is not None, "after_mb is never assigned"
+
+    # AN AST WALK, NOT A SUBSTRING SEARCH. The first version of this guard did
+    # `"raise" not in src.split("after_mb")[-1]`, which a QA pass showed was
+    # both evadable (move the raise into a helper and the token disappears)
+    # and fragile (any comment using the word "raise" failed it spuriously).
+    raises = [n.lineno for n in _ast.walk(tree)
+              if isinstance(n, _ast.Raise) and n.lineno > assign_line]
+    assert not raises, (
+        "_make_room_for_decode raises at line(s) %s after measuring free "
+        "VRAM; the operator ruling is that only a real OOM decides" % raises)
+
+    # The evasion the substring version allowed: a refusal routed through a
+    # helper. Catch the shape by name.
+    calls = [n for n in _ast.walk(tree)
+             if isinstance(n, _ast.Call) and n.lineno > assign_line]
+    suspicious = []
+    for call in calls:
+        name = getattr(call.func, "attr", None) or getattr(
+            call.func, "id", None) or ""
+        if any(word in str(name).lower()
+               for word in ("refuse", "reject", "abort", "shrink", "skip")):
+            suspicious.append((call.lineno, name))
+    assert not suspicious, (
+        "a refusal-shaped call follows the measurement: %s" % suspicious)
