@@ -1,6 +1,6 @@
 {
   "id": "otr_24gb_native_foley",
-  "display_name": "24 GB NVIDIA (any modern card) -- NATIVE, non-GGUF video that generates its own sound. Lane ltx25_native_foley_24gb (int8, stock ComfyUI loaders, no ComfyUI-GGUF), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.",
+  "display_name": "24 GB AND UP, ANY modern NVIDIA (Ada, Ampere or Blackwell) -- NATIVE, non-GGUF video that generates its own sound. Lane ltx25_native_foley_24gb (int8, stock ComfyUI loaders, no ComfyUI-GGUF), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. Proven on a rented RTX 4090: one 97-frame clip at 23.5 GB peak in 101.3 s, foley decoded and muxed.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",

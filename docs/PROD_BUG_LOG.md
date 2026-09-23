@@ -15975,3 +15975,54 @@ provisioner on a migrated pod before anything else.
 no virtualenv -- enumerate interpreters before concluding one. And a missing
 module in a dependency audit is a QUESTION, not a defect, until you check whether
 a shipped engine actually needs it.
+
+## PBUG-20260923-03 -- the shipped LTX 2.5 stack needs a Hugging Face token, and an ungated equivalent exists for every file
+
+**Artifact:** measured HTTP status against the URLs `scripts/otr_provision.py`
+actually fetches, from the pod, with no token present:
+
+    401  Lightricks/LTX-2.5 .../vae/ltx-2.5-video-vae-bf16.safetensors
+    401  Lightricks/LTX-2.5 .../latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors
+    401  Lightricks/LTX-2.5 .../diffusion_models/ltx-2.5-22b-distilled-transformer-nvfp4.safetensors
+    200  joeygambino/LTX-2.5-Quantized/LTX25-distilled-DiT-comfy-int8.safetensors
+
+**The gate is not a surprise to this repo -- it is already declared.** The
+`ltx25` entry in `MANUAL_TIERS` carries `"gated": True` on the Q5 encoder
+(`elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF`), and the video VAE, audio VAE and
+spatial upscaler all point at `Lightricks/LTX-2.5`, which returns 401 for every
+path without a token. So the SHIPPED LTX 2.5 lane cannot be provisioned
+unattended on a fresh box, and the failure arrives as an HTTP 401 mid-fetch
+rather than as a named refusal.
+
+**AN UNGATED EQUIVALENT EXISTS FOR EVERY FILE, AND THE BYTE COUNTS MATCH
+LIGHTRICKS EXACTLY** -- these are copies, not requants:
+
+    vae/ltx-2.5-video-vae-bf16.safetensors        1,472,223,346   vonkaiser/LTX-2.5-FP8-NVFP4
+    vae/ltx-2.5-audio-vae-bf16.safetensors          364,866,540   vonkaiser/LTX-2.5-FP8-NVFP4
+    latent_upscale_models/...-x2-bf16-1.0.safetensors  995,778,752   vonkaiser/LTX-2.5-FP8-NVFP4
+    model_patches/ltx-2.5-duration-head-bf16.safetensors 3,843,690   vonkaiser/LTX-2.5-FP8-NVFP4
+
+All four return 200 without a token. The DiT and text encoder are already
+ungated at `joeygambino/LTX-2.5-Quantized` (int8 20.03 GiB, w4a8 12.52 GiB),
+and a 17.44 GiB nvfp4 matching Lightricks' own to within ~200 KB is ungated at
+`BennyDaBall/LTX-2.5-22b-distilled-nvfp4-comfy-v2`.
+
+**So a COMPLETE native LTX 2.5 stack can be fetched unattended with no
+credential anywhere** -- which is the operator's stated goal ("remove all GGUF
+with things that are non-gated and can auto download", 2026-09-23) and was not
+previously known to be reachable. The GGUF path cannot make the same claim: it
+depends on two gated repos.
+
+**NOT YET DONE, and deliberately not claimed as done:** no provisioning lane
+has been written for any of this. The three native engines were registered with
+`NO_LANE_REASON = "manual_doc"` in the same session, on the precedent of
+`ltx25_foley_plus_24gb` ("a 24 GB card is a deliberate choice an operator
+makes"). That classification is now questionable given the goal above -- a file
+that can be fetched unattended and ungated is a candidate for a real lane, not
+a manual tier. Choosing between them is an operator decision about default
+install weight, not a code fact.
+
+**Verify:** `curl -sI -o /dev/null -w '%{http_code}' -L <url>` against each URL
+above. Re-check before trusting: repo gating is a publisher setting and can
+change under a stable filename, which is exactly how the fp8 lane in
+PBUG-20260923-01 came to point at a file that no longer existed.

@@ -191,7 +191,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_16gb_ltx_audio_in` | ltx_audio_in | - |
 | `otr_16gb_ltx_video` | ltx_video | - |
 | `otr_24gb_native_foley` | ltx25_native_foley_24gb | - |
-| `otr_32gb_native_foley` | ltx25_native_foley_blackwell | - |
 | `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | - |
 | `otr_amd16_rocm` | still_motion | - |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |

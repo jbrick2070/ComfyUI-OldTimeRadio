@@ -1644,6 +1644,18 @@ NO_LANE_REASON = {
     "ltx25_foley_plus_24gb": "manual_doc",
     # Identical artifacts to the lane above.
     "ltx25_foley_plus_32gb": "manual_doc",
+    # The NATIVE (non-GGUF) LTX 2.5 lanes, same reasoning as the two above and
+    # for the same reason: each is a 12.5-20 GB deliberate fetch that belongs
+    # to a card class an operator chooses, not something a default install
+    # should pull. All three are ungated on Hugging Face -- int8 and w4a8 from
+    # joeygambino/LTX-2.5-Quantized, nvfp4 from either that repo or
+    # BennyDaBall/LTX-2.5-22b-distilled-nvfp4-comfy-v2 -- so the manual step is
+    # a download, never a licence gate. (Lightricks' own LTX-2.5 repo IS gated
+    # and returns 401 without a token; the mirrors above are byte-comparable
+    # and need none.)
+    "ltx25_native_foley_24gb": "manual_doc",
+    "ltx25_native_foley_16gb": "manual_doc",
+    "ltx25_native_foley_blackwell": "manual_doc",
     # Voice and music that arrive through the HF cache on first use.
     "kokoro": "hf_cache",
     "bark": "hf_cache",

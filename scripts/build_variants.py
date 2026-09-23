@@ -128,7 +128,6 @@ SHIPPING_SET = (
     # leg completes -- they build a variant so the graph can be run and
     # measured, which is exactly how the qualification happens.
     "otr_24gb_native_foley",
-    "otr_32gb_native_foley",
 )
 
 class EmitRefused(RuntimeError):
