@@ -16202,3 +16202,80 @@ master. A test that asserts every engine harvesting a foley stem has a
 **STILL OPEN:** the pods run the registry-installed pack, so the fix does not
 reach them until a version ships. Episodes rendered there before then are
 foley-less and should not be judged for sound.
+
+## PBUG-20260923-06 -- the audio-in reference was exactly the right length, and the VAE round trip lost a frame of it
+
+**Artifact:** four consecutive FAILED live legs of `ltx25_native_audio_in_24gb`
+on the 4090 pod, each `RESULT FAIL`, each ~31 minutes, each with byte-identical
+numbers:
+
+    ltx25_native_audio_in_24gb decoded 182880 audio sample(s) for a 97-frame
+    clip that needs 186240 (3360 short, over one whole frame of 1920).
+    NO FALLBACK  -- FailureKind.INVALID_DAG
+
+raised at `eng_ltx25.py::_write_foley_stem`, reached from `_after_video_graph`.
+
+**THE IDENTICAL NUMBERS ACROSS A FIX ARE THE FINDING.** `31d26344` added
+`_conform_audio_to_clip`, which reconciles the reference WAVEFORM to the clip's
+duration before the encoder sees it. The next leg failed with the same 182880
+and the same 3360. A fix that changes nothing is evidence that the model of the
+problem is wrong, and it was: the function returns early when the file already
+has the requested duration, and it always did. **Zero** occurrences of its log
+line `conformed its audio_ref` in the entire pod server log.
+
+**MEASURED ON THE POD, which is what settles it.** The reference slice
+`slice_f50c78e13e331630.wav` is 171,108 frames at 44,100 Hz, mono:
+
+    171108 / 44100 = 3.88 s exactly
+    97 frames / 25 fps = 3.88 s exactly
+    171108 * 48000 / 44100 = 186240 samples exactly -- the number asked for
+
+The input was never wrong. **The loss is inside the VAE encode/decode round
+trip**, and the two nodes that can produce an audio latent disagree by
+construction:
+
+    LTXVEmptyLatentAudio   round(frames / fps * latents_per_second) latents
+                           (comfy/ldm/lightricks/vae/audio_vae.py:187)
+                           -- it is TOLD the frame count
+    LTXVAudioVAEEncode     whatever its own mel and downsample rounding give
+                           for the waveform handed to it
+
+For this beat that is one latent fewer than the picture. One latent is 4 mel
+frames is 1,920 samples is exactly one video frame at 25 fps -- so the deficit
+is 1,440 (which the guard silence-pads, as it does for the foley lane) plus a
+whole frame of 1,920, which the guard correctly refuses.
+
+**WHY THE FOLEY LANES NEVER HIT IT.** They use the empty-latent node, which is
+told the frame count. Only audio-in encodes a real waveform, so only audio-in
+can disagree with the picture.
+
+**The first design is the one a reader expects to work.** It swapped the class
+behind the `emptyaudio` graph key so the encoder stood where the empty latent
+had, leaving `concat` and everything downstream untouched. The wiring is
+correct; the LENGTH CONTRACT is what the key was carrying, and it was invisible.
+
+**Fix (`bed7556d`) -- a second concat, and its video input is the load-bearing
+part.** `emptyaudio` stays `LTXVEmptyLatentAudio`; the beat's waveform is
+encoded beside it as `refencode`; `refconcat` joins them.
+`LTXVConcatAVLatent.fit_audio` trims or zero-pads the encoded stream to the
+reference length, with the padded tail left unmasked so the model generates it
+-- its own documented behaviour for a clip shorter than the video, and better
+than conditioning the encoder on silence. `fit_audio` runs ONLY on the branch
+where `video_latent` is already an AV latent (`nodes_lt.py`:
+`if video_samples.is_nested:`), which `concat`'s output is; wiring `refconcat`
+to `i2v` instead would look equally sensible and would silently restore the
+bug, so `tests/test_ltx25_audio_in_latent_length.py` asserts that wire by name
+and the bite check covers that exact miswire.
+
+Stage two needs no twin: `refine_concat` takes `W("separate", 1)`, the stream
+stage one already sampled.
+
+**Verify condition (automatable, and automated):** the audio-in lanes must
+resolve `emptyaudio` to `LTXVEmptyLatentAudio`, must carry `refencode` and
+`refconcat`, and the sampler must read `refconcat`. Six guards, each proven to
+fail against the reconstructed pre-fix source.
+
+**The lesson that generalises.** Two graph nodes with the same output TYPE are
+not interchangeable when one of them derives a length from a parameter and the
+other derives it from data. The type system cannot see it, `ast.parse` cannot
+see it, and the unit suite was green through all four failed legs.
