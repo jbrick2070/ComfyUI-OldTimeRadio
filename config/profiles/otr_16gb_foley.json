@@ -82,7 +82,9 @@
       "gemma4-12b-ltx25-comfy-w4a8.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
       "ltx-2.5-audio-vae-bf16.safetensors",
-      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "lumina_2_model_bf16.safetensors",
+      "gemma_2_2b_fp16.safetensors"
     ],
     "required_keys": []
   },
