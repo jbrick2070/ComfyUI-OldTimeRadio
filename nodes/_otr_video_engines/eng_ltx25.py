@@ -3445,6 +3445,70 @@ class Ltx25NativeAudioInMixin:
         cand["loadaudio"] = ("LoadAudio",)
         return cand
 
+    def _conform_audio_to_clip(self, audio_path, length):
+        """Pad or trim the reference WAV to EXACTLY the clip's own duration.
+
+        MEASURED FAILURE THIS EXISTS FOR (live pod leg, 2026-09-23):
+
+            ltx25_native_audio_in_24gb decoded 182880 audio sample(s) for a
+            97-frame clip that needs 186240 (3360 short)  -- INVALID_DAG
+
+        3,360 samples at 48 kHz is 0.07 s. The two nodes size their latent
+        differently and that is the whole bug: ``LTXVEmptyLatentAudio`` is TOLD
+        ``frames_number`` and ``frame_rate`` and produces exactly the right
+        length, while ``LTXVAudioVAEEncode`` produces a latent sized to
+        whatever waveform it is handed. A master slice that is a few
+        hundredths short therefore reaches the decode a few thousand samples
+        short, and the clip is refused.
+
+        ``LTXVConcatAVLatent.fit_audio`` cannot save it: that trims or pads
+        against a REFERENCE stream, and in stage one the encoded latent arrives
+        with nothing to be fitted to.
+
+        So the reconciliation happens on the WAVEFORM, before the encoder ever
+        sees it, where the arithmetic is exact and checkable: 97 frames at 25
+        fps is 3.88 s is 186,240 samples at 48 kHz. Padding is silence at the
+        tail, which is the honest thing for audio that ran short -- the model
+        generates into it, exactly as ``fit_audio``'s own docstring describes
+        for the same situation.
+
+        Returns the path to use. Best-effort: if the file cannot be read the
+        original path is returned unchanged and the graph fails downstream with
+        its own named error rather than here with a confusing one.
+        """
+        import os
+        try:
+            from . import foley_stems as _fs
+        except ImportError:                  # pragma: no cover -- flat imports
+            return audio_path
+        fps = int(self.target_fps) or 25
+        try:
+            samples, rate = _fs.read_pcm16_wav(audio_path)
+        except Exception as exc:             # noqa: BLE001 -- never fatal here
+            _LOG.warning(
+                "[OTR video] %s could not read its audio_ref %r (%r); handing "
+                "it to the encoder unchanged", self.name, audio_path, exc)
+            return audio_path
+        import numpy as np
+        want = int(round(int(length) / float(fps) * int(rate)))
+        have = int(samples.shape[-1])
+        if have == want:
+            return audio_path
+        if have > want:
+            samples = samples[..., :want]
+        else:
+            pad = np.zeros((samples.shape[0], want - have), dtype=samples.dtype)
+            samples = np.concatenate([samples, pad], axis=-1)
+        out = os.path.join(
+            os.path.dirname(str(audio_path)) or ".",
+            "otr_%s_conformed_%d.wav" % (self.name, want))
+        _fs.write_pcm16_wav(out, samples, rate)
+        _LOG.info(
+            "[OTR video] %s conformed its audio_ref %d -> %d sample(s) at %d Hz "
+            "(%d frame(s) at %d fps); %s", self.name, have, want, rate,
+            int(length), fps, "trimmed" if have > want else "zero-padded")
+        return out
+
     def _build_render_request(self, request):
         plan = super()._build_render_request(request)
         get = request.get if isinstance(request, dict) else (
@@ -3484,6 +3548,7 @@ class Ltx25NativeAudioInMixin:
                 "FALLBACK -- this lane exists to follow a supplied waveform, "
                 "and quietly generating one instead would ship a foley clip "
                 "under an audio-in name" % (self.name,))
+        audio_path = self._conform_audio_to_clip(audio_path, length)
         audio_name = _wb.stage_into_comfy_input(audio_path)
         W = _wb.Wire
         g["loadaudio"] = {"class": "loadaudio",
