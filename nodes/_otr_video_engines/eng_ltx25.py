@@ -1587,6 +1587,19 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         #: is not the same as being kept.
         pending = {}
 
+        # WHICH node feeds the decode, read off the graph rather than named.
+        # The two-stage path wires ``refine_separate`` into it and a single-
+        # stage one would wire ``separate``; asking the graph keeps the seam
+        # correct for whichever it built, and silent (no eviction) if the shape
+        # ever changes out from under it.
+        _decode_feeder = None
+        try:
+            _samples = (graph.get(self._TERMINAL, {})
+                        .get("inputs", {}).get("samples"))
+            _decode_feeder = getattr(_samples, "src", None)
+        except Exception:                  # noqa: BLE001 -- telemetry, never fatal
+            _decode_feeder = None
+
         def _harvest(node_id, out):
             if node_id in ("te", "neg"):
                 pending[node_id] = out
@@ -1601,6 +1614,24 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # reading freed VRAM, which is a crash or silent garbage rather
             # than a saving. The foley lane copies to CPU inside this call.
             self._on_graph_result(node_id, out)
+            # SEAM 2 (2026-09-22): MAKE ROOM FOR THE DECODE, AND ONLY IF THERE
+            # IS NOT ANY.
+            #
+            # The terminal decode needs ~8.1 GB (R.LTX25_STAGE2_DECODE_NEEDS_MB,
+            # measured). The sampler's DiT is 12-13 GB and has no further
+            # consumer once the node feeding the decode has landed. On a 16 GB
+            # card those two cannot coexist, so ComfyUI streams the decode and
+            # it takes 400+ s instead of 34.7 s -- measured both ways on this
+            # 5080, same graph, same weight, same seed.
+            #
+            # FIRES ONLY WHEN THE CARD IS ACTUALLY SHORT. A 32 GB box has the
+            # room and evicting there would buy nothing while costing the next
+            # beat a reload, which is the one real hazard of the bigger hammer.
+            # The test is free VRAM against a measured need -- not a card-size
+            # tier, because the thing that matters is whether the decode fits,
+            # and that depends on what else this process is holding.
+            if node_id == _decode_feeder:
+                self._make_room_for_decode()
 
         execution_records = []
         graph_started = time.perf_counter()
@@ -1784,6 +1815,67 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "native_frame_count": raw.get("native_frame_count"),
             "extension_mode": raw.get("extension_mode"),
         }
+
+    def _make_room_for_decode(self):
+        """Evict resident models before the terminal decode, IF the card is short.
+
+        MEASURED ON A 16 GB RTX 5080, same graph, same weight, same seed, the
+        only difference being this call:
+
+            decode, DiT still resident      400+ s, killed, never finished
+            decode, after this eviction      34.7 s
+            whole two-stage render           196.3 s, foley muxed
+
+        and the isolated control that explains it -- only the video VAE, a
+        synthetic stage-2 latent, and an inert ballast tensor as the single
+        variable -- decoded in 30.0 s at a peak of 8,080 MB on a free card and
+        had not finished at 412 s with 11 GB occupied.
+
+        THE SAMPLER'S DiT HAS NO CONSUMER LEFT BY THE TIME THIS RUNS. It is
+        called from ``on_result`` for the node that feeds the decode, so every
+        node that wanted the transformer has already had it. What it is doing
+        is not freeing memory early; it is declining to hold 12 GB of finished
+        work across a stage that needs 8 GB of room on a card with 15.92.
+
+        WHY A GLOBAL UNLOAD RATHER THAN A PATCHER DETACH. Detaching is the
+        precise instrument and it is still the default at teardown, but it does
+        not reach this: ``run_graph``'s ``keep`` set was dropped to exclude the
+        unet and 9.61 GB stayed allocated anyway, because a Python reference is
+        not what pins weights to the device -- ComfyUI's model manager is. The
+        blanket prohibition on ``unload_all_models()`` was struck by the
+        operator the same day on exactly this reasoning: by the time video
+        renders, story, voices and music have all finished, so there is nothing
+        of theirs left for a global unload to take.
+
+        THE GUARD IS A MEASURED NEED, NOT A CARD-SIZE TIER. Evicting on a box
+        with room buys nothing and costs the next beat a reload, which is the
+        one real hazard here. So the question asked is the only one that
+        matters -- does the decode fit right now -- and a machine that has the
+        headroom never pays. Silent and safe on the CPU box, where
+        ``free_vram_mb`` returns ``None`` and nothing was ever resident."""
+        free_mb = _MC.free_vram_mb()
+        if free_mb is None:
+            return                          # CPU box / unit tests: nothing to evict
+        need = getattr(R, "LTX25_STAGE2_DECODE_NEEDS_MB", 8300)
+        if free_mb >= need:
+            _LOG.info(
+                "[OTR video] %s: decode has room (%.0f MB free >= %d MB "
+                "needed); leaving models resident", self.name, free_mb, need)
+            return
+        try:
+            import comfy.model_management as mm
+            mm.unload_all_models()
+            mm.soft_empty_cache()
+        except Exception as exc:            # noqa: BLE001 -- a saving, never a failure
+            _LOG.warning(
+                "[OTR video] %s: could not evict before decode (%r); the "
+                "decode will run under whatever is resident", self.name, exc)
+            return
+        after_mb = _MC.free_vram_mb()
+        _LOG.info(
+            "[OTR video] %s: EVICTED before decode -- %.0f MB free -> %.0f MB "
+            "(needed %d)", self.name, free_mb,
+            after_mb if after_mb is not None else -1.0, need)
 
     def _retain_model_patchers(self, results, prepared):
         """V-4: keep the MODEL patchers the graph produced so teardown can

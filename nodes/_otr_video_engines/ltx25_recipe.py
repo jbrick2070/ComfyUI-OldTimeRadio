@@ -179,6 +179,23 @@ LTX25_STAGE2_DECODE_OVERLAP = 64
 LTX25_STAGE2_DECODE_TEMPORAL_SIZE = 64
 LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP = 16
 
+#: What the terminal decode actually needs on the card, MEASURED (2026-09-22).
+#:
+#: An isolated probe -- only the video VAE, a synthetic stage-2 latent of the
+#: real shape (1,128,13,30,52), the tiling above, and an inert ballast tensor
+#: as the only variable -- decoded in **30.0 s at a peak of 8,080 MB** on a
+#: free card, and had NOT finished at 412 s with 11 GB occupied. So this is not
+#: a safety margin invented around a guess; it is the number the decode was
+#: observed to want, rounded up by the width of one tile's working set.
+#:
+#: It exists to answer ONE question at run time: is there room for the decode,
+#: or is the sampler's DiT still sitting where the decode needs to be? Below
+#: this figure ComfyUI streams the decode over PCIe and the same work takes
+#: more than twelve times longer -- the ~62 W, 100%-utilisation, 2%-memory-
+#: controller signature that reads like thrashing and is actually a card
+#: waiting on transfers.
+LTX25_STAGE2_DECODE_NEEDS_MB = 8300
+
 #: The exact three-step refinement schedule. Production resolves core's V3
 #: ``ManualSigmas`` (registered before duplicate custom nodes), whose direct
 #: Python input is ``sigmas``. The value is byte-identical to the lab recipe.
