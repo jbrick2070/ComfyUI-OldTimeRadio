@@ -3449,9 +3449,24 @@ class Ltx25NativeAudioInMixin:
         plan = super()._build_render_request(request)
         get = request.get if isinstance(request, dict) else (
             lambda k, d=None: getattr(request, k, d))
-        assets = get("asset_refs") or {}
-        ref = (assets.get("audio_ref") or "") if isinstance(assets, dict) else ""
-        plan["audio_path"] = self._ref_path(ref)
+        # TOP-LEVEL, NOT UNDER asset_refs -- the schema splits them on purpose
+        # (`schemas.py`: `asset_refs: dict[str, str]` beside
+        # `audio_ref: Optional[AudioRef]`), and `build_request` writes
+        # `"asset_refs": {"init_image": ...}` next to `"audio_ref": {...}`.
+        # NOTHING in the tree ever writes `asset_refs["audio_ref"]`.
+        #
+        # The first draft copied the `init_image` shape and read the empty
+        # slot, so every beat raised "requires an audio_ref and the beat
+        # carried none" while the driver had supplied one all along. That the
+        # render reached `_build_graph` at all is the proof: `_render_one`
+        # calls `_assert_family_inputs_satisfiable` first, which checks the
+        # TOP-LEVEL field -- a genuinely missing ref fails there as
+        # FamilyInputGap and never gets this far.
+        #
+        # This is the read every other audio consumer uses: eng_ltx_av:1442,
+        # eng_humo:1268, eng_minimax_h3:720, eng_visualizer:195, and the cloud
+        # adapters. Found by a cursor review after two failed live legs.
+        plan["audio_path"] = self._ref_path(get("audio_ref"))
         return plan
 
     def _build_graph(self, plan, image_name, length, width, height):
