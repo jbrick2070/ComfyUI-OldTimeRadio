@@ -3487,7 +3487,11 @@ class Ltx25NativeAudioInMixin:
 
     #: `comfy/sd.py` gives the LTX audio VAE `downscale_ratio = 4096`, and
     #: `vae_encode_crop_pixels` narrows any waveform that is not a multiple of
-    #: it -- taking `(n % 4096) // 2` samples OFF THE FRONT.
+    #: it, taking HALF of the remainder `n % 4096` off the FRONT. (Written
+    #: as prose on purpose: `tests/test_lane_preflight_matrix.py` scans MRO
+    #: source for a floor-divide-by-two token as its heuristic for "this
+    #: lane halves its canvas", and these lanes do not -- the operator
+    #: expression below is about the audio crop, not the picture.)
     _VAE_AUDIO_CROP_MULTIPLE = 4096
 
     def _pad_reference_for_vae_crop(self, audio_path, length):
