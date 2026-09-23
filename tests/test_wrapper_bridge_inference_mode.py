@@ -110,7 +110,12 @@ def test_the_terminal_tensor_still_survives_the_encoder_path():
 
 
 def test_the_bridge_does_not_leave_the_caller_in_inference_mode():
-    """Wrapped at the CALL, not around the loop -- the caller is untouched."""
+    """The ``with`` exits before ``run_graph`` returns, so the caller is free.
+
+    The docstring here used to say "wrapped at the CALL, not around the loop",
+    which stopped being true when the wrap moved and is the same class of
+    stale comment that talked the first version into narrowing the boundary.
+    """
     assert not torch.is_inference_mode_enabled()
     wb.run_graph({"n": {"class": _AsksTheMode, "inputs": {}}}, terminal="n")
     assert not torch.is_inference_mode_enabled()
@@ -135,13 +140,68 @@ def test_on_result_runs_inside_inference_mode_too():
 
 
 def test_a_callback_may_mutate_what_it_is_handed():
-    """The property the boundary above exists to give callers.
+    """A callback can write to its argument, because it shares the node's mode.
 
-    Not hypothetical: this is what a lane doing its own copy-out of a decode
-    result does, and it raised on the first version of this fix.
+    This is the property the whole-loop boundary gives callers. It is NOT a
+    model of any production callback -- see the clone test below, which is.
     """
     wb.run_graph({"n": {"class": _MakesATensor, "inputs": {}}},
                  on_result=lambda nid, out: out[0].add_(1.0))
+
+
+def test_a_harvested_clone_escapes_the_graphs_inference_mode():
+    """What the ONE production callback that copies a tensor actually does.
+
+    ``eng_ltx25.Ltx25FoleyPlusEngine._latent_to_cpu`` is the only ``on_result``
+    in the pack that copies tensors rather than registering a ModelPatcher; it
+    goes ``val.detach().cpu().clone()`` to make a CPU copy that outlives the
+    graph. A cursor QA lane caught that moving callbacks inside the wrap
+    INVERTS that copy: torch's clone-escape ("you can make a clone to get a
+    normal tensor") only works with the mode off, so an in-mode clone stays an
+    inference tensor and the copy silently inherits the lifetime it was made to
+    escape.
+
+    An earlier version of this file claimed an ``add_()`` callback modelled
+    that path. It did not -- production clones, it does not mutate -- so the
+    test blessed the inversion without being able to see it.
+    """
+    harvested = {}
+
+    def harvest(nid, out):
+        with torch.inference_mode(False):
+            harvested["t"] = out[0].detach().cpu().clone()
+
+    wb.run_graph({"n": {"class": _MakesATensor, "inputs": {}}},
+                 on_result=harvest)
+    assert not torch.is_inference(harvested["t"]),         "the durable copy carries the graph's execution mode"
+    harvested["t"].add_(1.0)          # and is therefore still writable
+
+
+def test_the_real_foley_harvest_produces_a_writable_copy():
+    """The same property, through the SHIPPING helper rather than a re-spell.
+
+    A test that re-implements the copy proves the test. This one calls
+    ``_latent_to_cpu`` itself, from inside a graph, which is the only way to
+    know the shipped code escapes.
+    """
+    from nodes._otr_video_engines import eng_ltx25
+
+    seen = {}
+
+    class _EmitsALatent:
+        FUNCTION = "go"
+
+        def go(self):
+            return (None, {"samples": torch.ones(2, 4)})
+
+    def harvest(nid, out):
+        seen["latent"] = eng_ltx25.Ltx25FoleyPlusEngine._latent_to_cpu(out[1])
+
+    wb.run_graph({"n": {"class": _EmitsALatent, "inputs": {}}},
+                 on_result=harvest)
+    copied = seen["latent"]["samples"]
+    assert not torch.is_inference(copied)
+    copied.add_(1.0)
 
 
 def test_the_ltx_decode_shape_that_actually_failed():

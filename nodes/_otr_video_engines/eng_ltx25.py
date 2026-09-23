@@ -1955,13 +1955,31 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
 
     @staticmethod
     def _latent_to_cpu(latent):
-        """A CPU copy of one LATENT dict.
+        """A CPU copy of one LATENT dict, DETACHED FROM THE GRAPH'S EXEC MODE.
 
         Nested tensors are left NESTED on purpose: ``LTXVAudioVAEDecode``
         already resolves them (``if audio_latent.is_nested: ... unbind()[-1]``,
         which takes the REFINED portion stage two concatenated), so unbinding
         here would duplicate handling the installed node does better.
+
+        THE ``inference_mode(False)`` IS THE WHOLE POINT OF THE COPY, and it
+        was added after a cursor QA lane caught the omission. This harvest runs
+        from ``on_result``, which ``run_graph`` now calls INSIDE
+        ``torch.inference_mode()`` -- and a clone taken inside that mode is
+        itself an inference tensor, so the copy would inherit the lifetime of
+        the graph it exists to outlive. Torch's own error text names the escape
+        ("You can make a clone to get a normal tensor"), and the escape only
+        works with the mode off. Measured both ways: clone inside -> inference
+        tensor, clone under ``inference_mode(False)`` -> normal and mutable.
+
+        It is not load-bearing TODAY -- the only consumer is the audio decode
+        graph, which runs inside the mode anyway -- and that is exactly why it
+        is worth stating rather than leaving to luck. A durable CPU copy that
+        survives its graph should not carry that graph's execution flags, and
+        the next edit that touches this latent should not have to know why it
+        cannot be written to.
         """
+        import torch
         if not isinstance(latent, dict):
             raise TypeError(
                 "ltx25_foley_plus expected a LATENT dict from "
@@ -1969,11 +1987,12 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
                 "the wrong object is how a lane ships noise as foley"
                 % (type(latent).__name__,))
         out = {}
-        for key, val in latent.items():
-            if hasattr(val, "detach") and hasattr(val, "cpu"):
-                out[key] = val.detach().cpu().clone()
-            else:
-                out[key] = val
+        with torch.inference_mode(False):
+            for key, val in latent.items():
+                if hasattr(val, "detach") and hasattr(val, "cpu"):
+                    out[key] = val.detach().cpu().clone()
+                else:
+                    out[key] = val
         return out
 
     # ---- seam 2: decode, conform to the mp4, write the durable stem ----
