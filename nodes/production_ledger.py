@@ -75,6 +75,11 @@ try:
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
 
+try:
+    from ._otr_shared.pathbudget import long_path as _long_path
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared.pathbudget import long_path as _long_path  # type: ignore
+
 log = logging.getLogger("OTR.production_ledger")
 
 # Canonical spoken-role test (S1). _otr_ledger_scrub is a leaf module
@@ -661,13 +666,29 @@ def load_replay_manifest(bundle_dir: str) -> Dict[str, Any]:
 
 
 def replay_episode_id(source_episode_id: str) -> str:
-    """``<source>_replay_<stamp with microseconds>`` -- distinct per replay so
-    the output dir and the obs file never collide (rename_episode hard-fails on
-    an existing directory)."""
-    import datetime as _dt
-    stamp = _dt.datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+    """``<source>_rp<8 hex>`` -- distinct per replay so the output dir and the
+    obs file never collide (rename_episode hard-fails on an existing directory).
+
+    DELIBERATELY SHORT, AND THAT IS A PORTABILITY FIX (2026-09-23). This used
+    to append ``_replay_<YYYYmmdd_HHMMSS_ffffff>``: thirty characters, and the
+    id lands TWICE in the ledger's path -- once as the episode directory and
+    again inside ``<id>_ledger.json`` -- so a replay ran about SIXTY characters
+    longer than the episode it came from. That is invisible on a short install
+    root and fatal on a long one.
+
+    MEASURED on the 4060, which is what the 4060 is for: a 289-character ledger
+    path against Windows' 260-character MAX_PATH with ``LongPathsEnabled=0``.
+    The install there is `.../ComfyUI-Installs/ComfyUI (1)/ComfyUI/...`,
+    where a stray Desktop reinstall contributes the `(1)`. Eleven characters
+    instead of thirty buys back thirty-eight, which cleared it.
+
+    THE TIMESTAMP IS NOT LOST. The source id carries its own date, the ledger
+    stamps its own creation time, and ``meta['replay_workspace_id']`` is
+    already a full uuid4. What this function owes its caller is uniqueness,
+    not a readable clock, and 8 hex digits give that.
+    """
     base = str(source_episode_id or "episode").strip() or "episode"
-    return "%s_replay_%s" % (base, stamp)
+    return "%s_rp%s" % (base, uuid.uuid4().hex[:8])
 
 
 def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) -> "Ledger":
@@ -760,7 +781,23 @@ def import_replay_bundle(bundle_dir: str, new_episode_id: Optional[str] = None) 
     led._rebase_publication_eligibility(new_id)
     path = led.save()
     if path is None:
-        raise ReplayBundleError("import_replay_bundle: the imported ledger did not save")
+        # ``Ledger.save`` NEVER RAISES -- it returns None and logs a warning,
+        # which is a deliberate contract elsewhere and a trap here. On the 4060
+        # a 289-character path surfaced to the operator as nothing but "the
+        # imported ledger did not save", with the real ``Errno 2`` buried in a
+        # WARNING line, and cost an hour. So say what we tried to write.
+        try:
+            target = str(led.path)
+        except Exception:                    # noqa: BLE001 -- diagnostics only
+            target = ""
+        hint = ""
+        if target and os.name == "nt" and len(target) > 240:
+            hint = (" -- that path is %d characters and Windows MAX_PATH is 260 "
+                    "unless LongPathsEnabled=1; shorten the ComfyUI "
+                    "--output-directory or enable long paths" % len(target))
+        raise ReplayBundleError(
+            "import_replay_bundle: the imported ledger did not save%s%s"
+            % ((" (target %s)" % target) if target else "", hint))
     log.info("[Ledger] replay workspace %s imported from %s (source %s, %d asset(s))",
              new_id, bundle, source_id, len(materialized))
     return led
@@ -1776,16 +1813,33 @@ class Ledger:
                 # the actual ledger write.
                 log.warning("[Ledger] meta.paths stamp failed: %s", exc)
 
-            # Atomic write: temp file + replace
+            # Atomic write: temp file + replace.
+            #
+            # THROUGH `long_path`, BECAUSE THIS IS WHERE MAX_PATH BIT (4060,
+            # 2026-09-23). A replay ledger landed at 289 characters against
+            # Windows' 260-character limit with `LongPathsEnabled=0`, and the
+            # `.tmp` suffix makes this write the LONGEST path the episode ever
+            # touches. The repo already owns the fix -- `pathbudget.long_path`
+            # prefixes `\\?\` only when it is actually needed -- and this
+            # module simply was not using it.
+            #
+            # AT THE CALL, NEVER STORED: `tmp` and `path` keep their plain
+            # spelling, because the helper's own contract is that a prefixed
+            # value must not leak into the ledger or two spellings of one file
+            # stop comparing equal. `path` is what gets returned and stamped.
+            #
+            # The registry flag is NOT an alternative here: `LongPathsEnabled`
+            # only reaches binaries carrying a `longPathAware` manifest, and
+            # the ffmpeg the publish tail shells out to does not carry one.
             tmp = path + ".tmp"
-            with open(tmp, "w", encoding="utf-8") as f:
+            with open(_long_path(tmp), "w", encoding="utf-8") as f:
                 json.dump(merged, f, indent=2, ensure_ascii=False)
                 f.flush()
                 try:
                     os.fsync(f.fileno())
                 except OSError:
                     pass
-            os.replace(tmp, path)
+            os.replace(_long_path(tmp), _long_path(path))
             # Wiring-review #5 (2026-05-11): assign merged payload
             # back to self.data so the in-memory ledger matches the
             # on-disk JSON byte-for-byte. Without this, the next read

@@ -1085,11 +1085,64 @@ def _source_rewrite_for_render(obj, normalized, source_context_hash):
     return receipt
 
 
+def _replay_rebase_to_live_episode(ledger: dict) -> dict:
+    """Move a pre-rename replay snapshot onto the episode's current directory.
+
+    Returns the ledger unchanged when nothing renamed it, when the singleton is
+    unavailable, or on any failure -- a rebase that cannot be proven is not
+    worth risking, and the caller's own existence check is the backstop.
+    """
+    if not isinstance(ledger, dict):
+        return ledger
+    try:
+        from .production_ledger import (
+            peek_ledger as _peek,
+            _rebase_episode_local_paths as _rebase,
+        )
+        live = _peek()
+        if live is None:
+            return ledger
+        stale_id = str(ledger.get("episode_id") or "").strip()
+        live_id = str((live.data or {}).get("episode_id") or "").strip()
+        if not stale_id or not live_id or stale_id == live_id:
+            return ledger            # nothing renamed under us
+        # `<episode dir>/audio/<id>_ledger.json` -> the episode dir, then its parent
+        new_ep_dir = os.path.dirname(os.path.dirname(str(live.path)))
+        old_ep_dir = os.path.join(os.path.dirname(new_ep_dir), stale_id)
+        if not os.path.isdir(new_ep_dir):
+            return ledger
+        rebased, n = _rebase(ledger, old_ep_dir, new_ep_dir)
+        if not isinstance(rebased, dict):
+            return ledger
+        if n:
+            log.info("[OTR_ImageGenDispatcher] REPLAY: rebased %d path(s) from "
+                     "%s onto the renamed episode %s", n, stale_id, live_id)
+        return rebased
+    except Exception as exc:             # noqa: BLE001 -- never fatal
+        log.warning("[OTR_ImageGenDispatcher] REPLAY: could not rebase the "
+                    "imported ledger onto the renamed episode (%r); verifying "
+                    "the paths as they arrived", exc)
+        return ledger
+
+
 def verify_replay_images(ledger: dict):
     """REPLAY (campaign item 0): every imported image row's file must exist at
     its rebased ``path`` with non-zero bytes; nothing is minted. Returns
     ``(ledger, image_done, report)`` and stamps the unchanged images section
     durably so the singleton and the wire agree."""
+    # THE DICT ON THE WIRE CAN PREDATE ``rename_episode`` (found on the 4060,
+    # 2026-09-23). A replay workspace is ALWAYS renamed to a fresh episode id,
+    # and the rename moves the whole per-episode directory and rebases the
+    # durable ledger -- but the snapshot travelling down the graph was captured
+    # before that, so every row still points into the pre-rename directory that
+    # no longer exists. The failure reads as "27 imported image row(s) have no
+    # file on disk" while all 27 files are present and the saved ledger is
+    # correct, which sends the reader hunting for missing assets that were
+    # never missing. It would fire on EVERY replay that reaches this node.
+    #
+    # Rebase against the live singleton with the same walker the rename itself
+    # used, so this cannot drift from that behaviour.
+    ledger = _replay_rebase_to_live_episode(ledger)
     images = ledger.get("images") if isinstance(ledger.get("images"), dict) else {}
     rows = images.get("images") if isinstance(images.get("images"), list) else []
     missing = []

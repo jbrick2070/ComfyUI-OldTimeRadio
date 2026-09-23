@@ -171,7 +171,7 @@ def test_import_replay_bundle_clones_into_a_new_workspace(frozen):
     led = PL.import_replay_bundle(str(frozen["bundle"]))
     data = led.data
     new_id = data["episode_id"]
-    assert new_id.startswith(frozen["ep"].name + "_replay_") and new_id != frozen["ep"].name
+    assert new_id.startswith(frozen["ep"].name + "_rp") and new_id != frozen["ep"].name
     assert PL.peek_ledger() is led, "the singleton is rebound"
     meta = data["meta"]
     assert meta["replay_of_episode"] == frozen["ep"].name
