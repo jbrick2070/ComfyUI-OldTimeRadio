@@ -125,7 +125,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  97 experimental profile(s), 48 shipping
+## 16 GB+  --  98 experimental profile(s), 48 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -178,9 +178,9 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_viz_mxc_mandala` | viz_mxc_mandala | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>49 draft profile(s) here -- not vouched for</summary>
+<details><summary>50 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
+Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx25_native_mime_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
@@ -192,6 +192,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_16gb_ltx_video` | ltx_video | - |
 | `otr_24gb_native_audio_in` | ltx25_native_foley_24gb | - |
 | `otr_24gb_native_foley` | ltx25_native_foley_24gb | - |
+| `otr_24gb_native_mime` | ltx25_native_mime_24gb | - |
 | `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | - |
 | `otr_amd16_rocm` | still_motion | - |
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
