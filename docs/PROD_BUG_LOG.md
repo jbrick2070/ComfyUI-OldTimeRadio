@@ -15949,9 +15949,23 @@ the shipped music engine. `sa3` is `eng_stable_audio_3.py`, a ComfyUI-native
 loader that needs no such package, and the 5080 has never had
 `stable_audio_tools` while publishing `sa3` episodes daily. Declaring it would
 have added a package that FAILS TO BUILD (`Failed to build 'pandas'`, measured on
-the pod) to the file `node-pack-extract` runs under `set -e` -- the exact
-mechanism the `pycairo` comment in that file records zeroing the registry node
-count.
+the pod) to the file `node-pack-extract` runs under `set -e` -- the mechanism the
+`pycairo` comment in that file records zeroing the registry node count.
+
+**THE DECISIVE REASON IS WORSE THAN THAT, AND A CODEX LANE MEASURED IT:
+`stable-audio-tools` HARD-PINS `torch==2.7.1`.** Resolving it together with
+`torch>=2.10` comes back UNSATISFIABLE. The very first instruction in
+`requirements.txt` is "Do NOT pin torch -- ComfyUI manages its own torch
+version", so declaring this package would have fought the host's torch on every
+install, not merely risked one extractor.
+
+**AND IT WAS ALREADY DECIDED.** Commit `5240c581` (2026-09-09) added the early
+`assert_usable()` import probe to `eng_stable_audio.py` and states in the file
+that this heavy dependency for an opt-in engine does not belong in every
+install. The omission is deliberate and documented. This window read an audit
+line as a defect and never grepped the history that had settled it three weeks
+earlier -- which is the actual lesson: an undeclared import is a QUESTION, and
+the first place to take it is `git log -S`, not `requirements.txt`.
 
 **Fix:** `/workspace/boot_venv.sh` resolves the venv before falling back to the
 system python and prints which it chose. The durable fix is to run the
