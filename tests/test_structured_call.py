@@ -17,7 +17,8 @@ Coverage map:
     4. Attempts 1+2 fail, Attempt 3 (repair) succeeds -> three calls,
        `repair_prompt_factory` was invoked.
     5. Attempts 1+2 fail, default repair factory used when caller
-       passes None -> Attempt 3 still runs (CRITICAL prefix present).
+       passes None -> Attempt 3 still runs (CRITICAL directive present,
+       and last -- see the note at that test).
     6. All attempts fail -> StructuredCallFailedError, message carries
        helper_name + last error.
     7. max_attempts cap is honoured (max_attempts=1 -> one call only).

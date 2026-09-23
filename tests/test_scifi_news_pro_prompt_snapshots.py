@@ -108,22 +108,41 @@ def test_casting_seam_assigns_voices_without_rewriting_story(stages):
 
 
 def test_the_cast_ceiling_in_the_seams_is_the_real_number(stages):
-    """The seams used to say "N_MAX", which nothing ever substituted.
+    """Each seam must name the ceiling that actually binds ITS field.
 
-    So the model read the characters N_MAX as its cast ceiling while
-    MAX_SPEAKING_CAST was what actually bound, in pydantic. Fixed
-    2026-09-23 by writing the real number into both seams; this test
-    exists because a hardcoded number in a pack can drift away from the
-    constant it mirrors, and nothing else would notice.
+    The seams used to say "N_MAX", substituted nowhere, so the model read
+    those characters as its ceiling. 61c51a2a wrote a number in -- and wrote
+    the WRONG one into the pitch seam: it used MAX_SPEAKING_CAST (10), which
+    bounds the cast LIST, while Pitch.cast_size is Field(ge=1, le=8). The
+    model was being invited to propose a size pydantic then rejected.
+
+    So this reads BOTH ceilings off the code rather than trusting either
+    number, and parses the integer out of the prompt instead of matching a
+    substring -- the first cut of this test asserted "1 through 10" IN the
+    text, which "1 through 100" also satisfies.
     """
-    from nodes._otr_scifi_news_pro import MAX_SPEAKING_CAST
+    import re
+
+    from nodes._otr_scifi_news_pro import MAX_SPEAKING_CAST, Pitch
+
+    meta = Pitch.model_fields["cast_size"].metadata
+    pitch_ceiling = next(m.le for m in meta if hasattr(m, "le"))
 
     for name, text in stages.items():
-        if not isinstance(text, str):
-            continue
-        assert "N_MAX" not in text, (
-            "%s ships an unsubstituted placeholder to the model" % name)
+        if isinstance(text, str):
+            assert "N_MAX" not in text, (
+                "%s ships an unsubstituted placeholder to the model" % name)
+
     pitch = stages["scifi_news_pro_pitch_system"]
+    got = re.search(r"integer from 1 through (\d+)", pitch)
+    assert got, pitch
+    assert int(got.group(1)) == pitch_ceiling, (
+        "pitch seam says %s; Pitch.cast_size allows up to %s"
+        % (got.group(1), pitch_ceiling))
+
     treatment = stages["scifi_news_pro_treatment_system"]
-    assert "1 through %d" % MAX_SPEAKING_CAST in pitch, pitch
-    assert "no more than %d cast members" % MAX_SPEAKING_CAST in treatment
+    got = re.search(r"no more than (\d+) cast members", treatment)
+    assert got, treatment
+    assert int(got.group(1)) == MAX_SPEAKING_CAST, (
+        "treatment seam says %s; the cast list allows %s"
+        % (got.group(1), MAX_SPEAKING_CAST))
