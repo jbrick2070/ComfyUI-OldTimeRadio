@@ -190,10 +190,43 @@ LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP = 16
 #:
 #: It exists to answer ONE question at run time: is there room for the decode,
 #: or is the sampler's DiT still sitting where the decode needs to be? Below
-#: this figure ComfyUI streams the decode over PCIe and the same work takes
-#: more than twelve times longer -- the ~62 W, 100%-utilisation, 2%-memory-
-#: controller signature that reads like thrashing and is actually a card
-#: waiting on transfers.
+#: this figure the same work takes more than twelve times longer -- a
+#: 100%-utilisation, low-memory-controller, low-wattage signature that reads
+#: like thrashing and is actually a card waiting on transfers over PCIe.
+#:
+#: COMFYUI IS NOT THE ONE STREAMING IT -- corrected 2026-09-23. This paragraph
+#: said "ComfyUI streams the decode over PCIe", and that is wrong. The LTX
+#: diffusion-VAE branch in `comfy/sd.py` sets ``disable_offload = True``, which
+#: is handed straight to ``force_full_load`` on the ``load_models_gpu`` call,
+#: so ComfyUI loads this VAE COMPLETELY and never streams it. A live 4060 log
+#: agrees: "loaded completely; 1403.92 MB loaded, full load: True".
+#:
+#: What actually spills is the WINDOWS WDDM CUDA SYSMEM FALLBACK: the driver
+#: backs an over-large allocation with pageable host memory instead of failing,
+#: so `cudaMalloc` succeeds, PyTorch never raises, and the card sits at 100%
+#: utilisation moving bytes over PCIe forever. That is why the stall never
+#: OOMs, and it is why this class of hang is WINDOWS-ONLY -- Linux has no such
+#: fallback. `nvidia-smi` cannot see it; Task Manager's "Shared GPU memory"
+#: can, and from outside the process ComfyUI's own `/system_stats`
+#: `torch_vram_total` exceeding the physical `vram_total` is the tell.
+#:
+#: The owner matters because it changes the fix. It is not a ComfyUI setting to
+#: tune: it is either the driver profile ("CUDA - Sysmem Fallback Policy" ->
+#: Prefer No Sysmem Fallback, an operator step with no env var or API), or
+#: geometry that fits.
+#:
+#: AND THE POLICY IS READ WHEN THE CUDA CONTEXT IS CREATED. A server process
+#: that predates the change does not pick it up, so a leg measured through an
+#: already-running backend is a confound. Restart before measuring.
+#:
+#: Verified on the 4060 by the peer box, which read the install this repo's
+#: 5080 checkout could not locate.
+#:
+#: 8300 IS A 5080-DERIVED NUMBER. The 8,080 MB peak above was measured on a
+#: free 16 GB card. An 8 GB 4060 offers ~7,399 MB with nothing else resident,
+#: so it is ~680 MB short of that peak by arithmetic -- which is why the 5080's
+#: fix (evict, make room) does not transfer to it. A measured 4060 peak is
+#: pending and replaces this figure when it lands.
 LTX25_STAGE2_DECODE_NEEDS_MB = 8300
 
 #: The exact three-step refinement schedule. Production resolves core's V3
