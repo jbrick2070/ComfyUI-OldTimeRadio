@@ -1816,43 +1816,89 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "extension_mode": raw.get("extension_mode"),
         }
 
+    #: Headroom a CUDA context and the desktop keep that `mem_get_info` never
+    #: offers us. MEASURED on the 4060: 8188 MiB total, 7399 MB free with the
+    #: card otherwise empty.
+    _VRAM_CONTEXT_RESERVE_MB = 300
+
+    def _settled_free_vram_mb(self, floor_mb, tries=8, pause_s=0.5):
+        """Free VRAM once the release has actually landed.
+
+        `reset_cast_buffers()` returns before the driver has handed the memory
+        back. MEASURED on the 4060 at 1 s sampling: 6469 -> 4421 -> 2821 -> 821
+        -> 789 MiB, so the figure was still falling three seconds after the
+        call returned. Reading immediately saw 4940 MB when the settled value
+        was ~7399 -- under-reporting a successful eviction by 2.5 GB, which is
+        enough to refuse a card that had in fact freed plenty.
+
+        Polls until the reading stops rising, rather than sleeping a fixed
+        time: a big card settles on the first look and pays nothing.
+        """
+        import time
+        best = floor_mb if floor_mb is not None else None
+        try:
+            import torch
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+        except Exception:                   # noqa: BLE001 -- telemetry only
+            pass
+        for _ in range(int(tries)):
+            now = _MC.free_vram_mb()
+            if now is None:
+                return best
+            if best is None or now > best + 1.0:
+                best = now
+                time.sleep(float(pause_s))
+                continue
+            return max(best, now)
+        return best
+
+    def _total_vram_mb(self):
+        """Card capacity, or None. `free_vram_mb` reads it and throws it away."""
+        try:
+            import torch
+            if torch.cuda.is_available():
+                return float(torch.cuda.mem_get_info()[1]) / (1024.0 * 1024.0)
+        except Exception:                   # noqa: BLE001 -- telemetry only
+            return None
+        return None
+
     def _make_room_for_decode(self):
-        """Evict resident models before the terminal decode, IF the card is short.
+        """Evict before the terminal decode, IF the card is short.
 
         MEASURED ON A 16 GB RTX 5080, same graph, same weight, same seed, the
         only difference being this call:
 
-            decode, DiT still resident      400+ s, killed, never finished
-            decode, after this eviction      34.7 s
-            whole two-stage render           196.3 s, foley muxed
+            decode, transformer still resident   400+ s, killed, never finished
+            decode, after this eviction           34.7 s
+            whole two-stage render               196.3 s, foley muxed
 
-        and the isolated control that explains it -- only the video VAE, a
-        synthetic stage-2 latent, and an inert ballast tensor as the single
-        variable -- decoded in 30.0 s at a peak of 8,080 MB on a free card and
-        had not finished at 412 s with 11 GB occupied.
+        WHAT ACTUALLY HOLDS THE MEMORY, corrected 2026-09-23 after a Fable
+        review refuted the first explanation written here. `unload_all_models`
+        DOES own a staged model: `detach()` -> the dynamic `unpatch_model`
+        override (`comfy/model_patcher.py:2132`) -> `partially_unload_ram(1e32)`
+        for the pinned host memory and `partially_unload(None, 1e32)` ->
+        `vbar.free_memory(1e32)` for the staged VRAM. The earlier claim that it
+        "never owned the staged weights" was wrong.
 
-        THE SAMPLER'S DiT HAS NO CONSUMER LEFT BY THE TIME THIS RUNS. It is
-        called from ``on_result`` for the node that feeds the decode, so every
-        node that wanted the transformer has already had it. What it is doing
-        is not freeing memory early; it is declining to hold 12 GB of finished
-        work across a stage that needs 8 GB of room on a card with 15.92.
+        What it does NOT own is the aimdo CAST BUFFERS -- one reservation per
+        offload stream in `STREAM_AIMDO_CAST_BUFFERS`, which grows and never
+        shrinks. On an 8 GB card that is most of what stays behind, and only
+        `reset_cast_buffers()` clears it. PROVEN on the 4060 at 1 s sampling:
+        6469 -> 789 MiB, about 5.7 GB returned in three seconds, where the same
+        card without this call sat at a flat 7910 MiB for sixteen minutes.
 
-        WHY A GLOBAL UNLOAD RATHER THAN A PATCHER DETACH. Detaching is the
-        precise instrument and it is still the default at teardown, but it does
-        not reach this: ``run_graph``'s ``keep`` set was dropped to exclude the
-        unet and 9.61 GB stayed allocated anyway, because a Python reference is
-        not what pins weights to the device -- ComfyUI's model manager is. The
-        blanket prohibition on ``unload_all_models()`` was struck by the
-        operator the same day on exactly this reasoning: by the time video
-        renders, story, voices and music have all finished, so there is nothing
-        of theirs left for a global unload to take.
+        ORDER MATTERS AND IS NOT OBVIOUS. `reset_cast_buffers` runs FIRST
+        because its per-model half walks `current_loaded_models`
+        (`model_management.py:1453`) and `unload_all_models` POPS that list
+        (`:910`). Calling unload first leaves an empty list and that half
+        silently does nothing. Found by a cursor review.
 
-        THE GUARD IS A MEASURED NEED, NOT A CARD-SIZE TIER. Evicting on a box
-        with room buys nothing and costs the next beat a reload, which is the
-        one real hazard here. So the question asked is the only one that
-        matters -- does the decode fit right now -- and a machine that has the
-        headroom never pays. Silent and safe on the CPU box, where
-        ``free_vram_mb`` returns ``None`` and nothing was ever resident."""
+        WHY THE 5080 NEVER NEEDED THE SECOND CALL: there the transformer FITS,
+        so it is resident and patcher-owned and the ordinary unload frees it.
+        Eviction and streaming are mutually exclusive by construction -- on the
+        card where you most need to evict, the thing you are reaching for is
+        not held where you are looking."""
         free_mb = _MC.free_vram_mb()
         if free_mb is None:
             return                          # CPU box / unit tests: nothing to evict
@@ -1862,108 +1908,70 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "[OTR video] %s: decode has room (%.0f MB free >= %d MB "
                 "needed); leaving models resident", self.name, free_mb, need)
             return
+
         reset_ok = False
         try:
             import comfy.model_management as mm
-            mm.unload_all_models()
-            # THE SECOND CALL IS THE ONE THAT MATTERS ON A SMALL CARD.
-            #
-            # `unload_all_models` reaches only what ComfyUI's model manager
-            # owns. When the transformer does not FIT -- 12.86 GB of mix4x8
-            # against an 8.19 GB card -- it is never resident in that sense:
-            # aimdo stages it, `loaded_size()` reports just the resident slice,
-            # and `detach()` frees the ordinary residents while the staging
-            # reservation stands. MEASURED on the 4060 (2026-09-23): the
-            # eviction recovered 1,088 MB of a model logged at `13147MB
-            # Staged`, and the decode then sat at a flat 7910 MiB for sixteen
-            # minutes -- 32.6 W of 90, `util.memory` 0%, `util.gpu` 100% --
-            # and never finished. 968 s against a 34.7 s control.
-            #
-            # `reset_cast_buffers()` is what owns that memory. It synchronises
-            # the offload streams, clears `STREAM_AIMDO_CAST_BUFFERS` so the
-            # `comfy_aimdo.vram_buffer.VRAMBuffer` reservations drop, and --
-            # for every dynamic model -- calls
-            # `partially_unload_ram(1e30, subsets=["patches", ...])`, which
-            # releases the PINNED HOST memory too. That second half matters as
-            # much: the same leg was down to 2.41 GB free RAM with 5.07 GB of
-            # page file in use, so the decode was paging its own staging buffer
-            # against the disk. Both halves of the stall are this call.
-            #
-            # Calling it mid-graph is an established pattern, not an abuse:
-            # `comfy/ldm/minimax_music/ar.py:259` does exactly this to reclaim
-            # before a heavy stage, and `execution.py:553` calls it per prompt.
-            #
-            # WHY THE 5080 NEVER NEEDED IT. There the DiT FITS, so it is
-            # resident and patcher-owned, `unload_all_models` genuinely frees
-            # it, and 400+ s became 34.7 s. The fix was written on the one
-            # card where the thing being evicted is the thing the patcher
-            # holds -- so it was never exercised against the configuration it
-            # most needs to handle. Eviction and streaming are mutually
-            # exclusive by construction: exactly when you must evict, there is
-            # nothing evictable where you are looking.
             reset = getattr(mm, "reset_cast_buffers", None)
             if callable(reset):
-                reset()
+                reset()                     # FIRST -- see the docstring on order
                 reset_ok = True
+            mm.unload_all_models()
             mm.soft_empty_cache()
         except Exception as exc:            # noqa: BLE001 -- a saving, never a failure
             _LOG.warning(
                 "[OTR video] %s: could not evict before decode (%r); the "
                 "decode will run under whatever is resident", self.name, exc)
             return
-        after_mb = _MC.free_vram_mb()
+
+        after_mb = self._settled_free_vram_mb(free_mb)
+        total_mb = self._total_vram_mb()
         _LOG.info(
             "[OTR video] %s: EVICTED before decode -- %.0f MB free -> %.0f MB "
-            "(needed %d, aimdo cast buffers %s)", self.name, free_mb,
+            "(needed %d, total %s, aimdo cast buffers %s)", self.name, free_mb,
             after_mb if after_mb is not None else -1.0, need,
+            ("%.0f MB" % total_mb) if total_mb else "unknown",
             "reset" if reset_ok else "NOT AVAILABLE on this ComfyUI")
 
-        # AN EVICTION THAT DID NOT REACH THE NEED MUST REFUSE, NOT PROCEED.
+        if after_mb is None or after_mb >= need:
+            return
+
+        # NEVER REFUSE ON A NUMBER. ONLY AN OOM DECIDES.
+        # (operator directive, 2026-09-23 -- hard.) In his words: "we should
+        # never refuse on numbers, only OOM decided... I don't want any probes
+        # flagging and dying for VRAM measurements, an OOM is the final
+        # determinant."
         #
-        # MEASURED ON THE 4060 (2026-09-23), and it is why this exists: the
-        # line above logged `3310 MB free -> 4398 MB (needed 8300)` -- 1,088 MB
-        # recovered from a model that had logged `13147MB Staged` -- and the
-        # decode then ran FOURTEEN MINUTES at a flat 7910 MiB, 32.6 W of a 90 W
-        # limit, `util.memory` 0% and `util.gpu` 100%. That is kernels resident
-        # with nothing to do, waiting on PCIe and the page file. It matches
-        # this file's own control exactly: "decode, DiT still resident --
-        # 400+ s, killed, never finished".
+        # THIS FUNCTION EARNED THAT RULING. A predicted-shortfall refusal
+        # shipped here and was wrong three times in one afternoon, every time
+        # in the pessimistic direction:
+        #   * `need` was 8300 MB against a card holding 8188 MiB in TOTAL, so
+        #     it refused an empty 4060 -- unsatisfiable by arithmetic.
+        #   * it read `after_mb` before the release had landed and saw 4940 MB
+        #     when the settled figure one second later was ~7399 MB,
+        #     under-reporting its own success by 2.5 GB.
+        #   * so it refused a decode having just freed 5.7 GB, and we never
+        #     learned whether that decode would have worked.
         #
-        # WHY THE EVICTION CANNOT WIN HERE. `unload_all_models()` reaches what
-        # ComfyUI's model manager owns. A lane staged through aimdo
-        # (`Model ... prepared for dynamic VRAM loading. NNNNN MB Staged`) keeps
-        # its weights in a `comfy_aimdo.vram_buffer.VRAMBuffer` reserved by
-        # `get_aimdo_cast_buffer`, which no `model_unload` owns -- `loaded_size`
-        # reports only the resident slice, so `detach()` frees the ordinary
-        # residents and leaves the reservation standing. Reaching that buffer
-        # is the real fix and is not this function's job.
+        # THE ASYMMETRY IS THE WHOLE ARGUMENT. A real OOM names the allocation
+        # that failed and the size it wanted: ground truth, and it says exactly
+        # how far to shrink a tile. A numeric refusal produces a number the
+        # guard invented about a render that never ran. And the expensive
+        # failure this guard was built against -- the 968 s thrash -- was
+        # residency, which the eviction above now fixes; it was never an OOM.
         #
-        # What IS this function's job is to stop claiming it made room. There
-        # is no proven case of the decode succeeding from here -- the isolated
-        # control had not finished at 412 s with 11 GB occupied -- and
-        # proceeding turned a diagnosable condition into an unexplained hang
-        # that cost an hour of another machine's time to characterise.
-        if after_mb is not None and after_mb < need:
-            allow = (otr_env.get("OTR_LTX25_ALLOW_TIGHT_DECODE", "") or "")
-            if allow.strip().lower() in ("1", "true", "yes", "on"):
-                _LOG.warning(
-                    "[OTR video] %s: decode is short of room (%.0f MB free < "
-                    "%d MB needed) and OTR_LTX25_ALLOW_TIGHT_DECODE is set -- "
-                    "proceeding, expect a very long or non-terminating decode",
-                    self.name, after_mb, need)
-                return
-            # Per-method import: this module is stdlib-only at module scope by
-            # the V-12 cold-import contract, so `_wb` is NOT a module global.
-            from . import wrapper_bridge as _wb
-            raise _wb.GraphExecutionError(
-                "%s cannot decode: eviction recovered only %.0f MB and the "
-                "terminal decode needs %d MB, leaving %.0f MB free. A staged "
-                "(dynamic VRAM) transformer is not released by "
-                "unload_all_models, so this card cannot clear room for stage "
-                "two. Proceeding would not fail cleanly -- it would run for "
-                "many minutes at near-zero throughput and may never finish. "
-                "Set OTR_LTX25_ALLOW_TIGHT_DECODE=1 to try anyway."
-                % (self.name, max(0.0, after_mb - free_mb), need, after_mb))
+        # So this is a WARNING and nothing more. The decode proceeds, and CUDA
+        # gets to answer.
+        _LOG.warning(
+            "[OTR video] %s: decode starts SHORT -- %.0f MB free against %d MB "
+            "measured need%s. Proceeding anyway: only a real OOM decides. If "
+            "this OOMs, the error names the allocation that failed and that is "
+            "the number to shrink the decode geometry to.",
+            self.name, after_mb, need,
+            ("" if total_mb is None
+             else "; this card holds %.0f MB in total, so the need may not be "
+                  "reachable at any residency and the answer would be a "
+                  "smaller decode rather than more eviction" % total_mb))
 
     def _retain_model_patchers(self, results, prepared):
         """V-4: keep the MODEL patchers the graph produced so teardown can
