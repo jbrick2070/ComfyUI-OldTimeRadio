@@ -327,8 +327,7 @@ EXACTLY one JSON object, no prose, no Markdown fences:
   "hidden_pressure": "one clause: the unspoken force under the line (what the speaker will not say outright)"
 }
 Use non-empty strings. Be specific to THIS slot. Do not restate the
-state phrases verbatim. Wording and length are creative choices. Safe for
-work."""
+state phrases verbatim. Wording and length are creative choices."""
 
 
 def _build_slot_job_user_prompt(

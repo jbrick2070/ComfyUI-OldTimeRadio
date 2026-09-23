@@ -67,9 +67,7 @@ BROADCAST CONVENTION
   with numbers.
 
 CONSTRAINTS
-- Family-broadcast safe. No profanity, no sexual content, no graphic
-  violence. Tension comes from menace, dread, and consequence -- not
-  from gore.
+- Tension comes from menace, dread, and consequence.
 - A complete arc in three parts: setup, confrontation, resolution.
   Even when the resolution is unsettling, it must be reached on the
   page, not deferred to a "to be continued."

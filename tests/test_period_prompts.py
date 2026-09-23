@@ -33,10 +33,29 @@ def test_system_prompt_mentions_core_period_anchors():
         "Suspense",
         "NARRATOR",
         "CHARACTER:dialogue",
-        "Family-broadcast safe",
     ]
     for token in must_have:
         assert token in OTR_PERIOD_SYSTEM_PROMPT, f"missing anchor token: {token!r}"
+
+
+def test_system_prompt_carries_no_content_guardrail():
+    """Operator directive 2026-08-03/08-05: no content guardrails on the
+    generation path.
+
+    "Family-broadcast safe" was an ANCHOR TOKEN in the test above until
+    2026-09-23 -- the suite required the guardrail to be present. The
+    2026-08-05 rip removed the equivalent clause from the shakespeare and
+    public_domain source lanes (both carry a comment saying so) and missed
+    this prompt, so the test went on enforcing it.
+
+    The craft half stayed: "Tension comes from menace, dread, and
+    consequence" is guidance about how radio builds dread, not a list of
+    what the writer may not say."""
+    for banned in ("Family-broadcast", "No profanity", "no sexual content",
+                   "graphic violence", "from gore", "Safe for work"):
+        assert banned not in OTR_PERIOD_SYSTEM_PROMPT, (
+            "content guardrail back in the period prompt: %r" % banned)
+    assert "menace, dread, and consequence" in OTR_PERIOD_SYSTEM_PROMPT
 
 
 def test_system_prompt_never_solicits_sfx():

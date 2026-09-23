@@ -415,14 +415,20 @@ def _llm_episode_title(
     prompt = [
         {
             "role": "system",
+            # NO CONTENT CLAUSE HERE (operator directive 2026-08-03/08-05).
+            # This prompt used to end "...and do not add profanity, explicit
+            # weapon language, or explicit sexual or nudity language." The
+            # step-2 safety repair it belonged with was ripped on 2026-08-05 --
+            # see this module's own docstring -- but the clause asking the
+            # TITLE model to self-censor was left behind. On an adaptation lane
+            # the author's own language is carried as written, and a title that
+            # names what the script does is the point.
             "content": (
                 ((language_instruction + "\n\n") if language_instruction else "")
                 +
                 "You title an already-written radio episode. Return JSON "
                 "only. The title must describe THIS script -- do not invent "
-                "events, characters, or a sequel hook, and do not add "
-                "profanity, explicit weapon language, or explicit sexual or "
-                "nudity language."
+                "events, characters, or a sequel hook."
             ),
         },
         {
