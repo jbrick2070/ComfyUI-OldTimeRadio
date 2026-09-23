@@ -105,3 +105,25 @@ def test_casting_seam_assigns_voices_without_rewriting_story(stages):
     assert "available voice-stock id" in prompt.lower()
     assert "copy names and voice-stock ids exactly" in prompt.lower()
     assert "do not rewrite story text" in prompt.lower()
+
+
+def test_the_cast_ceiling_in_the_seams_is_the_real_number(stages):
+    """The seams used to say "N_MAX", which nothing ever substituted.
+
+    So the model read the characters N_MAX as its cast ceiling while
+    MAX_SPEAKING_CAST was what actually bound, in pydantic. Fixed
+    2026-09-23 by writing the real number into both seams; this test
+    exists because a hardcoded number in a pack can drift away from the
+    constant it mirrors, and nothing else would notice.
+    """
+    from nodes._otr_scifi_news_pro import MAX_SPEAKING_CAST
+
+    for name, text in stages.items():
+        if not isinstance(text, str):
+            continue
+        assert "N_MAX" not in text, (
+            "%s ships an unsubstituted placeholder to the model" % name)
+    pitch = stages["scifi_news_pro_pitch_system"]
+    treatment = stages["scifi_news_pro_treatment_system"]
+    assert "1 through %d" % MAX_SPEAKING_CAST in pitch, pitch
+    assert "no more than %d cast members" % MAX_SPEAKING_CAST in treatment
