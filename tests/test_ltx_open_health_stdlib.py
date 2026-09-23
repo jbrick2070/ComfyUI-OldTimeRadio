@@ -84,12 +84,46 @@ class LtxOpenHealthTests(unittest.TestCase):
         with self.assertNoLogs(self.rd._LOG, level="WARNING"):
             self.assertEqual(self.rd.check_ltx_open_health(clips, strict=True), [])
 
-    def test_allowlist_adds_only_the_exact_ltx098_internal_id(self):
+    def test_allowlist_is_pinned_to_exactly_the_lanes_we_intend(self):
+        """Pinned so a lane joins DELIBERATELY, never by a broad pattern.
+
+        The nine LTX 2.5 tier/native ids were added 2026-09-23 after a QA
+        lane found they were absent: because each is in
+        ``_vreg.CAPABILITIES`` they passed the "unknown" check and then hit
+        the ``not_requested`` branch, so the BUG-LOCAL-413 guard never
+        inspected their delivered clip. A radio open that fell to procgen
+        on any of them read as healthy.
+        """
         self.assertEqual(self.rd._LTX_OPEN_ENGINES,
                          PREVIOUS_LTX_ENGINES | {
                              "ltx_8gb", "razzle_ltx_8gb",
                              "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
+                             "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
+                             "ltx25_native_foley_16gb",
+                             "ltx25_native_foley_24gb",
+                             "ltx25_native_foley_blackwell",
+                             "ltx25_native_mime_16gb",
+                             "ltx25_native_mime_24gb",
+                             "ltx25_native_audio_in_16gb",
+                             "ltx25_native_audio_in_24gb",
                          })
+
+    def test_every_registered_ltx25_lane_is_in_the_allowlist(self):
+        """The guard that would have caught this one.
+
+        Every LTX 2.5 lane renders the LTX 2.5 picture graph, so every one
+        of them is a real LTX open. A new lane that forgets to join the
+        set above fails HERE rather than silently blinding the guard.
+        """
+        from nodes._otr_video_engines import eng_ltx25
+        registered = {getattr(obj, "name", "")
+                      for obj in vars(eng_ltx25).values()
+                      if isinstance(obj, type)
+                      and str(getattr(obj, "name", "")).startswith("ltx25")}
+        missing = sorted(registered - set(self.rd._LTX_OPEN_ENGINES))
+        self.assertEqual(missing, [], "LTX 2.5 lane(s) absent from "
+                         "_LTX_OPEN_ENGINES, so BUG-LOCAL-413 cannot see "
+                         "them: %r" % (missing,))
 
     def test_previous_five_ltx_lanes_remain_healthy(self):
         for engine in sorted(PREVIOUS_LTX_ENGINES):

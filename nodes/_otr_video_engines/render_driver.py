@@ -7005,7 +7005,27 @@ _LTX_OPEN_ENGINES = frozenset(
      # Omitting them would report a healthy open as a procgen soft-open and,
      # under OTR_LTX_OPEN_STRICT=1, fail a build that did nothing wrong.
      "ltx25_foley_plus", "ltx25_mime",
-     "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in"})
+     "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
+     # THE SAME REASONING, APPLIED TO THE LANES THAT AROSE AFTER IT WAS
+     # WRITTEN (2026-09-23). Every one of these renders the LTX 2.5
+     # picture graph; they differ only in which weights they load and
+     # what becomes of the audio latent. Left out, they did not merely
+     # go unchecked -- they took the `not_requested` branch below, so
+     # BUG-LOCAL-413 never looked at the delivered clip at all and a
+     # radio open that fell to procgen on any of them was reported as
+     # healthy. Found by a Sonnet QA lane reading the diff that shipped
+     # the last four of them.
+     #
+     # THIS LIST IS THE WRONG SHAPE and is the repo's most repeated
+     # defect: a literal id table that a new lane must remember to join.
+     # It has now been missed once per lane family. The durable fix is a
+     # capability declared on the engine and derived here; that is a
+     # registry change and wants its own review, not a quiet edit.
+     "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
+     "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
+     "ltx25_native_foley_blackwell",
+     "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
+     "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb"})
 #: Roles whose beats are the radio-console OPENER -- expected to render on an
 #: LTX engine, not the procgen/still floor (the 6/15 clips=0 soft-open).
 _LTX_OPEN_ROLES = frozenset({"announcer_visual", "music_visual"})
