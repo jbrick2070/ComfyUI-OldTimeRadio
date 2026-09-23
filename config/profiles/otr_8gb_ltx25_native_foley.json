@@ -1,6 +1,6 @@
 {
   "id": "otr_8gb_ltx25_native_foley",
-  "display_name": "8 GB NVIDIA (Ada or newer) -- NATIVE, NO ComfyUI-GGUF anywhere. The 8 GB twin of otr_8gb_ltx25_foley with the two GGUF files swapped for safetensors: lane ltx25_native_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, sd15 stills, Kokoro voices, MusicGen. THE POINT IS THE ABSENCE OF GGUF, not speed: GGUF weights do not auto-download, so a lane that needs them cannot be a one-click install. Every weight here fetches itself. The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. NOT PROVEN ON HARDWARE YET.",
+  "display_name": "8 GB NVIDIA (Ada or newer) -- NATIVE, NO ComfyUI-GGUF anywhere. The 8 GB twin of otr_8gb_ltx25_foley with the two GGUF files swapped for safetensors: lane ltx25_native_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, sd15 stills, Kokoro voices, Stable Audio 3. THE POINT IS THE ABSENCE OF GGUF, not speed: GGUF weights do not auto-download, so a lane that needs them cannot be a one-click install. Every weight here fetches itself. The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. NOT PROVEN ON HARDWARE YET.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -18,7 +18,7 @@
   "slot_overrides": {
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "musicgen",
+    "music_engine": "stable_audio_3",
     "video_render_engine": "ltx25_native_foley_16gb"
   },
   "features": {
@@ -82,7 +82,9 @@
       "gemma4-12b-ltx25-comfy-w4a8.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
       "ltx-2.5-audio-vae-bf16.safetensors",
-      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "stable_audio_3_small_music.safetensors",
+      "t5gemma_b_b_ul2.safetensors"
     ],
     "required_keys": []
   },
