@@ -15871,3 +15871,93 @@ a wrapper that executes ComfyUI node classes outside `PromptExecutor` inherits n
 the executor's ambient state and must supply `torch.inference_mode()` itself; a node
 that is correct in a prompt can raise in that wrapper. Promote at wrap-up with the
 index row.
+
+## PBUG-20260923-01 -- the native lanes are tiered by a name, not by a measurement (lane fix `610b2494`; tiering OPEN)
+
+**Artifact:** two standalone legs on the RunPod RTX PRO 4500 (32,623 MiB),
+`/workspace/probe_native.log` and `/workspace/probe_24gb.log`, each rendering one
+97-frame clip through the engine's own `_build_graph` and
+`wrapper_bridge.run_graph`.
+
+**Both native lanes render.** `ltx25_native_foley_blackwell` (nvfp4, 12.5 GB DiT):
+GRAPH OK in 253.6 s, 97 frames, 1664x960 h264, peak RSS 17.6 GB.
+`ltx25_native_foley_24gb` (mix4x8, 15.84 GB DiT): GRAPH OK in 269.4 s, 97 frames,
+peak RSS 20.5 GB, **peak VRAM 24.1 GB**.
+
+**THE ENCODER AND THE DiT DO NOT COEXIST, which a single peak number cannot show
+and which a previous commit message got wrong.** VRAM sampled every four seconds
+through the 24 GB leg:
+
+     76 s   6.1 GB          the Gemma-4 encoder loading
+    100 s  10.6 GB          encoder fully resident -- exactly its file size
+    112 s   5.0 GB          ENCODER FREED
+    124 s   8.0 GB          the DiT begins loading
+    184 s  16.3 GB          DiT resident
+    196 s  19.3 GB  util 100%   sampling starts
+    220 s  24.1 GB  util 100%   peak
+
+`free_after_use` drops the encoder before the DiT is loaded, so the budget is
+DiT + activations (~8 GB here), never DiT + encoder + activations. Commit
+`610b2494` reasoned from the wrong premise -- it said this tier "runs its encoder
+on the accelerator, so the honest budget is DiT + ~5 GB", which is a non sequitur
+carrying a number that was also low. The conclusion it drew (prefer mix4x8 over
+int8 for this tier) survives the correction; the arithmetic behind it does not.
+
+**THE OPEN DEFECT: a lane named `24gb` peaked at 24.1 GB.** A 24 GB card has
+roughly 23.5 GB usable after driver overhead, so on its own name this lane does
+not fit. **That is NOT a proven failure and must not be written up as one:**
+ComfyUI sizes residency against the VRAM it finds, so a 32 GB card's peak is an
+UPPER BOUND on a 24 GB card's requirement, not a prediction of it. The honest
+status is that the tier boundary is unmeasured on the hardware it names -- for
+this lane, and for `ltx25_native_foley_16gb` (w4a8, 12.5 GB), which has never been
+run at all. Settling it needs a leg on a real 24 GB card, or a deliberate decision
+to retier by the numbers already in hand.
+
+**Verify:** the probe writes the timeline itself; re-run it on an interpreter
+`scripts/otr_venv_audit.py` reports clean, with `--engine <lane>`, and read the
+`[ram]` lines rather than the summary peak.
+
+## PBUG-20260923-02 -- an evening of missing dependencies, caused by booting the wrong interpreter
+
+**Artifact:** `/workspace/full_leg.log` and four successive failed starts on the
+migrated pod -- `comfy_kitchen` 0.2.10 too old, then `accelerate` missing, then
+`kokoro` missing, each discovered only when the pipeline reached that stage.
+
+**Cause, and it was never the environment.** The pod's `.venv-py313` is a dangling
+symlink after the host migration (built against python3.13; the new image ships
+3.12). Seeing that, this window moved to `/usr/bin/python3` and hand-installed
+packages into it for hours. **`.venv-cu128` was alive the whole time** -- created
+2026-09-20, already carrying `accelerate`, `kokoro`, `feedparser`, `pyloudnorm`
+and `gguf`. One dead venv was taken as proof that there was no venv.
+
+**The repo had already solved this, twice, and neither tool was used.**
+`scripts/otr_venv_audit.py` answers "does the interpreter that runs ComfyUI
+actually have it" in ten seconds with no GPU, and its own docstring names
+`accelerate`, `feedparser` and this exact root cause.
+`scripts/otr_pod_provision.sh` installs everything up front;
+`scripts/otr_provision.py`'s docstring is this bug verbatim, three weeks early:
+*"Sixteen legs died that way in one session. The answer is not detecting the gap
+sooner ... The answer is installing everything up front so there is nothing left
+to discover."* Running the provisioner took nine minutes and ended
+`=== provision complete ===` with
+`final torch verified: 2.10.0+cu130 | CUDA 13.0 | RTX PRO 4500 Blackwell`.
+
+**A near-miss worth recording.** `stable_audio_tools` appears in the audit's
+NOT IMPORTABLE list and was nearly declared in `requirements.txt` as the fix. It
+is imported by `eng_stable_audio.py`, engine `stable_audio_music` -- which is NOT
+the shipped music engine. `sa3` is `eng_stable_audio_3.py`, a ComfyUI-native
+loader that needs no such package, and the 5080 has never had
+`stable_audio_tools` while publishing `sa3` episodes daily. Declaring it would
+have added a package that FAILS TO BUILD (`Failed to build 'pandas'`, measured on
+the pod) to the file `node-pack-extract` runs under `set -e` -- the exact
+mechanism the `pycairo` comment in that file records zeroing the registry node
+count.
+
+**Fix:** `/workspace/boot_venv.sh` resolves the venv before falling back to the
+system python and prints which it chose. The durable fix is to run the
+provisioner on a migrated pod before anything else.
+
+**Bible:** portable, two rules. A dead virtualenv is not evidence that there is
+no virtualenv -- enumerate interpreters before concluding one. And a missing
+module in a dependency audit is a QUESTION, not a defect, until you check whether
+a shipped engine actually needs it.
