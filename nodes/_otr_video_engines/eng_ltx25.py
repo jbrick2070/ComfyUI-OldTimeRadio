@@ -3091,7 +3091,21 @@ class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
 #: They are quantisations of the Lightricks bf16 originals, served ungated
 #: (verified HTTP 206 anonymously) -- the official repo is gated and needs a
 #: token, which is why the mirror is named here.
-LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-w4a8.safetensors"
+#: THE 16 GB WEIGHT WAS CHOSEN BY A FOUR-WAY BAKE-OFF, not by file size.
+#: One RTX 5080 Laptop, one still, one seed, the full two-stage lane with the
+#: decode eviction in place -- the only variable being the DiT:
+#:
+#:   mix4x8-13.8GB   205.3 s   12.86 GB   quant_format "mixed:w4a8+int8"
+#:   w4a8            210.3 s   11.66 GB   quant_format "asym_w4a8_int8"
+#:   nvfp4           250.8 s   12.64 GB   BLACKWELL ONLY -- and the slowest
+#:
+#: mix4x8 IS w4a8 with 386 layers promoted to int8 -- read off the headers,
+#: which carry `quant_mixed_hi_layers: 386` on the one and nothing on the
+#: other. So it is not a speed-versus-precision trade: the same format family,
+#: strictly more precision, and it happened to be fastest too. The 1.2 GB it
+#: costs over w4a8 used to matter because the DiT had to share the card with
+#: the decode; it does not now that `_make_room_for_decode` evicts first.
+LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"
 LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
 #: 24 GB, ANY modern NVIDIA. NOT fp8_e4m3fn, which this lane shipped pointing
 #: at and which DOES NOT EXIST.
@@ -3299,7 +3313,26 @@ class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
     "Blackwell only" is the publisher's own wording. On anything older this
     lane is expected to refuse or fall back badly, which is why the wide lane
     above stays the default.
-    """
+
+    PARKED 2026-09-23 (operator): *"park blackwell, we don't need it, we have
+    int8 and mix4x8-13.8GB."* It stays REGISTERED because it is proven and
+    therefore an honest dropdown choice -- 237.8 s on an RTX PRO 4500, 250.8 s
+    on a 5080, both with foley. It simply has no profile and no further work
+    planned, and that is a decision rather than an oversight.
+
+    WHY IT LOST, measured the same night on one 16 GB Blackwell card, same
+    still, same seed, same recipe:
+
+        mix4x8-13.8GB   205.3 s      portable (Ampere+)
+        w4a8            210.3 s      portable (Ampere+)
+        nvfp4           250.8 s      BLACKWELL ONLY
+
+    The Blackwell-native format was the slowest of the three ON BLACKWELL, so
+    an architecture lock bought nothing. The attention angle closed too: LTX's
+    DiT goes through ``optimized_attention`` (SDPA), comfy-kitchen's
+    ``sol_attn`` is unreachable from that path, SageAttention process-aborts
+    LTX-Video (BUG-070), and the VAE decoder already calls
+    ``comfy_kitchen.na3d``. There was no Blackwell speedup left to claim."""
 
     name = "ltx25_native_foley_blackwell"
     engine_version = "1"

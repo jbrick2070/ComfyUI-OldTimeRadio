@@ -16069,3 +16069,71 @@ install weight, not a code fact.
 above. Re-check before trusting: repo gating is a publisher setting and can
 change under a stable filename, which is exactly how the fp8 lane in
 PBUG-20260923-01 came to point at a file that no longer existed.
+
+## PBUG-20260923-04 -- the terminal decode was streaming, because the DiT never left the card
+
+**Artifact:** three killed 16 GB legs plus an isolated reproduction and a fix leg,
+all on the RTX 5080 Laptop (15.92 GiB, Blackwell sm_120), all through the
+engine's own `_build_graph` and `wrapper_bridge.run_graph`.
+
+**The symptom, and why it was misread for a week.** The native LTX 2.5 stage-2
+`VAEDecodeTiled` at 1664x960x97 ran past 400 s and was killed three times. While
+it ran the card read ~62 W, GPU "utilization" 100%, MEMORY-controller
+utilization 2%, VRAM flat at 15.2-15.8 GB, 60 C. That shape reads like
+thrashing and is not: a card swapping shows a busy memory controller, and this
+one is nearly idle. `utilization.gpu` only means a kernel was resident, so 100%
+at 62 W with no memory traffic is many small serialized kernels that never fill
+the GPU -- a card waiting on PCIe transfers.
+
+**ISOLATED, WITH ONE VARIABLE.** A probe holding only the video VAE, a synthetic
+stage-2 latent of the real shape (1,128,13,30,52), the shipped 512/64/64/16
+tiling, and an inert `torch.empty` ballast tensor that does no work:
+
+    empty card          DECODE OK in  30.0 s     peak 8,080 MB
+    11 GB of ballast    killed at    412 s       never finished
+
+**The decode needs 8.1 GB. The DiT is 12.86 GB. The card is 15.92 GiB.** Below
+that line ComfyUI streams, and the same work takes at least twelve times longer.
+
+**THE FIRST FIX FAILED, AND THAT IS THE USEFUL HALF.** `run_graph`'s `keep` set
+was changed to drop `unet`, so `free_after_use` would release the DiT after its
+last consumer. An instrumented run showed **9.61 GB still allocated** after
+`refine_separate` and the decode still did not finish. A Python reference is not
+what pins weights to a device; ComfyUI's model manager is. Anything reasoning
+about residency from `keep` is reasoning about the wrong thing.
+
+**THE FIX, and what it measured.** `Ltx25VideoEngine._make_room_for_decode`
+fires from `on_result` for whichever node feeds the decode (read off the graph,
+not named), and calls `unload_all_models()` + `soft_empty_cache()` **only when
+free VRAM is below `R.LTX25_STAGE2_DECODE_NEEDS_MB`**:
+
+    EVICTED before decode: 11,595 MB -> 806 MB
+    decode                 34.7 s   (was 400+ s, never finished)
+    whole two-stage render 196.3 s  97 frames, 1664x960, foley decoded and muxed
+
+For scale, the lab's GGUF two-stage at the same geometry on the same card is
+255.4 s. With this seam the NATIVE lane is faster than the GGUF one on 16 GB.
+
+**THE SAME MECHANISM, NAMED BY COMFYUI, ON A 24 GB POD.** `server_4090.log`
+mid-episode: `Model LTXAV prepared for dynamic VRAM loading. 20484MB Staged.`
+then `12%|1/8 [01:03<07:26, 63.80s/it]` at 23,108 MiB / 72 W / **0% util**. The
+same int8 weight rendered a whole 97-frame clip in 101.3 s when it was the only
+thing on that card. The penalty appears exactly where demand exceeds the card
+and nowhere else -- the 4500 (31.9 GiB) reached `VAEDecodeTiled` in the same
+episode with no trouble.
+
+**WHAT THIS RULED OUT, each measured rather than argued:** the latent upscale
+(1.9 s), the refine pass (61.2 s for 3 steps at four times the pixels --
+proportional to 38.6 s for 8 steps), the tile geometry (already Lightricks'
+own, and the lab measured tile changes as noise in BOTH directions), the loaders
+(1.6-2.0 s), and the weight (mix4x8 / w4a8 / nvfp4 sit inside each other's
+run-to-run noise on a single-stage graph).
+
+**Verify:** run any 16 GB two-stage native leg and read the decode's per-node
+time. Above ~60 s with the card at low wattage and an idle memory controller,
+the eviction did not fire or did not free enough; the log line names both the
+free figure and the need.
+
+**STILL OPEN:** the condition can also fire on 24/32 GB hardware, where it has
+not been measured. The 4090's int8 leg ran 101.3 s without this seam; the same
+leg with it has not been run.
