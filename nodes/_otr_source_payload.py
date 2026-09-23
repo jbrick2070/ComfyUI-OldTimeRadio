@@ -449,6 +449,16 @@ class SourceInterpreterFallback:
         }
 
 
+#: NO CONTENT CLAUSE IN THE PER-BANK SCRIPT INSTRUCTIONS (operator directive
+#: 2026-08-03/08-05, finished 2026-09-23). Five of the ``script`` strings below
+#: used to read "a compact SFW ..." or "a compact, faithful, SFW radio
+#: adaptation ...". The 2026-08-05 rip removed the equivalent clause from the
+#: source lanes -- `_otr_public_domain_sources.py` and
+#: `_otr_shakespeare_sources.py` each carry a comment saying so -- and missed
+#: these, so the FIDELITY lanes went on asking for an adaptation of a
+#: Shakespeare scene that was both "faithful" and "SFW". The author's own
+#: language is carried as written; that is what faithful means.
+
 def build_source_interpreter_fallback(
     *, bank, payload: dict, source_meta: dict | None,
     attempts: int, failure_reason: str,
@@ -507,7 +517,7 @@ def build_source_interpreter_fallback(
             "research partner with distinct, natural radio voices."
         )
         script = (
-            "Create a compact SFW fictional archive drama grounded in the "
+            "Create a compact fictional archive drama grounded in the "
             "selected media-history item. Make the conflict about identifying, "
             "restoring, researching, or preserving that item, and resolve with "
             f"credible preservation progress. {source_context} "
@@ -525,7 +535,7 @@ def build_source_interpreter_fallback(
             + names_clause
         )
         script = (
-            "Create a compact, faithful, SFW radio adaptation of the configured "
+            "Create a compact, faithful radio adaptation of the configured "
             "public-domain unit. Preserve its central dramatic turn and ending; "
             "do not add an unrelated framing story or change the resolution. "
             f"{source_context}"
@@ -541,7 +551,7 @@ def build_source_interpreter_fallback(
             + names_clause
         )
         script = (
-            "Create a compact, faithful, SFW radio adaptation of the selected "
+            "Create a compact, faithful radio adaptation of the selected "
             "Shakespeare scene. Preserve its characters, dramatic turn, "
             "play-world stakes, and ending without an unrelated modern frame. "
             f"{source_context}"
@@ -556,7 +566,7 @@ def build_source_interpreter_fallback(
             "article, with distinct and natural radio voices."
         )
         script = (
-            "Create a compact SFW dramatization grounded only in the supplied "
+            "Create a compact dramatization grounded only in the supplied "
             f"article. {source_context} "
             "Clearly separate fictional dramatic events from reported facts."
         )
@@ -584,7 +594,7 @@ def build_source_interpreter_fallback(
             "material, with distinct, natural radio voices." + names_clause
         )
         script = (
-            "Create a compact SFW radio drama grounded only in the supplied "
+            "Create a compact radio drama grounded only in the supplied "
             f"source material from {bank_label}. Treat that source as the "
             "only authority for factual claims, keep the dramatic turn it "
             f"supports, and resolve it there. {source_context}"
