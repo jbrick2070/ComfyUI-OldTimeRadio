@@ -3367,19 +3367,44 @@ class Ltx25NativeAudioInMixin:
     THE SAME GRAPH AS THE FOLEY LANE IT IS MIXED INTO, with two changes, and
     both of them are forced by how the model works rather than chosen:
 
-    1. ``emptyaudio`` resolves to ``LTXVAudioVAEEncode`` instead of
-       ``LTXVEmptyLatentAudio``. The graph KEY is unchanged, so ``concat`` --
-       and everything downstream of it -- keeps its wiring untouched; only the
-       class behind the key and its inputs differ. Foley asks the model to
-       invent a bed; this hands it the beat's own audio and asks it to move the
-       picture to match.
+    1. THE ENCODED WAVEFORM IS FITTED TO THE PICTURE BEFORE IT IS SAMPLED.
+       ``emptyaudio`` STAYS ``LTXVEmptyLatentAudio``, because it is the only
+       node that computes the audio latent length the picture actually needs
+       (``num_of_latents_from_frames(frames, fps)``). The beat's own waveform
+       is encoded beside it by ``refencode`` and joined by ``refconcat``,
+       whose ``fit_audio`` trims or zero-pads the encoded stream to exactly
+       that length. Foley asks the model to invent a bed; this hands it the
+       beat's own audio and asks it to move the picture to match.
 
-    2. ``modality_scale`` leaves 1.0. That number is a documented NO-OP
-       (``LTXVModalityGuidance``: "Set to 1.0 to disable (no extra pass)") and
-       it is the right value for foley, where there is nothing to sync TO. It
-       is exactly the wrong value here: modality guidance IS the cross-modal
+    2. ``modality_scale`` RISES from 1.0 to 3.0. At 1.0 the guider is a
+       documented NO-OP (``LTXVModalityGuidance``: "Set to 1.0 to disable (no
+       extra pass)") and that is the right value for foley, where there is
+       nothing to sync TO. It is exactly the wrong value here: modality guidance IS the cross-modal
        coupling, and at 1.0 an audio-in lane would carry a reference waveform
        the sampler never leans on.
+
+    THE FIRST DESIGN SWAPPED THE CLASS BEHIND THE ``emptyaudio`` KEY and let
+    ``concat`` read the encoder directly. That is what a reader expects to
+    work, and it does not. ``LTXVEmptyLatentAudio`` is TOLD the frame count
+    and returns exactly ``round(frames / fps * latents_per_second)`` latents;
+    ``LTXVAudioVAEEncode`` returns whatever its own mel and downsample
+    rounding produce for the waveform it was handed. MEASURED on a live pod
+    leg (2026-09-23): a 97-frame beat whose reference WAV was ALREADY exactly
+    3.88 s -- 171,108 samples at 44.1 kHz, which resamples to exactly the
+    186,240 the clip needs at 48 kHz -- encoded to ONE latent fewer than the
+    picture, decoded 3,360 samples short, and was refused by
+    ``_write_foley_stem``. THE INPUT WAS NEVER WRONG; the round trip is lossy
+    and only the empty-latent node knows the target. A waveform-level
+    reconciliation was tried first and could not fire at all, because the
+    waveform already had the exact duration asked of it.
+
+    ``fit_audio`` LEAVES THE PADDED TAIL UNMASKED so the model generates it --
+    its own documented behaviour for a clip shorter than the video, and
+    better than handing the encoder silence to condition on.
+
+    STAGE TWO NEEDS NO EQUIVALENT: ``refine_concat`` takes its audio from
+    ``W("separate", 1)``, the stream stage one already sampled, so fixing the
+    length here fixes it everywhere.
 
     THE MODEL REALLY DOES CONDITION ON AUDIO -- this is not an assumption.
     ``LTXVModalityGuidance`` works by running one extra pass with
@@ -3432,91 +3457,28 @@ class Ltx25NativeAudioInMixin:
     #: which these lanes now join -- see that list.
     roles = ("announcer_visual", "music_visual", "character_video")
 
-    #: Lightricks' own reference default. NOT measured on this lane yet -- the
-    #: first leg that runs it should report whether 3.0 over- or under-couples,
-    #: and this constant is where that answer lands.
+    #: Lightricks' own reference default, and it DELIBERATELY DEPARTS from
+    #: `ltx25_recipe.LTX25_CFG_MODALITY = 1.0`. That recipe note calls the
+    #: three CFGs a VRAM contract and it is right about the two it was
+    #: measured on -- but this knob differs in KIND, not degree: raising the
+    #: video/audio CFG changes what the sampler batches, while raising this
+    #: one adds an entire extra forward pass per step
+    #: (`comfy_extras/nodes_lt.py` -- `LTXVModalityGuidance` calls
+    #: `calc_cond_batch` inside its post-CFG hook). The foley lanes keep 1.0
+    #: and are untouched; only audio-in reads this.
+    #:
+    #: NOT MEASURED ON 16 GB YET, and the 16 GB tier is the one clamped at
+    #: 14.5 GiB. The first 16 GB leg reports peak VRAM. If it tips, the answer
+    #: is a narrowed start/end_percent window -- NOT a silent drop back to
+    #: 1.0, because at 1.0 the lane stops being an audio-in lane at all.
     _modality_scale = 3.0
 
     def _node_candidates(self):
         cand = dict(super()._node_candidates())
-        cand["emptyaudio"] = ("LTXVAudioVAEEncode",)
         cand["loadaudio"] = ("LoadAudio",)
+        cand["refencode"] = ("LTXVAudioVAEEncode",)
+        cand["refconcat"] = ("LTXVConcatAVLatent",)
         return cand
-
-    def _conform_audio_to_clip(self, audio_path, length):
-        """Pad or trim the reference WAV to EXACTLY the clip's own duration.
-
-        MEASURED FAILURE THIS EXISTS FOR (live pod leg, 2026-09-23):
-
-            ltx25_native_audio_in_24gb decoded 182880 audio sample(s) for a
-            97-frame clip that needs 186240 (3360 short)  -- INVALID_DAG
-
-        3,360 samples at 48 kHz is 0.07 s. The two nodes size their latent
-        differently and that is the whole bug: ``LTXVEmptyLatentAudio`` is TOLD
-        ``frames_number`` and ``frame_rate`` and produces exactly the right
-        length, while ``LTXVAudioVAEEncode`` produces a latent sized to
-        whatever waveform it is handed. A master slice that is a few
-        hundredths short therefore reaches the decode a few thousand samples
-        short, and the clip is refused.
-
-        ``LTXVConcatAVLatent.fit_audio`` cannot save it: that trims or pads
-        against a REFERENCE stream, and in stage one the encoded latent arrives
-        with nothing to be fitted to.
-
-        So the reconciliation happens on the WAVEFORM, before the encoder ever
-        sees it, where the arithmetic is exact and checkable: 97 frames at 25
-        fps is 3.88 s is 186,240 samples at 48 kHz. Padding is silence at the
-        tail, which is the honest thing for audio that ran short -- the model
-        generates into it, exactly as ``fit_audio``'s own docstring describes
-        for the same situation.
-
-        Returns the path to use. Best-effort: if the file cannot be read the
-        original path is returned unchanged and the graph fails downstream with
-        its own named error rather than here with a confusing one.
-        """
-        import os
-        try:
-            from . import foley_stems as _fs
-        except ImportError:                  # pragma: no cover -- flat imports
-            return audio_path
-        fps = int(self.target_fps) or 25
-        try:
-            samples, rate = _fs.read_pcm16_wav(audio_path)
-        except Exception as exc:             # noqa: BLE001 -- never fatal here
-            _LOG.warning(
-                "[OTR video] %s could not read its audio_ref %r (%r); handing "
-                "it to the encoder unchanged", self.name, audio_path, exc)
-            return audio_path
-        import numpy as np
-        want = int(round(int(length) / float(fps) * int(rate)))
-        have = int(samples.shape[-1])
-        if have == want:
-            return audio_path
-        if have > want:
-            samples = samples[..., :want]
-        else:
-            pad = np.zeros((samples.shape[0], want - have), dtype=samples.dtype)
-            samples = np.concatenate([samples, pad], axis=-1)
-        # THE NAME MUST BE UNIQUE PER BEAT, NOT PER ENGINE. An earlier version
-        # keyed only on engine id and sample count, so every 97-frame beat of
-        # one lane wrote the same sibling file -- and `stage_into_comfy_input`
-        # copies BY BASENAME into ComfyUI's input dir, so two beats of equal
-        # length shared one staged waveform. Sequential rendering hides it; the
-        # identity is still wrong. Keyed on the SOURCE path's own digest, which
-        # the driver already makes unique per beat (`slice_<key>.wav`).
-        import hashlib
-        _key = hashlib.sha256(
-            os.path.abspath(str(audio_path)).encode("utf-8", "replace")
-        ).hexdigest()[:12]
-        out = os.path.join(
-            os.path.dirname(str(audio_path)) or ".",
-            "otr_%s_conformed_%s_%d.wav" % (self.name, _key, want))
-        _fs.write_pcm16_wav(out, samples, rate)
-        _LOG.info(
-            "[OTR video] %s conformed its audio_ref %d -> %d sample(s) at %d Hz "
-            "(%d frame(s) at %d fps); %s", self.name, have, want, rate,
-            int(length), fps, "trimmed" if have > want else "zero-padded")
-        return out
 
     def _build_render_request(self, request):
         plan = super()._build_render_request(request)
@@ -3557,16 +3519,24 @@ class Ltx25NativeAudioInMixin:
                 "FALLBACK -- this lane exists to follow a supplied waveform, "
                 "and quietly generating one instead would ship a foley clip "
                 "under an audio-in name" % (self.name,))
-        audio_path = self._conform_audio_to_clip(audio_path, length)
         audio_name = _wb.stage_into_comfy_input(audio_path)
         W = _wb.Wire
         g["loadaudio"] = {"class": "loadaudio",
                           "inputs": {"audio": audio_name}}
-        # SAME KEY, different class: `concat` still reads W("emptyaudio", 0)
-        # and needs no edit. See the class docstring.
-        g["emptyaudio"] = {"class": "emptyaudio", "inputs": {
+        # `emptyaudio` IS LEFT ALONE, and that is the fix -- it is the only
+        # node that knows the audio latent length the picture needs. See the
+        # class docstring for the leg that proved swapping it does not work.
+        g["refencode"] = {"class": "refencode", "inputs": {
             "audio": W("loadaudio", 0),
             "audio_vae": W("audiovae", 0)}}
+        # `concat` already emits an AV latent, which is exactly the branch
+        # where LTXVConcatAVLatent swaps the audio stream and runs
+        # `fit_audio` on it -- trimming or zero-padding the encoded waveform
+        # to the empty latent length, padded tail left unmasked.
+        g["refconcat"] = {"class": "refconcat", "inputs": {
+            "video_latent": W("concat", 0),
+            "audio_latent": W("refencode", 0)}}
+        g["sampler"]["inputs"]["latent_image"] = W("refconcat", 0)
         g["modality"]["inputs"]["modality_scale"] = float(self._modality_scale)
         return g
 
