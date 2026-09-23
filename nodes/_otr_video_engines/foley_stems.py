@@ -139,6 +139,12 @@ FOLEY_LANE_GAINS = {
     "ltx25_native_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_mime": (1.00, 0.00),
+    # The NATIVE mime lanes. Same 1.00/0.00 as ltx25_mime and the same reason:
+    # mime REPLACES the programme in its own beats rather than bedding under
+    # it. They stay OUT of GLOBAL_MASTER_GAIN_LANES for that reason -- see the
+    # membership test on that set.
+    "ltx25_native_mime_16gb": (1.00, 0.00),
+    "ltx25_native_mime_24gb": (1.00, 0.00),
     # Same 0.50/0.50 bed as local Foley -- harvested from the partner mp4
     # instead of the audio latent, then mixed by this table, not a second mux.
     "cloud_ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),

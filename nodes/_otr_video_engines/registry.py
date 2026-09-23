@@ -642,7 +642,35 @@ CAPABILITIES = {
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-w4a8-native",
+        # mix4x8, not w4a8: this row lagged the constant when the bake-off
+        # moved the weight (2026-09-23). Same format family -- mix4x8 IS w4a8
+        # with 386 layers at int8 -- which is exactly why the stale token read
+        # plausibly instead of wrongly.
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # The NATIVE MIME lanes. Identical requirements to their foley parents --
+    # same weights, same recipe, same graph. Mime differs only at the mux, in
+    # foley_stems.FOLEY_LANE_GAINS (1.00 foley / 0.00 master), so a row that
+    # differed here would be describing a difference that does not exist.
+    "ltx25_native_mime_16gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    "ltx25_native_mime_24gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-int8-native",
                                "gemma4-12b-ltx-2.5-w4a8-native",
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",

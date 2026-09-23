@@ -36,6 +36,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx25_native_foley_16gb` | ComfyUI-GGUF |
 | `ltx25_native_foley_24gb` | ComfyUI-GGUF |
 | `ltx25_native_foley_blackwell` | ComfyUI-GGUF |
+| `ltx25_native_mime_16gb` | ComfyUI-GGUF |
+| `ltx25_native_mime_24gb` | ComfyUI-GGUF |
 | `wan22_high_fast` | ComfyUI-GGUF |
 | `wan22_high_video` | ComfyUI-GGUF |
 
@@ -77,6 +79,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
 | `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |

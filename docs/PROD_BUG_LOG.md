@@ -16137,3 +16137,68 @@ free figure and the need.
 **STILL OPEN:** the condition can also fire on 24/32 GB hardware, where it has
 not been measured. The 4090's int8 leg ran 101.3 s without this seam; the same
 leg with it has not been run.
+
+## PBUG-20260923-05 -- five foley lanes delivered episodes with no foley in them, and nothing failed
+
+**Artifact:** a PUBLISHED episode, not a probe.
+`solitude_price_20260923_054059__rfrc__n24f__zimg__koko__pubd__g412__sa3_final.mp4`
+-- 83.7 MB, 1920x1080 h264, AAC 48 kHz stereo, 96.04 s, mean -16.7 dB / max
+-0.9 dB -- rendered on the 4090 pod through `ltx25_native_foley_24gb` (the
+`n24f` shortcode in its own filename) and `obs_publish OK`.
+
+**Membership of `FOLEY_LANE_GAINS` is not a mixing preference.** It is how
+`is_foley_route` decides an episode is a foley episode at all, and five
+shipping foley engines were absent from it: `ltx25_foley_plus_24gb` and
+`_32gb` (GGUF, shipping for weeks) and the three `ltx25_native_foley_*` lanes.
+
+**The chain, and every link is silent:**
+
+    scene_sequencer:1792   is_foley_route -> False
+    scene_sequencer:1960   so no MASTER_WAV_PRE_LOUDNESS stamp is written
+    master_audio_mux:1879  `_foley_route(...) or _master_wav_owes_a_delivery_gain(...)`
+                           -- both False, so _compile_foley_master never runs
+
+`_compile_foley_master` is the ONLY thing that mixes the bed under the master.
+The second gate cannot rescue the first, because the stamp it looks for is
+written by the first.
+
+**MEASURED ON THAT EPISODE'S OWN SERVER LOG:**
+
+    "FOLEY ROUTE"        occurrences: 0
+    foley bed mixed      occurrences: 0
+    obs_publish OK       yes
+
+while the same log carries, per beat:
+
+    [OTR video] ltx25_native_foley_24gb FOLEY decode: 186240 sample(s) x2ch
+        @48000 Hz (3.880 s over 97 frame(s)) -> ..._foley.wav
+    [OTR foley] native audio muxed into beat clip: 8.000 s AAC under 8.000 s video
+
+So the sound was generated, muxed into every beat clip, and written to a
+durable stem -- and then `canonicalize_video` stripped the beat audio (V-1:
+only `OTR_MasterAudioMux` ever adds audio) and the master was compiled without
+the bed. **The delivered episode has TTS and music and none of the model's own
+sound, on a lane whose entire reason to exist is that the model makes its own
+sound.**
+
+**WHY IT SURVIVED REVIEW.** Nothing fails. The beat mp4 genuinely has audio in
+it, the stem is genuinely on disk, the render reports success, the receipt is
+clean, and the published file has healthy audio levels because the programme
+audio is all there. Every check that exists passes. The only way to see it is
+to ask whether the bed reached the master, and no check asked.
+
+**Fix (`a8e68caa`):** all five join `FOLEY_LANE_GAINS`, and also
+`GLOBAL_MASTER_GAIN_LANES`, because they subclass `Ltx25FoleyPlusEngine` and
+bed under the dialogue exactly as it does -- omitting them there would have
+produced a different mix from the lane they inherit, by omission rather than
+by choosing it. Mime stays per-window: it REPLACES the programme in its beats,
+and a global zero would silence the episode.
+
+**Verify:** grep a foley episode's server log for `FOLEY ROUTE`. Zero
+occurrences on a lane that decoded foley means the bed did not reach the
+master. A test that asserts every engine harvesting a foley stem has a
+`FOLEY_LANE_GAINS` row would have caught this at import; there is none.
+
+**STILL OPEN:** the pods run the registry-installed pack, so the fix does not
+reach them until a version ships. Episodes rendered there before then are
+foley-less and should not be judged for sound.

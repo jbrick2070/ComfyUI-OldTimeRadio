@@ -3361,6 +3361,55 @@ class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
     #: it. _encoder_cache_expects_cpu stays True with it.
 
 
+@register
+class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
+    """The 16 GB NATIVE lane as a SILENT PERFORMANCE carrying its own score.
+
+    ``ltx25_native_foley_16gb`` is to this class what ``ltx25_foley_plus`` is
+    to ``ltx25_mime``, and for the same reason the older pair's body is almost
+    empty: the picture, the harvest of the audio latent, the second-pass
+    decode, the durable stem and the cut in the coverage assembler are all
+    inherited unchanged. What differs is entirely at the mux, in a table --
+    1.00 foley / 0.00 master instead of 0.50 / 0.50 -- and that row lives in
+    ``foley_stems.FOLEY_LANE_GAINS``, not here.
+
+    THE TTS AND MUSIC ARE STILL GENERATED AND THEN MIXED TO ZERO, exactly as
+    on ``ltx25_mime``. That waste is the operator's own ruling (2026-08-26) and
+    it is what lets this class be four lines instead of a new owner node and an
+    execution-order inversion.
+
+    THE ATTENUATION IS PER-WINDOW, which is why this lane is deliberately NOT
+    in ``GLOBAL_MASTER_GAIN_LANES`` while its foley parent is. Engines are
+    ROLE-WIDE: this id on ``character_video_model`` silences every character
+    beat while the announcer and music roles still speak out of the SAME master
+    WAV, so a global zero would silence the episode.
+    """
+
+    name = "ltx25_native_mime_16gb"
+    engine_version = "1"
+
+    #: SELECTABLE, NEVER A DEFAULT -- and here more emphatically than anywhere
+    #: else in the roster, as on ``ltx25_mime``. Inheriting it would mute every
+    #: beat of a role nobody chose to mute.
+    default_roles = ()
+
+
+@register
+class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
+    """The 24 GB AND UP NATIVE lane as a silent performance. int8.
+
+    Same relationship to ``ltx25_native_foley_24gb`` that
+    ``ltx25_native_mime_16gb`` has to the 16 GB lane, and the same one-row
+    difference at the mux. Everything about the weight, the encoder placement
+    and the recipe is inherited; see the sibling above for why the body is
+    empty and why this id is per-window rather than global.
+    """
+
+    name = "ltx25_native_mime_24gb"
+    engine_version = "1"
+    default_roles = ()
+
+
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
