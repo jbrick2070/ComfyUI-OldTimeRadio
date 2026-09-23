@@ -48,6 +48,24 @@ def _foley_parent():
     return Ltx25FoleyPlusEngine
 
 
+def _is_audio_in(engine):
+    """An audio-IN lane, which is EXCLUDED from the generate-audio contract.
+
+    `finish_joint_av_positive` states the split in its own docstring: the lanes
+    it finishes "GENERATE audio but are not audio-IN lanes: nothing spoken may
+    reach them, and the clause forbids voices outright". So an audio-in lane
+    must NOT bind the foley formatter and must NOT be in `_JOINT_AV_ENGINES` --
+    `ltx_audio_in` has declined both since 2026-08-27 on purpose, to keep the
+    driver's proven talking register.
+
+    An earlier version of the two guards below walked every foley subclass and
+    so DEMANDED the wrong thing of these lanes: a test that pins a defect is
+    worse than no test, because it makes the correct fix look like a
+    regression.
+    """
+    return str(getattr(engine, "family", "") or "") == "audio_conditioned_video"
+
+
 def _gains():
     from nodes._otr_video_engines.foley_stems import (
         FOLEY_LANE_GAINS, GLOBAL_MASTER_GAIN_LANES)
@@ -121,6 +139,8 @@ def test_every_ltx25_lane_binds_its_own_prompt_formatter():
         klass = eng if isinstance(eng, type) else type(eng)
         if not (isinstance(klass, type) and issubclass(klass, parent)):
             continue
+        if _is_audio_in(eng):
+            continue            # audio-IN keeps the driver's talking register
         if "compose_prompt" not in klass.__dict__:
             missing.append(engine_id)
     assert not missing, (
@@ -144,6 +164,7 @@ def test_every_prompt_binding_lane_is_in_the_joint_av_set():
     parent = _foley_parent()
     missing = [eid for eid, eng in sorted(engines.items())
                if issubclass(eng if isinstance(eng, type) else type(eng), parent)
+               and not _is_audio_in(eng)
                and eid not in _JOINT_AV_ENGINES]
     assert not missing, (
         "these lanes compose a joint-AV prompt but are absent from "

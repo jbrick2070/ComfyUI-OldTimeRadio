@@ -3497,9 +3497,20 @@ class Ltx25NativeAudioInMixin:
         else:
             pad = np.zeros((samples.shape[0], want - have), dtype=samples.dtype)
             samples = np.concatenate([samples, pad], axis=-1)
+        # THE NAME MUST BE UNIQUE PER BEAT, NOT PER ENGINE. An earlier version
+        # keyed only on engine id and sample count, so every 97-frame beat of
+        # one lane wrote the same sibling file -- and `stage_into_comfy_input`
+        # copies BY BASENAME into ComfyUI's input dir, so two beats of equal
+        # length shared one staged waveform. Sequential rendering hides it; the
+        # identity is still wrong. Keyed on the SOURCE path's own digest, which
+        # the driver already makes unique per beat (`slice_<key>.wav`).
+        import hashlib
+        _key = hashlib.sha256(
+            os.path.abspath(str(audio_path)).encode("utf-8", "replace")
+        ).hexdigest()[:12]
         out = os.path.join(
             os.path.dirname(str(audio_path)) or ".",
-            "otr_%s_conformed_%d.wav" % (self.name, want))
+            "otr_%s_conformed_%s_%d.wav" % (self.name, _key, want))
         _fs.write_pcm16_wav(out, samples, rate)
         _LOG.info(
             "[OTR video] %s conformed its audio_ref %d -> %d sample(s) at %d Hz "
@@ -3655,13 +3666,26 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 #
 # Each tier takes the formatter its PARENT binds, which is the definition of
 # parity: a tier differs by which weight loads, never by how it is prompted.
+# THE AUDIO-IN LANES ARE DELIBERATELY ABSENT FROM BOTH LOOPS, and an earlier
+# version of this block had them in the first one -- which was wrong in the
+# direction that matters. `finish_joint_av_positive` says what this contract is
+# for in its own words: "These lanes GENERATE audio but are not audio-IN lanes:
+# nothing spoken may reach them, and the clause forbids voices outright."
+# Binding the foley formatter to an audio-in lane, and listing it below,
+# appended `No speech, no voices.` to a lane whose entire job is to FOLLOW
+# supplied speech.
+#
+# `ltx_audio_in` made the opposite choice on purpose (eng_ltx_av.py:1693): it
+# binds NO formatter so it keeps the shared driver's P4 talking register, the
+# 240-char budget with the style cue front-loaded, and recipe gating -- three
+# proven, delicate behaviours a fresh formatter "would have to re-implement and
+# initially got wrong". The native audio-in lanes inherit that reasoning whole.
+# Found by a cursor QA pass on the commit that introduced it.
 for _tier_cls in (Ltx25FoleyPlus24gbEngine,
                   Ltx25FoleyPlusFast32gbEngine,
                   Ltx25NativeFoleyWideEngine,
                   Ltx25NativeFoleyBlackwellEngine,
-                  Ltx25NativeFoley16gbEngine,
-                  Ltx25NativeAudioIn16gbEngine,
-                  Ltx25NativeAudioIn24gbEngine):
+                  Ltx25NativeFoley16gbEngine):
     _tier_cls.compose_prompt = compose_ltx25_foley_plus
 for _tier_cls in (Ltx25NativeMime16gbEngine, Ltx25NativeMime24gbEngine):
     _tier_cls.compose_prompt = compose_ltx25_mime
@@ -3671,6 +3695,11 @@ del _tier_cls
 #: was written. A lane absent from here gets its positive back UNFINISHED from
 #: `finish_joint_av_positive` -- no named sounds, no terminator -- which is
 #: silent, because an unfinished prompt still renders a clip.
+#: EVERY lane that GENERATES its audio -- and no audio-IN lane, which is the
+#: distinction `finish_joint_av_positive` draws in its own docstring. The
+#: audio-in ids were briefly listed here and that appended a voice prohibition
+#: to lanes conditioned on speech; `ltx_audio_in` and `cloud_ltx25_audio_in`
+#: are correctly absent and always were.
 _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_foley_plus_24gb",
     "ltx25_foley_plus_32gb",
@@ -3679,8 +3708,6 @@ _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_native_foley_blackwell",
     "ltx25_native_mime_16gb",
     "ltx25_native_mime_24gb",
-    "ltx25_native_audio_in_16gb",
-    "ltx25_native_audio_in_24gb",
 )
 
 
