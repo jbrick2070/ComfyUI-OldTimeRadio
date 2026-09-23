@@ -101,3 +101,51 @@ def test_mime_lanes_are_per_window_not_global():
         "mime lanes must stay OUT of GLOBAL_MASTER_GAIN_LANES -- engines are "
         "ROLE-WIDE, so a global zero silences every role sharing the one "
         "master WAV, not just the mimed beats: %s" % (", ".join(wrong),))
+
+
+def test_every_ltx25_lane_binds_its_own_prompt_formatter():
+    """A lane that only INHERITS compose_prompt is treated as having none.
+
+    `render_driver` dispatches with ``type(engine).__dict__.get`` -- not
+    ``hasattr`` -- so inheritance does not count. Three assignments covered
+    three ids while nine tier lanes silently used the legacy composer: no named
+    sounds, no "No speech, no voices." terminator, on every beat they rendered.
+
+    Same mechanism as PBUG-20260923-05 one level up, and just as invisible:
+    an unfinished prompt still renders a clip.
+    """
+    engines = _engine_classes()
+    parent = _foley_parent()
+    missing = []
+    for engine_id, eng in sorted(engines.items()):
+        klass = eng if isinstance(eng, type) else type(eng)
+        if not (isinstance(klass, type) and issubclass(klass, parent)):
+            continue
+        if "compose_prompt" not in klass.__dict__:
+            missing.append(engine_id)
+    assert not missing, (
+        "these LTX 2.5 lanes inherit compose_prompt but do not BIND it, so "
+        "render_driver's `type(engine).__dict__.get('compose_prompt')` finds "
+        "nothing and they fall through to the legacy composer: %s"
+        % (", ".join(missing),))
+
+
+def test_every_prompt_binding_lane_is_in_the_joint_av_set():
+    """Binding a formatter and being finished are two halves of one contract.
+
+    `finish_joint_av_positive` returns the positive UNCHANGED for any id
+    outside `_JOINT_AV_ENGINES`, so a lane can compose a correct joint-AV
+    prompt and still ship it without its terminator. The driver imports this
+    same tuple rather than keeping a second literal copy -- two copies is how
+    the sets drifted to three-versus-twelve in the first place.
+    """
+    from nodes._otr_video_engines.eng_ltx25 import _JOINT_AV_ENGINES
+    engines = _engine_classes()
+    parent = _foley_parent()
+    missing = [eid for eid, eng in sorted(engines.items())
+               if issubclass(eng if isinstance(eng, type) else type(eng), parent)
+               and eid not in _JOINT_AV_ENGINES]
+    assert not missing, (
+        "these lanes compose a joint-AV prompt but are absent from "
+        "_JOINT_AV_ENGINES, so finish_joint_av_positive leaves their positive "
+        "unfinished -- no named sounds, no terminator: %s" % (", ".join(missing),))

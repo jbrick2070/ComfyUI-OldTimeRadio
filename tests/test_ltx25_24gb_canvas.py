@@ -57,9 +57,22 @@ def test_the_only_difference_from_the_parent_is_the_weights():
     assert child.__bases__ == (parent,), (
         "%s no longer subclasses its parent: %r" % (ENGINE_ID, child.__bases__))
     own = set(vars(child)) - {"__module__", "__qualname__", "__doc__"}
-    assert own <= {"name", "engine_version", "default_roles", "_dit_name"}, (
+    # `compose_prompt` is ALLOWED, and it is not a difference from the parent:
+    # it is the parent's own formatter, re-bound. render_driver dispatches with
+    # `type(engine).__dict__.get("compose_prompt")` rather than `hasattr`, so a
+    # tier that merely INHERITS the formatter is read as having none and falls
+    # to the legacy composer -- no named sounds, no "No speech, no voices."
+    # terminator. Binding it keeps this test's claim true in behaviour, which
+    # is what the claim was ever about; leaving it unbound made the claim true
+    # in the class body and false in the render.
+    assert own <= {"name", "engine_version", "default_roles", "_dit_name",
+                   "compose_prompt"}, (
         "the Q5 sibling overrides more than its identity and its weights: %r"
         % sorted(own))
+    assert child.__dict__.get("compose_prompt") is parent.__dict__.get(
+        "compose_prompt"), (
+        "the tier binds a DIFFERENT formatter than its parent, which is a real "
+        "divergence rather than the dispatch workaround this allowance is for")
     assert child._dit_name(child.__new__(child)) == eng_ltx25.LTX25_DIT_GGUF_24GB
     assert (child._dit_name(child.__new__(child))
             != parent._dit_name(parent.__new__(parent))), (
@@ -96,8 +109,12 @@ def test_the_fast_sibling_changes_only_where_the_encoder_runs():
     assert fast.__bases__ == (parent,), fast.__bases__
 
     own = set(vars(fast)) - {"__module__", "__qualname__", "__doc__"}
+    # `compose_prompt` allowed for the same reason as on the Q5 sibling above:
+    # it is the ancestor's own formatter, re-bound because render_driver reads
+    # `type(engine).__dict__` and inheritance therefore does not count.
     assert own <= {"name", "engine_version", "default_roles",
-                   "_wrap_text_encoder", "_encoder_cache_expects_cpu"}, (
+                   "_wrap_text_encoder", "_encoder_cache_expects_cpu",
+                   "compose_prompt"}, (
         "the fast sibling overrides more than its identity, the encoder "
         "placement and the matching cache-liveness expectation: %r"
         % sorted(own))

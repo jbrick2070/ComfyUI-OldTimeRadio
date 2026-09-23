@@ -3568,6 +3568,59 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
     default_roles = ()
 
 
+# ---------------------------------------------------------------------------
+# THE PROMPT FORMATTER IS BOUND PER CLASS, AND INHERITANCE DOES NOT COUNT.
+#
+# `render_driver` dispatches with
+# ``type(engine).__dict__.get("compose_prompt")`` -- deliberately ``__dict__``
+# and not ``hasattr``, so a subclass that merely INHERITS a formatter is
+# treated as having none and falls through to the legacy composer. The three
+# assignments above (Video / FoleyPlus / Mime) therefore covered exactly three
+# ids, while every TIER class -- the GGUF 24/32 GB lanes shipping for weeks,
+# and every native lane added this week -- silently used the legacy path.
+#
+# WHAT THAT COST, on beats those lanes render: no named sounds, and no
+# ``No speech, no voices.`` terminator, because `finish_joint_av_positive`
+# returns the positive UNCHANGED for any id outside `_JOINT_AV_ENGINES`. This
+# module's own record of that prompt shape is a few hundred lines up: it
+# "rendered a woman saying 'Queen of the Fairies' out loud".
+#
+# This is PBUG-20260923-05's mechanism one level up -- a subclass relationship
+# the author reads as inheritance, against a dispatch that reads only what a
+# class binds itself. Found by a Fable review of the GGUF-rip plan, on lanes
+# nobody was reviewing.
+#
+# Each tier takes the formatter its PARENT binds, which is the definition of
+# parity: a tier differs by which weight loads, never by how it is prompted.
+for _tier_cls in (Ltx25FoleyPlus24gbEngine,
+                  Ltx25FoleyPlusFast32gbEngine,
+                  Ltx25NativeFoleyWideEngine,
+                  Ltx25NativeFoleyBlackwellEngine,
+                  Ltx25NativeFoley16gbEngine,
+                  Ltx25NativeAudioIn16gbEngine,
+                  Ltx25NativeAudioIn24gbEngine):
+    _tier_cls.compose_prompt = compose_ltx25_foley_plus
+for _tier_cls in (Ltx25NativeMime16gbEngine, Ltx25NativeMime24gbEngine):
+    _tier_cls.compose_prompt = compose_ltx25_mime
+del _tier_cls
+
+#: EVERY joint-AV lane, not the three that happened to exist when this tuple
+#: was written. A lane absent from here gets its positive back UNFINISHED from
+#: `finish_joint_av_positive` -- no named sounds, no terminator -- which is
+#: silent, because an unfinished prompt still renders a clip.
+_JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
+    "ltx25_foley_plus_24gb",
+    "ltx25_foley_plus_32gb",
+    "ltx25_native_foley_16gb",
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_mime_16gb",
+    "ltx25_native_mime_24gb",
+    "ltx25_native_audio_in_16gb",
+    "ltx25_native_audio_in_24gb",
+)
+
+
 __all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",

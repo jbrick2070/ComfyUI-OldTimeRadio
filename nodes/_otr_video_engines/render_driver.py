@@ -4209,8 +4209,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # Reuses the id resolved once above -- one normalisation for the whole
     # request builder, not a second copy of the same map.
     _jav_engine = _engine_id
-    if _jav_engine in ("ltx25_foley_plus", "ltx25_mime",
-                       "cloud_ltx25_foley_plus"):
+    # ASK THE MODULE THAT OWNS THE ANSWER, rather than keeping a second literal
+    # copy of it here. This tuple listed three ids while `_JOINT_AV_ENGINES`
+    # grew to twelve, so every tier lane -- GGUF 24/32 GB and all seven native
+    # ones -- skipped the joint-AV finisher entirely and shipped positives with
+    # no named sounds and no "No speech, no voices." terminator. Two literals
+    # of the same set is how that happens; now there is one.
+    try:
+        from .eng_ltx25 import _JOINT_AV_ENGINES as _JAV
+    except Exception:                      # noqa: BLE001 -- adapter may be absent
+        _JAV = ("ltx25_foley_plus", "ltx25_mime", "cloud_ltx25_foley_plus")
+    if _jav_engine in _JAV:
         try:
             from .eng_ltx25 import (finish_joint_av_positive,
                                     identity_leaks_in,
