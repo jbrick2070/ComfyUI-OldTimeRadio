@@ -52,24 +52,12 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
         if pid.startswith("otr_16gb_"):
             assert creative == BIG, pid
             assert technical == BIG, pid
-        elif pid.startswith("otr_cloud_") or pid == "otr_cpu_low":
+        elif pid.startswith("otr_cloud_"):
             assert creative == "comfy:slot-a", pid
             assert technical == "comfy:slot-b", pid
         else:
             assert creative == SMALL, pid
             assert technical == SMALL, pid
-
-
-def test_shipping_cpu_graph_uses_sonnet_and_luna():
-    """The graph people open is otr_cpu_low. Lab leftovers are not this pin."""
-    llm = _profile("otr_cpu_low")["llm"]
-    assert llm["creative_model"] == "comfy:slot-a"
-    assert llm["technical_model"] == "comfy:slot-b"
-    assert llm["comfy_slot_a_model"] == "anthropic/claude-sonnet-5"
-    assert llm["comfy_slot_b_model"] == "openai/gpt-5.6-luna"
-    assert "comfy_credits" in llm["lane_allowlist"]
-    keys = list((_profile("otr_cpu_low").get("preflight") or {}).get("required_keys") or [])
-    assert "OTR_COMFY_API_KEY" in keys
 
 
 def test_shipping_variant_widgets_carry_the_live_label():

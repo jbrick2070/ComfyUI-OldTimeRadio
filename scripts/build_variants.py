@@ -118,7 +118,6 @@ SHIPPING_SET = (
     "otr_mac16_video",
     "otr_mac16_animatediff",
     "otr_amd_still",
-    "otr_cpu_low",
     "otr_cloud_low_1act",
     "otr_cloud_low",
     "otr_cloud_low_5act",

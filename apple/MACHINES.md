@@ -15,7 +15,7 @@ Three questions, in the order people ask them.
 | 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` | ComfyUI-GGUF |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` | nothing |
 | AMD ROCm -- Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` &mdash; in the shipping set, and an outside tester published an episode from it on a Radeon AI PRO R9700 under ROCm 7.2 (commit 0fc0fb90) -- see the AMD note at the foot | nothing |
-| CPU only -- no GPU at all | `workflows/variants/otr_cpu_low.json` | nothing |
+| CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
 
 Every machine needs **ffmpeg and ffprobe** on PATH, and Linux needs one monospace TTF installed for burned captions.
 

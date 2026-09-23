@@ -466,9 +466,13 @@ def render() -> str:
       "a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is "
       "nearly all of that: Qwen3.5-4B generates at about 3 tokens a second "
       "on a CPU, while Kokoro runs at 0.12x realtime and the procedural "
-      "video lanes draw their own frames. The `otr_cpu_low` graph published "
-      "separately the same day in 34.5 minutes. One system, two episodes: a "
-      "receipt, not a tier.\n")
+      "video lanes draw their own frames. A second CPU-only graph published "
+      "the same day in 34.5 minutes; that graph (`otr_cpu_low`) was retired "
+      "on 2026-09-23 because its writer was a Comfy Credits slot, which made "
+      "it a cloud tier with procedural visuals -- `otr_cloud_low` pays the "
+      "same writer and gets real stills and cloud video. The canonical "
+      "receipt above is unaffected and is the one that matters: CPU-only "
+      "works on the graph the quickstart actually tells you to open.\n")
     A("")
 
     A("## How to read the confidence column\n")

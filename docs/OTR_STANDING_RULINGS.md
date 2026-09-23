@@ -371,9 +371,14 @@ STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
   GiB with CPU TE). The public hole is `otr_16gb_video` /
   `otr_16gb_foley` / `otr_16gb_mime`. Cloud deluxe already ships
   `cloud_ltx25_foley_plus`.
-* The shipping CPU graph (`otr_cpu_low`) writes through Comfy Credits:
-  Sonnet 5 + Luna. It does not run local Qwen. Lab leftover `cpu_floor`
-  is the same writer pair; it is not a graph people open. Writer badges
+* THE CPU GRAPH IS RETIRED (2026-09-23). `otr_cpu_low` wrote through
+  Comfy Credits -- Sonnet 5 + Luna, never local Qwen -- so it was a cloud
+  tier wearing a CPU label, and it paid that writer only to render
+  procedural visuals. `otr_cloud_low` pays the identical writer and buys
+  real stills plus cloud video, so the CPU graph was strictly dominated.
+  CPU-only itself is NOT retired and is still proven on `otr_canonical`
+  with no profile. `cpu_floor` survives as a build-variants test fixture
+  and is not a graph people open. Writer badges
   name the download size and use `-nf4` when only the quantized load
   fits. The dropdown rows and loaders stay the same. Download-state
   badges stay ripped.

@@ -77,7 +77,7 @@ models — a larger one to write, a cheaper one for structural work.
 **The shipping cheap Comfy Cloud graphs, the deluxe graphs, and the CPU
 graph pin Sonnet 5 on creative and GPT 5.6 Luna on tech.** Measured on the
 saved widgets in `otr_cloud_low.json`, `otr_cloud_deluxe_3act.json`,
-`otr_cloud_deluxe_audio_in_3act.json` and `otr_cpu_low.json`. The Credits
+`otr_cloud_deluxe_audio_in_3act.json`. The Credits
 combo uses the OpenRouter ids `anthropic/claude-sonnet-5` and
 `openai/gpt-5.6-luna`. Luna is sent with `reasoning_effort=none` on the
 Comfy OpenRouter proxy (the Credits node widget spells that `off`).

@@ -21,7 +21,6 @@ fits its own tier. Which one depends on which graph you opened:
 |---|---|
 | 8 GB NVIDIA, AMD | **one Qwen row** (`Qwen/Qwen3.5-4B`). NVIDIA bakes NF4. There is no `:nf4` picker entry. |
 | 16 GB Mac, canonical | **the same Qwen row**. Mac loads full (`none`). |
-| CPU (`otr_cpu_low`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) -- Comfy Credits |
 | 16 GB+ NVIDIA (`otr_16gb_*`) | **gemma-4-12b-it** (23.9 GB download) -- NF4 is baked into the pick |
 | Comfy Cloud cheap (`otr_cloud_low*`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |
 | Comfy Cloud deluxe (`otr_cloud_deluxe_3act`) | creative **Sonnet 5** (`anthropic/claude-sonnet-5`), tech **GPT 5.6 Luna** (`openai/gpt-5.6-luna`) |

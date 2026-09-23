@@ -201,7 +201,6 @@ six dropdowns by hand:
 | 8 GB NVIDIA | `variants/otr_8gb_video.json` | `ltx098_low_video` |
 | 16 GB+ NVIDIA | `variants/otr_16gb_video.json` | `ltx25_high_video` |
 | Mac 16 GB | `variants/otr_mac16_video.json` | `ltx098_low_video` |
-| CPU only | `variants/otr_cpu_low.json` | the visualizers |
 | Comfy Cloud (cheap, 1/3/5-act) | `variants/otr_cloud_low*.json` | `cloud_vidu_q2_pro_fast_720p` |
 | Comfy Cloud (deluxe Foley) | `variants/otr_cloud_deluxe_3act.json` | `cloud_ltx25_foley_plus` |
 | Comfy Cloud (deluxe audio-in) | `variants/otr_cloud_deluxe_audio_in_3act.json` | `cloud_ltx25_audio_in` |

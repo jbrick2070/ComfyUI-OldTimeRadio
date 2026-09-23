@@ -70,7 +70,7 @@ draw their own frames from the audio do not.
 
 | Shipped graph | Its video lanes | Does the style show? |
 |---|---|---|
-| `otr_canonical`, `otr_16gb_low`, `otr_8gb_low`, `otr_cpu_low`, `otr_mac16_low` | `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_green`, `viz_camera` | **No.** Audio-reactive; no image, no prompt. |
+| `otr_canonical`, `otr_16gb_low`, `otr_8gb_low`, `otr_mac16_low` | `viz_mxc_cpu`, `viz_mxc_mandala`, `viz_green`, `viz_camera` | **No.** Audio-reactive; no image, no prompt. |
 | `otr_16gb_still`, `otr_amd_still` | two audio-reactive plus `still_motion` | **On the character beats only.** |
 | `otr_8gb_still` | `still_flat`, `viz_green`, `still_motion` | **On the announcer and character beats.** |
 | `otr_mac16_still` | `still_motion` throughout | **Yes, everywhere.** |

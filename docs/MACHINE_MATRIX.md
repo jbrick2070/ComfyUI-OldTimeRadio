@@ -50,7 +50,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 
 Provisioning installs and verifies artifacts; it does not rewrite the saved graph. To apply one row atomically to the real canonical workflow on a normal port-8188 ComfyUI server, run `<ComfyUI Python> scripts/otr_canonical_api_run.py --comfyui-url http://127.0.0.1:8188 --machine 8gb --act-count 1 --source-bank original --visual-style sci_fi_radio --timeout 0`, replacing only the exact machine key. To use an explicit profile instead, replace `--machine 8gb` with `--profile <exact-profile-id>`; the two selectors are intentionally exclusive. Every machine row selects the Kokoro voice. On the Python 3.13 that ComfyUI Desktop and the portable build ship it runs through kokoro-onnx on the CPU (the same voices, about six times faster than realtime); on Python 3.12 through the torch kokoro package. Python 3.14 has no kokoro backend packaged yet; there, run `--profile otr_4060_floor` for the bark route or switch the OTR_CastLock voice dropdowns to bark.
 
-Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `apple/MAC.md` before starting -- it ships with the pack, unlike `docs/`. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and unused, ran `otr_canonical` with no profile and no overrides -- exactly what the quickstart tells a stranger to open -- and published a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is nearly all of that: Qwen3.5-4B generates at about 3 tokens a second on a CPU, while Kokoro runs at 0.12x realtime and the procedural video lanes draw their own frames. The `otr_cpu_low` graph published separately the same day in 34.5 minutes. One system, two episodes: a receipt, not a tier.
+Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini M4 / 16 GB published episodes to `otr/obs/` on 2026-09-07 and 2026-09-08, including local `sd15` stills and local `ltx_8gb` video diffusion. It is not promoted to a machine key: a machine key implies a measured VRAM tier, and one 16 GB Mac is one data point, not a tier. Read `apple/MAC.md` before starting -- it ships with the pack, unlike `docs/`. CPU-ONLY IS PROVEN ON THE CANONICAL ITSELF, 2026-09-13: ComfyUI launched with `--cpu` on an x86 laptop, the GPU present and unused, ran `otr_canonical` with no profile and no overrides -- exactly what the quickstart tells a stranger to open -- and published a 2m07s episode to `otr/obs/` in 19 minutes 54 seconds. The writer is nearly all of that: Qwen3.5-4B generates at about 3 tokens a second on a CPU, while Kokoro runs at 0.12x realtime and the procedural video lanes draw their own frames. A second CPU-only graph published the same day in 34.5 minutes; that graph (`otr_cpu_low`) was retired on 2026-09-23 because its writer was a Comfy Credits slot, which made it a cloud tier with procedural visuals -- `otr_cloud_low` pays the same writer and gets real stills and cloud video. The canonical receipt above is unaffected and is the one that matters: CPU-only works on the graph the quickstart actually tells you to open.
 
 
 ## How to read the confidence column
@@ -238,7 +238,7 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 
 </details>
 
-## unstated  --  12 experimental profile(s), 6 shipping
+## unstated  --  11 experimental profile(s), 5 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -247,7 +247,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_s
 | `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
-| `otr_cpu_low` | viz_camera | - | musicgen | - | `shipping` | complete; Python <=3.13 |
 
 <details><summary>6 draft profile(s) here -- not vouched for</summary>
 
