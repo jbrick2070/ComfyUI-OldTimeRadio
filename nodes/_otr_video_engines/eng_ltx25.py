@@ -3012,15 +3012,31 @@ LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
 #: added) and the manifest was never updated. This lane was built from that
 #: manifest, so it was registered pointing at a file nobody can download.
 #:
-#: mix4x8-17GB is the replacement, chosen by ARITHMETIC rather than by the
-#: manifest's labels, since those are what misled it once already. The
-#: measured Blackwell leg peaked at 27.7 GB VRAM carrying a 12.5 GB DiT plus
-#: the 10.6 GB encoder on-GPU, i.e. roughly DiT + encoder + 5 GB of
-#: activations. This tier pins the encoder to the accelerator too, so the
-#: honest budget is DiT + ~5 GB: int8 at 21.5 GB lands near 26.5 GB and does
-#: NOT fit a 24 GB card, while mix4x8 at 17.0 GB lands near 22 GB and does.
-#: int8 is a 32 GB-class file, not a 24 GB one.
-LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-mix4x8-17GB.safetensors"
+#: int8, AND IT WAS PICKED BY RUNNING IT, not by arithmetic.
+#:
+#: An earlier version of this comment reasoned that int8 "lands near 26.5 GB
+#: and does NOT fit a 24 GB card ... int8 is a 32 GB-class file". That was an
+#: estimate stated as a fact, and the operator rejected it on exactly those
+#: grounds -- "says who, did it crash, did we test on a 24 GB machine". It had
+#: not been run and we had not.
+#:
+#: MEASURED on a rented RTX 4090 (24,564 MiB, Ada, clean box, nothing else on
+#: the card), one 97-frame clip through this lane's own graph:
+#:
+#:      int8         20.03 GB file   peak 23.5 GB   101.3 s   renders
+#:      mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s   renders
+#:
+#: int8 fits with ~0.5 GB to spare and is 40% FASTER, which the static model
+#: got backwards in both direction and magnitude -- ComfyUI sizes residency
+#: against the card it finds, so weights-plus-activations arithmetic
+#: systematically over-predicts. The foley decodes and muxes (3.88 s, 48 kHz
+#: stereo AAC) and the operator judged the result good.
+#:
+#: It is also the PORTABLE choice, which decides the tier on its own: nvfp4 is
+#: Blackwell-only, while INT8 tensor cores have shipped since Turing, so this
+#: one file serves Ada, Ampere and Blackwell alike. And at 8 bits against
+#: nvfp4's 4 it is the higher-precision weight -- the size IS the precision.
+LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-int8.safetensors"
 LTX25_NATIVE_TEXT_ENCODER = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
 
 
