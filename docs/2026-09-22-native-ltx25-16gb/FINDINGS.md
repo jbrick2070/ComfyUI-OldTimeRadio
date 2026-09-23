@@ -34,7 +34,9 @@ Stock nodes only, no OTR recipe, one sampling pass, written to mp4.
     mix4x8-13.8       46.1 s    18.7 s   11.4 s   also 55.1 s on a second run
     w4a8-11.7         51.7 s    22.8 s   11.5 s
     nvfp4-12.6        52.1 s    23.1 s   11.7 s
-    w4a4-7.8          DID NOT LOAD -- truncated download, SafetensorError
+    w4a4-10.46        DID NOT LOAD *AT THE TIME* -- the download was still in
+                      flight (7.76 of 10.46 GiB). It is complete and
+                      header-valid now; it has simply never been run.
 
 **The three weights are indistinguishable in speed.** The spread between them
 is 6.0 s; the spread of mix4x8 against ITSELF across two identical runs is
@@ -151,10 +153,33 @@ decides whether the fix is `keep` or an explicit unload call.
    (`_native_te_device = "cpu"`). The generic probe did the same work on GPU in
    9.5 s and still fit in 15.8 GB, because the encoder is freed before the DiT
    loads. Whether that holds in the two-stage graph is unmeasured.
-3. **`w4a4` re-download** -- 7.76 GiB on disk against a ~10.5 GiB target.
+3. **`w4a4` has never been RUN** -- the file is complete at 10.46 GiB; the
+   earlier "truncated" note measured a download in progress and is withdrawn.
 
-4. **Does releasing the DiT actually fix it?** The measurement above proves the
-   CAUSE. It does not prove the CURE -- that needs the two-stage lane re-run
-   with the DiT freed before the decode, and a decode time in the 30 s
-   neighbourhood rather than 400. `video_only_probe.py` now takes
-   `--free-dit-before-decode` for exactly this.
+4. **CURED, and the cure is committed (8069154d).** Two attempts, and the
+   first one failed usefully:
+
+       drop "unet" from run_graph(keep=...)   9.61 GB still allocated, decode
+                                              still 400+ s. A Python reference
+                                              is not what pins weights.
+       unload_all_models() + soft_empty_cache()
+                                              11,595 MB -> 806 MB freed,
+                                              decode 34.7 s, whole render
+                                              196.3 s with foley muxed.
+
+   196.3 s against the GGUF lane's 255.4 s at the same geometry on this same
+   card. The seam is conditional on free VRAM against the measured 8.1 GB
+   need, so a machine with room never pays.
+
+5. **The eviction on 24/32 GB is unmeasured.** The condition can fire there
+   too. The 4090's int8 leg ran 101.3 s without it; the same leg with it has
+   not been run.
+
+6. **56.1 s -- 29% of the render -- is CPU text encoding.** The generic probe
+   did the same work on GPU in 9.5 s. The eviction pattern applies one stage
+   earlier: encode on GPU, evict before the DiT loads.
+
+7. **`--cuda-malloc` may fight the dynamic-VRAM allocator.** The launcher
+   passes it (`_otr_soak_server_launch.cmd:192`); it sets
+   PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync before ComfyUI installs its
+   own pluggable allocator, and the interaction is undocumented.
