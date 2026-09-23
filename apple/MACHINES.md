@@ -33,6 +33,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx25_high_foley_plus` | ComfyUI-GGUF |
 | `ltx25_high_mime` | ComfyUI-GGUF |
 | `ltx25_high_video` | ComfyUI-GGUF |
+| `ltx25_native_audio_in_16gb` | ComfyUI-GGUF |
+| `ltx25_native_audio_in_24gb` | ComfyUI-GGUF |
 | `ltx25_native_foley_16gb` | ComfyUI-GGUF |
 | `ltx25_native_foley_24gb` | ComfyUI-GGUF |
 | `ltx25_native_foley_blackwell` | ComfyUI-GGUF |
@@ -76,6 +78,8 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `ltx25_foley_plus_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_plus_32gb` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |

@@ -675,6 +675,29 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # The NATIVE AUDIO-IN lanes. Same weights and same stack as their foley
+    # parents -- audio-in is a CONDITIONING mode, not a different model, so a
+    # row that named different artifacts would be inventing a difference.
+    "ltx25_native_audio_in_16gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
+    "ltx25_native_audio_in_24gb": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-int8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae",
+                               "ltx-2.5-latent-spatial-upscaler-x2"]},
     # minimax_h3_video (lane 19, 2026-08-12): MiniMax H3 FL2VA, the 33.1B packed
     # AV DiT rendered VIDEO-ONLY (this lane decodes the video half of the
     # NestedTensor latent and carries no audio VAE at all). cuda, no vendor gate.

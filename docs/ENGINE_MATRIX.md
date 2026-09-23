@@ -84,6 +84,8 @@ without that map would play ~4% short.
 | ltx25_foley_plus_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_plus_32gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_mime | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_native_audio_in_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_native_audio_in_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_blackwell | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
@@ -132,6 +134,8 @@ without that map would play ~4% short.
 | ltx25_foley_plus_24gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_foley_plus_32gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_mime | text_prompt, init_image | text_prompt REQUIRED |
+| ltx25_native_audio_in_16gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
+| ltx25_native_audio_in_24gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
 | ltx25_native_foley_16gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_foley_24gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_foley_blackwell | text_prompt, init_image | text_prompt REQUIRED |
@@ -184,6 +188,8 @@ the engine's own `aspect` column above.
 | ltx25_foley_plus_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_foley_plus_32gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_mime | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_native_audio_in_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
+| ltx25_native_audio_in_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_blackwell | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
@@ -238,6 +244,8 @@ means the adapter sizes itself and IGNORES the request canvas.
 | ltx25_foley_plus_24gb | 832x480 | declared |
 | ltx25_foley_plus_32gb | 832x480 | declared |
 | ltx25_mime | 832x480 | declared |
+| ltx25_native_audio_in_16gb | 832x480 | declared |
+| ltx25_native_audio_in_24gb | 832x480 | declared |
 | ltx25_native_foley_16gb | 832x480 | declared |
 | ltx25_native_foley_24gb | 832x480 | declared |
 | ltx25_native_foley_blackwell | 832x480 | declared |
@@ -296,6 +304,8 @@ JUMP plan on a still-consuming lane ever re-mints.
 | ltx25_foley_plus_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_foley_plus_32gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_mime | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_native_audio_in_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
+| ltx25_native_audio_in_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_blackwell | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
@@ -351,6 +361,8 @@ and it read exactly like a measured number until someone looked.
 | ltx25_foley_plus_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_foley_plus_32gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_mime | - | contract max | docs/PROD_BUG_LOG.md |
+| ltx25_native_audio_in_16gb | - | contract max | docs/PROD_BUG_LOG.md |
+| ltx25_native_audio_in_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_16gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_blackwell | - | contract max | docs/PROD_BUG_LOG.md |
@@ -376,7 +388,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **43**
+* registered engine names: **45**
 * provider-side: **9**
-* local: **34**
-* can chain (strict_first_frame): **16**
+* local: **36**
+* can chain (strict_first_frame): **18**

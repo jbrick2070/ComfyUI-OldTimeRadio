@@ -3361,6 +3361,109 @@ class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
     #: it. _encoder_cache_expects_cpu stays True with it.
 
 
+class Ltx25NativeAudioInMixin:
+    """AUDIO-IN: condition the picture on a real waveform instead of inventing one.
+
+    THE SAME GRAPH AS THE FOLEY LANE IT IS MIXED INTO, with two changes, and
+    both of them are forced by how the model works rather than chosen:
+
+    1. ``emptyaudio`` resolves to ``LTXVAudioVAEEncode`` instead of
+       ``LTXVEmptyLatentAudio``. The graph KEY is unchanged, so ``concat`` --
+       and everything downstream of it -- keeps its wiring untouched; only the
+       class behind the key and its inputs differ. Foley asks the model to
+       invent a bed; this hands it the beat's own audio and asks it to move the
+       picture to match.
+
+    2. ``modality_scale`` leaves 1.0. That number is a documented NO-OP
+       (``LTXVModalityGuidance``: "Set to 1.0 to disable (no extra pass)") and
+       it is the right value for foley, where there is nothing to sync TO. It
+       is exactly the wrong value here: modality guidance IS the cross-modal
+       coupling, and at 1.0 an audio-in lane would carry a reference waveform
+       the sampler never leans on.
+
+    THE MODEL REALLY DOES CONDITION ON AUDIO -- this is not an assumption.
+    ``LTXVModalityGuidance`` works by running one extra pass with
+    ``a2v_cross_attn`` and ``v2a_cross_attn`` set False and steering back
+    toward the coupled prediction (`comfy_extras/nodes_lt.py`). Those switches
+    exist because the transformer attends both ways between the streams; the
+    reference default for the scale is 3.0, which is what this uses.
+
+    THE COST IS ONE EXTRA FORWARD PASS PER STEP while guidance is active, on
+    top of whatever the sampler already costs. That is the trade audio-in makes
+    and it should be measured on this lane, not inherited from the foley
+    timings.
+
+    ``audio_ref`` IS ALREADY A FIRST-CLASS PER-BEAT ASSET -- the render driver
+    supplies it (`render_driver.py`) and ``ltx_audio_in`` / HuMo already
+    require it. Nothing new is plumbed; this lane simply declares that it needs
+    it and fails LOUD without one, because a lane that silently fell back to an
+    empty latent would be a foley lane wearing an audio-in name.
+    """
+
+    #: Lightricks' own reference default. NOT measured on this lane yet -- the
+    #: first leg that runs it should report whether 3.0 over- or under-couples,
+    #: and this constant is where that answer lands.
+    _modality_scale = 3.0
+
+    def _node_candidates(self):
+        cand = dict(super()._node_candidates())
+        cand["emptyaudio"] = ("LTXVAudioVAEEncode",)
+        cand["loadaudio"] = ("LoadAudio",)
+        return cand
+
+    def _build_render_request(self, request):
+        plan = super()._build_render_request(request)
+        get = request.get if isinstance(request, dict) else (
+            lambda k, d=None: getattr(request, k, d))
+        assets = get("asset_refs") or {}
+        ref = (assets.get("audio_ref") or "") if isinstance(assets, dict) else ""
+        plan["audio_path"] = self._ref_path(ref)
+        return plan
+
+    def _build_graph(self, plan, image_name, length, width, height):
+        g = super()._build_graph(plan, image_name, length, width, height)
+        audio_path = str(plan.get("audio_path") or "")
+        if not audio_path:
+            raise _wb.GraphExecutionError(
+                "%s requires an audio_ref and the beat carried none. NO "
+                "FALLBACK -- this lane exists to follow a supplied waveform, "
+                "and quietly generating one instead would ship a foley clip "
+                "under an audio-in name" % (self.name,))
+        audio_name = _wb.stage_into_comfy_input(audio_path)
+        W = _wb.Wire
+        g["loadaudio"] = {"class": "loadaudio",
+                          "inputs": {"audio": audio_name}}
+        # SAME KEY, different class: `concat` still reads W("emptyaudio", 0)
+        # and needs no edit. See the class docstring.
+        g["emptyaudio"] = {"class": "emptyaudio", "inputs": {
+            "audio": W("loadaudio", 0),
+            "audio_vae": W("audiovae", 0)}}
+        g["modality"]["inputs"]["modality_scale"] = float(self._modality_scale)
+        return g
+
+
+@register
+class Ltx25NativeAudioIn16gbEngine(Ltx25NativeAudioInMixin,
+                                   Ltx25NativeFoley16gbEngine):
+    """16 GB NATIVE audio-in. mix4x8, picture driven by the beat's own sound."""
+
+    name = "ltx25_native_audio_in_16gb"
+    engine_version = "1"
+    default_roles = ()
+    required_inputs = ("text_prompt", "init_image", "audio_ref")
+
+
+@register
+class Ltx25NativeAudioIn24gbEngine(Ltx25NativeAudioInMixin,
+                                   Ltx25NativeFoleyWideEngine):
+    """24 GB AND UP NATIVE audio-in. int8, same coupling as the 16 GB lane."""
+
+    name = "ltx25_native_audio_in_24gb"
+    engine_version = "1"
+    default_roles = ()
+    required_inputs = ("text_prompt", "init_image", "audio_ref")
+
+
 @register
 class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
     """The 16 GB NATIVE lane as a SILENT PERFORMANCE carrying its own score.
