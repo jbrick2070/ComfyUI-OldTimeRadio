@@ -121,6 +121,53 @@ def test_the_sampler_consumes_the_fitted_latent_not_the_unfitted_one():
         "built and then thrown away.")
 
 
+def test_the_reference_is_padded_before_staging_not_after():
+    """The pad is useless unless it runs on the file the graph actually loads."""
+    assert ('audio_path = self._pad_reference_for_vae_crop(audio_path, length)\n'
+            '        audio_name = _wb.stage_into_comfy_input(audio_path)'
+            ) in _GRAPH_SRC, (
+        "the VAE-crop pad must produce the path that is staged into ComfyUI; "
+        "padding a file nobody loads is the shape of the previous dead fix.")
+
+
+@pytest.mark.parametrize("have,rate", [
+    (171108, 44100),   # the real measured slice: 171108 % 4096 == 3172
+    (2205, 44100),     # 50 ms -- the old crop reduced this to ZERO samples
+    (400000, 44100),   # longer than the clip
+    (172032, 44100),   # already a multiple: must be left alone
+])
+def test_the_padded_reference_is_a_multiple_the_vae_crop_will_not_touch(
+        tmp_path, have, rate):
+    """Executed, not asserted from source.
+
+    ``vae_encode_crop_pixels`` narrows to ``(n // 4096) * 4096`` taking
+    ``(n % 4096) // 2`` off the FRONT, so any non-multiple loses the head of
+    the beat's audio. On an exact multiple ``x == dims[d]`` and it never
+    narrows.
+    """
+    import numpy as np
+
+    from nodes._otr_video_engines import foley_stems as fs
+
+    src = tmp_path / "slice_test.wav"
+    fs.write_pcm16_wav(str(src), np.zeros((1, have), dtype=np.float32), rate)
+
+    engine = eng_ltx25.Ltx25NativeAudioIn24gbEngine()
+    out = engine._pad_reference_for_vae_crop(str(src), 97)
+    samples, out_rate = fs.read_pcm16_wav(out)
+    n = int(samples.shape[-1])
+
+    assert out_rate == rate
+    assert n % 4096 == 0, (
+        "%d samples leaves a remainder of %d, so the VAE crop would take "
+        "%d samples off the front of the reference"
+        % (n, n % 4096, (n % 4096) // 2))
+    assert n >= int(round(97 / 25.0 * rate)), "padded below the clip duration"
+    assert n >= have, "the reference itself must never be shortened here"
+    if have % 4096 == 0 and have >= int(round(97 / 25.0 * rate)):
+        assert out == str(src), "an exact multiple must not be rewritten"
+
+
 def test_stage_two_inherits_the_fixed_length_and_needs_no_second_fix():
     """Documented here so nobody 'fixes' stage two as well and double-pads."""
     base = inspect.getsource(eng_ltx25.Ltx25VideoEngine._build_graph)

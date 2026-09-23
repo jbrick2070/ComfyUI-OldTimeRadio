@@ -3485,6 +3485,86 @@ class Ltx25NativeAudioInMixin:
     #: either way -- and this constant is where that lands.
     _modality_scale = 3.0
 
+    #: `comfy/sd.py` gives the LTX audio VAE `downscale_ratio = 4096`, and
+    #: `vae_encode_crop_pixels` narrows any waveform that is not a multiple of
+    #: it -- taking `(n % 4096) // 2` samples OFF THE FRONT.
+    _VAE_AUDIO_CROP_MULTIPLE = 4096
+
+    def _pad_reference_for_vae_crop(self, audio_path, length):
+        """Pad the reference WAV so the encoder's centre-crop removes nothing.
+
+        MEASURED (2026-09-23, this beat): the reference slice is 171,108
+        samples. ``171108 % 4096 == 3172``, so ``vae_encode_crop_pixels``
+        narrowed it to 167,936 and threw away **1,586 samples from the
+        BEGINNING** -- 35.96 ms, most of a frame at 25 fps. The picture was
+        then asked to follow audio that had lost its head and been shifted
+        earlier than the beat it belongs to.
+
+        Latent-space fitting cannot undo this: ``fit_audio`` pads or trims the
+        TAIL, and the damage is at the front and already baked into the mel.
+        The crop is also what made the encode come up one latent short in the
+        first place -- 381 mel frames instead of 389.
+
+        THE CROP IS A NO-OP ON AN EXACT MULTIPLE: ``x == dims[d]`` and
+        ``narrow`` is never called. So the fix is to hand it a length it will
+        not touch -- at least the clip's own duration, rounded up to the next
+        multiple. The added tail is silence the model is free to generate into
+        (`fit_audio` leaves the padded latent tail unmasked) and it is trimmed
+        off the decoded output by ``_write_foley_stem`` anyway.
+
+        This also covers the case that deleting the old waveform helper lost:
+        a reference much SHORTER than the clip used to be cropped to zero
+        samples and raise inside the encoder. Found by a codex review.
+
+        EXACT WHEN THE FILE'S RATE IS THE VAE'S INPUT RATE, which it is on
+        this path -- the driver writes 44.1 kHz slices and the LTX audio VAE
+        takes 44.1 kHz, so ``VAEEncodeAudio`` does not resample. A file at
+        another rate is resampled BEFORE the crop, so its padded length is no
+        longer a guaranteed multiple; that is logged rather than silently
+        assumed.
+
+        Best-effort: an unreadable file is handed on unchanged so the graph
+        fails downstream with its own named error instead of here.
+        """
+        import os
+        try:
+            from . import foley_stems as _fs
+        except ImportError:                  # pragma: no cover -- flat imports
+            return audio_path
+        try:
+            samples, rate = _fs.read_pcm16_wav(audio_path)
+        except Exception as exc:             # noqa: BLE001 -- never fatal here
+            _LOG.warning(
+                "[OTR video] %s could not read its audio_ref %r (%r); handing "
+                "it to the encoder unchanged", self.name, audio_path, exc)
+            return audio_path
+
+        import numpy as np
+        fps = int(self.target_fps) or 25
+        mult = int(self._VAE_AUDIO_CROP_MULTIPLE)
+        need = int(round(int(length) / float(fps) * int(rate)))
+        have = int(samples.shape[-1])
+        want = ((max(need, have) + mult - 1) // mult) * mult
+        if want == have:
+            return audio_path
+
+        pad = np.zeros((samples.shape[0], want - have), dtype=samples.dtype)
+        samples = np.concatenate([samples, pad], axis=-1)
+
+        import hashlib
+        key = hashlib.sha256(
+            os.path.abspath(str(audio_path)).encode("utf-8", "replace")
+        ).hexdigest()[:12]
+        out = os.path.join(
+            os.path.dirname(str(audio_path)) or ".",
+            "otr_%s_vaepad_%s_%d.wav" % (self.name, key, want))
+        _fs.write_pcm16_wav(out, samples, rate)
+        _LOG.info(
+            "[OTR video] %s padded its audio_ref %d -> %d sample(s) at %d Hz "
+            "so the VAE crop (multiple of %d) keeps the head; clip needs %d",
+            self.name, have, want, rate, mult, need)
+        return out
+
     def _node_candidates(self):
         cand = dict(super()._node_candidates())
         cand["loadaudio"] = ("LoadAudio",)
@@ -3533,6 +3613,7 @@ class Ltx25NativeAudioInMixin:
                 "FALLBACK -- this lane exists to follow a supplied waveform, "
                 "and quietly generating one instead would ship a foley clip "
                 "under an audio-in name" % (self.name,))
+        audio_path = self._pad_reference_for_vae_crop(audio_path, length)
         audio_name = _wb.stage_into_comfy_input(audio_path)
         W = _wb.Wire
         g["loadaudio"] = {"class": "loadaudio",
