@@ -1862,25 +1862,42 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         # reproduced the very bug this rewrite exists to fix.)
         best = None
         flat = 0
-        reads = 0
+        rose = False
         while True:
             now = _MC.free_vram_mb()
-            reads += 1
             if now is None:
-                return best if best is not None else floor_mb
-            if best is None or now > best + 1.0:
+                # A FAILED PROBE IS NOT AN ANSWER. This used to return
+                # `floor_mb` -- the unsettled pre-eviction reading the rest of
+                # this function exists to avoid -- so one bad sample
+                # republished the exact number the rewrite was written to stop
+                # publishing. Skip the sample and keep waiting.
+                tries = int(tries) - 1
+                if tries <= 0:
+                    return best
+                time.sleep(float(pause_s))
+                continue
+            if best is None:
                 best = now
                 flat = 0
+            elif now > best + 1.0:
+                best = now
+                flat = 0
+                rose = True                 # the release is demonstrably live
             elif now >= best - 50.0:
                 # At or near the high-water mark: a genuine plateau.
                 best = max(best, now)
                 flat += 1
-                # MIN_READS is the measurement, not a guess: the release above
-                # spans five samples at 1 s, so a plateau seen before ~4 s has
-                # not outlived the thing being waited for. A longer stall
-                # followed by a resume would still exit early -- nothing
-                # observed does that, and the cap below bounds the cost.
-                if flat >= 2 and reads >= 4:
+                # RISE FIRST, THEN TWO FLATS. The opening reading is taken
+                # while the release is still in flight, so a plateau that has
+                # never been interrupted by a RISE is the same false plateau
+                # the 0.5 s version returned -- four identical samples prove
+                # only that nothing has happened yet. An earlier draft
+                # justified a bare "minimum 4 reads" by the five-sample trace
+                # in the docstring above; that trace is USED memory FALLING,
+                # not free memory rising, so it never supported the claim.
+                # Waiting for a rise targets the defect instead of guessing a
+                # duration.
+                if rose and flat >= 2:
                     return best
             else:
                 # A big DROP is not a plateau -- something else took memory,
@@ -1963,8 +1980,24 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 "decode will run under whatever is resident", self.name, exc)
             return
 
-        after_mb = self._settled_free_vram_mb(free_mb)
-        total_mb = self._total_vram_mb()
+        # TELEMETRY MUST NOT KILL THE GRAPH. This call sits outside the
+        # eviction's own try/except, and it sleeps, divides and calls into
+        # torch -- a raise here would escape `_harvest` and take the render
+        # with it, over a number that only reaches a log line. Its own
+        # `torch.cuda.synchronize()` is also unbounded and not covered by
+        # `tries`; if the driver wedges there, this except is what keeps the
+        # decode reachable.
+        try:
+            after_mb = self._settled_free_vram_mb(free_mb)
+        except BaseException as exc:        # noqa: BLE001 -- telemetry only
+            _LOG.warning(
+                "[OTR video] %s: could not settle the free-VRAM reading (%r); "
+                "reporting the unsettled figure", self.name, exc)
+            after_mb = free_mb
+        try:
+            total_mb = self._total_vram_mb()
+        except BaseException:               # noqa: BLE001 -- telemetry only
+            total_mb = None
         _LOG.info(
             "[OTR video] %s: EVICTED before decode -- %.0f MB free -> %.0f MB "
             "(needed %d, total %s, aimdo cast buffers %s)", self.name, free_mb,
@@ -2001,16 +2034,32 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         #
         # So this is a WARNING and nothing more. The decode proceeds, and CUDA
         # gets to answer.
+        # AN UNREACHABLE NEED IS NOT A SHORTFALL (2026-09-23, found by a
+        # contrarian review of this very rewrite). `need` is 8300 MB, measured
+        # on a free 16 GB card. A 4060 holds 8188 MiB in TOTAL, so on that card
+        # `after_mb >= need` can never be true and this warning fired on EVERY
+        # successful eviction -- including the one that returned 5.7 GB. The
+        # rewrite above exists to stop a wrong number misdirecting a diagnosis,
+        # and then graded the right number against an impossible bar, which
+        # reads as failure just the same. Same defect as the refusal this
+        # ruling removed, wearing a warning's clothes.
+        if total_mb is not None and need > total_mb:
+            _LOG.warning(
+                "[OTR video] %s: this card cannot reach the measured need at "
+                "any residency -- %.0f MB total against %d MB needed, and "
+                "%.0f MB free after eviction. Nothing is wrong with the "
+                "eviction; the decode geometry is too big for this card. The "
+                "answer is a smaller decode, not more eviction. Proceeding: "
+                "only a real OOM decides, and its error names the allocation "
+                "to shrink to.",
+                self.name, total_mb, need, after_mb)
+            return
         _LOG.warning(
             "[OTR video] %s: decode starts SHORT -- %.0f MB free against %d MB "
-            "measured need%s. Proceeding anyway: only a real OOM decides. If "
+            "measured need. Proceeding anyway: only a real OOM decides. If "
             "this OOMs, the error names the allocation that failed and that is "
             "the number to shrink the decode geometry to.",
-            self.name, after_mb, need,
-            ("" if total_mb is None
-             else "; this card holds %.0f MB in total, so the need may not be "
-                  "reachable at any residency and the answer would be a "
-                  "smaller decode rather than more eviction" % total_mb))
+            self.name, after_mb, need)
 
     def _retain_model_patchers(self, results, prepared):
         """V-4: keep the MODEL patchers the graph produced so teardown can
