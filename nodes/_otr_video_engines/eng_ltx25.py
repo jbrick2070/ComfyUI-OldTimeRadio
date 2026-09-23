@@ -3455,6 +3455,12 @@ class Ltx25NativeAudioInMixin:
         return plan
 
     def _build_graph(self, plan, image_name, length, width, height):
+        # LOCAL IMPORT, like every other method in this module. Module scope
+        # here is stdlib-only by contract (V-12 cold-import), so `_wb` is bound
+        # per-method and is NOT a module global -- the first draft of this
+        # mixin used it as though it were and died on the first shot with
+        # "name '_wb' is not defined", CRASH_BEFORE_LOAD, on a live pod leg.
+        from . import wrapper_bridge as _wb
         g = super()._build_graph(plan, image_name, length, width, height)
         audio_path = str(plan.get("audio_path") or "")
         if not audio_path:
