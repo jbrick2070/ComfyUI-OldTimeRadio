@@ -114,21 +114,76 @@ class _RepairSpan(NamedTuple):
     quote: str
 
 
+def _as_char_index(value: Any) -> int | None:
+    """A model's idea of an index, if it is usable as one.
+
+    Accepts an int, an integral float and a numeric string, because a JSON
+    response from a small local model supplies all three for the same field.
+    The previous `type(start) is not int` rejected `12.0` and `"12"` outright
+    and dropped the whole finding with them.
+    """
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str):
+        try:
+            return int(value.strip())
+        except ValueError:
+            return None
+    return None
+
+
 def _exact_interval(text: str, finding: Mapping[str, Any]) -> tuple[int, int] | None:
-    """Ground one occurrence without case folding or whitespace changes."""
+    """Ground one occurrence without case folding or whitespace changes.
+
+    THE QUOTE IS THE GROUND TRUTH; THE OFFSETS ONLY DISAMBIGUATE (2026-09-23).
+    This used to require the model's `start_char`/`end_char` to be exactly
+    right whenever it supplied either, and returned None otherwise -- so a
+    quote that `text.find` would have located exactly was discarded because a
+    4B model miscounted characters. The prompt that feeds this asks for those
+    offsets explicitly, which is asking a small model for the one thing it is
+    worst at, and `_exact_interval` gates every repair call site.
+
+    MEASURED CONSEQUENCE, reported from the 4060 on 2026-09-23: `ledger_clean`
+    detected five of six unclean rows and repaired ZERO of them, in 18 model
+    calls. Detection was working; the repairs were being thrown away here.
+
+    THE SAFETY PROPERTY IS UNCHANGED, and it is what makes widening this safe:
+    an interval is returned only when the text at that interval IS the quote,
+    so no edit can land anywhere else. Being more permissive about how the
+    interval is FOUND does not make it possible to edit the wrong span.
+    """
     quote = finding.get("quote")
     if not isinstance(quote, str) or not quote:
         return None
-    start, end = finding.get("start_char"), finding.get("end_char")
-    if start is not None or end is not None:
-        if (type(start) is not int or type(end) is not int
-                or not 0 <= start < end <= len(text) or text[start:end] != quote):
-            return None
-        return start, end
-    start = text.find(quote)
-    if start < 0 or text.find(quote, start + 1) >= 0:
-        return None
-    return start, start + len(quote)
+
+    hits: list[int] = []
+    at = text.find(quote)
+    while at >= 0:
+        hits.append(at)
+        at = text.find(quote, at + 1)
+    if not hits:
+        return None                     # the quote is not in this line at all
+
+    start = _as_char_index(finding.get("start_char"))
+
+    # 1. Offsets that land on the quote win outright -- the model was right.
+    if start is not None and text[start:start + len(quote)] == quote:
+        return start, start + len(quote)
+    # 2. One occurrence: the offsets were never needed. This is the case that
+    #    used to be discarded for an off-by-one.
+    if len(hits) == 1:
+        return hits[0], hits[0] + len(quote)
+    # 3. Several occurrences and offsets that do not land: take the one nearest
+    #    to where the model pointed. It still had to name the right text.
+    if start is not None:
+        near = min(hits, key=lambda h: abs(h - start))
+        return near, near + len(quote)
+    # 4. Ambiguous with nothing to disambiguate by. Now we decline.
+    return None
 
 
 def _whole_spoken_row(text: str, interval: tuple[int, int]) -> bool:

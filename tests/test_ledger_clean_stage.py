@@ -534,7 +534,6 @@ def test_normalized_whole_row_complaint_can_authorize_a_real_direction():
 @pytest.mark.parametrize("authorization", [
     {"verdict": "rewrite_it"},
     {"verdict": "localized_defect", "spans": []},
-    {"verdict": "localized_defect", "spans": [{"quote": "Until", "start_char": 1, "end_char": 6}]},
     {"verdict": "localized_defect", "spans": [{"quote": "Until", "start_char": False, "end_char": 5}]},
     {"verdict": "localized_defect", "spans": [{"quote": "Until next"}, {"quote": "next time."}]},
     {"verdict": "already_spoken", "spans": [{"quote": "Until"}]},
@@ -550,6 +549,43 @@ def test_malformed_or_collectively_full_localization_keeps_the_original(authoriz
     record = receipt["rows"][0]
     assert record["outcome"] == "unresolved" and receipt["unclean"] == 1
     assert all(call["error"] for call in record["scope"]["authorization"]["calls"])
+
+
+def test_an_unambiguous_quote_survives_off_by_one_offsets():
+    """Wrong offsets on a quote that appears ONCE are recoverable, not malformed.
+
+    THIS PARAMETER USED TO LIVE IN THE MALFORMED LIST ABOVE (2026-09-23) --
+    `{"quote": "Until", "start_char": 1, "end_char": 6}` against "Until next
+    time.", where `text[1:6]` is "ntil " and the old `_exact_interval` returned
+    None, so the row came back unresolved.
+
+    WHY IT MOVED, and it is a measurement rather than a preference. The 4060
+    reported `ledger_clean` detecting five of six unclean rows and repairing
+    ZERO of them across 18 model calls: the judge was finding real defects and
+    every repair was being discarded here. The prompt asks a 4B model for
+    zero-based character offsets, which is the one thing a small model is worst
+    at, and an off-by-one threw away a quote `text.find` locates exactly.
+
+    THE DISTINCTION THAT MAKES THIS SAFE, and the reason the rest of the
+    malformed list is untouched: "Until" occurs exactly once in this line, so
+    there is only one span it can mean. The model DID ground itself -- by
+    quoting -- and the arithmetic added nothing. Where the quote is AMBIGUOUS
+    and the offsets do not land, `_exact_interval` still declines, because then
+    the offsets are the only thing that could have told us which occurrence was
+    meant. And an interval is returned only when the text at it IS the quote,
+    so no edit can land on a span the model did not name."""
+    original = "Until next time."
+    slot = _Slot(judgements={original: [_dirty_judgement(original)]},
+                 authorizations={original: [{
+                     "verdict": "localized_defect",
+                     "spans": [{"quote": "Until", "start_char": 1,
+                                "end_char": 6}]}]},
+                 repairs={original: [_replacement_reply("So long")]})
+    ledger = _ledger(original)
+    lcl.run_ledger_clean(ledger, slot_fn=slot, bank_id="original")
+    assert ledger["lines"][1]["text"] != original, (
+        "an off-by-one offset on a unique quote still discarded the repair")
+    assert slot.repair_calls == 1
 
 
 def test_partial_ambiguous_complaint_cannot_authorize_whole_row_conversion():
