@@ -587,85 +587,89 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
         for s in srcs:
             remaining[s] = remaining.get(s, 0) + 1
     results = dict(ext)
-    # EVERY NODE RUNS UNDER torch.inference_mode(), EXACTLY AS COMFYUI RUNS IT.
+    # THE WHOLE EXECUTION RUNS UNDER torch.inference_mode(), AS COMFYUI RUNS IT.
     #
-    # ComfyUI's own executor wraps its whole graph run in ``inference_mode``
-    # (``execution.py``), and a node is written against that contract. This
-    # bridge did not, which is not a missing optimisation -- it is a different
-    # execution environment, and a node that is correct under ComfyUI can be
-    # wrong here.
+    # ComfyUI's executor wraps its ENTIRE ``execute_async`` body -- cache,
+    # model cleanup, every node -- in one ``with torch.inference_mode():``
+    # (execution.py). A node is written against that contract. This bridge
+    # wrapped nothing, which is not a missing optimisation: it is a different
+    # execution environment, and a node that is correct under ComfyUI is wrong
+    # here.
     #
     # It cost a render to find. The LTX 2.5 VAE's ``process_output`` is
     # ``lambda image: image.add_(1.0).div_(2.0).clamp_(0.0, 1.0)`` (comfy/sd.py)
-    # -- three IN-PLACE ops on the decode result. The tiled 3D decode path
-    # produces that tensor inside inference mode, and torch refuses an in-place
-    # update to an inference tensor from outside, so the graph sampled both
-    # stages perfectly and then died on its very last node with
-    # "Inplace update to inference tensor outside InferenceMode is not allowed".
+    # -- three IN-PLACE ops on the decode result. ``tiled_scale_multidim`` is
+    # itself decorated ``@torch.inference_mode()``, so it returns an inference
+    # tensor and its context EXITS before ``process_output`` touches it; torch
+    # then refuses the update unless an outer mode is still in force. The graph
+    # sampled both stages perfectly and died on its very last node.
     #
-    # Wrapped at the CALL, not around the whole loop, so ``on_result`` and the
-    # free/evict bookkeeping keep running in normal mode -- those hand tensors
-    # to callers who may legitimately mutate them.
+    # THE FIRST VERSION OF THIS FIX WRAPPED ONLY THE NODE CALL, and a cursor QA
+    # lane reproduced the very error the fix exists to kill: ``on_result`` ran
+    # outside the wrap, was handed an inference tensor, and any in-place write
+    # in a callback raised. The comment there claimed callbacks "may
+    # legitimately mutate" what they are given -- they may not, and narrowing
+    # the boundary is what created the hole. ComfyUI does not narrow it either.
     _inference_mode = _torch_inference_mode()
-    for nid in _topo_order(graph, external_keys=set(ext)):
-        node = graph[nid]
-        cls = node.get("class")
-        if isinstance(cls, str):
-            if cls not in classes:
+    with _inference_mode():
+        for nid in _topo_order(graph, external_keys=set(ext)):
+            node = graph[nid]
+            cls = node.get("class")
+            if isinstance(cls, str):
+                if cls not in classes:
+                    raise GraphExecutionError(
+                        "node %r class %r unresolved" % (nid, cls))
+                cls = classes[cls]
+            if cls is None:
+                raise GraphExecutionError("node %r has no class" % nid)
+            fn_name = node.get("function") or getattr(cls, "FUNCTION", None)
+            if not fn_name:
                 raise GraphExecutionError(
-                    "node %r class %r unresolved" % (nid, cls))
-            cls = classes[cls]
-        if cls is None:
-            raise GraphExecutionError("node %r has no class" % nid)
-        fn_name = node.get("function") or getattr(cls, "FUNCTION", None)
-        if not fn_name:
-            raise GraphExecutionError(
-                "node %r class %r has no FUNCTION" % (nid, getattr(cls, "__name__", cls)))
-        inst = cls() if isinstance(cls, type) else cls
-        fn = getattr(inst, fn_name, None)
-        if not callable(fn):
-            raise GraphExecutionError(
-                "node %r function %r not callable" % (nid, fn_name))
-        kwargs = {k: _resolve_value(v, results)
-                  for k, v in (node.get("inputs") or {}).items()}
-        try:
-            with _inference_mode():
-                out = normalize_node_output(fn(**kwargs))
-        except Exception as exc:  # noqa: BLE001 -- surfaced NAMED, never silent
-            raise GraphExecutionError(
-                "node %r (%s) raised %s: %s"
-                % (nid, fn_name, type(exc).__name__, exc))
-        results[nid] = out if isinstance(out, tuple) else (out,)
-        if nid in audit_ids:
-            audit_ordinal += 1
-            record = {
-                "class_name": getattr(cls, "__name__", type(cls).__name__),
-                "node_id": str(nid),
-                "ordinal": audit_ordinal,
-                "output_shapes": _execution_shape(results[nid]),
-            }
-            if execution_records is not None:
-                execution_records.append(record)
-            _LOG.info("[OTR graph-exec] %s", json.dumps(
-                record, sort_keys=True, separators=(",", ":")))
-        if on_result is not None:
+                    "node %r class %r has no FUNCTION" % (nid, getattr(cls, "__name__", cls)))
+            inst = cls() if isinstance(cls, type) else cls
+            fn = getattr(inst, fn_name, None)
+            if not callable(fn):
+                raise GraphExecutionError(
+                    "node %r function %r not callable" % (nid, fn_name))
+            kwargs = {k: _resolve_value(v, results)
+                      for k, v in (node.get("inputs") or {}).items()}
             try:
-                on_result(nid, results[nid])
-            except Exception as exc:  # noqa: BLE001 -- surfaced NAMED
+                out = normalize_node_output(fn(**kwargs))
+            except Exception as exc:  # noqa: BLE001 -- surfaced NAMED, never silent
                 raise GraphExecutionError(
-                    "node %r on_result callback raised %s: %s"
-                    % (nid, type(exc).__name__, exc))
-        if free_after_use:
-            did_free = False
-            for s in node_srcs.get(nid, ()):
-                remaining[s] -= 1
-                if remaining[s] <= 0 and s not in keep and s in results:
-                    if s in evict:
-                        _evict_dropped_models(s, results[s])
-                    del results[s]
-                    did_free = True
-            if did_free:
-                _soft_free()
+                    "node %r (%s) raised %s: %s"
+                    % (nid, fn_name, type(exc).__name__, exc))
+            results[nid] = out if isinstance(out, tuple) else (out,)
+            if nid in audit_ids:
+                audit_ordinal += 1
+                record = {
+                    "class_name": getattr(cls, "__name__", type(cls).__name__),
+                    "node_id": str(nid),
+                    "ordinal": audit_ordinal,
+                    "output_shapes": _execution_shape(results[nid]),
+                }
+                if execution_records is not None:
+                    execution_records.append(record)
+                _LOG.info("[OTR graph-exec] %s", json.dumps(
+                    record, sort_keys=True, separators=(",", ":")))
+            if on_result is not None:
+                try:
+                    on_result(nid, results[nid])
+                except Exception as exc:  # noqa: BLE001 -- surfaced NAMED
+                    raise GraphExecutionError(
+                        "node %r on_result callback raised %s: %s"
+                        % (nid, type(exc).__name__, exc))
+            if free_after_use:
+                did_free = False
+                for s in node_srcs.get(nid, ()):
+                    remaining[s] -= 1
+                    if remaining[s] <= 0 and s not in keep and s in results:
+                        if s in evict:
+                            _evict_dropped_models(s, results[s])
+                        del results[s]
+                        did_free = True
+                if did_free:
+                    _soft_free()
     if terminal is not None:
         # Validate against GRAPH, not results. `results` is seeded with the
         # externals, so checking membership there let an id that exists ONLY in

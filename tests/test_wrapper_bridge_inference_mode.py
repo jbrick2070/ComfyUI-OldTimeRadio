@@ -39,6 +39,40 @@ class _MakesATensor:
         return (torch.ones(2, 4, 4, 3),)
 
 
+@torch.inference_mode()
+def _tiled_scale_multidim_like():
+    """Stands in for ``comfy.utils.tiled_scale_multidim``, decorator and all.
+
+    THE DECORATOR IS THE POINT. The returned tensor carries the inference flag
+    and this function's context has already EXITED by the time the caller sees
+    it, so the in-place update below is legal only while some OUTER mode is
+    still in force.
+    """
+    return torch.ones(2, 4, 4, 3)
+
+
+class _DecodesLikeTheLtxVae:
+    """The node that actually died: tiled decode, then ``process_output``.
+
+    ``comfy/sd.py`` defines that step as
+    ``lambda image: image.add_(1.0).div_(2.0).clamp_(0.0, 1.0)`` and the LTX
+    VideoVAE branches never override it.
+    """
+
+    FUNCTION = "decode"
+
+    def decode(self):
+        image = _tiled_scale_multidim_like()
+        return (image.add_(1.0).div_(2.0).clamp_(0.0, 1.0),)
+
+
+class _MutatesWhatItIsGiven:
+    FUNCTION = "go"
+
+    def go(self, image):
+        return (image.add_(1.0),)
+
+
 def test_a_node_executes_inside_inference_mode():
     out = wb.run_graph({"n": {"class": _AsksTheMode, "inputs": {}}},
                        terminal="n")
@@ -82,13 +116,57 @@ def test_the_bridge_does_not_leave_the_caller_in_inference_mode():
     assert not torch.is_inference_mode_enabled()
 
 
-def test_on_result_runs_outside_inference_mode():
-    """Callbacks hand tensors to owners who may legitimately mutate them."""
+def test_on_result_runs_inside_inference_mode_too():
+    """The callback is inside the SAME mode the node ran in.
+
+    An earlier version of this fix wrapped only the node call so that
+    ``on_result`` stayed in normal mode, on the reasoning that callbacks own
+    the tensors they are handed and may mutate them. A cursor QA lane
+    reproduced the exact error the fix exists to kill: the callback receives
+    an INFERENCE tensor, and any in-place write raised
+    ``GraphExecutionError: ... Inplace update to inference tensor outside
+    InferenceMode``. ComfyUI does not draw that boundary and neither do we.
+    """
     seen = []
     wb.run_graph({"n": {"class": _AsksTheMode, "inputs": {}}},
                  on_result=lambda nid, out: seen.append(
                      torch.is_inference_mode_enabled()))
-    assert seen == [False]
+    assert seen == [True]
+
+
+def test_a_callback_may_mutate_what_it_is_handed():
+    """The property the boundary above exists to give callers.
+
+    Not hypothetical: this is what a lane doing its own copy-out of a decode
+    result does, and it raised on the first version of this fix.
+    """
+    wb.run_graph({"n": {"class": _MakesATensor, "inputs": {}}},
+                 on_result=lambda nid, out: out[0].add_(1.0))
+
+
+def test_the_ltx_decode_shape_that_actually_failed():
+    """The regression lock: nested @inference_mode, then an in-place update.
+
+    The first version of these tests asserted only that a node SAW the mode
+    flag set, and that a tensor built with ``torch.ones`` inside the wrap
+    carried the inference flag. Both are weaker properties than the defect,
+    and neither reconstructs it -- which a QA lane pointed out, correctly.
+    This one fails without the wrap and passes with it.
+    """
+    out = wb.run_graph({"decode": {"class": _DecodesLikeTheLtxVae,
+                                   "inputs": {}}}, terminal="decode")
+    assert torch.allclose(out[0], torch.ones(2, 4, 4, 3))
+
+
+def test_a_consumer_node_may_mutate_an_upstream_tensor_in_place():
+    """Node-to-node, the same property, since every node shares one mode."""
+    graph = {
+        "make": {"class": _MakesATensor, "inputs": {}},
+        "post": {"class": _MutatesWhatItIsGiven,
+                 "inputs": {"image": wb.Wire("make", 0)}},
+    }
+    out = wb.run_graph(graph, terminal="post")
+    assert torch.allclose(out[0], torch.full((2, 4, 4, 3), 2.0))
 
 
 def test_torch_is_still_imported_lazily():
