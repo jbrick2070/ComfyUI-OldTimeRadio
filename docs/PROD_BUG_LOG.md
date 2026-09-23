@@ -15808,3 +15808,66 @@ loop, the chunker's cap and byte identity, English chunking unchanged).
 
 **Bible:** portable -- an ASCII-only word regex silently zeroes every non-Latin
 script, and a whitespace chunker cannot cut one; promote at wrap-up with the index row.
+
+## PBUG-20260922-05 -- a wrapper executor that drives node classes outside ComfyUI's PromptExecutor must supply `torch.inference_mode()` itself (fixed `4d3db6cd`, `b5734c02`, `f0b49cdb`)
+
+**Artifact:** the first live leg of the native (non-GGUF) LTX 2.5 Blackwell lane on the
+RunPod RTX PRO 4500, `/workspace/probe_native.log`. The graph resolved all five
+weights, loaded the 12.5 GB nvfp4 DiT, and sampled BOTH stages at 100% GPU / 27.7 GB
+VRAM -- then died on its last node:
+
+    node 'decode' (decode) raised RuntimeError: Inplace update to inference tensor
+    outside InferenceMode is not allowed.
+
+**Cause.** `comfy.utils.tiled_scale_multidim` is decorated `@torch.inference_mode()`
+(`comfy/utils.py:1144`), so it returns an INFERENCE tensor and its context exits
+before the caller sees it. `VAE.process_output` is then
+`lambda image: image.add_(1.0).div_(2.0).clamp_(0.0, 1.0)` (`comfy/sd.py:508`) --
+three in-place ops -- and torch refuses an in-place update to an inference tensor
+unless an outer mode is still in force. `wrapper_bridge.run_graph` supplied no mode
+at all: no `inference_mode`, no `no_grad`, anywhere in the module. A node correct
+under ComfyUI was therefore wrong under this bridge.
+
+**THE BLAST RADIUS IS THE OPPOSITE OF WHAT THE FIX COMMITS CLAIMED, and the
+correction is the most useful part of this entry.** `4d3db6cd` said "every video lane
+has been running its nodes outside inference mode" and `b5734c02` said the reach was
+"every run_graph CALLER". Both are true of the FUNCTION and false of PRODUCTION.
+ComfyUI's executor wraps its entire prompt -- cache, cleanup and every `execute` call
+-- in one `with torch.inference_mode():` (`execution.py:751-837`), and every OTR
+engine runs inside an OTR node inside that prompt. On the canonical path the new wrap
+is a nested no-op. The counter-evidence was already on disk before either fix landed:
+`otr/obs/autumn_leaves_20260921_222229__vart__l24f__...` and
+`glass_ghost_20260922_102217__pori__l24f__...` both published with `l24f` =
+`ltx25_foley_plus_24gb`, whose decode node IS `VAEDecodeTiled`
+(`eng_ltx25.py:435,745`) -- the identical tiled-then-in-place path. Found by the
+Fable judgment lane; the driver had asserted the wider radius in two commit messages
+without checking the published receipts that disproved it.
+
+**What actually changed, then:** `run_graph` is now self-sufficient instead of
+depending on an ambient mode it never declared. That reaches NON-PROMPT callers only
+-- standalone probes, tests and scripts that drive engines without a `PromptExecutor`.
+That is a real class: the leg above is one, and it is how the native lanes are being
+proven.
+
+**Fix, in three commits because two QA lanes refuted the first two.**
+`4d3db6cd` wrapped only the node call; a cursor lane reproduced the same RuntimeError
+on an `on_result` callback, which received an inference tensor outside the wrap --
+the narrow boundary re-made the bug it was fixing, and the comment claiming "EXACTLY
+AS COMFYUI RUNS IT" was false, since ComfyUI narrows nothing. `b5734c02` wrapped the
+whole loop. `f0b49cdb` then fixed what THAT broke: `Ltx25FoleyPlusEngine._latent_to_cpu`
+makes a durable CPU copy of the audio latent from `on_result`, and torch's clone-escape
+("you can make a clone to get a normal tensor") only works with the mode off -- so the
+copy silently became an inference tensor. It now copies under `inference_mode(False)`.
+
+**Verify:** `tests/test_wrapper_bridge_inference_mode.py` (11 tests; the discriminating
+ones are the nested-`@inference_mode`-then-in-place decode shape, `on_result`'s mode,
+and the SHIPPED `_latent_to_cpu` called from inside a graph -- each confirmed to fail
+when its fix is reverted). Read-only Sonnet fan-outs cleared flux_gen1,
+ideogram4_local, lumina_image, eng_ltx_8gb, eng_ltx_av and eng_ltx_video by tracing
+every value out of `run_graph`: all reach `images_to_uint8`, which only reads.
+
+**Bible:** portable, and the entry is the general rule rather than the LTX symptom --
+a wrapper that executes ComfyUI node classes outside `PromptExecutor` inherits none of
+the executor's ambient state and must supply `torch.inference_mode()` itself; a node
+that is correct in a prompt can raise in that wrapper. Promote at wrap-up with the
+index row.
