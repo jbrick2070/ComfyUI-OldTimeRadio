@@ -78,13 +78,13 @@ If you change a dropdown yourself, these are the only picks that need anything b
 |---|---|---|---|---|---|---|---|
 | `ltx25_foley_plus_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_plus_32gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
 | `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
@@ -262,9 +262,13 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 * `ltx23_low_audio_in`
 * `ltx25_foley_plus_24gb`
 * `ltx25_foley_plus_32gb`
+* `ltx25_native_audio_in_16gb`
+* `ltx25_native_audio_in_24gb`
 * `ltx25_native_foley_16gb`
 * `ltx25_native_foley_24gb`
 * `ltx25_native_foley_blackwell`
+* `ltx25_native_mime_16gb`
+* `ltx25_native_mime_24gb`
 * `mesh_stage`
 * `spandrel_esrgan`
 * `wan22_high_fast`

@@ -49,13 +49,13 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 |---|---|---|---|---|---|---|---|
 | `ltx25_foley_plus_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_foley_plus_32gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_16gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_24gb` | *no lane* | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
 | `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
@@ -234,9 +234,4 @@ These need no weights and no VRAM -- only a credential -- and the engines themse
 
 ## Engines with no provisioning lane
 
-These are registered and selectable, but `scripts/otr_provision.py` has no lane that fetches their weights -- so a profile that selects one fails to provision. Worth closing before shipping.
-
-* `ltx25_native_audio_in_16gb` (video)
-* `ltx25_native_audio_in_24gb` (video)
-* `ltx25_native_mime_16gb` (video)
-* `ltx25_native_mime_24gb` (video)
+None -- every registered engine routes to a lane or declares that it needs no weights.

@@ -1656,6 +1656,16 @@ NO_LANE_REASON = {
     "ltx25_native_foley_24gb": "manual_doc",
     "ltx25_native_foley_16gb": "manual_doc",
     "ltx25_native_foley_blackwell": "manual_doc",
+    # The mime and audio-in lanes load exactly the same artifacts as the foley
+    # lanes they subclass -- same DiT, same encoder, same VAEs, same upscaler.
+    # They inherit the classification for the same reason and they inherit its
+    # open question too: PBUG-20260923-03 measured every one of those files
+    # ungated, so "manual" is a decision nobody has revisited rather than a
+    # constraint. A real fetch lane would clear all seven at once.
+    "ltx25_native_mime_16gb": "manual_doc",
+    "ltx25_native_mime_24gb": "manual_doc",
+    "ltx25_native_audio_in_16gb": "manual_doc",
+    "ltx25_native_audio_in_24gb": "manual_doc",
     # Voice and music that arrive through the HF cache on first use.
     "kokoro": "hf_cache",
     "bark": "hf_cache",
