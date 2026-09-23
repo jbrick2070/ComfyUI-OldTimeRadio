@@ -1816,12 +1816,15 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "extension_mode": raw.get("extension_mode"),
         }
 
-    #: Headroom a CUDA context and the desktop keep that `mem_get_info` never
-    #: offers us. MEASURED on the 4060: 8188 MiB total, 7399 MB free with the
-    #: card otherwise empty.
-    _VRAM_CONTEXT_RESERVE_MB = 300
+    #: MEASURED on the 4060: 8188 MiB total, 7399 MB free with the card
+    #: otherwise empty -- so a CUDA context and the desktop hold ~789 MB that
+    #: `mem_get_info` never offers us. There used to be a
+    #: `_VRAM_CONTEXT_RESERVE_MB = 300` here; nothing ever read it. It existed
+    #: to pad a refusal, and refusing on a predicted number was removed the
+    #: same day, so it is deleted rather than left looking load-bearing. The
+    #: measurement is the part worth keeping.
 
-    def _settled_free_vram_mb(self, floor_mb, tries=8, pause_s=0.5):
+    def _settled_free_vram_mb(self, floor_mb, tries=12, pause_s=1.0):
         """Free VRAM once the release has actually landed.
 
         `reset_cast_buffers()` returns before the driver has handed the memory
@@ -1831,27 +1834,63 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         was ~7399 -- under-reporting a successful eviction by 2.5 GB, which is
         enough to refuse a card that had in fact freed plenty.
 
-        Polls until the reading stops rising, rather than sleeping a fixed
-        time: a big card settles on the first look and pays nothing.
+        Polls until the reading stops rising and STAYS there. Costs about
+        four seconds on any card -- the old version claimed a big card "pays
+        nothing", which was true and was exactly the bug: it exited on the
+        first plateau, and on the 4060 the first plateau was 2.5 GB short.
         """
         import time
-        best = floor_mb if floor_mb is not None else None
         try:
             import torch
             if torch.cuda.is_available():
                 torch.cuda.synchronize()
         except Exception:                   # noqa: BLE001 -- telemetry only
             pass
-        for _ in range(int(tries)):
+        # TWO flat reads, a full second apart, before we believe it.
+        #
+        # This used to poll every 0.5 s and return on the FIRST reading that
+        # was not higher than the last. The release lands in ~1 s steps (the
+        # trace above), so two reads inside one step are IDENTICAL and the
+        # loop exited on a plateau that was not the end -- it read 4940 MB
+        # against a settled ~7399 MB and a decode then ground for 17 minutes
+        # 2.5 GB poorer than the card really was. Sampling faster than the
+        # thing you are measuring does not measure it sooner.
+        # `floor_mb` is the UNSETTLED reading -- it must not seed the
+        # flatness test, or the first real read matches it and counts as
+        # flat straight away. It is only the fallback when we cannot read
+        # at all. (Caught by the probe for this function: seeding with it
+        # reproduced the very bug this rewrite exists to fix.)
+        best = None
+        flat = 0
+        reads = 0
+        while True:
             now = _MC.free_vram_mb()
+            reads += 1
             if now is None:
-                return best
+                return best if best is not None else floor_mb
             if best is None or now > best + 1.0:
                 best = now
-                time.sleep(float(pause_s))
-                continue
-            return max(best, now)
-        return best
+                flat = 0
+            elif now >= best - 50.0:
+                # At or near the high-water mark: a genuine plateau.
+                best = max(best, now)
+                flat += 1
+                # MIN_READS is the measurement, not a guess: the release above
+                # spans five samples at 1 s, so a plateau seen before ~4 s has
+                # not outlived the thing being waited for. A longer stall
+                # followed by a resume would still exit early -- nothing
+                # observed does that, and the cap below bounds the cost.
+                if flat >= 2 and reads >= 4:
+                    return best
+            else:
+                # A big DROP is not a plateau -- something else took memory,
+                # or the release is still moving. Keep waiting rather than
+                # reading the dip as "settled".
+                flat = 0
+            tries = int(tries) - 1
+            if tries <= 0:
+                return best
+            time.sleep(float(pause_s))
 
     def _total_vram_mb(self):
         """Card capacity, or None. `free_vram_mb` reads it and throws it away."""
