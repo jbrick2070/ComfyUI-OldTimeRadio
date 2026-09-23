@@ -3379,9 +3379,16 @@ class Ltx25NativeAudioInMixin:
     2. ``modality_scale`` RISES from 1.0 to 3.0. At 1.0 the guider is a
        documented NO-OP (``LTXVModalityGuidance``: "Set to 1.0 to disable (no
        extra pass)") and that is the right value for foley, where there is
-       nothing to sync TO. It is exactly the wrong value here: modality guidance IS the cross-modal
-       coupling, and at 1.0 an audio-in lane would carry a reference waveform
-       the sampler never leans on.
+       nothing to sync TO. It is the weaker value here: modality guidance
+       STRENGTHENS the cross-modal coupling.
+
+       IT DOES NOT CREATE IT, and an earlier draft of this docstring said
+       it did. `a2v_cross_attn` and `v2a_cross_attn` both default to
+       enabled (`comfy/ldm/lightricks/av_model.py`); scale 1.0 disables
+       only the EXTRA guidance pass, not the attention. So 1.0 is a
+       defensible shipping value for this lane and is the fallback if the
+       16 GB tier turns out not to afford the extra pass. Corrected by a
+       codex review.
 
     THE FIRST DESIGN SWAPPED THE CLASS BEHIND THE ``emptyaudio`` KEY and let
     ``concat`` read the encoder directly. That is what a reader expects to
@@ -3460,23 +3467,30 @@ class Ltx25NativeAudioInMixin:
     #: Lightricks' own reference default, and it DELIBERATELY DEPARTS from
     #: `ltx25_recipe.LTX25_CFG_MODALITY = 1.0`. That recipe note calls the
     #: three CFGs a VRAM contract and it is right about the two it was
-    #: measured on -- but this knob differs in KIND, not degree: raising the
-    #: video/audio CFG changes what the sampler batches, while raising this
-    #: one adds an entire extra forward pass per step
+    #: measured on -- but this knob differs in KIND, not degree: it adds an
+    #: entire extra forward pass per step
     #: (`comfy_extras/nodes_lt.py` -- `LTXVModalityGuidance` calls
     #: `calc_cond_batch` inside its post-CFG hook). The foley lanes keep 1.0
     #: and are untouched; only audio-in reads this.
     #:
+    #: THE EXTRA PASS CAN RAISE PEAK VRAM, not just time: the conditional
+    #: prediction and the CFG result stay live while it runs, so it needs
+    #: storage on top of them. A codex review refuted the "sequential means
+    #: free" reading, and narrowing the guidance window reduces how MANY
+    #: extra passes run without lowering the peak during an active one.
+    #:
     #: NOT MEASURED ON 16 GB YET, and the 16 GB tier is the one clamped at
-    #: 14.5 GiB. The first 16 GB leg reports peak VRAM. If it tips, the answer
-    #: is a narrowed start/end_percent window -- NOT a silent drop back to
-    #: 1.0, because at 1.0 the lane stops being an audio-in lane at all.
+    #: 14.5 GiB. The first 16 GB leg reports peak VRAM. If it tips, 1.0 is a
+    #: legitimate answer for that tier -- the cross-modal attention stays on
+    #: either way -- and this constant is where that lands.
     _modality_scale = 3.0
 
     def _node_candidates(self):
         cand = dict(super()._node_candidates())
         cand["loadaudio"] = ("LoadAudio",)
         cand["refencode"] = ("LTXVAudioVAEEncode",)
+        cand["refsolid"] = ("SolidMask",)
+        cand["refmask"] = ("SetLatentNoiseMask",)
         cand["refconcat"] = ("LTXVConcatAVLatent",)
         return cand
 
@@ -3533,9 +3547,30 @@ class Ltx25NativeAudioInMixin:
         # where LTXVConcatAVLatent swaps the audio stream and runs
         # `fit_audio` on it -- trimming or zero-padding the encoded waveform
         # to the empty latent length, padded tail left unmasked.
+        # FREEZE THE SUPPLIED AUDIO, or the sampler simply discards it.
+        # `LTXVAudioVAEEncode` returns no noise mask, and
+        # `LTXVConcatAVLatent` substitutes `ones_like` for a missing audio
+        # mask whenever the VIDEO side has one -- which the i2v anchor
+        # always gives it. An all-ones mask means "generate this", and the
+        # stage-one ladder starts at sigma 1.0, where
+        # `sigma * noise + (1 - sigma) * latent_image` contributes exactly
+        # NOTHING from the reference. The lane would have carried a
+        # correctly sized reference waveform and then thrown it away.
+        # This is the same SolidMask(0) -> SetLatentNoiseMask that the
+        # proven `ltx_audio_in` lane rides its audio latent under
+        # (`eng_ltx_av.py` -- "the audio latent rides FROZEN").
+        #
+        # It also completes the fit: `fit_audio` appends `ones_like(pad)`
+        # to an EXISTING mask, so the supplied span stays frozen at 0 and
+        # only the padded tail is left free for the model to generate.
+        # With no mask to extend, that branch did nothing.
+        g["refsolid"] = {"class": "refsolid", "inputs": {
+            "value": 0.0, "width": int(width), "height": int(height)}}
+        g["refmask"] = {"class": "refmask", "inputs": {
+            "samples": W("refencode", 0), "mask": W("refsolid", 0)}}
         g["refconcat"] = {"class": "refconcat", "inputs": {
             "video_latent": W("concat", 0),
-            "audio_latent": W("refencode", 0)}}
+            "audio_latent": W("refmask", 0)}}
         g["sampler"]["inputs"]["latent_image"] = W("refconcat", 0)
         g["modality"]["inputs"]["modality_scale"] = float(self._modality_scale)
         return g

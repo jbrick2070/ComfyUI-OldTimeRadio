@@ -81,7 +81,38 @@ def test_the_fitting_concat_takes_an_av_latent_so_fit_audio_actually_runs():
         "`refconcat` must take `concat`'s AV latent. Any plain video latent "
         "(`i2v`, `latent_upscale`) skips fit_audio entirely and the encoded "
         "stream reaches the sampler at the encoder's own length.")
-    assert '"audio_latent": W("refencode", 0)' in _GRAPH_SRC
+    assert '"audio_latent": W("refmask", 0)' in _GRAPH_SRC, (
+        "`refconcat` must take the FROZEN latent, not the raw encoder output "
+        "-- see test_the_supplied_audio_is_frozen_not_regenerated.")
+
+
+@pytest.mark.parametrize("cls", AUDIO_IN, ids=lambda c: c.name)
+def test_the_freeze_nodes_are_registered(cls):
+    cand = cls()._node_candidates()
+    assert cand.get("refsolid") == ("SolidMask",)
+    assert cand.get("refmask") == ("SetLatentNoiseMask",)
+
+
+def test_the_supplied_audio_is_frozen_not_regenerated():
+    """Without this the lane carries the reference and then discards it.
+
+    ``LTXVAudioVAEEncode`` returns no noise mask.
+    ``LTXVConcatAVLatent.execute`` substitutes ``ones_like`` for a missing
+    AUDIO mask whenever the VIDEO side has one, and the i2v anchor always
+    gives it one. All-ones means "generate this", and stage one starts at
+    sigma 1.0 where ``sigma * noise + (1 - sigma) * latent_image`` takes
+    exactly nothing from the reference.
+
+    The proven ``ltx_audio_in`` lane rides its audio latent under
+    ``SolidMask(0)`` -> ``SetLatentNoiseMask`` for this reason
+    (``eng_ltx_av.py``). Raising ``modality_scale`` cannot recover audio that
+    was already thrown away. Found by a codex review of `bed7556d`.
+    """
+    assert '"value": 0.0' in _GRAPH_SRC, (
+        "the solid mask must be 0.0 -- a 1.0 mask regenerates the reference, "
+        "which is the exact defect this guards.")
+    assert '"samples": W("refencode", 0), "mask": W("refsolid", 0)' in _GRAPH_SRC, (
+        "the freeze must wrap the ENCODED reference.")
 
 
 def test_the_sampler_consumes_the_fitted_latent_not_the_unfitted_one():
