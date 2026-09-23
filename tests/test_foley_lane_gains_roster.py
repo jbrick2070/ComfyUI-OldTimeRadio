@@ -149,3 +149,49 @@ def test_every_prompt_binding_lane_is_in_the_joint_av_set():
         "these lanes compose a joint-AV prompt but are absent from "
         "_JOINT_AV_ENGINES, so finish_joint_av_positive leaves their positive "
         "unfinished -- no named sounds, no terminator: %s" % (", ".join(missing),))
+
+
+def test_a_declared_role_set_is_not_a_restriction_it_cannot_enforce():
+    """A lane may not declare FEWER roles than it is capability-eligible for.
+
+    `role_compat.engine_fits_role` is "PURELY capability -- every token in the
+    engine's required_inputs must be available in the role" and IGNORES this
+    list. So narrowing `roles` restricts nothing: the director still selects
+    the lane for any role its inputs fit, and if a separate literal table does
+    not know it there, the combination refuses at plan time.
+
+    That is precisely what the native audio-in lanes did -- declared cabinet
+    roles only, believing it kept them off character faces, while
+    `render_driver._AUDIO_IN_CHARACTER_ENGINES` did not list them. Found by a
+    codex review.
+
+    DECLARING NO ROLES IS DIFFERENT AND STAYS LEGAL. An empty tuple states no
+    preference rather than a false restriction, and the cloud
+    audio_conditioned lanes rely on it: aimed at a character beat they refuse
+    DELIBERATELY, which `test_wire_w7_mouth_ownership` pins on purpose.
+    """
+    from nodes._otr_shared.role_compat import ROLE_AVAILABLE_INPUTS
+
+    engines = _engine_classes()
+    parent = _foley_parent()
+    lying = []
+    for engine_id, eng in sorted(engines.items()):
+        klass = eng if isinstance(eng, type) else type(eng)
+        if not (isinstance(klass, type) and issubclass(klass, parent)):
+            continue
+        declared = set(tuple(getattr(eng, "roles", ()) or ()))
+        if not declared:
+            continue                          # states no preference: legal
+        required = set(tuple(getattr(eng, "required_inputs", ()) or ()))
+        eligible = {r for r, avail in ROLE_AVAILABLE_INPUTS.items()
+                    if required <= set(avail)}
+        unclaimed = eligible - declared
+        if unclaimed:
+            lying.append("%s declares %s but is eligible for %s"
+                         % (engine_id, sorted(declared), sorted(unclaimed)))
+    assert not lying, (
+        "these lanes declare a narrower role set than their required_inputs "
+        "make them eligible for, which restricts NOTHING -- role_compat is "
+        "capability-only. Either widen the declaration and make the lane work "
+        "there, or change required_inputs so the capability gate actually "
+        "excludes the role: %s" % ("; ".join(lying),))

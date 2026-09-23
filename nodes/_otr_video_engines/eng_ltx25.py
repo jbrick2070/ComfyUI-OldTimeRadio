@@ -3417,22 +3417,20 @@ class Ltx25NativeAudioInMixin:
     #: its "audio-in video" wording for free.
     family = "audio_conditioned_video"
 
-    #: CABINET ROLES ONLY -- character_video is deliberately dropped, and the
-    #: mouth policy is what says so rather than taste.
+    #: THE PARENT'S FULL ROLE SET, and an earlier draft narrowed it here on a
+    #: false premise. That draft declared cabinet roles only and claimed the
+    #: narrowing was what kept these lanes out of `MouthPolicyError`. IT
+    #: RESTRICTED NOTHING: `role_compat.engine_fits_role` is "PURELY
+    #: capability -- every token in the engine's required_inputs must be
+    #: available in the role", and it ignores this list outright. These lanes
+    #: require exactly what `ltx_audio_in` requires and fit `character_video`
+    #: exactly as it does, so the director could select them there regardless
+    #: and then hit a plan-time refusal. Found by a codex review.
     #:
-    #: The foley parent serves announcer_visual, music_visual AND
-    #: character_video. Inheriting that set put these lanes straight into
-    #: `MouthPolicyError` on the third: "an audio-in beat ... is neither a
-    #: character face nor a cabinet role, so nothing decides whether its still
-    #: has a mouth -- and an audio-in engine WILL animate whatever it is
-    #: given."
-    #:
-    #: That is the same hazard `ltx_audio_in` documents: a character beat must
-    #: be driven by the character's OWN clean voice, never the ambient master
-    #: mix, or the face lip-syncs to the wrong sound. These lanes take their
-    #: audio from the ambient slice, so they take the cabinet roles and leave
-    #: character faces to the families built for them.
-    roles = ("announcer_visual", "music_visual")
+    #: `roles` is UI-sort / self-description metadata. The real gates are
+    #: capability (above) and `_AUDIO_IN_CHARACTER_ENGINES` in render_driver,
+    #: which these lanes now join -- see that list.
+    roles = ("announcer_visual", "music_visual", "character_video")
 
     #: Lightricks' own reference default. NOT measured on this lane yet -- the
     #: first leg that runs it should report whether 3.0 over- or under-couples,

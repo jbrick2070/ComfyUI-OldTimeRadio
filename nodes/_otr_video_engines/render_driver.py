@@ -2272,7 +2272,20 @@ def ltx_prompt_diversity_status(trace):
 #: clips motion-EXEMPT, so the beat would stop being checked for motion at all
 #: -- trading a loud plan-time refusal for a silent quality hole.
 _AUDIO_IN_CHARACTER_ENGINES = (
-    "ltx_audio_in", "minimax_h3_audio_in", "cloud_ltx25_audio_in")
+    "ltx_audio_in", "minimax_h3_audio_in", "cloud_ltx25_audio_in",
+    # The NATIVE LTX 2.5 audio-in lanes, added 2026-09-23. They declare exactly
+    # what `ltx_audio_in` declares and therefore fit `character_video` exactly
+    # as it does -- `role_compat.engine_fits_role` is capability-only and
+    # ignores an engine's `roles` list, so a lane cannot opt out of a role by
+    # declaring a narrower one. Without membership here a selectable, accepted
+    # combination reached a deterministic plan-time refusal at the mouth-owner
+    # check: the director allowed it, this table did not recognise it.
+    #
+    # On a character beat the driver supplies the per-line VOICE wav -- the
+    # character's own clean audio -- which is what a lip-sync lane wants and is
+    # the same thing `ltx_audio_in` gets. The ambient master slice is the
+    # LINELESS-beat path, not the character path.
+    "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb")
 
 
 def _is_character_face_beat(shot):
