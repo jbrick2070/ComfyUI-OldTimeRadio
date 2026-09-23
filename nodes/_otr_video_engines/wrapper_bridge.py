@@ -465,6 +465,22 @@ def reclaim_idle_models(reason=""):
     return detached
 
 
+def _torch_inference_mode():
+    """``torch.inference_mode`` if torch is importable, else a no-op context.
+
+    Torch is imported LAZILY throughout this module (see the module docstring)
+    so the pure helpers stay testable without it. A box with no torch cannot
+    execute a graph anyway, but it can still import this module, and a hard
+    import here would break that.
+    """
+    try:
+        import torch
+    except Exception:  # noqa: BLE001 - no torch means no graph to run
+        import contextlib
+        return contextlib.nullcontext
+    return torch.inference_mode
+
+
 def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
               keep=None, external_results=None, on_result=None,
               audit_node_ids=None, execution_records=None, evict_after_use=None):
@@ -571,6 +587,26 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
         for s in srcs:
             remaining[s] = remaining.get(s, 0) + 1
     results = dict(ext)
+    # EVERY NODE RUNS UNDER torch.inference_mode(), EXACTLY AS COMFYUI RUNS IT.
+    #
+    # ComfyUI's own executor wraps its whole graph run in ``inference_mode``
+    # (``execution.py``), and a node is written against that contract. This
+    # bridge did not, which is not a missing optimisation -- it is a different
+    # execution environment, and a node that is correct under ComfyUI can be
+    # wrong here.
+    #
+    # It cost a render to find. The LTX 2.5 VAE's ``process_output`` is
+    # ``lambda image: image.add_(1.0).div_(2.0).clamp_(0.0, 1.0)`` (comfy/sd.py)
+    # -- three IN-PLACE ops on the decode result. The tiled 3D decode path
+    # produces that tensor inside inference mode, and torch refuses an in-place
+    # update to an inference tensor from outside, so the graph sampled both
+    # stages perfectly and then died on its very last node with
+    # "Inplace update to inference tensor outside InferenceMode is not allowed".
+    #
+    # Wrapped at the CALL, not around the whole loop, so ``on_result`` and the
+    # free/evict bookkeeping keep running in normal mode -- those hand tensors
+    # to callers who may legitimately mutate them.
+    _inference_mode = _torch_inference_mode()
     for nid in _topo_order(graph, external_keys=set(ext)):
         node = graph[nid]
         cls = node.get("class")
@@ -593,7 +629,8 @@ def run_graph(graph, classes=None, *, terminal=None, free_after_use=False,
         kwargs = {k: _resolve_value(v, results)
                   for k, v in (node.get("inputs") or {}).items()}
         try:
-            out = normalize_node_output(fn(**kwargs))
+            with _inference_mode():
+                out = normalize_node_output(fn(**kwargs))
         except Exception as exc:  # noqa: BLE001 -- surfaced NAMED, never silent
             raise GraphExecutionError(
                 "node %r (%s) raised %s: %s"
