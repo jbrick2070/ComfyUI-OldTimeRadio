@@ -15907,16 +15907,30 @@ entry said "prefer mix4x8 over int8 for this tier" was still right even though
 its arithmetic was wrong. It was not. Both weights were then run on a rented
 RTX 4090 -- 24,564 MiB, Ada, a clean box -- through this lane's own graph:
 
-    int8         20.03 GB file   peak 23.5 GB   101.3 s
-    mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s
+    int8         20.03 GB file   peak 23.5 GB   101.3 s   /workspace/probe_int8.log
+    mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s   /workspace/probe_4090.log
+
+Verbatim from those two logs, on the 4090 pod:
+
+    engine=ltx25_native_foley_24gb dit=LTX25-distilled-DiT-comfy-int8.safetensors
+    GRAPH OK in 101.3s  frames=97  peak_rss=26.2 GB  peak_vram=23.5 GB
+
+    engine=ltx25_native_foley_24gb dit=LTX25-distilled-DiT-comfy-mix4x8-17GB.safetensors
+    GRAPH OK in 168.7s  frames=97  peak_rss=20.4 GB  peak_vram=23.1 GB
 
 int8 fits a 24 GB card with about half a gigabyte to spare and is FORTY PERCENT
 faster, so `LTX25_NATIVE_DIT_WIDE` is int8 and the mix4x8 rows above are
 history, not the lane's identity. Confirmed again on the RTX PRO 4500:
 `/workspace/probe_4500_int8_v2.log` -- `GRAPH OK in 266.1s frames=97
-peak_rss=24.0 GB peak_vram=26.8 GB`, foley decoded and muxed. That log is the
-artifact for the 266.1 s / 26.8 GB pair; a QA lane correctly refused the pair
-when it was quoted in a commit message with nothing in the tree behind it.
+peak_rss=24.0 GB peak_vram=26.8 GB`, foley decoded and muxed.
+
+**EVERY NUMBER IN THIS BLOCK NOW NAMES ITS LOG, AND THAT TOOK TWO PASSES.** A
+QA lane refused the 4500 pair when it was quoted in a commit message with
+nothing in the tree behind it. A second lane then pointed out that the 4090
+table -- the PRIMARY evidence for choosing int8 at all -- had exactly the same
+defect and had survived the first correction. Both are cited above. The rule
+this keeps re-teaching: the measurement is not the receipt; the path to the log
+is.
 
 The VRAM timeline above remains the useful part of this entry: it is the reason
 a static weights-plus-activations estimate over-predicts, which is exactly the
@@ -15931,6 +15945,16 @@ status is that the tier boundary is unmeasured on the hardware it names -- for
 this lane, and for `ltx25_native_foley_16gb` (w4a8, 12.5 GB), which has never been
 run at all. Settling it needs a leg on a real 24 GB card, or a deliberate decision
 to retier by the numbers already in hand.
+
+**CLOSED FOR THE 24 GB LANE, SAME DAY, BY THE LEG THIS PARAGRAPH ASKED FOR.**
+The SUPERSEDED block above IS that leg: a real RTX 4090, 24,564 MiB, int8
+peaking at 23.5 GB and rendering in 101.3 s. The upper-bound reasoning held
+exactly as written -- the 32 GB card's 24.1 GB was not a prediction of the 24 GB
+card's requirement, and the tier fits. **STILL OPEN, and narrowed to one lane:**
+`ltx25_native_foley_16gb` has never been run on 16 GB hardware. A QA lane flagged
+this paragraph as self-contradictory once the block above was inserted three
+lines from it, which it was; this note is the reconciliation rather than a
+deletion, because the reasoning is what made the measurement worth taking.
 
 **Verify:** the probe writes the timeline itself; re-run it on an interpreter
 `scripts/otr_venv_audit.py` reports clean, with `--engine <lane>`, and read the
