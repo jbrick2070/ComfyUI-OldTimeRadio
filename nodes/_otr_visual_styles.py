@@ -343,10 +343,10 @@ def compose_pack_from_card(card: VisualStyleCardModel | dict) -> dict:
             "default": f"{{form}} glowing warmly, {tex} dials and vacuum tubes",
         },
         "motion_registers": {
-            "announcer": f"Continuous shot, same console throughout. Dial needle sweeps in gentle arcs. {m_temp}. Slow handheld dolly forward.",
+            "announcer": f"Continuous shot, same console throughout. Dial needle sweeps in wide arcs. {m_temp}. Handheld dolly forward.",
             "music_open": f"Continuous shot, same console throughout. Dial whip-pans across frequencies. {m_temp}. Dynamic dolly push forward.",
-            "music_close": f"Continuous shot, same console throughout. Dial settles. {m_temp}. Slow dolly pull back.",
-            "music_inter": f"Continuous shot, same console throughout. Dial steady. {m_temp}. Slow orbit around the speaker.",
+            "music_close": f"Continuous shot, same console throughout. Dial needle drops back. {m_temp}. Dolly pull back.",
+            "music_inter": f"Continuous shot, same console throughout. Dial steady. {m_temp}. Orbit around the speaker.",
         },
         "still_word_typography": {
             "noir": f"{typo} lettering, deep shadow",
