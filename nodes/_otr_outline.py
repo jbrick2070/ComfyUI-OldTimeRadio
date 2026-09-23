@@ -973,7 +973,7 @@ Schema:
   "premise":         non-empty dramatic extrapolation from the story,
   "setting":         non-empty concrete place,
   "time_of_day":     non-empty time context,
-  "central_tension": the dramatic question the episode answers.
+  "central_tension": "one yes/no question naming who wants what and what stops them".
 }
 """
 
