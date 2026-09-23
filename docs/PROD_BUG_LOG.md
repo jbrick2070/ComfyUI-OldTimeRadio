@@ -15900,8 +15900,27 @@ through the 24 GB leg:
 DiT + activations (~8 GB here), never DiT + encoder + activations. Commit
 `610b2494` reasoned from the wrong premise -- it said this tier "runs its encoder
 on the accelerator, so the honest budget is DiT + ~5 GB", which is a non sequitur
-carrying a number that was also low. The conclusion it drew (prefer mix4x8 over
-int8 for this tier) survives the correction; the arithmetic behind it does not.
+carrying a number that was also low.
+
+**SUPERSEDED THE SAME DAY, AND THE CONCLUSION DID NOT SURVIVE EITHER.** This
+entry said "prefer mix4x8 over int8 for this tier" was still right even though
+its arithmetic was wrong. It was not. Both weights were then run on a rented
+RTX 4090 -- 24,564 MiB, Ada, a clean box -- through this lane's own graph:
+
+    int8         20.03 GB file   peak 23.5 GB   101.3 s
+    mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s
+
+int8 fits a 24 GB card with about half a gigabyte to spare and is FORTY PERCENT
+faster, so `LTX25_NATIVE_DIT_WIDE` is int8 and the mix4x8 rows above are
+history, not the lane's identity. Confirmed again on the RTX PRO 4500:
+`/workspace/probe_4500_int8_v2.log` -- `GRAPH OK in 266.1s frames=97
+peak_rss=24.0 GB peak_vram=26.8 GB`, foley decoded and muxed. That log is the
+artifact for the 266.1 s / 26.8 GB pair; a QA lane correctly refused the pair
+when it was quoted in a commit message with nothing in the tree behind it.
+
+The VRAM timeline above remains the useful part of this entry: it is the reason
+a static weights-plus-activations estimate over-predicts, which is exactly the
+error that ruled int8 out before anyone loaded it.
 
 **THE OPEN DEFECT: a lane named `24gb` peaked at 24.1 GB.** A 24 GB card has
 roughly 23.5 GB usable after driver overhead, so on its own name this lane does

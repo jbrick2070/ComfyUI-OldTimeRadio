@@ -3162,21 +3162,25 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
 
 @register
 class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
-    """24 GB, ANY modern NVIDIA. No Blackwell-only format, no ComfyUI-GGUF.
+    """24 GB AND UP, ANY modern NVIDIA. No Blackwell-only format, no GGUF.
 
-    mix4x8 at 17.0 GB runs on Ada and Hopper as well as Blackwell, so this is
-    the lane for a 4090 and a 5090 alike. It is the DEFAULT native choice; the
-    Blackwell lane below is the optimisation, not the baseline.
+    int8 is the weight, and it was chosen by running it rather than by sizing
+    it. INT8 tensor cores have shipped since Turing, so this one file serves
+    Ada, Ampere and Blackwell alike -- measured on a 4090 (101.3 s, 23.5 GB
+    peak) and an RTX PRO 4500 (266.1 s, 26.8 GB peak), both a 97-frame clip
+    with foley. It is the DEFAULT native choice; the Blackwell lane below is
+    the optimisation, not the baseline.
 
-    THIS DOCSTRING USED TO NAME fp8_e4m3fn AND EVERY CLAIM IN IT WAS WRONG.
-    It said fp8 was "the largest native DiT that fits a 24 GB card". That file
-    does not exist -- the publisher's MANIFEST.json still advertises it with a
-    size and a sha256, but the repository does not carry it, and a lane built
-    from that manifest was registered pointing at an undownloadable weight. It
-    would not have fit either: at 21.48 GB it lands near 26.5 GB in flight by
-    the arithmetic in ``LTX25_NATIVE_DIT_WIDE`` above, which is a 32 GB budget.
-    Both halves of a confident sentence, wrong, from trusting a vendor
-    manifest over a directory listing.
+    TWO EARLIER VERSIONS OF THIS DOCSTRING WERE WRONG, in opposite directions,
+    and both were wrong the same way: they reasoned about the weight instead of
+    loading it. The first named fp8_e4m3fn, a file the publisher's
+    MANIFEST.json advertises with a size and a sha256 and the repository does
+    not carry. The second ruled int8 out as a "32 GB-class file" that would
+    land near 26.5 GB in flight -- wrong in direction AND magnitude, since int8
+    both fits a 24 GB card and is forty percent faster than the alternative.
+    ComfyUI sizes residency against the card it finds and offloads when it is
+    tight, so weights-plus-activations arithmetic systematically over-predicts.
+    The receipts live in docs/PROD_BUG_LOG.md; what belongs here is the file.
     """
 
     name = "ltx25_native_foley_24gb"
@@ -3193,10 +3197,12 @@ class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
 class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
     """24/32 GB BLACKWELL. NVFP4, and it is the small one.
 
-    12.50 GB against the wide lane's 21.48 -- so Blackwell does not merely
-    match the other tier, it frees ~9 GB that a larger canvas or a longer rung
-    can spend. What that headroom should actually buy is a MEASUREMENT, not a
-    guess, so the canvas stays inherited until a real leg reports a peak.
+    12.50 GB against the wide lane's 20.03 -- so Blackwell does not merely
+    match the other tier, it frees ~7.5 GB that a larger canvas or a longer
+    rung can spend. What that headroom should actually buy is a MEASUREMENT,
+    not a guess, so the canvas stays inherited until a real leg reports a peak.
+    (This line compared against 21.48 until 2026-09-22 -- the size of the fp8
+    file that does not exist. The wide lane is int8 at 20.03 GB.)
 
     "Blackwell only" is the publisher's own wording. On anything older this
     lane is expected to refuse or fall back badly, which is why the wide lane

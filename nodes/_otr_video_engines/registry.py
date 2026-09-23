@@ -618,7 +618,7 @@ CAPABILITIES = {
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-fp8-e4m3fn-native",
+        "model_requirements": ["ltx-2.5-distilled-int8-native",
                                "gemma4-12b-ltx-2.5-w4a8-native",
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",

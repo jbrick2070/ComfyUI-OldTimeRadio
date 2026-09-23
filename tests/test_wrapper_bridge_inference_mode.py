@@ -149,32 +149,14 @@ def test_a_callback_may_mutate_what_it_is_handed():
                  on_result=lambda nid, out: out[0].add_(1.0))
 
 
-def test_a_harvested_clone_escapes_the_graphs_inference_mode():
-    """What the ONE production callback that copies a tensor actually does.
-
-    ``eng_ltx25.Ltx25FoleyPlusEngine._latent_to_cpu`` is the only ``on_result``
-    in the pack that copies tensors rather than registering a ModelPatcher; it
-    goes ``val.detach().cpu().clone()`` to make a CPU copy that outlives the
-    graph. A cursor QA lane caught that moving callbacks inside the wrap
-    INVERTS that copy: torch's clone-escape ("you can make a clone to get a
-    normal tensor") only works with the mode off, so an in-mode clone stays an
-    inference tensor and the copy silently inherits the lifetime it was made to
-    escape.
-
-    An earlier version of this file claimed an ``add_()`` callback modelled
-    that path. It did not -- production clones, it does not mutate -- so the
-    test blessed the inversion without being able to see it.
-    """
-    harvested = {}
-
-    def harvest(nid, out):
-        with torch.inference_mode(False):
-            harvested["t"] = out[0].detach().cpu().clone()
-
-    wb.run_graph({"n": {"class": _MakesATensor, "inputs": {}}},
-                 on_result=harvest)
-    assert not torch.is_inference(harvested["t"]),         "the durable copy carries the graph's execution mode"
-    harvested["t"].add_(1.0)          # and is therefore still writable
+# A test named test_a_harvested_clone_escapes_the_graphs_inference_mode used to
+# sit here. It RE-SPELLED ``detach().cpu().clone()`` under
+# ``inference_mode(False)`` in its own body instead of calling the shipping
+# helper -- so it proved that the IDIOM works, which was never in doubt, and
+# would have passed unchanged while ``_latent_to_cpu`` was broken. Both QA
+# lanes flagged it independently on 2026-09-22. The test below covers the same
+# property by calling the real function, which is the only version of this that
+# can fail when the code does.
 
 
 def test_the_real_foley_harvest_produces_a_writable_copy():
