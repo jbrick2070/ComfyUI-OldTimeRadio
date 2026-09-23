@@ -3494,6 +3494,14 @@ class Ltx25NativeAudioInMixin:
     #: expression below is about the audio crop, not the picture.)
     _VAE_AUDIO_CROP_MULTIPLE = 4096
 
+    #: THE RATE THE ENCODER ACTUALLY SEES, which is not the file's.
+    #: `VAE.__init__` sets `self.audio_sample_rate = 44100` (`comfy/sd.py`)
+    #: and the LTX audio branch never overrides it -- it sets only
+    #: `audio_sample_rate_output`, the DECODE side, which is 48 kHz. So
+    #: `VAEEncodeAudio` compares the file against 44100 and resamples
+    #: anything else BEFORE `vae.encode` runs its crop.
+    _VAE_AUDIO_INPUT_RATE = 44100
+
     def _pad_reference_for_vae_crop(self, audio_path, length):
         """Pad the reference WAV so the encoder's centre-crop removes nothing.
 
@@ -3537,6 +3545,7 @@ class Ltx25NativeAudioInMixin:
             return audio_path
         try:
             samples, rate = _fs.read_pcm16_wav(audio_path)
+            orig_rate = int(rate)
         except Exception as exc:             # noqa: BLE001 -- never fatal here
             _LOG.warning(
                 "[OTR video] %s could not read its audio_ref %r (%r); handing "
@@ -3546,6 +3555,46 @@ class Ltx25NativeAudioInMixin:
         import numpy as np
         fps = int(self.target_fps) or 25
         mult = int(self._VAE_AUDIO_CROP_MULTIPLE)
+        target_rate = int(self._VAE_AUDIO_INPUT_RATE)
+
+        # RESAMPLE FIRST, or the alignment below is computed against a
+        # length the encoder never sees. `VAEEncodeAudio` resamples to the
+        # VAE's own rate BEFORE `vae.encode` crops, so a 4096-aligned file
+        # at some other rate arrives unaligned and the crop eats the head
+        # again -- reopening the very defect this helper exists to close.
+        #
+        # IT IS NOT A HYPOTHETICAL. These lanes serve `character_video`
+        # beats, where the driver hands over the per-line VOICE wav
+        # unchanged at whatever rate the TTS wrote it, and Bark writes
+        # 24 kHz. Found by a Sonnet QA lane; the 44.1 kHz claim held only
+        # for the master-slice path, which is pinned to 44100.
+        #
+        # Done with the SAME call ComfyUI would have made, just early and
+        # at a length we control, so the waveform is not altered twice.
+        if int(rate) != target_rate:
+            try:
+                import torch
+                import torchaudio
+                samples = torchaudio.functional.resample(
+                    torch.from_numpy(np.ascontiguousarray(samples)),
+                    int(rate), target_rate).numpy()
+            except Exception as exc:       # noqa: BLE001
+                # NEVER relabel a failed resample with the destination
+                # rate. Say what is wrong and leave the rate honest; the
+                # crop will misbehave and the log will say why.
+                _LOG.warning(
+                    "[OTR video] %s could not resample its audio_ref from "
+                    "%d Hz to the encoder's %d Hz (%r); the VAE will "
+                    "resample it AFTER this alignment and its crop may "
+                    "take samples off the front of the beat",
+                    self.name, int(rate), target_rate, exc)
+            else:
+                _LOG.info(
+                    "[OTR video] %s resampled its audio_ref %d -> %d Hz to "
+                    "match the encoder, so the crop alignment holds",
+                    self.name, int(rate), target_rate)
+                rate = target_rate
+
         need = int(round(int(length) / float(fps) * int(rate)))
         have = int(samples.shape[-1])
         # THE TARGET IS THE CLIP, NOT THE FILE. A reference longer than the
@@ -3556,7 +3605,7 @@ class Ltx25NativeAudioInMixin:
         # HEAD is the correct slice because the driver already cut this file
         # to the beat (`render_driver` owns `start_s + segment.offset_s`).
         want = ((need + mult - 1) // mult) * mult
-        if want == have:
+        if want == have and int(rate) == int(orig_rate):
             return audio_path
 
         if have > want:

@@ -182,6 +182,61 @@ def test_the_padded_reference_is_a_multiple_the_vae_crop_will_not_touch(
         assert out == str(src), "an exact multiple must not be rewritten"
 
 
+@pytest.mark.parametrize("rate", [24000, 22050, 48000, 16000])
+def test_a_reference_at_any_other_rate_is_aligned_at_the_encoders_rate(
+        tmp_path, rate):
+    """The 44.1 kHz assumption was false on the character-dialogue path.
+
+    ``VAE.__init__`` sets ``audio_sample_rate = 44100`` (``comfy/sd.py``) and
+    the LTX audio branch never overrides it -- it sets only
+    ``audio_sample_rate_output`` (48 kHz, the DECODE side). So
+    ``VAEEncodeAudio`` resamples anything that is not 44.1 kHz BEFORE
+    ``vae.encode`` runs its 4096 crop.
+
+    These lanes serve ``character_video`` beats, where the driver hands over
+    the per-line VOICE wav unchanged at whatever rate the TTS wrote it -- and
+    Bark writes 24 kHz. Aligning at the FILE's rate therefore produced a
+    length the encoder never saw, the resample destroyed the alignment, and
+    the crop took samples off the front again. Found by a Sonnet QA lane.
+    """
+    import numpy as np
+
+    from nodes._otr_video_engines import foley_stems as fs
+
+    src = tmp_path / ("voice_%d.wav" % rate)
+    fs.write_pcm16_wav(
+        str(src), np.zeros((1, int(rate * 3.88)), dtype=np.float32), rate)
+
+    engine = eng_ltx25.Ltx25NativeAudioIn24gbEngine()
+    out = engine._pad_reference_for_vae_crop(str(src), 97)
+    samples, out_rate = fs.read_pcm16_wav(out)
+    n = int(samples.shape[-1])
+
+    assert out_rate == 44100, (
+        "the reference was left at %d Hz, so VAEEncodeAudio will resample it "
+        "after this alignment and the crop will eat the head" % out_rate)
+    assert n % 4096 == 0, (
+        "%d samples at %d Hz leaves a remainder of %d" % (n, out_rate, n % 4096))
+    assert n >= int(round(97 / 25.0 * 44100))
+
+
+@pytest.mark.parametrize("key", [
+    "refencode", "refsolid", "refmask", "refconcat",
+])
+def test_each_added_graph_node_is_assigned_exactly_once(key):
+    """Last write wins, so a second assignment silently replaces the first.
+
+    A codex review defeated the sampler guard this way; a Sonnet review then
+    pointed out the defence had been applied to that one key only. A later
+    ``g["refconcat"]`` taking ``W("refencode", 0)`` would restore the
+    discarded-reference bug while every substring assertion in this file
+    still found its literal somewhere in the source.
+    """
+    assert _GRAPH_SRC.count('g["%s"] = ' % key) == 1, (
+        '`g["%s"]` is assigned more than once; the last assignment is what '
+        "the graph gets, so an earlier correct one proves nothing." % key)
+
+
 def test_stage_two_inherits_the_fixed_length_and_needs_no_second_fix():
     """Documented here so nobody 'fixes' stage two as well and double-pads."""
     base = inspect.getsource(eng_ltx25.Ltx25VideoEngine._build_graph)
