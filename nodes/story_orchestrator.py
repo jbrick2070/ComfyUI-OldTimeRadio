@@ -21,8 +21,12 @@ S2 (commit 249bc06). Voice and video paths share the L3 ledger as
 the single source of truth; there is no Director-shape projection
 anywhere in active code.
 
-LLM runs via transformers (local GPU). Content safety filter
-catches profanity/NSFW that slips past the prompt policy.
+LLM runs via transformers (local GPU). THERE IS NO CONTENT SAFETY
+FILTER -- this line claimed one until 2026-09-23 and had been stale
+since the 2026-08-05 rip. No content check remains anywhere on the
+generation path: `validate_sfw` is a no-op, the G9 freeze gate is
+deleted, and `_otr_content_safety` has no importer outside tests.
+On an adaptation lane the author's own language is carried as written.
 
 v1.0  2026-04-04  Jeffrey Brick
 v2.0  2026-05-13  voice-path-cleanbreak S23.2 (docstring scrub)
