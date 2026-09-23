@@ -103,16 +103,28 @@ def qualified(monkeypatch):
     return "wan_ti2v"
 
 
-def test_unaffordable_planned_segment_raises(monkeypatch, qualified):
-    """A qualified row that cannot fit the planned length must REFUSE.
+def test_unaffordable_planned_segment_proceeds_and_is_reported(
+        monkeypatch, qualified, caplog):
+    """A qualified row predicted too small for the planned length PROCEEDS.
 
-    This is the case that used to reach the GPU: a planned segment skipped the
-    predictor entirely, so an unaffordable length ran to an in-process CUDA OOM,
-    which corrupts the allocator rather than failing cleanly.
+    NEVER REFUSE ON A NUMBER; ONLY AN OOM DECIDES (operator directive,
+    2026-09-23). This test asserted the opposite until that day -- it
+    pinned a PREDICTED shortfall raising before any work ran. The cost
+    model is still computed and still says what it thinks; it simply no
+    longer ends the run. A real OOM names the allocation that failed and
+    the size it wanted, which is the number worth having.
+
+    The old docstring here argued that reaching the GPU was the harm, because
+    an in-process CUDA OOM "corrupts the allocator rather than failing
+    cleanly". The operator weighed that against the cost of refusing on a
+    guess and chose the OOM: it is the only reading that is not an estimate,
+    and it names the allocation and size to shrink to.
     """
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 1200.0)
-    with pytest.raises(mc.MotionBudgetError):
-        rd._assert_beat_affordable({"engine_id": qualified}, _prebuilt([177]))
+    with caplog.at_level("WARNING"):
+        record = rd._assert_beat_affordable(
+            {"engine_id": qualified}, _prebuilt([177]))
+    assert record is not None
 
 
 def test_free_vram_unreadable_is_reported_not_guessed(monkeypatch, qualified):

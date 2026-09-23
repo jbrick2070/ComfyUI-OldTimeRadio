@@ -26,12 +26,18 @@ shared GPU lease + the dep-free registry error types. torch / diffusers / the LT
 """
 from __future__ import annotations
 
+import logging
 import math
 import os
 import sys
 
 from .._otr_shared import gpu_residency as _GR
 from .registry import EngineUnusable, EngineUsabilityReason
+
+#: This module had no logger until 2026-09-23. It never needed one while its
+#: memory findings were raised; now that they are SAID rather than enforced,
+#: it does.
+_LOG = logging.getLogger("OTR.motion")
 
 try:
     from .._otr_shared import env as otr_env
@@ -642,6 +648,35 @@ def unified_memory_budget_mb():
 _UNIFIED_SWAP_TOLERANCE = 1.15
 
 
+# ---------------------------------------------------------------------------
+# NEVER REFUSE ON A NUMBER. ONLY AN OOM DECIDES.
+# (operator directive, 2026-09-23 -- hard.) His words: "we should never refuse
+# on numbers, only OOM decided ... I don't want any probes flagging and dying
+# for VRAM measurements, an OOM is the final determinant", and, on the
+# eviction this came out of: "i'm fine with unloading models but we can't have
+# a guard kill the workflow because of measurements."
+#
+# THE DISTINCTION THE DIRECTIVE DRAWS, and it is the whole rule: FREEING
+# memory is welcome, PREDICTING a shortfall and refusing is not. A real OOM
+# names the allocation that failed and the size it wanted -- ground truth, and
+# it says exactly how far to shrink. A predictive refusal produces a number the
+# guard invented about work that never ran.
+#
+# WHY THE PREDICTIONS LOSE. The same afternoon this landed, an LTX 2.5 guard
+# refused three times and was wrong every time, always pessimistically: its
+# threshold exceeded the card's TOTAL so it refused an empty 4060; it sampled
+# free VRAM before an asynchronous release had landed and under-reported a
+# successful eviction by 2.5 GB; and so it refused a decode that had just
+# freed 5.7 GB, and nobody learned whether that decode would have worked.
+#
+# The LLM path reached this conclusion first -- `8ca19674`, "Stop estimate
+# gates from refusing LLM loads" -- and `_otr_model_loader`,
+# `_otr_gguf_backend` and `_otr_model_catalog` have all said "never raises"
+# since. These functions are the video half of the same ruling.
+#
+# MEASURE AND SAY. Never measure and refuse.
+# ---------------------------------------------------------------------------
+
 def unified_memory_weight_refusal(engine_name, weight_mb, free_mb,
                                   headroom_mb=None):
     """Would loading ``weight_mb`` of weights exceed this host's budget?
@@ -982,7 +1017,12 @@ def refuse_if_weights_exceed_unified_memory(engine_name):
     except Exception:  # noqa: BLE001 -- a guard must never be the failure
         return
     if message:
-        raise MotionBudgetError(message)
+        # WAS A RAISE until 2026-09-23; see the directive banner above. The
+        # weights genuinely may not fit -- this is the honest lower bound,
+        # charging nothing for activations -- but "may not fit" is a
+        # prediction, and on this project the prediction is not allowed to end
+        # the run. Say it loudly and let the allocator decide.
+        _LOG.warning("[OTR video] %s", message)
 
 
 def _cost_model_for(engine_name):
@@ -1212,25 +1252,33 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
         return snapped
     # 3. the FIXED overhead must fit, whatever the slope.
     if budget_mb < overhead:
-        raise MotionBudgetError(
-            "engine %s: the model's fixed overhead alone (%.0f MB) exceeds the "
-            "usable budget %.0f MB (free=%.0f MB, margin=%.2f). No frame count "
-            "is affordable -- free VRAM or pick a lighter engine."
-            % (engine_name, overhead, budget_mb,
-               float(free_vram_mb_value), margin))
+        # WAS A RAISE until 2026-09-23. A forecast, and forecasts do not end
+        # runs here -- see the directive banner above.
+        _LOG.warning(
+            "[OTR video] engine %s: the model's fixed overhead alone (%.0f MB) "
+            "exceeds the usable budget %.0f MB (free=%.0f MB, margin=%.2f). "
+            "Proceeding anyway -- only a real OOM decides, and its error names "
+            "the allocation that actually failed.",
+            engine_name, overhead, budget_mb,
+            float(free_vram_mb_value), margin)
     # 4. zero slope is legal ONLY now that the overhead has been proven to fit:
     #    frames are free, so any length is affordable.
     # 5. a positive slope prices the frames.
     if per_frame_at_res > 0:
         affordable = int((budget_mb - overhead) / per_frame_at_res)
         if affordable < snapped:
-            raise MotionBudgetError(
-                "engine %s: static frame budget %d (snapped %d) exceeds the "
-                "cost-model's affordable %d frames (free=%.0f MB, "
-                "margin=%.2f). NO silent resize -- lower the frame_count "
-                "widget, free VRAM, or pick a lighter engine."
-                % (engine_name, target, snapped, max(0, affordable),
-                   float(free_vram_mb_value), margin))
+            # WAS A RAISE until 2026-09-23. Note what it does NOT do, then or
+            # now: it never silently resized. The frame count the caller asked
+            # for is still what it gets -- the cost model only says it looks
+            # expensive, and a cost model is a guess about work that has not
+            # run.
+            _LOG.warning(
+                "[OTR video] engine %s: static frame budget %d (snapped %d) "
+                "exceeds the cost-model's affordable %d frames (free=%.0f MB, "
+                "margin=%.2f). Proceeding at the requested length -- no silent "
+                "resize, and only a real OOM decides.",
+                engine_name, target, snapped, max(0, affordable),
+                float(free_vram_mb_value), margin)
     return snapped
 
 

@@ -54,12 +54,20 @@ def qualified_row(monkeypatch):
     monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
 
 
-def test_budget_raises_under_pressure(monkeypatch, qualified_row):
-    """S4 platform-portability rewrite (2026-07-10): the frame budget is now a
-    STATIC 4n+1-snapped target (geometry only) -- it NEVER shrinks to fit live
-    VRAM anymore. When the cost model predicts the snapped target will not
-    fit, compute_real_frame_budget RAISES MotionBudgetError instead of
-    returning a smaller frame count. Same pressure inputs as the pre-S4 test.
+def test_budget_warns_under_pressure_and_still_returns_the_target(
+        monkeypatch, qualified_row, caplog):
+    """The frame budget is a STATIC 4n+1-snapped target (geometry only): it
+    never shrinks to fit live VRAM, and since 2026-09-23 it never refuses
+    either.
+
+    NEVER REFUSE ON A NUMBER; ONLY AN OOM DECIDES (operator directive,
+    2026-09-23). This test asserted the opposite until that day -- it
+    pinned a PREDICTED shortfall raising before any work ran. The cost
+    model is still computed and still says what it thinks; it simply no
+    longer ends the run. A real OOM names the allocation that failed and
+    the size it wanted, which is the number worth having.
+
+    Same pressure inputs as the pre-S4 test.
     # overhead 7000 + 185/frame @1472x832; budget = free*0.85 (no policy ceiling
     # post-VRAM-rip -- the operator's tier JSON owns the OOM budget).
     # free 14775 -> 12558.75 budget -> (12558.75-7000)/185 = 30 affordable, which
@@ -68,13 +76,29 @@ def test_budget_raises_under_pressure(monkeypatch, qualified_row):
     may no longer price frames.
     """
     _clear_cost_env(monkeypatch)
-    with pytest.raises(mc.MotionBudgetError):
-        mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
+    with caplog.at_level("WARNING"):
+        got = mc.compute_real_frame_budget(14775.0, 280, 1472, 832, "wan_ti2v")
+    assert got == 277, "the snapped target is returned, never silently resized"
+    assert any("affordable" in r.getMessage() for r in caplog.records), \
+        "the cost model must still SAY what it predicts"
 
 
-def test_budget_raises_when_starved(monkeypatch, qualified_row):
-    """Starved VRAM that cannot cover the engine's fixed overhead refuses --
-    when the row is QUALIFIED to say so.
+def test_budget_warns_when_starved_and_still_returns_the_target(
+        monkeypatch, qualified_row, caplog):
+    """Starved VRAM that cannot cover the engine's fixed overhead is REPORTED.
+
+    NEVER REFUSE ON A NUMBER; ONLY AN OOM DECIDES (operator directive,
+    2026-09-23). This test asserted the opposite until that day -- it
+    pinned a PREDICTED shortfall raising before any work ran. The cost
+    model is still computed and still says what it thinks; it simply no
+    longer ends the run. A real OOM names the allocation that failed and
+    the size it wanted, which is the number worth having.
+
+    It used to refuse here, and this is the starkest case for the directive:
+    the 7000 MB overhead came from an ABSOLUTE peak while the comparison is
+    against FREE bytes, so it double-charges the desktop baseline on every
+    prediction -- a refusal built on a number known to be wrong in the
+    pessimistic direction.
     # 8000 free -> budget 6800 < the 7000 MB overhead -> raises before any
     # frame is priced, whatever the target length is.
 
@@ -87,8 +111,10 @@ def test_budget_raises_when_starved(monkeypatch, qualified_row):
     on every prediction. Both halves of an unqualified row are impeached.
     """
     _clear_cost_env(monkeypatch)
-    with pytest.raises(mc.MotionBudgetError):
-        mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v")
+    with caplog.at_level("WARNING"):
+        got = mc.compute_real_frame_budget(8000.0, 280, 1472, 832, "wan_ti2v")
+    assert got == 277
+    assert any("overhead" in r.getMessage() for r in caplog.records)
 
 
 def test_an_unqualified_row_may_not_refuse_on_OVERHEAD_either(monkeypatch):
@@ -136,7 +162,7 @@ def test_budget_never_exceeds_target(monkeypatch):
     assert out <= 49 and (out - 1) % 4 == 0
 
 
-def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row):
+def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row, caplog):
     """S4 rewrite: old expectation was bigger-canvas -> fewer predicted frames
     (a shrink). NEW: the snapped target (277 for target=280 on wan_ti2v) is
     canvas-independent -- per-frame VRAM cost still scales with pixel area, so
@@ -150,8 +176,14 @@ def test_budget_scales_cost_with_pixel_area(monkeypatch, qualified_row):
     _clear_cost_env(monkeypatch)
     small = mc.compute_real_frame_budget(40000.0, 280, 832, 480, "wan_ti2v")
     assert small == 277
-    with pytest.raises(mc.MotionBudgetError):
-        mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "wan_ti2v")
+    # The bigger canvas is predicted unaffordable at the same free level. Since
+    # 2026-09-23 that is a WARNING: the snapped target comes back either way
+    # and the allocator gets to decide. Cost still scales with pixel area --
+    # that is what the warning reports -- it just no longer ends the run.
+    with caplog.at_level("WARNING"):
+        big = mc.compute_real_frame_budget(40000.0, 280, 1472, 832, "wan_ti2v")
+    assert big == 277
+    assert any("affordable" in r.getMessage() for r in caplog.records)
 
 
 @pytest.mark.parametrize("engine, free_mb, frames", [
