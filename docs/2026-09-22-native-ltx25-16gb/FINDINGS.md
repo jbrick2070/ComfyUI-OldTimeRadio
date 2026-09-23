@@ -183,3 +183,30 @@ decides whether the fix is `keep` or an explicit unload call.
    passes it (`_otr_soak_server_launch.cmd:192`); it sets
    PYTORCH_CUDA_ALLOC_CONF=backend:cudaMallocAsync before ComfyUI installs its
    own pluggable allocator, and the interaction is undocumented.
+
+## A CAVEAT ON EVERY NUMBER ABOVE: THE TEXT ENCODER WAS NOT THE LANE'S OWN
+
+Every probe tonight was run with `OTR_LTX25_NATIVE_TE=
+gemma4-12b-with-proj-ltx-2.5-nvfp4.safetensors` (10.43 GiB), because that is
+what was on disk. The lane DECLARES `gemma4-12b-ltx25-comfy-w4a8.safetensors`
+(9.88 GiB), which was not.
+
+The canonical runner's preflight caught it on the first episode attempt and
+refused before rendering rather than failing part-way -- which is the behaviour
+that rule exists for, and it worked.
+
+WHAT IT DOES AND DOES NOT INVALIDATE. The DiT comparison stands: all four arms
+used the SAME encoder, so the bake-off's variable was still only the DiT. What
+is NOT established is the absolute wall-clock with the shipped stack, because
+the encoder differs in size (10.43 vs 9.88 GiB) and in format.
+
+AND THE FORMAT IS THE PART THAT MATTERS. The on-disk encoder is **nvfp4 --
+Blackwell-only**. Retargeting the lane at it would have silently made the
+"portable, any Ampere+" 16 GB lane Blackwell-locked through its TEXT ENCODER
+while every note about it still said portable. That is the kind of defect that
+passes every test and is discovered by someone whose card cannot run it. The
+declared w4a8 encoder is being fetched instead; it is ungated (verified
+`gated: False` on joeygambino/LTX-2.5-Quantized today).
+
+The 205.3 s figure is therefore provisional until one leg runs on the declared
+stack end to end.

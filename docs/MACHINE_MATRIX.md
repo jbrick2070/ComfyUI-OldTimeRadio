@@ -125,13 +125,13 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 
 </details>
 
-## 16 GB+  --  97 experimental profile(s), 48 shipping
+## 16 GB+  --  96 experimental profile(s), 48 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `16gb_full` | viz_camera | - | musicgen | lumina_image | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_foley` | ltx25_foley_plus | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
+| `otr_16gb_foley` | ltx25_native_foley_16gb | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
 | `otr_16gb_low` | viz_camera | - | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_mime` | ltx25_mime | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
 | `otr_16gb_still` | still_motion | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
@@ -178,9 +178,9 @@ Video engines they select: `animatediff15_v3_haunted_video`, `viz_camera`, `wan_
 | `otr_w45_viz_mxc_mandala` | viz_mxc_mandala | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>49 draft profile(s) here -- not vouched for</summary>
+<details><summary>48 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx25_native_foley_blackwell`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
+Video engines they select: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
