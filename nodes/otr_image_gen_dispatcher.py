@@ -1106,6 +1106,24 @@ def _replay_rebase_to_live_episode(ledger: dict) -> dict:
         live_id = str((live.data or {}).get("episode_id") or "").strip()
         if not stale_id or not live_id or stale_id == live_id:
             return ledger            # nothing renamed under us
+        # PROVE THE SINGLETON IS THIS REPLAY BEFORE REWRITING ANY PATH.
+        # Without this the function will happily rebase onto an UNRELATED
+        # episode -- a Sonnet QA lane demonstrated exactly that by execution,
+        # feeding a live ledger with no lineage to the wire one and watching
+        # every image path move to a directory the files are not in. It is
+        # not reachable today (one prompt at a time, one new_ledger per graph)
+        # but "currently unreachable" is not a guarantee, and the cost of the
+        # check is one string compare.
+        #
+        # ``import_replay_bundle`` stamps meta.replay_workspace_id and
+        # rename_episode does not touch meta, so the two must agree.
+        stale_ws = str(((ledger.get("meta") or {}) if isinstance(ledger.get("meta"), dict) else {}).get("replay_workspace_id") or "").strip()
+        live_ws = str(((live.data or {}).get("meta") or {}).get("replay_workspace_id") or "").strip()
+        if not stale_ws or not live_ws or stale_ws != live_ws:
+            log.warning("[OTR_ImageGenDispatcher] REPLAY: the live ledger is "
+                        "%r, not this replay (%r); refusing to rebase its "
+                        "paths", live_id or "?", stale_id)
+            return ledger
         # `<episode dir>/audio/<id>_ledger.json` -> the episode dir, then its parent
         new_ep_dir = os.path.dirname(os.path.dirname(str(live.path)))
         old_ep_dir = os.path.join(os.path.dirname(new_ep_dir), stale_id)

@@ -36,6 +36,11 @@ import logging
 import os
 import tempfile
 from pathlib import Path
+
+try:
+    from ._otr_shared.pathbudget import long_path as _long_path
+except ImportError:  # pragma: no cover -- flat test imports
+    from _otr_shared.pathbudget import long_path as _long_path  # type: ignore
 from typing import Any, Iterable, Optional
 
 try:
@@ -554,7 +559,9 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
                     # (network drives, filesystems without flush
                     # support). Non-fatal; the write itself flushed.
                     pass
-            os.replace(tmp_name, target)
+            # `target` can be over MAX_PATH on a long install root; the
+            # temp file never is, because it is named by mkstemp.
+            os.replace(tmp_name, _long_path(str(target)))
         except Exception:
             # Clean up the partial temp so we don't leave debris.
             try:

@@ -1241,7 +1241,8 @@ class Ledger:
                 from pathlib import Path as _Path
                 from . import _otr_ledger as _OTRL  # type: ignore
 
-                with open(new_ledger_path, "r", encoding="utf-8") as _fh:
+                with open(_long_path(str(new_ledger_path)), "r",
+                          encoding="utf-8") as _fh:
                     _disk_ledger = json.load(_fh)
                 if not isinstance(_disk_ledger, dict):
                     raise TypeError(
@@ -1875,9 +1876,16 @@ class Ledger:
           see the ROW_KEYED map below.)
         """
         try:
-            if not os.path.exists(path):
+            # THROUGH `_long_path`, AND THIS ONE IS LOAD-BEARING FOR BUG-108.
+            # `Ledger.save` writes through the helper; if this read does not,
+            # `os.path.exists` answers False for a file that IS there whenever
+            # the path is over budget, and the merge below is skipped forever.
+            # The ledger then silently clobbers the schema-l3 fields the audio
+            # nodes wrote -- exactly the bug this method exists to prevent,
+            # reopened by wrapping the write alone. Found by a Sonnet QA lane.
+            if not os.path.exists(_long_path(path)):
                 return in_mem
-            with open(path, "r", encoding="utf-8") as f:
+            with open(_long_path(path), "r", encoding="utf-8") as f:
                 on_disk = json.load(f)
         except Exception as exc:  # noqa: BLE001
             log.warning("[Ledger] BUG-108 merge: on-disk read failed: %s", exc)
