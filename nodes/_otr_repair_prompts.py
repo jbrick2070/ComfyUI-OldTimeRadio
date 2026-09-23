@@ -73,14 +73,23 @@ def _compose_repair(
     `directive` differs between classes. This mirrors the structure of
     `default_repair_prompt_factory` so the typed factories stay
     drop-in compatible with it.
+
+    THE DIRECTIVE GOES LAST (2026-09-23). It used to lead, and the
+    restated original instruction closed the message -- so the last thing
+    a small model read before generating was a verbatim echo of the prompt
+    that had just failed it, and the one sentence naming the fix was
+    hundreds of tokens upstream. The restatement STAYS, because a repair
+    turn has to be self-contained; only the order changed. Same content,
+    and the fix now sits at the generation boundary where recency works
+    for it instead of against it.
     """
     original_text = _prompt_to_text(original_prompt)
     body = (
-        directive.rstrip()
-        + "\n\n"
-        + f"Failed response: {failed_output[:_FAILED_OUTPUT_ECHO_CHARS]}\n\n"
-        + "Original instruction follows.\n\n"
+        "The original instruction was:\n\n"
         + original_text
+        + f"\n\nYour failed response: "
+          f"{failed_output[:_FAILED_OUTPUT_ECHO_CHARS]}\n\n"
+        + directive.rstrip()
     )
     return [{"role": "user", "content": body}]
 

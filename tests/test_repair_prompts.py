@@ -132,7 +132,13 @@ def test_json_syntax_repair_requests_one_valid_object():
         failed_output=_FAILED_OUTPUT,
         error=_json_error(),
     ))
-    assert text.startswith("CRITICAL:")
+    # The directive is PRESENT and CLOSES the message -- see the module
+    # note in nodes/_otr_repair_prompts.py::_compose_repair. It used to
+    # lead; the original instruction now does, so the fix is the last thing
+    # read before generation.
+    assert "CRITICAL:" in text
+    assert text.rstrip().endswith("must be balanced.")
+    assert text.startswith("The original instruction was:")
     assert "not valid JSON" in text
     assert "Out Of Range" in text
     assert _ORIGINAL_PROMPT in text

@@ -471,15 +471,23 @@ def default_repair_prompt_factory(
     """
     error_text = f"{type(error).__name__}: {error}"
     original_text = _prompt_to_text(original_prompt)
-    critical = (
-        "CRITICAL: Your previous response failed schema validation "
-        f"because: {error_text}.\n\n"
-        "Return ONE valid JSON object that satisfies the schema. No "
-        "Markdown, no prose, no preamble -- only the JSON object.\n\n"
-        f"Failed response: {failed_output[:400]}\n\n"
-        "Original instruction follows.\n\n"
+    # THE DIRECTIVE GOES LAST (2026-09-23) -- same change and same reasoning
+    # as `_otr_repair_prompts._compose_repair`, whose shape this mirrors.
+    # Both used to close on the restated original, which put a verbatim echo
+    # of the contract that had just failed at the generation boundary, and
+    # left the sentence naming the fix hundreds of tokens upstream. The
+    # restatement stays -- a repair turn must be self-contained -- but the
+    # directive now sits closest to generation.
+    body = (
+        "The original instruction was:\n\n"
+        + original_text
+        + f"\n\nYour failed response: {failed_output[:400]}\n\n"
+        + "CRITICAL: that response failed schema validation because: "
+        + f"{error_text}.\n\n"
+        + "Return ONE valid JSON object that satisfies the schema. No "
+          "Markdown, no prose, no preamble -- only the JSON object."
     )
-    return [{"role": "user", "content": critical + original_text}]
+    return [{"role": "user", "content": body}]
 
 
 # ---------------------------------------------------------------------------

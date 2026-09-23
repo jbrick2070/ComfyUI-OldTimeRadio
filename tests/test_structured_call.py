@@ -432,11 +432,21 @@ def test_default_repair_factory_used_when_none_passed():
     )
     assert isinstance(result, SampleSchema)
     assert len(slot.calls) == 3
-    # The default factory prepends a CRITICAL directive to the repair
-    # message, so Attempt 3's prompt should carry that marker.
+    # The default factory puts a CRITICAL directive in the repair
+    # message, so Attempt 3's prompt must carry that marker. Until
+    # 2026-09-23 the directive LED the message and this asserted
+    # `startswith`; it now CLOSES it, so the fix sits at the generation
+    # boundary instead of a restatement of the contract that just
+    # failed. The marker being present is the contract; where it sits
+    # is the improvement. REASONED, NOT MEASURED -- no A/B compared the
+    # two orders, so revert here if a live leg shows retries worsening.
     attempt_three_messages = slot.calls[2]["messages"]
     repair_text = attempt_three_messages[0]["content"]
-    assert repair_text.startswith("CRITICAL:"), repair_text[:80]
+    assert "CRITICAL:" in repair_text, repair_text[:80]
+    assert repair_text.rstrip().endswith("only the JSON object."), \
+        repair_text[-80:]
+    assert repair_text.startswith("The original instruction was:"), \
+        repair_text[:80]
 
 
 # ---------------------------------------------------------------------------
