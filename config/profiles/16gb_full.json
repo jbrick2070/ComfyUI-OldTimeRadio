@@ -18,7 +18,7 @@
   "slot_overrides": {
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
-    "music_engine": "musicgen",
+    "music_engine": "stable_audio_3",
     "video_render_engine": "viz_camera"
   },
   "features": {
@@ -46,7 +46,13 @@
     "comfy_slot_b_model": "(enable Comfy Credits)",
     "google_api_slot_a_model": "(select Google API model)",
     "google_api_slot_b_model": "(select Google API model)",
-    "lane_allowlist": ["transformers", "gguf", "openrouter", "comfy_credits", "google_api"]
+    "lane_allowlist": [
+      "transformers",
+      "gguf",
+      "openrouter",
+      "comfy_credits",
+      "google_api"
+    ]
   },
   "video": {
     "device_policy": "cuda",
