@@ -84,8 +84,8 @@ without that map would play ~4% short.
 | ltx25_foley_plus_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_foley_plus_32gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_mime | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_native_audio_in_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_native_audio_in_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_native_audio_in_16gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
+| ltx25_native_audio_in_24gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_blackwell | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |

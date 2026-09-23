@@ -195,6 +195,21 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     # Same composer again: encoder placement is invisible to a prompt.
     "ltx25_foley_plus_32gb",
     "ltx25_mime",
+    # THE SIX NATIVE (non-GGUF) LANES. Same composer as their GGUF siblings for
+    # the same reason given twice above: a bookend prompt cannot see which DiT
+    # file loads, and these differ from `ltx25_foley_plus` in exactly that and
+    # in how their bed is mixed. The three foley ids were ALREADY missing here
+    # before the mime and audio-in pairs were registered -- this list is an
+    # inline literal precisely because it goes stale, and it had.
+    "ltx25_native_foley_16gb",
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_mime_16gb",
+    "ltx25_native_mime_24gb",
+    # Audio-in composes the same bookend text; what differs is the WAVEFORM it
+    # is handed, which is not a prompt concern either.
+    "ltx25_native_audio_in_16gb",
+    "ltx25_native_audio_in_24gb",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",
 })
