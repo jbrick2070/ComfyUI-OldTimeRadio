@@ -119,6 +119,14 @@ def test_the_sampler_consumes_the_fitted_latent_not_the_unfitted_one():
     assert 'g["sampler"]["inputs"]["latent_image"] = W("refconcat", 0)' in _GRAPH_SRC, (
         "the sampler still reads `concat`, so the fitted audio stream is "
         "built and then thrown away.")
+    # A codex review defeated the assertion above by appending a SECOND
+    # assignment back to `concat`: the correct string is still present, so the
+    # guard passed while the built graph was wrong. Last write wins, so the
+    # only safe count is one.
+    assert _GRAPH_SRC.count('g["sampler"]["inputs"]["latent_image"]') == 1, (
+        "the sampler's latent_image is assigned more than once; the last "
+        "assignment is what the graph gets, so an earlier correct one proves "
+        "nothing.")
 
 
 def test_the_reference_is_padded_before_staging_not_after():
@@ -163,8 +171,14 @@ def test_the_padded_reference_is_a_multiple_the_vae_crop_will_not_touch(
         "%d samples off the front of the reference"
         % (n, n % 4096, (n % 4096) // 2))
     assert n >= int(round(97 / 25.0 * rate)), "padded below the clip duration"
-    assert n >= have, "the reference itself must never be shortened here"
-    if have % 4096 == 0 and have >= int(round(97 / 25.0 * rate)):
+    # BOUNDED BY THE CLIP, never by the file. `fit_audio` narrows the encoded
+    # latent with `narrow(dim, 0, length)` and throws the tail away anyway, so
+    # encoding a longer reference spends VRAM on samples that are discarded --
+    # and the 16 GB tier can least afford it.
+    assert n == 172032, (
+        "a %d-sample reference produced %d; every case must land on the same "
+        "clip-sized multiple" % (have, n))
+    if have == 172032:
         assert out == str(src), "an exact multiple must not be rewritten"
 
 

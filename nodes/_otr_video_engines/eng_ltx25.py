@@ -3544,12 +3544,23 @@ class Ltx25NativeAudioInMixin:
         mult = int(self._VAE_AUDIO_CROP_MULTIPLE)
         need = int(round(int(length) / float(fps) * int(rate)))
         have = int(samples.shape[-1])
-        want = ((max(need, have) + mult - 1) // mult) * mult
+        # THE TARGET IS THE CLIP, NOT THE FILE. A reference longer than the
+        # beat is not extra context: `fit_audio` narrows the encoded latent
+        # with `narrow(dim, 0, length)` and discards the tail regardless, so
+        # encoding all of it only spends time and VRAM on samples that are
+        # thrown away -- which the 16 GB tier can least afford. Taking the
+        # HEAD is the correct slice because the driver already cut this file
+        # to the beat (`render_driver` owns `start_s + segment.offset_s`).
+        want = ((need + mult - 1) // mult) * mult
         if want == have:
             return audio_path
 
-        pad = np.zeros((samples.shape[0], want - have), dtype=samples.dtype)
-        samples = np.concatenate([samples, pad], axis=-1)
+        if have > want:
+            samples = samples[..., :want]
+        else:
+            pad = np.zeros((samples.shape[0], want - have),
+                           dtype=samples.dtype)
+            samples = np.concatenate([samples, pad], axis=-1)
 
         import hashlib
         key = hashlib.sha256(
@@ -3560,9 +3571,10 @@ class Ltx25NativeAudioInMixin:
             "otr_%s_vaepad_%s_%d.wav" % (self.name, key, want))
         _fs.write_pcm16_wav(out, samples, rate)
         _LOG.info(
-            "[OTR video] %s padded its audio_ref %d -> %d sample(s) at %d Hz "
-            "so the VAE crop (multiple of %d) keeps the head; clip needs %d",
-            self.name, have, want, rate, mult, need)
+            "[OTR video] %s %s its audio_ref %d -> %d sample(s) at %d Hz so "
+            "the VAE crop (multiple of %d) keeps the head; clip needs %d",
+            self.name, "trimmed" if have > want else "padded",
+            have, want, rate, mult, need)
         return out
 
     def _node_candidates(self):
