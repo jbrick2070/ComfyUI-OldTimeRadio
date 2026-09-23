@@ -105,19 +105,66 @@ FOLEY_RECEIPT_KEYS = (
 #: audio entirely. BOTH are answered: the native audio STAYS at 1.00, and the
 #: programme (TTS, music cues, announcer) STAYS at 0.00 inside mime windows.
 #: Do not propose dropping mime's generated audio; the operator wants it.
+#: EVERY LANE THAT HARVESTS A FOLEY BED MUST HAVE A ROW HERE, AND FIVE DID
+#: NOT (2026-09-23). Membership of this table is not a mixing preference; it is
+#: how `is_foley_route` decides an episode is a foley episode at all. A lane
+#: that is absent renders its foley per beat, writes its durable stem, and then
+#: the episode master never mixes it:
+#:
+#:   scene_sequencer:1792  is_foley_route -> False
+#:   scene_sequencer:1960  so no MASTER_WAV_PRE_LOUDNESS stamp is written
+#:   master_audio_mux:1879 `_foley_route(...) or _master_wav_owes_a_delivery_gain(...)`
+#:                         -- both False, so _compile_foley_master never runs
+#:
+#: and because `canonicalize_video` strips beat audio (V-1: only
+#: OTR_MasterAudioMux ever adds audio), the delivered episode is SILENT of
+#: foley. The lane looks healthy the whole way: the beat mp4 has sound in it,
+#: the stem is on disk, nothing fails, and the receipt says the render
+#: succeeded.
+#:
+#: The missing rows were the two GGUF TIER lanes -- `ltx25_foley_plus_24gb`
+#: and `_32gb`, which have been shipping -- and the three NATIVE lanes added
+#: the same week. All five subclass `Ltx25FoleyPlusEngine` and harvest exactly
+#: as it does, so they take exactly its gains -- and they join
+#: `GLOBAL_MASTER_GAIN_LANES` below for the same reason, because a lane that
+#: mixes like foley_plus and ducks like foley_plus is foley_plus at a different
+#: weight. Leaving them out would have ducked the master only inside their own
+#: beats instead of across the episode, which is a DIFFERENT MIX from the lane
+#: they inherit, arrived at by omission rather than by choosing it.
 FOLEY_LANE_GAINS = {
     "ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_foley_plus_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_foley_plus_32gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_native_foley_16gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_native_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    "ltx25_native_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_mime": (1.00, 0.00),
     # Same 0.50/0.50 bed as local Foley -- harvested from the partner mp4
     # instead of the audio latent, then mixed by this table, not a second mux.
     "cloud_ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
 }
 
-#: The lane whose master gain applies GLOBALLY rather than per-window. Exactly
-#: one lane does this and the distinction is a ruling, not an implementation
-#: detail -- see the table above.
+#: The lanes whose master gain applies GLOBALLY rather than per-window, and
+#: the distinction is a ruling rather than an implementation detail -- see the
+#: table above.
+#:
+#: THE TEST FOR MEMBERSHIP IS WHAT THE LANE DOES TO THE PROGRAMME, not which
+#: weight it loads. A foley lane beds its sound UNDER the dialogue, so the
+#: master is ducked everywhere and the episode reads as one mix; mime REPLACES
+#: the programme in its own beats, so its gain must be per-window or an episode
+#: with one mime role would go silent entirely. Every foley variant therefore
+#: belongs here and mime never does.
+#:
+#: This note used to say "exactly one lane does this" while the set already
+#: held two, and the count was wrong again the moment the tier lanes were
+#: added. A membership rule survives the next addition; a tally does not.
 GLOBAL_MASTER_GAIN_LANES = frozenset({
     "ltx25_foley_plus",
+    "ltx25_foley_plus_24gb",
+    "ltx25_foley_plus_32gb",
+    "ltx25_native_foley_16gb",
+    "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
     "cloud_ltx25_foley_plus",
 })
 
