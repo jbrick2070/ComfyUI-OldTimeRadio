@@ -1,6 +1,6 @@
 {
   "id": "otr_24gb_native_foley",
-  "display_name": "24 GB NVIDIA (any modern card) -- NATIVE, non-GGUF video that generates its own sound. Lane ltx25_native_foley_24gb (fp8_e4m3fn, stock ComfyUI loaders, no ComfyUI-GGUF), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. NOT YET QUALIFIED: no live leg has completed on this profile.",
+  "display_name": "24 GB NVIDIA (any modern card) -- NATIVE, non-GGUF video that generates its own sound. Lane ltx25_native_foley_24gb (mix4x8 17 GB, stock ComfyUI loaders, no ComfyUI-GGUF), z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.8-27B at a 22 GB ceiling. NOT YET QUALIFIED: no live leg has completed on this profile.",
   "status": "draft",
   "platform": "any",
   "device_backend": "cuda",
@@ -77,7 +77,7 @@
   },
   "preflight": {
     "required_models": [
-      "LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors",
+      "LTX25-distilled-DiT-comfy-mix4x8-17GB.safetensors",
       "gemma4-12b-ltx25-comfy-w4a8.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
       "ltx-2.5-audio-vae-bf16.safetensors",

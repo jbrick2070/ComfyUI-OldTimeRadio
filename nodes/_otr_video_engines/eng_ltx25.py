@@ -3001,7 +3001,26 @@ class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
 #: token, which is why the mirror is named here.
 LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-w4a8.safetensors"
 LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
-LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors"
+#: 24 GB, ANY modern NVIDIA. NOT fp8_e4m3fn, which this lane shipped pointing
+#: at and which DOES NOT EXIST.
+#:
+#: The publisher's own MANIFEST.json still advertises
+#: ``LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors`` at 21.48 GB, noted
+#: "24 GB+, widest GPU support", with a sha256 -- and the repository does not
+#: contain it. A stat returns exists=false and a find for ``*fp8*`` returns
+#: nothing. The lineup was revised (fp8 dropped; int8 and two mix4x8 builds
+#: added) and the manifest was never updated. This lane was built from that
+#: manifest, so it was registered pointing at a file nobody can download.
+#:
+#: mix4x8-17GB is the replacement, chosen by ARITHMETIC rather than by the
+#: manifest's labels, since those are what misled it once already. The
+#: measured Blackwell leg peaked at 27.7 GB VRAM carrying a 12.5 GB DiT plus
+#: the 10.6 GB encoder on-GPU, i.e. roughly DiT + encoder + 5 GB of
+#: activations. This tier pins the encoder to the accelerator too, so the
+#: honest budget is DiT + ~5 GB: int8 at 21.5 GB lands near 26.5 GB and does
+#: NOT fit a 24 GB card, while mix4x8 at 17.0 GB lands near 22 GB and does.
+#: int8 is a 32 GB-class file, not a 24 GB one.
+LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-mix4x8-17GB.safetensors"
 LTX25_NATIVE_TEXT_ENCODER = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
 
 
@@ -3127,12 +3146,21 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
 
 @register
 class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
-    """24/32 GB, ANY modern NVIDIA. The publisher's "widest GPU support".
+    """24 GB, ANY modern NVIDIA. No Blackwell-only format, no ComfyUI-GGUF.
 
-    fp8_e4m3fn at 21.48 GB is the largest native DiT that fits a 24 GB card,
-    and it runs on Ada and Hopper as well as Blackwell -- so this is the lane
-    for a 4090 or a 5090 alike. It is the DEFAULT native choice; the Blackwell
-    lane below is the optimisation, not the baseline.
+    mix4x8 at 17.0 GB runs on Ada and Hopper as well as Blackwell, so this is
+    the lane for a 4090 and a 5090 alike. It is the DEFAULT native choice; the
+    Blackwell lane below is the optimisation, not the baseline.
+
+    THIS DOCSTRING USED TO NAME fp8_e4m3fn AND EVERY CLAIM IN IT WAS WRONG.
+    It said fp8 was "the largest native DiT that fits a 24 GB card". That file
+    does not exist -- the publisher's MANIFEST.json still advertises it with a
+    size and a sha256, but the repository does not carry it, and a lane built
+    from that manifest was registered pointing at an undownloadable weight. It
+    would not have fit either: at 21.48 GB it lands near 26.5 GB in flight by
+    the arithmetic in ``LTX25_NATIVE_DIT_WIDE`` above, which is a 32 GB budget.
+    Both halves of a confident sentence, wrong, from trusting a vendor
+    manifest over a directory listing.
     """
 
     name = "ltx25_native_foley_24gb"
