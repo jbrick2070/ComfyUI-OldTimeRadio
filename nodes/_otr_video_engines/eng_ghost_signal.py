@@ -1090,8 +1090,16 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         """Clear GHOST-OWNED references only, then restore the base flags.
 
         It never clears a global model registry and never calls
-        ``unload_all_models`` (V-4 / V-5). The staged reclaim seam may detach
-        loaded patchers; that is a different act from evicting the world.
+        ``unload_all_models``. The staged reclaim seam may detach loaded
+        patchers; that is a different act from evicting the world.
+
+        THIS IS THIS ENGINE'S OWN CHOICE, NOT A RULE IT INHERITS. It used to
+        cite V-4 as the authority; the blanket prohibition in
+        ``MotionEngineBase._detach_patchers`` was struck by the operator on
+        2026-09-22 (the pipeline finishes voices and music before video starts,
+        so there is nothing for it to protect). Ghost Signal still declines the
+        bigger hammer because precise teardown is correct HERE, which is a
+        different statement from nobody being allowed it.
         """
         self._classes = None
         self._artifacts = None

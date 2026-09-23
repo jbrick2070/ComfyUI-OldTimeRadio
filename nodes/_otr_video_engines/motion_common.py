@@ -1454,9 +1454,30 @@ class MotionEngineBase:
     @staticmethod
     def _detach_patchers(prepared):
         """V-4: detach EVERY tracked patcher (Wan experts + each LoRA) with
-        ``patcher.detach(unpatch_all=True)`` and clear strong refs. NEVER
-        ``unload_all_models()``. Guarded + idempotent; a no-op on the CPU box
-        where nothing was tracked."""
+        ``patcher.detach(unpatch_all=True)`` and clear strong refs. Guarded +
+        idempotent; a no-op on the CPU box where nothing was tracked.
+
+        THE "NEVER ``unload_all_models()``" CLAUSE IS STRUCK (operator, 2026-09-22):
+        *"we can unload because by the time we get to video we don't need tts
+        etc anymore"*, and *"remove that constraint"*. The rule was written to
+        protect other stages' resident models from a video engine's teardown,
+        and the pipeline order makes that protection empty -- story, voices and
+        music have all finished before a single frame is rendered.
+
+        It also contradicted the rest of this repo, which was the tell. The LLM
+        loader has called ``unload_all_models()`` + ``soft_empty_cache()``
+        before every load since long before this docstring
+        (`_otr_model_loader.py:1066`, the "Zero-Prime wash"), `_vram_log.py:165`
+        calls it too, and PBUG-20260908-03's CORRECTION measured that wash
+        working exactly as intended. A prohibition that the same tree violates
+        in two places is a local habit wearing an invariant's clothes.
+
+        Detaching tracked patchers is still the RIGHT default here, because it
+        is precise: it releases what this engine loaded and leaves everything
+        else alone. What is gone is the ban on the bigger hammer when a lane
+        genuinely needs the whole card -- which the 16 GB LTX 2.5 decode does
+        (docs/2026-09-22-native-ltx25-16gb/FINDINGS.md: 30.0 s on a free card,
+        unfinished at 412 s with 11 GB occupied)."""
         for patcher in list((prepared or {}).get("patchers") or []):
             try:
                 detach = getattr(patcher, "detach", None)
