@@ -14310,6 +14310,37 @@ and retry policy are unchanged. Final qualification and Opus/Cursor judgment:
 owns this termination contract. Fresh canonical qualification remains open;
 no new bug ID is minted from an unverified hidden-token hypothesis.
 
+### PBUG-20260910-05 follow-up -- 2026-09-23 pod treatment loop recovers
+
+Operator-supplied live evidence is archived exactly in
+`2026-09-23-my-story-treatment-prompt/verbatim_cycle_excerpt.log`. The run
+uses Qwen/Qwen3.8-27B, NF4, snapshot
+`1d4bf0f2ff6012fd82039f2fa52739d0dd7c60c0`, seed 152287566, one act and
+three characters. Attempt 1 at 0.850 halts at 288 tokens after 61.7 seconds;
+telemetry reports a 69-token cycle, three repeats, allowance 259326,
+`ended_with_eos=False`, and `open_string_tokens=None`.
+
+The captured HEAD begins repeating inside the still-open `logline`. The
+original incident writeup claimed a transition into `dramatic_question`;
+the artifact does not support that claim. Cross-field overlap, quantization
+and sampling causality remain unproven. See also PBUG-20260910-01's
+pairlock_03/04 same-field observations and their explicit causal limits.
+
+The existing retry at 0.500 completes at 849 tokens on EOS 248046. The
+writer subsequently completes The Extra Bowl: 49 ledger lines, 945 words,
+three cast members and one act. The supplied full cleaned log has no
+`obs_publish` or `Prompt executed` completion marker; this is writer
+recovery evidence, not a finished media receipt.
+
+Prompt clarification d11c31c3 defines the declarative logline separately from
+the direct yes/no question and asks completed string values to close and
+advance. Schema, guards and the three-attempt ladder are unchanged. This is
+a prompt mitigation at the author's boundary, not a measured cure or new
+repetition rule. Existing Bible 12.100 owns this known failure class; no new
+ID or Bible entry. Scoped checks: 342 passed, Bible 24 passed / 36 skipped /
+3 xfailed; prompt delivery is verified across base, retry and typed repair.
+Full-suite and independent-review details are in the adjacent receipt.
+
 ### PBUG-20260910-03 follow-up -- pairlock_02 publishes but source metadata and pixels diverge
 
 Full canonical prompt a6c9d550-12ec-4dd3-b9d2-031e3d265b1b on bd814148

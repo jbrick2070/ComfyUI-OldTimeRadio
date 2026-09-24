@@ -1,3 +1,28 @@
+## 2026-09-23 -- My Story treatment prompt and verified loop evidence
+
+Code d11c31c3 is pushed to main: clarify declarative logline versus direct
+dramatic_question, and finish each text value. Existing schema, guard,
+temperatures, retry budget and canonical workflow remain unchanged. The
+operator's supplied pod log corrects the initial diagnosis: the captured
+loop starts inside the still-open logline; there is no shown transition to
+dramatic_question. The 69-token cycle halts at 288 tokens; retry at 0.500
+completes, then the writer finishes The Extra Bowl with 945 words. This is
+original-run writer recovery, not a post-change cure or publication claim.
+
+Verification: 342 scoped tests pass; Bible 24 pass / 36 skip / 3 xfail.
+Composer 2.5 then Sonnet reviewed the pushed diff with no implementation
+blocker; documentation findings are resolved. Full suite: 37 failing
+nodeids; focused original-versus-updated-prompt reruns at fixed 19958a92
+have the identical 32 failures, while the other five pass in both reruns.
+No introduced failure in that comparison. The full run overlapped unrelated
+shared-path edits, so no pristine full-suite green is claimed.
+
+Evidence, hashes, reviewer reports and exact failure-set comparison:
+[treatment receipt](2026-09-23-my-story-treatment-prompt/receipt.md).
+Existing PBUG-20260910-05 gains the live addendum; PBUG-20260910-01 and
+Bible 12.100 remain the same-field precedent and portable contract.
+No new PBUG, runtime gate, render, monitor, tag or release was created.
+
 ## 2026-09-19 -- HEAD 75cd39dd +handoff (main) -- CODER (the scanned-volume lane: page furniture is removed by WHERE it sits)
 
 Did: Built out `scripts/otr_vendor_scan.py` until two Portuguese scenes were
