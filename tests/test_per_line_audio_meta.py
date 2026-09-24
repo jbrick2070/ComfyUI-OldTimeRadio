@@ -184,7 +184,29 @@ class TestStampPerLineAudioMeta:
 # dying field into a surviving file.
 # ---------------------------------------------------------------------------
 
-def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(tmp_path):
+@pytest.fixture()
+def no_in_flight_ledger(monkeypatch):
+    """Pin the in-flight ledger singleton to absent.
+
+    `_persist_ledger_stamps` PREFERS the in-flight singleton over the
+    caller-supplied `meta.paths.ledger_path`, deliberately -- the wire value is
+    attacker-controlled and can go stale, so the singleton wins when it exists.
+    That makes these three tests depend on process-wide state: any earlier test
+    in the session that constructs a Ledger leaves the singleton set, and then
+    the tmp_path ledger below is never the one written.
+
+    Found the hard way. These tests used to live in a file whose name sorted
+    later in the run, where the singleton happened to be clear; moving them here
+    put them after a test that leaves it set, and the full suite failed while the
+    file passed alone. The position was never the contract -- this is. Every
+    other test touching this helper pins it the same way.
+    """
+    from nodes import _otr_ledger as _OTRL
+    monkeypatch.setattr(_OTRL, "in_flight_ledger_path", lambda: None)
+
+
+def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(
+        tmp_path, no_in_flight_ledger):
     """The count alone cannot answer WHICH line failed to stamp.
 
     Without the id set, one unrelated line's failed stamp makes the caller
@@ -208,7 +230,7 @@ def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(tmp_path):
     assert failed == {"L_NOT_IN_LEDGER"}, (
         "the good line must not be blamed for the bad one")
 
-def test_a_missing_ledger_path_blames_every_stamp(tmp_path):
+def test_a_missing_ledger_path_blames_every_stamp(tmp_path, no_in_flight_ledger):
     from nodes._otr_voice_node_common import _persist_ledger_stamps
 
     failed = set()
@@ -218,7 +240,8 @@ def test_a_missing_ledger_path_blames_every_stamp(tmp_path):
     assert degraded == 1
     assert failed == {"L1"}
 
-def test_the_flush_still_works_without_the_new_argument(tmp_path):
+def test_the_flush_still_works_without_the_new_argument(
+        tmp_path, no_in_flight_ledger):
     """Three positional args is the existing call shape, including a spy in
     tests/test_audio_cache_wiring.py."""
     from nodes._otr_voice_node_common import _persist_ledger_stamps
