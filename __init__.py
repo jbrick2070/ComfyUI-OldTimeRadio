@@ -675,7 +675,25 @@ try:
 except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
     print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_janitor_err}")
 
+# =====================================================================
+# WEB_DIRECTORY -- the saved-graph schema boundary (js/workflow_schema.js).
+#
+# LiteGraph restores widget values POSITIONALLY, so a node that drops a widget
+# shifts every later value up by one on load: no error, no warning, a graph that
+# looks fine and renders something else. That extension reconciles an older
+# saved graph against the schema this build declares, BY NAME, before the loader
+# sees it -- or refuses and leaves the open canvas untouched.
+#
+# It has to own the loader call rather than hook `beforeConfigureGraph`: the
+# frontend runs those hooks through `invokeExtensionsAsync`, which catches and
+# merely logs whatever they throw, so throwing there cannot stop a stale graph.
+#
+# ComfyUI serves this directory automatically when the module exports the name.
+# =====================================================================
+WEB_DIRECTORY = "./js"
+
 __all__ = [
     "NODE_CLASS_MAPPINGS",
     "NODE_DISPLAY_NAME_MAPPINGS",
+    "WEB_DIRECTORY",
 ]
