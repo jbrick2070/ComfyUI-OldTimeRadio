@@ -98,14 +98,23 @@ def _rows(matrix):
     return {r["id"]: r for r in matrix["rows"]}
 
 
-def test_every_shipping_id_has_exactly_one_row(matrix, modules):
-    """No workflow is lost in the consolidation, and none is invented."""
-    bv, _, _ = modules
-    shipping = set(bv.SHIPPING_SET)
+def test_every_shipping_row_has_a_committed_variant(matrix):
+    """No workflow is lost in the consolidation, and none is invented.
+
+    COMPARED AGAINST THE GRAPHS ON DISK, not against `build_variants.SHIPPING_SET`.
+    That constant is `shipping_ids()`, which reads this same file -- so the earlier
+    version of this test compared the matrix's `ships` set to itself and would have
+    passed with any set at all. The variant filenames are an independent artifact:
+    they exist because something emitted them.
+    """
     ships = {r["id"] for r in matrix["rows"] if r.get("ships")}
-    assert ships == shipping, (
-        "matrix-only: %s\nSHIPPING_SET-only: %s"
-        % (sorted(ships - shipping), sorted(shipping - ships)))
+    variants = {p.stem for p in (REPO / "workflows" / "variants").glob("otr_*.json")
+                if not p.name.endswith(".env.json")}
+    assert ships, "the matrix marks no row as shipping"
+    assert ships == variants, (
+        "rows marked `ships` with no committed graph: %s\n"
+        "committed graphs with no shipping row: %s"
+        % (sorted(ships - variants), sorted(variants - ships)))
 
 
 @pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
@@ -118,9 +127,22 @@ def test_the_row_renders_what_the_config_renders(pid, matrix, modules, canonical
     is what RENDERS.
     """
     _, cp, wa = modules
+
+    # THE FILE, READ DIRECTLY -- not through `load_profile`, which prefers the matrix
+    # and would make both sides of this comparison the same source. That is exactly
+    # what happened once this migration landed: the test stayed green and stopped
+    # proving anything, because `load_profile("otr_8gb_low")` returned 16 top-level
+    # keys from the matrix while the file on disk had 19.
+    legacy = REPO / "config" / "profiles" / ("%s.json" % pid)
+    if not legacy.is_file():
+        pytest.skip("config/profiles/%s.json is gone; there is no second source left "
+                    "to compare against, and comparing the matrix to itself would "
+                    "prove nothing" % pid)
+    from_file_doc = json.loads(legacy.read_text(encoding="utf-8"))
+
     logging.disable(logging.CRITICAL)
     try:
-        from_config = wa.apply_profile(canonical, cp.load_profile(pid))
+        from_config = wa.apply_profile(canonical, from_file_doc)
         from_row = wa.apply_profile(canonical, _row_document(_rows(matrix)[pid]))
     finally:
         logging.disable(logging.NOTSET)
