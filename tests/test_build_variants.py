@@ -286,3 +286,42 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
     (vdir / "otr_cpu_floor.json").write_text(bv._dump(tampered),
                                              encoding="utf-8")
     assert bv.cmd_check() == 1
+
+def test_the_committed_variants_match_their_source(capsys):
+    """THE ONE ABOVE PROVES THE MECHANISM. THIS PROVES THE SHIPPED TREE.
+
+    `test_check_detects_variant_drift` monkeypatches VARIANTS_DIR to a tmp_path
+    and emits a single profile into it, so it verifies that drift detection
+    WORKS. Nothing verified that `workflows/variants/` -- the 24 graphs a user
+    actually loads -- still matches the source it is generated from. That was
+    checked only when a person remembered to run the CLI by hand.
+
+    It matters more here than a missing test usually does, because section 0's
+    hardest rule is that variants are GENERATED and never hand-edited. Without
+    this, a hand-edit to a shipped graph survives the entire suite: it is not a
+    syntax error, the widget count still matches, the links still resolve, and
+    the next person to run `--all` silently reverts the edit or bakes it in.
+
+    Runs the real `cmd_check()` against the real directory -- no monkeypatch,
+    which is the entire point.
+    """
+    rc = bv.cmd_check()
+    out = capsys.readouterr().out
+    assert rc == 0, (
+        "the committed workflows/variants/ tree no longer matches what its "
+        "source regenerates. Run:\n"
+        "    python scripts/build_variants.py --all\n"
+        "and commit the result -- or, if the regeneration is what is wrong, "
+        "fix the source rather than the graph.\n\n" + out)
+
+    # NON-VACUITY. Every assertion above is "no failures", which is also what
+    # a run that examined nothing reports -- and `cmd_check` returns 0 early
+    # and by design when it finds no committed variants at all. The socket
+    # audit shipped earlier today passed while reading 1 file of 25 for
+    # exactly this reason, so the count is pinned rather than assumed.
+    committed = sorted(p for p in bv.VARIANTS_DIR.glob("otr_*.json")
+                       if not p.name.endswith(".env.json"))
+    assert len(committed) >= 20, (
+        "expected the full shipped set, found %d -- this test would be "
+        "passing by checking almost nothing" % len(committed))
+    assert "no committed variants yet" not in out
