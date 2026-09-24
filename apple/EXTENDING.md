@@ -227,11 +227,11 @@ Copy the closest sibling. Then:
    `toolchains`, `launch`, `preflight` -- defaults from the matrix `defaults`
    block. State only what differs. `device_backend` is required on every row;
    omitting it does not inherit, it fails validation. State `gpu_vendor` too
-   (`nvidia`, `amd`, `apple`, `none`): it is optional in the schema and
-   absent from `defaults`, so omitting it silently becomes none and the
-   launch recipe writes the NVIDIA CUDA lines. `allow_sidecars` defaults
-   false; set it true only if this graph should offer engines that declare
-   `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
+   (`nvidia`, `amd`, `apple`, `none`). It is not in `defaults`. Every shipping
+   row states it. Omit it and an AMD/cuda row gets the NVIDIA launch recipe,
+   and any engine that `requires_vendor` is refused at emit. `allow_sidecars`
+   defaults false; set it true only if this graph should offer engines that
+   declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
 
 Do not put a JSON in `workflows/` for the new row. Browse Templates stays one
 card.
@@ -269,7 +269,7 @@ Set `"ships"` false (or delete the row), **and delete** the matching files in
 that id). If you delete the row, also delete any `config/profiles/<id>.json`
 twin -- `--check` falls through to that file and can pass on a graph that no
 longer ships. `--all` does not remove leftovers; `--check` still validates
-every `otr_*.json` sitting in that folder (not the `.env.json` knob files).
+every `otr_*.json` sitting in `workflows/variants/`.
 
 ### The proof
 
