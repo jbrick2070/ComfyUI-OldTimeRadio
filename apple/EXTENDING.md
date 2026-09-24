@@ -4,7 +4,7 @@ What you can add: an **engine** (a way of rendering video, images, speech,
 music or an upscale), a **source bank** (a place stories come from), a
 **writer LLM** (the model that writes the script), an **episode language**
 (a registry row that binds writing, voices, captions and credits), and a
-**shipped workflow** (a saved graph for a machine or a paid lane). They are
+**shipped workflow** (a saved graph for a machine or a Comfy Cloud stack). They are
 different jobs.
 Engines are a Python file in this repo. A source bank can be a folder of your
 own that this repo never sees. A writer LLM is either a snapshot in your
@@ -221,9 +221,10 @@ Copy the closest sibling. Then:
    pin that restates the canonical is a fork: it keeps the old value when the
    canonical moves. If a non-indicator key *is* a decision, add it to
    `key_indicators` instead of leaving it looking accidental.
-4. **Metadata that is not a widget** -- `launch`, `preflight`, `status`,
-   `device_backend`, `gpu_vendor`, `allow_sidecars` -- defaults from the
-   matrix `defaults` block. State only what differs. `allow_sidecars`
+4. **Metadata that is not a widget** -- `status`, `platform`, `allow_sidecars`,
+   `toolchains`, `launch`, `preflight` -- defaults from the matrix `defaults`
+   block. State only what differs. `device_backend` is required on every row;
+   omitting it does not inherit, it fails validation. `allow_sidecars`
    defaults false; set it true only if this graph should offer engines that
    declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
 
@@ -261,7 +262,7 @@ the one that would otherwise lie.
 Set `"ships"` false (or delete the row), **and delete** the matching files in
 `workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
 that id). `--all` does not remove leftovers; `--check` still validates every
-JSON sitting in that folder.
+`otr_*.json` sitting in that folder (not the `.env.json` knob files).
 
 ### The proof
 
