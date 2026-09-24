@@ -76,11 +76,35 @@ function reconcileNode(node, lookup) {
     const saved = savedWidgetNames(node);
     const values = node.widgets_values;
 
-    // No saved names means nothing to reconcile BY. Leave it exactly as it is:
-    // inferring an alignment from a bare value list is the silent corruption
-    // this file exists to prevent.
-    if (saved.length === 0) return { ok: true, changed: false };
     if (!Array.isArray(values)) return { ok: true, changed: false };
+
+    // A NODE CAN CARRY VALUES AND NO NAMES, AND THAT SHAPE IS NOT RARE.
+    // ComfyUI's own core nodes serialise this way -- the shipped workflow
+    // templates save KSampler with all seven widget values and ZERO widget
+    // descriptors in `inputs`. An earlier cut of this file returned "unchanged"
+    // for that shape, which meant a count mismatch passed through silently:
+    // exactly the positional corruption this boundary exists to stop, sailing
+    // through the middle of it. Found by a review pass that read the installed
+    // frontend's own templates rather than only this pack's graphs.
+    //
+    // There is nothing to reconcile BY here -- inferring which value is which
+    // from a bare list is the guess we refuse to make. But we CAN tell whether
+    // the file still fits: if the count disagrees with what this build
+    // declares, positional restore is guaranteed to put values in the wrong
+    // widgets, so refuse. If it agrees, positional restore is correct and the
+    // node passes through untouched.
+    if (saved.length === 0) {
+        if (values.length !== live.length) {
+            return refuse(
+                "a node carries values but no widget names, and the count no " +
+                "longer matches this build",
+                `${node.type}: ${values.length} value(s) saved, ` +
+                `${live.length} widget(s) declared. Without names there is ` +
+                `nothing to reconcile by, and restoring positionally would put ` +
+                `values in the wrong widgets.`);
+        }
+        return { ok: true, changed: false };
+    }
 
     // THE 1:1 MAPPING IS CHECKED, NEVER ASSUMED. Every node in this pack's
     // canonical graph maps widget descriptors to saved values one for one
@@ -135,6 +159,19 @@ function reconcileNode(node, lookup) {
         .filter((name) => byName.has(name))
         .map((name) => byName.get(name));
 
+    // KEEP `widgets_values_named` CONSISTENT IF THE FILE CARRIES IT. The
+    // frontend writes this map on every save and, when `LiteGraph
+    // .namedValuesRestore` is on, PREFERS it over the positional list. That
+    // setting is off by default in the installed build, which is why the
+    // positional repair above is the load-bearing half -- but leaving a stale
+    // entry for a widget this build no longer has would make the two
+    // representations disagree, and the one we did not fix would win the moment
+    // the setting flipped. Found by a review that read the frontend bundle.
+    if (node.widgets_values_named
+        && typeof node.widgets_values_named === "object") {
+        for (const name of dropped) delete node.widgets_values_named[name];
+    }
+
     return { ok: true, changed: true, dropped };
 }
 
@@ -147,8 +184,14 @@ function reconcileNode(node, lookup) {
  * cannot be double-applied, which subtracting an offset can.
  */
 export function repairLinkSlots(graph) {
+    // DUPLICATE NODE IDS WOULD COLLAPSE THIS MAP and repair a link against the
+    // wrong node. LiteGraph never emits them, so this can only come from a
+    // hand-edited file -- but a silently wrong slot is worse than a stop.
     const byId = new Map();
-    for (const node of graph.nodes || []) byId.set(node.id, node);
+    for (const node of graph.nodes || []) {
+        if (byId.has(node.id)) return { duplicateId: node.id };
+        byId.set(node.id, node);
+    }
     for (const link of graph.links || []) {
         const [linkId, , , dstNodeId] = link;   // [id, src, srcSlot, dst, dstSlot, type]
         const node = byId.get(dstNodeId);
@@ -180,6 +223,13 @@ export function reconcileGraph(graphData, lookup) {
             notes.push(`${node.type}: dropped ${verdict.dropped.join(", ")}`);
         }
     }
-    if (changed) repairLinkSlots(copy);
+    if (changed) {
+        const problem = repairLinkSlots(copy);
+        if (problem?.duplicateId !== undefined) {
+            return refuse("duplicate node id in the saved graph",
+                          `node id ${problem.duplicateId} appears more than ` +
+                          `once, so a link cannot be repaired unambiguously`);
+        }
+    }
     return { ok: true, graph: copy, changed, notes };
 }

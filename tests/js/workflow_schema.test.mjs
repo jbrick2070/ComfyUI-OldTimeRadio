@@ -173,3 +173,72 @@ test("a null or empty graph is handled without throwing", () => {
     assert.equal(reconcile({}).ok, true);
     assert.equal(reconcile({ nodes: [] }).ok, true);
 });
+
+// --- cases a review pass found the suite could not distinguish ---------------
+
+test("REFUSES an OVER-count too, not only an under-count", () => {
+    // Mutation-proven gap: with only the under-count case covered, changing the
+    // check from `!==` to `>` left all twelve tests green while the boundary
+    // silently accepted a node with MORE values than names -- the shape a
+    // seed-style companion slot produces.
+    declare("W", ["a", "b"]);
+    const node = savedNode(1, "W", [["a", "A"], ["b", "B"]]);
+    node.widgets_values = ["A", "B", "EXTRA"];
+    const out = reconcile({ nodes: [node], links: [] });
+    assert.equal(out.ok, false, "more values than names must refuse");
+    assert.match(out.reason, /count/i);
+});
+
+test("REFUSES a node with values, no names, and a count this build cannot fit", () => {
+    // ComfyUI's own core nodes serialise with ZERO widget descriptors -- the
+    // shipped templates save KSampler with seven values and no names at all. An
+    // earlier cut returned "unchanged" for that shape, so a count mismatch
+    // passed straight through: the exact positional corruption this boundary
+    // exists to stop, going through the middle of it.
+    declare("W", ["only_one"]);
+    const out = reconcile({
+        nodes: [{ id: 1, type: "W", widgets_values: ["A", "B"] }], links: [],
+    });
+    assert.equal(out.ok, false);
+    assert.match(out.reason, /no widget names/i);
+});
+
+test("a node with values, no names, and a MATCHING count passes through", () => {
+    // The other half of the same rule: when the count still fits, positional
+    // restore is correct and the node must not be touched or blocked.
+    declare("W", ["a", "b"]);
+    const graph = {
+        nodes: [{ id: 1, type: "W", widgets_values: ["A", "B"] }], links: [],
+    };
+    const before = structuredClone(graph);
+    const out = reconcile(graph);
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, false);
+    assert.deepEqual(graph, before);
+});
+
+test("widgets_values_named loses the dropped key, so the two agree", () => {
+    // The frontend writes this map on every save and PREFERS it when
+    // LiteGraph.namedValuesRestore is on. Leaving a stale entry would make the
+    // named and positional forms disagree, and the one left unfixed would win
+    // the moment that setting flipped.
+    declare("W", ["kept"]);
+    const node = savedNode(1, "W", [["kept", "K"], ["gone", "X"]]);
+    node.widgets_values_named = { kept: "K", gone: "X" };
+    const out = reconcile({ nodes: [node], links: [] });
+    assert.equal(out.ok, true);
+    assert.equal(out.changed, true);
+    assert.deepEqual(out.graph.nodes[0].widgets_values_named, { kept: "K" });
+});
+
+test("REFUSES duplicate node ids rather than repairing against the wrong node", () => {
+    // LiteGraph never emits these, so it takes a hand-edited file -- but the id
+    // map would collapse last-write-wins and a link would be repaired against
+    // the wrong node's inputs, which is silently wrong rather than merely odd.
+    declare("W", ["kept"]);
+    const a = savedNode(7, "W", [["kept", "A"], ["gone", "X"]]);
+    const b = savedNode(7, "W", [["kept", "B"], ["gone", "Y"]]);
+    const out = reconcile({ nodes: [a, b], links: [[1, 9, 0, 7, 0, "STRING"]] });
+    assert.equal(out.ok, false);
+    assert.match(out.reason, /duplicate node id/i);
+});

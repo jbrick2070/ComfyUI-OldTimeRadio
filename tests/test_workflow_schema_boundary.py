@@ -23,6 +23,7 @@ values nobody asked it to touch. All 25 shipped graphs must come back byte-equal
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import sys
@@ -71,17 +72,19 @@ def test_the_glue_owns_the_loader_and_holds_no_logic():
     """
     glue = (_JS / "workflow_schema.js").read_text(encoding="utf-8")
     assert "app.loadGraphData" in glue, "the glue must own the loader call"
-    # NOT MERELY ABSENT AS A WORD -- the file explains at length why it does
-    # not use that hook, so a bare substring check fails on its own docstring.
-    # What must be absent is the hook being DEFINED: `beforeConfigureGraph(` or
-    # `beforeConfigureGraph:` as an extension property.
-    import re
-    registered_hook = re.search(
-        r"beforeConfigureGraph\s*[(:]", glue)
-    assert not registered_hook, (
-        "the extension defines beforeConfigureGraph; its exceptions are "
-        "swallowed by invokeExtensionsAsync, so refusal must live at the "
-        "loader boundary instead. Found: %r" % (registered_hook.group(0),))
+    # NOT A SUBSTRING CHECK ON THE RAW FILE -- the glue explains at length why
+    # it does not use that hook, so its own comment would trip one. And not a
+    # regex for `name(` or `name:` either: a QA pass defeated that with an
+    # ordinary quoted key, `"beforeConfigureGraph": function(g){}`, and again
+    # with a computed one. Strip the comments, then require the identifier to be
+    # absent from the CODE, which no legitimate spelling can evade.
+    code = re.sub(r"/\*.*?\*/", "", glue, flags=re.S)       # block comments
+    code = re.sub(r"^\s*//.*$", "", code, flags=re.M)        # line comments
+    assert "beforeConfigureGraph" not in code, (
+        "the extension references beforeConfigureGraph in code; exceptions "
+        "from that hook are swallowed by invokeExtensionsAsync, so a refusal "
+        "must live at the loader boundary instead")
+
     # On refusal the original loader must NOT run. The early `return` before the
     # forwarding call is the whole mechanism.
     assert "return;" in glue

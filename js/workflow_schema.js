@@ -24,9 +24,16 @@ app.registerExtension({
             return;
         }
 
-        // Preserve the signature, the `this` binding and the return value. The
-        // real one is (graphData, clean, restore_view, workflow, options) and is
-        // async; forwarding with ...rest keeps working if that list grows.
+        // Preserve the signature and the `this` binding, and forward with
+        // ...rest so a longer argument list keeps working -- the real one is
+        // (graphData, clean, restore_view, workflow, options).
+        //
+        // THE RETURN VALUE IS FORWARDED ON EVERY PATH BUT ONE: a refusal returns
+        // undefined where the original would return a Promise. Every call site
+        // in the installed frontend `await`s this and none chains .then() or
+        // reads the result, so awaiting undefined is harmless there -- but the
+        // asymmetry is real and is stated rather than glossed, because a future
+        // caller that does chain would find it the hard way.
         app.loadGraphData = function (graphData, ...rest) {
             let verdict;
             try {
