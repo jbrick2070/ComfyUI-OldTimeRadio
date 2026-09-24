@@ -99,7 +99,7 @@ __all__ = [
     "make_polish_generate_fn",
     "ModelLoaderError",
     "GenerationDeadlineExceededError",
-    # The deadline API is public because the GGUF backend consumes it from
+    # The deadline API is public because a backend consumes it from
     # another module -- it is a cross-module contract, not an internal.
     "set_generation_deadline",
     "get_generation_deadline",
@@ -150,7 +150,7 @@ LLM_CACHE: dict[str, Any] = {
 # this one unconditional dict write.
 #
 # OWNERSHIP, not just a counter: request_slot can invalidate the cache
-# ITSELF, mid-call, as ordinary control flow -- a GGUF load-config change
+# ITSELF, mid-call, as ordinary control flow -- a policy change
 # or a cross-model slot transition both tear down the old resident model
 # before loading the replacement, in the SAME call whose Step-9 store
 # follows a few lines later. The DECISION to self-unload is made from an
@@ -214,26 +214,22 @@ def _detach_and_invalidate_locked(
 
 
 def _try_cache_hit_locked(
-    normalized: str, slot: str, *,
-    gguf_key: str | None = None, policy_key: tuple | str | None = None,
+    normalized: str, slot: str, *, policy_key: tuple | str | None = None,
 ) -> dict | None:
     """Atomically check a cache-hit predicate and capture+return the
     matching entry (also stamping ``slot``) under the same lock -- a
     separate check-then-return would let an invalidation land between the
     predicate passing and the return, producing either a ``None`` where
     request_slot's contract promises a dict, or a hit against an entry
-    that no longer exists. Pass exactly one of ``gguf_key``/``policy_key``
-    to select which identity dimension gates the hit. Returns ``None`` on
-    any miss; the caller is responsible for its own (unlocked, advisory)
-    miss-reason logging afterward.
+    that no longer exists. ``policy_key`` is the identity dimension that
+    gates the hit. Returns ``None`` on any miss; the caller is responsible
+    for its own (unlocked, advisory) miss-reason logging afterward.
     """
     with _CACHE_EPOCH_LOCK:
         if (
             LLM_CACHE.get("model_id") != normalized
             or LLM_CACHE.get("cache_entry") is None
         ):
-            return None
-        if gguf_key is not None and LLM_CACHE.get("gguf_load_key") != gguf_key:
             return None
         if policy_key is not None and LLM_CACHE.get("policy_key") != policy_key:
             return None
@@ -284,28 +280,16 @@ def _publish_cache_entry_if_current(expected_epoch: int, fields: dict) -> bool:
 # degeneracy guard for the same reason -- is not wired in: one warmup
 # token adds negligible orphan lifetime, not worth a third criterion.)
 #
-# THE GGUF LANE IS NOW COVERED TOO (2026-08-25, closing the PBUG-20260825-04
-# deferral). It could not use a StoppingCriteria: llama-cpp-python's
-# create_chat_completion accepts no `stopping_criteria` and does not forward
-# one (verified against installed 0.3.33), so the GGUF lane instead takes
-# DEADLINE-CONDITIONAL STREAMING inside _otr_gguf_backend -- with no deadline
-# registered it makes the exact same non-streaming call it always did, and
-# with one it streams and stops between chunks. The backend call-time imports
-# get_generation_deadline() from here; the state stays owned in this module.
+# THE DEADLINE STATE STAYS OWNED HERE and is read through
+# get_generation_deadline(), so a backend that cannot accept a StoppingCriteria
+# can still consult it at call time rather than growing its own clock.
 #
-# WHY IT STOPPED BEING THEORETICAL: six committed status="shipping" profiles
-# (otr_g4_fastwan/_humo/_ltx_8gb/_ltx_audio_in/_ltx_video/_wan_ti2v) pin
-# technical_model to unsloth/gemma-4-12b-it-GGUF, and profile status is
-# validated but is NOT an application gate -- so real shipping runs reach this
-# lane. The default unprofiled canonical run does not (its technical slot is
-# the transformers gemma-4-12b row), which is why this looked latent at first.
-#
-# WHAT A DEADLINE STILL CANNOT INTERRUPT, on EITHER lane: prompt evaluation.
-# The criterion/stream is only consulted per GENERATED token. It also cannot
-# interrupt the model LOAD -- which is why the worker checks for an
-# already-expired deadline BEFORE calling fn() at all (story_orchestrator),
-# since request_slot runs inside the timed worker and a cold ~12 GB GGUF load
-# is the realistic way to blow a 65 s budget.
+# WHAT A DEADLINE STILL CANNOT INTERRUPT: prompt evaluation. The criterion is
+# only consulted per GENERATED token. It also cannot interrupt the model LOAD
+# -- which is why the worker checks for an already-expired deadline BEFORE
+# calling fn() at all (story_orchestrator), since request_slot runs inside the
+# timed worker and a cold multi-GB load is the realistic way to blow a 65 s
+# budget.
 #
 # LATCH, don't raise mid-decode -- mirrors the established pattern in
 # _otr_decode_guard.py's degeneracy criterion: raising from inside a
@@ -337,7 +321,7 @@ def set_generation_deadline(deadline: float | None) -> None:
 def get_generation_deadline() -> float | None:
     """This thread's registered ``time.monotonic()`` deadline, or None.
 
-    Public because the GGUF backend needs it and cannot inherit a
+    Public because a backend needs it and cannot inherit a
     transformers ``StoppingCriteria``. It call-time imports this getter
     rather than the thread-local itself, and the state deliberately stays
     OWNED HERE rather than moving to a leaf module: this repo supports both
@@ -1739,18 +1723,8 @@ def _teardown_gpu_for_entry(entry: dict | None) -> None:
     model_id = entry.get("model_id") if entry is not None else None
     _memory_log.memory_snapshot("llm_retirement_before", model_id=model_id)
     if entry is not None:
-        if entry.get("provider") == "gguf_native":
-            try:
-                from ._otr_gguf_backend import GGUFNativeBackend
-                GGUFNativeBackend().unload(entry)
-            except Exception as exc:  # noqa: BLE001
-                log.debug("[OTR_ModelLoader] GGUF unload failed: %s", exc)
         model = entry.get("model")
-        if (
-            entry.get("provider") != "gguf_native"
-            and model is not None
-            and hasattr(model, "to")
-        ):
+        if model is not None and hasattr(model, "to"):
             try:
                 model.to("cpu")
             except Exception as exc:  # noqa: BLE001
@@ -1935,9 +1909,9 @@ def _assert_policy_admits_vram(
     is no VRAM to fit). Remote lanes never reach it: they return earlier and
     use zero local VRAM.
 
-    Why it does not live inside either loader branch (A1, 2026-07-27):
-    neither ``LLMRuntimePolicy.cache_key()`` nor ``GGUFLoadConfig.reuse_key()``
-    carries the ceiling, and both are RIGHT not to -- admission does not shape
+    Why it does not live inside the loader branch (A1, 2026-07-27):
+    ``LLMRuntimePolicy.cache_key()`` does not carry the ceiling, and is RIGHT
+    not to -- admission does not shape
     the loaded artifact. But that means a resident model is reused on load
     IDENTITY alone, so a model admitted under a permissive ceiling used to
     satisfy a stricter-ceiling request by cache hit. Gating the load alone
@@ -1945,13 +1919,11 @@ def _assert_policy_admits_vram(
     This mirrors the lane backstop, which was already placed correctly -- the
     two admission fields now get the same treatment.
 
-    ONE estimator serves every local lane. ``check_vram_fit`` already prices a
-    ``gguf_native`` row from its pinned on-disk artifact plus that row's KV
-    cache (``_otr_model_catalog._estimate_resident_gb``), so the GGUF lane
-    never needed a second calculation -- it needed this one to RUN. The GGUF
-    backend's own in-load preflight answers a different question ("does this
-    box have free VRAM right now") and stays where it is; a physical-free
-    probe cannot enforce a tier ceiling on a card that is larger than it.
+    ONE estimator serves every local lane -- ``check_vram_fit``, via
+    ``_otr_model_catalog._estimate_resident_gb``. A lane never needs a second
+    calculation; it needs this one to RUN. An in-load physical-free probe
+    answers a different question ("does this box have free VRAM right now")
+    and cannot enforce a tier ceiling on a card larger than it.
     """
     from . import _otr_model_catalog as _otr_catalog
 
@@ -1962,28 +1934,14 @@ def _assert_policy_admits_vram(
         )
         return
 
-    # PRICE THE REQUEST, NOT THE ROW'S CEILING -- both terms.
-    #
-    # The quant half was PBUG-20260829-08: without it a profile asking for
-    # Q4_K_M was judged on a Q8_0 load. The CONTEXT half is the same defect and
-    # was still live (PBUG-20260829-20): `ctx_verdict.value` is the row's
-    # context_window -- 8192 for the gemma GGUF row -- while the loader will
-    # actually open the context the POLICY asks for. A profile requesting
-    # n_ctx 4096 was therefore priced at 8192:
-    #
-    #     gemma-4-12b-it-GGUF Q4_K_M @ 4096  ->  9.43 GB   WARN, admitted
-    #     gemma-4-12b-it-GGUF Q4_K_M @ 8192  -> 12.23 GB   FAIL, refused
-    #
-    # and it was refused against a card that MEASURED 7,751 MiB running that
-    # exact configuration with all 48 layers resident. The gate was refusing a
-    # load the hardware performs, on the arithmetic of a context nobody asked
-    # for. Third instance of this family after the gate (-08) and the dropdown
-    # badge (-17); the lesson is that a row's declared maximum is never the
-    # right number to judge a specific request by.
-    _est_ctx = getattr(policy, "gguf_n_ctx", None) or ctx_verdict.value
+    # PRICE THE REQUEST, NOT THE ROW'S CEILING. PBUG-20260829-08, -17 and -20
+    # were three instances of one family: judging a specific request by a row's
+    # declared maximum -- in the gate, in the dropdown badge, and in the
+    # context term. The surviving rows resolve their cap through
+    # `resolve_context_cap`, which already answers for the request rather than
+    # for the row, so the ceiling is priced against that verdict.
     fit_verdict = _otr_catalog.check_vram_fit(
-        model_id, _est_ctx, ceiling_gb=policy.vram_ceiling_gb,
-        gguf_quant=getattr(policy, "gguf_quant", None),
+        model_id, ctx_verdict.value, ceiling_gb=policy.vram_ceiling_gb,
     )
 
     # FAIL is a recommendation, not a capability refusal. Hugging Face auto-
@@ -2017,9 +1975,8 @@ def _assert_policy_admits_vram(
 
 def _self_unload(my_epoch: int, *, slot: str) -> int:
     """request_slot's own "tear down the resident model before loading a
-    different one" step, for all 4 self-triggered transition branches
-    (GGUF load-config change, GGUF slot transition, transformers policy
-    change, transformers slot transition).
+    different one" step, for both self-triggered transition branches
+    (transformers policy change, transformers slot transition).
 
     The DECISION to call this is made from an unlocked read a few lines
     earlier ("a different model is resident") -- if an external
@@ -2051,16 +2008,10 @@ def _self_unload(my_epoch: int, *, slot: str) -> int:
 
 
 def request_slot(
-    slot: str, model_id: str, policy: Any = None, load_config: Any = None,
+    slot: str, model_id: str, policy: Any = None,
 ) -> dict[str, Any]:
     """Slot-aware entry point. Loads (or reuses cached) LLM, handling
     cache reuse vs full teardown automatically.
-
-    ``load_config`` (GGUF row registry, 2026-07-16): the immutable per-slot
-    GGUF load contract resolved by the writer's preflight. When present it is
-    the resident-reuse identity (repo_id + resolved path + quant + n_ctx +
-    n_batch + n_gpu_layers) and is threaded to the backend load -- no live-env
-    rebuild. Ignored for non-GGUF rows.
 
     B1d order, as CORRECTED by A1 (2026-07-27) -- admission before REUSE,
     not merely before network/disk work:
@@ -2073,8 +2024,7 @@ def request_slot(
          attempted. The runtime's own exception is the authority. Steps 3-4
          still run before every cache read so telemetry sees the request's
          ceiling even when reuse wins.
-      5. GGUF dispatch: reuse on load identity, else load. Returns.
-      6. Transformers cache hit (same model_id + same policy cache_key)
+      5. Transformers cache hit (same model_id + same policy cache_key)
          -> return entry; a mismatched cache_key is a teardown, never
          a silent reuse.
       7. auto_download_if_missing -- gated/disk-space pre-flight +
@@ -2113,13 +2063,13 @@ def request_slot(
     # rather than silently adopted by a later, unrelated caller.
     _my_cache_epoch = _current_cache_epoch()
 
-    # Route curated remote/GGUF entries before any HF filesystem work. Native
+    # Route curated remote entries before any HF filesystem work. Native
     # validation can scan an uncurated model, so repair its root first.
     normalized = (_otr_catalog._strip_label_suffix(model_id)
                   if isinstance(model_id, str) else model_id)
     _early_row = _otr_catalog._by_repo_id().get(normalized) if isinstance(normalized, str) else None
     _early_backend = getattr(_early_row, "loader_backend", None)
-    if _early_backend in ("openrouter_http", "comfy_credits_http", "google_api_http", "gguf_native"):
+    if _early_backend in ("openrouter_http", "comfy_credits_http", "google_api_http"):
         normalized = _otr_catalog.validate_model_id(model_id)
         _hub_root = None
     else:
@@ -2161,10 +2111,8 @@ def request_slot(
     # a future remote lane only adds its key to this tuple.
     # Virtual catalog rows must be intercepted before the HF cache/download
     # path below. Remote rows are zero-VRAM and do not disturb a resident
-    # local model. The GGUF row is different: it is in-process VRAM and must
-    # participate in the singleton cache/teardown discipline.
+    # local model.
     _REMOTE_DISPATCH_BACKENDS = ("openrouter_http", "comfy_credits_http", "google_api_http")
-    _GGUF_DISPATCH_BACKENDS = ("gguf_native",)
     _virtual_row = _otr_catalog._by_repo_id().get(normalized)
 
     # S1 runtime lane backstop: the profile's lane_allowlist is enforced at
@@ -2196,102 +2144,15 @@ def request_slot(
     # Steps 3-5, HOISTED (A1, 2026-07-27): the context cap and THE policy
     # admission calculation, once, before every local-lane cache read and
     # before every local-lane load. They used to sit below both cache-hit
-    # returns and below the GGUF dispatch, so the ceiling could only ever
-    # gate a fresh TRANSFORMERS load -- see _assert_policy_admits_vram for
-    # why neither reuse key can carry the ceiling instead.
-    _is_gguf = getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
-    if _is_gguf:
-        # Allocated GGUF context and its existing reuse identity are independent.
-        ctx_verdict = _otr_catalog.ContextCapVerdict(
-            "PASS", int(_virtual_row.context_window), "GGUF row; policy n_ctx is priced",
-        )
-    else:
-        _context_pin = _otr_catalog._hard_vram_context_limit()
-        _hf_key = (_policy.cache_key(), _context_pin)
-        ctx_verdict = _otr_catalog.resolve_context_cap(
-            normalized, hub_root=_hub_root, context_pin=_context_pin,
-        )
+    # returns, so the ceiling could only ever gate a fresh TRANSFORMERS load
+    # -- see _assert_policy_admits_vram for why the reuse key cannot carry
+    # the ceiling instead.
+    _context_pin = _otr_catalog._hard_vram_context_limit()
+    _hf_key = (_policy.cache_key(), _context_pin)
+    ctx_verdict = _otr_catalog.resolve_context_cap(
+        normalized, hub_root=_hub_root, context_pin=_context_pin,
+    )
     _assert_policy_admits_vram(normalized, ctx_verdict, _policy)
-
-    if (
-        _virtual_row is not None
-        and getattr(_virtual_row, "loader_backend", None) in _GGUF_DISPATCH_BACKENDS
-    ):
-        from ._otr_model_runtime import get_backend_for_row
-        # Resident-reuse identity for the in-process GGUF singleton. The
-        # threaded load_config's reuse_key (repo_id + resolved path + quant +
-        # n_ctx + n_batch + n_gpu_layers) is the artifact-shaping identity that
-        # policy.cache_key() alone cannot see (it misses the resolved path /
-        # n_batch / n_gpu_layers). Without a load_config (direct/legacy caller)
-        # fall back to the raw policy key -- the pre-registry behavior.
-        _gguf_key = (
-            load_config.reuse_key() if load_config is not None
-            else _policy.cache_key()
-        )
-        # A resident model only counts as a hit when it was loaded under the
-        # SAME load identity. Silent stale reuse is the bug class this
-        # campaign kills. The whole check-then-return is one atomic locked
-        # read (_try_cache_hit_locked) -- a separate check-then-return would
-        # let an invalidation land between the predicate passing and the
-        # return, producing a hit against an entry that no longer exists.
-        _hit = _try_cache_hit_locked(normalized, slot, gguf_key=_gguf_key)
-        if _hit is not None:
-            log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
-            return _hit  # type: ignore[return-value]
-        if (
-            LLM_CACHE.get("model_id") == normalized
-            and LLM_CACHE.get("cache_entry") is not None
-        ):
-            log.info(
-                "[Selector] gguf load-config change for %s (%s -> %s): "
-                "full teardown",
-                normalized, LLM_CACHE.get("gguf_load_key"), _gguf_key,
-            )
-            _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
-        if LLM_CACHE.get("model_id") not in (None, normalized):
-            log.info(
-                "[Selector] slot transition: %s -> %s (full teardown)",
-                LLM_CACHE.get("model_id"),
-                normalized,
-            )
-            _my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)
-        # r4 kibitz finding (Cursor): the transformers load below is
-        # wrapped in try/_self_unload so a load failure after partial GPU
-        # allocation doesn't strand orphan VRAM for a cache-miss retry to
-        # pile a second copy on top of (Sprint H iter 3); this GGUF load
-        # was not, pre-existing this session. Same shape, same reasoning.
-        try:
-            cache_entry = get_backend_for_row(_virtual_row).load(
-                normalized, _virtual_row, policy=_policy, load_config=load_config,
-            )
-        except Exception:
-            log.warning(
-                "[Selector] GGUF backend.load() raised for %s; running "
-                "self-unload to drop any orphan VRAM before retry",
-                normalized,
-            )
-            try:
-                _self_unload(_my_cache_epoch, slot=slot)
-            except Exception:  # noqa: BLE001
-                log.exception("[Selector] self-unload also raised; continuing")
-            raise
-        _published = _publish_cache_entry_if_current(_my_cache_epoch, {
-            "model_id": normalized,
-            "slot": slot,
-            "cache_entry": cache_entry,
-            "policy_key": _policy.cache_key(),
-            "gguf_load_key": _gguf_key,
-        })
-        if not _published:
-            log.warning(
-                "[Selector] slot=%s GGUF load for %s completed after this "
-                "call was abandoned (cache epoch advanced) -- NOT adopting "
-                "into LLM_CACHE; a later caller would otherwise take a "
-                "cache hit on a model this orphaned call may still be "
-                "using",
-                slot, normalized,
-            )
-        return cache_entry
 
     # Capability-gate architecture support before cache/download work. A stale
     # ComfyUI venv must not spend time resolving a 23.9 GB model only to fail in
@@ -2300,8 +2161,9 @@ def request_slot(
 
     # Step 2: cache hit on the same model id (regardless of slot) -- policy
     # keyed (S1): a mismatched policy_key is a MISS + teardown, never reuse.
-    # Atomic locked check-and-return (_try_cache_hit_locked) -- see the GGUF
-    # branch above for why a separate check-then-return is not safe here.
+    # Atomic locked check-and-return (_try_cache_hit_locked) -- a separate
+    # check-then-return would let an invalidation land between the predicate
+    # passing and the return, hitting an entry that no longer exists.
     _hit = _try_cache_hit_locked(normalized, slot, policy_key=_hf_key)
     if _hit is not None:
         log.info("[Selector] slot=%s reuse cache for %s", slot, normalized)
@@ -2571,10 +2433,6 @@ def make_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "google_api":
         from ._otr_google_api.llm import make_google_api_generate_fn
         return make_google_api_generate_fn(cache_entry)
-    # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
-    if cache_entry.get("provider") == "gguf_native":
-        from ._otr_gguf_backend import make_gguf_generate_fn
-        return make_gguf_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
@@ -2784,10 +2642,6 @@ def make_polish_generate_fn(cache_entry: dict[str, Any]):
     if cache_entry.get("provider") == "google_api":
         from ._otr_google_api.llm import make_google_api_generate_fn
         return make_google_api_generate_fn(cache_entry)
-    # Native GGUF lane: in-process llama-cpp-python, no daemon or port.
-    if cache_entry.get("provider") == "gguf_native":
-        from ._otr_gguf_backend import make_gguf_generate_fn
-        return make_gguf_generate_fn(cache_entry)
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:

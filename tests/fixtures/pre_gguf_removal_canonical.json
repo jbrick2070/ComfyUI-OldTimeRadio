@@ -412,11 +412,31 @@
           "link": null
         },
         {
+          "localized_name": "gguf_n_ctx",
+          "name": "gguf_n_ctx",
+          "shape": 7,
+          "type": "INT",
+          "widget": {
+            "name": "gguf_n_ctx"
+          },
+          "link": null
+        },
+        {
           "localized_name": "gate_in",
           "name": "gate_in",
           "shape": 7,
           "type": "STRING",
           "link": 279
+        },
+        {
+          "localized_name": "gguf_quant",
+          "name": "gguf_quant",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "gguf_quant"
+          },
+          "link": null
         },
         {
           "localized_name": "use_exchange",
@@ -552,6 +572,8 @@
         "sdpa",
         "none",
         10.0,
+        4096,
+        "Q8_0",
         true,
         true,
         true,
@@ -3030,7 +3052,7 @@
       63,
       0,
       1,
-      30,
+      31,
       "STRING"
     ],
     [

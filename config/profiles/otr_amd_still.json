@@ -38,8 +38,6 @@
         "attn_impl": "sdpa",
         "quant_policy": "none",
         "vram_ceiling_gb": 6.8,
-        "gguf_n_ctx": 2048,
-        "gguf_quant": "Q4_K_M",
         "creative_model": "Qwen/Qwen3.5-4B",
         "technical_model": "Qwen/Qwen3.5-4B",
         "openrouter_slot_a_model": "(enable OpenRouter)",
@@ -50,7 +48,6 @@
         "google_api_slot_b_model": "(select Google API model)",
         "lane_allowlist": [
             "transformers",
-            "gguf",
             "openrouter",
             "comfy_credits",
             "google_api"

@@ -84,68 +84,14 @@ def _local_rows():
             continue
         # The dropdown label carries a human size suffix; the id is the head.
         rows.append(label.split(" (")[0].strip())
-    # Preserve order, drop duplicates (Qwen3-8B appears as its own row and as a
-    # GGUF sibling; they are different rows and both are kept).
+    # Preserve order, drop duplicates: the dropdown can list the same head id
+    # under more than one label.
     seen, ordered = set(), []
     for r in rows:
         if r not in seen:
             seen.add(r)
             ordered.append(r)
     return ordered
-
-
-#: Set from --gguf-quant. `gguf_quant` is ONE per-run widget in production
-#: (GO_FORWARD 5.6), so a run probes one quant; this makes which one explicit
-#: instead of inheriting whatever the baseline policy happens to carry.
-_QUANT_OVERRIDE = ""
-
-
-def _gguf_load_config(model_id: str, slot: str):
-    """The immutable GGUF load contract for ``model_id``, or None if not a GGUF row.
-
-    WITHOUT THIS THE PROBE MEASURES ITSELF, NOT THE ROW. `request_slot` with no
-    threaded `load_config` falls into a gemma-only env fallback that refuses
-    loudly for any non-gemma repo -- correctly, because that path resolves the
-    gemma artifact and would otherwise load gemma while claiming to be Qwen.
-    The writer resolves this contract in its own preflight and stamps it at
-    `meta['llm_gguf_load_config']` (`_otr_writer_tail.py:894`); a preflight that
-    skipped it would report every non-gemma GGUF row dead and, under the
-    charter, invite ripping a row on the probe's own omission rather than on a
-    measured failure.
-    """
-    try:
-        from nodes import _otr_gguf_backend as gguf
-    except Exception:                                       # noqa: BLE001
-        return None
-    try:
-        gguf.gguf_row_for_repo(model_id)
-    except Exception:                                       # noqa: BLE001
-        return None                                         # not a GGUF row
-    from dataclasses import replace as _replace
-
-    from nodes._otr_shared.llm_policy import BASELINE_POLICY
-    policy = BASELINE_POLICY
-
-    # PROBE THE ROW AT A QUANT IT ACTUALLY SHIPS. `gguf_quant` is ONE per-run
-    # widget (GO_FORWARD 5.6), so the baseline policy's value -- Q8_0, chosen
-    # for the gemma negative probe -- is simply absent from the Qwen rows, which
-    # publish Q4_K_M only. Refusing there would be the PROBE's configuration
-    # failing, not the row, and under the charter that must never be recorded as
-    # a measured failure. The quant actually used is reported in the result.
-    row = gguf.gguf_row_for_repo(model_id)
-    try:
-        available = list(row.artifacts.keys())
-    except Exception:                                       # noqa: BLE001
-        available = []
-    wanted = _QUANT_OVERRIDE or getattr(policy, "gguf_quant", None)
-    if available and wanted not in available:
-        wanted = available[0]
-    if wanted and wanted != getattr(policy, "gguf_quant", None):
-        try:
-            policy = _replace(policy, gguf_quant=wanted)
-        except Exception:                                   # noqa: BLE001 -- not a dataclass
-            pass
-    return gguf.build_gguf_load_config(repo_id=model_id, policy=policy, slot=slot)
 
 
 def _probe(model_id: str, slot: str, max_new_tokens: int) -> dict:
@@ -155,12 +101,7 @@ def _probe(model_id: str, slot: str, max_new_tokens: int) -> dict:
     before = _vram()
     t0 = time.time()
     try:
-        load_config = _gguf_load_config(model_id, slot)
-        if load_config is not None:
-            out["gguf"] = True
-            out["quant"] = getattr(load_config, "quant", None)
-            out["n_ctx"] = getattr(load_config, "n_ctx", None)
-        entry = loader.request_slot(slot, model_id, load_config=load_config)
+        entry = loader.request_slot(slot, model_id)
         out["load_s"] = round(time.time() - t0, 1)
         out["loaded"] = _vram()
         gen = loader.make_generate_fn(entry)
@@ -206,14 +147,8 @@ def main() -> int:
     ap.add_argument("--rows", default="", help="comma-separated subset of row ids")
     ap.add_argument("--slots", default="creative,technical")
     ap.add_argument("--max-new-tokens", type=int, default=40)
-    ap.add_argument("--gguf-quant", default="",
-                    help="probe GGUF rows at this quant (one per run, "
-                         "as in production); falls back to a quant the "
-                         "row actually ships")
     ap.add_argument("--json-out", default="")
     args = ap.parse_args()
-    global _QUANT_OVERRIDE
-    _QUANT_OVERRIDE = args.gguf_quant.strip()
 
     rows = [r.strip() for r in args.rows.split(",") if r.strip()] or _local_rows()
     slots = [s.strip() for s in args.slots.split(",") if s.strip()]

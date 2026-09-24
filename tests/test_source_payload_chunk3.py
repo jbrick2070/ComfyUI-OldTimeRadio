@@ -375,10 +375,9 @@ def test_science_rss_wrapper_forwards_runtime_policy(
     calls = {}
 
     def _fake(
-        model_id, *, load_config=None, policy=None, receipt_sink=None,
+        model_id, *, policy=None, receipt_sink=None,
     ):
         calls["model_id"] = model_id
-        calls["load_config"] = load_config
         calls["policy"] = policy
         calls["receipt_sink"] = receipt_sink
         if receipt_sink is not None:
@@ -401,18 +400,15 @@ def test_science_rss_wrapper_forwards_runtime_policy(
     monkeypatch.setattr(writer, "_fetch_rss_seed_or_die", _fake)
     bank = routing.get_bank(bank_id)
     entry = osp.resolve_fetcher(bank)
-    load_config = object()
     policy = object()
     out = entry.fetch(
         bank=bank,
         technical_model="tm-id",
         source_ref="ignored://source",
-        load_config=load_config,
         policy=policy,
     )
 
     assert calls["model_id"] == "tm-id"
-    assert calls["load_config"] is load_config
     assert calls["policy"] is policy
     assert isinstance(calls["receipt_sink"], dict)
     payload, meta, rights = osp.normalize_fetch_result(

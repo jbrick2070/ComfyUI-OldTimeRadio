@@ -39,9 +39,8 @@ NODES = ROOT / "nodes"
 PROBE_EXEMPTIONS = {("_otr_loader_backends.py", "probe")}
 
 #: Backends that own their think handling instead of the shared helper. The
-#: GGUF lane strips a leading think envelope from the OUTPUT and injects its own
-#: no-think directive; the OpenRouter lane never touches a local tokenizer.
-SELF_MANAGED_BACKENDS = {"_otr_gguf_backend.py", "_otr_openrouter_backend.py"}
+#: OpenRouter lane never touches a local tokenizer.
+SELF_MANAGED_BACKENDS = {"_otr_openrouter_backend.py"}
 
 
 def _first_arg_name(call: ast.Call) -> str:

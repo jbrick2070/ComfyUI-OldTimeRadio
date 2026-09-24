@@ -51,9 +51,7 @@ def test_gemma_12b_hf_pin_is_accepted_without_a_sidecar(tmp_path):
     ) == "google/gemma-4-12b-it"
 
 
-def test_hf_and_gguf_gemma_12b_rows_are_explicit_peers():
-    from nodes import _otr_gguf_backend as ggf
-
+def test_the_gemma_12b_row_is_the_transformers_one():
     ids = catalog._by_repo_id()
     assert "google/gemma-4-12b-it" in ids
     hf_row = ids["google/gemma-4-12b-it"]
@@ -62,5 +60,7 @@ def test_hf_and_gguf_gemma_12b_rows_are_explicit_peers():
     assert hf_row.requires_auth is False
     assert hf_row.vram_fit_tier == "PASS"
     assert hf_row.context_window == 8192
+    # The GGUF writer peer was retired with its backend; the catalog must
+    # never grow the handle back, since validate_model_id rejects it by shape
+    # and a row carrying it would be a menu entry that cannot load.
     assert "unsloth/gemma-4-12b-it-GGUF" not in ids
-    assert not ggf.GGUF_ROWS

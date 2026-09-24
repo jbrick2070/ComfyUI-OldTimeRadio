@@ -63,9 +63,6 @@ KNOWN_EXEMPTIONS = {
     ("nodes/_otr_google_api/llm.py", "make_google_api_generate_fn"): (
         "Remote Google API HTTP backend (zero local VRAM)"
     ),
-    ("nodes/_otr_gguf_backend.py", "make_gguf_generate_fn"): (
-        "GGUF llama-cpp-python backend"
-    ),
     ("visual/backends/florence2_sdxl_comp.py", "_render_real"): (
         "Florence-2 vision model"
     ),

@@ -1699,7 +1699,7 @@ def _resolve_writer_llm_binding(meta: dict, warnings: list):
 
     Extracted so Ghost Prompt v2 can send a real chat batch without going
     through :func:`_resolve_writer_llm`'s prompt-only wrapper, and without a
-    second copy of the slot/policy/GGUF load contract that would drift.
+    second copy of the slot/policy contract that would drift.
     """
 
     if otr_env.get("OTR_TEST_MODE") == "1":
@@ -1720,15 +1720,10 @@ def _resolve_writer_llm_binding(meta: dict, warnings: list):
         # Post-ship audit fix (2026-07-10): same policy the writer ran
         # under (ledger stamp); None = pre-stamp backstop.
         from ._otr_shared.llm_policy import policy_from_meta
-        from ._otr_gguf_backend import load_config_from_meta
 
-        # GGUF row registry (2026-07-16): thread the writer's exact per-slot load
-        # contract so a resident-cache MISS reloads the selected row under ITS
-        # registry entry, never the gemma env-fallback. None for a non-GGUF run.
         entry = request_slot(  # LLM slot: technical
             "technical", model_id,
-            policy=policy_from_meta(meta),
-            load_config=load_config_from_meta(meta, "technical"))
+            policy=policy_from_meta(meta))
         gen = make_generate_fn(entry)
         return gen, str(entry.get("model_id", model_id) or model_id)
     except Exception as exc:  # noqa: BLE001

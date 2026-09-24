@@ -671,7 +671,7 @@ _UNIFIED_SWAP_TOLERANCE = 1.15
 #
 # The LLM path reached this conclusion first -- `8ca19674`, "Stop estimate
 # gates from refusing LLM loads" -- and `_otr_model_loader`,
-# `_otr_gguf_backend` and `_otr_model_catalog` have all said "never raises"
+# `_otr_model_catalog` and its peers have all said "never raises"
 # since. These functions are the video half of the same ruling.
 #
 # MEASURE AND SAY. Never measure and refuse.

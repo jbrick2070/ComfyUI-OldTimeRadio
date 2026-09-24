@@ -39,8 +39,6 @@
         "attn_impl": "sdpa",
         "quant_policy": "none",
         "vram_ceiling_gb": 0,
-        "gguf_n_ctx": 2048,
-        "gguf_quant": "Q4_K_M",
         "creative_model": "google_api:slot-a",
         "technical_model": "google_api:slot-b",
         "openrouter_slot_a_model": "(enable OpenRouter)",
@@ -51,7 +49,6 @@
         "google_api_slot_b_model": "gemini-flash-lite-latest",
         "lane_allowlist": [
             "transformers",
-            "gguf",
             "openrouter",
             "comfy_credits",
             "google_api"

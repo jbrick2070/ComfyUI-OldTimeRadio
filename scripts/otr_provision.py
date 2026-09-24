@@ -653,16 +653,13 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
             lowered = model_id.lower()
             if "gguf" in lowered:
                 say("SKIP", "writer: %s" % model_id,
-                    "GGUF-native artifact is managed by its explicit lane")
+                    "retired writer handle; it is not a catalog row and has "
+                    "no local Transformers payload to warm")
             else:
                 say("SKIP", "writer: %s" % model_id,
                     "not a static local Transformers catalog row")
             continue
         provider = getattr(row, "provider", "local")
-        if provider == "gguf_native" or row.loader_backend == "gguf_native":
-            say("SKIP", "writer: %s" % model_id,
-                "GGUF-native artifact is managed by its explicit lane")
-            continue
         if provider != "local":
             say("SKIP", "writer: %s" % model_id,
                 "provider %s has no local Hub payload" % provider)

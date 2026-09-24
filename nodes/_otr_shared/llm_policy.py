@@ -12,8 +12,7 @@ Stdlib-only by contract (this package is imported by the workflow
 validator, which must stay light).
 
 Field classes (one per field -- spec section 2):
-  W (widget-mapped) : device, attn_impl, quant_policy, vram_ceiling_gb,
-                      gguf_n_ctx, gguf_quant
+  W (widget-mapped) : device, attn_impl, quant_policy, vram_ceiling_gb
   E (emit/validate) : lane_allowlist (profile-derived; runtime backstop in
                       request_slot + a per-backend assert in every remote
                       lane)
@@ -27,14 +26,12 @@ from typing import Any
 # lanes match their catalog ``loader_backend`` families 1:1 via
 # LANE_BY_LOADER_BACKEND. A profile's lane_allowlist carries THESE tokens.
 LANE_TRANSFORMERS = "transformers"
-LANE_GGUF = "gguf"
 LANE_OPENROUTER = "openrouter"
 LANE_COMFY_CREDITS = "comfy_credits"
 LANE_GOOGLE_API = "google_api"
 
 ALL_LANES: tuple[str, ...] = (
     LANE_TRANSFORMERS,
-    LANE_GGUF,
     LANE_OPENROUTER,
     LANE_COMFY_CREDITS,
     LANE_GOOGLE_API,
@@ -46,7 +43,6 @@ LANE_BY_LOADER_BACKEND: dict[str, str] = {
     "transformers_safetensors": LANE_TRANSFORMERS,
     "transformers_multimodal_text_only": LANE_TRANSFORMERS,
     "transformers_gptq_int4": LANE_TRANSFORMERS,
-    "gguf_native": LANE_GGUF,
     "openrouter_http": LANE_OPENROUTER,
     "comfy_credits_http": LANE_COMFY_CREDITS,
     "google_api_http": LANE_GOOGLE_API,
@@ -55,7 +51,6 @@ LANE_BY_LOADER_BACKEND: dict[str, str] = {
 _DEVICES = ("cuda", "cpu", "mps")
 _ATTN_IMPLS = ("sdpa", "flash_attention_2", "eager")
 _QUANT_POLICIES = ("bnb_nf4", "bnb_8bit", "none")
-_GGUF_QUANTS = ("Q8_0", "Q6_K", "Q4_K_M")
 
 
 class LLMPolicyError(ValueError):
@@ -75,8 +70,6 @@ class LLMRuntimePolicy:
     attn_impl: str = "sdpa"
     quant_policy: str = "bnb_nf4"
     vram_ceiling_gb: float = 14.5
-    gguf_n_ctx: int = 4096
-    gguf_quant: str = "Q8_0"
     lane_allowlist: tuple[str, ...] = ALL_LANES
 
     def __post_init__(self) -> None:
@@ -95,13 +88,6 @@ class LLMRuntimePolicy:
             raise LLMPolicyError(
                 f"llm.vram_ceiling_gb must be >= 0 (0 = disabled, cpu tier "
                 f"only); got {self.vram_ceiling_gb!r}")
-        if not isinstance(self.gguf_n_ctx, int) or self.gguf_n_ctx < 512:
-            raise LLMPolicyError(
-                f"llm.gguf_n_ctx must be an int >= 512; got "
-                f"{self.gguf_n_ctx!r}")
-        if self.gguf_quant not in _GGUF_QUANTS:
-            raise LLMPolicyError(
-                f"llm.gguf_quant {self.gguf_quant!r} not in {_GGUF_QUANTS}")
         lanes = tuple(self.lane_allowlist)
         unknown = [l for l in lanes if l not in ALL_LANES]
         if unknown or not lanes:
@@ -120,8 +106,7 @@ class LLMRuntimePolicy:
         reloaded -- silent stale-policy reuse is exactly the bug class this
         campaign kills. vram_ceiling_gb (pre-load gate) and lane_allowlist
         (admission) do not shape the artifact and are excluded."""
-        return (self.device, self.attn_impl, self.quant_policy,
-                self.gguf_n_ctx, self.gguf_quant)
+        return (self.device, self.attn_impl, self.quant_policy)
 
 
 #: The nv50 16 GB identity policy -- today's resolved baseline values.
@@ -146,8 +131,14 @@ def policy_from_meta(meta: Any) -> "LLMRuntimePolicy | None":
             device=raw["device"], attn_impl=raw["attn_impl"],
             quant_policy=raw["quant_policy"],
             vram_ceiling_gb=raw["vram_ceiling_gb"],
-            gguf_n_ctx=raw["gguf_n_ctx"], gguf_quant=raw["gguf_quant"],
-            lane_allowlist=tuple(raw.get("lane_allowlist") or ALL_LANES),
+            # AN OLD LEDGER'S EXTRA KEYS ARE IGNORED, NOT REJECTED. Every
+            # episode finished before this removal carries the two retired
+            # fields in its stamp, and those files are not rewritten -- reading
+            # one must still yield the policy it ran under for the fields that
+            # still exist. Only a MALFORMED surviving field fails loud.
+            lane_allowlist=tuple(
+                l for l in (raw.get("lane_allowlist") or ALL_LANES)
+                if l in ALL_LANES) or ALL_LANES,
         )
     except (KeyError, TypeError) as e:
         raise LLMPolicyError(
@@ -172,7 +163,6 @@ __all__ = [
     "BASELINE_POLICY",
     "LANE_BY_LOADER_BACKEND",
     "LANE_COMFY_CREDITS",
-    "LANE_GGUF",
     "LANE_GOOGLE_API",
     "LANE_OPENROUTER",
     "LANE_TRANSFORMERS",

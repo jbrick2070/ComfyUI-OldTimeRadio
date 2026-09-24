@@ -643,8 +643,6 @@ class TestWriterB2aSurface:
         #  27  llm_attn_impl               "sdpa"
         #  28  llm_quant_policy            "bnb_nf4"
         #  29  llm_vram_ceiling_gb         14.5
-        #  30  gguf_n_ctx                  4096
-        #  31  gguf_quant                  "Q8_0"
         # History: `seed` + companion removed 2026-05-25 (BUG-LOCAL-269/270);
         # the 2026-05-29 lean-down brought the vector to 19; S2 (2026-06-01)
         # appended the OpenRouter pair; Comfy Credits appended its sibling
@@ -659,9 +657,9 @@ class TestWriterB2aSurface:
         # vector back to 27; Source Banks v2 then appended source_ref as
         # slot 27 without moving any prior slot.
         #
-        # S5 platform-portability (2026-07-10): pin 28 -> pin 34. The six
-        # explicit LLM runtime-policy widgets (llm_device .. gguf_quant)
-        # were appended after source_ref at slots 28-33 (append-only,
+        # S5 platform-portability (2026-07-10): pin 28 -> pin 34. The
+        # explicit LLM runtime-policy widgets were appended after
+        # source_ref (append-only,
         # BUG-LOCAL-097). Defaults equal the nv50 16 GB baseline the writer
         # already resolved to, so an old 28-slot workflow still resolves
         # byte-identically. A gate_in forceInput socket was also added
@@ -698,14 +696,20 @@ class TestWriterB2aSurface:
         # which consumes no saved slot -- so it lands last and no earlier index
         # and no link dst_slot moved. The shipped bake ships "English", which
         # is today's behaviour byte for byte and says so on the ledger.
-        assert len(wv) == 37, (
-            f"writer widgets_values length drift: {len(wv)} (expected 37: "
-            f"32 after the 2026-08-14 target_words removal and the 2026-08-28 "
-            f"refine_target_grade removal, plus the trailing replay_from "
-            f"widget appended 2026-09-02 for the canonical replay, plus the "
-            f"four My Story fields appended 2026-09-10, minus "
-            f"perfect_run_spacesaver removed 2026-09-13, plus "
-            f"episode_language appended 2026-09-18)"
+        #
+        # 2026-09-24: `gguf_n_ctx` and `gguf_quant` were REMOVED with the
+        # writer backend they configured, taking the vector 37 -> 35. They sat
+        # mid-list, immediately before the `gate_in` forceInput, so this is the
+        # second removal here carried by scripts/otr_widget_surgery.py rather
+        # than by hand: descriptor, saved value AND link table moved together,
+        # `gate_in` went from input slot 31 to 30, and link 279 followed it by
+        # identity. A captured pre-removal graph is replayed through the
+        # frontend boundary in tests/test_workflow_schema_boundary.py and must
+        # land on exactly the values this file pins.
+        assert len(wv) == 35, (
+            f"writer widgets_values length drift: {len(wv)} (expected 35 "
+            f"after the 2026-09-24 removal of the two writer-backend quant "
+            f"widgets; every earlier count is recorded in the history above)"
         )
         # The one-switch ships English -- not Off, and never a language the
         # first-run listener did not ask for.
@@ -842,12 +846,6 @@ class TestWriterB2aSurface:
             f"llm_vram_ceiling_gb must ship 10.0 on the CANONICAL -- a ceiling "
             f"an 8 GB card can also live under; 14.5 is the 16 GB variants' "
             f"number. Got {wv[slot('llm_vram_ceiling_gb')]!r}"
-        )
-        assert wv[slot('gguf_n_ctx')] == 4096, (
-            f"gguf_n_ctx must ship 4096; got {wv[slot('gguf_n_ctx')]!r}"
-        )
-        assert wv[slot('gguf_quant')] == "Q8_0", (
-            f"gguf_quant must ship 'Q8_0'; got {wv[slot('gguf_quant')]!r}"
         )
         # Creative + technical slots both bound to a non-empty repo id.
         assert isinstance(wv[slot('creative_writing_model')], str) and wv[slot('creative_writing_model')], (

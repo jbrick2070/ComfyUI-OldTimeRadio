@@ -179,27 +179,32 @@ def test_step_4_resolves_the_comfy_models_dir_not_one_inside_custom_nodes(
         "off-by-one this test exists for" % wrong)
 
 
-def test_the_retiring_backend_no_longer_owns_an_implementation():
+def test_no_other_module_defines_a_second_models_root():
     """One owner, not two that agree today and drift tomorrow.
 
     The pack carried two models-root implementations once before. Their
     docstrings both claimed "the same override chain" for weeks while one
     existence-gated the legacy literal and the other returned it
     unconditionally. A second definition is the defect, not the disagreement.
+    The module that held the duplicate has since been deleted outright, so
+    this now watches the whole package rather than that one file -- which is
+    the check that should have existed first.
     """
-    import inspect
-    from nodes import _otr_gguf_backend as backend
+    import pathlib as _pl
 
-    src = inspect.getsource(backend)
-    assert "def _models_root" not in src, (
-        "the retiring backend defines _models_root again; it must re-export "
-        "the one owner, never carry a copy")
-    assert backend._models_root is mr._models_root, (
-        "the backend's _models_root must BE the owner's function object")
-    assert backend.ModelsRootUnresolved is mr.ModelsRootUnresolved
+    owner = _pl.Path(mr.__file__).resolve()
+    offenders = []
+    for path in sorted((owner.parent).rglob("*.py")):
+        if path.resolve() == owner:
+            continue
+        if "def _models_root" in path.read_text(encoding="utf-8"):
+            offenders.append(path.name)
+    assert offenders == [], (
+        "a second _models_root implementation is back, in %r; every consumer "
+        "must import the one owner instead" % (offenders,))
 
 
-def test_every_caller_imports_the_owner_and_not_the_retiring_backend():
+def test_every_caller_imports_the_owner_at_its_real_site():
     """The consumers import LAZILY, so this reads their source.
 
     Both of these deliberately import inside a function to keep their own cold
@@ -217,9 +222,6 @@ def test_every_caller_imports_the_owner_and_not_the_retiring_backend():
         src = inspect.getsource(module)
         assert "_otr_models_root import _models_root" in src, (
             "%s should import the models root from its neutral owner"
-            % module.__name__)
-        assert "_otr_gguf_backend import _models_root" not in src, (
-            "%s still reaches the models root through the retiring backend"
             % module.__name__)
 
 

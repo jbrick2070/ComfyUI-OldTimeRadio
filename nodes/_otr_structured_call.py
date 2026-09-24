@@ -641,8 +641,8 @@ def invoke_structured_slot(
     unchanged, and the local path is byte-identical.
     """
     # force_json_object=False is how a TEXT pass opts out (2026-08-25). A
-    # `gguf_native` or OpenRouter row carries `_otr_supports_json_object`, and
-    # on the GGUF backend that kwarg installs a real JSON grammar on the
+    # An OpenRouter row carries `_otr_supports_json_object`, and on that
+    # backend the kwarg installs a real JSON grammar on the
     # decode -- so a labelled-section prompt would be sampled under a
     # constraint that forbids the very format it asks for. The transformers
     # rows in tonight's failure never carried the marker, which is why the

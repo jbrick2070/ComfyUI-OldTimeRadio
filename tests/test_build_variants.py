@@ -138,15 +138,15 @@ def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
         variant, mapping=mapping, schemas=schemas)
     # The profile's managed values reached the nodes that own them: the cast
     # lock renders its voices on the CPU, and the writer runs its model on the
-    # CPU at the quantisation the floor profile asks for. Each widget is found
-    # by its own name, so adding or removing an unrelated control above it
-    # leaves these three assertions alone -- which is the whole reason no
-    # position is written down here.
+    # CPU. Each widget is found by its own NAME, so adding or removing an
+    # unrelated control above it leaves these assertions alone -- which is the
+    # whole reason no position is written down here, and is why removing the
+    # writer's two retired quant widgets cost this test one line rather than a
+    # re-index.
     castlock = next(n for n in variant["nodes"] if n["id"] == 80)
     assert value(castlock, "voice_device") == "cpu"
     writer = next(n for n in variant["nodes"] if n["id"] == 1)
     assert value(writer, "llm_device") == "cpu"
-    assert value(writer, "gguf_quant") == "Q4_K_M"
     # Recipe carries args + env pointers + key names, never key values.
     assert "--cpu" in recipe
     assert "OTR_COMFYUI_MODELS_ROOT" in recipe

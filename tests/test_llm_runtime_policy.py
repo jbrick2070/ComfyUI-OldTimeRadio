@@ -15,15 +15,8 @@ import types
 
 import pytest
 
-from nodes import _otr_gguf_backend as gguf
 from nodes import _otr_model_loader as ml
 from nodes._otr_shared import llm_policy as lp
-
-_skip_no_gguf_row = pytest.mark.skipif(
-    not gguf.GGUF_ROWS,
-    reason="no GGUF writer row ships; row-content contracts are dormant "
-           "(see nodes/_otr_gguf_backend.GGUF_ROWS)",
-)
 
 
 # --------------------------------------------------------------------------
@@ -35,7 +28,6 @@ def test_baseline_equals_spec_section4_defaults():
     assert (p.device, p.attn_impl, p.quant_policy) == ("cuda", "sdpa",
                                                        "bnb_nf4")
     assert p.vram_ceiling_gb == 14.5
-    assert (p.gguf_n_ctx, p.gguf_quant) == (4096, "Q8_0")
     assert p.lane_allowlist == lp.ALL_LANES
 
 
@@ -44,8 +36,6 @@ def test_baseline_equals_spec_section4_defaults():
     {"attn_impl": "flash_attention_3"},
     {"quant_policy": "gptq"},
     {"vram_ceiling_gb": -1.0},
-    {"gguf_n_ctx": 128},
-    {"gguf_quant": "Q5_K"},
     {"lane_allowlist": ("warp_drive",)},
     {"lane_allowlist": ()},
 ])
@@ -56,7 +46,7 @@ def test_policy_validation_fails_loud(kw):
 
 def test_cache_key_covers_artifact_fields_only():
     """vram_ceiling_gb (pre-load gate) + lane_allowlist (admission) must
-    NOT force a reload; device/attn/quant/gguf fields must."""
+    NOT force a reload; device/attn/quant fields must."""
     base = lp.LLMRuntimePolicy()
     same = lp.LLMRuntimePolicy(vram_ceiling_gb=0,
                                lane_allowlist=("transformers",))
@@ -66,13 +56,11 @@ def test_cache_key_covers_artifact_fields_only():
     assert base.cache_key() != lp.LLMRuntimePolicy(
         quant_policy="none").cache_key()
     assert base.cache_key() != lp.LLMRuntimePolicy(
-        gguf_n_ctx=2048).cache_key()
+        device="cpu").cache_key()
 
 
 def test_lane_for_row_mapping():
     assert lp.lane_for_row(None) == lp.LANE_TRANSFORMERS
-    row = types.SimpleNamespace(loader_backend="gguf_native")
-    assert lp.lane_for_row(row) == lp.LANE_GGUF
     assert lp.lane_for_row(
         types.SimpleNamespace(loader_backend="openrouter_http")
     ) == lp.LANE_OPENROUTER
@@ -102,7 +90,7 @@ def test_request_slot_lane_backstop(monkeypatch, clean_llm_cache):
     row = types.SimpleNamespace(loader_backend="openrouter_http")
     monkeypatch.setattr(cat, "_by_repo_id", lambda: {"fake-remote": row})
 
-    pol = lp.LLMRuntimePolicy(lane_allowlist=("transformers", "gguf"))
+    pol = lp.LLMRuntimePolicy(lane_allowlist=("transformers",))
     with pytest.raises(ml.ModelLoaderError, match="not admitted"):
         ml.request_slot("creative", "fake-remote", policy=pol)
 
@@ -216,7 +204,8 @@ def test_native_pin_is_captured_once_and_shapes_reuse(monkeypatch, clean_llm_cac
     assert all(path == tmp_path / "hub" for path in roots)
 
 
-@pytest.mark.parametrize("backend", ["openrouter_http", "comfy_credits_http", "google_api_http", "gguf_native"])
+@pytest.mark.parametrize(
+    "backend", ["openrouter_http", "comfy_credits_http", "google_api_http"])
 def test_virtual_routes_do_not_resolve_or_scan_hf(backend, monkeypatch, clean_llm_cache):
     from nodes import _otr_model_catalog as cat
     from nodes import _otr_hf_env as hf
@@ -244,7 +233,6 @@ def _backend_classes():
         rt.TransformersSafetensorsBackend,
         rt.TransformersMultimodalTextOnlyBackend,
         rt.TransformersGPTQInt4Backend,
-        gguf.GGUFNativeBackend,
         ob.OpenRouterBackend,
         cb.ComfyCreditsBackend,
         gl.GoogleAPIBackend,
@@ -276,55 +264,6 @@ def test_remote_backends_assert_lane_admission():
                                       policy=local_only)
     with pytest.raises(GoogleAPIError, match="not admitted"):
         gl.GoogleAPIBackend().load("google:slot-a", row, policy=local_only)
-
-
-# --------------------------------------------------------------------------
-# GGUF: artifact table + deleted silent tolerances
-# --------------------------------------------------------------------------
-
-def test_gguf_artifact_table_known_and_unknown():
-    name, size, sha = gguf.gguf_artifact_for_quant("Q8_0")
-    assert name == "gemma-4-12b-it-Q8_0.gguf"
-    assert size == gguf.EXPECTED_Q8_0_SIZE_BYTES
-    assert sha is not None and len(sha) == 64
-    for quant in ("Q6_K", "Q4_K_M"):
-        fname, fsize, fsha = gguf.gguf_artifact_for_quant(quant)
-        assert quant in fname and fname.endswith(".gguf")
-    with pytest.raises(gguf.GGUFNativeConfigError, match="artifact-table"):
-        gguf.gguf_artifact_for_quant("Q5_K")
-
-
-def test_gguf_load_missing_quant_file_fails_loud(monkeypatch, tmp_path):
-    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
-    monkeypatch.delenv("GEMMA4_12B_GGUF_PATH", raising=False)
-    pol = lp.LLMRuntimePolicy(gguf_quant="Q6_K")
-    with pytest.raises(gguf.GGUFNativeConfigError,
-                       match="gemma-4-12b-it-Q6_K.gguf"):
-        gguf.GGUFNativeBackend().load(
-            "unsloth/gemma-4-12b-it-GGUF",
-            types.SimpleNamespace(context_window=4096), policy=pol)
-
-
-def test_gguf_load_size_mismatch_fails_loud(monkeypatch, tmp_path):
-    bad = tmp_path / "gemma-4-12b-it-Q8_0.gguf"
-    bad.write_bytes(b"placeholder-not-a-real-gguf")
-    monkeypatch.setenv("GEMMA4_12B_GGUF_PATH", str(bad))
-    with pytest.raises(gguf.GGUFNativeConfigError, match="Incomplete"):
-        gguf.GGUFNativeBackend().load(
-            "unsloth/gemma-4-12b-it-GGUF",
-            types.SimpleNamespace(context_window=4096),
-            policy=lp.BASELINE_POLICY)
-
-
-def test_gguf_silent_tolerances_are_gone():
-    """The 4096->2048 downgrade (truncated original_concept JSON, see
-    d526c8b7) and the 'proceeding anyway' preflight tolerance must not
-    exist in the module source anymore."""
-    src = inspect.getsource(gguf)
-    assert "Dynamically downgrading" not in src
-    assert "n_ctx = 2048" not in src, "the silent context downgrade is back"
-    assert 'log.warning("[GGUFNative] VRAM preflight check failed' not in src, (
-        "the proceed-anyway preflight tolerance is back")
 
 
 # --------------------------------------------------------------------------
@@ -363,12 +302,11 @@ def test_resolve_inputs_threads_explicit_policy_fields():
     resolved = _resolve_inputs(
         custom_premise="test premise",
         llm_device="cpu", llm_quant_policy="none",
-        llm_vram_ceiling_gb=0, gguf_n_ctx=2048, gguf_quant="Q4_K_M",
+        llm_vram_ceiling_gb=0,
     )
     pol = resolved["llm_policy"]
     assert (pol.device, pol.quant_policy) == ("cpu", "none")
     assert pol.vram_ceiling_gb == 0
-    assert (pol.gguf_n_ctx, pol.gguf_quant) == (2048, "Q4_K_M")
 
 
 def test_resolve_inputs_rejects_bad_policy_enum():
@@ -384,11 +322,10 @@ def test_resolve_inputs_rejects_bad_policy_enum():
 
 def test_policy_from_meta_roundtrip_and_failure_modes():
     pol = lp.LLMRuntimePolicy(device="cpu", quant_policy="none",
-                              vram_ceiling_gb=0, gguf_quant="Q4_K_M")
+                              vram_ceiling_gb=0)
     stamp = {"device": pol.device, "attn_impl": pol.attn_impl,
              "quant_policy": pol.quant_policy,
              "vram_ceiling_gb": pol.vram_ceiling_gb,
-             "gguf_n_ctx": pol.gguf_n_ctx, "gguf_quant": pol.gguf_quant,
              "lane_allowlist": list(pol.lane_allowlist)}
     assert lp.policy_from_meta({"llm_policy": stamp}) == pol
     # Absent stamp -> None (pre-stamp ledgers keep the BASELINE backstop).
@@ -436,15 +373,14 @@ def test_stable_audio_music_has_no_device_waterfall():
 
 # --------------------------------------------------------------------------
 # A1 (2026-07-27): the ceiling is an ADMISSION field, so it is evaluated on
-# every REQUEST -- ahead of cache reuse and ahead of loading, on BOTH local
-# lanes. Before this it could only gate a fresh transformers load: the GGUF
-# dispatch and the transformers cache hit both returned above it, and neither
-# reuse key carries the ceiling (correctly -- admission does not shape the
-# artifact, so it cannot be closed by widening a key).
+# every REQUEST -- ahead of cache reuse and ahead of loading. Before this it
+# could only gate a fresh transformers load, because the cache hit returned
+# above it, and the reuse key does not carry the ceiling (correctly --
+# admission does not shape the artifact, so it cannot be closed by widening
+# a key).
 # --------------------------------------------------------------------------
 
 _EIGHT_GB_TIER = 6.8  # config/profiles/otr_8gb_ltx.json -> llm.vram_ceiling_gb
-_GEMMA_GGUF = "unsloth/gemma-4-12b-it-GGUF"
 _GEMMA_HF = "google/gemma-4-12b-it"
 
 
@@ -454,96 +390,9 @@ class _CountingBackend:
     def __init__(self):
         self.loads = []
 
-    def load(self, model_id, row, policy=None, load_config=None):
+    def load(self, model_id, row, policy=None):
         self.loads.append(model_id)
         return {"model_id": model_id, "model": object(), "backend": "stub"}
-
-
-def _gguf_load_config(repo, n_ctx=4096, quant="Q8_0"):
-    return gguf.GGUFLoadConfig(
-        repo_id=repo, model_path=f"/models/{repo}/{quant}.gguf", quant=quant,
-        n_ctx=n_ctx, n_batch=512, n_gpu_layers=-1, kv_gb_per_1k=None, seed=1,
-        stop_tokens=(), think_policy="none",
-    )
-
-
-@_skip_no_gguf_row
-def test_shipped_registry_admits_the_default_and_refuses_the_8gb_tier():
-    """Real registry arithmetic, no fixture and no stub. The ceiling this
-    repo ships (14.5) must keep PASS-estimating the GGUF writer it ships,
-    and the 8 GB tier's 6.8 must FAIL-estimate it. FAIL is a
-    recommendation, not a request_slot raise. If the first flips, the
-    default workflow is priced wrong; if the second flips, the tier
-    ceiling is decorative again."""
-    from nodes import _otr_model_catalog as cat
-
-    admitted = cat.check_vram_fit(_GEMMA_GGUF, 4096, ceiling_gb=14.5)
-    assert admitted.tier != "FAIL", admitted.reason
-
-    refused = cat.check_vram_fit(_GEMMA_GGUF, 2048, ceiling_gb=_EIGHT_GB_TIER)
-    assert refused.tier == "FAIL"
-    assert refused.estimated_gb > _EIGHT_GB_TIER
-    assert refused.ceiling_gb == _EIGHT_GB_TIER
-
-
-@_skip_no_gguf_row
-def test_gguf_cache_hit_cannot_inherit_a_permissive_ceiling(
-    monkeypatch, clean_llm_cache,
-):
-    """Dormant. Writer GGUF_ROWS is empty on purpose. Do not restore a
-    writer row to make this run. Video GGUF files are unrelated."""
-    backend = _CountingBackend()
-    monkeypatch.setattr(
-        "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend)
-
-    load_config = _gguf_load_config(_GEMMA_GGUF)
-    ml.request_slot("technical", _GEMMA_GGUF, policy=lp.LLMRuntimePolicy(),
-                    load_config=load_config)
-    assert backend.loads == [_GEMMA_GGUF]
-    assert ml.LLM_CACHE.get("model_id") == _GEMMA_GGUF  # genuinely resident
-
-    reused = ml.request_slot(
-        "technical", _GEMMA_GGUF,
-        policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
-        load_config=load_config,
-    )
-    assert reused["model_id"] == _GEMMA_GGUF
-    assert backend.loads == [_GEMMA_GGUF]
-
-
-@_skip_no_gguf_row
-def test_gguf_fresh_load_consults_the_policy_ceiling(
-    monkeypatch, clean_llm_cache,
-):
-    """Dormant. Writer GGUF_ROWS is empty on purpose. Do not restore a
-    writer row to make this run."""
-    backend = _CountingBackend()
-    monkeypatch.setattr(
-        "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend)
-
-    entry = ml.request_slot(
-        "technical", _GEMMA_GGUF,
-        policy=lp.LLMRuntimePolicy(vram_ceiling_gb=_EIGHT_GB_TIER),
-        load_config=_gguf_load_config(_GEMMA_GGUF),
-    )
-    assert entry["model_id"] == _GEMMA_GGUF
-    assert backend.loads == [_GEMMA_GGUF]
-
-
-@_skip_no_gguf_row
-def test_gguf_ceiling_zero_disables_the_gate(monkeypatch, clean_llm_cache):
-    """vram_ceiling_gb == 0 is the cpu tier: there is no VRAM to fit, so
-    admission must be DISABLED there, not maximally strict."""
-    backend = _CountingBackend()
-    monkeypatch.setattr(
-        "nodes._otr_model_runtime.get_backend_for_row", lambda row: backend)
-
-    ml.request_slot(
-        "technical", _GEMMA_GGUF,
-        policy=lp.LLMRuntimePolicy(device="cpu", vram_ceiling_gb=0),
-        load_config=_gguf_load_config(_GEMMA_GGUF),
-    )
-    assert backend.loads == [_GEMMA_GGUF]
 
 
 def test_remote_lane_is_exempt_from_the_ceiling(monkeypatch, clean_llm_cache):
@@ -605,108 +454,6 @@ def test_admission_runs_before_every_cache_read_in_source():
     src = inspect.getsource(ml.request_slot)
     gate = src.index("_assert_policy_admits_vram(")
     assert gate < src.index("_try_cache_hit_locked(")
-    assert gate < src.index('LLM_CACHE.get("gguf_load_key")')
     assert gate < src.index('LLM_CACHE.get("policy_key")')
 
 
-# --------------------------------------------------------------------------
-# A6 (2026-07-27): a GGUF artifact with no pinned integrity used to pass
-# readiness. Both checks were conditional on their own pin existing, so an
-# unpinned quant skipped integrity entirely -- on Q4_K_M, the quant the 8 GB
-# profile selects. The registry now carries measured pins, one table feeds
-# both the registry and the env-fallback path, and unpinned is a REFUSAL.
-# --------------------------------------------------------------------------
-
-def test_every_shipped_quant_is_pinned_or_absent_from_the_box():
-    """Q8_0 and Q4_K_M are pinned by measurement. Q6_K is deliberately
-    unpinned -- it has never been on this box -- and the test says so, so
-    that pinning it later is a deliberate edit rather than a surprise."""
-    pinned = {"Q8_0", "Q4_K_M"}
-    for quant, (name, size, sha) in gguf.GGUF_ARTIFACTS.items():
-        assert name.endswith(".gguf")
-        if quant in pinned:
-            assert isinstance(size, int) and size > 0, quant
-            assert isinstance(sha, str) and len(sha) == 64, quant
-            assert sha == sha.lower(), quant
-        else:
-            assert (size, sha) == (None, None), quant
-
-
-def test_q4_pin_is_the_quant_the_8gb_profile_selects():
-    """The A6 defect in one assertion: the artifact whose integrity was
-    unverifiable is the one the 8 GB tier picks. Its size must also be
-    clearly distinct from the Q8_0's, so a pin transcribed onto the wrong
-    row cannot pass."""
-    _q4_name, q4_size, q4_sha = gguf.gguf_artifact_for_quant("Q4_K_M")
-    _q8_name, q8_size, q8_sha = gguf.gguf_artifact_for_quant("Q8_0")
-    assert q4_size is not None and q8_size is not None
-    assert q4_size < q8_size
-    assert q4_sha != q8_sha
-
-
-@_skip_no_gguf_row
-def test_registry_row_carries_the_table_shas_not_a_none_slot():
-    """The gemma row used to graft sha=None onto every quant while building
-    its artifacts, which discarded any sha the table carried. One table,
-    read verbatim."""
-    row = gguf.gguf_row_for_repo(gguf.ROW_ID)
-    for quant, entry in gguf.GGUF_ARTIFACTS.items():
-        assert row.artifact_for_quant(quant) == entry
-
-
-def test_env_fallback_path_gets_the_same_sha_contract(monkeypatch, tmp_path):
-    """The no-load_config path hard-coded expected_sha = None, so pinning a
-    sha in the registry would have been decorative for every caller that
-    reaches the gemma env fallback. Source-level pin: it now unpacks three
-    values from the one table."""
-    import inspect
-
-    src = inspect.getsource(gguf.GGUFNativeBackend.load)
-    assert "expected_sha = None" not in src
-    assert "expected_name, expected_size, expected_sha" in src
-
-
-@_skip_no_gguf_row
-def test_unpinned_artifact_is_refused_not_loaded_unchecked(
-    monkeypatch, tmp_path,
-):
-    """A present-but-unpinned artifact is the exact A6 hole: the file exists,
-    so the missing-file check passes, and both integrity checks skip
-    themselves. It must refuse by name instead."""
-    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
-    monkeypatch.delenv("GEMMA4_12B_GGUF_PATH", raising=False)
-
-    target = (tmp_path / "LLM" / "converted" / "gemma-4-12b-it"
-              / "gemma-4-12b-it-Q6_K.gguf")
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(b"GGUF" + b"\x00" * 64)  # a plausible partial download
-
-    with pytest.raises(gguf.GGUFNativeConfigError) as excinfo:
-        gguf.GGUFNativeBackend().load(
-            gguf.ROW_ID, gguf.gguf_row_for_repo(gguf.ROW_ID),
-            policy=lp.LLMRuntimePolicy(gguf_quant="Q6_K"),
-        )
-    message = str(excinfo.value)
-    assert "Unpinned" in message
-    assert "Q6_K" in message
-    assert "size" in message and "sha256" in message
-
-
-@_skip_no_gguf_row
-def test_pinned_quant_still_catches_a_short_file(monkeypatch, tmp_path):
-    """The other half of the row: with the size pinned, a non-zero SHORT
-    file is rejected as incomplete rather than loaded."""
-    monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path))
-    monkeypatch.delenv("GEMMA4_12B_GGUF_PATH", raising=False)
-
-    name, size, _sha = gguf.gguf_artifact_for_quant("Q4_K_M")
-    target = tmp_path / "LLM" / "converted" / "gemma-4-12b-it" / name
-    target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_bytes(b"GGUF" + b"\x00" * 1024)
-    assert target.stat().st_size < size
-
-    with pytest.raises(gguf.GGUFNativeConfigError, match="Incomplete"):
-        gguf.GGUFNativeBackend().load(
-            gguf.ROW_ID, gguf.gguf_row_for_repo(gguf.ROW_ID),
-            policy=lp.LLMRuntimePolicy(gguf_quant="Q4_K_M"),
-        )

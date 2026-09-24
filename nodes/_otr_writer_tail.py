@@ -1091,18 +1091,7 @@ class WriterTailMixin:
             "attn_impl": _pol.attn_impl,
             "quant_policy": _pol.quant_policy,
             "vram_ceiling_gb": _pol.vram_ceiling_gb,
-            "gguf_n_ctx": _pol.gguf_n_ctx,
-            "gguf_quant": _pol.gguf_quant,
             "lane_allowlist": list(_pol.lane_allowlist),
-        }
-        # GGUF row registry (2026-07-16): serialize the immutable per-slot GGUF
-        # load_config the writer actually loaded under (resolved path / quant /
-        # n_ctx / n_batch / n_gpu_layers / kv / seed + algo / pinned top_k /
-        # sampling / stop / think). Downstream consumers read THIS, not the env.
-        # Empty dict for a non-GGUF run.
-        meta["llm_gguf_load_config"] = {
-            _slot: _lc.as_receipt()
-            for _slot, _lc in slot_scheduler.load_config_by_slot.items()
         }
         # S30 B2b: top-level slot stamps + per-phase routing trace.
         # `gen_params_by_phase` records the slot + resolved model for

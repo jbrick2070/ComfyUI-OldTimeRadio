@@ -33,7 +33,6 @@ from __future__ import annotations
 from typing import Any
 
 from . import _otr_comfy_backend
-from . import _otr_gguf_backend
 from . import _otr_loader_backends
 from . import _otr_model_catalog
 from . import _otr_model_loader
@@ -162,9 +161,6 @@ BACKENDS_BY_KEY: dict[str, Any] = {
     # resolves from the writer's google_api_slot_a/b widgets.
     _otr_google_api_models.GOOGLE_API_BACKEND_KEY:
         _otr_google_api_llm.GoogleAPIBackend(),
-    # Native GGUF Gemma 4 12B path: in-process llama-cpp-python, no sidecar.
-    _otr_gguf_backend.GGUF_BACKEND_KEY:
-        _otr_gguf_backend.GGUFNativeBackend(),
 }
 
 

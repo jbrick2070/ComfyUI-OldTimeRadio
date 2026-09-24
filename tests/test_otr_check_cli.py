@@ -323,7 +323,7 @@ def test_a_lane_that_cannot_take_the_writers_keywords_is_refused(
 
 def test_named_keywords_and_kwargs_both_satisfy_the_binding(tmp_path, capsys):
     explicit = _bundle(tmp_path, "client_named", module=(
-        "def fetch_source(*, bank, technical_model, source_ref, load_config,"
+        "def fetch_source(*, bank, technical_model, source_ref,"
         " policy):\n    return None\n\n\n"
         "def interpret_source(*, bank, payload, technical_fn, model_id):\n"
         "    return None\n"))

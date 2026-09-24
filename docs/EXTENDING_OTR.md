@@ -147,8 +147,8 @@ user_packs/source_banks/<bank_id>/
   `shakespeare_interpreter`) and reuse that lane wholesale, or mix -- a `"self"`
   fetcher with a shipped interpreter is fine. Any other value is a typo and
   quarantines the bundle. A bank only ever executes its OWN bundle.
-- **`fetch_source(*, bank, technical_model, source_ref="", load_config=None,
-  policy=None)`** returns the exact seven-key payload envelope --
+- **`fetch_source(*, bank, technical_model, source_ref="", policy=None)`**
+  returns the exact seven-key payload envelope --
   `headline`, `summary`, `full_text`, `source`, `date`, `link`, `seed_text`
   (all strings, `seed_text` non-empty; unknown key = hard error) -- either as a
   plain dict or wrapped in `SourceFetchResult` to carry the

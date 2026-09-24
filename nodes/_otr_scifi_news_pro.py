@@ -2950,7 +2950,7 @@ def _draft_fits_repair_turn(base_user: str, draft: str,
     # THE TRANSPORT'S OWN WINDOW FIRST (2026-09-11).
     #
     # `cap` is the number resolved by the transport that will actually receive
-    # this turn: llama.cpp's `n_ctx` on the GGUF lane, the provider's advertised
+    # this turn: the provider's advertised
     # `context_window` on OpenRouter, the tokenizer/config value locally. A
     # single flat constant is right for none of them, and it is wrong in BOTH
     # directions -- it is VRAM-shaped, so it understates a large remote window

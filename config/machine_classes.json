@@ -203,9 +203,6 @@
       "char_voice": "kokoro",
       "writer_ceiling_gb": 6.8,
       "quant_policy": "none",
-      "llm": {
-        "gguf_n_ctx": 2048
-      },
       "render": {
         "canvas_w": 512,
         "canvas_h": 288
@@ -311,9 +308,6 @@
       "writer_ceiling_gb": 6.8,
       "quant_policy": "none",
       "status": "draft",
-      "llm": {
-        "gguf_n_ctx": 2048
-      },
       "video_policy": {
         "dtype_policy": "no_fp8"
       },
@@ -367,8 +361,6 @@
     "llm": {
       "device": "cuda",
       "attn_impl": "sdpa",
-      "gguf_n_ctx": 8192,
-      "gguf_quant": "Q4_K_M",
       "openrouter_slot_a_model": "(enable OpenRouter)",
       "openrouter_slot_b_model": "(enable OpenRouter)",
       "comfy_slot_a_model": "(enable Comfy Credits)",
@@ -377,7 +369,6 @@
       "google_api_slot_b_model": "(select Google API model)",
       "lane_allowlist": [
         "transformers",
-        "gguf",
         "openrouter",
         "comfy_credits",
         "google_api"

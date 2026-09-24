@@ -28,7 +28,7 @@ def test_gemma_12b_on_8gb_ceiling_is_fail_estimate_not_a_raise():
     _assert_policy_admits_vram(
         "google/gemma-4-12b-it",
         types.SimpleNamespace(value=8192, tier="WARN"),
-        types.SimpleNamespace(vram_ceiling_gb=6.8, gguf_quant=None, gguf_n_ctx=None),
+        types.SimpleNamespace(vram_ceiling_gb=6.8),
     )
 
 
@@ -38,7 +38,7 @@ def test_70b_fail_estimate_still_does_not_raise():
     _assert_policy_admits_vram(
         cat.TEST_OVERSIZED_LLM,
         types.SimpleNamespace(value=8192, tier="UNKNOWN"),
-        types.SimpleNamespace(vram_ceiling_gb=14.5, gguf_quant=None, gguf_n_ctx=None),
+        types.SimpleNamespace(vram_ceiling_gb=14.5),
     )
 
 

@@ -36,8 +36,6 @@
         "attn_impl": "sdpa",
         "quant_policy": "none",
         "vram_ceiling_gb": 0,
-        "gguf_n_ctx": 2048,
-        "gguf_quant": "Q4_K_M",
         "creative_model": "comfy:slot-a",
         "technical_model": "comfy:slot-b",
         "openrouter_slot_a_model": "(enable OpenRouter)",
@@ -47,7 +45,6 @@
         "google_api_slot_a_model": "(select Google API model)",
         "google_api_slot_b_model": "(select Google API model)",
         "lane_allowlist": [
-            "gguf",
             "openrouter",
             "comfy_credits",
             "google_api"

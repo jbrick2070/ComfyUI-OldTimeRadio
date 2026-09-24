@@ -53,8 +53,6 @@ class _StubPolicy:
     attn_impl: str = "sdpa"
     quant_policy: str = "none"
     vram_ceiling_gb: float = 0.0
-    gguf_n_ctx: int = 0
-    gguf_quant: str = ""
     lane_allowlist: tuple = ()
 
 
@@ -96,7 +94,7 @@ def _make_ctx(tmp_path: Path, monkeypatch, **overrides) -> WriterTailContext:
     monkeypatch.setattr(
         loader,
         "request_slot",
-        lambda slot, model_id, policy=None, load_config=None: {
+        lambda slot, model_id, policy=None: {
             "model": None,
             "tokenizer": None,
         },

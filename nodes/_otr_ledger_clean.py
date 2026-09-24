@@ -1660,7 +1660,7 @@ def _authorize_repair_scope(
                                 "error": None if error is None else f"{type(error).__name__}: {error}"})
 
     # Reuse the scheduler's advertised native schema owner for both attempts.
-    # Remote/GGUF slots without this capability retain their existing routing.
+    # Remote slots without this capability retain their existing routing.
     bind = getattr(slot_fn, "_otr_bind_schema", None)
     authorization_fn = bind(_ScopeAuthorization) if callable(bind) else slot_fn
     try:

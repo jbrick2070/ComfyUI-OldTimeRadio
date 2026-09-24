@@ -68,7 +68,7 @@ _EXPECTED_INPUT_ORDER = [
     "google_api_slot_a_model", "google_api_slot_b_model",
     # Set once for this machine.
     "llm_device", "llm_attn_impl", "llm_quant_policy",
-    "llm_vram_ceiling_gb", "gguf_n_ctx", "gguf_quant",
+    "llm_vram_ceiling_gb",
     # Lab equipment.
     "use_exchange", "enable_production_stage3_validators",
     "news_briefs_required",
@@ -107,8 +107,9 @@ def test_widget_order_appends_slots_at_end():
     (`order[16] == "openrouter_slot_a_model"`, and so on). Those literals had
     been renumbered by hand four separate times -- the style-engine
     consolidation took two slots out at 8/9, `refine_target_grade` took one out
-    at 20, `target_words` took one out at 1, and `perfect_run_spacesaver` took
-    one out at 8 on 2026-09-13 -- and every renumber was arithmetic performed
+    at 20, `target_words` took one out at 1, `perfect_run_spacesaver` took one
+    out at 8 on 2026-09-13, and the two writer-backend quant widgets came out
+    mid-list on 2026-09-24 -- and every renumber was arithmetic performed
     on a layout someone had to reconstruct from comments. Three of those four
     comment blocks were stale by the time the fourth arrived.
 
@@ -119,7 +120,7 @@ def test_widget_order_appends_slots_at_end():
 
     `gate_in` appears in this list because it is a declared INPUT, but it is a
     forceInput SOCKET and consumes no `widgets_values` slot -- which is why the
-    saved widget vector is 37 while this list is 38.
+    saved widget vector is one shorter than this list.
     """
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
@@ -135,8 +136,8 @@ def test_widget_order_appends_slots_at_end():
     # The socket, called out separately because it is the one entry here that
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
-    assert len(widgets) == 37, (
-        "the writer should declare 37 widgets plus the gate_in socket; got %d"
+    assert len(widgets) == 35, (
+        "the writer should declare 35 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

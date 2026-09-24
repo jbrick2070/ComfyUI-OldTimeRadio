@@ -490,38 +490,29 @@ def _get_substring_stop_class():
 
 
 class _LLMPreflight:
-    """Result of _preflight_llm_selection: the ONE validated policy, the two
-    normalized slot ids, and an immutable per-slot GGUF load_config (gguf slots
-    only)."""
+    """Result of _preflight_llm_selection: the ONE validated policy and the
+    two normalized slot ids."""
 
-    __slots__ = ("creative_id", "technical_id", "policy", "load_config_by_slot")
+    __slots__ = ("creative_id", "technical_id", "policy")
 
-    def __init__(self, *, creative_id, technical_id, policy, load_config_by_slot):
+    def __init__(self, *, creative_id, technical_id, policy):
         self.creative_id = creative_id
         self.technical_id = technical_id
         self.policy = policy
-        self.load_config_by_slot = load_config_by_slot
 
 
 def _preflight_llm_selection(
     *, creative_writing_model, technical_model,
     llm_device, llm_attn_impl, llm_quant_policy, llm_vram_ceiling_gb,
-    gguf_n_ctx, gguf_quant,
 ) -> "_LLMPreflight":
-    """Single early resolution point for the two LLM slots (GGUF row registry,
-    2026-07-16).
+    """Single early resolution point for the two LLM slots.
 
     Runs AFTER the bank / word-count / refine gates and BEFORE the
     story-scaffold env mutation and any source fetch/rerank. It builds the ONE
     validated LLMRuntimePolicy (byte-identical to the _resolve_inputs build --
-    same six widgets, default lane_allowlist), normalizes the two slot ids, and
-    resolves an immutable per-slot GGUF load_config. A gguf slot with an
-    unknown quant, an out-of-range effective n_ctx, or a missing/malformed
-    OTR_GGUF_SEED fails LOUD here, before any story work. No downstream consumer
-    rebuilds effective config from live env.
+    same widgets, default lane_allowlist) and normalizes the two slot ids, so
+    no downstream consumer re-derives either from live env.
     """
-    from . import _otr_gguf_backend as _gguf
-
     resolved_device = _OTR_DEVICE_OPTIONS.resolve_device(
         llm_device, fallback="cuda",
     )
@@ -548,22 +539,11 @@ def _preflight_llm_selection(
         attn_impl=str(llm_attn_impl),
         quant_policy=baked_quant,
         vram_ceiling_gb=float(llm_vram_ceiling_gb),
-        gguf_n_ctx=int(gguf_n_ctx),
-        gguf_quant=str(gguf_quant),
     )
     norm_creative = _otr_model_catalog.validate_model_id(creative_writing_model)
     norm_technical = _otr_model_catalog.validate_model_id(technical_model)
-    load_config_by_slot: dict[str, Any] = {}
-    by_repo = _otr_model_catalog._by_repo_id()
-    for slot, mid in (("creative", norm_creative), ("technical", norm_technical)):
-        row = by_repo.get(mid)
-        if getattr(row, "provider", "local") == "gguf_native":
-            load_config_by_slot[slot] = _gguf.build_gguf_load_config(
-                repo_id=mid, policy=policy, slot=slot,
-            )
     return _LLMPreflight(
-        creative_id=norm_creative, technical_id=norm_technical,
-        policy=policy, load_config_by_slot=load_config_by_slot,
+        creative_id=norm_creative, technical_id=norm_technical, policy=policy,
     )
 
 
@@ -591,7 +571,6 @@ class _SlotScheduler:
         min_p: float,
         repetition_penalty: float,
         policy: Any = None,
-        load_config_by_slot: dict | None = None,
     ):
         self.ids = {
             "creative": creative_id,
@@ -601,10 +580,6 @@ class _SlotScheduler:
         # into every request_slot call (None = nv50 baseline, resolved
         # by request_slot itself).
         self.policy = policy
-        # GGUF row registry (2026-07-16): the immutable per-slot GGUF
-        # load_config (gguf slots only) threaded into request_slot -> backend
-        # load. Empty for non-GGUF runs (request_slot then uses the policy).
-        self.load_config_by_slot = load_config_by_slot or {}
         self.sampling = {
             "top_p": float(top_p),
             "min_p": float(min_p or 0.0),
@@ -657,7 +632,6 @@ class _SlotScheduler:
         resolved_id = self.ids[slot]
         cache_entry = _OTRML.request_slot(
             slot, resolved_id, policy=self.policy,
-            load_config=self.load_config_by_slot.get(slot),
         )
         if (
             self._last_resolved_id is not None
@@ -699,12 +673,12 @@ class _SlotScheduler:
     def context_cap_for(self, slot: str) -> int:
         """Return the slot's REAL context window, or 0 when it cannot be read.
 
-        The three transports each resolve capacity differently and each stamps
-        its answer into the cache entry as `context_cap`: local transformers
-        from the tokenizer/config, GGUF-native from llama.cpp's `n_ctx`,
-        OpenRouter from the provider's advertised `context_window`. This reads
-        that already-resolved number rather than re-deriving it, which is why
-        it is one accessor and not three.
+        Each transport resolves capacity differently and stamps its answer
+        into the cache entry as `context_cap`: local transformers from the
+        tokenizer/config, OpenRouter from the provider's advertised
+        `context_window`. This reads that already-resolved number rather than
+        re-deriving it, which is why it is one accessor and not one per
+        transport.
 
         CALL THIS ONLY WHERE THE SLOT IS ALREADY WARM. It shares
         `_account_and_get_entry` with `inspect_fit`, so it does not count a
@@ -763,18 +737,17 @@ class _SlotScheduler:
             "_otr_openrouter": provider == "openrouter",
             "_otr_comfy_credits": provider == "comfy_credits",
             "_otr_google_api": provider == "google_api",
-            "_otr_gguf_native": provider == "gguf_native",
             # Providers whose backend accepts a json_object response_format:
             # invoke_structured_slot forces json_object for a schema-less
-            # structured pass on these. OpenRouter (frontier prose->JSON) AND
-            # native GGUF (llama-cpp json_object). The local transformers lane
-            # is excluded (it has no json_object mode).
-            "_otr_supports_json_object": provider in ("openrouter", "gguf_native"),
+            # structured pass on these. OpenRouter is the one that does
+            # (frontier prose->JSON); the local transformers lane is excluded
+            # because it has no json_object mode.
+            "_otr_supports_json_object": provider == "openrouter",
             # The plain scheduler closure does not bind a schema itself.
             # Local-transformers closures expose `_otr_bind_schema`; the SciFi
             # structured invoker uses it to bind each pass's exact Pydantic
-            # result type. OpenRouter/GGUF retain their existing json_object
-            # response-format behavior and are intentionally unchanged.
+            # result type. OpenRouter retains its existing json_object
+            # response-format behavior and is intentionally unchanged.
             "_otr_response_format": None,
         }
 
@@ -815,7 +788,7 @@ class _SlotScheduler:
 
             def inspect_fit(messages, *, max_new_tokens, **kwargs):
                 if any(transport_markers[marker] for marker in (
-                    "_otr_openrouter", "_otr_comfy_credits", "_otr_google_api", "_otr_gguf_native",
+                    "_otr_openrouter", "_otr_comfy_credits", "_otr_google_api",
                 )):
                     return {"supported": False, "reason": "native tokenizer inspection unavailable"}
                 from . import _otr_model_loader as loader
@@ -897,23 +870,6 @@ def _build_truncating_generate_fn(
     if cache_entry.get("provider") == "google_api":
         from ._otr_google_api import llm as _gai_llm
         return _gai_llm.make_google_api_generate_fn(cache_entry)
-    # [Local OpenAI] External local server lane for Gemma 4 12B. Same
-    # provider-tag dispatch; zero ComfyUI-process VRAM.
-    if cache_entry.get("provider") == "gguf_native":
-        from . import _otr_gguf_backend as _gguf
-        # GGUF row registry (2026-07-16): the native GGUF lane now HONORS the
-        # writer's episode sampling widgets (previously discarded, so gemma ran
-        # at llama-cpp defaults). top_k stays pinned to GGUF_TOP_K inside the
-        # backend; the base seed rides the cache_entry from the preflight
-        # load_config. Announced behavior change for all gguf rows.
-        return _gguf.make_gguf_generate_fn(
-            cache_entry,
-            sampling={
-                "top_p": top_p,
-                "min_p": min_p,
-                "repeat_penalty": repetition_penalty,
-            },
-        )
     model = cache_entry["model"]
     tokenizer = cache_entry["tokenizer"]
     active_top_p = float(top_p)
@@ -1422,7 +1378,7 @@ def _seed_writer_sampling(inputs) -> "int | None":
 
 
 def _fetch_rss_seed_or_die(
-    model_id: str, *, load_config=None, policy=None,
+    model_id: str, *, policy=None,
     receipt_sink: dict[str, Any] | None = None,
 ) -> dict:
     """Run the story_orchestrator RSS fetcher and return the article dict.
@@ -1449,8 +1405,7 @@ def _fetch_rss_seed_or_die(
         import story_orchestrator as _so  # type: ignore
     try:
         news = _so._fetch_science_news(
-            max_feeds=10, model_id=model_id,
-            load_config=load_config, policy=policy,
+            max_feeds=10, model_id=model_id, policy=policy,
         )
         if not news:
             raise RuntimeError(
@@ -2596,7 +2551,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                 # S30 B2a: single model_id widget replaced by two slots.
                 # The catalog dropdown_choices() call scans the local HF
                 # cache live and applies display-only suffixes such as
-                # [LOCAL HF], [LOCAL GGUF], and [NOT DOWNLOADED]. Labels are
+                # [LOCAL HF] and [NOT DOWNLOADED]. Labels are
                 # stripped via _otr_model_catalog._strip_label_suffix
                 # before any consumer / meta stamp gets the value -- raw
                 # widget strings never reach downstream nodes.
@@ -2609,7 +2564,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "(outline, cast, dialogue composer, polish, "
                             "style picker invention). Mistral-Nemo is "
                             "the C7 byte-identical audio baseline. "
-                            "Suffix tags like [LOCAL HF], [LOCAL GGUF], "
+                            "Suffix tags like [LOCAL HF] "
                             "and [NOT DOWNLOADED] are "
                             "stripped before HF lookup. To use a remote "
                             "OpenRouter model, set OPENROUTER_API_KEY and "
@@ -2841,34 +2796,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     {"default": 14.5, "min": 0.0, "max": 96.0, "step": 0.1,
                      "tooltip": "Pre-download VRAM-fit ceiling (GB). 0 "
                                 "DISABLES the gate (cpu tier only)."},
-                ),
-                "gguf_n_ctx": (
-                    "INT",
-                    {"default": 4096, "min": 512, "max": 32768, "step": 512,
-                     "tooltip": "GGUF lane context window. NO silent "
-                                "downgrade: a window that does not fit "
-                                "free VRAM fails loud."},
-                ),
-                # 2026-08-25: Q6_K REMOVED from the operator-facing choices
-                # (operator: "if it doesn't fit nicely ... rip it from the
-                # dropdown"). Selecting it was a GUARANTEED failure: it is
-                # unpinned in GGUF_ARTIFACTS -- ("...Q6_K.gguf", None, None) --
-                # and since A6 (2026-07-27) an unpinned quant is REFUSED at
-                # load, so the only reachable outcome was a raise. No Q6_K
-                # artifact has ever been on this box either.
-                # The table entry and _GGUF_QUANTS deliberately KEEP Q6_K: it
-                # is the live fixture that proves the unpinned-refusal path
-                # (tests/test_gguf_registry.py, tests/test_llm_runtime_policy.py).
-                # Deleting it would have removed the operator's guaranteed
-                # failure AND the only proof that the guard works. Re-add it
-                # here the day it is on disk and pinned BY MEASUREMENT.
-                "gguf_quant": (
-                    ["Q8_0", "Q4_K_M"],
-                    {"default": "Q8_0",
-                     "tooltip": "GGUF artifact quant (filename + expected "
-                                "size come from the artifact table). Only "
-                                "PINNED quants are offered -- an unpinned "
-                                "artifact is refused at load."},
                 ),
                 # S5 gate_in (2026-07-10, validation-order fix): the
                 # OTR_WorkflowValidator report gates the WRITER now (link
@@ -3155,8 +3082,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         llm_attn_impl="sdpa",
         llm_quant_policy="bnb_nf4",
         llm_vram_ceiling_gb=14.5,
-        gguf_n_ctx=4096,
-        gguf_quant="Q8_0",
         # S5 gate_in (validation-order fix): opaque ordering signal from
         # OTR_WorkflowValidator -- never parsed, just sequenced.
         gate_in="",
@@ -3434,12 +3359,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # `import os` binds the name first -- run() has a later function-local
         # `import os`, which makes os function-local for the whole body (the
         # 096ef64 UnboundLocalError gotcha).
-        # LLM slot preflight (GGUF row registry, 2026-07-16): the single early
-        # resolution of the ONE policy + normalized slot ids + immutable
-        # per-slot GGUF load_config -- AFTER the bank / word-count / refine
-        # gates, BEFORE the scaffold env mutation and any source fetch/rerank.
-        # A gguf slot with a bad quant / out-of-range n_ctx / missing
-        # OTR_GGUF_SEED fails LOUD here, cheaply, before any story work.
+        # LLM slot preflight: the single early resolution of the ONE policy
+        # and the normalized slot ids -- AFTER the bank / word-count / refine
+        # gates, BEFORE the scaffold env mutation and any source fetch/rerank,
+        # so a bad selection fails cheaply and before any story work.
         _llm_preflight = _preflight_llm_selection(
             creative_writing_model=creative_writing_model,
             technical_model=technical_model,
@@ -3447,8 +3370,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             llm_attn_impl=llm_attn_impl,
             llm_quant_policy=llm_quant_policy,
             llm_vram_ceiling_gb=llm_vram_ceiling_gb,
-            gguf_n_ctx=gguf_n_ctx,
-            gguf_quant=gguf_quant,
         )
         _scaffold = _apply_story_scaffold_env(story_scaffold)
         if _scaffold in ("on", "off"):
@@ -3549,14 +3470,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             llm_attn_impl=llm_attn_impl,
             llm_quant_policy=llm_quant_policy,
             llm_vram_ceiling_gb=llm_vram_ceiling_gb,
-            gguf_n_ctx=gguf_n_ctx,
-            gguf_quant=gguf_quant,
-            # GGUF row registry (2026-07-16): hand the RSS fetch/rerank the
-            # preflight's ONE policy + the technical-slot load_config so a
-            # gguf technical slot reranks under its real per-row config, not
-            # the gemma env fallback.
+            # Hand the RSS fetch/rerank the preflight's ONE policy so the
+            # technical slot reranks under the same policy the writer resolved.
             preflight_policy=_llm_preflight.policy,
-            technical_load_config=_llm_preflight.load_config_by_slot.get("technical"),
             # My Story: the three optional creative fields plus the
             # attribution, and the PRE-ROLL request so the resolver's bundle
             # digest matches the one already saved above.
@@ -3639,17 +3555,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # picker (creative -> technical) and before cast lock
         # (technical -> creative), one transition lands per direction.
         # Documented at the call sites below.
-        # GGUF row registry (2026-07-16): attach the resolved episode sampling
-        # to each per-slot GGUF load_config (from the early preflight) for the
-        # receipt, then hand them to the scheduler. Sampling is generate-time
-        # and does NOT shape the load / resident-reuse identity.
-        _gguf_lc_by_slot = {
-            _s: _lc.with_sampling(
-                top_p=resolved["top_p"], min_p=resolved["min_p"],
-                repeat_penalty=resolved["repetition_penalty"],
-            )
-            for _s, _lc in _llm_preflight.load_config_by_slot.items()
-        }
         slot_scheduler = _SlotScheduler(
             creative_id=resolved["creative_writing_model"],
             technical_id=resolved["technical_model"],
@@ -3660,7 +3565,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             # S1 platform-portability: the explicit runtime policy rides
             # every request_slot call this scheduler makes.
             policy=resolved["llm_policy"],
-            load_config_by_slot=_gguf_lc_by_slot,
         )
         # LLM slot: creative -- bulk writer path (outline, cast,
         # dialogue, polish, style picker, title regen).
@@ -5218,7 +5122,6 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             _sdc_cache = _OTRML_SDC.request_slot(
                 "technical", resolved["technical_model"],
                 policy=resolved["llm_policy"],
-                load_config=slot_scheduler.load_config_by_slot.get("technical"),
             )
             _sdc_gen_fn = _OTRCG_SDC.make_constrained_generate_fn(
                 _sdc_cache, _SlotJobFields, heartbeat_label="SlotContract",

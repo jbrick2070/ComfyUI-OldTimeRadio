@@ -38,8 +38,6 @@
     "attn_impl": "sdpa",
     "quant_policy": "bnb_nf4",
     "vram_ceiling_gb": 22.0,
-    "gguf_n_ctx": 4096,
-    "gguf_quant": "Q8_0",
     "creative_model": "Qwen/Qwen3.8-27B",
     "technical_model": "Qwen/Qwen3.8-27B",
     "openrouter_slot_a_model": "(enable OpenRouter)",

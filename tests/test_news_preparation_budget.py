@@ -162,16 +162,14 @@ class PreparationAssertions:
     def setUp(self):
         self.harness = NewsHarness(self.function_name, self.response)
         self.policy = object()
-        self.load_config = object()
         self.pool = [
             {"headline": "Headline one", "full_text": "Body one"},
             {"headline": "Headline two", "full_text": "Body two"},
             {"headline": "Headline three", "full_text": "Body three"},
         ]
 
-    def invoke(self, *, pool=None, load_config=True):
-        kwargs = dict(model_id="google/gemma-4-E2B-it", policy=self.policy,
-                      load_config=self.load_config if load_config else None)
+    def invoke(self, *, pool=None):
+        kwargs = dict(model_id="google/gemma-4-E2B-it", policy=self.policy)
         if self.function_name == "_llm_rank_news_candidates":
             kwargs["top_k"] = 2
         return self.harness.run(self.pool if pool is None else pool, **kwargs)
@@ -194,7 +192,6 @@ class PreparationAssertions:
         args, kwargs, deadline = self.harness.requests[0]
         self.assertEqual(args, ("technical", "google/gemma-4-E2B-it"))
         self.assertIs(kwargs["policy"], self.policy)
-        self.assertIs(kwargs["load_config"], self.load_config)
         self.assertIsNone(deadline)
         self.assertEqual(len(self.harness.generations), 1)
         generation = self.harness.generations[0]
@@ -213,7 +210,7 @@ class PreparationAssertions:
     def test_cancel_before_preparation_does_not_acquire_or_start_worker(self):
         self.harness.cancel_on_check = 1
         with self.assertRaises(Cancelled):
-            self.invoke(load_config=False)
+            self.invoke()
         self.assertEqual(self.harness.requests, [])
         self.assertEqual(self.harness.submissions, [])
         self.assertEqual(self.harness.generations, [])
@@ -221,7 +218,7 @@ class PreparationAssertions:
     def test_cancel_after_preparation_does_not_start_generation(self):
         self.harness.cancel_on_check = 2
         with self.assertRaises(Cancelled):
-            self.invoke(load_config=False)
+            self.invoke()
         self.assertEqual(len(self.harness.requests), 1)
         self.assertEqual(self.harness.submissions, [])
         self.assertEqual(self.harness.generations, [])
@@ -229,21 +226,29 @@ class PreparationAssertions:
         self.assertIsNone(self.harness.deadline)
 
     def test_preparation_error_does_not_create_timed_worker(self):
-        error = RuntimeError("synthetic acquisition failure")
-        self.harness.request_error = error
-        with self.assertRaises(RuntimeError) as caught:
-            self.invoke()
-        self.assertIs(caught.exception, error)
+        """A failure ACQUIRING the model must not leave a timed worker behind.
+
+        The worker is the thing that can outlive the call and hold the GPU, so
+        "no submission, no generation, no invalidate" is the invariant -- not
+        how the failure is reported. This used to also assert the error
+        propagated, but that re-raise only ever fired for a writer backend
+        since removed: it was reached by threading that lane's load config in,
+        and the surviving local lane always fell back to shuffle order here.
+        Whether the surviving lane SHOULD fail loud instead is an open
+        question for the operator, not something to change inside a removal.
+        """
+        self.harness.request_error = RuntimeError("synthetic acquisition failure")
+        result = self.invoke()
+        self.assertEqual(result, self.pool[:self.fallback_count])
         self.assertEqual(self.harness.submissions, [])
         self.assertEqual(self.harness.generations, [])
         self.assertNotIn("invalidate", self.harness.events)
 
     def test_adapter_error_does_not_create_timed_worker(self):
-        error = RuntimeError("synthetic adapter failure")
-        self.harness.adapter_error = error
-        with self.assertRaises(RuntimeError) as caught:
-            self.invoke()
-        self.assertIs(caught.exception, error)
+        """Same invariant one step later: the adapter, not the acquisition."""
+        self.harness.adapter_error = RuntimeError("synthetic adapter failure")
+        result = self.invoke()
+        self.assertEqual(result, self.pool[:self.fallback_count])
         self.assertEqual(self.harness.submissions, [])
         self.assertEqual(self.harness.generations, [])
 
@@ -257,7 +262,7 @@ class PreparationAssertions:
     def test_real_generation_overrun_still_pauses_and_invalidates(self):
         self.harness.generation_seconds = self.budget + 1.0
         with self.assertRaises(self.harness.pause):
-            self.invoke(load_config=False)
+            self.invoke()
         self.assertEqual(len(self.harness.generations), 1)
         self.assertEqual(self.harness.events.count("invalidate"), 1)
         self.assertEqual(self.harness.shutdowns, [False])
@@ -271,6 +276,10 @@ class HeadlinePreparationTests(PreparationAssertions, unittest.TestCase):
     budget = 65
     token_cap = 64
     bypass_count = 2
+    # The rank helper's fallback keeps its top_k; the re-rank helper keeps the
+    # whole candidate list. Spelled per class so the shared assertions above
+    # do not have to know which helper they are driving.
+    fallback_count = 2
     prompt_marker = "Top 2 indices:"
 
 
@@ -281,6 +290,7 @@ class BodyPreparationTests(PreparationAssertions, unittest.TestCase):
     budget = 40
     token_cap = 8
     bypass_count = 1
+    fallback_count = 3
     prompt_marker = "Best index:"
 
 

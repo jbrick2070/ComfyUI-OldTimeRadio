@@ -129,12 +129,17 @@ def test_removing_a_widget_repairs_the_link_that_follows_it():
     # wearing the clothes of a check.
     #
     # These two numbers are read independently, straight out of
-    # workflows/otr_canonical.json: min_p is inputs[15], gate_in is inputs[31]
+    # workflows/otr_canonical.json: min_p is inputs[15], gate_in is inputs[30]
     # carrying link 279. When a future migration moves them, this test SHOULD
     # go red and be re-pinned from the JSON -- that red is the guard working,
     # not a maintenance burden to engineer away.
+    #
+    # Re-pinned 2026-09-24: the writer's two retired quant widgets came out at
+    # descriptors 30 and 31, so gate_in moved 31 -> 30 and link 279 followed it
+    # by identity. min_p sits ahead of the cut and did not move, which is the
+    # asymmetry that makes this fixture worth keeping.
     EXPECTED_INPUT_POS = 15
-    EXPECTED_GATE_POS = 31
+    EXPECTED_GATE_POS = 30
     expected_input_pos = EXPECTED_INPUT_POS
 
     gate_pos, gate_inp = next(

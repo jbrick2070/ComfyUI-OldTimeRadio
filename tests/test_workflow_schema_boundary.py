@@ -163,5 +163,131 @@ def test_every_shipped_graph_round_trips_unchanged():
         % "\n".join("  %s: %s %s" % tuple(p) for p in problems))
 
 
+
+# The reconciliation is run in node, against the real shipped core, and the
+# result is handed back as JSON so the assertions live in Python where a failure
+# prints something a reader can act on. Written with real newlines rather than
+# escapes: a JS source string full of backslash-n inside a Python literal is how
+# this file got mangled once already.
+_MIGRATE_MJS = """import fs from "node:fs";
+import { pathToFileURL } from "node:url";
+const core = await import(pathToFileURL(process.argv[2]).href);
+const reg = JSON.parse(fs.readFileSync(process.argv[3], "utf8"));
+const old = JSON.parse(fs.readFileSync(process.argv[4], "utf8"));
+const first = core.reconcileGraph(old, reg);
+if (!first.ok) {
+  console.log(JSON.stringify({ok: false, why: first.reason + ": " + first.detail}));
+} else {
+  const again = core.reconcileGraph(first.graph, reg);
+  console.log(JSON.stringify({ok: true, changed: first.changed, notes: first.notes,
+                              graph: first.graph, changedAgain: again.changed}));
+}
+"""
+
+
+def test_a_real_pre_removal_graph_migrates_to_exactly_what_we_ship_today():
+    """THE MIGRATION PROOF, on a real saved graph instead of a constructed one.
+
+    The JS suite proves the algorithm on small hand-built nodes; the inertness
+    test proves the boundary leaves today's graphs alone. Neither covers the case
+    the boundary was BUILT for -- a real file somebody saved before a widget was
+    removed, opened in the build that removed it.
+
+    The fixture is the canonical graph as it stood at the commit before the
+    writer's two GGUF widgets came out, captured with ``git show`` rather than
+    authored. Migrating it must land on EXACTLY the values ``build_variants.py``
+    emits today, because that is what a correct migration means: the user's saved
+    graph ends up where a freshly generated one already is.
+    """
+    node = _node_exe()
+    if node is None:
+        pytest.skip("node is not installed; the JS core cannot run here")
+
+    fixture = _HERE / "fixtures" / "pre_gguf_removal_canonical.json"
+    saved = json.loads(fixture.read_text(encoding="utf-8"))
+    writer = next(n for n in saved["nodes"]
+                  if n.get("type") == "OTR_LedgerScriptWriter")
+    stale = [s["widget"]["name"] for s in writer.get("inputs", [])
+             if s.get("widget", {}).get("name", "").startswith("gguf")]
+
+    # THE FIXTURE GUARD. Without it, re-capturing this file from the CURRENT
+    # canonical would leave a test that migrates nothing and passes anyway --
+    # green, meaningless, and indistinguishable from the real thing.
+    assert stale, (
+        "the fixture no longer carries the widgets it was captured for, so this "
+        "test would pass without migrating anything. Re-capture it from the "
+        "commit before the removal; never regenerate it from the canonical.")
+
+    from nodes._otr_workflow_apply import build_offline_schemas
+    schemas = build_offline_schemas()
+    spec = schemas["OTR_LedgerScriptWriter"]["input"]
+    declared = set(spec.get("required", {})) | set(spec.get("optional", {}))
+    assert not declared & set(stale), (
+        "this build still declares %s, so the fixture is not stale relative to "
+        "it and nothing would be migrated" % sorted(declared & set(stale)))
+
+    registry = {t: {"nodeData": {"input": s.get("input", {})}}
+                for t, s in schemas.items()}
+
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        reg_path = pathlib.Path(tmp) / "registry.json"
+        reg_path.write_text(json.dumps(registry), encoding="utf-8")
+        script = pathlib.Path(tmp) / "migrate.mjs"
+        script.write_text(_MIGRATE_MJS, encoding="utf-8")
+        proc = subprocess.run(
+            [node, str(script), str(_JS / "workflow_schema_core.js"),
+             str(reg_path), str(fixture)],
+            capture_output=True, text=True, timeout=180)
+
+    assert proc.returncode == 0, proc.stderr[-2000:]
+    out = json.loads(proc.stdout.strip().splitlines()[-1])
+    assert out["ok"], "a real older graph was refused: %s" % out.get("why")
+    assert out["changed"], (
+        "the older graph should have been migrated, not passed through")
+    assert out["changedAgain"] is False, (
+        "migration is not idempotent -- loading the migrated graph again "
+        "changed it")
+
+    migrated = out["graph"]
+    mig_writer = next(n for n in migrated["nodes"]
+                      if n.get("type") == "OTR_LedgerScriptWriter")
+
+    survivors = {s["widget"]["name"] for s in mig_writer.get("inputs", [])
+                 if s.get("widget", {}).get("name")}
+    assert not survivors & set(stale), (
+        "a widget this build removed survived the migration: %s"
+        % sorted(survivors & set(stale)))
+
+    current = json.loads((_ROOT / "workflows" / "otr_canonical.json")
+                         .read_text(encoding="utf-8"))
+    cur_writer = next(n for n in current["nodes"]
+                      if n.get("type") == "OTR_LedgerScriptWriter")
+    assert mig_writer["widgets_values"] == cur_writer["widgets_values"], (
+        "a migrated older graph must land on the same values a freshly "
+        "generated one carries.\n  migrated : %r\n  canonical: %r"
+        % (mig_writer["widgets_values"], cur_writer["widgets_values"]))
+
+    # EVERY link is checked, not only the one that moved. ``dst_slot`` indexes
+    # the node's ``inputs`` array, so a descriptor removed anywhere shifts every
+    # later socket. The invariant proving the repair is identity-based rather
+    # than arithmetic is simply: the slot a link points at is the slot holding
+    # it.
+    by_id = {n["id"]: n for n in migrated["nodes"]}
+    for link in migrated["links"]:
+        link_id, _src, _src_slot, dst_id, dst_slot = link[:5]
+        dst = by_id.get(dst_id)
+        if dst is None:
+            continue
+        slots = dst.get("inputs") or []
+        assert 0 <= dst_slot < len(slots), (
+            "link %s points past the end of %s's inputs (%s of %s)"
+            % (link_id, dst.get("type"), dst_slot, len(slots)))
+        assert slots[dst_slot].get("link") == link_id, (
+            "link %s lands on %s slot %s, which holds link %r -- the "
+            "destination slots were not repaired by identity"
+            % (link_id, dst.get("type"), dst_slot, slots[dst_slot].get("link")))
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

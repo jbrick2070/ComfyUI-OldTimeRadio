@@ -138,9 +138,8 @@ def _live_llm_rows() -> tuple:
 
     THIS WAS A HAND-WRITTEN TUPLE UNTIL 2026-09-14 and every one of its seven
     entries had gone stale. Four carried sizes the catalog no longer reports
-    (12.0 vs 24.0, 3.0 vs 6.0, 4.5 vs 9.0, 11.9 vs 23.9) and TWO named GGUF rows
-    that no longer exist at all -- `_otr_gguf_backend.GGUF_ROWS` is empty by
-    operator ruling.
+    (12.0 vs 24.0, 3.0 vs 6.0, 4.5 vs 9.0, 11.9 vs 23.9) and TWO named rows
+    from a writer lane that has since been removed entirely.
 
     None of that would have raised. ComfyUI resolves a COMBO value it does not
     recognise to INDEX 0, so the sweep would have run the first catalog row

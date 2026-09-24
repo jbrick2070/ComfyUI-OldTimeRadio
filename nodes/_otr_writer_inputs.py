@@ -178,20 +178,15 @@ def _resolve_inputs(
     # S1 platform-portability (2026-07-10): the explicit LLM runtime policy
     # fields. Defaults EQUAL today's resolved nv50 16 GB baseline, so the
     # explicit policy reproduces current behavior exactly; the S5 writer
-    # widgets feed these 1:1 (llm_device .. gguf_quant, append-only).
+    # widgets feed these 1:1 (llm_device .. llm_vram_ceiling_gb, append-only).
     llm_device: str = "cuda",
     llm_attn_impl: str = "sdpa",
     llm_quant_policy: str = "bnb_nf4",
     llm_vram_ceiling_gb: float = 14.5,
-    gguf_n_ctx: int = 4096,
-    gguf_quant: str = "Q8_0",
-    # GGUF row registry (2026-07-16): the preflight-resolved technical-slot
-    # load_config + the ONE validated policy, threaded into the RSS fetch/
-    # rerank dispatch so a gguf technical slot reranks under its real per-row
-    # load_config (path/quant/n_ctx) instead of the gemma env fallback. Both
-    # None on a non-gguf run (request_slot then resolves from the policy).
+    # The ONE validated policy, threaded into the RSS fetch/rerank dispatch
+    # so the technical slot reranks under the same policy the writer resolved.
+    # None before the preflight has run (request_slot then resolves its own).
     preflight_policy: Any = None,
-    technical_load_config: Any = None,
     # The LEMMY cameo knob, resolved HERE so every lane reads one answer.
     # Defaulted from the choices list rather than a repeated literal: the two
     # spellings drifting apart is the failure this parameter exists to end.
@@ -546,7 +541,6 @@ def _resolve_inputs(
             bank=_fetch_bank,
             technical_model=technical_model,
             source_ref=source_ref,
-            load_config=technical_load_config,
             policy=preflight_policy,
         )
         news_article, source_meta, source_rights, source_document = (
@@ -667,8 +661,6 @@ def _resolve_inputs(
             attn_impl=str(llm_attn_impl),
             quant_policy=baked_quant,
             vram_ceiling_gb=float(llm_vram_ceiling_gb),
-            gguf_n_ctx=int(gguf_n_ctx),
-            gguf_quant=str(gguf_quant),
         ),
         "include_act_breaks":   bool(include_act_breaks),
         "act_count":            int(act_count_int),

@@ -27,7 +27,6 @@ describing what its own detach-reclaim replaced. The function did not become
 less important, it became more general, and the docstring simply never caught
 up. Live callers today:
 
-  * ``_otr_gguf_backend.py`` -- around GGUF model handoffs.
   * ``_otr_video_engines/render_driver.py`` -- pre-render, and the
     inter-engine reclaim between two beats on different engines, which is what
     keeps two heavy engines from co-residing on a 16 GB card.

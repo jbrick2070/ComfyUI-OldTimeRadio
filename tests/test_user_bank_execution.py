@@ -37,7 +37,7 @@ CLIENT_ID = "client_selfrun"
 # A minimal bundle module that honours the shipped keyword contract exactly.
 GOOD_MODULE = '''
 def fetch_source(*, bank, technical_model, source_ref="",
-                 load_config=None, policy=None):
+                 policy=None):
     return {
         "headline": "Client Headline",
         "summary": "Client summary.",
@@ -314,7 +314,7 @@ def test_client_fetch_result_still_passes_normalize_fetch_result(bundle):
         entry = osp.resolve_fetcher(bundle.row, owner=bundle)
         payload, meta, rights = osp.normalize_fetch_result(
             entry.fetch(bank=bundle.row, technical_model="m", source_ref="",
-                        load_config=None, policy=None),
+                        policy=None),
             origin="wave3 client fetch")
         assert payload["seed_text"] == "a client-authored seed"
         assert (meta, rights) == ({}, {})

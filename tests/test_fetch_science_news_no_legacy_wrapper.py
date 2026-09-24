@@ -225,20 +225,24 @@ def test_orchestrator_no_remaining_generate_with_llm_callers():
 
 
 # ---------------------------------------------------------------------------
-# GGUF row registry (2026-07-16): preflight load_config + policy thread the
-# whole RSS technical rerank chain, so a gguf technical slot loads its real
-# per-row artifact instead of the gemma env-fallback path.
+# The preflight-resolved policy threads the whole RSS technical rerank chain,
+# so the rerank runs under the SAME policy the writer resolved rather than
+# whatever request_slot would derive for itself.
+#
+# This pair used to pin a per-slot `load_config=` alongside it, for a writer
+# backend removed 2026-09-24. The policy half is the half that survived, and
+# it is the half that was always load-bearing for every other lane.
 # ---------------------------------------------------------------------------
 
 
-def test_rss_rank_rerank_thread_load_config_and_policy_to_request_slot():
+def test_rss_rank_rerank_thread_the_policy_to_request_slot():
     """`_llm_rank_news_candidates` + `_llm_rerank_with_bodies` must pass
-    BOTH `load_config=` and `policy=` into every `request_slot(...)` call.
+    `policy=` into every `request_slot(...)` call.
 
-    An unthreaded `request_slot("technical", model_id)` leaves load_config
-    None, so the gguf backend's env-fallback resolves the GEMMA artifact
-    for a Qwen id (silent wrong-model path) -- the exact bug this wiring
-    closes for both-slots-Qwen runs."""
+    An unthreaded `request_slot("technical", model_id)` makes request_slot
+    resolve its own policy, so the rerank can run under a different device /
+    attention / quantisation than the writer already committed to -- a silent
+    divergence inside one episode."""
     tree = _orch_tree()
     offenders: dict[str, list[str]] = {}
     for fname in ("_llm_rank_news_candidates", "_llm_rerank_with_bodies"):
@@ -248,26 +252,21 @@ def test_rss_rank_rerank_thread_load_config_and_policy_to_request_slot():
             offenders.setdefault(fname, []).append("no request_slot(...) call")
             continue
         for call in rs_calls:
-            if not _has_kwarg(call, "load_config"):
-                offenders.setdefault(fname, []).append(
-                    f"request_slot at line {call.lineno} missing load_config="
-                )
             if not _has_kwarg(call, "policy"):
                 offenders.setdefault(fname, []).append(
                     f"request_slot at line {call.lineno} missing policy="
                 )
     assert not offenders, (
-        "GGUF row registry: RSS rank/rerank must thread load_config + "
-        "policy into request_slot. Offenders:\n"
+        "RSS rank/rerank must thread the resolved policy into "
+        "request_slot. Offenders:\n"
         + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
     )
 
 
-def test_fetch_science_news_forwards_load_config_and_policy():
-    """`_fetch_science_news` is the middle link: it must forward
-    `load_config=` + `policy=` into BOTH `_llm_rank_news_candidates` and
-    `_llm_rerank_with_bodies` so the preflight-resolved config reaches the
-    request_slot calls above."""
+def test_fetch_science_news_forwards_the_policy():
+    """`_fetch_science_news` is the middle link: it must forward `policy=`
+    into BOTH `_llm_rank_news_candidates` and `_llm_rerank_with_bodies` so the
+    preflight-resolved policy reaches the request_slot calls above."""
     tree = _orch_tree()
     fn = _find_function(tree, "_fetch_science_news")
     offenders: dict[str, list[str]] = {}
@@ -277,16 +276,12 @@ def test_fetch_science_news_forwards_load_config_and_policy():
             offenders.setdefault(target, []).append("not called")
             continue
         for call in calls:
-            if not _has_kwarg(call, "load_config"):
-                offenders.setdefault(target, []).append(
-                    f"call at line {call.lineno} missing load_config="
-                )
             if not _has_kwarg(call, "policy"):
                 offenders.setdefault(target, []).append(
                     f"call at line {call.lineno} missing policy="
                 )
     assert not offenders, (
-        "GGUF row registry: _fetch_science_news must forward load_config + "
-        "policy to rank/rerank. Offenders:\n"
+        "_fetch_science_news must forward the resolved policy to "
+        "rank/rerank. Offenders:\n"
         + "\n".join(f"  {k}: {v}" for k, v in offenders.items())
     )

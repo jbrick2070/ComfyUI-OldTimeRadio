@@ -523,7 +523,7 @@ def _flatten_profile_values(profile: dict) -> dict:
     # S2 platform-portability (2026-07-10): widget-mapped v2 sections whose
     # targets EXIST today. llm model keys -> the writer's 8 existing model
     # widgets; render.* -> the fps/canvas/composite/frame-budget widget set.
-    # The llm RUNTIME fields (device/attn/quant/gguf/...) and the
+    # The llm RUNTIME fields (device/attn/quant/...) and the
     # video/image/audio policy fields flatten in S5 WITH their widgets --
     # flattening them earlier would fail apply (no mapping target), and a
     # mapping target must never name a widget that does not exist yet.
@@ -532,9 +532,8 @@ def _flatten_profile_values(profile: dict) -> dict:
               "openrouter_slot_a_model", "openrouter_slot_b_model",
               "comfy_slot_a_model", "comfy_slot_b_model",
               "google_api_slot_a_model", "google_api_slot_b_model",
-              # S5: the six runtime-policy widgets (writer slots 28-33).
-              "device", "attn_impl", "quant_policy", "vram_ceiling_gb",
-              "gguf_n_ctx", "gguf_quant"):
+              # S5: the writer's runtime-policy widgets.
+              "device", "attn_impl", "quant_policy", "vram_ceiling_gb"):
         if k in llm:
             flat[f"llm.{k}"] = llm[k]
     rend = profile.get("render", {})

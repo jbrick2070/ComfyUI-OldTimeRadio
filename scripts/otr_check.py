@@ -118,7 +118,7 @@ def _check_fixtures(fixtures_dir: Path) -> int:
 # ever drift, this list must follow the code and the doc gets fixed.
 _WRITER_KEYWORDS = {
     _ub.FETCH_ENTRY_ATTR: ("bank", "technical_model", "source_ref",
-                           "load_config", "policy"),
+                           "policy"),
     _ub.INTERPRET_ENTRY_ATTR: ("bank", "payload", "technical_fn", "model_id"),
 }
 

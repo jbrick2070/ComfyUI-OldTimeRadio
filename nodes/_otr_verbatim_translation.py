@@ -61,8 +61,8 @@ _OUTPUT_TOKENS_FLOOR = 96
 #: every language that already fit behaves byte-identically and pays nothing.
 #: See the long note in `translate_entries` -- this grows rather than predicts
 #: because the true tokens-per-source-word ratio depends on the writer's
-#: tokenizer and the target script, and a GGUF writer ships no tokenizer file
-#: to measure against.
+#: tokenizer and the target script, and a measured table would be a second
+#: artefact to keep true (see the long note in `translate_entries`).
 _OUTPUT_BUDGET_GROWTH = (1, 3, 6)
 
 #: What a reply cut off mid-JSON leaves behind. A batch that came back WHOLE
@@ -273,10 +273,9 @@ def translate_entries(
         # a model that cannot translate.
         #
         # The fix is to GROW rather than to predict, and the reason is NOT
-        # that the ratio cannot be measured -- an earlier version of this
-        # comment claimed the GGUF writers ship no tokenizer to measure
-        # against, which is false: `llama_cpp.Llama` exposes `tokenize()` and
-        # the backend already holds that object. (Corrected by the Fable
+        # that the ratio cannot be measured. A writer's tokenizer is reachable,
+        # so a table COULD be built. (An earlier version of this comment
+        # claimed otherwise for a backend since retired; corrected by the Fable
         # architecture review, 2026-09-18, because the next reader would have
         # believed it.)
         #

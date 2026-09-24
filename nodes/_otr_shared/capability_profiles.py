@@ -229,8 +229,7 @@ _LLM_MODEL_KEYS = (
     "google_api_slot_a_model", "google_api_slot_b_model",
 )
 _LLM_RUNTIME_KEYS = (
-    "device", "attn_impl", "quant_policy", "vram_ceiling_gb",
-    "gguf_n_ctx", "gguf_quant", "lane_allowlist",
+    "device", "attn_impl", "quant_policy", "vram_ceiling_gb", "lane_allowlist",
 )
 
 
@@ -254,7 +253,6 @@ def _validate_llm_section(sub: Any, source: str) -> None:
             device=sub["device"], attn_impl=sub["attn_impl"],
             quant_policy=sub["quant_policy"],
             vram_ceiling_gb=sub["vram_ceiling_gb"],
-            gguf_n_ctx=sub["gguf_n_ctx"], gguf_quant=sub["gguf_quant"],
             lane_allowlist=tuple(sub["lane_allowlist"]),
         )
     except (LLMPolicyError, TypeError) as e:

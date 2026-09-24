@@ -614,7 +614,7 @@ def test_writer_warm_deduplicates_and_uses_the_catalog_download_contract(
                for row in provision._LOG)
 
 
-def test_writer_warm_skips_remote_and_gguf_rows_without_download(
+def test_writer_warm_skips_every_non_local_row_without_download(
         tmp_path, monkeypatch):
     provision = _load(PROVISION, "otr_provision_writer_skip_test")
     monkeypatch.setenv("HF_HOME", str(tmp_path / "hf"))
@@ -622,8 +622,8 @@ def test_writer_warm_skips_remote_and_gguf_rows_without_download(
         CURATED_LLM_MODELS=(
             SimpleNamespace(repo_id="remote:slot", provider="openrouter",
                             loader_backend="openrouter_http"),
-            SimpleNamespace(repo_id="local:model.gguf", provider="gguf_native",
-                            loader_backend="gguf_native"),
+            SimpleNamespace(repo_id="local:retired.gguf", provider="retired",
+                            loader_backend="retired_backend"),
         ),
         ALLOW_PATTERNS=("*.json",),
     )

@@ -40,8 +40,6 @@
         "attn_impl": "sdpa",
         "quant_policy": "none",
         "vram_ceiling_gb": 0,
-        "gguf_n_ctx": 2048,
-        "gguf_quant": "Q4_K_M",
         "creative_model": "openrouter:slot-a",
         "technical_model": "openrouter:slot-b",
         "openrouter_slot_a_model": "(enable OpenRouter)",

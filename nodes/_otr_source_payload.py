@@ -699,7 +699,7 @@ def _rss_source_fetch_result(
 
 def _fetch_science_rss(*, bank, technical_model: str,
                        source_ref: str = "",
-                       load_config=None, policy=None) -> SourceFetchResult:
+                       policy=None) -> SourceFetchResult:
     """science_rss: verbatim wrapper around the writer's RSS fetcher.
 
     Forwards technical_model POSITIONALLY -- the S31 B6 slot-label/id
@@ -715,7 +715,7 @@ def _fetch_science_rss(*, bank, technical_model: str,
         import OTR_LedgerScriptWriter as _writer  # type: ignore
     receipt: dict[str, Any] = {}
     payload = _writer._fetch_rss_seed_or_die(
-        technical_model, load_config=load_config, policy=policy,
+        technical_model, policy=policy,
         receipt_sink=receipt,
     )
     return _rss_source_fetch_result(
@@ -762,11 +762,11 @@ def _interpret_news(*, bank, payload: dict, technical_fn,
 
 def _fetch_media_archive_rss(*, bank, technical_model: str,
                              source_ref: str = "",
-                             load_config=None, policy=None) -> SourceFetchResult:
+                             policy=None) -> SourceFetchResult:
     """media_archive_rss: RSS/Atom media-history feed normalizer."""
-    # load_config/policy accepted for uniform fetch dispatch; the media
-    # archive lane has no in-fetch LLM rerank chain to thread them into.
-    del load_config, policy
+    # policy is accepted for uniform fetch dispatch; the media archive lane
+    # has no in-fetch LLM rerank chain to thread it into.
+    del policy
     try:
         from . import _otr_media_archive_sources as _mas
     except ImportError:  # pragma: no cover -- flat-import test harnesses
@@ -779,10 +779,10 @@ def _fetch_media_archive_rss(*, bank, technical_model: str,
 
 def _fetch_public_domain_source(*, bank, technical_model: str,
                                 source_ref: str = "",
-                                load_config=None, policy=None) -> SourceFetchResult:
+                                policy=None) -> SourceFetchResult:
     """public_domain_source: manifest-local public-domain source fetcher."""
     del technical_model  # source text selection is source_ref/default driven
-    del load_config, policy  # accepted for uniform dispatch; no LLM rerank here
+    del policy  # accepted for uniform dispatch; no LLM rerank here
     try:
         from . import _otr_public_domain_sources as _pds
     except ImportError:  # pragma: no cover -- flat-import test harnesses
@@ -792,10 +792,10 @@ def _fetch_public_domain_source(*, bank, technical_model: str,
 
 def _fetch_shakespeare_folger(*, bank, technical_model: str,
                               source_ref: str = "",
-                              load_config=None, policy=None) -> SourceFetchResult:
+                              policy=None) -> SourceFetchResult:
     """shakespeare_folger: manifest-local curated Shakespeare scene fetcher."""
     del technical_model  # scene selection is source_ref/default driven
-    del load_config, policy  # accepted for uniform dispatch; no LLM rerank here
+    del policy  # accepted for uniform dispatch; no LLM rerank here
     try:
         from . import _otr_shakespeare_sources as _shx
     except ImportError:  # pragma: no cover -- flat-import test harnesses

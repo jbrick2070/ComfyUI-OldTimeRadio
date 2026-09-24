@@ -8,9 +8,8 @@ Found by an independent (Fable) cold-take review of the orphan-lifecycle
 design, and NOT identified by either mechanical reviewer (Codex, Cursor) in
 the same round -- both focused on VRAM contention; this is a sharper hazard:
 
-1. THE CACHE EPOCH. request_slot's Step-9 cache store (and the analogous
-   GGUF-path store) writes to the shared LLM_CACHE dict UNCONDITIONALLY once
-   load_llm()/backend.load() returns -- with no check for whether the
+1. THE CACHE EPOCH. request_slot's Step-9 cache store writes to the shared
+   LLM_CACHE dict UNCONDITIONALLY once load_llm()/backend.load() returns -- with no check for whether the
    CALLER is still wanted. If an abandoned worker's own load call finishes
    successfully AFTER the main thread has already invalidated the cache and
    moved on, that write lands anyway, and a completely unrelated LATER
@@ -67,8 +66,8 @@ call's snapshot is already stale by the time it reaches its own teardown,
 but the unconditional re-baseline would still let it adopt a fresh epoch --
 laundering someone else's invalidation into a legitimate-looking
 self-triggered one, reopening the exact publish-after-abandonment bug this
-whole file exists to close. Also found the cache-HIT lookup (Step 2 /
-GGUF-branch reuse check) was several unlocked reads followed by a return,
+whole file exists to close. Also found the cache-HIT lookup (Step 2) was
+several unlocked reads followed by a return,
 letting an invalidation land mid-check and produce either a None (violating
 request_slot's documented dict-return contract) or a hit against an entry
 that no longer exists.
@@ -79,8 +78,8 @@ Both are fixed with two new atomic-locked primitives:
   for external callers). Atomically claims ownership of my_epoch before
   touching LLM_CACHE or the GPU; a stale claim is a complete no-op and
   returns my_epoch UNCHANGED rather than adopting a new one.
-* _try_cache_hit_locked(normalized, slot, gguf_key=... | policy_key=...) --
-  the entire hit-check-and-return under one lock acquisition.
+* _try_cache_hit_locked(normalized, slot, policy_key=...) -- the entire
+  hit-check-and-return under one lock acquisition.
 
 Neither fix requires or attempts the larger orphan-occupancy registry
 (deferred to a dedicated session -- see docs/PROD_BUG_LOG.md). All of it is
@@ -199,8 +198,8 @@ def test_self_unload_claims_ownership_and_stores_succeed():
     """THE r2 fix, reproduced directly against _self_unload (the real
     call target request_slot now uses -- NOT the public unload_llm()):
     tearing down ITS OWN prior resident model as ordinary control flow
-    (exactly what request_slot does for a GGUF load-config change or a
-    cross-model slot transition) must still let the call publish its own
+    (exactly what request_slot does for a policy change or a cross-model
+    slot transition) must still let the call publish its own
     replacement load afterward."""
     my_epoch = ml._current_cache_epoch()
 
@@ -351,7 +350,6 @@ def test_cache_hit_lookup_correctly_hits_then_misses_after_invalidation():
         "slot": "technical",
         "cache_entry": real_entry,
         "policy_key": "policy-a",
-        "gguf_load_key": "gguf-a",
     })
 
     # A hit must return the exact live entry.
@@ -457,8 +455,8 @@ def test_request_slot_source_routes_self_unload_through_ownership_claim():
     request_slot's own control flow must go through _self_unload (the
     ownership-checked claim), not the public unconditional unload_llm(),
     or that call site reintroduces the r3 laundering regression for its
-    specific branch (GGUF load-config change, GGUF slot transition,
-    transformers policy change, transformers slot transition)."""
+    specific branch (transformers policy change, transformers slot
+    transition)."""
     src = inspect.getsource(ml.request_slot)
     assert "_my_cache_epoch = _current_cache_epoch()" in src, (
         "request_slot must snapshot the epoch before doing any local work"
@@ -466,30 +464,31 @@ def test_request_slot_source_routes_self_unload_through_ownership_claim():
     rebaseline_count = src.count(
         "_my_cache_epoch = _self_unload(_my_cache_epoch, slot=slot)"
     )
-    assert rebaseline_count == 4, (
-        f"expected exactly 4 self-triggered _self_unload() call sites (GGUF "
-        f"load-config change, GGUF slot transition, transformers policy "
-        f"change, transformers slot transition); found {rebaseline_count}. "
+    assert rebaseline_count == 2, (
+        f"expected exactly 2 self-triggered _self_unload() call sites "
+        f"(transformers policy change, transformers slot transition); found "
+        f"{rebaseline_count}. This was 4 until 2026-09-24, when the writer "
+        f"backend's dispatch arm was removed and took its own pair with it. "
         f"A self-unload site that calls the raw unload_llm() instead "
         f"reintroduces the r3 laundering regression for that branch."
     )
     publish_count = src.count("_publish_cache_entry_if_current(_my_cache_epoch,")
-    assert publish_count == 2, (
-        f"expected exactly 2 epoch-guarded publish calls (GGUF path + "
-        f"transformers Step 9); found {publish_count}"
+    assert publish_count == 1, (
+        f"expected exactly 1 epoch-guarded publish call (transformers "
+        f"Step 9); found {publish_count}"
     )
     hit_count = src.count("_try_cache_hit_locked(normalized, slot,")
-    assert hit_count == 2, (
-        f"expected exactly 2 atomic cache-hit checks (GGUF path + "
-        f"transformers Step 2); found {hit_count}. An unlocked multi-read "
-        f"hit check reintroduces the r3 cache-hit-atomicity regression."
+    assert hit_count == 1, (
+        f"expected exactly 1 atomic cache-hit check (transformers Step 2); "
+        f"found {hit_count}. An unlocked multi-read hit check reintroduces "
+        f"the r3 cache-hit-atomicity regression."
     )
 
     # r4 kibitz finding (Cursor): the source-count check above only counts
     # _self_unload call sites -- it never asserted the ABSENCE of the raw,
     # unconditional unload_llm() anywhere else in request_slot's body. That
-    # gap is exactly how the load-failure cleanup paths (both the
-    # transformers and GGUF load-except blocks) kept calling unload_llm()
+    # gap is exactly how the load-failure cleanup path (the transformers
+    # load-except block) kept calling unload_llm()
     # unconditionally after the success-path sites were fixed: an orphaned
     # call whose load fails could tear down or epoch-bump a completely
     # different, legitimate caller's freshly-published model. AST-walk

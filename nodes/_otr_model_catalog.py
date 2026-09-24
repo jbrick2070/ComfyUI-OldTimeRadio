@@ -137,7 +137,6 @@ class CuratedModel:
         "openrouter_http",
         "comfy_credits_http",
         "google_api_http",
-        "gguf_native",
     ]
     vram_fit_tier: Literal["PASS", "WARN", "UNKNOWN", "FAIL"]
     approx_safetensors_gb: float  # download size on disk, not VRAM resident
@@ -161,13 +160,11 @@ class CuratedModel:
     # every existing row uses; "openrouter" = a virtual row behind the
     # own-key OpenRouter API (S2); "comfy_credits" = a virtual row behind
     # ComfyUI's credit-billed partner-node proxy (2026-06-01);
-    # "google_api" = a virtual row behind the user's Gemini API key;
-    # "gguf_native" = a virtual row backed by an in-process llama-cpp-python
-    # GGUF loader. It is local VRAM, not a remote/HTTP zero-VRAM row.
+    # "google_api" = a virtual row behind the user's Gemini API key.
     # Default "local" so every pre-existing row and any older fixture that
     # omits the field still constructs unchanged.
     provider: Literal[
-        "local", "openrouter", "comfy_credits", "google_api", "gguf_native",
+        "local", "openrouter", "comfy_credits", "google_api",
     ] = "local"
     # How a MULTIMODAL checkpoint driven text-only is actually loaded.
     #
@@ -608,8 +605,8 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
     Static license/audit tests iterate CURATED_LLM_MODELS directly, so
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
-    keyed off the real gated set. Writer GGUF is not a catalog row --
-    GGUF_ROWS staying empty is not enough; this list never injects one."""
+    keyed off the real gated set. A retired writer GGUF handle is not a
+    catalog row, and this list never injects one."""
     return (
         CURATED_LLM_MODELS
         + _openrouter_virtual_rows()
@@ -1037,7 +1034,7 @@ def build_dropdown_choices(
     active = _active_curated_models()
     for m in active:
         provider = getattr(m, "provider", "local")
-        if provider == "gguf_native" or _is_gguf_writer_id(m.repo_id):
+        if _is_gguf_writer_id(m.repo_id):
             continue
         if m.repo_id == DEFAULT_LLM_NF4:
             continue
@@ -1787,44 +1784,14 @@ def vram_badge_for(repo_id: str) -> str:
     get no badge rather than a guess -- the download-state badge was removed
     for exactly that reason, and a wrong number is worse than none.
 
-    GGUF ROWS ARE PRICED AT THE DEFAULT CONTEXT, AND SAY SO (PBUG-20260829-17).
-    A GGUF row's cost is weights + KV, and KV scales with ``n_ctx`` -- so a
-    single number is only meaningful once you know which context it assumes.
-    This used to assume the row's MAXIMUM, which priced the rarest case as the
-    norm: `unsloth/Qwen3-4B-Instruct-2507-GGUF` showed **7.9 GB** (2.3 weights
-    + 5.6 KV at n_ctx 8192) when the same model needs **5.2 GB** at the default
-    4096 -- measured on an 8 GB card. Only 6 of 94 shipped profiles request
-    8192; 69 request 4096.
-
-    THE COST OF THAT WAS A USER WALKING AWAY. An 8 GB owner reads "(7.9 GB)"
-    against an 8 GB card and skips the smallest, cheapest-to-download,
-    Apache-2.0 writer in the list -- 2.3 GB on disk, loads with headroom. The
-    operator's directive is that a dropdown states "how much VRAM it needs so
-    users select only the one they can use"; 7.9 was not what it needs.
-
-    Same defect shape as PBUG-20260829-08 -- pricing the ROW's maximum instead
-    of the REQUEST -- which was fixed in the gate and survived here in the
-    label. The context is now named in the badge so the number can never again
-    be read as unconditional."""
-    ctx = None
-    suffix = ""
+    PBUG-20260829-17 is why no surviving row carries a context term here. The
+    only rows whose badge depended on one were priced as weights + KV, where KV
+    scales with the context the caller asks for, so a single number meant
+    nothing without naming the context it assumed. Every surviving row is a
+    safetensors download whose badge does not move with context, so the number
+    is unconditional again by construction rather than by annotation."""
     try:
-        from ._otr_shared.llm_policy import LLMRuntimePolicy as _Policy
-        row = None
-        try:
-            from . import _otr_gguf_backend as _gguf
-            row = _gguf.gguf_row_for_repo(repo_id)
-        except Exception:  # noqa: BLE001 -- not a GGUF row; no context term
-            row = None
-        if row is not None and row.kv_gb_per_1k:
-            ctx = int(getattr(_Policy, "gguf_n_ctx", 4096)
-                      if isinstance(getattr(_Policy, "gguf_n_ctx", None), int)
-                      else _Policy.__dataclass_fields__["gguf_n_ctx"].default)
-            suffix = " @%dk ctx" % (ctx // 1024)
-    except Exception:  # noqa: BLE001 -- a badge must never break the picker
-        ctx, suffix = None, ""
-    try:
-        est = _estimate_resident_gb(repo_id, context_cap=ctx)
+        est = _estimate_resident_gb(repo_id)
     except Exception:  # noqa: BLE001 -- a badge must never break the picker
         return ""
     if not est or est <= 0:
@@ -1837,10 +1804,6 @@ def vram_badge_for(repo_id: str) -> str:
     # read "(4.3 GB)" for a model that measured 14 GB there, and a reader who
     # trusted that badge lost the machine. The download size is true
     # everywhere; the tags carry what changes.
-    if suffix:
-        # GGUF: the number is weights plus KV at a named context, not a
-        # safetensors download. Keep that wording; do not relabel it.
-        return " (%.1f GB%s)" % (float(est), suffix)
     curated = _by_repo_id().get(repo_id)
     download_gb = float(getattr(curated, "approx_safetensors_gb", 0.0) or 0.0)
     tags = list(fit_tags_for(repo_id))
@@ -2134,7 +2097,6 @@ def _estimate_resident_gb(
     model_id: str,
     *,
     safetensors_gb_hint: float | None = None,
-    gguf_quant: str | None = None,
     context_cap: int | None = None,
 ) -> float | None:
     """Rough heuristic for VRAM resident size on the OTR pipeline.
@@ -2166,43 +2128,6 @@ def _estimate_resident_gb(
     lookup = _strip_label_suffix(model_id) if isinstance(model_id, str) else model_id
     curated = _by_repo_id().get(lookup)
     if curated is not None:
-        # gguf_native rows carry the REAL on-disk artifact size (derived from
-        # pinned bytes), not a BF16 download -- so NO /2 halve. Peak resident
-        # ~= weights on disk + the per-row KV cache at its context window. An
-        # unpinned row (approx 0.0 = UNKNOWN) yields None (can't estimate).
-        if getattr(curated, "provider", "local") == "gguf_native":
-            # PRICE WHAT THE REQUEST ACTUALLY ASKED FOR, not the row's worst
-            # case. `curated.approx_safetensors_gb` is `row.approx_artifact_gb()`
-            # -- the FIRST pinned artifact, which is Q8_0 on the gemma row -- and
-            # the KV term used to read `row.context_window`, the row's MAXIMUM.
-            # Together they priced every caller at 11.8 + 5.6 = 17.4 GB no matter
-            # what it requested, so a profile asking for Q4_K_M at n_ctx 2048 was
-            # judged on a Q8_0 load at 8192 and REFUSED at 2.56x its ceiling.
-            # The honest figure for that request is 6.63 + 1.40 = 8.03 GB, a 1.18x
-            # WARN. See PBUG-20260829-08.
-            weights_gb = 0.0
-            kv_gb = 0.0
-            try:
-                from . import _otr_gguf_backend as _gguf
-                _row = _gguf.gguf_row_for_repo(model_id)
-                if gguf_quant:
-                    try:
-                        _fn, _size, _sha = _row.artifact_for_quant(gguf_quant)
-                        if _size:
-                            weights_gb = float(_size) / (1024.0 ** 3)
-                    except Exception:  # noqa: BLE001 -- unknown quant: fall back
-                        weights_gb = 0.0
-                if _row.kv_gb_per_1k is not None:
-                    _ctx = context_cap or _row.context_window
-                    kv_gb = (float(_ctx) / 1024.0) * float(_row.kv_gb_per_1k)
-            except Exception:  # noqa: BLE001 -- KV additive; absent -> weights only
-                kv_gb = 0.0
-            if weights_gb <= 0.0:
-                # No per-quant pin available: the projected row's own figure.
-                weights_gb = float(curated.approx_safetensors_gb)
-            if weights_gb <= 0.0:
-                return None
-            return weights_gb + kv_gb
         download = float(curated.approx_safetensors_gb)
         implied = getattr(curated, "implied_quant_policy", "") or ""
         if implied == "none":
@@ -2239,7 +2164,6 @@ def check_vram_fit(
     *,
     ceiling_gb: float | None = None,
     safetensors_gb_hint: float | None = None,
-    gguf_quant: str | None = None,
 ) -> VRAMFitVerdict:
     """Coarse guardrail against the obvious oversize case (70B-on-16GB).
     Returns a tiered verdict (never raises):
@@ -2263,7 +2187,7 @@ def check_vram_fit(
     curated = _by_repo_id().get(model_id)
     estimate = _estimate_resident_gb(
         model_id, safetensors_gb_hint=safetensors_gb_hint,
-        gguf_quant=gguf_quant, context_cap=context_cap
+        context_cap=context_cap,
     )
 
     # FAIL case first: clearly oversized regardless of curation.

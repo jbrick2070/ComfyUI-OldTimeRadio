@@ -154,7 +154,7 @@ import threading
 # was the deleted GemmaHeartbeatStreamer's put(), so the writes and cleanup in
 # `_run_with_timeout` had become write-only ceremony. The deadline the REAL
 # transports check is loader-owned -- `set_generation_deadline()` below, read
-# back by `_DeadlineStoppingCriteria` and the GGUF backend -- and that path is
+# back by `_DeadlineStoppingCriteria` -- and that path is
 # untouched.
 
 def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
@@ -179,7 +179,7 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 
     def _worker():
         # The loader-owned deadline is what the real transports check: the
-        # transformers closures via _DeadlineStoppingCriteria, and the GGUF
+        # transformers closures via _DeadlineStoppingCriteria, and the
         # backend via get_generation_deadline() + conditional streaming.
         # (A thread-local mirror of this deadline was removed 2026-08-28
         # with its only reader, the legacy GemmaHeartbeatStreamer.)
@@ -197,7 +197,7 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
             # A worker scheduled AFTER the budget already expired must not
             # start at all. This is the check that covers the dominant
             # overrun case: request_slot (a cold model load, tens of seconds
-            # for a ~12 GB GGUF) runs inside fn(), and NO deadline mechanism
+            # for a ~12 GB model) runs inside fn(), and NO deadline mechanism
             # on any lane can interrupt a load once it is under way.
             if time.monotonic() > deadline:
                 raise _otr_loader_mod.GenerationDeadlineExceededError(
@@ -716,7 +716,6 @@ def _llm_rank_news_candidates(
     pool: list[dict],
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
     top_k: int = 5,
-    load_config=None,
     policy=None,
 ) -> list[dict]:
     """Use the LLM to rank news headlines for genre-fit, return top_k.
@@ -773,7 +772,7 @@ def _llm_rank_news_candidates(
         log.info("[NewsFetcher] Preparing technical model for NewsCuration; "
                  "download/load precede the 65s generation budget")
         cache_entry = _OTRML.request_slot(
-            "technical", model_id, policy=policy, load_config=load_config,
+            "technical", model_id, policy=policy,
         )
         gen_fn = _OTRML.make_generate_fn(cache_entry)
         _OTRML.raise_if_processing_interrupted()
@@ -817,13 +816,6 @@ def _llm_rank_news_candidates(
             if len(indices) >= top_k:
                 break
         if not indices:
-            if load_config is not None:
-                raise RuntimeError(
-                    "[NewsFetcher] local GGUF news ranking returned no "
-                    f"parseable indices (response={str(response)[:120]!r}); "
-                    "refusing to silently fall back to shuffle order "
-                    "(operator directive: no local-LM fallbacks)."
-                )
             log.warning("[NewsFetcher] LLM ranking returned no parseable indices "
                         "(response=%r) - falling back to shuffle order",
                         str(response)[:120])
@@ -837,21 +829,15 @@ def _llm_rank_news_candidates(
         # 2026-08-25: this subtype's own docstring says "ComfyUI catches
         # this at the node boundary and halts the queue cleanly" -- but the
         # broad `except Exception` below used to catch it here FIRST and
-        # (when load_config is None) silently fall back to shuffle order,
+        # silently fall back to shuffle order,
         # letting the main thread immediately start ANOTHER LLM load while
         # this phase's orphan worker is still alive on GPU (generation is
         # not cancellable mid-token -- _run_with_timeout abandons it, it
         # does not stop it). That is exactly the window PBUG-20260825-04
         # was found in. Re-raise unconditionally so the pause always
-        # reaches the node boundary, regardless of load_config.
+        # reaches the node boundary.
         raise
-    except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
-        if load_config is not None:
-            log.error(
-                "[NewsFetcher] local GGUF news ranking failed (%s); failing "
-                "loud (operator directive: no local-LM fallbacks)", exc,
-            )
-            raise
+    except Exception as exc:  # noqa: BLE001 -- ranking is an enhancement, not a requirement
         log.warning("[NewsFetcher] LLM ranking failed (%s) - falling back to "
                     "shuffle order", exc)
         return list(pool[:top_k])
@@ -860,7 +846,6 @@ def _llm_rank_news_candidates(
 def _llm_rerank_with_bodies(
     candidates_with_body: list[dict],
     model_id: str = "mistralai/Mistral-Nemo-Instruct-2407",
-    load_config=None,
     policy=None,
 ) -> list[dict]:
     """Body-aware second-pass news rank ("Option B / 65s budget").
@@ -912,7 +897,7 @@ def _llm_rerank_with_bodies(
         log.info("[NewsFetcher] Preparing technical model for NewsCurationDeep; "
                  "download/load precede the 40s generation budget")
         cache_entry = _OTRML.request_slot(
-            "technical", model_id, policy=policy, load_config=load_config,
+            "technical", model_id, policy=policy,
         )
         gen_fn = _OTRML.make_generate_fn(cache_entry)
         _OTRML.raise_if_processing_interrupted()
@@ -935,13 +920,6 @@ def _llm_rerank_with_bodies(
         )
         m = re.search(r"\d+", str(response or ""))
         if not m:
-            if load_config is not None:
-                raise RuntimeError(
-                    "[NewsFetcher] local GGUF body re-rank returned no "
-                    f"parseable index (response={str(response)[:120]!r}); "
-                    "refusing to silently keep headline order "
-                    "(operator directive: no local-LM fallbacks)."
-                )
             log.warning(
                 "[NewsFetcher] body re-rank returned no parseable index "
                 "(response=%r) - keeping headline order",
@@ -950,13 +928,6 @@ def _llm_rerank_with_bodies(
             return list(candidates_with_body)
         idx = int(m.group(0)) - 1
         if not (0 <= idx < len(candidates_with_body)):
-            if load_config is not None:
-                raise RuntimeError(
-                    f"[NewsFetcher] local GGUF body re-rank index {idx + 1} out "
-                    f"of range (have {len(candidates_with_body)}); refusing to "
-                    "silently keep headline order (operator directive: no "
-                    "local-LM fallbacks)."
-                )
             log.warning(
                 "[NewsFetcher] body re-rank index %d out of range "
                 "(have %d) - keeping headline order",
@@ -974,21 +945,15 @@ def _llm_rerank_with_bodies(
         # 2026-08-25: this subtype's own docstring says "ComfyUI catches
         # this at the node boundary and halts the queue cleanly" -- but the
         # broad `except Exception` below used to catch it here FIRST and
-        # (when load_config is None) silently fall back to shuffle order,
+        # silently fall back to shuffle order,
         # letting the main thread immediately start ANOTHER LLM load while
         # this phase's orphan worker is still alive on GPU (generation is
         # not cancellable mid-token -- _run_with_timeout abandons it, it
         # does not stop it). That is exactly the window PBUG-20260825-04
         # was found in. Re-raise unconditionally so the pause always
-        # reaches the node boundary, regardless of load_config.
+        # reaches the node boundary.
         raise
-    except Exception as exc:  # noqa: BLE001 -- enhancement for non-GGUF lanes only
-        if load_config is not None:
-            log.error(
-                "[NewsFetcher] local GGUF body re-rank failed (%s); failing "
-                "loud (operator directive: no local-LM fallbacks)", exc,
-            )
-            raise
+    except Exception as exc:  # noqa: BLE001 -- ranking is an enhancement, not a requirement
         log.warning(
             "[NewsFetcher] body re-rank failed (%s) - keeping headline order",
             exc,
@@ -1097,7 +1062,7 @@ def _body_rerank_preview(text: str, limit: int = 800) -> str:
 
 def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; current body iterates the full feed list. Wiring is a future feature, not a cleanbreak target
                          model_id=None,
-                         *, load_config=None, policy=None):
+                         *, policy=None):
     # `optimization_profile` was removed from this signature 2026-08-28. It
     # was threaded three levels deep -- here, then into the two LLM news-rank
     # helpers -- and NEITHER receiver ever read it (AST-verified: zero Load
@@ -1285,7 +1250,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             pool,
             model_id=model_id,
             top_k=5,
-            load_config=load_config,
             policy=policy,
         )
         # Put LLM-ranked picks at the front of the pool; everything
@@ -1359,7 +1323,6 @@ def _fetch_science_news(max_feeds=10,  # kept: max_feeds is API stability arg; c
             rich = _llm_rerank_with_bodies(
                 rich,
                 model_id=model_id,
-                load_config=load_config,
                 policy=policy,
             )
         chosen = rich[0]

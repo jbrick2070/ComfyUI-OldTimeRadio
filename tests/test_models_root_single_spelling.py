@@ -43,4 +43,4 @@ def test_the_module_stays_cold_import_clean():
         (n.module or "") for n in tree.body
         if isinstance(n, ast.ImportFrom)
     }
-    assert not any("_otr_gguf_backend" in m for m in top_level), top_level
+    assert not any("_otr_models_root" in m for m in top_level), top_level

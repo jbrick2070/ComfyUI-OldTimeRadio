@@ -17,7 +17,7 @@ Two independent, INDEPENDENTLY-VERIFIED fixes, tested here:
 2. ``story_orchestrator._LLMTimeoutWorkflowPause`` must always reach the
    node boundary. Both NewsCuration and NewsCurationDeep's LLM-ranking
    helpers used to catch it via a broad ``except Exception`` and (when
-   ``load_config`` is None) silently fall back to shuffle order -- letting
+   silently fall back to shuffle order -- letting
    the main thread immediately start ANOTHER LLM load while this phase's
    orphan worker is still alive on GPU (generation is not cancellable
    mid-token; ``_run_with_timeout`` abandons the worker, it does not stop

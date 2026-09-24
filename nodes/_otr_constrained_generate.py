@@ -231,17 +231,6 @@ def make_constrained_generate_fn(
         return _occ.make_comfy_credits_generate_fn(
             cache_entry, response_format=response_format,
         )
-    # Native GGUF lane. It accepts llama-cpp-python response_format, so map the
-    # existing OpenRouter-style json_schema wrapper at the backend boundary.
-    if cache_entry.get("provider") == "gguf_native":
-        from . import _otr_openrouter_backend as _orb
-        from . import _otr_gguf_backend as _gguf
-        response_format = _orb.schema_to_response_format(
-            schema_model, name=getattr(schema_model, "__name__", "otr_schema"),
-        )
-        return _gguf.make_gguf_generate_fn(
-            cache_entry, response_format=response_format,
-        )
     required = {"model", "tokenizer"}
     missing = required - set(cache_entry)
     if missing:
