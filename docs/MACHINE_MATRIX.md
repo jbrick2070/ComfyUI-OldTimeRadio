@@ -123,12 +123,12 @@ Video engines they select: `wan_ti2v`
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `16gb_full` | viz_camera | - | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_foley` | ltx25_native_foley_16gb | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
-| `otr_16gb_low` | viz_camera | - | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_mime` | ltx25_native_mime_16gb | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
-| `otr_16gb_still` | still_motion | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
-| `otr_16gb_video` | ltx25_high_video | - | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
+| `otr_16gb_animatediff` | animatediff15_v3_haunted_video | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_foley` | ltx25_native_foley_16gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_16gb_low` | viz_camera | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_mime` | ltx25_native_mime_16gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_16gb_still` | still_motion | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_video` | ltx25_high_video | - | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_g4_fastwan` | fastwan_8gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_g4_humo` | humo | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_g4_ltx_8gb` | ltx_8gb | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |

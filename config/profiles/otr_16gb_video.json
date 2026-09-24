@@ -11,9 +11,9 @@
     "announcer_visual": "ltx25_high_video",
     "music_visual": "ltx25_high_video",
     "character_visual": "ltx25_high_video",
-    "announcer_image": "lumina_image",
-    "music_image": "lumina_image",
-    "character_image": "lumina_image"
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo"
   },
   "slot_overrides": {
     "cast_voice_policy": "auto_registry",
