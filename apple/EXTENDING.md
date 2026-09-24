@@ -266,10 +266,10 @@ the one that would otherwise lie.
 
 Set `"ships"` false (or delete the row), **and delete** the matching files in
 `workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
-that id). `--all` does not remove leftovers; `--check` still validates every
-`otr_*.json` sitting in `workflows/variants/`. Do not leave a
-`config/profiles/<id>.json` behind either -- `load_profile` falls through to
-that file, and `--check` can then pass on a graph that no longer ships.
+that id). Leaving the files is not enough to fail `--check`: a row that still
+exists -- even with `"ships"` false -- is what `load_profile` reads, so the
+leftover graph regenerates cleanly. If you delete the row, also delete any
+`config/profiles/<id>.json` or the same pass falls through to that file.
 
 ### The proof
 
