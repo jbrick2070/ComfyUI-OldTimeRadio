@@ -177,11 +177,10 @@ partner stack, a Mac device policy.
 one workflow. Edit that file. Do not hand-edit anything in
 `workflows/variants/` -- those JSON files and their `.launch.md` recipes are
 generated, and the next rebuild silently undoes you. Do not add a
-`config/profiles/<id>.json` for something you intend to ship -- the matrix is
-consulted first. That folder still holds twins of the current shipping rows
-from the migration, plus the lab rigs (`otr_soak_*` and friends) that
-`--profile` loads on the canonical runner. A new shipping graph is a matrix
-row only.
+`config/experiments/<id>.json` for something you intend to ship -- the matrix
+is consulted first. That folder is the lab rigs (`otr_soak_*` and friends)
+that `--profile` loads on the canonical runner. A new shipping graph is a
+matrix row only.
 
 This wants the git clone. `scripts/` is not in a registry install.
 
@@ -201,7 +200,7 @@ descriptor, and repair every later link's `dst_slot` (it is an index into that
 same array). Trailing widgets are cheap; mid-list ones are not.
 
 If the new widget is something a machine graph should pin, add it to
-`config/profiles/widget_mapping.json` as well, or the matrix cannot reach it.
+`config/widget_map.json` as well, or the matrix cannot reach it.
 
 **Changing what a machine graph pins** -- writer, lanes, voices, ceiling,
 device -- is an edit to that row's `deltas` in the matrix. The canonical is
@@ -269,7 +268,7 @@ Set `"ships"` false (or delete the row), **and delete** the matching files in
 that id). Leaving the files is not enough to fail `--check`: a row that still
 exists -- even with `"ships"` false -- is what `load_profile` reads, so the
 leftover graph regenerates cleanly. If you delete the row, also delete any
-`config/profiles/<id>.json` or the same pass falls through to that file.
+`config/experiments/<id>.json` or the same pass falls through to that file.
 
 ### The proof
 
