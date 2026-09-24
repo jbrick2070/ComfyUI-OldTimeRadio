@@ -286,9 +286,11 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     a language miss.
 
     TWO SOURCES, IN ORDER. A bank row RESERVED for this character is his own
-    recording and wins; otherwise the shared catalogue assignment in
-    RECURRING_CHARACTER_VOICES applies. A reservation that never reached its
-    owner is the defect this order exists to prevent.
+    recording and wins -- PROVIDED ITS BYTES ARE ON THIS MACHINE; otherwise the
+    shared catalogue assignment in RECURRING_CHARACTER_VOICES applies. A
+    reservation that never reached its owner is the defect this order exists to
+    prevent; a reservation delivered without its file is the crash that presence
+    check exists to prevent.
 
     WHAT THIS DELIBERATELY NO LONGER CHECKS, stated because it is a real
     reduction and not an oversight: the retired route subsystem gated its
@@ -370,7 +372,51 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
         return None, "%s has %d reserved %s rows" % (
             character_key, len(owned), engine)
     if owned:
-        return _deliver(owned[0], owned[0].voice_ref_id)
+        row = owned[0]
+        # HIS RECORDING IS ONLY HIS VOICE IF IT IS ON THIS MACHINE.
+        #
+        # The reserved rows name a PRIVATE clip that nothing distributes:
+        # `scripts/otr_dl_indextts2_refs.py` has no entry for it and
+        # `scripts/otr_provision.py` skips reserved rows deliberately, so the
+        # provisioner reports green on a box where the bytes are absent. 51
+        # profiles put a clone engine on the character slot, including the
+        # rented-pod starter. Delivering the row regardless hands the adapter a
+        # path that is not there and the voice path fails loud by design -- so a
+        # cameo would turn a working episode into a dead render on every machine
+        # except the one that recorded it.
+        #
+        # Resolved through the RENDER PATH's own resolver so this check and the
+        # adapter cannot disagree about where the file lives.
+        ref_path = str(getattr(row, "ref_path", "") or "")
+        if ref_path and not ref_path.startswith("cloud:"):
+            try:
+                from ._otr_voice_node_common import _resolve_ref_to_disk
+            except ImportError:  # pragma: no cover -- flat-import harnesses
+                from _otr_voice_node_common import (  # type: ignore
+                    _resolve_ref_to_disk)
+            # RESOLVE **AND STAT**. `_resolve_ref_to_disk` answers "where would
+            # this live", not "is it there" -- it returns None only for an empty
+            # or remote ref and otherwise hands back a path that may not exist.
+            # Checking only its truthiness (the first version of this guard) is
+            # a guard that cannot fire, which is worse than none because it
+            # reads as covered.
+            #
+            # The stat is deliberately on the resolver's OWN answer rather than
+            # a second path built here: this function's docstring records that
+            # the previous existence check used a broader resolver than the
+            # adapters did, so it could confirm a reference the worker then
+            # could not open. One resolver, then stat what it said.
+            import os
+
+            resolved = _resolve_ref_to_disk(ref_path)
+            if not resolved or not os.path.exists(resolved):
+                # Named, not silent: this is the one miss an operator can
+                # actually act on, by fetching the clip.
+                return None, (
+                    "reserved row %s: its reference is not on this machine "
+                    "(%s); taking the ordinary draw"
+                    % (row.voice_ref_id, ref_path))
+        return _deliver(row, row.voice_ref_id)
 
     voice_ref_id = recurring_character_voice(character_key, engine)
     if not voice_ref_id:

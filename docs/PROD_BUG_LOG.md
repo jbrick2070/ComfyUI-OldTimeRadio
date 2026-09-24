@@ -16310,3 +16310,72 @@ fail against the reconstructed pre-fix source.
 not interchangeable when one of them derives a length from a parameter and the
 other derives it from data. The type system cannot see it, `ast.parse` cannot
 see it, and the unit suite was green through all four failed legs.
+
+---
+
+## PBUG-20260924-01 -- a reserved voice reference nothing distributes became a hard cast
+
+**Found:** 2026-09-24, by a Fable final-gate review of the recurring-character
+casting arc. **Not** by a failed render -- see the admission note at the end.
+
+**Introduced by:** `1d5e18ff` (same day), which made a voice-bank row whose
+`reserved_for` names a character outrank the shared catalogue table. That fix
+was right and is kept; this is the hole it opened.
+
+**The defect.** All three reserved rows -- `idx_`/`cb_`/`dia_lemmy_algenib_cockney_v1`
+-- name ONE private clip, `models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav`.
+Nothing puts that clip on a machine that did not record it:
+
+* `scripts/otr_dl_indextts2_refs.py` has no entry for it (zero mentions).
+* `scripts/otr_provision.py` SKIPS reserved rows on purpose when it verifies
+  registered references -- "refusing to distribute a private recording" -- so
+  the provisioner reports GREEN on a box where the file is absent.
+
+So after `1d5e18ff`, casting handed the adapter a path that did not exist, and
+the voice path fails loud by design (the 2026-07-03 no-fallback rip). A cameo
+would have turned a working episode into a dead render.
+
+**Exposure.** 51 profiles put a clone engine on the character slot, including
+`config/profiles/otr_runpod_starter.json` (indextts2) -- the rented-pod
+starter. The cameo rate is roughly one episode in nine. The canonical workflow
+saves `auto_registry` + `kokoro`, so a DEFAULT install was never exposed.
+
+**Why it looked fine.** The clip is on the 5080 (298 KB, 2026-08-08) and
+essentially nowhere else. Every check ran on the one machine that structurally
+could not show the defect -- the same shape as the `config.cast_pools` import
+bug found earlier the same day, which is twice in one session.
+
+**Fix** (`nodes/cast_lock.py`, `_recurring_character_bank_ref`): a reserved row
+is delivered only if its bytes resolve AND exist on the running machine;
+otherwise the character takes the ordinary draw and the report names the
+missing reference, because fetching the clip is the operator's fix and a silent
+stranger's voice tells him nothing.
+
+**The fix had to be fixed.** The first version guarded with
+`if not _resolve_ref_to_disk(ref_path)`. That resolver answers "where would
+this live", not "is it there": it returns `None` only for an empty or remote
+ref and otherwise hands back a path that may not exist. A guard that cannot
+fire is worse than no guard, because it reads as covered. It now resolves and
+stats, and the regression test is mutation-checked against that exact broken
+version as well as against no guard at all.
+
+**Gender, checked because it is the operator's standing correctness rule:** the
+fallback draw is gender-correct. Twelve draws (indextts2 / chatterbox / dia x
+four seeds) all returned `male` voices for a male character. The character
+sounds like a stranger on a machine without his clip; he does not sound like a
+woman.
+
+**Known and deliberately NOT fixed here:** a character with a reserved clone row
+but NO entry in `RECURRING_CHARACTER_VOICES` is skipped silently -- the caller
+gates on the table before the reserved scan. So "adding a recurring character is
+a new key in a dict and nothing else" is not true for a clone-voiced one.
+Operator ruling 2026-09-24: not worth building for, since expanding to other
+recurring characters is unconfirmed. Recorded here so the next author does not
+rediscover it as a mystery.
+
+**Admission note.** Per CLAUDE.md a PBUG wants a live production artifact. This
+was caught by review plus a probe that simulates a machine without the clip, not
+by a failed leg. It is logged on the operator's explicit instruction; the
+exposure is real and measured, but no render died proving it. Treat it as
+admitted-by-ruling rather than as satisfying the ordinary admission rule, and do
+not promote it to the Bug Bible on this evidence alone.

@@ -591,6 +591,58 @@ def test_an_ambiguous_reservation_refuses_rather_than_guessing(monkeypatch):
     assert "reserved" in miss, miss
 
 
+@pytest.mark.parametrize("engine", _CLONE_ENGINES)
+def test_a_reserved_recording_that_is_not_on_this_machine_is_not_delivered(
+        engine, monkeypatch):
+    """The clone is his voice only where his bytes actually are.
+
+    ALL THREE reserved rows name ONE private clip,
+    `models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav`, and NOTHING puts
+    it on a fresh machine: `scripts/otr_dl_indextts2_refs.py` has no entry for
+    it, and `scripts/otr_provision.py` skips reserved rows on purpose --
+    "refusing to distribute a private recording" -- so the provisioner reports
+    green on a box where the file is absent.
+
+    Without this guard casting hands the adapter a path that is not there and
+    the voice path fails loud by design (the 2026-07-03 no-fallback rip). 51
+    profiles put a clone engine on the character slot, including the rented-pod
+    starter, so a cameo would turn a working episode into a dead render on
+    every machine except the one that recorded the clip. It looked correct here
+    for exactly that reason -- the clip is on this box and essentially nowhere
+    else, which is the same shape as the dormant-import defect.
+
+    The fallback must also be LOUD: an operator who hears a stranger needs to
+    be told the reference is missing, because fetching it is the whole fix.
+    """
+    import os
+
+    real_exists = os.path.exists
+    monkeypatch.setattr(
+        os.path, "exists",
+        lambda p: False if "lemmy_algenib_cockney" in str(p)
+        else real_exists(p))
+
+    out, _n, *rest = CastLock().lock(
+        script_json=_ledger(), voice_bank="default_clean",
+        char_voice_engine=engine, cast_voice_policy="auto_registry")
+    row = _rows(out)["c02"]
+    got = str(row.get("voice_ref_id") or "")
+
+    assert "lemmy_algenib_cockney" not in got, (
+        "a reserved recording that is NOT on this machine was delivered as %r; "
+        "the adapter would be handed a path that does not exist and the line "
+        "would fail to render" % (got,))
+    assert got, (
+        "the character was left with no voice at all; a missing reserved "
+        "reference must fall through to the ordinary draw, not to nothing")
+
+    said = chr(10).join(x for x in rest if isinstance(x, str))
+    assert "not on this machine" in said, (
+        "the fallback was SILENT. The operator hears a stranger and is told "
+        "nothing about why, when the fix is to fetch the clip. Report: %s"
+        % (said[:600],))
+
+
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-v"]))
