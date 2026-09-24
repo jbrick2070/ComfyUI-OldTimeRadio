@@ -74,11 +74,74 @@ if environ.get("OTR_TEST_MODE") == "1" and "PYTEST_CURRENT_TEST" not in environ:
 # capability is wanted for future models; the mock above already kills the
 # offending background check.
 
-# Keep the HF cache next to ComfyUI's models/.
+# Keep the HF cache next to ComfyUI's models/ -- BUT ONLY IF THE RESULTING ROOT
+# IS SHORT ENOUGH THAT THE FILES CAN ACTUALLY BE WRITTEN.
+#
+# THE LONGEST CACHE TAIL THIS PACK ASKS FOR IS 162 CHARACTERS:
+#   hub\models--Comfy-Org--Lumina_Image_2.0_Repackaged\snapshots\<40-char sha>
+#       \split_files\diffusion_models\lumina_2_model_bf16.safetensors
+# Windows' usable path budget is 259, so the root may be at most 96 characters.
+# A ComfyUI Desktop root is 89 + len(username), which makes SEVEN CHARACTERS the
+# longest safe Windows username on a stock install. An eighth breaks it.
+#
+# HOW IT BREAKS, because it is not recognisable from the error. huggingface_hub
+# 1.30.0 (file_download.py) adds the \\?\ extended-length prefix to lock_path
+# and blob_path but NOT to pointer_path. So the whole weight downloads -- the
+# 5.22 GB blob sits at 220 characters and needs no prefix -- and then
+# materialising the 261-character pointer goes _create_symlink -> shutil.move ->
+# os.rename -> WinError 3 -> FileNotFoundError. Measured on an 8 GB box:
+# 259 succeeds, 260 fails, and the same 265-character path succeeds WITH the
+# prefix. That cache held 86 materialised files, the longest at 238, and the one
+# missing pointer was the 261-character Lumina one.
+#
+# SO WHEN THE PIN WOULD NOT FIT, DO NOT PIN. huggingface_hub then uses its own
+# ~/.cache/huggingface, which is short, standard and always writable. This also
+# un-deads nodes/_otr_hf_env.py's own default: resolve() reads os.environ first,
+# so pinning here made its C:\ComfyUI-Models\huggingface branch unreachable on
+# every live boot.
+#
+# tests/test_hf_home_fits_max_path.py re-derives the 162 from the real
+# _SOURCES tuples and fails if a new model outgrows this constant. Do not edit
+# the number by hand -- read what that test prints.
+_OTR_LONGEST_HF_TAIL = 162
+_OTR_WINDOWS_PATH_BUDGET = 259
+
+
+def _otr_long_paths_enabled():
+    """True when Windows' 260-char limit is lifted registry-wide.
+
+    Both the manifest and the registry key are required, and python.exe already
+    ships longPathAware, so this key is the deciding half. Never raises: a
+    prestartup that dies takes the whole boot with it.
+    """
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE,
+                            r"SYSTEM\CurrentControlSet\Control\FileSystem") as k:
+            return int(winreg.QueryValueEx(k, "LongPathsEnabled")[0]) == 1
+    except Exception:                        # noqa: BLE001 -- absent key = off
+        return False
+
+
 if "HF_HOME" not in environ:
     comfy_base = os.path.dirname(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    environ["HF_HOME"] = os.path.join(comfy_base, "models", "huggingface")
+    _otr_hf_home = os.path.join(comfy_base, "models", "huggingface")
+    # The +1 is the separator between the root and the tail.
+    _otr_room = _OTR_WINDOWS_PATH_BUDGET - _OTR_LONGEST_HF_TAIL - 1
+    if (sys.platform == "win32" and len(_otr_hf_home) > _otr_room
+            and not _otr_long_paths_enabled()):
+        logging.getLogger("OTR").warning(
+            "OldTimeRadio prestartup: NOT pinning HF_HOME to %s -- it is %d "
+            "characters and Windows MAX_PATH leaves room for %d, so the longest "
+            "model this pack fetches could download in full and then fail to "
+            "materialise with a bare FileNotFoundError. Falling back to "
+            "huggingface_hub's own cache. To keep the cache beside ComfyUI's "
+            "models instead, either enable Windows long paths "
+            "(LongPathsEnabled=1) or set HF_HOME yourself to something shorter.",
+            _otr_hf_home, len(_otr_hf_home), _otr_room)
+    else:
+        environ["HF_HOME"] = _otr_hf_home
 
 logging.getLogger("OTR").info(
     "OldTimeRadio prestartup: HF_HOME=%s | safetensors_conversion mocked EARLY",

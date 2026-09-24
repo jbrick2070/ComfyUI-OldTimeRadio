@@ -88,6 +88,11 @@ _SOURCES = (
     ("text_encoders", "Comfy-Org/Lumina_Image_2.0_Repackaged",
      "split_files/text_encoders/gemma_2_2b_fp16.safetensors"),        # 5.23 GB
 )
+#: Windows MAX_PATH is 260 including the terminating NUL, so 259 is what a
+#: path may actually occupy. Named here because _scrub_transfer_error reports
+#: against it and prestartup_script.py decides the HF_HOME pin by it.
+_WINDOWS_PATH_BUDGET = 259
+
 MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
             {"repo_id": repo, "filename": filename}
             for category, repo, filename in _SOURCES}
@@ -585,9 +590,61 @@ def _hf_fetch(spec, metadata, progress=None):
         raise
     except Exception as exc:  # noqa: BLE001 -- never leak a signed CDN URL
         raise VisualAssetError(
-            "visual weight transfer failed (%s) for %s/%s"
-            % (type(exc).__name__, spec["repo_id"], spec["filename"])) from None
+            "visual weight transfer failed (%s) for %s/%s: %s"
+            % (type(exc).__name__, spec["repo_id"], spec["filename"],
+               _scrub_transfer_error(exc))) from None
 
+
+def _scrub_transfer_error(exc):
+    r"""The exception's own message, with any URL redacted, plus path lengths.
+
+    WHY THIS EXISTS. ``_hf_fetch`` used to report only ``type(exc).__name__``, so
+    a Windows MAX_PATH failure arrived as a bare "visual weight transfer failed
+    (FileNotFoundError)" with no path and no cause. That cost a cross-machine
+    investigation to identify as a 261-character path, and it would cost it again
+    -- because Windows does not say "too long" for this. The underlying
+    ``os.rename`` raises WinError 3, "cannot find the path specified", while the
+    5.22 GB blob it was moving sits happily on disk at 220 characters.
+
+    WHY IT SCRUBS RATHER THAN OMITS. The caller's ``from None`` exists so a
+    signed CDN URL can never reach a log, and that property is preserved: any
+    scheme-like run is replaced outright. A path is not a credential, and a path
+    is what a reader needs.
+
+    WHY IT APPENDS LENGTHS. The one fact that diagnoses this failure class is
+    invisible in the text -- a 261-character path and a 238-character one look
+    identical in a log line. So each path-shaped token is annotated with its own
+    length, and anything past the Windows budget is named as such.
+
+    Never raises: it runs inside an exception handler, and a formatter that threw
+    would replace a useful error with a confusing one.
+    """
+    try:
+        import re
+        message = str(exc) or exc.__class__.__name__
+        # Any scheme://... run goes, signed query string and all.
+        message = re.sub(r"\b[a-zA-Z][a-zA-Z0-9+.\-]*://\S+",
+                         "<url redacted>", message)
+        notes = []
+        for candidate in re.findall(r"(?:[A-Za-z]:\\|/)[^\s'\"]{8,}", message):
+            trimmed = candidate.rstrip(".,;:)")
+            # MEASURE THE REAL PATH, NOT ITS REPR. An OSError's str() renders a
+            # Windows path with DOUBLED backslashes, so counting the captured
+            # text reported 282 characters for a path that is 264 -- inflated by
+            # one per separator. The length IS the diagnosis here, so a reader
+            # working out how much to shorten by must not be handed a number
+            # that is eighteen too high.
+            trimmed = trimmed.replace("\\\\", "\\")
+            note = "%d chars" % len(trimmed)
+            if len(trimmed) > _WINDOWS_PATH_BUDGET:
+                note += " -- OVER the %d-char Windows path budget" % (
+                    _WINDOWS_PATH_BUDGET,)
+            notes.append("%s (%s)" % (trimmed, note))
+        if notes:
+            message += " [paths: %s]" % "; ".join(notes)
+        return message
+    except Exception:                        # noqa: BLE001 -- formatter only
+        return exc.__class__.__name__
 
 def _resolve_transfer_token():
     """The operator's HF token if one is set, else None. Never raises."""
