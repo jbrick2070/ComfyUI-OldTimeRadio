@@ -3,7 +3,7 @@
 Generated 2026-08-26, after the disk-reclaim pass recorded at the bottom of this file.
 
 Models root is `C:\ComfyUI-Models`, resolved through
-`nodes/_otr_gguf_backend.py::_models_root()`. Never assume a path under the repo or the
+`nodes/_otr_models_root.py::_models_root()`. Never assume a path under the repo or the
 ComfyUI tree -- see CLAUDE.md section 6A.
 
 **This file is the standing record of what is on disk and what uses it**, so a future

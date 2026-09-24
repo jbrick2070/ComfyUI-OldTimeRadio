@@ -21,7 +21,7 @@ HF_HOME                   writer/voice/music cache, default ~/.cache/huggingface
 <models_root>/TTS/refs/<engine>/*.wav       voice-cloning reference clips
 ```
 
-Resolve the models root through `nodes/_otr_gguf_backend.py::_models_root()` rather than guessing -- a `find` under the ComfyUI tree proves nothing.
+Resolve the models root through `nodes/_otr_models_root.py::_models_root()` rather than guessing -- a `find` under the ComfyUI tree proves nothing.
 
 ## Public one-command paths
 
@@ -62,14 +62,14 @@ Anything not listed there is a manual install -- see its row below.
 | `google_veo_video` | nothing on disk | - | 4 profile(s) |
 | `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_INSTALL.md) | 3 profile(s) |
 | `ltx25` | 5 weight file(s) | manual download | - |
-| `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 7 profile(s) |
+| `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 6 profile(s) |
 | `ltx_av` | 8 weight file(s) | manual download | - |
 | `ltx_video` | 7 weight file(s) | manual download | 4 profile(s) |
 | `mesh_stage` | 3 weight file(s) | manual download | 1 profile(s) |
 | `minimax_h3` | 5 weight file(s) | explicit operator-local `otr_fetch_lane_weights.py minimax_h3` | - |
 | `razzle_ltx_8gb` | **not declared in code -- verify** | - | 1 profile(s) |
 | `visualizer` | nothing on disk | - | - |
-| `viz_camera` | nothing on disk | - | 12 profile(s) |
+| `viz_camera` | nothing on disk | - | 7 profile(s) |
 | `viz_mandala` | nothing on disk | - | - |
 | `viz_rainbow` | nothing on disk | - | - |
 | `wan_ti2v` | 4 weight file(s) | `otr_fetch_lane_weights.py wan_ti2v` | 9 profile(s) |
@@ -78,18 +78,18 @@ Anything not listed there is a manual install -- see its row below.
 
 | engine | needs | how | used by profiles |
 |---|---|---|---|
-| `bark` | **not declared in code -- verify** | - | 2 profile(s) |
+| `bark` | **not declared in code -- verify** | - | 1 profile(s) |
 | `chatterbox` | **a SEPARATE project + its own venv** | manual, see below | 2 profile(s) |
 | `cloud_elevenlabs` | nothing on disk | - | 6 profile(s) |
 | `cloud_sonilo` | nothing on disk | - | - |
 | `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | 2 profile(s) |
-| `google_lyria` | nothing on disk | - | 6 profile(s) |
-| `google_tts` | nothing on disk | - | 6 profile(s) |
-| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 59 profile(s) |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 120 profile(s) |
-| `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 44 profile(s) |
+| `google_lyria` | nothing on disk | - | 4 profile(s) |
+| `google_tts` | nothing on disk | - | 4 profile(s) |
+| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 49 profile(s) |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 102 profile(s) |
+| `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 4 profile(s) |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
-| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 81 profile(s) |
+| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 102 profile(s) |
 
 ## Image engines (every shipped workflow picks one)
 

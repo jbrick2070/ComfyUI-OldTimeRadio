@@ -105,6 +105,43 @@ def test_the_module_sits_where_its_file_arithmetic_assumes():
         "pack; got %r for a repo at %r" % (walked, repo))
 
 
+def test_step_4_finds_comfyuis_models_dir_BESIDE_custom_nodes():
+    r"""The off-by-one that caused the 2026-09-21 incident, pinned.
+
+    Step 4 walked THREE dirname() calls until 2026-09-23, landing on
+    ``<comfy>/custom_nodes/models`` -- a directory INSIDE custom_nodes that a
+    normal install does not have. So on a Linux pod with no env var and no
+    running ComfyUI it found nothing, fell through, and returned the Windows
+    literal, which put 3.7 GB of weights into a directory literally named
+    ``C:\ComfyUI-Models`` inside the repo.
+
+    THE OLD TEST COULD NOT CATCH THIS. It monkeypatched ``isdir`` to accept any
+    path ending in "models", so it passed with three dirname() calls and would
+    have passed with five. It pinned the ORDERING (sibling before literal) and
+    said nothing about WHICH directory. This one names the path.
+    """
+    import re
+
+    src = inspect_source_of_models_root()
+    # The sibling expression, however it is formatted across lines.
+    joined = re.sub(r"\s+", "", src)
+    assert "os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(" in joined, (
+        "step 4 must walk FOUR dirname() calls from __file__ to reach the "
+        "models/ directory beside custom_nodes/; three lands inside it")
+
+    here = os.path.abspath(mr.__file__)
+    walked = here
+    for _ in range(4):
+        walked = os.path.dirname(walked)
+    assert os.path.basename(walked) != "custom_nodes", (
+        "the walk still ends inside custom_nodes/: %r" % walked)
+
+
+def inspect_source_of_models_root():
+    import inspect
+    return inspect.getsource(mr._models_root)
+
+
 def test_the_retiring_backend_no_longer_owns_an_implementation():
     """One owner, not two that agree today and drift tomorrow.
 
@@ -170,15 +207,31 @@ def test_the_owner_stays_cold_import_clean():
     import inspect
 
     tree = ast.parse(inspect.getsource(mr))
-    top = []
-    for node in tree.body:
-        if isinstance(node, ast.Import):
-            top += [a.name.split(".")[0] for a in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.module:
-            top.append(node.module.split(".")[0])
+
+    # WALK EVERYTHING OUTSIDE A FUNCTION, not just tree.body. The first version
+    # of this test inspected only top-level Import nodes, so a heavy import
+    # hidden inside a module-level `try:` or `if:` was invisible -- and this
+    # module's own env-shim import uses exactly that try/except shape, so the
+    # blind spot covered its most likely future edit rather than a hypothetical
+    # one. A QA pass proved it by hiding `import torch` in a try block and
+    # watching this test pass.
+    def module_scope_imports(node, inside_function=False):
+        found = []
+        for child in ast.iter_child_nodes(node):
+            entering = isinstance(
+                child, (ast.FunctionDef, ast.AsyncFunctionDef))
+            if not (inside_function or entering):
+                if isinstance(child, ast.Import):
+                    found += [a.name.split(".")[0] for a in child.names]
+                elif isinstance(child, ast.ImportFrom) and child.module:
+                    found.append(child.module.split(".")[0])
+            found += module_scope_imports(
+                child, inside_function or entering)
+        return found
+
     heavy = {"torch", "transformers", "llama_cpp", "numpy", "folder_paths"}
-    assert not (set(top) & heavy), "module-scope heavy import(s): %r" % (
-        sorted(set(top) & heavy),)
+    got = set(module_scope_imports(tree)) & heavy
+    assert not got, "module-scope heavy import(s): %r" % (sorted(got),)
 
 
 if __name__ == "__main__":

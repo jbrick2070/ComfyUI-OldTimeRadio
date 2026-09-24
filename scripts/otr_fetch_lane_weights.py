@@ -431,8 +431,7 @@ def models_root() -> str:
     docstring here used to say "never a hardcoded guess" directly above a
     hardcoded Windows guess.
 
-    The old order tried `from nodes._otr_gguf_backend import _models_root`
-    FIRST. That import needs ComfyUI's own `folder_paths`, which only exists
+    The old order tried to import the pack's models-root owner FIRST. That import needs ComfyUI's own `folder_paths`, which only exists
     inside the running ComfyUI process -- so when this script is run standalone,
     exactly as its own README invocation says to, the import raised, a bare
     `except Exception` swallowed it, and the function returned

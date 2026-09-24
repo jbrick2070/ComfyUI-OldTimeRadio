@@ -16,11 +16,9 @@ torch, no transformers, no model library, and the one runtime-only import
 be able to ask where the models are without loading a model, and a cold import
 must stay cold.
 
-IT SITS IN ``nodes/`` ON PURPOSE, at the same directory depth as its previous
-home. Step 4 below walks up from ``__file__`` to find ComfyUI's ``models/``
-beside ``custom_nodes/``, so moving this file one level in or out would silently
-change which directory that step returns. Same depth, same answer -- verified,
-not assumed.
+IT SITS IN ``nodes/`` ON PURPOSE. Step 4 below walks up from ``__file__`` to
+find ComfyUI's ``models/`` beside ``custom_nodes/``, so moving this file one
+level in or out silently changes which directory that step returns.
 """
 from __future__ import annotations
 
@@ -98,14 +96,27 @@ def _models_root() -> Path:
     #    os.path rather than pathlib on purpose: Path() binds to the host
     #    flavour, so a test that simulates POSIX cannot construct one here.
     #
-    #    THE THREE dirname() CALLS ARE COUNTED FROM THIS FILE'S LOCATION. This
-    #    module lives in nodes/, exactly where the previous owner did, so the
-    #    walk lands on the same directory it always did. Moving this file
-    #    changes that answer silently; tests/test_models_root_is_one_owner.py
-    #    pins the depth for that reason.
+    #    FOUR dirname() CALLS, COUNTED FROM THIS FILE. It was THREE until
+    #    2026-09-23, which landed on <comfy>/custom_nodes/models -- a directory
+    #    INSIDE custom_nodes rather than the models/ dir beside it. The comment
+    #    above has always described the fourth; the code only ever walked three.
+    #
+    #    THAT OFF-BY-ONE IS WHY THE 2026-09-21 INCIDENT HAPPENED. On a Linux pod
+    #    with no env var and no running ComfyUI, this step looked for a
+    #    directory a normal install does not have, found nothing, fell through,
+    #    and returned the Windows literal -- which put 3.7 GB of weights into a
+    #    directory literally named "C:\ComfyUI-Models" inside the repo. Commit
+    #    fa87d1c4 fixed that by refusing the literal off Windows, which stopped
+    #    the damage but left the cause in place: had this step looked one level
+    #    up, it would have found the real models dir and never reached the
+    #    literal at all.
+    #
+    #    THE DEPTH IS COUNTED FROM THIS FILE'S LOCATION, so moving this module
+    #    changes the answer silently. tests/test_models_root_is_one_owner.py
+    #    pins both the depth and the resolved path for that reason.
     sibling = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.dirname(
-            os.path.abspath(__file__)))), "models")
+        os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(
+            os.path.abspath(__file__))))), "models")
     if os.path.isdir(sibling):
         return Path(sibling)
     # 5. The literal, last. ADDED A GUARD 2026-09-21: returning it

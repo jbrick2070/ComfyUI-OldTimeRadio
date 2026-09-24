@@ -256,7 +256,7 @@ def render() -> str:
       "HF_HOME                   writer/voice/music cache, default ~/.cache/huggingface\n"
       "<models_root>/TTS/refs/<engine>/*.wav       voice-cloning reference clips\n"
       "```\n")
-    A("Resolve the models root through `nodes/_otr_gguf_backend.py::_models_root()` "
+    A("Resolve the models root through `nodes/_otr_models_root.py::_models_root()` "
       "rather than guessing -- a `find` under the ComfyUI tree proves nothing.\n")
 
     A("## Public one-command paths\n")

@@ -247,7 +247,7 @@ def models_root(comfy: str) -> str:
     precisely the trap the project rules call out: a plausible tree that is not
     the tree, which makes a wrong answer look verified.
 
-    `nodes/_otr_gguf_backend.py::_models_root()` is the single owner of this
+    `nodes/_otr_models_root.py::_models_root()` is the single owner of this
     question. Ask it, and only fall back when it cannot be imported at all.
     """
     # BOTH paths go in: the repo so the pack imports, and ComfyUI's root so
