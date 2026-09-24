@@ -1122,9 +1122,14 @@ class OTRVoiceNodeBase:
             # excluded even when it holds the same shared catalogue voice,
             # because it is a role, not a character.
             try:
-                from config.cast_pools import recurring_character_key
-            except ImportError:              # pragma: no cover -- flat imports
-                from cast_pools import recurring_character_key  # type: ignore
+                from ..config.cast_pools import recurring_character_key
+            except ImportError:          # pragma: no cover -- flat imports
+                try:
+                    from config.cast_pools import (  # type: ignore
+                        recurring_character_key)
+                except ImportError:
+                    from cast_pools import (  # type: ignore
+                        recurring_character_key)
             character_rows = [
                 e for e in (led.get("cast") or [])
                 if isinstance(e, dict)

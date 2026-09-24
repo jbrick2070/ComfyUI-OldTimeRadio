@@ -140,13 +140,18 @@ def _recurring_character_key(entry) -> str:
     test harness that cannot see `config` degrades to "ordinary row" instead of
     raising inside casting.
     """
+    # RELATIVE FIRST. A bare `config` is not importable when ComfyUI loads the
+    # pack as a submodule -- see the note at `_announcer_pool_from_pools`.
     try:
-        from config.cast_pools import recurring_character_key
+        from ..config.cast_pools import recurring_character_key
     except ImportError:  # pragma: no cover -- flat-import harnesses
         try:
-            from cast_pools import recurring_character_key  # type: ignore
+            from config.cast_pools import recurring_character_key  # type: ignore
         except ImportError:
-            return ""
+            try:
+                from cast_pools import recurring_character_key  # type: ignore
+            except ImportError:
+                return ""
     return recurring_character_key(entry)
 
 
@@ -284,14 +289,18 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     either takes its assigned voice or takes the ordinary draw.
     """
     try:
-        from config.cast_pools import (
+        from ..config.cast_pools import (
             recurring_character_key, recurring_character_voice)
     except ImportError:  # pragma: no cover -- flat-import harnesses
         try:
-            from cast_pools import (  # type: ignore
+            from config.cast_pools import (  # type: ignore
                 recurring_character_key, recurring_character_voice)
         except ImportError:
-            return None, "recurring table unavailable"
+            try:
+                from cast_pools import (  # type: ignore
+                    recurring_character_key, recurring_character_voice)
+            except ImportError:
+                return None, "recurring table unavailable"
 
     character_key = recurring_character_key(entry)
     if not character_key:
@@ -1536,14 +1545,18 @@ class CastLock:
         was before this existed.
         """
         try:
-            from config.cast_pools import (
+            from ..config.cast_pools import (
                 recurring_character_key, recurring_character_voice)
         except ImportError:  # pragma: no cover -- flat-import harnesses
             try:
-                from cast_pools import (  # type: ignore
+                from config.cast_pools import (  # type: ignore
                     recurring_character_key, recurring_character_voice)
             except ImportError:
-                return 0
+                try:
+                    from cast_pools import (  # type: ignore
+                        recurring_character_key, recurring_character_voice)
+                except ImportError:
+                    return 0
 
         engine = str(engine or "").strip()
         if not engine:

@@ -40,6 +40,7 @@ _FILES = (
     "nodes/_otr_voice_bank.py",
     "nodes/_otr_voice_route.py",
     "nodes/_otr_scifi_news_pro.py",
+    "nodes/_otr_voice_node_common.py",
 )
 
 
@@ -62,12 +63,19 @@ def _functions_importing_cast_pools(tree: ast.AST):
 
     hits: dict[str, list[ast.ImportFrom]] = {}
     for node in ast.walk(tree):
-        if isinstance(node, ast.ImportFrom) and node.module in (
-            "config", "..config", ".config",
-        ):
-            names = {a.name for a in node.names}
-            if "cast_pools" not in names:
-                continue
+        if not isinstance(node, ast.ImportFrom):
+            continue
+        # BOTH SPELLINGS. `from config import cast_pools` puts cast_pools in
+        # the NAMES; `from config.cast_pools import f` puts it in the MODULE.
+        # Matching only the first is how four sites of PBUG-20260825-02 were
+        # added on 2026-09-24 without this test noticing.
+        module = (node.module or "")
+        root = module.lstrip(".")
+        names = {a.name for a in node.names}
+        is_cast_pools = (
+            root in ("config", "cast_pools") and "cast_pools" in names
+        ) or root in ("config.cast_pools",)
+        if is_cast_pools:
             fn = enclosing_function(node)
             key = fn.name if fn is not None else "<module level>"
             hits.setdefault(key, []).append(node)
@@ -156,3 +164,111 @@ def test_assign_bark_announcer_specifically_has_the_fallback():
         and not line.startswith((" " * 12, "\t\t\t"))
     ]
     assert not bare, f"found an unguarded absolute import: {bare}"
+
+
+def test_the_FIRST_import_attempt_at_every_site_is_the_relative_one():
+    """A fallback chain proves nothing if its first rung is unreachable.
+
+    THIS IS THE ASSERTION THE OTHER TEST SHOULD HAVE BEEN. On 2026-09-24 four
+    recurring-character sites were added, each correctly wrapped in
+    try/except ImportError with a fallback -- and each tried `config.cast_pools`
+    first and bare `cast_pools` second. Under a real ComfyUI package load
+    NEITHER resolves, so every one of them silently took its `return ""` /
+    `return 0` path and the whole cutover was dormant in production while this
+    suite stayed green.
+
+    The reachable form under a package load is the RELATIVE one, because the
+    loader imports the pack by file location and adds nothing to sys.path.
+    So: whatever else a site tries, it tries `..config` first.
+    """
+    offenders = []
+    for rel in _FILES:
+        path = REPO_ROOT / rel
+        if not path.exists():           # a file removed by a later change
+            continue
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for fn_name, imports in _functions_importing_cast_pools(tree).items():
+            first = min(imports, key=lambda n: n.lineno)
+            if first.level == 0:
+                offenders.append(
+                    "%s::%s line %d: first attempt is absolute (%r)"
+                    % (rel, fn_name, first.lineno, first.module))
+    assert not offenders, (
+        "a cast_pools import site tries an absolute form FIRST:\n  "
+        + "\n  ".join(offenders))
+
+
+def test_the_recurring_character_table_resolves_under_a_real_package_load():
+    """Load the pack as ComfyUI does and prove the cutover actually runs.
+
+    ComfyUI imports a custom-node pack BY FILE LOCATION under its folder name
+    and adds nothing to sys.path. Under pytest the repo root IS on sys.path,
+    which is the accident that made every other test here pass while the
+    feature did not exist at runtime. This removes that accident.
+
+    RUN IN A SUBPROCESS, deliberately. Doing the sys.path surgery in-process
+    would leak into whatever test ran next and make this file's result depend
+    on collection order -- trading one invisible defect for another.
+    """
+    import json
+    import subprocess
+    import sys
+    import textwrap
+
+    probe = textwrap.dedent(
+        """
+        import importlib.util, json, sys
+        from pathlib import Path
+        REPO = Path(sys.argv[1])
+        sys.path = [p for p in sys.path
+                    if p and Path(p).resolve() != REPO.resolve()]
+        out = {}
+        try:
+            import config                       # noqa: F401
+            out["repo_root_still_on_path"] = True
+        except ImportError:
+            out["repo_root_still_on_path"] = False
+        name = "OTR_pkgload_probe"
+        spec = importlib.util.spec_from_file_location(
+            name, REPO / "__init__.py",
+            submodule_search_locations=[str(REPO)])
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[name] = mod
+        spec.loader.exec_module(mod)
+        cl = importlib.import_module(name + ".nodes.cast_lock")
+        out["key"] = cl._recurring_character_key(
+            {"char_id": "c02", "name": "LEMMY", "gender": "male"})
+        bcv = importlib.import_module(name + ".nodes.batch_character_voices")
+        out["is_changed"] = bcv.BatchCharacterVoices.IS_CHANGED(
+            script_json=json.dumps({
+                "meta": {"episode_seed": 42},
+                "cast": [{"char_id": "c02", "name": "LEMMY", "gender": "male",
+                          "voice_ref_id": "bm_george",
+                          "voice_engine": "kokoro"}],
+                "lines": []}),
+            engine="kokoro")
+        print("OTRPROBE" + json.dumps(out))
+        """
+    )
+    proc = subprocess.run(
+        [sys.executable, "-c", probe, str(REPO_ROOT)],
+        capture_output=True, text=True, timeout=300)
+    line = next((l for l in proc.stdout.splitlines()
+                 if l.startswith("OTRPROBE")), None)
+    assert line, (
+        "the package-load probe produced no verdict.\nstdout:\n%s\nstderr:\n%s"
+        % (proc.stdout[-2000:], proc.stderr[-2000:]))
+    out = json.loads(line[len("OTRPROBE"):])
+
+    assert out["repo_root_still_on_path"] is False, (
+        "the probe did not actually simulate a package load -- the repo root "
+        "is still importable, so this test would pass on the broken code")
+    assert out["key"] == "LEMMY", (
+        "the recurring-character table is DORMANT under a package load: "
+        "_recurring_character_key returned %r, so the recurring voice never "
+        "applies on a real install and the character is cast on an ordinary "
+        "drawn voice" % (out["key"],))
+    assert out["is_changed"] != "static", (
+        "IS_CHANGED returned 'static' for a ledger holding the recurring row, "
+        "so the reference bytes behind that voice can change without the graph "
+        "noticing")
