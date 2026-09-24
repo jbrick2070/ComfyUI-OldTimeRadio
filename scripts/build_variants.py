@@ -397,6 +397,60 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
     return 1 if (explicit and refused) else 0
 
 
+
+#: Generated docs rebuilt alongside the variants, so one edit needs one command.
+#: Run as SUBPROCESSES on purpose -- see `cmd_regenerate_docs`.
+DOC_GENERATORS = (
+    ("docs/MACHINE_MATRIX.md + README block", "otr_machine_matrix.py"),
+    ("docs/DROPDOWN_MATRIX.md + apple/MACHINES.md", "otr_dropdown_matrix.py"),
+)
+
+
+def cmd_regenerate_docs() -> int:
+    """Rebuild every generated doc from the same matrix the variants came from.
+
+    Operator: "when it's updated it updates the variants AND the documentation, all
+    at once". Before this, a matrix edit meant remembering three commands, and a
+    forgotten one left a doc disagreeing with the graphs until somebody noticed --
+    which is exactly how the retired tier doc froze four workflows behind.
+
+    SUBPROCESSES, NOT IMPORTS, for three measured reasons. The generators use
+    incompatible exit codes (3 means "degraded interpreter, refuse to write" for the
+    machine matrix; 2 means "engine-row conflict" for the dropdown one, neither of
+    which this module uses). `otr_dropdown_matrix` already imports THIS module for
+    SHIPPING_SET, so importing it back is an order-dependent cycle. And
+    `otr_machine_matrix` refuses to write under a torch-less interpreter because such
+    a run once replaced its voice table with a placeholder and reported success --
+    a subprocess keeps that guard rather than importing its failure mode here.
+
+    A DOC FAILURE IS REPORTED, NOT FATAL. The variants are already written and
+    correct when this runs; exiting nonzero over an unhappy doc generator would mean
+    a red command over a good tree. `--check` is where staleness actually blocks.
+    """
+    import subprocess
+
+    print("\nregenerating the docs from the same matrix:")
+    failures = []
+    for label, script in DOC_GENERATORS:
+        path = REPO / "scripts" / script
+        if not path.exists():
+            print(f"  SKIP  {label} ({script} is not present)")
+            continue
+        proc = subprocess.run([sys.executable, str(path)],
+                              capture_output=True, text=True)
+        if proc.returncode == 0:
+            print(f"  OK    {label}")
+        else:
+            failures.append((script, proc.returncode))
+            tail = (proc.stdout + proc.stderr).strip().splitlines()
+            why = tail[-1] if tail else "(no output)"
+            print(f"  FAIL  {label} -- {script} exit {proc.returncode}: {why}")
+    if failures:
+        print(f"{len(failures)} doc generator(s) failed; the variants are written "
+              f"and correct. Fix the generator, then re-run -- `--check` is the "
+              f"gate that blocks on staleness.")
+    return 1 if failures else 0
+
 def cmd_check() -> int:
     schemas = build_offline_schemas()
     mapping = load_widget_mapping()
@@ -476,12 +530,17 @@ def main(argv=None) -> int:
     g.add_argument("--check", action="store_true",
                    help="regenerate + diff committed variants/recipes; "
                         "nonzero on drift")
+    ap.add_argument("--no-docs", action="store_true",
+                    help="with --all, emit the graphs but skip the generated docs")
     args = ap.parse_args(argv)
     if args.check:
         return cmd_check()
     if args.all:
         ids = [p for p in _committed_profile_ids() if p not in LANE_PRESETS]
-        return cmd_emit(ids, explicit=False)
+        rc = cmd_emit(ids, explicit=False)
+        if not args.no_docs:
+            cmd_regenerate_docs()
+        return rc
     return cmd_emit([s.strip() for s in args.profiles.split(",") if
                      s.strip()], explicit=True)
 
