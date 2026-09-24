@@ -185,20 +185,57 @@ class TestTheErrorNowNamesItsCause:
             2, "no such file", r"C:\ComfyUI-Models\huggingface\hub\f.safetensors"))
         assert "OVER the" not in out, out
 
-    def test_a_signed_cdn_url_still_never_survives(self):
+    #: Every shape an adversarial review got a credential through in. The first
+    #: redaction matched only ``scheme://<non-whitespace>`` and FIVE OF THESE SIX
+    #: leaked -- each one a shape a real Hugging Face error can produce. They are
+    #: parametrised rather than written as prose because the lesson is that the
+    #: SHAPE cannot be anticipated; the KEY can, which is why the redaction is
+    #: key-based now.
+    LEAK_CASES = (
+        ("no scheme, bare host and query",
+         "cdn-lfs.hf.co/repos/ab/m.safetensors?X-Amz-Signature=%s failed"),
+        ("an Authorization header echoed into the message",
+         "request failed: Authorization: Bearer %s"),
+        ("a percent-encoded url",
+         "GET https%%3A%%2F%%2Fcdn-lfs.hf.co%%2Ff%%3FX-Amz-Signature%%3D%s"),
+        ("a url split across a newline",
+         "https://cdn-lfs.hf.co/file?\nX-Amz-Signature=%s"),
+        ("a token in no url at all",
+         "hf_token=%s was rejected"),
+        ("a plain scheme url, which the first version did catch",
+         "GET https://cdn-lfs.hf.co/f?X-Amz-Signature=%s"),
+    )
+
+    @pytest.mark.parametrize("label,template", LEAK_CASES,
+                             ids=[c[0] for c in LEAK_CASES])
+    def test_a_credential_never_survives(self, label, template):
         """The property the caller's ``from None`` was protecting.
 
-        Keeping the message is only acceptable because the URL is removed. If
-        this ever fails, the fix is a better redaction, never going back to
-        discarding the diagnosis.
+        Keeping the message is only acceptable because credentials are removed.
+        If one of these fails the fix is a better redaction -- never going back to
+        discarding the diagnosis, which is what hid the MAX_PATH bug for a day.
+        """
+        secret = "TEST_SECRET_DO_NOT_LEAK"
+        out = _visual_assets()._scrub_transfer_error(OSError(template % secret))
+        assert secret not in out, "%s leaked: %r" % (label, out)
+        assert "redacted" in out, (
+            "%s: the redaction must be VISIBLE so a reader knows something was "
+            "removed rather than never present: %r" % (label, out))
+
+    def test_an_exception_that_cannot_be_stringified_still_returns(self):
+        """The formatter runs inside an exception handler and may never raise.
+
+        An earlier fallback called ``exc.__class__.__name__`` unguarded, which an
+        exception overriding attribute access defeats -- turning a useful error
+        into a confusing one at the worst moment.
         """
         scrub = _visual_assets()._scrub_transfer_error
-        out = scrub(OSError(
-            "GET https://cdn-lfs.hf.co/repos/ab/m.safetensors"
-            "?X-Amz-Signature=deadbeefsecret failed"))
-        assert "deadbeefsecret" not in out, out
-        assert "cdn-lfs.hf.co" not in out, out
-        assert "<url redacted>" in out, out
+
+        class Hostile(Exception):
+            def __str__(self):
+                raise RuntimeError("no str for you")
+
+        assert scrub(Hostile()) == "Hostile"
 
     def test_a_formatter_that_raises_degrades_to_the_type_name(self):
         """It runs inside an exception handler; it may never add a failure."""

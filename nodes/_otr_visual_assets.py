@@ -595,8 +595,65 @@ def _hf_fetch(spec, metadata, progress=None):
                _scrub_transfer_error(exc))) from None
 
 
+#: Parameter and header names that carry a credential. Matched case-insensitively
+#: against a token's KEY, which is what makes the redaction robust: every bypass
+#: found in review had a recognisable key and an unrecognisable shape.
+_CREDENTIAL_KEYS = (
+    "signature", "sig", "token", "secret", "credential", "password", "passwd",
+    "apikey", "api_key", "api-key", "auth", "access_key", "accesskey",
+    "sessionid", "session_id", "x-amz", "bearer", "hf_token",
+)
+
+
+def _redact_credentials(message):
+    r"""Every credential-bearing run replaced, whatever shape it arrived in.
+
+    WHY THIS IS KEY-BASED AND NOT URL-BASED. The first cut redacted only
+    ``scheme://<non-whitespace>`` runs, and an adversarial review broke it five
+    ways out of six -- every one of which a real Hugging Face error can produce:
+
+      * ``cdn-lfs.hf.co/f?X-Amz-Signature=...``  -- a bare host, no scheme
+      * ``Authorization: Bearer ...``            -- a header echoed into the text
+      * ``https%3A%2F%2F...%3FX-Amz-Signature%3D...`` -- percent-encoded
+      * a URL split across a newline, signature on the second line
+      * ``hf_token=...``                         -- not in a URL at all
+
+    A shape-based rule has to anticipate the shape. A KEY-based rule only has to
+    recognise the name, and the names are few and stable. So each whitespace
+    token is percent-decoded and checked for a credential key or a scheme; a hit
+    redacts the WHOLE token rather than trying to excise part of it, because a
+    partial redaction of a credential is not a redaction.
+
+    Header forms are handled first because they span two tokens
+    (``Authorization:`` then the value), which a per-token rule cannot see.
+    """
+    import re
+    import urllib.parse
+
+    # Two-token header forms, before tokenising.
+    message = re.sub(r"(?i)\bauthorization\s*:\s*\S+", "<credential redacted>",
+                     message)
+    message = re.sub(r"(?i)\bbearer\s+\S+", "<credential redacted>", message)
+
+    out = []
+    for token in re.split(r"(\s+)", message):
+        if not token.strip():
+            out.append(token)
+            continue
+        try:
+            probe = urllib.parse.unquote(token)
+        except Exception:                    # noqa: BLE001 -- treat as raw
+            probe = token
+        low = probe.lower()
+        if "://" in probe or any(k in low for k in _CREDENTIAL_KEYS):
+            out.append("<credential redacted>")
+        else:
+            out.append(token)
+    return "".join(out)
+
+
 def _scrub_transfer_error(exc):
-    r"""The exception's own message, with any URL redacted, plus path lengths.
+    r"""The exception's own message, credentials removed, plus path lengths.
 
     WHY THIS EXISTS. ``_hf_fetch`` used to report only ``type(exc).__name__``, so
     a Windows MAX_PATH failure arrived as a bare "visual weight transfer failed
@@ -606,35 +663,42 @@ def _scrub_transfer_error(exc):
     ``os.rename`` raises WinError 3, "cannot find the path specified", while the
     5.22 GB blob it was moving sits happily on disk at 220 characters.
 
-    WHY IT SCRUBS RATHER THAN OMITS. The caller's ``from None`` exists so a
-    signed CDN URL can never reach a log, and that property is preserved: any
-    scheme-like run is replaced outright. A path is not a credential, and a path
-    is what a reader needs.
+    WHY IT SCRUBS RATHER THAN OMITS. The caller's ``from None`` exists so a signed
+    CDN URL can never reach a log, and that property is preserved -- see
+    ``_redact_credentials``, which was rewritten after a review broke the first
+    attempt five ways. A path is not a credential, and a path is what a reader
+    needs.
 
     WHY IT APPENDS LENGTHS. The one fact that diagnoses this failure class is
     invisible in the text -- a 261-character path and a 238-character one look
     identical in a log line. So each path-shaped token is annotated with its own
     length, and anything past the Windows budget is named as such.
 
-    Never raises: it runs inside an exception handler, and a formatter that threw
-    would replace a useful error with a confusing one.
+    IT MAY NOT RAISE, and the fallback is written so that it cannot either: an
+    earlier version called ``exc.__class__.__name__`` unguarded, which an
+    exception overriding attribute access can defeat. This runs inside an
+    exception handler, where a formatter that throws replaces a useful error with
+    a confusing one.
     """
     try:
         import re
-        message = str(exc) or exc.__class__.__name__
-        # Any scheme://... run goes, signed query string and all.
-        message = re.sub(r"\b[a-zA-Z][a-zA-Z0-9+.\-]*://\S+",
-                         "<url redacted>", message)
+        try:
+            raw = str(exc)
+        except Exception:                    # noqa: BLE001 -- __str__ may raise
+            raw = ""
+        message = _redact_credentials(raw or type(exc).__name__)
+
         notes = []
-        for candidate in re.findall(r"(?:[A-Za-z]:\\|/)[^\s'\"]{8,}", message):
-            trimmed = candidate.rstrip(".,;:)")
-            # MEASURE THE REAL PATH, NOT ITS REPR. An OSError's str() renders a
-            # Windows path with DOUBLED backslashes, so counting the captured
-            # text reported 282 characters for a path that is 264 -- inflated by
-            # one per separator. The length IS the diagnosis here, so a reader
-            # working out how much to shorten by must not be handed a number
-            # that is eighteen too high.
-            trimmed = trimmed.replace("\\\\", "\\")
+        # Paths may contain spaces, so a quoted run is taken whole first and the
+        # bare form only picks up what is left.
+        candidates = re.findall(r"'((?:[A-Za-z]:\\|/)[^']{8,})'", message)
+        candidates += re.findall(r"(?:[A-Za-z]:\\|/)[^\s'\"]{8,}", message)
+        seen = set()
+        for candidate in candidates:
+            trimmed = candidate.rstrip(".,;:)").replace("\\\\", "\\")
+            if trimmed in seen:
+                continue
+            seen.add(trimmed)
             note = "%d chars" % len(trimmed)
             if len(trimmed) > _WINDOWS_PATH_BUDGET:
                 note += " -- OVER the %d-char Windows path budget" % (
@@ -644,8 +708,10 @@ def _scrub_transfer_error(exc):
             message += " [paths: %s]" % "; ".join(notes)
         return message
     except Exception:                        # noqa: BLE001 -- formatter only
-        return exc.__class__.__name__
-
+        try:
+            return type(exc).__name__
+        except Exception:                    # noqa: BLE001 -- nothing is safe
+            return "unprintable exception"
 def _resolve_transfer_token():
     """The operator's HF token if one is set, else None. Never raises."""
     try:
