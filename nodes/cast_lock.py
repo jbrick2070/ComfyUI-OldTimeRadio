@@ -285,6 +285,29 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
     voice does not exist", and collapsing them would hide a broken table behind
     a language miss.
 
+    TWO SOURCES, IN ORDER. A bank row RESERVED for this character is his own
+    recording and wins; otherwise the shared catalogue assignment in
+    RECURRING_CHARACTER_VOICES applies. A reservation that never reached its
+    owner is the defect this order exists to prevent.
+
+    WHAT THIS DELIBERATELY NO LONGER CHECKS, stated because it is a real
+    reduction and not an oversight: the retired route subsystem gated its
+    indextts2 clone on a RUNTIME FINGERPRINT -- it hashed three files (the
+    adapter, the worker, and `_otr_resolved_request.py`, that last one because
+    the seed path is part of the rendering code), compared the result against
+    the value frozen at the 2026-08-18 audition, and demoted the voice to an
+    ordinary draw when any of them had moved since.
+    This resolver has no such gate; a reserved row is delivered on the strength
+    of being in the bank. That trade is intentional. The fingerprint produced
+    eighteen false demotions in nineteen commits (measured, and recorded in
+    `tests/test_stale_ledger_voice_guard_removed.py`), it silently substituted a
+    stranger's voice as its failure mode, and the operator's standing direction
+    is that a guard is legitimate only against a silent WRONG result -- which
+    this one caused rather than prevented. The residual risk is real and is
+    accepted: if the indextts2 adapter drifts far enough to change how that
+    reference clones, nothing here will notice, and the check is the operator's
+    ear on the next leg.
+
     No ledger field is written here and no qualification is consulted. The row
     either takes its assigned voice or takes the ordinary draw.
     """
@@ -318,6 +341,37 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
         # from. Bark rows reach this and keep the preset path.
         return None, "no engine resolved"
 
+    def _deliver(ref, voice_ref_id):
+        """Language is checked AFTER the match, for both sources alike."""
+        if not voice_speaks_language(ref, language):
+            return None, "%s does not speak %s" % (voice_ref_id, language)
+        return ref, ""
+
+    # HIS OWN RECORDING FIRST. A bank row whose `reserved_for` names this
+    # character is a clone of that character's actual voice, withheld from
+    # every other draw. It outranks a shared catalogue assignment because it
+    # IS him rather than a stand-in, and because withholding a row from
+    # everyone and then not giving it to its owner reserves it for nobody --
+    # which is exactly what happened between the casting cutover and this
+    # change: Lemmy's chatterbox and dia clones sat reserved while he was cast
+    # on an ordinary librivox voice.
+    #
+    # Read off the bank, not a second table: `reserved_for` already carries
+    # the owner, and duplicating those ids into RECURRING_CHARACTER_VOICES
+    # would also break that table's own rule that its ids stay castable for
+    # everyone else.
+    owned = [e for e in (bank_entries or ())
+             if e.engine == engine
+             and str(getattr(e, "reserved_for", "") or "").strip().casefold()
+             == character_key.strip().casefold()]
+    if len(owned) > 1:
+        # Ambiguous exactly like the table path below: picking either would
+        # make the cast depend on bank file order.
+        return None, "%s has %d reserved %s rows" % (
+            character_key, len(owned), engine)
+    if owned:
+        return _deliver(owned[0], owned[0].voice_ref_id)
+
     voice_ref_id = recurring_character_voice(character_key, engine)
     if not voice_ref_id:
         return None, "no %s mapping for %s" % (engine, character_key)
@@ -328,10 +382,7 @@ def _recurring_character_bank_ref(entry, engine, bank_entries, language):
         return None, "%s/%s matched %d bank rows" % (
             engine, voice_ref_id, len(matches))
 
-    ref = matches[0]
-    if not voice_speaks_language(ref, language):
-        return None, "%s does not speak %s" % (voice_ref_id, language)
-    return ref, ""
+    return _deliver(matches[0], voice_ref_id)
 
 class CastLock:
     """Registered as ``OTR_CastLock``. Single v2 ledger authority."""
@@ -1539,22 +1590,32 @@ class CastLock:
         every assignment would miss while the report said nothing was claimed.
         `lock()` has already turned "auto" into a concrete engine before here.
 
-        THE BANK LOADS LAZILY, and only when a registered row and a mapped engine
-        actually need it. The dormant case -- no recurring character in the cast,
-        or an engine with no mapping -- stays free of bank I/O, which is what it
-        was before this existed.
+        THE BANK LOADS LAZILY, when a registered row is present. The dormant
+        case -- no recurring character in the cast at all -- stays free of bank
+        I/O, which is what it was before this existed. It deliberately does NOT
+        also require the catalogue table to name the engine: a character can be
+        delivered by a RESERVED bank row that the table never mentions, and
+        checking the table here is what hid that path from this mode until
+        2026-09-24.
+
+        THE COST THAT BUYS, stated rather than glossed: a cast that DOES name a
+        recurring character now loads the bank even on an engine that can never
+        deliver one -- bark, which has no bank rows and no table mapping. The
+        old pre-filter skipped that read. It is one bank load, the row is
+        unchanged either way, and the miss is still reported; the trade is a
+        redundant read in one case against a silently unreachable code path in
+        three, which is the bug this replaced.
         """
         try:
-            from ..config.cast_pools import (
-                recurring_character_key, recurring_character_voice)
+            from ..config.cast_pools import recurring_character_key
         except ImportError:  # pragma: no cover -- flat-import harnesses
             try:
                 from config.cast_pools import (  # type: ignore
-                    recurring_character_key, recurring_character_voice)
+                    recurring_character_key)
             except ImportError:
                 try:
                     from cast_pools import (  # type: ignore
-                        recurring_character_key, recurring_character_voice)
+                        recurring_character_key)
                 except ImportError:
                     return 0
 
@@ -1562,17 +1623,19 @@ class CastLock:
         if not engine:
             return 0
 
-        # Which rows want an assignment, before paying for a bank load.
+        # WHICH ROWS NAME A RECURRING CHARACTER -- and nothing more than that.
+        # This used to also ask the catalogue table for a voice and drop any row
+        # it could not answer for, which made it a SECOND resolver: when
+        # `_recurring_character_bank_ref` learned that a reserved bank row is an
+        # assignment, this filter did not, so on the clone engines the row was
+        # dropped here and the reserved scan never ran. One resolver decides.
         wanted = []
         for entry in cast:
             if not isinstance(entry, dict) or _is_announcer_entry(entry):
                 continue
             key = recurring_character_key(entry)
-            if not key:
-                continue
-            voice_ref_id = recurring_character_voice(key, engine)
-            if voice_ref_id:
-                wanted.append((entry, key, voice_ref_id))
+            if key:
+                wanted.append((entry, key))
         if not wanted:
             return 0
 
@@ -1590,7 +1653,7 @@ class CastLock:
             return 0
 
         changed = 0
-        for entry, key, voice_ref_id in wanted:
+        for entry, _key in wanted:
             ref, miss = _recurring_character_bank_ref(
                 entry, engine, bank_entries, language)
             if ref is None:

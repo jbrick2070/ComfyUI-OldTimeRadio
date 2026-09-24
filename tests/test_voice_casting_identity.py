@@ -288,11 +288,13 @@ def test_a_provider_assignment_reaches_the_provider_voice_id(assign):
         "the provider identity reached neither field: %r" % (row,))
 
 
+@pytest.mark.parametrize("policy", ["auto_registry", "preserve_ledger"])
 @pytest.mark.parametrize("engine,ref", [
     ("kokoro", KOKORO_REF),
     ("cloud_elevenlabs", PROVIDER_REF),
 ])
-def test_a_locked_row_sheds_every_retired_route_field(assign, engine, ref):
+def test_a_locked_row_sheds_every_retired_route_field(assign, engine, ref,
+                                                      policy):
     """Seeded, then cleared. The seeding is the entire point.
 
     THE FIELD NAMES ARE THE REAL ONES, and getting them wrong is how the first
@@ -318,7 +320,7 @@ def test_a_locked_row_sheds_every_retired_route_field(assign, engine, ref):
     # The seeded row must really carry them, or this proves nothing.
     assert all(k in cast[1] for k in retired), cast[1]
 
-    rows = _lock_recurring_row(assign, engine, ref, cast=cast)
+    rows = _lock_recurring_row(assign, engine, ref, cast=cast, policy=policy)
     row = rows["c02"]
     survivors = [k for k in retired if k in row]
     assert not survivors, (
@@ -338,11 +340,25 @@ def test_the_retired_field_list_here_matches_the_one_the_code_clears():
     """
     from nodes.cast_lock import _STALE_IDENTITY_FIELDS
 
-    for name in ("lemmy_route_tier", "lemmy_route_id",
-                 "lemmy_route_reason_code", "voice_route"):
-        assert name in _STALE_IDENTITY_FIELDS, (
-            "%r is no longer cleared by cast_lock, so a row re-locked today "
-            "would keep it" % (name,))
+    # THE EXACT SET, not a subset. Asserting "these four are present" lets the
+    # tuple grow an eighth name that no test has ever seen cleared, which is
+    # how a list-versus-list pin quietly stops being one.
+    assert set(_STALE_IDENTITY_FIELDS) == {
+        # engine-specific identity a re-cast row must not keep
+        "voice_ref_path",
+        "ref_path",
+        "provider_voice_id",
+        # the retired route vocabulary, spelled as literals in both places
+        # because the module that defined them is deleted
+        "voice_route",
+        "lemmy_route_tier",
+        "lemmy_route_id",
+        "lemmy_route_reason_code",
+    }, (
+        "the cleared-field set moved. Add the new name to the seeded row in "
+        "test_a_locked_row_sheds_every_retired_route_field as well, or it is "
+        "cleared by code that no test ever watches clear it: %r"
+        % (sorted(_STALE_IDENTITY_FIELDS),))
 
 
 # ---------------------------------------------------------------------------
@@ -464,6 +480,115 @@ def test_only_the_owned_recording_is_reserved_not_the_borrowed_catalogue():
     for borrowed in ("bm_george", "el_daniel", "gt_algenib"):
         assert borrowed not in reserved, (
             "%r is a SHARED catalogue voice and must stay castable" % borrowed)
+
+
+# ---------------------------------------------------------------------------
+# 7. A RESERVATION REACHES ITS OWNER.
+#
+# Section 6 proves the clone is withheld from everybody else. That is only half
+# of a reservation, and for a while it was the only half that was true: between
+# the casting cutover and 2026-09-24 Lemmy's chatterbox and dia clones were
+# withheld from every other character AND never delivered to him, so he was cast
+# on an ordinary librivox voice while his own recording sat reserved for nobody.
+# Measured against the pre-cutover commit, not inferred.
+# ---------------------------------------------------------------------------
+
+_CLONE_ENGINES = ("indextts2", "chatterbox", "dia")
+
+
+@pytest.mark.parametrize("policy", ["auto_registry", "preserve_ledger"])
+@pytest.mark.parametrize("engine", _CLONE_ENGINES)
+def test_the_reserved_recording_is_delivered_to_the_character_it_names(
+        engine, policy):
+    """His own voice, on every engine that has a recording of it, in BOTH modes.
+
+    No `assign` fixture here on purpose: the whole point is that this works
+    from the BANK's `reserved_for`, with nothing in the catalogue table naming
+    these ids. `recurring_character_voice("LEMMY", "indextts2")` returns "" and
+    must keep doing so -- the table holds shared rows only.
+
+    THE POLICY PARAMETER IS NOT DECORATION. The first version of this test ran
+    auto_registry only, and preserve_ledger -- which is `lock()`'s own default
+    -- still had the whole bug: its pre-filter asked the catalogue table before
+    the reserved scan could run, so on these three engines the row was dropped
+    and Lemmy came back with no voice at all. A fix proven in one mode of a
+    two-mode switch is proven in half the product.
+    """
+    from nodes._otr_voice_bank import load_voice_bank
+
+    bank = load_voice_bank()[0]
+    owned = [e for e in bank
+             if e.engine == engine
+             and str(getattr(e, "reserved_for", "") or "").strip().casefold()
+             == RECURRING.casefold()]
+    assert len(owned) == 1, (
+        "expected exactly one %s row reserved for %s, found %d"
+        % (engine, RECURRING, len(owned)))
+
+    out = CastLock().lock(
+        script_json=_ledger(), voice_bank="default_clean",
+        char_voice_engine=engine, cast_voice_policy=policy)[0]
+    row = _rows(out)["c02"]
+    assert row.get("voice_ref_id") == owned[0].voice_ref_id, (
+        "%s was cast on %r while his own reserved %s recording %r went to "
+        "nobody -- a reservation that never reaches its owner withholds a "
+        "voice from everyone"
+        % (RECURRING, row.get("voice_ref_id"), engine, owned[0].voice_ref_id))
+
+
+@pytest.mark.parametrize("policy", ["auto_registry", "preserve_ledger"])
+def test_the_reservation_outranks_a_catalogue_assignment(assign, policy):
+    """When both exist, his own recording wins.
+
+    Seeded by pointing the TABLE at a shared row on an engine where he also
+    owns a reserved one. The shared row is a stand-in; the recording is him.
+    """
+    from nodes._otr_voice_bank import load_voice_bank
+
+    bank = load_voice_bank()[0]
+    owned = next(e for e in bank
+                 if e.engine == "chatterbox"
+                 and str(getattr(e, "reserved_for", "") or "").strip().casefold()
+                 == RECURRING.casefold())
+    stand_in = next(e for e in bank
+                    if e.engine == "chatterbox"
+                    and e.voice_ref_id != owned.voice_ref_id
+                    and not str(getattr(e, "reserved_for", "") or "").strip())
+
+    rows = _lock_recurring_row(assign, "chatterbox", stand_in.voice_ref_id,
+                               policy=policy)
+    assert rows["c02"].get("voice_ref_id") == owned.voice_ref_id, (
+        "the catalogue stand-in %r beat his own recording %r"
+        % (stand_in.voice_ref_id, owned.voice_ref_id))
+
+
+def test_an_ambiguous_reservation_refuses_rather_than_guessing(monkeypatch):
+    """Two rows reserved for one character on one engine is a broken bank.
+
+    Picking either would make the cast depend on file order, which is the same
+    reasoning the exactly-one-match rule uses on the catalogue path. The row
+    falls through to the ordinary draw and the report says why.
+    """
+    from nodes import cast_lock as CL
+    from nodes._otr_voice_bank import load_voice_bank
+
+    bank = list(load_voice_bank()[0])
+    owned = next(e for e in bank
+                 if e.engine == "chatterbox"
+                 and str(getattr(e, "reserved_for", "") or "").strip().casefold()
+                 == RECURRING.casefold())
+    import dataclasses
+
+    twin = dataclasses.replace(owned,
+                               voice_ref_id=owned.voice_ref_id + "_twin")
+    assert twin.voice_ref_id != owned.voice_ref_id, (
+        "the twin is not distinct, so this would be testing one row twice")
+
+    ref, miss = CL._recurring_character_bank_ref(
+        {"char_id": "c02", "name": RECURRING}, "chatterbox",
+        bank + [twin], "en")
+    assert ref is None, "an ambiguous reservation was resolved to %r" % (ref,)
+    assert "reserved" in miss, miss
 
 
 if __name__ == "__main__":

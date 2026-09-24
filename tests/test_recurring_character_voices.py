@@ -187,9 +187,44 @@ def test_the_helpers_never_name_a_character_in_their_own_source():
             "list of things the code already knows" % fn.__name__)
 
 
-if __name__ == "__main__":
-    import sys
-    sys.exit(pytest.main([__file__, "-v"]))
+
+#: A ledger with no cast at all -- the reference answer every "this row must
+#: not be fingerprinted" assertion is compared against.
+_NO_CAST = {"meta": {"episode_seed": 42}, "cast": [], "lines": []}
+
+
+def _is_changed(ledger, engine="kokoro"):
+    """IS_CHANGED for a ledger dict, as a comparable value.
+
+    COMPARED AGAINST A SIBLING CALL, NEVER AGAINST THE LITERAL "static".
+    IS_CHANGED returns "static" only when the selected rows AND the engine's
+    render-time params are both empty, and kokoro's params are empty only on
+    the torch backend -- under ONNX it carries the model's size and mtime. An
+    oracle of `== "static"` therefore passes on this box and fails on a
+    portable one for a reason that has nothing to do with row selection.
+    Comparing two ledgers at the SAME engine cancels that term entirely.
+
+    AND IT REFUSES A CACHE-ENABLED ENGINE, loudly. IS_CHANGED returns NaN
+    unconditionally when the resolved profile has `use_cache`, and NaN != NaN --
+    so two sides that are both "always rerun" would compare UNEQUAL and every
+    caller's assertion would fail for a reason unrelated to what it tests. Only
+    the two google_tts profiles opt in today, so no current caller reaches it;
+    this raises rather than waiting for someone to point the helper at one and
+    spend an afternoon on a red test that is telling the truth.
+    """
+    import math
+
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    out = BatchCharacterVoices.IS_CHANGED(
+        script_json=json.dumps(ledger), engine=engine)
+    if isinstance(out, float) and math.isnan(out):
+        raise AssertionError(
+            "IS_CHANGED returned NaN for engine %r, which means its profile "
+            "has use_cache set. This helper compares two calls for equality "
+            "and NaN never equals NaN, so the comparison would be meaningless. "
+            "Use a cache-disabled engine." % (engine,))
+    return out
 
 
 # ---------------------------------------------------------------------------
@@ -255,20 +290,16 @@ def test_an_announcer_sharing_the_recurring_voice_is_still_excluded():
     for a name the table does not list. It pins the OUTCOME, which is the thing
     that matters to the graph. The test below is the one that pins the guard.
     """
-    from nodes.batch_character_voices import BatchCharacterVoices
-
-    shared = "bm_george"
-    announcer_only = json.dumps({
+    announcer_only = {
         "meta": {"episode_seed": 42},
         "cast": [
             {"char_id": "c01", "name": "MONTY", "gender": "male"},
             {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
-             "voice_ref_id": shared, "voice_engine": "kokoro"},
+             "voice_ref_id": "bm_george", "voice_engine": "kokoro"},
         ],
         "lines": [],
-    })
-    assert BatchCharacterVoices.IS_CHANGED(
-        script_json=announcer_only, engine="kokoro") == "static", (
+    }
+    assert _is_changed(announcer_only) == _is_changed(_NO_CAST), (
         "an ANNOUNCER holding a shared catalogue voice was fingerprinted; it "
         "is a role, not a recurring character")
 
@@ -295,17 +326,19 @@ def test_the_announcer_is_excluded_even_if_the_table_names_him(monkeypatch):
     `test_only_the_recurring_row_takes_the_assignment`; this pins the probe's
     half, and it FAILS if the guard is removed from the selection.
     """
-    from nodes.batch_character_voices import BatchCharacterVoices
-
     monkeypatch.setattr(
         "config.cast_pools.RECURRING_CHARACTER_VOICES",
         {"ANNOUNCER": {"kokoro": "bm_george"}})
 
     row = {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
            "voice_ref_id": "bm_george", "voice_engine": "kokoro"}
-    led = json.dumps({"meta": {"episode_seed": 42}, "cast": [row], "lines": []})
-    assert BatchCharacterVoices.IS_CHANGED(
-        script_json=led, engine="kokoro") == "static", (
+    led = {"meta": {"episode_seed": 42}, "cast": [row], "lines": []}
+    assert _is_changed(led) == _is_changed(_NO_CAST), (
         "IS_CHANGED fingerprinted the announcer while casting refuses to "
         "stamp him -- the cache key now covers a different set of rows than "
         "casting actually writes")
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(pytest.main([__file__, "-v"]))
