@@ -270,13 +270,50 @@ class TestStampAssertion:
             node.validate(str(_DEFAULT_WORKFLOW_PATH), False, False,
                           profile_id="16gb_full")
 
-    def test_unknown_profile_id_aborts_naming_known(self, monkeypatch):
+    def test_an_unknown_profile_id_WARNS_AND_LETS_THE_WORKFLOW_RUN(
+            self, monkeypatch, caplog):
+        """Operator, 2026-09-23: "just let the workflow run".
+
+        THIS TEST USED TO ASSERT THE OPPOSITE, and the reversal is the point. It
+        was `test_unknown_profile_id_aborts_naming_known` and it required a
+        ValueError naming the known profiles -- so an unreadable or missing
+        profile JSON killed the prompt before a single model loaded.
+
+        That was the wrong trade. The profile is METADATA about the host;
+        everything the render needs is already baked into the graph's widget
+        values by `build_variants`. There is no silent wrong render being
+        prevented here, only an unperformed courtesy check -- so the old
+        behaviour cost a user their whole run to protect them from nothing.
+
+        What the validator still does is warn, and say what was skipped.
+        """
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host()))
         node = WorkflowValidator()
-        with pytest.raises(ValueError, match="16gb_full"):
+        with caplog.at_level("WARNING", logger="OTR.workflow_validator"):
+            out = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
+                                profile_id="no_such_tier")
+        assert out is not None, "the workflow must still run"
+        assert any("no_such_tier" in r.getMessage() for r in caplog.records), (
+            "the skip must be announced, naming the profile it could not load; "
+            "got %r" % [r.getMessage() for r in caplog.records])
+        assert any("CONTINUING" in r.getMessage() for r in caplog.records), (
+            "the warning must say plainly that the render is proceeding")
+
+    def test_a_REAL_mismatch_still_aborts_when_the_profile_does_load(
+            self, monkeypatch):
+        """Narrowing one branch must not have narrowed the guard.
+
+        A profile that loads and does not fit the machine is a different thing
+        from a profile that cannot be read: there the alternative IS a wrong
+        render, on the wrong device, so the abort is worth it and stays.
+        """
+        monkeypatch.setattr(WorkflowValidator, "_detect_host",
+                            staticmethod(lambda: _host(has_cuda=False)))
+        node = WorkflowValidator()
+        with pytest.raises(ValueError, match="validate_anyway never skips"):
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                          profile_id="no_such_tier")
+                          profile_id="16gb_full")
 
     def test_is_changed_varies_on_stamp(self):
         a = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,

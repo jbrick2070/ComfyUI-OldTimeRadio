@@ -483,10 +483,69 @@ class WorkflowValidator:
         try:
             profile = load_profile(profile_id)
         except ProfileError as e:
-            raise ValueError(
-                f"OTR_WorkflowValidator: stamped profile_id {profile_id!r} "
-                f"failed to load: {e}") from e
+            # A MISSING PROFILE LETS THE WORKFLOW RUN (operator, 2026-09-23:
+            # "just let the workflow run").
+            #
+            # This used to raise, which aborted the prompt before any model
+            # loaded. That was the wrong trade: the profile is METADATA about
+            # the host, and everything the render actually needs is already
+            # baked into the graph's own widget values by `build_variants`. So a
+            # missing or unreadable profile JSON cost the user their entire run
+            # to protect them from nothing -- there is no silent wrong render
+            # here, only an unperformed courtesy check.
+            #
+            # WHAT IS LOST when it cannot load, stated so nobody assumes
+            # otherwise: the host-reality warnings below. A CUDA lane on a
+            # machine with no CUDA, an MPS lane with no MPS, a vendor-pinned
+            # lane on the other vendor and a platform mismatch will no longer be
+            # named up front -- they will surface later, as the real failure at
+            # the real node. That is a worse error message and an acceptable
+            # price for not destroying a run over a metadata file.
+            #
+            # WHEN THE PROFILE *DOES* LOAD, EVERY CHECK BELOW STILL BITES and
+            # still aborts. This narrows one branch -- file unreadable -- not the
+            # guard. The distinction matters: catching a real mismatch is worth
+            # the abort, because the alternative there IS a wrong render.
+            log.warning(
+                "OTR_WorkflowValidator: stamped profile_id %r could not be "
+                "loaded (%s); CONTINUING without the host-reality checks. The "
+                "graph's own widget values are what drive the render, so this "
+                "does not change what is produced -- but a device or platform "
+                "mismatch will now fail later, at the node that needs it, "
+                "instead of here with a suggestion.", profile_id, e)
+            profile = None
 
+        # THE MASTER-HASH CHECK BELOW STILL RUNS EITHER WAY, and that is why
+        # this is a `None` rather than an early return. An earlier cut of this
+        # returned here and would have skipped the drift tripwire -- the guard
+        # whose own comment records that "a hand-edited variant sailed through"
+        # before it existed. A missing profile is a reason to skip the host
+        # courtesy checks; it is not a reason to stop checking that the graph is
+        # the graph we emitted.
+        problems = []
+        if profile is not None:
+            problems = self._host_reality_problems(profile, profile_id)
+        if problems:
+            raise ValueError(
+                "OTR_WorkflowValidator: STAMP ASSERTION FAILED (the stamped "
+                "snapshot does not fit this machine; validate_anyway never "
+                "skips this):\n  " + "\n  ".join(problems))
+
+        return self._assert_master_hash(workflow_json_path, master_hash,
+                                        profile_id, generated_by)
+
+    def _host_reality_problems(self, profile, profile_id: str) -> list:
+        """Every way this profile does not fit the machine it is running on.
+
+        Split out of ``_assert_stamp`` so the caller can skip it when the
+        profile could not be read while still running the drift tripwire. The
+        checks themselves are unchanged and still abort the prompt: a real
+        mismatch is worth the abort, because the alternative there IS a wrong
+        render on the wrong device.
+        """
+        from ._otr_shared.boot_contracts import (
+            BootContractError, assert_running_server, contract_for_profile,
+        )
         host = self._detect_host()
         problems = []
         if profile["device_backend"] == "cuda" and not host["has_cuda"]:
@@ -519,12 +578,16 @@ class WorkflowValidator:
             assert_running_server(contract_for_profile(profile))
         except BootContractError as exc:
             problems.append(str(exc))
-        if problems:
-            raise ValueError(
-                "OTR_WorkflowValidator: STAMP ASSERTION FAILED (the stamped "
-                "snapshot does not fit this machine; validate_anyway never "
-                "skips this):\n  " + "\n  ".join(problems))
+        return problems
 
+    def _assert_master_hash(self, workflow_json_path: str, master_hash: str,
+                            profile_id: str, generated_by: str) -> str:
+        """The drift tripwire and the runtime export.
+
+        Split out of ``_assert_stamp`` alongside ``_host_reality_problems`` so a
+        profile that cannot be read stops the courtesy checks WITHOUT stopping
+        this one. Unchanged otherwise.
+        """
         # S5 drift tripwire: the stamped master_hash must MATCH the live
         # semantic hash of the workflow file (node types + links + the
         # profile-MANAGED widget set; creative widgets + the stamps
