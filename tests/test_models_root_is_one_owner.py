@@ -98,11 +98,17 @@ def test_the_module_sits_where_its_file_arithmetic_assumes():
         "calls up from __file__ to reach ComfyUI's models/ beside "
         "custom_nodes/; moving this file changes that answer silently. Got %r"
         % here)
-    walked = os.path.dirname(os.path.dirname(os.path.dirname(here)))
+    # THREE HERE IS NOT STEP 4'S FOUR, and the collision of those two numbers
+    # is how the off-by-one survived. Three levels up from the module reaches
+    # the directory HOLDING this pack -- custom_nodes/ -- which is the only
+    # thing this test is about. Step 4 walks one further, to the ComfyUI root;
+    # that level is pinned by
+    # test_step_4_resolves_the_comfy_models_dir_not_one_inside_custom_nodes.
+    holding = os.path.dirname(os.path.dirname(os.path.dirname(here)))
     repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    assert walked == os.path.dirname(repo), (
-        "the three-dirname walk should land on the directory holding this "
-        "pack; got %r for a repo at %r" % (walked, repo))
+    assert holding == os.path.dirname(repo), (
+        "this module should sit two levels below the directory holding the "
+        "pack; got %r for a repo at %r" % (holding, repo))
 
 
 def test_step_4_resolves_the_comfy_models_dir_not_one_inside_custom_nodes(
@@ -137,6 +143,18 @@ def test_step_4_resolves_the_comfy_models_dir_not_one_inside_custom_nodes(
     right = os.path.join(up, "models")            # <comfy>/models
     wrong = os.path.join(os.path.dirname(here), "..", "..", "models")
     wrong = os.path.normpath(wrong)               # <comfy>/custom_nodes/models
+
+    # A CHECKOUT SHALLOW ENOUGH THAT dirname() HITS A DRIVE ROOT collapses the
+    # two candidates into one path, and this test would then FAIL on correct
+    # code -- a false CI failure, reproduced by a QA pass in a worktree two
+    # levels below a drive root. No real deployment is that shallow: the 5080,
+    # the 4060 and the pod layouts are all far deeper. Skipping is the honest
+    # answer, because the test genuinely cannot discriminate there and should
+    # say so rather than report a defect that is not present.
+    if os.path.normpath(right) == os.path.normpath(wrong):
+        pytest.skip(
+            "checkout too shallow to tell the two candidates apart (%r); this "
+            "test cannot discriminate at a drive root" % right)
 
     for key in _ENV:
         monkeypatch.delenv(key, raising=False)
