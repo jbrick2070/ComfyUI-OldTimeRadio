@@ -454,7 +454,7 @@ def models_root() -> str:
     if here not in sys.path:
         sys.path.insert(0, here)
     try:
-        from nodes._otr_gguf_backend import _models_root
+        from nodes._otr_models_root import _models_root
         return str(_models_root())
     except Exception:
         pass

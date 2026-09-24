@@ -153,8 +153,9 @@ def resolve_voice_ref_path(ref):
             "OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")):
         # Delegate precedence and expansion to the pack's one models-root
         # authority. This is lazy so ordinary audio imports stay side-effect
-        # free and the GGUF backend is not imported when no override exists.
-        from .._otr_gguf_backend import _models_root
+        # free: asking where the weights live must never pull in a model
+        # library, and this module's own cold-import test depends on it.
+        from .._otr_models_root import _models_root
         # An explicit root is EXCLUSIVE, not merely the first candidate. If its
         # file is missing, return that named absolute miss so the caller fails
         # loudly instead of opening a plausible stale reference elsewhere.

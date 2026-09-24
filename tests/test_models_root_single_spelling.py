@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes import _otr_gguf_backend as gguf
+from nodes import _otr_models_root as gguf
 from nodes._otr_video_engines import wan_shared as ws
 
 _ENV = ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")

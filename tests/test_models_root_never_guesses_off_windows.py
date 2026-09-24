@@ -33,7 +33,7 @@ import pathlib
 
 import pytest
 
-from nodes import _otr_gguf_backend as g
+from nodes import _otr_models_root as g
 
 
 def test_an_explicit_env_var_always_wins(monkeypatch, tmp_path):

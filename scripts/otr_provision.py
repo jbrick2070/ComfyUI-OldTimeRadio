@@ -257,7 +257,7 @@ def models_root(comfy: str) -> str:
     # On a fresh Linux box that literal is a RELATIVE directory name, and this
     # function would accept it as a successful answer.
     code = ("import sys;sys.path.insert(0,%r);sys.path.insert(0,%r)" + chr(10) +
-            "from nodes._otr_gguf_backend import _models_root" + chr(10) +
+            "from nodes._otr_models_root import _models_root" + chr(10) +
             "print(_models_root())" + chr(10)) % (_REPO, comfy)
     r = run([sys.executable, "-c", code], cwd=os.path.dirname(_REPO))
     if r.returncode == 0 and r.stdout.strip():

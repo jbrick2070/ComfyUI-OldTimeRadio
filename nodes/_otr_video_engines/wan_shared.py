@@ -60,9 +60,9 @@ def configured_models_root():
     module's cold-import statement above stays true.
     """
     try:
-        from .._otr_gguf_backend import _models_root
+        from .._otr_models_root import _models_root
     except ImportError:  # pragma: no cover -- flat (sys.path) test import
-        from _otr_gguf_backend import _models_root  # type: ignore
+        from _otr_models_root import _models_root  # type: ignore
     return str(_models_root())
 
 
