@@ -286,3 +286,61 @@ def test_a_key_a_row_omits_follows_the_canonical(pid, probe_key, matrix, modules
         "The canonical was moved to %r and the row rendered %r instead -- something "
         "is re-pinning an omitted key from a stored copy."
         % (pid, probe_key, sentinel, got))
+
+@pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
+    MATRIX_PATH.read_text(encoding="utf-8"))["rows"]])
+def test_resolved_values_are_already_in_profile_form(pid, modules, canonical):
+    """ONE SPELLING OUT OF `resolved_profile`, WHICHEVER BRANCH ANSWERED.
+
+    It has two: a value the row STATES, and a value inherited from the canonical.
+    They must agree on spelling, or a caller gets `ltx25_high_video` or
+    `ltx25_video` for the same engine depending on something it cannot see. That was
+    a real defect, and every test passed through it because every engine key is a key
+    indicator -- so every row states one, and the inherited branch never fired.
+
+    Rather than contriving a row that inherits an engine, this pins a property of the
+    ANSWER: the output is already in profile form, so projecting it again is a no-op.
+    A branch that skips the projection fails here for any value the projection would
+    have changed, with no special fixture needed.
+    """
+    _, _, wa = modules
+    logging.disable(logging.CRITICAL)
+    try:
+        resolved = wa.resolved_profile(pid, canonical)
+        flat = wa._flatten_profile_values(resolved)
+    finally:
+        logging.disable(logging.NOTSET)
+
+    drifting = {k: (v, wa._to_profile_form(v)) for k, v in flat.items()
+                if wa._to_profile_form(v) != v}
+    assert not drifting, (
+        "row %s resolves %d value(s) that are not in profile form -- applying the "
+        "projection again changes them, which means one branch of resolved_profile "
+        "skipped it and the two branches disagree on spelling:\n  %s"
+        % (pid, len(drifting),
+           "\n  ".join("%s: %r -> %r" % (k, a, b) for k, (a, b) in sorted(drifting.items()))))
+
+
+def test_the_profile_form_projection_is_idempotent_and_keeps_public_spellings():
+    """`_to_profile_form` strips a COMBO label and nothing else.
+
+    It deliberately does NOT apply `resolve_engine_id`, which maps public spellings to
+    internal ones. Public is what rows state and what a person picks in the dropdown,
+    so keeping it is what lets the generated docs read like the menu. The consumer
+    that genuinely wants internal ids resolves them itself.
+    """
+    from nodes import _otr_workflow_apply as wa
+
+    # A stored COMBO label loses its parenthetical; the bare value is untouched.
+    assert wa._to_profile_form(
+        "Qwen/Qwen3.5-4B (8.7 GB download, mac16-tight nv8-nf4 nv16 nv24)"
+    ) == "Qwen/Qwen3.5-4B"
+    assert wa._to_profile_form("Qwen/Qwen3.5-4B") == "Qwen/Qwen3.5-4B"
+
+    # THE PUBLIC ALIAS SURVIVES. `resolve_engine_id` would make this ltx25_video.
+    assert wa._to_profile_form("ltx25_high_video") == "ltx25_high_video"
+
+    # Idempotent, and non-strings pass straight through.
+    for value in ("viz_camera", "kokoro", 25, 6.8, True, None, ["a"]):
+        assert wa._to_profile_form(value) == value
+        assert wa._to_profile_form(wa._to_profile_form(value)) == wa._to_profile_form(value)

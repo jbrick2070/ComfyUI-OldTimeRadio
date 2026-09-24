@@ -1185,8 +1185,12 @@ def _profile_engines(profile_id: str) -> set:
     Reads the workflow matrix via `resolved_profile`, so a row that INHERITS a lane
     from the canonical still reports it. Reading the raw row would under-report
     exactly the lanes a row does not override, which is the opposite of what this
-    function is for. `resolved_profile` already returns internal ids, which is what
-    the caller wants.
+    function is for.
+
+    `resolved_profile` returns the PUBLIC spelling -- it deliberately does not apply
+    `resolve_engine_id` -- so the resolution to internal ids below is this function's
+    own job and not a duplicate of something already done. An earlier version of this
+    comment claimed the opposite and was wrong.
     """
     # This script imports pack modules by FILE PATH (see `_load`) and never puts
     # the repo root on sys.path, so a `nodes.` package import needs it added here.

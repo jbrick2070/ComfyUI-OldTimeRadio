@@ -427,18 +427,25 @@ def widget_value_by_name(target_node: dict, widget_name: str,
 
 
 def _to_profile_form(value: Any) -> Any:
-    """A graph value projected back to the spelling a profile uses.
+    """A value in the spelling a profile row uses. Idempotent; non-strings pass through.
 
-    The graph stores COMBO labels; a profile stores bare ids. Both inverses are
-    idempotent and are the same ones the WRITE path applies, so this cannot drift
-    from emitting. Non-strings pass straight through.
+    The graph stores COMBO labels -- 'Qwen/Qwen3.5-4B (8.7 GB download, ...)' -- where a
+    row states the bare value, so `_strip_label_suffix` (documented "IDEMPOTENT AND
+    BACKWARD-COMPATIBLE") is the inverse that matters. It is the same one the WRITE path
+    applies, so this cannot drift from emitting.
+
+    IT DELIBERATELY DOES NOT CALL `resolve_engine_id`. That maps PUBLIC spellings to
+    INTERNAL ones (`ltx25_high_video` -> `ltx25_video`), and applying it here made
+    `resolved_profile` answer in two different spellings depending on whether a row
+    stated a key or inherited it. Public is the right one to keep: it is what rows
+    state, it is what a person picks in the dropdown so the generated docs read like
+    the menu, and the one consumer that wants internal ids
+    (`otr_dropdown_matrix._profile_engines`) resolves them itself.
     """
     if not isinstance(value, str):
         return value
     from ._otr_model_catalog import _strip_label_suffix
-    from ._otr_shared.public_engines import resolve_engine_id
-    stripped = _strip_label_suffix(value)
-    return resolve_engine_id(stripped) or stripped
+    return _strip_label_suffix(value)
 
 
 def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
@@ -477,7 +484,10 @@ def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
     out: dict = {}
     for dotted, entry in (mapping.get("managed") or {}).items():
         if dotted in stated:
-            first = stated[dotted]
+            # Through the SAME projection as the inherited branch below. Returning a
+            # stated value verbatim while projecting an inherited one gave the two
+            # branches different spellings for the same engine.
+            first = _to_profile_form(stated[dotted])
         else:
             values = []
             for node_type, widget in entry["targets"]:

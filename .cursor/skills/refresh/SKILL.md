@@ -23,7 +23,7 @@ python .cursor/skills/refresh/scripts/brief.py
 
 Canonical VideoDirector pins, every `SHIPPING_SET` local graph, every cloud graph (act count, writer, video, still).
 
-2. Read only if the brief is incomplete: `docs/TIER_MATRIX.md` (profiles win), `apple/VIDEO_MODELS.md` families, `scripts/build_variants.py` `SHIPPING_SET`.
+2. Read only if the brief is incomplete: `config/workflow_matrix.json` (the one source; TIER_MATRIX.md was retired 2026-09-24), `apple/VIDEO_MODELS.md` families, `scripts/build_variants.py` `SHIPPING_SET`.
 
 3. Generate a 16:9 Grok image (`GenerateImage`).
    - `filename`: `otr-video-lane-ecosystem.png`

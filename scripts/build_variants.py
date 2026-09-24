@@ -443,14 +443,18 @@ def cmd_regenerate_docs() -> int:
     for label, script in DOC_GENERATORS:
         path = REPO / "scripts" / script
         if not path.exists():
-            print(f"  SKIP  {label} ({script} is not present)")
+            # A FAILURE, not a note. A renamed or moved generator would otherwise do
+            # nothing quietly -- the same shape as the tier generator that sat dead
+            # for weeks while its doc froze four workflows behind.
+            failures.append((script, "not present"))
+            print(f"  FAIL  {label} -- {script} is not present")
             continue
         proc = subprocess.run([sys.executable, str(path)],
                               capture_output=True, text=True)
         if proc.returncode == 0:
             print(f"  OK    {label}")
         else:
-            failures.append((script, proc.returncode))
+            failures.append((script, "exit %d" % proc.returncode))
             tail = (proc.stdout + proc.stderr).strip().splitlines()
             why = tail[-1] if tail else "(no output)"
             print(f"  FAIL  {label} -- {script} exit {proc.returncode}: {why}")
@@ -548,7 +552,13 @@ def main(argv=None) -> int:
         ids = [p for p in _committed_profile_ids() if p not in LANE_PRESETS]
         rc = cmd_emit(ids, explicit=False)
         if not args.no_docs:
-            cmd_regenerate_docs()
+            doc_rc = cmd_regenerate_docs()
+            # The graphs are already written and correct, so a doc failure must not
+            # turn a good tree red -- but it must not vanish either. Reported through
+            # the exit code only when the EMIT itself was clean, so the louder
+            # failure still wins.
+            if rc == 0:
+                rc = doc_rc
         return rc
     return cmd_emit([s.strip() for s in args.profiles.split(",") if
                      s.strip()], explicit=True)
