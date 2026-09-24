@@ -757,10 +757,16 @@ canonical ships:
 - **Artifacts that are not on this machine.** Some receipts cite audition
   wavs under `otr/episodes/lemmy_cross_engine/` by hash. The files were
   removed from the maintainer's output tree and the receipts still name them.
-- **The portable voice bank.** Its route tests expect a generic Lemmy to be
-  cast on the portable IndexTTS2 route when his qualified route is
-  unavailable; he is cast on a kokoro voice instead. This predates the
-  language work and has not been diagnosed.
+- **The portable voice bank.** Four tests in
+  `tests/test_make_portable_voice_bank.py` exercise the retired voice-route
+  subsystem (`VoiceRouteError`, `approved_native_routes`,
+  `_lemmy_voice_policy`) that casting stopped consulting at the
+  recurring-character cutover. `nodes/_otr_voice_route.py` has no importers
+  left under `nodes/`, and these four tests go with it once that module is
+  deleted. Lemmy himself is cast correctly today: a bank row whose
+  `reserved_for` field names him outranks the shared catalogue entry --
+  his own recordings on indextts2/chatterbox/dia, a shared voice from
+  `RECURRING_CHARACTER_VOICES` on kokoro/cloud_elevenlabs/google_tts.
 - **Profile and sweep checks.** A few 8 GB video profiles declare a canvas
   their engine overrules, a static sweep finds LLM call sites without a slot
   tag, and the auto-download disk-space precheck reads this machine's free

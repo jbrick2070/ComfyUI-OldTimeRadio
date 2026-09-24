@@ -22,6 +22,43 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-24 -- THE PORTABLE-BANK "NOT DIAGNOSED" NOTE IS NOW EXPLAINED AND FIXED
+
+The 2026-09-20 entry below (and the README's "Known failures" section, and
+the since-deleted 2026-09-19 ship-regression note) all said the four
+`test_make_portable_voice_bank.py` route-test failures were "not diagnosed"
+and that Lemmy was cast on kokoro `bm_george` where they expect the portable
+IndexTTS2 route. Both are now resolved, in seven commits
+(`b1d522b6`..`1d5e18ff`, same day):
+
+* **The four tests are diagnosed.** They exercise the qualified voice-route
+  subsystem -- `VoiceRouteError`, `approved_native_routes`,
+  `_lemmy_voice_policy` -- that casting stopped consulting at the
+  recurring-character cutover (`b7cafcbb`). `nodes/_otr_voice_route.py` has
+  no importers left under `nodes/`; the four tests go with it once that
+  module itself is deleted, which has not happened yet -- deleting it is
+  separate work.
+* **The Lemmy regression the note also described was real, and is fixed.**
+  Between the cutover and `1d5e18ff`, Lemmy's own clone recordings on
+  indextts2/chatterbox/dia sat in the bank marked `reserved_for` him, but
+  nothing read that field, so he was cast on an ordinary drawn voice
+  instead. `1d5e18ff` added the missing rule: a bank row `reserved_for` a
+  recurring character now outranks the shared catalogue entry in
+  `RECURRING_CHARACTER_VOICES` (`config/cast_pools.py`). Lemmy is cast on
+  his own recordings on indextts2/chatterbox/dia and on a shared catalogue
+  voice on kokoro/cloud_elevenlabs/google_tts, in both casting policies,
+  today.
+* **The runtime-fingerprint staleness gate the old route subsystem used to
+  gate the indextts2 clone on was deliberately NOT reimplemented.** It
+  produced eighteen false demotions in nineteen commits and its failure
+  mode was substituting a stranger's voice, which is the opposite of what a
+  guard is for (`nodes/cast_lock.py`, `_recurring_character_bank_ref`
+  docstring). The residual risk is accepted, not overlooked.
+
+The historical entries below are left verbatim, per this file's own rule at
+the top ("Every section below is VERBATIM as it stood in the plan"); this
+section is the correction, not an edit to them.
+
 ## 2026-09-20 -- v2.3.0 IS ON THE REGISTRY, WARTS AND ALL. THE PRESET CALL IS CLOSED
 
 Operator: **"clean up the pyproject, clean up the git publishing and publish 2.3

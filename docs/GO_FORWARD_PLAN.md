@@ -109,8 +109,9 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   landed on `my_story`, two of three characters (Stomp, Whiskers) carried
   `gender: None` because the operator's story never states one -- and
   `_otr_my_story.py:26` says so on purpose ("a gender they did not state is
-  never guessed from a name"). `cast_lock.py:1282` then raises
-  `VoiceCastingError ... NO FALLBACK` for `google_tts`, where the Kokoro
+  never guessed from a name"). `cast_lock.py:1303` (citation fixed
+  2026-09-24; was `:1282`) then raises `VoiceCastingError ... NO FALLBACK`
+  for `google_tts`, where the Kokoro
   path takes the gender-agnostic draw and ships. Two rules that are each
   right collide only on this lane. The fork: (a) let `google_tts` take the
   same seeded gender-agnostic draw Kokoro takes when the SOURCE deliberately
