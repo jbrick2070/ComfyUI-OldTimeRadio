@@ -1124,6 +1124,7 @@ class CastLock:
             CASTING_POLICY_VERSION, _SEEDED_ANNOUNCER_ENGINES, VoiceCastingError,
             announcer_voice_ref, assign_voice_for_slot,
             filter_voices_for_language, gender_agnostic_fallback_ref,
+            accent_timbre_tags,
             load_voice_bank, voice_speaks_language,
             voice_ref_usage_keys,
         )
@@ -1369,6 +1370,19 @@ class CastLock:
             # any entry-level fields for legacy ledgers without the stamp.
             slot = voice_slots.get(char_id) or {}
             slot_timbre = slot.get("timbre") or entry.get("timbre") or ()
+            # THE ROW'S DECLARED ACCENT IS A TIMBRE PREFERENCE. `lemmy_row()`
+            # has stamped `accent` since it was written and no caster ever read
+            # it -- the selector scores `timbre`, so the two never met. UNIONED,
+            # not substituted: adding tags can only let a better-fitting voice
+            # win, never stop a previously-matching one from matching, and the
+            # selector's ladder drops the dimension entirely when nothing in
+            # the bank carries it. So a character whose accent no voice can
+            # speak still draws a gender-correct voice, unchanged.
+            _accent_tags = accent_timbre_tags(
+                entry.get("accent"), bank=bank_entries, engine=target_engine)
+            if _accent_tags:
+                slot_timbre = tuple(dict.fromkeys(
+                    tuple(slot_timbre) + tuple(_accent_tags)))
             slot_age = str(slot.get("age_band") or entry.get("age_band") or "")
             try:
                 if not gender:

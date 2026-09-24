@@ -547,6 +547,90 @@ def filter_voices_for_language(entries, language: str):
     return [e for e in entries if voice_speaks_language(e, language)]
 
 
+#: Accent words that name the same voice-bank timbre tag. The bank tags accents
+#: informally inside `timbre` (`british`, `bbc`, `american`), and a cast row
+#: says it in the author's words (`cockney`), so the two need a join. Kept
+#: deliberately SMALL and additive: an accent this does not recognise
+#: contributes nothing and the row simply draws as it did before.
+#:
+#: THIS CAN ONLY EVER DELIVER RP/BBC, NEVER ACTUAL COCKNEY. The bank has no
+#: `cockney` tag anywhere -- only `british` and `bbc` -- so every regional
+#: British accent collapses onto a newsreader register that is, in British
+#: usage, close to the opposite of the one the character profile names. That is
+#: forced by the bank's content rather than chosen, and it is written here so a
+#: reader does not assume a fidelity the data cannot support.
+_ACCENT_TIMBRE_ALIASES = {
+    "british": ("british", "bbc"),
+    "english": ("british", "bbc"),
+    "uk": ("british", "bbc"),
+    "cockney": ("british", "bbc"),
+    "london": ("british", "bbc"),
+    "estuary": ("british", "bbc"),
+    "rp": ("british", "bbc"),
+    "received pronunciation": ("british", "bbc"),
+    "american": ("american",),
+    "us": ("american",),
+    "midwest": ("american",),
+    "midwestern": ("american",),
+}
+
+
+def accent_timbre_tags(accent, bank=None, engine="") -> Tuple[str, ...]:
+    """Bank timbre tags expressing ``accent``, or ``()`` when none do.
+
+    A PREFERENCE, NEVER A FILTER. The caller unions the result into the timbre
+    it already has; `assign_voice_for_slot` then scores it like any other
+    timbre and its ladder drops the dimension when no candidate carries it. So
+    an accent no voice can speak still leaves a gender-correct draw -- the
+    operator's standing rule, and the behaviour `cast_lock`'s French-Hamlet
+    note records.
+
+    ONLY TAGS A VOICE **ON THIS ENGINE** CARRIES ARE RETURNED, and the engine
+    scoping is the entire point. `timbre` feeds the deterministic slot seed
+    (`stable_cast_seed`), so a tag that cannot match still changes which voice
+    is drawn. An unmatchable accent must cost NOTHING, or "the bank could not
+    help" silently becomes "we reshuffled your cast".
+
+    THE FIRST VERSION OF THIS CHECKED THE WHOLE BANK AND WAS WRONG. A word that
+    is real vocabulary on another engine -- `british`, which kokoro and the
+    cloud engines carry -- passed the check and perturbed the draw on
+    `indextts2` and `dia`, which carry no british voice of either gender.
+    Measured: eight of twelve seeds moved. "Does any voice carry this tag" was
+    never the question; "can the pool this character draws from carry it" is,
+    and they differ whenever the bank is uneven across engines, which it always
+    is.
+
+    Passing no ``engine`` keeps the old bank-wide behaviour and is only correct
+    when the caller has already narrowed ``bank``.
+
+    An accent already spelled as a bank tag is honoured as itself, so the bank
+    can grow a vocabulary without editing the alias table above.
+
+    IT IS AN "EITHER", NOT A "BOTH". The caller unions these tags with whatever
+    timbre the row already carries, and the selector scores any overlap the
+    same, so a row asking for `gravelly` AND `cockney` gets a voice matching
+    EITHER -- not one preferring both. Widening can only enlarge the eligible
+    pool, never starve it, which is the safer failure mode under the operator's
+    "never a hard fail" rule.
+    """
+    word = str(accent or "").strip().lower()
+    if not word:
+        return ()
+    wanted = _ACCENT_TIMBRE_ALIASES.get(word, (word,))
+    try:
+        entries = bank if bank is not None else load_voice_bank()[0]
+    except Exception:            # noqa: BLE001 -- an unreadable bank is not a
+        return ()                # casting failure; contribute no preference
+    want_engine = str(engine or "").strip()
+    carried = set()
+    for entry in entries or ():
+        if want_engine and str(getattr(entry, "engine", "")) != want_engine:
+            continue
+        for tag in (getattr(entry, "timbre", ()) or ()):
+            carried.add(str(tag).strip().lower())
+    return tuple(t for t in wanted if t in carried)
+
+
 def assign_voice_for_slot(
     *,
     role: str,
