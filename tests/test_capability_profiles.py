@@ -135,11 +135,58 @@ def test_v2_unknown_llm_key_rejected():
         cp.validate_profile_shape(bad)
 
 
-def test_v2_missing_section_rejected():
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
-    del bad["render"]
-    with pytest.raises(cp.ProfileError, match="missing required key"):
-        cp.validate_profile_shape(bad)
+@pytest.mark.parametrize("section", [
+    "render", "llm", "seed_policy", "features", "video", "image", "audio",
+    "launch", "preflight", "role_overrides", "slot_overrides", "toolchains",
+])
+def test_an_absent_section_is_legal(section):
+    """A CONFIG STATES ONLY WHAT IT CHANGES (2026-09-24).
+
+    This test asserted the opposite until the delta relaxation, and it was
+    right to fail: an omitted section now means "take the canonical's value",
+    which is what the applier always did -- `_flatten_profile_values` guards
+    every key with `if k in`, so a partial document was already safe to apply
+    and only the validator forbade writing one.
+
+    Parametrized across every section because the relaxation edited a table.
+    Asserting on `render` alone would have passed while `llm` was still
+    all-or-nothing, which is precisely what happened mid-change.
+    """
+    doc = copy.deepcopy(cp.load_profile("16gb_full"))
+    del doc[section]
+    assert cp.validate_profile_shape(doc) is doc
+
+
+@pytest.mark.parametrize("section,key", [
+    ("render", "frame_budget"),
+    ("llm", "vram_ceiling_gb"),
+    ("seed_policy", "request_seed"),
+])
+def test_a_section_may_state_one_key_and_omit_the_rest(section, key):
+    """The delta shape a workflow-matrix row actually writes.
+
+    Deleting a whole section proves the top-level table; this proves the
+    per-section one, which is a different code path and the one the llm
+    section failed.
+    """
+    full = cp.load_profile("16gb_full")
+    doc = {"id": full["id"], section: {key: full[section][key]}}
+    assert cp.validate_profile_shape(doc) is doc
+
+
+@pytest.mark.parametrize("section", ["render", "llm", "seed_policy"])
+def test_a_typo_inside_a_partial_section_is_still_fatal(section):
+    """THE HALF THAT MUST NOT HAVE MOVED.
+
+    Relaxing "every key must be present" must not relax "every key must be
+    one we declared". A typo'd key silently doing nothing is the drift class
+    this validator exists to kill, and a partial section is exactly where a
+    typo would otherwise hide -- there is no longer a missing-key error to
+    trip over it.
+    """
+    doc = {"id": "probe", section: {"ths_is_not_a_key": 1}}
+    with pytest.raises(cp.ProfileError, match="unknown"):
+        cp.validate_profile_shape(doc)
 
 
 def test_v2_llm_section_matches_runtime_policy_enums():
@@ -259,11 +306,20 @@ def test_unknown_top_level_key_rejected():
         cp.validate_profile_shape(bad)
 
 
-def test_missing_required_key_rejected():
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
-    del bad["toolchains"]
+def test_id_is_the_only_required_key():
+    """`id` survives the relaxation as the one thing a config must state.
+
+    Not an arbitrary survivor: a row with no identity cannot be named as a
+    shipping workflow, stamped into the graph it generates, or reported by
+    `--check`. Everything else absent is a deliberate deferral to the
+    canonical.
+    """
+    doc = copy.deepcopy(cp.load_profile("16gb_full"))
+    del doc["id"]
     with pytest.raises(cp.ProfileError, match="missing required key"):
-        cp.validate_profile_shape(bad)
+        cp.validate_profile_shape(doc)
+
+    assert cp.validate_profile_shape({"id": "probe"}) == {"id": "probe"}
 
 
 # S2 platform-portability (2026-07-10): mps + linux are FIRST-CLASS enum

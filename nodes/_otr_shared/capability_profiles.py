@@ -98,24 +98,24 @@ def _is_str_list(v: Any) -> bool:
 # key -> (required, validator-callable, human description)
 _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "id": (True, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
-    "display_name": (True, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
-    "status": (True, lambda v: v in _STATUSES, f"one of {_STATUSES}"),
-    "platform": (True, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
-    "device_backend": (True, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
-    "gpu_vendor": (True, lambda v: v in _GPU_VENDORS, f"one of {_GPU_VENDORS}"),
-    "toolchains": (True, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
-    "allow_sidecars": (True, lambda v: isinstance(v, bool), "bool"),
-    "role_overrides": (True, lambda v: _is_str_dict(v), "dict[str, str]"),
-    "slot_overrides": (True, lambda v: _is_str_dict(v), "dict[str, str]"),
-    "features": (True, lambda v: isinstance(v, dict), "dict"),
-    "seed_policy": (True, lambda v: isinstance(v, dict), "dict"),
-    "launch": (True, lambda v: isinstance(v, dict), "dict"),
-    "llm": (True, lambda v: isinstance(v, dict), "dict"),
-    "video": (True, lambda v: isinstance(v, dict), "dict"),
-    "image": (True, lambda v: isinstance(v, dict), "dict"),
-    "audio": (True, lambda v: isinstance(v, dict), "dict"),
-    "render": (True, lambda v: isinstance(v, dict), "dict"),
-    "preflight": (True, lambda v: isinstance(v, dict), "dict"),
+    "display_name": (False, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
+    "status": (False, lambda v: v in _STATUSES, f"one of {_STATUSES}"),
+    "platform": (False, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
+    "device_backend": (False, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
+    "gpu_vendor": (False, lambda v: v in _GPU_VENDORS, f"one of {_GPU_VENDORS}"),
+    "toolchains": (False, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
+    "allow_sidecars": (False, lambda v: isinstance(v, bool), "bool"),
+    "role_overrides": (False, lambda v: _is_str_dict(v), "dict[str, str]"),
+    "slot_overrides": (False, lambda v: _is_str_dict(v), "dict[str, str]"),
+    "features": (False, lambda v: isinstance(v, dict), "dict"),
+    "seed_policy": (False, lambda v: isinstance(v, dict), "dict"),
+    "launch": (False, lambda v: isinstance(v, dict), "dict"),
+    "llm": (False, lambda v: isinstance(v, dict), "dict"),
+    "video": (False, lambda v: isinstance(v, dict), "dict"),
+    "image": (False, lambda v: isinstance(v, dict), "dict"),
+    "audio": (False, lambda v: isinstance(v, dict), "dict"),
+    "render": (False, lambda v: isinstance(v, dict), "dict"),
+    "preflight": (False, lambda v: isinstance(v, dict), "dict"),
     # S5: OPTIONAL operator-ratification gate. While non-empty,
     # scripts/build_variants.py REFUSES to emit this profile's variant;
     # the operator ratifies each named decision and clears the list.
@@ -234,27 +234,42 @@ _LLM_RUNTIME_KEYS = (
 
 
 def _validate_llm_section(sub: Any, source: str) -> None:
+    """Validate an llm section that may state only SOME of its keys.
+
+    Unknown keys are still refused. Every key that IS stated gets exactly the
+    check it always got; a key that is absent takes the canonical's value and
+    is not this function's business.
+
+    The runtime keys are checked by CONSTRUCTING `LLMRuntimePolicy` from the
+    ones present and letting its defaults stand in for the rest. That works
+    because every rule in its `__post_init__` reads a single field -- there is
+    no cross-key rule to lose by omitting a key -- and it keeps the dataclass
+    as the ONE enum truth rather than duplicating its value sets here, which
+    is the drift this indirection exists to prevent.
+    """
     allowed = set(_LLM_MODEL_KEYS) | set(_LLM_RUNTIME_KEYS)
     unknown = set(sub) - allowed
     if unknown:
         raise ProfileError(f"profile {source}: unknown llm key(s) {sorted(unknown)!r}")
-    missing = [k for k in (*_LLM_MODEL_KEYS, *_LLM_RUNTIME_KEYS) if k not in sub]
-    if missing:
-        raise ProfileError(f"profile {source}: llm missing key(s) {missing!r}")
     for k in _LLM_MODEL_KEYS:
+        if k not in sub:
+            continue
         v = sub[k]
         if not isinstance(v, str):
             raise ProfileError(f"profile {source}: llm.{k} must be a str; got {v!r}")
         if k in ("creative_model", "technical_model") and not v:
             raise ProfileError(f"profile {source}: llm.{k} must be non-empty")
     from .llm_policy import LLMPolicyError, LLMRuntimePolicy
+    stated = {k: sub[k] for k in _LLM_RUNTIME_KEYS if k in sub}
+    if "lane_allowlist" in stated:
+        try:
+            stated["lane_allowlist"] = tuple(stated["lane_allowlist"])
+        except TypeError as e:
+            raise ProfileError(
+                f"profile {source}: llm.lane_allowlist must be a sequence; "
+                f"got {sub['lane_allowlist']!r}") from e
     try:
-        LLMRuntimePolicy(
-            device=sub["device"], attn_impl=sub["attn_impl"],
-            quant_policy=sub["quant_policy"],
-            vram_ceiling_gb=sub["vram_ceiling_gb"],
-            lane_allowlist=tuple(sub["lane_allowlist"]),
-        )
+        LLMRuntimePolicy(**stated)
     except (LLMPolicyError, TypeError) as e:
         raise ProfileError(f"profile {source}: llm section invalid: {e}") from e
 
@@ -266,10 +281,27 @@ def _is_str_dict(v: Any) -> bool:
 
 
 def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
-    """S0 shape validator. Returns the profile on success; raises
+    """S0 shape validator. Returns the config on success; raises
     :class:`ProfileError` naming the first offending key otherwise.
-    Unknown top-level / seed_policy / launch keys are REJECTED (a typo'd
-    policy key silently doing nothing is the drift class this kills)."""
+
+    UNKNOWN KEYS ARE STILL REJECTED -- a typo'd key silently doing nothing is
+    the drift class this validator exists to kill, and that is untouched.
+
+    ABSENT KEYS ARE NOW LEGAL (2026-09-24), which is a different property that
+    had been conflated with it. Only `id` is required. Everything else absent
+    means "take the canonical's value", which is what the applier has always
+    done: `_flatten_profile_values` guards every key with `if k in`, so a
+    partial document was already safe to apply and only this function forbade
+    writing one.
+
+    WHY IT MATTERS RATHER THAN BEING TIDINESS. Requiring every key meant every
+    config restated values it did not mean to own -- 584 of them across the 24
+    shipped configs, each one a fork point that silently keeps its value when
+    the canonical moves. That is exactly how 82 configs once pinned
+    `char_voice_engine: indextts2` and kept shipping it after the canonical
+    moved to kokoro. A key a config does not mention now follows the canonical
+    forever, by construction.
+    """
     if not isinstance(profile, dict):
         raise ProfileError(f"profile {source}: expected a JSON object, got {type(profile).__name__}")
 
@@ -305,11 +337,12 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
         unknown = set(sub) - set(sub_spec) - set(optional_spec)
         if unknown:
             raise ProfileError(f"profile {source}: unknown {sub_name} key(s) {sorted(unknown)!r}")
-        missing = [k for k in sub_spec if k not in sub]
-        if missing:
-            raise ProfileError(f"profile {source}: {sub_name} missing key(s) {missing!r}")
+        # A SECTION MAY BE PARTIAL. Any key it omits takes the canonical's
+        # value, exactly as an omitted top-level section does. What a section
+        # may NOT do is carry a key nobody declared -- that check is above and
+        # is unchanged, because a typo must never be silently accepted.
         for k, check in sub_spec.items():
-            if not check(sub[k]):
+            if k in sub and not check(sub[k]):
                 raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
         # Optional keys: absent is legal, present is validated (a typo'd value
         # silently doing nothing is the drift class this whole validator kills).
@@ -318,13 +351,16 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
                 raise ProfileError(f"profile {source}: {sub_name}.{k} has invalid value {sub[k]!r}")
 
     # v2: the llm section (constructor-based validation; ONE enum truth).
-    _validate_llm_section(profile["llm"], source)
+    # Guarded because the section is optional now; absent means "the canonical
+    # decides", and there is nothing to enum-check.
+    if "llm" in profile:
+        _validate_llm_section(profile["llm"], source)
 
     # features: the episode-shape knobs. bool + str cover the widget-backed
     # BOOLEANs and COMBO styles; int was added 2026-09-13 for
     # `num_characters`, which is an INT widget. `bool` is a subclass of
     # `int`, so the order of this check does not matter -- both pass.
-    for k, v in profile["features"].items():
+    for k, v in (profile.get("features") or {}).items():
         if not isinstance(k, str) or not isinstance(v, (bool, str, int)):
             raise ProfileError(
                 f"profile {source}: features.{k} must be bool, str or int; "
