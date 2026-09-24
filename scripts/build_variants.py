@@ -139,7 +139,7 @@ def _variant_stem(profile_id: str) -> str:
 def _profile_id_from_stem(stem: str) -> str:
     """Inverse of _variant_stem against the profile FILES on disk.
 
-    Resolved against every profile in config/profiles/, not the shipping
+    Resolved against every rig in config/experiments/, not the shipping
     allow-list: `--check` may be pointed at a directory holding a lab
     profile's graph (the drift test writes cpu_floor's), and a stem that
     cannot find its profile must still name the file it came from.

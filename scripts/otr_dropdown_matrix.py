@@ -145,7 +145,10 @@ def availability_grid(caps: dict) -> dict:
     profiles = _load("nodes/_otr_shared/capability_profiles.py", "_odm_profiles")
     grid = {}
     for machine in MACHINES:
-        path = os.path.join(_REPO, "config/profiles/%s.json" % machine["profile"])
+        # The five machine COLUMNS are computed against experiment rigs, which is
+        # what they have always been -- they moved with the folder, not with the
+        # shipped workflows, which are rows in config/workflow_matrix.json.
+        path = os.path.join(_REPO, "config/experiments/%s.json" % machine["profile"])
         doc = json.load(io.open(path, encoding="utf-8"))
         profile = doc.get("capability_profile") or doc
         for namespace, table in caps.items():
@@ -734,7 +737,7 @@ def render_doc(rows: list) -> str:
          "## The machines\n\n",
          "| column | machine | reproduce with |\n|---|---|---|\n"]
     for machine in MACHINES:
-        L.append("| %s | %s | `config/profiles/%s.json` |\n" % (
+        L.append("| %s | %s | `config/experiments/%s.json` |\n" % (
             machine["label"], machine["blurb"], machine["profile"]))
     L.append("\n## Every dropdown\n")
     L.append(render_table(rows))
@@ -990,13 +993,20 @@ def recommended_graph(profile_id: str) -> tuple:
     canonical is the answer: it is always present, always runnable, and
     resolves the device at run time.
     """
-    path = os.path.join(_REPO, "config", "profiles", "%s.json" % profile_id)
+    # STATUS COMES FROM THE MATRIX. This used to read config/profiles/<id>.json
+    # directly, so once that file was gone `status` fell back to "" -- not
+    # "shipping" -- and this page told a stranger that every proven row was "in the
+    # shipping set, not yet proven on this hardware". `load_profile` prefers the
+    # matrix and falls back to the folder for a lab rig, so a shipped workflow has
+    # exactly one place its status is written, and promoting a row reaches this page.
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
     status = ""
-    if os.path.exists(path):
-        try:
-            status = str(json.load(io.open(path, encoding="utf-8")).get("status", ""))
-        except Exception:
-            status = ""
+    try:
+        from nodes._otr_shared.capability_profiles import ProfileError, load_profile
+        status = str(load_profile(profile_id).get("status", ""))
+    except ProfileError:
+        status = ""          # no such workflow; the canonical is the answer below
     graph = _variant_for(profile_id)
     full = os.path.join(_REPO, graph)
     if not os.path.exists(full):

@@ -212,7 +212,7 @@ def resolve_launch(profile: dict) -> dict:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
-        "profile", help="exact config/profiles id or machine:<matrix-key>")
+        "profile", help="exact config/experiments id or machine:<matrix-key>")
     parser.add_argument(
         "--mode",
         choices=("args", "env", "contract", "fingerprint", "requires-indextts2"),

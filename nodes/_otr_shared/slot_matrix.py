@@ -4,7 +4,7 @@ rip-sfx-broll 2026-07-01: shrunk from five roles to three).
 The slot-audit soak must drive the REAL workflow (workflows/otr_canonical.json)
 with ALL video roles set INDEPENDENTLY -- announcer / music / character -- via the
 capability-profile role_overrides, so the applier patches each OTR_VideoDirector
-video widget (by node TYPE through ``config/profiles/widget_mapping.json``, never a
+video widget (by node TYPE through ``config/widget_map.json``, never a
 node id). It must NEVER lean on a legacy catch-all fallback for
 character (that fallback is exactly what masked the per-slot drift the sprint
 fixed).

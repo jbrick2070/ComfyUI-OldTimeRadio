@@ -300,7 +300,10 @@ scripts/_tmp_*
 # widget_mapping.json and cpu_floor.json are NOT excluded: the first is the
 # checked-in widget MAPPING every applier reads, the second is the fallback tier
 # the validator names in its own suggestions.
-config/profiles/otr_*.json
-config/profiles/google_*.json
-config/profiles/16gb_full.json
-config/profiles/8gb_lite.json
+# 2026-09-24: config/profiles/ no longer exists. The 24 shipping files it
+# held are now rows in config/workflow_matrix.json, and the experiment rigs
+# moved to config/experiments/ -- which does not ship, because nobody
+# installs OTR to run a soak. config/widget_map.json and
+# config/workflow_matrix.json DO ship: the first is the widget mapping every
+# applier reads, the second is the one file that says what each workflow is.
+config/experiments/

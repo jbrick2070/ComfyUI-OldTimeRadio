@@ -12,7 +12,7 @@ their machine wants one row, not a narrative of how the row was discovered.
 
 WHY IT IS GENERATED. The stranger-facing machine answer, proof receipts, and
 measurements come from `config/machine_classes.json`; experimental profile
-detail comes from `config/profiles/*.json`. A hand-written compatibility table
+detail comes from `config/experiments/*.json`. A hand-written compatibility table
 is the single most rot-prone document a project can own.
 
 THE CONFIDENCE LEVELS ARE NOT THE SAME CLAIM, and the table says which:

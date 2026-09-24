@@ -193,7 +193,7 @@ def collect_profiles() -> dict:
         "character_visual", "announcer_visual", "music_visual",
         "video_render_engine",
     }
-    for path in sorted(glob.glob(os.path.join(_REPO, "config/profiles/*.json"))):
+    for path in sorted(glob.glob(os.path.join(_REPO, "config/experiments/*.json"))):
         try:
             doc = json.load(io.open(path, encoding="utf-8"))
         except Exception:

@@ -5,11 +5,12 @@ Spec: docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md
 section 0 (GATE B).
 
 S0 -- profile FOUNDATION:
-  * the committed profile shape (``config/profiles/<id>.json``) -- capability
+  * the committed row/rig shape (a row of ``config/workflow_matrix.json``, or
+    ``config/experiments/<id>.json`` for a lab rig) -- capability
     POLICY, not creative presets; OVERRIDES only, registry defaults supply the
     base;
   * a fail-closed SHAPE validator (unknown keys rejected, enums enforced);
-  * the checked-in widget MAPPING (``config/profiles/widget_mapping.json``)
+  * the checked-in widget MAPPING (``config/widget_map.json``)
     loader -- profile key -> ``(node_type, widget_name)`` targets; raw node
     ids are banned by construction.
 
@@ -53,8 +54,26 @@ __all__ = [
 ]
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-PROFILE_DIR = os.path.join(_REPO_ROOT, "config", "profiles")
-WIDGET_MAPPING_PATH = os.path.join(PROFILE_DIR, "widget_mapping.json")
+#: EXPERIMENT RIGS, not workflows. `otr_soak_*`, `otr_w45_*`, `otr_g4_*` and the
+#: campaign inputs twelve harness scripts drive: they answer "which experiment am I
+#: running", never "which workflow ships". Every SHIPPED workflow is a row in
+#: `config/workflow_matrix.json`; `load_profile` falls through to here only for an id
+#: the matrix does not carry.
+#:
+#: This was `config/profiles/` until 2026-09-24. Operator: "no profile folder, no
+#: tiers, just one workflow matrix ... so I never hear the word profile again."
+EXPERIMENT_DIR = os.path.join(_REPO_ROOT, "config", "experiments")
+
+#: Back-compatible alias. Several tests and scripts import this name; it is the same
+#: directory and exists so the rename did not have to be atomic across every reader.
+PROFILE_DIR = EXPERIMENT_DIR
+
+#: The node-type-to-widget map every applier reads at render time. It is NOT an
+#: experiment rig and never was a profile -- it sat in that folder by accident of
+#: history. Moved out with the rename. Safe to move because `semantic_master_hash`
+#: hashes this file's CONTENT, never its path, so no saved graph's stamp depends on
+#: where it lives.
+WIDGET_MAPPING_PATH = os.path.join(_REPO_ROOT, "config", "widget_map.json")
 
 
 class ProfileError(ValueError):
@@ -516,7 +535,7 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
 def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
     """Every id `load_profile` can resolve: matrix rows first, then lab rigs.
 
-    The enumeration a `config/profiles/*.json` glob used to stand in for. Matrix
+    The enumeration a folder glob used to stand in for. Matrix
     rows lead because they are the shipped surface; the rigs (`otr_soak_*`,
     `otr_w45_*`, `otr_g4_*`) follow in name order. An id carried by both appears
     once, from the matrix -- which is what one source of truth has to mean when the
@@ -538,7 +557,7 @@ def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
     except OSError:
         names = []
     for name in names:
-        if not name.endswith(".json") or name == "widget_mapping.json":
+        if not name.endswith(".json") or name == "widget_map.json":
             continue
         rid = name[:-5]
         if rid not in seen:
@@ -553,7 +572,7 @@ def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
     THE MATRIX IS CONSULTED FIRST for every shipped workflow -- that is what
     makes `config/workflow_matrix.json` the single source of truth rather than a
     second copy of one. An id with no row falls through to
-    ``config/profiles/<id>.json``, which keeps the lab rigs (`otr_soak_*`,
+    ``config/experiments/<id>.json``, which keeps the lab rigs (`otr_soak_*`,
     `otr_w45_*`) working; they answer "which experiment", not "which workflow
     ships". An explicit `profile_dir` also reads the folder, because that is how
     tests point this at a fixture directory.
@@ -589,7 +608,7 @@ def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
         try:
             known = sorted(
                 f[:-5] for f in os.listdir(d)
-                if f.endswith(".json") and f != "widget_mapping.json"
+                if f.endswith(".json") and f != "widget_map.json"
             )
         except OSError:
             known = []

@@ -150,7 +150,7 @@ def test_the_two_questions_stay_separate():
 def test_machine_columns_name_real_shipped_profiles():
     """Every column is reproducible -- a reader can run that exact profile."""
     for machine in _generator().MACHINES:
-        path = os.path.join(_REPO, "config/profiles/%s.json" % machine["profile"])
+        path = os.path.join(_REPO, "config/experiments/%s.json" % machine["profile"])
         assert os.path.exists(path), (
             "column %r names profile %r, which does not exist"
             % (machine["label"], machine["profile"]))

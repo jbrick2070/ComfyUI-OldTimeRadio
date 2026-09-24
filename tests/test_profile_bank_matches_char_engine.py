@@ -10,9 +10,9 @@ profile, so a new lab preset cannot ship the same trap.
 """
 from __future__ import annotations
 
-import glob
 import json
 import os
+import pathlib
 
 os.environ.setdefault("OTR_TEST_MODE", "1")
 
@@ -21,21 +21,49 @@ import pytest
 from nodes._otr_engine_profiles import load_resolver
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_PROFILES = sorted(glob.glob(os.path.join(_HERE, "..", "config", "profiles", "*.json")))
+_REPO = os.path.dirname(_HERE)
 
 
 def _pinned_profiles():
+    """Every SHIPPED workflow and every experiment rig that names a character voice.
+
+    BOTH, and the shipped half is the one that matters. This used to glob
+    `config/profiles/*.json`; that folder is gone, and the shipped workflows are now
+    rows in `config/workflow_matrix.json` where `char_voice_engine` is a declared key
+    indicator, so all 24 state one. The five configurations whose broken pairing this
+    test exists for were shipped rows -- reading only the rigs would watch the lab and
+    ignore the graphs a stranger opens.
+
+    Resolved through `load_profile`, which takes a matrix row when there is one and
+    falls back to `config/experiments/<id>.json` otherwise.
+    """
+    from nodes._otr_shared.capability_profiles import (
+        ProfileError, known_profile_ids, load_profile)
+
     rows = []
-    for path in _PROFILES:
-        if os.path.basename(path) == "widget_mapping.json":
+    for pid in known_profile_ids():
+        try:
+            data = load_profile(pid)
+        except ProfileError:
             continue
-        with open(path, encoding="utf-8") as fh:
-            data = json.load(fh)
         so = data.get("slot_overrides") or {}
         engine = str(so.get("char_voice_engine") or "").strip()
         if engine and engine != "auto":
-            rows.append((os.path.basename(path), engine, str(so.get("voice_bank") or "")))
-    assert rows, "no profile pins a character voice engine"
+            rows.append((pid, engine, str(so.get("voice_bank") or "")))
+
+    assert rows, "nothing pins a character voice engine -- this test is checking nothing"
+    # NON-VACUITY, sharpened: the shipped workflows must be in here, not just rigs.
+    # `char_voice_engine` is a key indicator, so every matrix row states one; if none
+    # of them appear, the enumeration has silently stopped reaching the matrix.
+    import json as _json
+    matrix = _json.loads(
+        (pathlib.Path(_REPO) / "config" / "workflow_matrix.json").read_text(
+            encoding="utf-8"))
+    shipped = {r["id"] for r in matrix["rows"] if r.get("ships")}
+    covered = {name for name, _, _ in rows} & shipped
+    assert len(covered) >= 20, (
+        "only %d of %d shipped workflows are covered; the enumeration is not reaching "
+        "the matrix" % (len(covered), len(shipped)))
     return rows
 
 

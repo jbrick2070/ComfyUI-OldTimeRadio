@@ -183,7 +183,7 @@ def test_every_shipped_profile_still_validates_with_the_new_optional_key():
     once."""
     # widget_mapping.json shares the directory but is a WIDGET MAP, not a
     # profile -- load_profile refuses it by design.
-    ids = sorted(p.stem for p in (REPO / "config" / "profiles").glob("*.json")
+    ids = sorted(p.stem for p in (REPO / "config" / "experiments").glob("*.json")
                  if p.stem != "widget_mapping")
     assert len(ids) >= 20
     for pid in ids:

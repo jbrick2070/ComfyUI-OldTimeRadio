@@ -673,22 +673,53 @@ def gate_g2_canvas(name, eng):
     return bad
 
 
-_PROFILES_DIR = os.path.join(REPO_ROOT, "config", "profiles")
+_PROFILES_DIR = os.path.join(REPO_ROOT, "config", "experiments")
 
 
 def _load_profiles():
+    """Every shipped workflow AND every experiment rig, keyed by id.
+
+    THE SHIPPED HALF COMES FROM THE MATRIX, RESOLVED. Until 2026-09-24 this globbed one
+    folder that happened to hold both, so the gates below judged lanes against the
+    shipping configurations too. Those are now rows in `config/workflow_matrix.json`, and
+    losing them changed two gate verdicts -- which is the wrong half to lose: G2 exists
+    because a lane that declares no `render_canvas` while its configurations set
+    `render.canvas_w/h` sends node 87 a number it never honours, and a SHIPPED workflow
+    doing that is somebody's episode.
+
+    Resolved rather than as-stated because `render.canvas_w/h` is not a key indicator --
+    only 2 of 24 rows state it -- so a raw row read would claim 22 workflows declare no
+    canvas when they render at the canonical's. What reaches the node is the resolved
+    value.
+    """
     out = {}
-    if not os.path.isdir(_PROFILES_DIR):
-        return out
-    for fname in sorted(os.listdir(_PROFILES_DIR)):
-        if not fname.endswith(".json"):
-            continue
-        try:
-            with open(os.path.join(_PROFILES_DIR, fname), "r",
-                      encoding="utf-8") as fh:
-                out[fname[:-5]] = json.load(fh)
-        except Exception:  # noqa: BLE001 -- a malformed profile is another
-            continue      # test's business; this gate reads what parses
+
+    # The shipped workflows, from the matrix.
+    try:
+        from nodes._otr_shared.capability_profiles import ProfileError, shipping_ids
+        from nodes._otr_workflow_apply import resolved_profile
+        canonical = json.load(open(
+            os.path.join(REPO_ROOT, "workflows", "otr_canonical.json"),
+            encoding="utf-8"))
+        for pid in shipping_ids():
+            try:
+                out[pid] = resolved_profile(pid, canonical)
+            except ProfileError:
+                continue
+    except Exception:  # noqa: BLE001 -- see the rig loop's note; a gate reads
+        pass           # what it can, and other tests own the matrix's health
+
+    # The experiment rigs, read as files exactly as before.
+    if os.path.isdir(_PROFILES_DIR):
+        for fname in sorted(os.listdir(_PROFILES_DIR)):
+            if not fname.endswith(".json"):
+                continue
+            try:
+                with open(os.path.join(_PROFILES_DIR, fname), "r",
+                          encoding="utf-8") as fh:
+                    out.setdefault(fname[:-5], json.load(fh))
+            except Exception:  # noqa: BLE001 -- a malformed rig is another
+                continue      # test's business; this gate reads what parses
     return out
 
 

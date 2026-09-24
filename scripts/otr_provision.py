@@ -1570,10 +1570,11 @@ def load_profile(profile_id: str) -> dict:
     profile_id = str(profile_id or "")
     if not _PROFILE_ID_RE.fullmatch(profile_id):
         raise ProvisionFailure("invalid profile id: %r" % profile_id)
-    path = os.path.join(_REPO, "config", "profiles", profile_id + ".json")
+    path = os.path.join(_REPO, "config", "experiments", profile_id + ".json")
     if not os.path.isfile(path):
         raise ProvisionFailure(
-            "profile %r does not exist; use an exact config/profiles id" % profile_id)
+            "%r does not exist; use an exact config/experiments id, or a row id "
+            "from config/workflow_matrix.json" % profile_id)
     try:
         profile = json.load(io.open(path, encoding="utf-8"))
     except (OSError, ValueError) as exc:
