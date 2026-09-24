@@ -16,8 +16,6 @@
 
 # These two files preserve byte-identical upstream/patch evidence, including
 # upstream trailing spaces. Their SHA-256 identities are runtime contracts.
-patches/ComfyUI-GGUF-ltx25-gemma4.patch -whitespace
-tests/fixtures/comfyui_gguf_6ea2651/loader.py -whitespace
 
 # Hashed qualification evidence retains the captured bytes on every checkout.
 # In particular, do not rewrite Windows log/XML line endings after hashing.

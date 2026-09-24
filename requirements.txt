@@ -142,7 +142,8 @@ kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
 #
 # `unidic-lite` carries its dictionary INSIDE the wheel (~50 MB, no download,
 # no network at render time), which is the shape this project wants -- the
-# offline-first rule and the same reason GGUF auto-download was cut.
+# offline-first rule and the same reason the quant-pack auto-download was
+# cut: a weight a user did not choose to fetch is not offline-first.
 #
 # THE TRAP, MEASURED THE SAME DAY: installing unidic-lite does NOT fix a box
 # that already has `unidic`. fugashi prefers `unidic` when it is importable

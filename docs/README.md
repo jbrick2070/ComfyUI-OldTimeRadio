@@ -13,7 +13,6 @@ design rows; finished campaigns live in git history and `HANDOFF_LOG.md`.
 - `openrouter-setup.md` - optional BYO OpenRouter LLM setup.
 - `comfy-credits-setup.md` - optional Comfy Credits / Partner API setup.
 - `gemma4/` - Gemma 4 12B writer (NF4 baked into `google/gemma-4-12b-it`).
-  `gemma4-gguf-native-setup.md` is the retired-GGUF stub that points here.
 
 ## Apple Silicon
 

@@ -296,8 +296,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         "prestartup banner otherwise).",
         "- Models root override: `OTR_COMFYUI_MODELS_ROOT` (the "
         "`C:\\ComfyUI-Models` default in _otr_hf_env/_otr_models_root "
-        "is a Windows-only convenience); GGUF path escape hatch: "
-        "`GEMMA4_12B_GGUF_PATH`.",
+        "is a Windows-only convenience).",
     ]
     for k, v in sorted(env.items()):
         lines.append(f"- `{k}={v}`")
