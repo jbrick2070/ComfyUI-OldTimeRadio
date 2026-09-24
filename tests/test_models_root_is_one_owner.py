@@ -12,7 +12,7 @@ that make that move safe rather than merely tidy: the PRECEDENCE is unchanged
 under every branch, and the file sits at the DEPTH its ``__file__`` arithmetic
 assumes.
 
-THE DEPTH IS THE SUBTLE ONE. Step 4 walks three ``dirname()`` calls up from
+THE DEPTH IS THE SUBTLE ONE. Step 4 walks four ``dirname()`` calls up from
 ``__file__`` to find ComfyUI's ``models/`` beside ``custom_nodes/``. Move the
 module one directory in or out and that walk silently returns a different
 directory -- no error, no failed import, just a wrong root, which on a fresh
@@ -94,7 +94,7 @@ def test_the_module_sits_where_its_file_arithmetic_assumes():
     """
     here = os.path.abspath(mr.__file__)
     assert os.path.basename(os.path.dirname(here)) == "nodes", (
-        "_otr_models_root.py must live in nodes/. Step 4 walks three dirname() "
+        "_otr_models_root.py must live in nodes/. Step 4 walks four dirname() "
         "calls up from __file__ to reach ComfyUI's models/ beside "
         "custom_nodes/; moving this file changes that answer silently. Got %r"
         % here)

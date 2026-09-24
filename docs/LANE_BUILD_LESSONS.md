@@ -310,7 +310,7 @@ happened to be exported, so the two WAN lanes looked different for a reason
 that had nothing to do with their code.
 
 **Fix:** `wan_shared.configured_models_root()` -- one spelling of "where this
-box keeps its models", the same override chain `_otr_gguf_backend._models_root`
+box keeps its models", the same override chain `_otr_models_root._models_root`
 already used -- probed LAST in `_resolve_model_file_by_token`. Additive by
 construction: every earlier probe still wins, so it can only turn a false
 negative into the truth. It fixed all three WAN lanes at once, which is why it

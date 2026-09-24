@@ -14,4 +14,4 @@ Start every session: `git fetch origin main` then `git log --oneline HEAD..origi
 - Git: one branch `main`. Never ask to commit. Always commit and push green chunks in the same turn (operator 2026-09-17). Named files only -- never `git add .`. Never push `v2.0-alpha`. Do not edit `pyproject.toml` just to tidy (it publishes).
 - After push: HEAD == origin, no 0-byte files, no BOM, AST-parse touched `.py`.
 - Reset before a headless run: selective CIM kill of the Comfy server (never a blanket `python` kill). Port 8000 empty, VRAM at desktop baseline.
-- Models live at `C:\ComfyUI-Models` via `_otr_gguf_backend._models_root()`, not under Documents.
+- Models live at `C:\ComfyUI-Models` via `_otr_models_root._models_root()`, not under Documents.

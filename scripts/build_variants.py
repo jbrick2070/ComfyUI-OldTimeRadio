@@ -328,7 +328,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         "- Windows hosts: set `PYTHONUTF8=1` (cp1252 consoles crash the "
         "prestartup banner otherwise).",
         "- Models root override: `OTR_COMFYUI_MODELS_ROOT` (the "
-        "`C:\\ComfyUI-Models` default in _otr_hf_env/_otr_gguf_backend "
+        "`C:\\ComfyUI-Models` default in _otr_hf_env/_otr_models_root "
         "is a Windows-only convenience); GGUF path escape hatch: "
         "`GEMMA4_12B_GGUF_PATH`.",
     ]
