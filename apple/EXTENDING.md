@@ -178,7 +178,8 @@ one workflow. Edit that file. Do not hand-edit anything in
 `workflows/variants/` -- those JSON files and their `.launch.md` recipes are
 generated, and the next rebuild silently undoes you. Do not add a
 `config/profiles/<id>.json` for something you intend to ship -- the matrix is
-consulted first. That folder is the lab rigs (`otr_soak_*` and friends) that
+consulted first. That folder still holds twins of the current shipping rows
+from the migration, plus the lab rigs (`otr_soak_*` and friends) that
 `--profile` loads on the canonical runner. A new shipping graph is a matrix
 row only.
 
