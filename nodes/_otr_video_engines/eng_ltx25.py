@@ -1632,23 +1632,43 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # and that depends on what else this process is holding.
             if node_id == _decode_feeder:
                 self._make_room_for_decode()
+                # BRACKET THE DECODE, NOT THE GRAPH. An earlier cut of this
+                # reset the counter before `run_graph` and read it after, so
+                # the window covered the sampler's 12-13 GB DiT as well and the
+                # figure it printed was the sampler's high-water, not the
+                # decode's. Feeding THAT back into
+                # `LTX25_STAGE2_DECODE_NEEDS_MB` would have made the decode's
+                # need sampler-sized and evicted on every card forever. Caught
+                # by a contrarian review before any leg acted on it.
+                #
+                # This branch fires on the node FEEDING the decode, which is
+                # immediately before the decode runs, so the reset here plus
+                # the read below measures the decode and the decode only.
+                try:
+                    import torch as _t_dec
+                    if _t_dec.cuda.is_available():
+                        _t_dec.cuda.reset_peak_memory_stats()
+                except Exception:           # noqa: BLE001 -- telemetry only
+                    pass
+            if node_id == self._TERMINAL:
+                try:
+                    import torch as _t_dec2
+                    if _t_dec2.cuda.is_available():
+                        _LOG.info(
+                            "[OTR video] %s: DECODE PEAK -- allocated %.0f MB, "
+                            "reserved %.0f MB, measured across the decode node "
+                            "alone. THIS is the figure comparable to "
+                            "LTX25_STAGE2_DECODE_NEEDS_MB (%s MB), which was "
+                            "measured on a 16 GB card and never on 8 GB.",
+                            self.name,
+                            _t_dec2.cuda.max_memory_allocated() / (1024.0 * 1024.0),
+                            _t_dec2.cuda.max_memory_reserved() / (1024.0 * 1024.0),
+                            getattr(R, "LTX25_STAGE2_DECODE_NEEDS_MB", "?"))
+                except Exception:           # noqa: BLE001 -- telemetry only
+                    pass
 
         execution_records = []
         graph_started = time.perf_counter()
-        # TORCH'S OWN HIGH-WATER MARK, alongside the sampled probe. The probe
-        # reads the device every 0.1 s and can miss a peak between samples;
-        # `max_memory_allocated` is exact and is the number that replaces the
-        # 8300 MB estimate in `LTX25_STAGE2_DECODE_NEEDS_MB` -- which was
-        # measured on a 16 GB 5080 and has never been measured on an 8 GB card.
-        # Asked for by the 4060 box after a decode there filled the card to
-        # 158 MiB free and then neither completed nor raised, so there was no
-        # OOM error to read an allocation size out of.
-        try:
-            import torch as _t_peak
-            if _t_peak.cuda.is_available():
-                _t_peak.cuda.reset_peak_memory_stats()
-        except Exception:                   # noqa: BLE001 -- telemetry only
-            pass
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(
@@ -1661,20 +1681,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         finally:
             render_elapsed_s = time.perf_counter() - graph_started
             peak = probe.stop()
-            try:
-                import torch as _t_peak2
-                if _t_peak2.cuda.is_available():
-                    _LOG.info(
-                        "[OTR video] %s: TORCH PEAK over the graph -- "
-                        "allocated %.0f MB, reserved %.0f MB (sampled probe "
-                        "said %s). This allocated figure is the measured need "
-                        "for this card's geometry.",
-                        self.name,
-                        _t_peak2.cuda.max_memory_allocated() / (1024.0 * 1024.0),
-                        _t_peak2.cuda.max_memory_reserved() / (1024.0 * 1024.0),
-                        peak)
-            except Exception:               # noqa: BLE001 -- telemetry only
-                pass
+
             if results is not None:
                 self._retain_model_patchers(results, prepared)
             _wb.reclaim_idle_models(reason="%s post-decode" % self.name)

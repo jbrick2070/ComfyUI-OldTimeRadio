@@ -239,6 +239,12 @@ def _whole_spoken_row(text: str, interval: tuple[int, int]) -> bool:
 
 
 def _merge_repair_spans(text: str, intervals: Sequence[tuple[int, int]]) -> tuple[_RepairSpan, ...]:
+    # A None interval means `_exact_interval` declined, and this used to unpack
+    # it and raise TypeError instead of producing no spans. The two
+    # `recover_unique=True` sites agree today, so a None cannot reach here --
+    # but they are two sites, and a drift between them should degrade to
+    # "unresolved" rather than to a traceback in the middle of a render.
+    intervals = [pair for pair in intervals if pair is not None]
     merged: list[tuple[int, int]] = []
     for start, end in sorted(set(intervals)):
         if merged and start < merged[-1][1]:
@@ -1417,12 +1423,25 @@ def _judge_row(
     if parts is None:
         return [], False
     BaseModel, Field, structured_call = parts
+    from pydantic import field_validator as _fv
 
     class _NotSpeech(BaseModel):
         quote: str = Field(min_length=1)
         why: str = Field(default="", max_length=120)
-        start_char: int | None = Field(default=None, ge=0, strict=True)
-        end_char: int | None = Field(default=None, ge=1, strict=True)
+        # SAME COERCION AS THE AUTHORIZATION SCHEMA. b5a8ccaf relaxed
+        # `strict=True` on `_ComplaintSpan`'s offsets so a model emitting
+        # `12.0` or `"12"` no longer fails the whole structured call -- and
+        # left this twin strict, so the identical ValidationError could still
+        # exhaust the JUDGE, earlier in the ladder, before any recovery was
+        # reachable. Found by a contrarian review of the commit that fixed the
+        # other half. The judge prompt does not even ask for these offsets;
+        # they arrive volunteered, so refusing the whole answer over their TYPE
+        # loses the quote as well, which is the part that matters.
+        start_char: int | None = Field(default=None, ge=0)
+        end_char: int | None = Field(default=None, ge=1)
+
+        _coerce_judge = _fv("start_char", "end_char",
+                            mode="before")(_coerce_offset)
 
     class _SpokenLineJudgement(BaseModel):
         # A model cannot report how many pieces it read without actually
