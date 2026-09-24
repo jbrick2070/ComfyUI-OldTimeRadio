@@ -1635,6 +1635,20 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         execution_records = []
         graph_started = time.perf_counter()
+        # TORCH'S OWN HIGH-WATER MARK, alongside the sampled probe. The probe
+        # reads the device every 0.1 s and can miss a peak between samples;
+        # `max_memory_allocated` is exact and is the number that replaces the
+        # 8300 MB estimate in `LTX25_STAGE2_DECODE_NEEDS_MB` -- which was
+        # measured on a 16 GB 5080 and has never been measured on an 8 GB card.
+        # Asked for by the 4060 box after a decode there filled the card to
+        # 158 MiB free and then neither completed nor raised, so there was no
+        # OOM error to read an allocation size out of.
+        try:
+            import torch as _t_peak
+            if _t_peak.cuda.is_available():
+                _t_peak.cuda.reset_peak_memory_stats()
+        except Exception:                   # noqa: BLE001 -- telemetry only
+            pass
         probe = _MC.VramPeakProbe(interval_s=0.1).start()
         try:
             results = _wb.run_graph(
@@ -1647,6 +1661,20 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         finally:
             render_elapsed_s = time.perf_counter() - graph_started
             peak = probe.stop()
+            try:
+                import torch as _t_peak2
+                if _t_peak2.cuda.is_available():
+                    _LOG.info(
+                        "[OTR video] %s: TORCH PEAK over the graph -- "
+                        "allocated %.0f MB, reserved %.0f MB (sampled probe "
+                        "said %s). This allocated figure is the measured need "
+                        "for this card's geometry.",
+                        self.name,
+                        _t_peak2.cuda.max_memory_allocated() / (1024.0 * 1024.0),
+                        _t_peak2.cuda.max_memory_reserved() / (1024.0 * 1024.0),
+                        peak)
+            except Exception:               # noqa: BLE001 -- telemetry only
+                pass
             if results is not None:
                 self._retain_model_patchers(results, prepared)
             _wb.reclaim_idle_models(reason="%s post-decode" % self.name)

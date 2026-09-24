@@ -136,55 +136,62 @@ def _as_char_index(value: Any) -> int | None:
     return None
 
 
-def _exact_interval(text: str, finding: Mapping[str, Any]) -> tuple[int, int] | None:
+def _exact_interval(text: str, finding: Mapping[str, Any], *,
+                    recover_unique: bool = False) -> tuple[int, int] | None:
     """Ground one occurrence without case folding or whitespace changes.
 
-    THE QUOTE IS THE GROUND TRUTH; THE OFFSETS ONLY DISAMBIGUATE (2026-09-23).
-    This used to require the model's `start_char`/`end_char` to be exactly
-    right whenever it supplied either, and returned None otherwise -- so a
-    quote that `text.find` would have located exactly was discarded because a
-    4B model miscounted characters. The prompt that feeds this asks for those
-    offsets explicitly, which is asking a small model for the one thing it is
-    worst at, and `_exact_interval` gates every repair call site.
+    THE DEFAULT IS THE ORIGINAL, FAIL-CLOSED BEHAVIOUR. The strict branch below
+    is copied unchanged from before 2026-09-23, because the callers do not share
+    a contract: `_otr_story_source._apply_spoken_edits` also calls this and its
+    own module header says that path "never rechecks its own rewrite", so
+    fail-closed offsets are the only check it has.
 
-    MEASURED CONSEQUENCE, reported from the 4060 on 2026-09-23: `ledger_clean`
-    detected five of six unclean rows and repaired ZERO of them, in 18 model
-    calls. Detection was working; the repairs were being thrown away here.
+    `recover_unique=True` adds ONE thing, for the one caller that re-reads its
+    own result: when offsets were supplied and do not select the quote, but the
+    quote occurs exactly ONCE in the line, ground it anyway.
 
-    THE SAFETY PROPERTY IS UNCHANGED, and it is what makes widening this safe:
-    an interval is returned only when the text at that interval IS the quote,
-    so no edit can land anywhere else. Being more permissive about how the
-    interval is FOUND does not make it possible to edit the wrong span.
+    WHY THAT EXISTS. The 4060 measured `ledger_clean` detecting five of six
+    unclean voiced rows -- three of them by the model judge alone -- and
+    repairing ZERO, across 18 model calls. The authorization prompt asks a 4B
+    model for "zero-based start_char/end_char (end exclusive)", which is asking
+    a small model for the thing it is worst at, and an off-by-one discarded a
+    quote `text.find` locates exactly.
+
+    WHAT IT DELIBERATELY DOES NOT DO: guess which occurrence of a REPEATED quote
+    was meant. An earlier cut took the hit nearest to where the model pointed,
+    and a review killed it with the case that matters -- "Mother died. Mother
+    died." with offsets landing on neither, where nearest-to-zero edits the
+    first sentence when the intended correction was the second. Interval-equals-
+    quote does not license guessing which one; a repeated quote without landing
+    offsets always declines, whatever the caller asked for.
     """
     quote = finding.get("quote")
     if not isinstance(quote, str) or not quote:
         return None
 
-    hits: list[int] = []
-    at = text.find(quote)
-    while at >= 0:
-        hits.append(at)
-        at = text.find(quote, at + 1)
-    if not hits:
-        return None                     # the quote is not in this line at all
+    raw_start, raw_end = finding.get("start_char"), finding.get("end_char")
 
-    start = _as_char_index(finding.get("start_char"))
+    if raw_start is not None or raw_end is not None:
+        # --- the original strict block, unchanged -----------------------------
+        if (type(raw_start) is int and type(raw_end) is int
+                and 0 <= raw_start < raw_end <= len(text)
+                and text[raw_start:raw_end] == quote):
+            return raw_start, raw_end
+        # --- the one addition, for the caller that opted in -------------------
+        if recover_unique:
+            loose = _as_char_index(raw_start)
+            if loose is not None and text[loose:loose + len(quote)] == quote:
+                return loose, loose + len(quote)
+            if text.count(quote) == 1:
+                at = text.find(quote)
+                return at, at + len(quote)
+        return None
 
-    # 1. Offsets that land on the quote win outright -- the model was right.
-    if start is not None and text[start:start + len(quote)] == quote:
-        return start, start + len(quote)
-    # 2. One occurrence: the offsets were never needed. This is the case that
-    #    used to be discarded for an off-by-one.
-    if len(hits) == 1:
-        return hits[0], hits[0] + len(quote)
-    # 3. Several occurrences and offsets that do not land: take the one nearest
-    #    to where the model pointed. It still had to name the right text.
-    if start is not None:
-        near = min(hits, key=lambda h: abs(h - start))
-        return near, near + len(quote)
-    # 4. Ambiguous with nothing to disambiguate by. Now we decline.
-    return None
-
+    # --- no offsets supplied: ground a unique quote, decline a repeated one ---
+    start = text.find(quote)
+    if start < 0 or text.find(quote, start + 1) >= 0:
+        return None
+    return start, start + len(quote)
 
 def _whole_spoken_row(text: str, interval: tuple[int, int]) -> bool:
     start, end = interval
@@ -1546,9 +1553,18 @@ def _authorize_repair_scope(
         resolved = []
         for item in result.spans:
             finding = item.model_dump()
-            interval = _exact_interval(text, finding)
+            # THIS IS THE GATE THAT WAS DISCARDING THE REPAIRS, and it is the
+            # right place to recover: it is validating the model's OWN
+            # authorization answer, and the quote in that answer is what the
+            # edit is keyed to. An off-by-one on a quote occurring exactly once
+            # rejected the whole authorization, which is how the 4060 got 5
+            # detections, 18 model calls and ZERO repairs. A repeated quote
+            # without landing offsets still declines.
+            interval = _exact_interval(text, finding, recover_unique=True)
             if interval is None:
-                return "Each span must uniquely identify exact original text with valid offsets"
+                return ("Each span must name exact original text that occurs "
+                        "once, or give offsets that select the intended "
+                        "occurrence")
             resolved.append(interval)
             if _whole_spoken_row(text, interval):
                 return "Use whole_row_direction only when the entire row is actually a direction"
@@ -1608,7 +1624,13 @@ def _authorize_repair_scope(
         return "whole", (), record
     if result.verdict == "unresolved":
         return "unresolved", (), record
-    resolved = [_exact_interval(text, item.model_dump()) for item in result.spans]
+    # THE ONE CALLER THAT RECOVERS. This is the repair-authorization path the
+    # 4060 measured: 5 of 6 rows detected, ZERO repaired, 18 model calls, because
+    # an off-by-one on a quote occurring exactly once discarded the finding. It
+    # re-reads its own result downstream, which is why recovery is safe here and
+    # is left off everywhere else.
+    resolved = [_exact_interval(text, item.model_dump(), recover_unique=True)
+                for item in result.spans]
     return "partial", _merge_repair_spans(text, original_partial + resolved), record
 
 
