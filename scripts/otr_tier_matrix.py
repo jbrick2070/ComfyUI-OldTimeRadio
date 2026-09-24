@@ -68,9 +68,23 @@ _COLUMNS = ("tier", "graph", "writer", "quant", "lanes (announcer / music / char
 
 
 def _load_profile(profile_id: str) -> dict:
-    path = os.path.join(_REPO, "config", "profiles", "%s.json" % profile_id)
-    with io.open(path, encoding="utf-8") as fh:
-        return json.load(fh)
+    """What this workflow RESOLVES to -- its own values plus what it inherits.
+
+    Reads the workflow matrix, not `config/profiles/`, so editing one JSON file
+    updates the variants and this table together.
+
+    Resolved rather than as-stated on purpose: a matrix row omits any key it takes
+    from the canonical, so the raw row would make the `(canonical)` fallbacks below
+    fire on the 12 rows that inherit their writer -- a worse table than this one
+    replaces. `resolved_profile` renders the row and reads the values back, so
+    nothing is stored and nothing can go stale.
+    """
+    import json as _json
+    from nodes._otr_workflow_apply import resolved_profile
+    canonical_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
+    with io.open(canonical_path, encoding="utf-8") as fh:
+        canonical = _json.load(fh)
+    return resolved_profile(profile_id, canonical)
 
 
 def _internal(engine: str) -> str:

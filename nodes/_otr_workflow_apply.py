@@ -351,33 +351,150 @@ def _patch_node_widget(target_node: dict, widget_name: str, value: Any,
         return
 
     serialized_slots = serialized_slot_names(node_type, schemas)
-    linked_names = {
-        inp["name"]
-        for inp in target_node.get("inputs", []) or []
-        if inp.get("link") is not None and inp.get("name") in widget_names
-    }
+    linked_names = _linked_widget_names(target_node, widget_names)
     if widget_name in linked_names:
         raise ValueError(
             f"widget {widget_name!r} on node {node_id} has been converted to an "
             f"input socket; cannot patch via widgets_values."
         )
     wv = target_node.setdefault("widgets_values", [])
-    target_idx = serialized_slots.index(widget_name)
-    linked_widget_count = sum(1 for n in serialized_slots if n in linked_names)
-    if len(wv) == len(serialized_slots):
-        slot = target_idx
-    elif len(wv) == len(serialized_slots) - linked_widget_count:
-        leading_linked = sum(1 for n in serialized_slots[:target_idx] if n in linked_names)
-        slot = target_idx - leading_linked
-    else:
-        raise ValueError(
-            f"widgets_values length mismatch on node {node_id} ({node_type}): "
-            f"len(wv)={len(wv)} vs len(serialized_slots)={len(serialized_slots)} "
-            f"(linked={linked_widget_count}). Refusing to patch by name."
-        )
+    slot = _widget_slot_index(target_node, widget_name, serialized_slots,
+                              linked_names)
     while len(wv) <= slot:
         wv.append(None)
     wv[slot] = value
+
+
+def _widget_slot_index(target_node: dict, widget_name: str,
+                       serialized_slots: list, linked_names: set) -> int:
+    """Index into ``widgets_values`` for one widget, resolved by NAME.
+
+    EXTRACTED SO THE READ AND WRITE SIDES CANNOT DIVERGE. The array is either full
+    length, or shortened by however many widgets ahead of this one were converted
+    to link sockets -- and getting that wrong reads or writes a NEIGHBOURING
+    widget, which is the silent drift this module exists to refuse.
+    `_patch_node_widget` and `widget_value_by_name` both call this.
+    """
+    wv = target_node.get("widgets_values") or []
+    node_type = target_node.get("type")
+    node_id = target_node.get("id")
+    target_idx = serialized_slots.index(widget_name)
+    linked_widget_count = sum(1 for n in serialized_slots if n in linked_names)
+    if len(wv) == len(serialized_slots):
+        return target_idx
+    if len(wv) == len(serialized_slots) - linked_widget_count:
+        leading_linked = sum(
+            1 for n in serialized_slots[:target_idx] if n in linked_names)
+        return target_idx - leading_linked
+    raise ValueError(
+        f"widgets_values length mismatch on node {node_id} ({node_type}): "
+        f"len(wv)={len(wv)} vs len(serialized_slots)={len(serialized_slots)} "
+        f"(linked={linked_widget_count}). Refusing to patch by name."
+    )
+
+
+def _linked_widget_names(target_node: dict, widget_names: list) -> set:
+    """Widget names on this node that have been converted to link sockets."""
+    return {
+        inp["name"]
+        for inp in target_node.get("inputs", []) or []
+        if inp.get("link") is not None and inp.get("name") in widget_names
+    }
+
+
+def widget_value_by_name(target_node: dict, widget_name: str,
+                         schemas: dict) -> Any:
+    """Current value of one widget by name -- the mirror of `_patch_node_widget`.
+
+    ``None`` when the widget is not serialized on this node or has been converted
+    to a link socket: both mean "this node carries no value here".
+    """
+    node_type = target_node.get("type")
+    widget_names = ordered_widget_names(node_type, schemas)
+    serialized_slots = serialized_slot_names(node_type, schemas)
+    if widget_name not in widget_names or widget_name not in serialized_slots:
+        return None
+    linked_names = _linked_widget_names(target_node, widget_names)
+    if widget_name in linked_names:
+        return None
+    try:
+        slot = _widget_slot_index(target_node, widget_name, serialized_slots,
+                                  linked_names)
+    except ValueError:
+        return None
+    wv = target_node.get("widgets_values") or []
+    return wv[slot] if 0 <= slot < len(wv) else None
+
+
+def _to_profile_form(value: Any) -> Any:
+    """A graph value projected back to the spelling a profile uses.
+
+    The graph stores COMBO labels; a profile stores bare ids. Both inverses are
+    idempotent and are the same ones the WRITE path applies, so this cannot drift
+    from emitting. Non-strings pass straight through.
+    """
+    if not isinstance(value, str):
+        return value
+    from ._otr_model_catalog import _strip_label_suffix
+    from ._otr_shared.public_engines import resolve_engine_id
+    stripped = _strip_label_suffix(value)
+    return resolve_engine_id(stripped) or stripped
+
+
+def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
+                     schemas: Optional[dict] = None) -> dict:
+    """Every profile-managed value a row RESOLVES to, for the generated docs.
+
+    FOR READING, NEVER FOR EMITTING. A row states only its deltas, which is
+    required on the emit path: a key that is written cannot follow the canonical.
+    The docs need the opposite -- a tier table reading "(canonical)" for every
+    inherited writer is worse than the table it replaces -- so resolution happens
+    HERE, after the render, where nothing it produces can be written back.
+
+    That ordering is the correction to a defect this replaced: a baseline block
+    merged resolved values on the way IN, so they reached `apply_profile` and were
+    emitted as pins, and an omitted key silently kept a stale value.
+
+    Returns a nested profile-shaped dict: `{"llm": {"creative_model": ...}, ...}`
+    plus the row's own metadata.
+    """
+    mapping = mapping if mapping is not None else load_widget_mapping()
+    schemas = schemas if schemas is not None else build_offline_schemas()
+    if isinstance(profile, str):
+        profile = load_profile(profile)
+
+    rendered = apply_profile(canonical, profile, mapping=mapping, schemas=schemas)
+
+    out: dict = {}
+    for dotted, entry in (mapping.get("managed") or {}).items():
+        values = []
+        for node_type, widget in entry["targets"]:
+            try:
+                node = _node_by_type(rendered, node_type)
+            except Exception:
+                values = []
+                break
+            values.append(_to_profile_form(
+                widget_value_by_name(node, widget, schemas)))
+        if not values:
+            continue
+        first = values[0]
+        # One profile key can drive several widgets. If they disagree there is no
+        # single value to report, so the key is omitted rather than guessed at.
+        if not all(repr(v) == repr(first) for v in values):
+            continue
+        parts = dotted.split(".")
+        node_out = out
+        for part in parts[:-1]:
+            node_out = node_out.setdefault(part, {})
+        node_out[parts[-1]] = first
+
+    for key in ("id", "display_name", "status", "platform", "device_backend",
+                "gpu_vendor", "allow_sidecars", "toolchains", "launch",
+                "preflight"):
+        if key in profile:
+            out.setdefault(key, profile[key])
+    return out
 
 
 def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:

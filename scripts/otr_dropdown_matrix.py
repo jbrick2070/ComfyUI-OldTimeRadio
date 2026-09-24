@@ -1180,11 +1180,32 @@ def render_apple(rows: list) -> str:
 
 
 def _profile_engines(profile_id: str) -> set:
-    """Every engine id a profile selects, public labels resolved to real ids."""
-    path = os.path.join(_REPO, "config", "profiles", "%s.json" % profile_id)
-    if not os.path.exists(path):
+    """Every engine id a workflow selects, public labels resolved to real ids.
+
+    Reads the workflow matrix via `resolved_profile`, so a row that INHERITS a lane
+    from the canonical still reports it. Reading the raw row would under-report
+    exactly the lanes a row does not override, which is the opposite of what this
+    function is for. `resolved_profile` already returns internal ids, which is what
+    the caller wants.
+    """
+    # This script imports pack modules by FILE PATH (see `_load`) and never puts
+    # the repo root on sys.path, so a `nodes.` package import needs it added here.
+    # It must be a package import, not `_load`: `_otr_workflow_apply` uses relative
+    # imports, which fail for a module loaded with no parent package.
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    from nodes._otr_workflow_apply import resolved_profile
+    from nodes._otr_shared.capability_profiles import ProfileError
+    canonical_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
+    with io.open(canonical_path, encoding="utf-8") as fh:
+        canonical = json.load(fh)
+    try:
+        data = resolved_profile(profile_id, canonical)
+    except ProfileError:
+        # Only "no such workflow", which is what the os.path.exists check this
+        # replaces was for. Anything else is a real fault and must not be swallowed
+        # into an empty set that reads as "this workflow selects no engines".
         return set()
-    data = json.load(io.open(path, encoding="utf-8"))
     picked = set()
     for block in ("role_overrides", "slot_overrides"):
         for value in (data.get(block) or {}).values():
