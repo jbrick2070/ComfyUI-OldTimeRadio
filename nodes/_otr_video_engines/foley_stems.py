@@ -136,6 +136,10 @@ FOLEY_LANE_GAINS = {
     "ltx25_foley_plus_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_foley_plus_32gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_16gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
+    # Low res changes the PICTURE's geometry and nothing about the bed, so it
+    # takes the identical gains. A different pair here would be inventing an
+    # audio difference out of a video decision.
+    "ltx25_native_foley_lowres": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_mime": (1.00, 0.00),
@@ -186,6 +190,7 @@ GLOBAL_MASTER_GAIN_LANES = frozenset({
     "ltx25_foley_plus_24gb",
     "ltx25_foley_plus_32gb",
     "ltx25_native_foley_16gb",
+    "ltx25_native_foley_lowres",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
     "cloud_ltx25_foley_plus",

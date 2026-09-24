@@ -427,17 +427,32 @@ def _resolve(folder, name):
             os.path.dirname(os.path.dirname(here))))), "models", folder, name)
 
 
-def _assert_two_stage_execution(records, frame_count):
-    """Require executor-owned proof that the HQ second stage really ran."""
-    expected = (
-        ("latent_upscale", "LTXVLatentUpsampler"),
-        ("refine_sampler", "SamplerCustomAdvanced"),
-        ("decode", "VAEDecodeTiled"),
-    )
+def _assert_two_stage_execution(records, frame_count, *, two_stage=True):
+    """Require executor-owned proof of what actually ran.
+
+    `two_stage=False` is the FAST lane: no latent upscale, no refinement, and
+    the decode lands at the model's native 832x480 rather than the doubled
+    1664x960. The proof still exists -- it just proves a different graph, and
+    it still fails closed if the decode is missing or the canvas is wrong.
+    Loosening it to "any shape" would have made the fast lane unable to catch a
+    silent geometry change, which is the one thing this check is for.
+    """
+    if two_stage:
+        expected = (
+            ("latent_upscale", "LTXVLatentUpsampler"),
+            ("refine_sampler", "SamplerCustomAdvanced"),
+            ("decode", "VAEDecodeTiled"),
+        )
+    else:
+        expected = (("decode", "VAEDecodeTiled"),)
     if not isinstance(records, list) or len(records) != len(expected):
+        # THE COUNT COMES FROM `expected`, not a literal 3. The fast lane proves
+        # one node, so a hardcoded 3 here would have printed a wrong number in
+        # the one message a reader consults when the proof fails.
         raise RuntimeError(
-            "ltx25 two-stage execution proof expected 3 node records, got %r"
-            % (len(records) if isinstance(records, list) else type(records).__name__,))
+            "ltx25 %s execution proof expected %d node record(s), got %r"
+            % ("two-stage" if two_stage else "single-stage", len(expected),
+               len(records) if isinstance(records, list) else type(records).__name__))
     for ordinal, (record, wanted) in enumerate(zip(records, expected), 1):
         node_id, class_name = wanted
         if (record.get("node_id"), record.get("class_name"),
@@ -448,16 +463,17 @@ def _assert_two_stage_execution(records, frame_count):
 
     shapes = records[-1].get("output_shapes")
     shape = shapes[0] if isinstance(shapes, list) and shapes else None
+    want_h = R.LTX25_RENDER_CANVAS_H if two_stage else R.LTX25_CANVAS_H
+    want_w = R.LTX25_RENDER_CANVAS_W if two_stage else R.LTX25_CANVAS_W
     legal = (isinstance(shape, list) and len(shape) == 4
              and shape[0] == int(frame_count)
-             and shape[1:3] == [R.LTX25_RENDER_CANVAS_H,
-                                R.LTX25_RENDER_CANVAS_W]
+             and shape[1:3] == [want_h, want_w]
              and shape[3] in (3, 4))
     if not legal:
         raise RuntimeError(
-            "ltx25 two-stage decode returned %r; expected [%d,%d,%d,3|4]"
-            % (shape, int(frame_count), R.LTX25_RENDER_CANVAS_H,
-               R.LTX25_RENDER_CANVAS_W))
+            "ltx25 %s decode returned %r; expected [%d,%d,%d,3|4]"
+            % ("two-stage" if two_stage else "single-stage", shape,
+               int(frame_count), want_h, want_w))
     return True
 
 
@@ -1226,7 +1242,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         seed = int(plan.get("seed", 0) or 0)
         fps = float(R.LTX25_FPS)
 
-        return {
+        graph = {
             # --- loaders ---
             "unet": {"class": "unet",
                      "inputs": {"unet_name": self._dit_name()}},
@@ -1379,13 +1395,28 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             # Decode VIDEO ONLY. refine_separate slot 1 is the audio latent and
             # stays unwired, preserving V-1 while stage two sharpens the video.
             "decode": {"class": "decode", "inputs": {
-                "samples": W("refine_separate", 0),
+                "samples": W("refine_separate" if self._ingraph_upscale
+                             else "separate", 0),
                 "vae": W("videovae", 0),
                 "tile_size": R.LTX25_STAGE2_DECODE_TILE_SIZE,
                 "overlap": R.LTX25_STAGE2_DECODE_OVERLAP,
                 "temporal_size": R.LTX25_STAGE2_DECODE_TEMPORAL_SIZE,
                 "temporal_overlap": R.LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP}},
         }
+
+        if not self._ingraph_upscale:
+            # THE FAST LANE: drop stage two entirely rather than leave it
+            # wired-but-unused. The decode above already reads `separate`, so
+            # leaving these in place would have run the upscaler and the
+            # refinement sampler and then discarded both -- the slowest
+            # possible way to render at low resolution, which is the exact
+            # opposite of why this lane exists.
+            for stage_two in ("upscale_loader", "latent_upscale", "refine_i2v",
+                              "refine_concat", "refine_sampler",
+                              "refine_separate"):
+                graph.pop(stage_two, None)
+
+        return graph
 
     # ---- the two Chunk B seams (2026-08-26) ----
     #
@@ -1675,7 +1706,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 graph, classes, free_after_use=True,
                 keep={"unet", "modality", self._TERMINAL},
                 external_results=external, on_result=_harvest,
-                audit_node_ids={"latent_upscale", "refine_sampler", "decode"},
+                audit_node_ids=(
+                    {"latent_upscale", "refine_sampler", "decode"}
+                    if self._ingraph_upscale else {"decode"}),
                 execution_records=execution_records)
             images = results[self._TERMINAL][0]
         finally:
@@ -1689,13 +1722,22 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             raise _wb.GraphExecutionError(
                 "%s: run_graph produced no terminal image" % self.name)
         try:
-            _assert_two_stage_execution(execution_records, length)
+            _assert_two_stage_execution(
+                execution_records, length, two_stage=self._ingraph_upscale)
         except RuntimeError as exc:
             raise _wb.GraphExecutionError(str(exc)) from exc
+        # THE LINE SAYS WHICH GRAPH RAN, because this is the line a reader
+        # greps to find out what a lane actually did. It used to hardcode
+        # "TWO-STAGE PASS nodes=3" and the doubled canvas, which on a
+        # single-stage lane would have printed a confident description of a
+        # graph that never ran.
         _LOG.info(
-            "[OTR video] %s TWO-STAGE PASS nodes=3 decode=%dx%d "
-            "render_elapsed_s=%.3f",
-            self.name, R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H,
+            "[OTR video] %s %s nodes=%d decode=%dx%d render_elapsed_s=%.3f",
+            self.name,
+            "TWO-STAGE PASS" if self._ingraph_upscale else "SINGLE-STAGE PASS",
+            3 if self._ingraph_upscale else 1,
+            R.LTX25_RENDER_CANVAS_W if self._ingraph_upscale else R.LTX25_CANVAS_W,
+            R.LTX25_RENDER_CANVAS_H if self._ingraph_upscale else R.LTX25_CANVAS_H,
             render_elapsed_s)
 
         # PUBLISH ON GRAPH SUCCESS, and only whole.
@@ -2280,7 +2322,15 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
         ``reclaim_idle_models`` is freed VRAM, which is a crash or silent
         garbage rather than a saving.
         """
-        if node_id != "refine_separate" or not out or len(out) < 2:
+        # WHICH NODE CARRIES THE AUDIO DEPENDS ON THE LANE. Stage two
+        # re-samples the joint latent, so on an HQ lane the audio to keep is
+        # `refine_separate`'s. The fast lane has no stage two at all, and its
+        # audio is the stream `separate` already carries -- reading the
+        # stage-two name there would match nothing, the harvest would never
+        # fire, and the episode would come out with no foley bed and no error
+        # to say why.
+        want = "refine_separate" if self._ingraph_upscale else "separate"
+        if node_id != want or not out or len(out) < 2:
             return
         self._pending_audio_latent = self._latent_to_cpu(out[1])
 
@@ -3409,6 +3459,13 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
     #: Declared by the tier subclasses. Named here so the base reads complete.
     _native_dit = None
 
+    #: TRUE ON EVERY EXISTING LANE. The 2x in-graph latent upscale and the
+    #: refinement pass that follows it are the accepted HQ path and stay the
+    #: default; a subclass sets this False to decode the stage-one latent at
+    #: its native canvas instead. See `Ltx25NativeFoleyFastEngine` for why one
+    #: lane wants that.
+    _ingraph_upscale = True
+
     #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
     #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
     #:
@@ -3598,6 +3655,41 @@ class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
     #: KEEPS THE PIN, inherited from the base. 16 GB is exactly the class the
     #: pin was written for, and this lane is the one that would tip without
     #: it. _encoder_cache_expects_cpu stays True with it.
+
+
+@register
+class Ltx25NativeFoleyLowResEngine(Ltx25NativeFoley16gbEngine):
+    """LOW RES: the same foley lane, decoded at 832x480 instead of 1664x960.
+
+    THE ONE DIFFERENCE IS `_ingraph_upscale`. Everything that makes an episode
+    is inherited untouched from the 16 GB lane -- the same mix4x8 DiT, the same
+    Gemma-4 encoder, the same 97-frame rung, the same joint-AV latent, the same
+    0.50/0.50 foley mix. What this lane does not do is run the x2 latent
+    upscaler and the refinement sampler that follow stage one.
+
+    WHY A SEPARATE LANE RATHER THAN A WIDGET. A widget that changes output
+    geometry changes what a saved graph produces without changing the graph,
+    which is the same class of silent drift that positional `widgets_values`
+    already punishes us for. A lane is a name: the episode's receipt says which
+    one rendered it, the shortcode says so in the filename, and nobody has to
+    remember how a switch was left.
+
+    THE TRADE, PLAINLY. Stage two is where a large fraction of the render goes
+    on a small card: it samples the whole joint latent a second time at four
+    times the pixel count, then decodes that. Dropping it costs real detail --
+    this is the low-quality option and it is meant to be -- and buys back the
+    time. It also drops `ltx-2.5-latent-spatial-upscaler-x2` from the download
+    list, because nothing loads it here.
+
+    NOT PROVEN ON A LEG YET. Registered, wired and suite-green; the wall-clock
+    claim above is arithmetic about which nodes run, not a measurement. The
+    first leg that renders on it is what turns that into a number.
+    """
+
+    name = "ltx25_native_foley_lowres"
+    engine_version = "1"
+    default_roles = ()
+    _ingraph_upscale = False
 
 
 class Ltx25NativeAudioInMixin:
@@ -4094,6 +4186,7 @@ _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_foley_plus_24gb",
     "ltx25_foley_plus_32gb",
     "ltx25_native_foley_16gb",
+    "ltx25_native_foley_lowres",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
     "ltx25_native_mime_16gb",

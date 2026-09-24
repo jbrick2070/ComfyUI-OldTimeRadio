@@ -1655,6 +1655,8 @@ NO_LANE_REASON = {
     # and need none.)
     "ltx25_native_foley_24gb": "manual_doc",
     "ltx25_native_foley_16gb": "manual_doc",
+    # Same artifacts minus the x2 upscaler, so the same classification.
+    "ltx25_native_foley_lowres": "manual_doc",
     "ltx25_native_foley_blackwell": "manual_doc",
     # The mime and audio-in lanes load exactly the same artifacts as the foley
     # lanes they subclass -- same DiT, same encoder, same VAEs, same upscaler.

@@ -651,6 +651,20 @@ CAPABILITIES = {
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
+    # LOW RES: the same lane decoded at 832x480 rather than upscaled to
+    # 1664x960. FOUR artifacts, not five -- the x2 latent upscaler is absent
+    # because this lane never builds the node that loads it. That is a real
+    # difference in what a fresh install has to fetch, which is the one thing
+    # this table is read for.
+    "ltx25_native_foley_lowres": {
+        "required_toolchain": None, "requires_sidecar": False,
+        "device_backends": ["cuda"], "requires_vendor": None,
+        "needs_fp8_te": False, "needs_fp4_te": False,
+        "practical_without_gpu": False, "sidecar_conditional": False,
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
+                               "ltx-2.5-video-vae",
+                               "ltx-2.5-audio-vae"]},
     # The NATIVE MIME lanes. Identical requirements to their foley parents --
     # same weights, same recipe, same graph. Mime differs only at the mux, in
     # foley_stems.FOLEY_LANE_GAINS (1.00 foley / 0.00 master), so a row that
