@@ -127,6 +127,25 @@ SHIPPING_SET = (
     # leg completes -- they build a variant so the graph can be run and
     # measured, which is exactly how the qualification happens.
     "otr_24gb_native_foley",
+    # THE 8 GB NATIVE TIER, 2026-09-23. Operator: "if it's a lane it should be
+    # in the workflows folder" -- which is the rule that put these here. A
+    # profile with no variant is not a lane a person can pick; it is internal
+    # config that happens to live beside the lanes, and four of these had been
+    # sitting in that state while being treated as lanes in conversation.
+    #
+    # THEY COST NO NEW DOWNLOAD. All four run mix4x8, the weight measured clean
+    # at 707.0 s for a 97-frame clip on a 4060 -- against 1018 s cold and
+    # 821-859 s warm for the GGUF lane this tier used to run. So the native tier
+    # is FASTER than the GGUF one it replaces and it auto-downloads, which GGUF
+    # cannot. The framing carried for weeks, "slower but installable", was wrong
+    # in both halves.
+    #
+    # Draft on the same reasoning as the 24 GB row above: the variant is how the
+    # leg becomes possible, not a claim that the leg has run.
+    "otr_8gb_ltx25_native_foley",
+    "otr_8gb_ltx25_native_foley_lowres",
+    "otr_8gb_ltx25_native_mime",
+    "otr_8gb_ltx25_native_audio_in",
 )
 
 class EmitRefused(RuntimeError):
