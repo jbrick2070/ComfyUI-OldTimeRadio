@@ -178,8 +178,7 @@ one workflow. Edit that file. Do not hand-edit anything in
 `workflows/variants/` -- those JSON files and their `.launch.md` recipes are
 generated, and the next rebuild silently undoes you. Do not add a
 `config/profiles/<id>.json` for something you intend to ship -- the matrix is
-consulted first. That folder still holds twins of the current shipping rows
-from the migration, plus the lab rigs (`otr_soak_*` and friends) that
+consulted first. That folder is the lab rigs (`otr_soak_*` and friends) that
 `--profile` loads on the canonical runner. A new shipping graph is a matrix
 row only.
 
@@ -229,7 +228,7 @@ Copy the closest sibling. Then:
    omitting it does not inherit, it fails validation. State `gpu_vendor` too
    (`nvidia`, `amd`, `apple`, `none`). It is not in `defaults`. Every shipping
    row states it. Omit it and an AMD/cuda row gets the NVIDIA launch recipe,
-   and any engine that `requires_vendor` is refused at emit. `allow_sidecars`
+   and a pinned engine that `requires_vendor` is refused at emit. `allow_sidecars`
    defaults false; set it true only if this graph should offer engines that
    declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
 
@@ -266,10 +265,10 @@ the one that would otherwise lie.
 
 Set `"ships"` false (or delete the row), **and delete** the matching files in
 `workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
-that id). If you delete the row, also delete any `config/profiles/<id>.json`
-twin -- `--check` falls through to that file and can pass on a graph that no
-longer ships. `--all` does not remove leftovers; `--check` still validates
-every `otr_*.json` sitting in `workflows/variants/`.
+that id). `--all` does not remove leftovers; `--check` still validates every
+`otr_*.json` sitting in `workflows/variants/`. Do not leave a
+`config/profiles/<id>.json` behind either -- `load_profile` falls through to
+that file, and `--check` can then pass on a graph that no longer ships.
 
 ### The proof
 
