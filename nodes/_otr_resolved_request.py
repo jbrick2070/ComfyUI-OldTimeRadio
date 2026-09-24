@@ -27,14 +27,29 @@ import torch
 
 # BUMPED 3 -> 4 (2026-09-24) because those same four fields LEFT
 # IN_KEY_FIELDS with the voice-route subsystem. Removing a key field moves
-# every request's cache_key exactly as adding one did, so it takes the same
-# declared route through `needs_rerender` rather than letting keys drift
-# silently -- a cache that quietly stops matching is indistinguishable from
-# a cache that is broken.
+# every request's cache_key exactly as adding one did, so the bump DECLARES
+# an invalidation that was going to happen anyway -- a cache that quietly
+# stops matching is indistinguishable from one that is broken.
+#
+# IT DOES NOT ROUTE THROUGH `needs_rerender`, AND SAYING SO WAS WRONG.
+# The 2 -> 3 note here claimed the bump "routes that invalidation through the
+# DESIGNED slim-migration path (needs_rerender)". It does not, and could not:
+# `request_schema_version` is the FIRST entry of IN_KEY_FIELDS, so it is
+# hashed into the key itself. A v3 record lives under a v3-derived key; a v4
+# request derives a different key; `FileAudioCache.get` stats a path that does
+# not exist and returns at its "never cached" line, having never loaded the
+# record. `needs_rerender` is still called on every hit, but the only record
+# it can ever see is one the key already agreed with, so its mismatch branch
+# is unreachable by version drift alone. (It remains reachable if a cache is
+# constructed with a `request_schema_version` target that differs from the one
+# the requests carry -- a configuration fault, not a migration.)
+# Measured 2026-09-24: same request at v4 and v3 -> 122035d08cc48714 vs
+# fd9005968c8f968e. Corrected here rather than left standing, because a reader
+# planning the next bump would otherwise budget for a migration path that does
+# not run.
 #
 # (Bumped 2 -> 3 on 2026-08-10 when they joined. Measured at THAT bump: zero
-# cached entries on this box. This bump is the same shape in reverse and is
-# declared for the same reason -- the next box, not this one.)
+# cached entries on this box. This bump is the same shape in reverse.)
 REQUEST_SCHEMA_VERSION = "4"
 _DEFAULT_SR = 24000
 _SEP = b"\x1f"  # ASCII unit separator -> unambiguous part join

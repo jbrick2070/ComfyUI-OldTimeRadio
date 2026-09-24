@@ -79,18 +79,22 @@ def test_schema_versions_bumped():
 
     REQUEST 2 -> 3 on 2026-08-10: four route-identity fields (route_id,
     route_contract_version, qualification_record_id, weight_revision) joined
-    IN_KEY_FIELDS, which changes every request's cache_key. The bump routes that
-    invalidation through the designed slim-migration path rather than letting
-    keys drift silently. CACHE_SCHEMA_VERSION is unchanged: the SIDECAR record
-    shape did not change, only what the key is computed over.
+    IN_KEY_FIELDS, which changes every request's cache_key. CACHE_SCHEMA_VERSION
+    is unchanged: the SIDECAR record shape did not change, only what the key is
+    computed over.
 
     REQUEST 3 -> 4 on 2026-09-24: those same four fields LEFT IN_KEY_FIELDS with
     the voice-route subsystem. Removing a key field moves every cache_key
-    exactly as adding one did, so it takes the same declared path. This test
-    failing is the mechanism working -- it is the reason the bump was not
-    forgotten -- so a future edit here is a deliberate act, never a way to make
-    red go green. CACHE_SCHEMA_VERSION is again unchanged, for the same reason
-    as last time: the sidecar record shape did not move.
+    exactly as adding one did. This test failing is the mechanism working -- it
+    is the reason the bump was not forgotten -- so a future edit here is a
+    deliberate act, never a way to make red go green. CACHE_SCHEMA_VERSION is
+    again unchanged, for the same reason as last time.
+
+    BOTH NOTES USED TO SAY the bump "routes that invalidation through the
+    designed slim-migration path". That was false, and false at the 2 -> 3 bump
+    too; the version is IN the key, so a stale record is unreachable rather than
+    migrated. See
+    `test_the_schema_version_invalidates_BY_THE_KEY_not_by_needs_rerender`.
     """
     assert REQUEST_SCHEMA_VERSION == "4"
     assert CACHE_SCHEMA_VERSION == "2"
@@ -1090,3 +1094,46 @@ def test_persist_ledger_stamps_wired_into_render_per_line_finally():
 
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__, "-v"]))
+
+
+def test_the_schema_version_invalidates_BY_THE_KEY_not_by_needs_rerender():
+    """Pin how a schema bump actually invalidates, because the comment lied.
+
+    Until 2026-09-24 the note beside REQUEST_SCHEMA_VERSION claimed a bump
+    "routes that invalidation through the DESIGNED slim-migration path
+    (needs_rerender)". It does not, and it could not have at the 2 -> 3 bump
+    either: `request_schema_version` is the FIRST entry of IN_KEY_FIELDS, so it
+    is hashed into the key. A record written at v3 lives under a v3-derived
+    key; a v4 request derives a different key; `FileAudioCache.get` stats a
+    path that does not exist and returns at its "never cached" line without
+    ever loading the record. So `needs_rerender` -- which IS called on every
+    hit -- can only ever see a record the key already agreed with, and its
+    mismatch branch is unreachable by version drift alone.
+
+    This matters to the next person who bumps it: the invalidation is real and
+    total, but there is no migration step to hook, and stale sidecars are
+    simply orphaned rather than swept.
+    """
+    import dataclasses
+
+    from nodes._otr_resolved_request import IN_KEY_FIELDS
+
+    assert IN_KEY_FIELDS[0] == "request_schema_version", (
+        "the schema version left the front of the cache key; if it left the "
+        "key entirely, a bump no longer invalidates anything and this whole "
+        "mechanism is gone")
+
+    at_current = _req()
+    at_previous = dataclasses.replace(at_current, request_schema_version="3")
+    assert at_current.cache_key != at_previous.cache_key, (
+        "two schema versions produced the SAME cache_key, so a bump would "
+        "silently serve audio rendered under the old field set")
+
+    # ...and the record found under a key is always version-agreeable, which is
+    # why needs_rerender cannot fire on drift.
+    from nodes._otr_audio_cache import needs_rerender
+
+    class _Rec:
+        request_schema_version = at_current.request_schema_version
+
+    assert needs_rerender(_Rec()) is False

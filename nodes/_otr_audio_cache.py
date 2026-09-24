@@ -182,9 +182,11 @@ class AudioCache(Protocol):
 # ===========================================================================
 from ._otr_resolved_request import REQUEST_SCHEMA_VERSION  # noqa: E402
 
-# The registry-path (cast-locked) ledger schema. A pre-cast-lock ledger replayed
-# through the registry path predates voice_ref_id and must be re-rendered.
-LEDGER_SCHEMA_VERSION_TARGET = "2"
+# LEDGER_SCHEMA_VERSION_TARGET was removed on 2026-09-24. It declared a
+# registry-path ledger schema target and had exactly one line in the repo --
+# its own assignment. No production code, no test, and no doc read it, so it
+# stated a rule that nothing enforced. Reinstating it means giving it a reader
+# in the same change; a constant is not a contract on its own.
 
 
 def needs_rerender(record, *, target_request_schema_version: str = REQUEST_SCHEMA_VERSION) -> bool:
