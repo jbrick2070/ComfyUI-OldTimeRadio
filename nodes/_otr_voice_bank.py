@@ -188,9 +188,11 @@ class VoiceBankEntry:
     # (ref-clip / preset) engine -- behavior unchanged until a cloud bank ships.
     provider_voice_id: str = ""
     #: Non-empty means this row belongs to ONE named character and is excluded
-    #: from every ordinary draw. Appended LAST: VoiceBankEntry is frozen and
-    #: constructed by keyword everywhere, but a field inserted mid-list would
-    #: still reorder the dataclass signature for any positional caller.
+    #: from every ordinary draw. Position is safe rather than last: this landed
+    #: before `speaker_id` and `languages`, not at the end as an earlier version
+    #: of this comment claimed. It does not matter because VoiceBankEntry is
+    #: frozen and constructed by KEYWORD at every site in the repo -- which was
+    #: checked, not assumed -- so no positional caller can be reordered by it.
     reserved_for: str = ""
     # The real HUMAN behind this reference, when two rows are two recordings of
     # one person. ref_path collision cannot catch that case: LibriVox's Mark F.

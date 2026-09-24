@@ -170,7 +170,26 @@ def test_only_a_stamped_job_scoped_verdict_floors_a_cue():
 # --------------------------------------------------------------------------- #
 # the LEDGER, which a floored line must not damage
 # --------------------------------------------------------------------------- #
-def test_a_floored_line_stamp_lands_and_spares_its_healthy_neighbours(tmp_path):
+@pytest.fixture()
+def no_in_flight_ledger(monkeypatch):
+    """Pin the in-flight ledger singleton to absent.
+
+    `_persist_ledger_stamps` PREFERS the in-flight singleton over the caller's
+    `meta.paths.ledger_path` -- deliberately, because the wire value is
+    attacker-controlled and can go stale. That makes any test of it depend on
+    process-wide state: an earlier test in the session that constructs a Ledger
+    leaves the singleton set, and the tmp_path ledger below is then not the file
+    that gets stamped.
+
+    Added 2026-09-24 after a review REPRODUCED the failure here by planting a
+    real singleton. Today's alphabetical order happens not to trip it, which is
+    exactly the point -- ordering was never the contract.
+    """
+    from nodes import _otr_ledger as _OTRL
+    monkeypatch.setattr(_OTRL, "in_flight_ledger_path", lambda: None)
+
+
+def test_a_floored_line_stamp_lands_and_spares_its_healthy_neighbours(tmp_path, no_in_flight_ledger):
     """THE DEFECT THIS FILE MISSED THE FIRST TIME.
 
     `stamp_per_line_audio_meta` is keyword-only with no **kwargs. An earlier

@@ -975,7 +975,21 @@ def verify_registered_indextts2_refs(root: str, bank_path: str | None = None):
     try:
         authority = _load_voice_bank_module()
         rows, _bank_sha = authority.load_voice_bank(bank_path)
-        reserved = authority.reserved_voice_ref_ids()
+        # RESERVED IN EITHER BANK IS RESERVED HERE, and the union is the point.
+        #
+        # `bank_path` may name a bank that is NOT the configured one -- that
+        # parameter exists so a caller can gate an arbitrary bank, and this
+        # function's own test exercises exactly that shape. Two failure modes
+        # follow, and one argument alone fixes only one of them:
+        #   * ask only the CONFIGURED bank, and a custom bank's own
+        #     `reserved_for` marker is ignored, so a private clone in it reads
+        #     as usable;
+        #   * ask only the LOADED bank, and a synthetic bank that omits the
+        #     marker loses the protection entirely -- which is what the gate is
+        #     for, since its job is refusing to distribute a private recording.
+        # Taking both means a row has to be unreserved in BOTH to be offered.
+        reserved = (authority.reserved_voice_ref_ids(rows)
+                    | authority.reserved_voice_ref_ids())
     except Exception as exc:  # noqa: BLE001 - schema authority owns details
         return [], ["voice bank invalid: %s" % exc], 0
 

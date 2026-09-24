@@ -101,6 +101,51 @@ def test_source_gate_requires_exact_pin_and_allows_only_runtime_drift(
                provision._indextts2_source_problems(str(source)))
 
 
+def test_a_custom_banks_own_reservation_marker_is_honoured(tmp_path):
+    """THE MIRROR CASE, found by review on 2026-09-24.
+
+    `bank_path` exists so a caller can gate an ARBITRARY bank. Reservation moved
+    onto the bank row that day, and the gate was still asking the CONFIGURED
+    bank which ids are reserved -- so a private clone marked `reserved_for` in a
+    custom bank read as usable, because its id is not one of the three the
+    shipped bank marks.
+
+    The test above covers the opposite direction (a synthetic bank that OMITS the
+    marker must still not offer the known-private id). Both have to hold, which
+    is why the gate takes the union of the two banks' reserved sets: a row must
+    be unreserved in BOTH to be offered.
+    """
+    provision = _load_provision()
+    root = tmp_path / "models"
+    refs = root / "TTS" / "refs" / "indextts2"
+    refs.mkdir(parents=True)
+    ordinary = _write_wav(refs / "ordinary.wav", sample=100)
+    private = _write_wav(refs / "private.wav", sample=-100)
+
+    # An id the SHIPPED bank knows nothing about, marked reserved here.
+    owned = _bank_row("someone_elses_clone_v1", "private.wav", private, "male")
+    owned["reserved_for"] = "a_future_character"
+    bank = tmp_path / "custom-bank.json"
+    bank.write_text(json.dumps({"voices": [
+        _bank_row("ordinary", "ordinary.wav", ordinary, "female"),
+        owned,
+    ]}), encoding="utf-8")
+
+    usable, problems, registered = provision.verify_registered_indextts2_refs(
+        str(root), str(bank))
+    assert "someone_elses_clone_v1" not in usable, (
+        "a row this bank marks `reserved_for` was offered as usable: %r"
+        % (usable,))
+    assert usable == ["ordinary"], usable
+    assert registered == 1
+    # THE COVERAGE COMPLAINT IS THE POSITIVE EVIDENCE, not a failure of this
+    # test. The reserved row was the only male one, so excluding it leaves the
+    # bank without male coverage and the gate says so. A version of this test
+    # that demanded `problems == []` would have been asserting the exclusion did
+    # NOT happen.
+    assert any("lacks male coverage" in item for item in problems), problems
+
+
 def test_reference_gate_uses_registered_rows_not_arbitrary_wavs(tmp_path):
     provision = _load_provision()
     root = tmp_path / "models"

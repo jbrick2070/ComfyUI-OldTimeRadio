@@ -150,8 +150,11 @@ def test_a_stale_route_field_is_cleared_on_a_re_stamp(assign, policy):
 
     rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                cast=cast, policy=policy)
-    assert not rows["c02"].get("voice_route"), (
-        "a stale voice_route survived a %s re-stamp" % policy)
+    assert "voice_route" not in rows["c02"], (
+        "a stale voice_route survived a %s re-stamp as %r; the clear must "
+        "DELETE the key, not blank it -- a consumer that reads truthiness and "
+        "one that reads presence would then disagree"
+        % (policy, rows["c02"].get("voice_route")))
 
 
 def test_a_row_the_caster_never_reaches_is_left_exactly_as_it_arrived(assign):
@@ -211,7 +214,7 @@ def test_preserve_ledger_reaches_the_assignment(assign):
     rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                policy="preserve_ledger")
     assert rows["c02"].get("voice_ref_id") == KOKORO_REF
-    assert not rows["c02"].get("voice_route")
+    assert "voice_route" not in rows["c02"]
 
 
 def test_preserve_ledger_leaves_an_unassigned_row_with_nothing_added(assign):
@@ -294,7 +297,7 @@ def test_no_assignment_writes_a_route_and_none_of_them_raises(assign, engine, re
     """The per-line dispatch call runs for every row of every episode."""
     rows = _lock_recurring_row(assign, engine, ref)
     row = rows["c02"]
-    assert "voice_route" not in row or not row["voice_route"]
+    assert "voice_route" not in row
     resolved = ROUTE.resolve_and_verify_reference(row, engine)
     assert resolved is ROUTE.LEGACY_REFERENCE, resolved
     assert resolved.is_policy_route is False

@@ -349,7 +349,26 @@ def test_audio_cache_dir_empty_when_no_source(monkeypatch):
 # ----------------------------------------------------------------------------
 # _persist_ledger_stamps reload-before-save preserves prior role stamps
 # ----------------------------------------------------------------------------
-def test_persist_ledger_stamps_preserves_prior_role_stamps(tmp_path):
+@pytest.fixture()
+def no_in_flight_ledger(monkeypatch):
+    """Pin the in-flight ledger singleton to absent.
+
+    `_persist_ledger_stamps` PREFERS the in-flight singleton over the caller's
+    `meta.paths.ledger_path` -- deliberately, because the wire value is
+    attacker-controlled and can go stale. That makes any test of it depend on
+    process-wide state: an earlier test in the session that constructs a Ledger
+    leaves the singleton set, and the tmp_path ledger below is then not the file
+    that gets stamped.
+
+    Added 2026-09-24 after a review REPRODUCED the failure here by planting a
+    real singleton. Today's alphabetical order happens not to trip it, which is
+    exactly the point -- ordering was never the contract.
+    """
+    from nodes import _otr_ledger as _OTRL
+    monkeypatch.setattr(_OTRL, "in_flight_ledger_path", lambda: None)
+
+
+def test_persist_ledger_stamps_preserves_prior_role_stamps(tmp_path, no_in_flight_ledger):
     """Character stamps land, announcer stamps land, both survive the
     two-write sequence because _persist_ledger_stamps reloads the ledger
     from disk before patching."""
@@ -403,7 +422,7 @@ def test_persist_ledger_stamps_preserves_prior_role_stamps(tmp_path):
     assert line_map["l002"].get("audio_sha256") == "ann_sha_1"
 
 
-def test_persist_ledger_stamps_missing_path_returns_all_degraded(tmp_path):
+def test_persist_ledger_stamps_missing_path_returns_all_degraded(tmp_path, no_in_flight_ledger):
     import logging
 
     from nodes._otr_voice_node_common import _persist_ledger_stamps
