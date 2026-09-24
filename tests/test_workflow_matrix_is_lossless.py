@@ -129,28 +129,64 @@ def test_the_row_renders_what_the_config_renders(pid, matrix, modules, canonical
         "consolidation dropped or changed something that reaches a widget" % (pid, pid))
 
 
+def _key_indicators(matrix):
+    """The keys every row must state, from the matrix's own declaration."""
+    return tuple(matrix.get("key_indicators") or ())
+
+
 @pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
     MATRIX_PATH.read_text(encoding="utf-8"))["rows"]])
-def test_no_delta_merely_restates_the_canonical(pid, matrix, modules, canonical):
-    """THE ANTI-DRIFT PROPERTY, MECHANIZED.
+def test_every_row_states_every_key_indicator(pid, matrix):
+    """AN INDICATOR MUST NOT GO QUIETLY MISSING.
 
-    A stated value equal to the canonical's is a fork point: it keeps its value
-    when the canonical moves. That is how 82 configs went on pinning a voice
-    engine the canonical had already left. A key the matrix does not mention
-    follows the canonical forever, so the rule is that a delta must actually
-    change something.
+    A row that drops one silently starts INHERITING it -- which is the precise
+    failure the indicator list exists to prevent, arriving by omission rather than
+    by decision. It matters most where a machine requires the value: an 8 GB row
+    that stops stating its writer follows the canonical, and a canonical that moves
+    to a 12B then puts a model on that card which cannot fit.
+    """
+    declared = _key_indicators(matrix)
+    assert declared, "the matrix declares no key_indicators; nothing is guarded"
+    stated = set(_rows(matrix)[pid].get("deltas") or {})
+    missing = [k for k in declared if k not in stated]
+    assert not missing, (
+        "row %s does not state %d key indicator(s): %s\nAn unstated indicator is "
+        "inherited from the canonical, which is exactly what stating it prevents."
+        % (pid, len(missing), ", ".join(missing)))
 
-    Checked per row, by removing one delta and rendering: if the graph is
-    unchanged, that delta was not doing anything and belongs deleted.
+
+@pytest.mark.parametrize("pid", [r["id"] for r in json.loads(
+    MATRIX_PATH.read_text(encoding="utf-8"))["rows"]])
+def test_no_incidental_value_merely_restates_the_canonical(pid, matrix, modules,
+                                                           canonical):
+    """THE ANTI-DRIFT PROPERTY, NARROWED TO WHERE IT STILL APPLIES.
+
+    A value stated for no reason and equal to the canonical's is a fork point: it
+    keeps its old value when the canonical moves. That is how 82 configs went on
+    pinning a voice engine the canonical had already left, and it stays an error.
+
+    KEY INDICATORS ARE EXEMPT, and the exemption is the point rather than a hole.
+    Those are stated deliberately -- the writer, the ceiling, the lanes, the device --
+    because they define the workflow and because a machine can REQUIRE one. An 8 GB
+    card needs the small writer whatever the canonical picks, so that pin must
+    survive a canonical that moves upward. What makes an explicit pin safe here is
+    that all 25 rows sit in one column of one file; the 82-file drift was invisible
+    because it was spread across 82 files, not because it was pinned.
+
+    So the rule is narrower, not weaker: anything NOT declared an indicator must
+    actually change something.
     """
     _, _, wa = modules
     row = _rows(matrix)[pid]
     deltas = row.get("deltas") or {}
+    indicators = set(_key_indicators(matrix))
+    candidates = [k for k in sorted(deltas) if k not in indicators]
+
     logging.disable(logging.CRITICAL)
     try:
         full = wa.apply_profile(canonical, _row_document(row))
         inert = []
-        for dotted in sorted(deltas):
+        for dotted in candidates:
             trimmed = dict(row)
             trimmed["deltas"] = {k: v for k, v in deltas.items() if k != dotted}
             if wa.apply_profile(canonical, _row_document(trimmed)) == full:
@@ -158,9 +194,11 @@ def test_no_delta_merely_restates_the_canonical(pid, matrix, modules, canonical)
     finally:
         logging.disable(logging.NOTSET)
     assert not inert, (
-        "row %s states %d value(s) that change nothing: %s\nDelete them -- an "
-        "inert pin is a fork point that silently keeps its value when the "
-        "canonical moves." % (pid, len(inert), ", ".join(inert)))
+        "row %s states %d non-indicator value(s) that change nothing: %s\nDelete "
+        "them -- an incidental pin is a fork point that silently keeps its value "
+        "when the canonical moves. If one of these is actually a decision, declare "
+        "it in `key_indicators` instead of leaving it to look accidental."
+        % (pid, len(inert), ", ".join(inert)))
 
 
 def test_the_matrix_actually_has_material(matrix):
