@@ -503,13 +503,9 @@ class CastLock:
             "announcer_voice", announcer_voice_engine)
 
         bank_entries = None
-        bank_unavailable_route_ids = None
         if cast_voice_policy == "auto_registry":
-            from ._otr_voice_bank import (
-                load_voice_bank, unavailable_qualified_route_ids)
+            from ._otr_voice_bank import load_voice_bank
             bank_entries, _bank_sha = load_voice_bank()
-            bank_unavailable_route_ids = unavailable_qualified_route_ids(
-                source_sha256=_bank_sha)
         target_engine, announcer_engine = self._stamp_voice_engine_selection(
             led, char_bank, ann_bank, char_voice_engine, announcer_voice_engine,
             bank_entries=bank_entries, voice_device=voice_device)
@@ -523,7 +519,6 @@ class CastLock:
                 bank_entries=bank_entries,
                 target_engine=target_engine,
                 announcer_engine=announcer_engine,
-                bank_unavailable_route_ids=bank_unavailable_route_ids,
                 ann_bank=ann_bank,
                 language=language_iso)
         else:
@@ -1011,7 +1006,6 @@ class CastLock:
                        bank_entries=None,
                        target_engine=None,
                        announcer_engine=None,
-                       bank_unavailable_route_ids=None,
                        ann_bank=None,
                        language="en"):
         """Re-cast the registry rows.
@@ -1025,7 +1019,6 @@ class CastLock:
             announcer_voice_ref, assign_voice_for_slot,
             filter_voices_for_language, gender_agnostic_fallback_ref,
             load_voice_bank, voice_speaks_language,
-            unavailable_qualified_route_ids as resolve_unavailable_route_ids,
             voice_ref_usage_keys,
         )
         language = str(language or "en").strip() or "en"
@@ -1033,14 +1026,6 @@ class CastLock:
 
         if bank_entries is None:
             bank_entries, _bank_sha = load_voice_bank()
-            if bank_unavailable_route_ids is None:
-                bank_unavailable_route_ids = resolve_unavailable_route_ids(
-                    source_sha256=_bank_sha)
-        elif bank_unavailable_route_ids is None:
-            # Direct tests and compatibility callers may inject rows. Metadata
-            # from the environment-selected bank must never authorize an
-            # exception on unrelated injected entries.
-            bank_unavailable_route_ids = frozenset()
         meta = led.get("meta") or {}
         if meta.get("episode_seed") is None:
             # SILENCE IS HOW THIS HID. A missing seed folds through
