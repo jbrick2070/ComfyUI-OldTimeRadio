@@ -460,6 +460,7 @@ def test_validator_rejects_gguf_extension(empty_hub_root, monkeypatch):
     "unsloth/gemma-4-12b-it-gguf",          # same, lowercased
     "someone/model_GGUF",                   # the _gguf spelling
     "someone/gguf-model",                   # the /gguf spelling, mid-string
+    "someone/model.GGUF",                   # the literal .gguf EXTENSION
 ])
 def test_validator_rejects_every_retired_gguf_writer_spelling(
         handle, empty_hub_root, monkeypatch):
@@ -475,7 +476,16 @@ def test_validator_rejects_every_retired_gguf_writer_spelling(
     `_is_gguf_writer_id` and running every one of the 62 test files that mention
     gguf: ZERO new failures. The code was right and nothing was watching it, so
     a later "tidy-up" of a function whose subject no longer exists would have
-    silently reopened the download path. Asserting the ERROR, not the absence of
+    silently reopened the download path.
+
+    THE .GGUF EXTENSION CASE IS UPPERCASE ON PURPOSE. A later review found the
+    first five cases left that branch untested, and that a LOWERCASE fixture
+    would not have closed it either: `_structural_reject` catches a lowercase
+    `.gguf` by a separate, case-SENSITIVE check, so a lowercase case passes even
+    with this branch deleted. Uppercase is the spelling only this function
+    rejects.
+
+    Asserting the ERROR, not the absence of
     a catalog row, is the difference.
     """
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")

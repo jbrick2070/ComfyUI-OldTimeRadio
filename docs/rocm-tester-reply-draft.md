@@ -114,7 +114,8 @@ has no general Vulkan compute device (the one it had was mobile-focused and has
 been wound down). The single overlap is genuine, though -- this pack has a
 `gguf_native` writer transport that drives `llama-cpp-python` in process, with
 `n_gpu_layers`, already handling Metal alongside CUDA
-(`nodes/_otr_gguf_backend.py`). A Vulkan-built llama-cpp-python would therefore
+(in a writer GGUF backend REMOVED on 2026-09-24 -- do not send this paragraph
+as written). A Vulkan-built llama-cpp-python would therefore
 accelerate the writer, which is the largest single model in the AMD lane, while
 everything downstream stayed on CPU. The shipped GGUF dropdown rows are Gemma 4
 12B, not the Qwen the AMD graph names, so this is an experiment and not a

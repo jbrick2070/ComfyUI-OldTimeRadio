@@ -1387,7 +1387,9 @@ pruned two community WARN-tier 12B rows.
 
 **THE OLLAMA HALF HAD ZERO TARGETS, and that is worth recording so nobody
 re-hunts it.** Nothing in OTR uses Ollama. The GGUF lane is IN-PROCESS
-llama-cpp-python -- `nodes/_otr_gguf_backend.py` states it opens no port and
+llama-cpp-python -- `nodes/_otr_gguf_backend.py` (DELETED 2026-09-24 with the
+writer GGUF lane; quoted as the record of what it said while it existed, not as
+a file to go read) stated it opens no port and
 does not call Ollama. There is no daemon, no sidecar, no HTTP hop to remove.
 
 **DO NOT READ A >16 GB DISK SIZE AS "DOES NOT FIT".** `approx_safetensors_gb`

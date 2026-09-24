@@ -2104,8 +2104,12 @@ def _estimate_resident_gb(
     # where cost was weights + a KV cache that scaled with the requested
     # context. Every surviving row is a safetensors download whose resident
     # size does not move with context, so pricing one against a context would
-    # be the PBUG-20260829-08/-17/-20 defect returning: judging a request by a
-    # number the loader will not honour.
+    # be the same defect family returning: judging a request by a number the
+    # loader will not honour. PBUG-20260829-08 (priced the row's max QUANT) and
+    # -17 (priced its max CONTEXT in the dropdown badge) are the two LOGGED
+    # instances. A review found this comment's original "-20" citation points at
+    # an unrelated news-validator bug, so the number is dropped rather than left
+    # sending the next reader to the wrong entry.
     #
     # The parameter stays because it is the handle the tripwire needs --
     # tests/test_gate_prices_the_policy_context.py calls this at 8192 and at

@@ -141,7 +141,11 @@ Levers that do NOT work, all measured:
 
 The lever that should work and is not wired up: **GGUF via llama.cpp.**
 llama.cpp has real Metal kernels, `Q4_K_M` on a 4B writer is roughly 2.5 GB, and
-`_otr_gguf_backend.py` already honours `mps` for `n_gpu_layers`. The README
+`_otr_gguf_backend.py` DID honour `mps` for `n_gpu_layers` -- but that file was
+DELETED on 2026-09-24 with the whole writer GGUF lane, so this is no longer a
+lever that is merely unwired: reviving it means rebuilding the backend. The
+sizing problem it answered is still real and currently has no in-tree answer.
+The README
 documents the build
 (`CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python==0.3.33`), but
 `llama-cpp-python` is declared in neither `requirements.txt` nor
