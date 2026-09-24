@@ -82,14 +82,54 @@ import logging
 from typing import Any, Callable, Literal, Mapping, MutableMapping, NamedTuple, Sequence
 
 try:
-    from pydantic import BaseModel, Field
+    from pydantic import BaseModel, Field, field_validator
 except ImportError:  # pragma: no cover -- the optional pass remains unavailable
     _ScopeAuthorization = _SpanReplacements = _RepairedLine = None
 else:
+    def _coerce_offset(value):
+        """Accept the same index in whatever JSON type the model chose.
+
+        `strict=True` used to sit on these fields, so a model emitting `12.0`
+        or `"12"` -- which a small local model routinely does for an integer
+        field -- failed validation, and a ValidationError fails the whole
+        `structured_call` attempt rather than dropping one span. It retried and
+        exhausted, reproducing the "detected, repaired zero" bug this pass was
+        fixed for. Found by a QA pass which noticed that
+        `_exact_interval`'s own float/string handling was unreachable dead code
+        because of it.
+
+        STILL REFUSES ANYTHING THAT IS NOT AN INDEX. 12.5 is not an index.
+        `False` is not an index -- bool is an int subclass in Python, so it has
+        to be rejected by name or it arrives as 0. Non-numeric text is not an
+        index. The `ge` bounds below still apply to whatever comes back.
+        """
+        if value is None:
+            return value
+        if isinstance(value, bool):
+            # RAISED, NOT RETURNED. `strict=True` used to reject a bool for
+            # free; without it pydantic happily coerces False -> 0, which is a
+            # VALID index and would authorize an edit at the start of the line.
+            # bool is an int subclass in Python, so this has to be refused by
+            # name. A test covers exactly this input.
+            raise ValueError("a boolean is not a character index")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            return int(value) if value.is_integer() else value
+        if isinstance(value, str):
+            try:
+                return int(value.strip())
+            except ValueError:
+                return value                # let pydantic report it
+        return value
+
     class _ComplaintSpan(BaseModel):
         quote: str = Field(min_length=1)
-        start_char: int | None = Field(default=None, ge=0, strict=True)
-        end_char: int | None = Field(default=None, ge=1, strict=True)
+        start_char: int | None = Field(default=None, ge=0)
+        end_char: int | None = Field(default=None, ge=1)
+
+        _coerce = field_validator("start_char", "end_char",
+                                  mode="before")(_coerce_offset)
 
     class _ScopeAuthorization(BaseModel):
         verdict: Literal["already_spoken", "localized_defect", "whole_row_direction", "unresolved"]
