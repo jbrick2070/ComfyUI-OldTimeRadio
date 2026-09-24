@@ -5,7 +5,7 @@ from nodes._otr_dialogue_policy import (
     append_dialogue_policy,
     _COCKNEY_ORTHOGRAPHY_RULE,
 )
-from config.cast_pools import LEMMY_PROFILE, lemmy_row, LEMMY_VOICE_POLICY
+from config.cast_pools import LEMMY_PROFILE, lemmy_row
 
 
 def test_lemmy_profile_and_row_schema():
@@ -19,12 +19,6 @@ def test_lemmy_profile_and_row_schema():
     assert row["dialogue_orthography"] == "standard_english"
     assert row["tts_model"] == "bark"
     assert row["voice_preset"] == "v2/en_speaker_8"
-
-
-def test_lemmy_voice_policy_structure():
-    assert LEMMY_VOICE_POLICY["policy_version"] == "lemmy-cockney-v1"
-    assert LEMMY_VOICE_POLICY["required_accent"] == "cockney"
-    assert LEMMY_VOICE_POLICY["canonical_route"]["engine"] == "bark"
 
 
 _BASE_PROMPT = "You are an AI radio script writer."
@@ -113,13 +107,3 @@ def test_the_speaker_category_is_keyword_only():
 # consistent. That is BUG-12.86: a field that reads as evidence and is not.
 # These pin the honest shape so it cannot quietly come back.
 # ---------------------------------------------------------------------------
-from config.cast_pools import QUALIFICATION_RECEIPT_REQUIRED_FIELDS
-
-
-def _full_receipt(**over):
-    r = {f: "x" for f in QUALIFICATION_RECEIPT_REQUIRED_FIELDS}
-    r.update(over)
-    return {"engine": "bark", "identity_kind": "preset",
-            "identity_id": "v2/en_speaker_8", "qualification_receipt": r}
-
-

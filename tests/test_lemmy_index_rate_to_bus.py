@@ -111,13 +111,23 @@ def test_no_char_voice_engine_is_already_at_the_bus_rate():
             "every clip gets resampled" % engine)
 
 
-def test_the_qualified_lemmy_route_targets_that_engine():
-    """Ties the rate question to the ACTUAL shipped route rather than to a
-    hard-coded engine name."""
-    from config.cast_pools import LEMMY_VOICE_POLICY as P
+def test_the_recurring_characters_own_recording_is_on_that_engine():
+    """Ties the rate question to where the recording ACTUALLY lives, rather
+    than to a hard-coded engine name.
 
-    route = P["approved_native_routes"]["indextts2"]
-    assert route["qualification_record"]["engine"] == "indextts2"
+    RETARGETED 2026-09-24. It used to read the qualified route's record; routes
+    are gone, and the fact it was really asserting -- that this file's premise
+    is about the engine the recurring character is delivered on -- now lives on
+    the bank row that reserves his recording for him.
+    """
+    from nodes._otr_voice_bank import load_voice_bank
+
+    owned = [e for e in load_voice_bank()[0]
+             if str(getattr(e, "reserved_for", "") or "").strip().casefold()
+             == "lemmy" and e.engine == "indextts2"]
+    assert len(owned) == 1, (
+        "expected exactly one indextts2 row reserved for him, found %d; this "
+        "file's resample premise is written around that engine" % len(owned))
 
 
 # ---------------------------------------------------------------------------

@@ -85,11 +85,22 @@ def test_p1_2_every_announcer_voice_engine_is_registered_and_serves_the_role():
 
 
 def test_p2_1_every_routed_voice_ref_resolves_to_exactly_one_bank_row():
-    """P2.1 -- The route resolver demands EXACTLY ONE bank entry for
-    (voice_ref_id, engine) and has no fallback; zero or two is a hard failure at
-    cast time, not a degraded render."""
+    """P2.1 -- a recurring character's voice must resolve to EXACTLY ONE bank
+    row for its (voice_ref_id, engine); zero or two is a miss, not a coin flip.
+
+    RETARGETED 2026-09-24. The rule survived the route subsystem and moved:
+    `cast_lock._recurring_character_bank_ref` and
+    `_otr_voice_node_common._bank_identity_fingerprint` both require exactly one
+    match and refuse otherwise. What CHANGED is the consequence -- an ambiguous
+    or absent match is now a soft miss that reports and takes the ordinary draw,
+    not a hard failure at cast time. The old wording said "hard failure"; that
+    is no longer true and the honest rule is the exactly-one part.
+    """
     bank, _ = load_voice_bank()
-    routes = POOLS.LEMMY_VOICE_POLICY.get("approved_native_routes") or {}
+    table = getattr(POOLS, "RECURRING_CHARACTER_VOICES", {}) or {}
+    routes = {eng: {"qualification_record": {"voice_ref_id": vid}}
+              for by_engine in table.values()
+              for eng, vid in by_engine.items()}
 
     for engine, route in routes.items():
         ref_id = route["qualification_record"]["voice_ref_id"]
@@ -242,19 +253,6 @@ def test_p3_5_a_mirror_carries_its_sources_speaker_id():
 
 
 # --- P4: the route contract -----------------------------------------------
-
-
-def test_p4_1_qualification_still_requires_a_human():
-    """P4.1 -- `operator_verdict` is the field no automated pass may supply. A
-    driver-signed verdict is the evidence-shaped-but-not-evidence pattern that
-    produced BUG-12.86."""
-    assert "operator_verdict" in POOLS.QUALIFICATION_RECEIPT_REQUIRED_FIELDS
-
-
-def test_p4_3_the_canonical_route_stays_honestly_unqualified():
-    """P4.3 -- Bark's default route is a ROUTING fact, not an audition, and its
-    null receipt is what says so."""
-    assert POOLS.LEMMY_VOICE_POLICY["canonical_route"]["qualification_receipt"] is None
 
 
 # --- P5: engine runtime declarations --------------------------------------
