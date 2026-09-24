@@ -513,6 +513,40 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
     return doc
 
 
+def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
+    """Every id `load_profile` can resolve: matrix rows first, then lab rigs.
+
+    The enumeration a `config/profiles/*.json` glob used to stand in for. Matrix
+    rows lead because they are the shipped surface; the rigs (`otr_soak_*`,
+    `otr_w45_*`, `otr_g4_*`) follow in name order. An id carried by both appears
+    once, from the matrix -- which is what one source of truth has to mean when the
+    two disagree.
+    """
+    ordered = []
+    seen = set()
+    try:
+        for row in load_matrix()["rows"]:
+            rid = row.get("id")
+            if rid and rid not in seen:
+                seen.add(rid)
+                ordered.append(rid)
+    except ProfileError:
+        pass                       # no matrix: the folder is the whole answer
+    d = profile_dir or PROFILE_DIR
+    try:
+        names = sorted(os.listdir(d))
+    except OSError:
+        names = []
+    for name in names:
+        if not name.endswith(".json") or name == "widget_mapping.json":
+            continue
+        rid = name[:-5]
+        if rid not in seen:
+            seen.add(rid)
+            ordered.append(rid)
+    return tuple(ordered)
+
+
 def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
     """Resolve a workflow id to a shape-validated config. Fail closed.
 

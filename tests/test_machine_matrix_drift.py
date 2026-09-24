@@ -118,7 +118,13 @@ def test_experimental_shipping_status_is_separate_from_install_ownership():
     assert all(profiles[pid]["status"] == "shipping" for pid in missing)
     assert all(profiles[pid]["install_recipe"] == "missing exact owner"
                for pid in missing)
-    assert profiles["otr_4060_floor"]["install_recipe"] == "complete"
+    # "complete; Python <=3.13", not bare "complete" (2026-09-24). This row sets
+    # no voice engine, so it INHERITS the canonical's kokoro and genuinely needs
+    # Python <=3.13. The old expectation held only because the generator read
+    # profile FILES, where an absent key did not exist -- it was pinning the
+    # generator's blindness rather than the profile's truth.
+    assert profiles["otr_4060_floor"]["install_recipe"].startswith("complete")
+    assert "missing exact owner" not in profiles["otr_4060_floor"]["install_recipe"]
 
     text = M.render()
     assert "| confidence | install recipe |" in text

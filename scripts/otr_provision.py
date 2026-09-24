@@ -1902,10 +1902,16 @@ def profile_python_issue(profile: dict, version_info=None) -> str:
     # voices), so only 3.14+ has no kokoro backend packaged yet.
     if "kokoro" in voices and tuple(version_info[:2]) >= (3, 14):
         return (
+            # The third way out used to read "or the Bark-based otr_4060_floor
+            # profile". That profile sets no voice engine at all, so it INHERITS
+            # the canonical's kokoro and has this exact problem -- the advice sent
+            # the reader in a circle. Removed 2026-09-24 rather than repointed:
+            # naming a different profile means auditing which one really is
+            # Bark-based, and which voice a profile uses is the operator's call.
             "selected Kokoro voice has no backend packaged for Python 3.14 yet "
             "(kokoro needs <=3.12, kokoro-onnx needs <=3.13); use Python 3.13 "
-            "(kokoro-onnx, CPU) or 3.12 (kokoro), or the Bark-based otr_4060_floor "
-            "profile"
+            "(kokoro-onnx, CPU) or 3.12 (kokoro), or set a non-Kokoro voice "
+            "engine on the profile"
         )
     return ""
 

@@ -463,26 +463,39 @@ def resolved_profile(profile, canonical: dict, mapping: Optional[dict] = None,
     if isinstance(profile, str):
         profile = load_profile(profile)
 
-    rendered = apply_profile(canonical, profile, mapping=mapping, schemas=schemas)
+    # A PURE READ -- deliberately NOT a render. Routing this through
+    # `apply_profile` made it environment-sensitive (the applier validates each
+    # value against live COMBO choices, which `OTR_ENABLE_*` flags gate) and made
+    # it RAISE for a profile naming an engine the shell has not enabled. In
+    # `otr_machine_matrix` that raise was swallowed into `continue` and two
+    # workflows silently vanished from the generated table.
+    #
+    # The question never needed a render: a value is either STATED by the row, or
+    # the canonical's graph already holds it. Both are reads.
+    stated = _flatten_profile_values(profile)
 
     out: dict = {}
     for dotted, entry in (mapping.get("managed") or {}).items():
-        values = []
-        for node_type, widget in entry["targets"]:
-            try:
-                node = _node_by_type(rendered, node_type)
-            except Exception:
-                values = []
-                break
-            values.append(_to_profile_form(
-                widget_value_by_name(node, widget, schemas)))
-        if not values:
-            continue
-        first = values[0]
-        # One profile key can drive several widgets. If they disagree there is no
-        # single value to report, so the key is omitted rather than guessed at.
-        if not all(repr(v) == repr(first) for v in values):
-            continue
+        if dotted in stated:
+            first = stated[dotted]
+        else:
+            values = []
+            for node_type, widget in entry["targets"]:
+                try:
+                    node = _node_by_type(canonical, node_type)
+                except Exception:
+                    values = []
+                    break
+                values.append(_to_profile_form(
+                    widget_value_by_name(node, widget, schemas)))
+            if not values:
+                continue
+            first = values[0]
+            # One profile key can drive several widgets. If the canonical's already
+            # disagree there is no single value to inherit, so the key is omitted
+            # rather than guessed at.
+            if not all(repr(v) == repr(first) for v in values):
+                continue
         parts = dotted.split(".")
         node_out = out
         for part in parts[:-1]:

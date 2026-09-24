@@ -154,14 +154,20 @@ def _profile_id_from_stem(stem: str) -> str:
 
 
 def _committed_profile_ids() -> list[str]:
-    out = []
-    for p in sorted(Path(PROFILE_DIR).glob("*.json")):
-        if p.stem == "widget_mapping":
-            continue
-        if p.stem not in SHIPPING_SET:
-            # A lab fixture. Still loadable with --profile; just not shipped.
-            continue
-        out.append(p.stem)
+    """The ids `--all` emits: exactly what the matrix says ships.
+
+    THIS USED TO GLOB `config/profiles/*.json` AND INTERSECT WITH SHIPPING_SET,
+    which made the FOLDER decide what got emitted while the matrix only decided
+    what was allowed to. Two silent failures came out of that: a new matrix row
+    with no file twin was never emitted, and an emptied folder made `--all` emit
+    nothing and still exit 0. `--check` hid it, because it enumerates the
+    already-committed graphs in `workflows/variants/` and never looks at the
+    source folder at all.
+
+    `shipping_ids()` reads the matrix, so the enumeration and the allow-list are
+    now the same list rather than two that agreed by coincidence.
+    """
+    out = list(shipping_ids())
     # Stem-collision guard (post-ship audit): a bare id X and a prefixed
     # otr_X would map to the SAME variant filename -- refuse loudly.
     for pid in out:
@@ -401,7 +407,10 @@ def cmd_emit(profile_ids: list[str], explicit: bool) -> int:
 #: Generated docs rebuilt alongside the variants, so one edit needs one command.
 #: Run as SUBPROCESSES on purpose -- see `cmd_regenerate_docs`.
 DOC_GENERATORS = (
-    ("docs/MACHINE_MATRIX.md + README block", "otr_machine_matrix.py"),
+    # No README block: both generators only STRIP the old BEGIN/END markers and
+    # neither re-injects, and README.md carries no marker any more. The earlier
+    # label here claimed one and was written from an assumption.
+    ("docs/MACHINE_MATRIX.md", "otr_machine_matrix.py"),
     ("docs/DROPDOWN_MATRIX.md + apple/MACHINES.md", "otr_dropdown_matrix.py"),
 )
 
