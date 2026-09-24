@@ -229,7 +229,14 @@ here that reaches strangers and cannot be taken back.
 
 ## 2. CODE -- decided, in order
 
-### 0. Windows HF_HOME -- always pin a short root (decided 2026-09-23)
+### 0. Remaining voice-route deletion (hardened 2026-09-24)
+
+The unused `nodes/_otr_voice_route.py` module and the policy / portable-bank
+fields that only compile if it exists. Spec:
+[2026-09-24-route-deletion-PLAN.md](2026-09-24-route-deletion-PLAN.md).
+Do not start from the 51b6c146 draft. Do not re-rip `91ad5961`.
+
+### 0a. Windows HF_HOME -- always pin a short root (decided 2026-09-23)
 
 When the models-adjacent pin cannot fit MAX_PATH, do not decline.
 Choose a short root (registry if it fits, then models-adjacent if it
