@@ -639,6 +639,24 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: Terminal node: its IMAGE batch becomes the clip.
     _TERMINAL = "decode"
 
+    #: TRUE ON EVERY LANE BUT ONE. The x2 in-graph latent upscale and the
+    #: refinement pass after it are the accepted HQ path and stay the default;
+    #: a subclass sets this False to decode the stage-one latent at its native
+    #: 832x480 instead. `Ltx25NativeFoleyLowResEngine` is the only one that does.
+    #:
+    #: IT BELONGS ON THIS CLASS BECAUSE THIS CLASS READS IT. `_build_graph` is
+    #: defined here, so every LTX 2.5 lane reaches the attribute -- and when it
+    #: was first added it sat on `Ltx25NativeFoleyBase` instead, five levels
+    #: down. `ltx25_video`, `ltx25_foley_plus`, `ltx25_mime`,
+    #: `ltx25_foley_plus_24gb` and `ltx25_foley_plus_32gb` do not inherit that
+    #: class, so all five raised AttributeError the moment they built a graph.
+    #: The entire suite passed, because no test builds those graphs -- the
+    #: defect was found by a review lane reading the inheritance, and it is the
+    #: same shape as the 2026-09-07 decorator incident CLAUDE.md records: valid
+    #: syntax, green tests, a working feature destroyed on every platform.
+    #: tests/test_ltx25_every_lane_builds_a_graph.py is the guard now.
+    _ingraph_upscale = True
+
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
     #: Whether THIS lane's cache is expected to find its handle on the CPU.
     #: Read by ``_cached_clip_is_live`` -- default True keeps the liveness
@@ -3458,13 +3476,6 @@ class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
 
     #: Declared by the tier subclasses. Named here so the base reads complete.
     _native_dit = None
-
-    #: TRUE ON EVERY EXISTING LANE. The 2x in-graph latent upscale and the
-    #: refinement pass that follows it are the accepted HQ path and stay the
-    #: default; a subclass sets this False to decode the stage-one latent at
-    #: its native canvas instead. See `Ltx25NativeFoleyFastEngine` for why one
-    #: lane wants that.
-    _ingraph_upscale = True
 
     #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
     #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
