@@ -10,9 +10,9 @@
   "role_overrides": {
     "announcer_visual": "still_motion",
     "music_visual": "still_motion",
-    "announcer_image": "sd15",
-    "music_image": "sd15",
-    "character_image": "sd15",
+    "announcer_image": "z_image_turbo",
+    "music_image": "z_image_turbo",
+    "character_image": "z_image_turbo",
     "character_visual": "still_motion"
   },
   "slot_overrides": {
