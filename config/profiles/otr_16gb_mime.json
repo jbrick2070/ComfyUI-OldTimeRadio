@@ -8,9 +8,9 @@
   "toolchains": [],
   "allow_sidecars": true,
   "role_overrides": {
-    "announcer_visual": "ltx25_mime",
-    "music_visual": "ltx25_mime",
-    "character_visual": "ltx25_mime",
+    "announcer_visual": "ltx25_native_mime_16gb",
+    "music_visual": "ltx25_native_mime_16gb",
+    "character_visual": "ltx25_native_mime_16gb",
     "announcer_image": "lumina_image",
     "music_image": "lumina_image",
     "character_image": "lumina_image"
@@ -19,7 +19,7 @@
     "cast_voice_policy": "auto_registry",
     "announcer_voice_engine": "kokoro",
     "music_engine": "stable_audio_3",
-    "video_render_engine": "ltx25_mime"
+    "video_render_engine": "ltx25_native_mime_16gb"
   },
   "features": {
     "burn_captions": true,
@@ -78,11 +78,13 @@
   },
   "preflight": {
     "required_models": [
-      "LTX-2.5-Distilled-Q3_K_M.gguf",
-      "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+      "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+      "gemma4-12b-ltx25-comfy-w4a8.safetensors",
       "ltx-2.5-video-vae-bf16.safetensors",
       "ltx-2.5-audio-vae-bf16.safetensors",
-      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+      "lumina_2_model_bf16.safetensors",
+      "gemma_2_2b_fp16.safetensors"
     ],
     "required_keys": []
   },
