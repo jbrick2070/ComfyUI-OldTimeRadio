@@ -1074,21 +1074,30 @@ class OTRVoiceNodeBase:
         """Cache-enabled legs rerun (NaN); local legs return a FINGERPRINT.
 
         The old local answer was the constant string ``"static"``, which told
-        ComfyUI that a local voice leg never changes. For a qualified route that
-        is false in the one way that matters: swap the reference WAV under a pin,
-        or move the route to a new contract version, and ``"static"`` would serve
-        the previous render's audio while the ledger claimed the new route. The
-        fingerprint below is over the route identity, the active profile/runtime
-        fields, and -- for ``local_wav`` -- the actual reference BYTES.
+        ComfyUI that a local voice leg never changes. For a RECURRING CHARACTER
+        that is false in the one way that matters: a cast row names a voice by
+        ID, so re-record the reference WAV or replace the kokoro ``.pt`` behind
+        that id and ``"static"`` would serve the previous render's audio while
+        the ledger named the new identity. The fingerprint below is over the
+        recurring rows' identity fields, the active render params, and -- for a
+        local reference -- the actual BYTES.
+
+        REWRITTEN 2026-09-24. It used to fingerprint voice-ROUTE identity and
+        contract versions; that subsystem is gone and the rows are now selected
+        through the same `recurring_character_key` lookup casting itself uses,
+        so the two cannot drift apart about what a character is.
 
         Three rules this obeys, all of them load-bearing:
 
-        * **A ledger with no routes fingerprints to the literal ``"static"``.**
-          Not "something stable" -- the same string as before, so every shipping
-          local render keeps its exact in-graph caching behaviour.
-        * **NEVER a network call.** ``provider_voice`` rows contribute route id,
-          provider, voice and runtime values only; nothing is fetched, and no
-          cloud URI is treated as a file to hash.
+        * **A ledger with no recurring rows fingerprints to the literal
+          ``"static"``.** Not "something stable" -- the same string as before,
+          so every shipping local render keeps its exact in-graph caching
+          behaviour. An ordinary drawn row is not fingerprinted and never was,
+          and ANNOUNCER is excluded even when it holds the same shared
+          catalogue voice, because it is a role rather than a character.
+        * **NEVER a network call.** A provider voice contributes its id and
+          nothing else; nothing is fetched, and no cloud URI is treated as a
+          file to hash.
         * **An unreadable expected local file returns NaN.** Failing OPEN on a
           missing reference is the Bug Bible unavailable-input rule: rerun and
           let the render path fail loudly, rather than quietly reusing audio.
