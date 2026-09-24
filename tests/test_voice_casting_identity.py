@@ -139,10 +139,11 @@ def test_a_stale_engine_identity_is_cleared_on_a_re_stamp(assign, policy,
 def test_a_stale_route_field_is_cleared_on_a_re_stamp(assign, policy):
     """A leftover `voice_route` from a prior lock does not survive.
 
-    Kept after the cutover for a reason that outlives the route concept: the
-    voice node RAISES on a non-empty `voice_route` whose status is not
-    qualified, so a stale one is a dead render on every line, not a cosmetic
-    field.
+    Kept after the cutover for a reason that outlives the route concept: a
+    re-locked row must not carry identity from a system that no longer exists.
+    The original reason -- that the voice node RAISED on a non-qualified
+    `voice_route` -- stopped being true in `b1d522b6`, which deleted that
+    dispatch; the clear is still right, the old justification was not.
     """
     cast = json.loads(json.dumps(CAST))
     cast[1]["voice_route"] = {"status": "qualified", "route_id": "stale-v0"}

@@ -37,10 +37,7 @@ fails these.
 """
 from __future__ import annotations
 
-import copy
 import json
-import os
-import pathlib
 import re
 
 import pytest
@@ -629,226 +626,28 @@ def test_no_announcer_profile_gained_the_flag():
             assert profile.character_stable_seed is False, pid
 
 
-# --------------------------------------------------------------------------- #
-# LEMMY IS UNQUALIFIED AFTER THIS CHANGE [QA-7]
-#
-# A qualification record stores the runtime it was proved under, and
-# `config/cast_pools.py` has described that field as "the sha256 of the adapter
-# plus its worker script" since the day it was written -- the whole point being
-# that changing the rendering code changes it. Nothing ever COMPUTED the live
-# value, so nothing ever compared them: the field was stored, described, and
-# never read. This fix changes IndexTTS2's seed handling and its emotion blend,
-# which are precisely the two things a listener judges, so the August audition
-# no longer describes what this engine does.
-#
-# THE DEMOTION IS A DEGRADE, NOT A FAILURE, and that distinction is the whole
-# safety argument. `resolve_policy_route_claim` RAISES `VoiceRouteError` on a
-# SELECTED route that cannot prove itself -- so gating inside the validator
-# would have killed every episode that casts Lemmy. Gating at SELECTION reaches
-# the module's own established outcome instead: nothing was selected, so nothing
-# failed, the row takes the ordinary draw, and the episode still publishes.
-# --------------------------------------------------------------------------- #
-def _live_indextts2_fingerprint():
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    return ROUTE.live_engine_impl_version("indextts2")
 
 
-def test_the_live_fingerprint_is_computable_and_reproducible():
-    """A gate that cannot compute a live value would silently never fire."""
-    first = _live_indextts2_fingerprint()
-
-    assert re.fullmatch(r"[0-9a-f]{16}", first), first
-    assert first == _live_indextts2_fingerprint(), "the recipe is not stable"
 
 
-def test_an_engine_with_no_recipe_is_never_demoted_on_this_ground():
-    """Silence, not a guess: an unknown fingerprint is not evidence of a
-    changed one."""
-    from nodes import _otr_voice_route as ROUTE
-
-    assert ROUTE.live_engine_impl_version("bark") == ""
-    record = {"route_id": "r",
-              "qualification_record": {"runtime": {"engine_impl_version": "zz"}}}
-    assert ROUTE.stale_runtime_fingerprint(record, "bark") is None
 
 
-def _stale_lemmy_policy():
-    """The shipped policy with the runtime deliberately rotted.
-
-    THE SYNTHETIC STALE RECORD [2026-08-18]. Between 2026-08-10 and 2026-08-18
-    the SHIPPED record was itself stale, so these gates could be pointed
-    straight at `cast_pools.py`. Lemmy is qualified again on the current build,
-    which is the good outcome and also removes the only naturally-stale record
-    the suite had. The demotion path must stay covered regardless of whether
-    the shipped route happens to be stale today, so it gets a record that is
-    real in every respect except one rotted fingerprint.
-
-    THE ROTTED VALUE IS REAL HISTORY, NOT AN INVENTED ONE. It is read from the
-    superseded 2026-08-10 record -- the fingerprint this project actually
-    withdrew -- so the fixture cannot drift into a value no build ever had.
-    Exactly ONE field differs from the shipped record, which matters: a fixture
-    that is malformed in some other way would be rejected for the wrong reason
-    and the demotion path would go untested while looking green.
-    """
-    from config import cast_pools as POOLS
-
-    withdrawn = POOLS.LEMMY_VOICE_POLICY[
-        "superseded_native_routes"]["indextts2"][0]["engine_impl_version"]
-    stale = copy.deepcopy(
-        POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"])
-    assert stale["qualification_record"]["runtime"]["engine_impl_version"] != \
-        withdrawn, "the shipped record already carries the withdrawn runtime"
-    stale["qualification_record"]["runtime"]["engine_impl_version"] = withdrawn
-    return dict(POOLS.LEMMY_VOICE_POLICY,
-                approved_native_routes={"indextts2": stale})
 
 
-def test_the_shipped_lemmy_route_is_withdrawn_until_someone_re_auditions():
-    """The release gate, asserted from whichever side is true today.
-
-    IT HAS FLIPPED THREE TIMES AND EACH FLIP WAS THE MECHANISM WORKING. It
-    asserted `is None` while nothing had been auditioned; `is not None` after
-    `prod-audition-2026-08-18` re-qualified Lemmy on the shipped build; and
-    `is None` again from 2026-09-12, when the IndexTTS2 timeout fix moved the
-    adapter fingerprint (`d47779386ce91209` -> `c78934682057fc65`).
-
-    THE FIX SHIPPED WITH THAT COST KNOWN AND PRICED. Both protocol reads in
-    `eng_indextts2` were unbounded, so a stalled worker held VRAM indefinitely
-    with nothing in the log, while its two sibling engines already route the
-    identical read through `_otr_sidecar.read_protocol_line`. The withdrawal
-    costs nothing on the SHIPPING surface: this policy carries a qualified route
-    for `indextts2` alone and the canonical ships `kokoro` on both voice slots,
-    so `select_policy_route` returns None there and always has.
-
-    NOTE THE OTHER TESTS DID NOT FLIP WITH IT. The machinery tests now take the
-    `lemmy_route_qualified` fixture, because "does stamping work" should never
-    depend on whether a voice is waiting on somebody's ears. This and the canary
-    in `test_cast_lock_policy_repin` are the two that read the real file on
-    purpose.
-    """
-    from config import cast_pools as POOLS
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    selected = ROUTE.select_policy_route(POOLS.LEMMY_VOICE_POLICY, "indextts2")
-
-    assert selected is None, (
-        "the route selected again -- if it was re-auditioned, flip this back "
-        "and name the audition that did it")
-    record = POOLS.LEMMY_VOICE_POLICY["approved_native_routes"]["indextts2"]
-    assert record["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
-    assert (record["qualification_record"]["runtime"]["engine_impl_version"]
-            != _live_indextts2_fingerprint()), (
-        "the record matches the live build again -- this test is stale")
 
 
-def test_a_stale_record_is_not_selected():
-    """The gate itself, on a record whose runtime no longer matches the code."""
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-
-    assert ROUTE.select_policy_route(_stale_lemmy_policy(), "indextts2") is None
 
 
-def test_the_superseded_lemmy_record_is_preserved_unedited():
-    """PRESERVE THE OLD RECORD [QA-7]. The claim is withdrawn by the gate, not
-    by deleting the evidence -- a re-audition needs something to compare to.
-
-    The withdrawn 2026-08-10 record now lives under `superseded_native_routes`,
-    where nothing can select it and nothing can quietly edit it. Its cited
-    manifest still hashes to the value it claims, so the August audition
-    remains re-verifiable byte for byte.
-    """
-    from config import cast_pools as POOLS
-
-    superseded = POOLS.LEMMY_VOICE_POLICY["superseded_native_routes"]["indextts2"]
-    assert len(superseded) == 1
-    record = superseded[0]
-
-    assert record["route_id"] == "lemmy-indextts2-algenib-cockney-v1"
-    assert record["record_id"] == "g1-test-a-2026-08-10"
-    assert record["engine_impl_version"] == "b965453f355661a3"
-    assert record["audition_manifest"]["sha256"] == (
-        "34dd4c9d8b3404814d1d7d0703d8f0e8f71893a62455169eae67b8199c90da67")
-    assert record["operator_verdict"].startswith("PASS (blinded, 2026-08-10)")
 
 
-def test_a_superseded_record_is_never_selectable():
-    """Evidence, not a route. `superseded_native_routes` is deliberately not a
-    key anything reads -- so a withdrawn qualification can be audited forever
-    without ever coming back as a selected route."""
-    from config import cast_pools as POOLS
-    from nodes import _otr_voice_route as ROUTE
-
-    superseded = POOLS.LEMMY_VOICE_POLICY["superseded_native_routes"]
-    policy = {"policy_version": "test", "approved_native_routes": {},
-              "superseded_native_routes": copy.deepcopy(superseded)}
-
-    assert ROUTE.select_policy_route(policy, "indextts2") is None
 
 
-def test_a_re_qualified_record_selects_again():
-    """The route is recoverable, and the ONLY thing that recovers it is a
-    record whose runtime matches the build that will render it."""
-    from nodes import _otr_voice_route as ROUTE
-
-    live = _live_indextts2_fingerprint()
-    requalified = copy.deepcopy(
-        _stale_lemmy_policy()["approved_native_routes"]["indextts2"])
-    requalified["qualification_record"]["runtime"]["engine_impl_version"] = live
-    policy = {"policy_version": "test",
-              "approved_native_routes": {"indextts2": requalified}}
-
-    selected = ROUTE.select_policy_route(policy, "indextts2")
-    assert selected is not None
-    assert selected["route_id"] == "lemmy-indextts2-algenib-cockney-v2"
 
 
-def test_the_demotion_degrades_and_never_raises():
-    """THE LAW: an audit may never FAIL an episode; a render degrades.
-
-    `resolve_policy_route_claim` is the call CastLock makes, and it raises on a
-    SELECTED route that fails its checks. A demoted route must come back as
-    None from here -- not as an exception that aborts the episode.
-
-    Runs against the SYNTHETIC stale record, because the shipped one is
-    qualified again. The law being tested is about what a demotion does, not
-    about which record happens to be demoted this week.
-    """
-    from datetime import datetime, timezone
-
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    claim = ROUTE.resolve_policy_route_claim(
-        _stale_lemmy_policy(), "indextts2", datetime.now(timezone.utc),
-        bank_entries=[])
-
-    assert claim is None
 
 
-def test_an_unknown_active_engine_is_still_loud():
-    """The demotion must not have widened into a general "say nothing" -- the
-    one case this module exists to shout about still shouts."""
-    from config import cast_pools as POOLS
-    from nodes import _otr_voice_route as ROUTE
-
-    with pytest.raises(ROUTE.VoiceRouteError):
-        ROUTE.select_policy_route(POOLS.LEMMY_VOICE_POLICY, "")
 
 
-def test_a_record_that_claims_no_fingerprint_is_not_contradicted():
-    """Only a record that CLAIMS a runtime can contradict one. This keeps the
-    gate off records the validator judges by its own rules."""
-    from nodes import _otr_voice_route as ROUTE
-
-    for runtime in ({}, {"engine_impl_version": ""}, {"engine_impl_version": None}):
-        record = {"route_id": "r",
-                  "qualification_record": {"runtime": runtime}}
-        assert ROUTE.stale_runtime_fingerprint(record, "indextts2") is None
 
 
 # --------------------------------------------------------------------------- #
@@ -1073,66 +872,52 @@ def test_a_malformed_ceiling_falls_back_to_the_shipped_one(raw, expected, monkey
 
 
 # --------------------------------------------------------------------------- #
-# A WITHDRAWN CLAIM MUST NOT COME BACK THROUGH AN OLD LEDGER.
+# A FROZEN LEDGER THAT STILL CARRIES A ROUTE RENDERS ON ITS voice_ref_id.
 #
-# `select_policy_route` only runs at CastLock time, so a ledger frozen while the
-# route was still qualified carries the route dict on its own cast row. The
-# render path used to trust it outright -- so re-rendering that ledger under
-# changed engine code would stamp the old qualification_record_id into per-line
-# receipts describing audio the audition never heard.
+# Episodes locked before 2026-09-24 have a `voice_route` dict on the cast row.
+# Nothing reads it any more -- and that is precisely what needs a test, because
+# it is invisible: the render path simply never mentions the field, so a reader
+# cannot tell "deliberately inert" from "not implemented yet", and a change that
+# started honouring it again would silently re-point a character at a retired
+# id with nothing going red.
+#
+# AIMED AT THE RENDER PATH, NOT THE ROUTE MODULE. Written the obvious way this
+# would call the route module's own resolver -- which has no production callers
+# and is deleted in the next commit, so the test would pass while proving
+# nothing about rendering. It asks the code that actually resolves identity.
 # --------------------------------------------------------------------------- #
-def _routed_cast_row(fingerprint):
-    return {
-        "char_id": "c02", "name": "LEMMY",
-        "voice_ref_id": "idx_lemmy_algenib_cockney_v1",
-        "voice_route": {
-            "route_id": "lemmy-indextts2-algenib-cockney-v1",
-            "route_contract_version": 1,
+
+def test_a_frozen_ledger_route_does_not_override_the_stamped_voice():
+    """The leftover dict names a DIFFERENT voice, and loses."""
+    import inspect as _inspect
+
+    from nodes import _otr_voice_node_common as VNC
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    assert "voice_route" not in _inspect.getsource(VNC), (
+        "the render path mentions voice_route again; identity is supposed to "
+        "come from voice_ref_id alone, so a frozen ledger's retired route dict "
+        "cannot reach it")
+
+    row = {
+        "char_id": "c02", "name": "LEMMY", "gender": "male",
+        "voice_ref_id": "bm_george", "voice_engine": "kokoro",
+        "voice_route": {                      # what a pre-cutover lock left
             "status": "qualified",
-            "engine": "indextts2",
-            "voice_ref_id": "idx_lemmy_algenib_cockney_v1",
-            "reference_kind": "local_wav",
-            "ref_path": "models/TTS/refs/indextts2/lemmy_algenib_cockney_v1.wav",
-            "source_ref_sha256": "47e733d51ea58773142f934f3484cf3633cada5f"
-                                 "e603b672cdfc47c712a60db2",
-            "qualification_record_id": "g1-test-a-2026-08-10",
-            "runtime": {"model_id": "IndexTTS-2",
-                        "engine_impl_version": fingerprint,
-                        "weight_revision": "6238972345f704ef"},
+            "route_id": "lemmy-indextts2-algenib-cockney-v2",
+            "voice_ref_id": "idx_lemmy_algenib_cockney_v1",   # a DIFFERENT id
         },
     }
+    with_route = json.dumps({"meta": {"episode_seed": 42}, "cast": [row],
+                             "lines": []})
+    clean = json.loads(json.dumps(row))
+    clean.pop("voice_route")
+    without = json.dumps({"meta": {"episode_seed": 42}, "cast": [clean],
+                          "lines": []})
 
-
-def test_an_old_locked_ledger_stops_re_asserting_the_withdrawn_claim():
-    """It DEGRADES to an ordinary bank reference -- it does not raise, and the
-    row still renders. THE LAW."""
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    # verify_bytes=False + an injected bank: the point here is the STALENESS
-    # gate, and it deliberately sits AFTER every structural proof, so the row
-    # has to get past those first.
-    resolved = ROUTE.resolve_and_verify_reference(
-        _routed_cast_row("b965453f355661a3"), "indextts2", verify_bytes=False,
-        bank_lookup=lambda vid: {"engine": "indextts2", "voice_ref_id": vid})
-
-    assert resolved.is_policy_route is False
-    assert resolved.route_id == ""
-    assert resolved.qualification_record_id == "", (
-        "a stale route still handed its record id to the per-line receipt")
-
-
-def test_a_current_ledger_route_is_still_honoured(tmp_path, monkeypatch):
-    """The demotion must be about STALENESS, not a blanket refusal to trust a
-    stamped route -- a re-qualified episode has to keep working."""
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    row = _routed_cast_row(ROUTE.live_engine_impl_version("indextts2"))
-    resolved = ROUTE.resolve_and_verify_reference(
-        row, "indextts2", verify_bytes=False,
-        bank_lookup=lambda vid: {"engine": "indextts2", "voice_ref_id": vid})
-
-    assert resolved.is_policy_route is True
-    assert resolved.route_id == "lemmy-indextts2-algenib-cockney-v1"
-    assert resolved.qualification_record_id == "g1-test-a-2026-08-10"
+    got = BatchCharacterVoices.IS_CHANGED(script_json=with_route, engine="kokoro")
+    assert got != "static", "the recurring row was not fingerprinted at all"
+    assert got == BatchCharacterVoices.IS_CHANGED(
+        script_json=without, engine="kokoro"), (
+        "the leftover voice_route changed the render identity; a retired field "
+        "on a frozen ledger must be inert")

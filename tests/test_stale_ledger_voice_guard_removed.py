@@ -32,7 +32,7 @@ additive, no logic touched. It turned FOUR tests red across
 
 The cause is not the warning. It is that `nodes/_otr_voice_node_common.py` is
 one of the four files hashed by
-``_otr_voice_route.RUNTIME_FINGERPRINT_SOURCES["indextts2"]``. A qualified
+the retired route module's runtime fingerprint. A qualified
 voice route records the fingerprint of the code that will render it; when the
 live hash stops matching, ``select_policy_route`` withdraws the route and the
 voice falls back to an ordinary draw. **A comment changed the hash, so Lemmy
@@ -53,7 +53,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 AUDIO_CACHE = REPO_ROOT / "nodes" / "_otr_audio_cache.py"
-VOICE_ROUTE = REPO_ROOT / "nodes" / "_otr_voice_route.py"
 
 
 # --------------------------------------------------------------------------
@@ -107,106 +106,9 @@ def test_no_production_code_CALLS_OR_IMPORTS_the_deleted_guard():
 # The constraint that blocked the replacement -- pinned so it is discoverable
 # --------------------------------------------------------------------------
 
-def test_the_voice_resolver_is_OUT_of_the_indextts2_fingerprint():
-    """INVERTED 2026-08-19, and the inversion is the story.
-
-    This test was written earlier the same day asserting the OPPOSITE -- that
-    `_otr_voice_node_common.py` IS inside the fingerprint -- with a failure
-    message reading: *"either the protection was weakened, or this constraint
-    is finally lifted and the stale-ledger warning can now be added; check
-    which."* It then fired on the recipe change and forced exactly that
-    check. It is the answer, so it is now pinned the other way.
-
-    WHY THE FILE LEFT THE RECIPE, measured rather than argued:
-      * 19 commits in 60 days, because it is shared dispatch code.
-      * Of those 19, exactly ONE touched the seed path that was the stated
-        reason for including it (`62fb6a1f`, the voice-identity fix).
-      * So the whole-file hash produced 18 false demotions and 1 true one.
-      * And `62fb6a1f` ALSO edited `eng_indextts2.py`, which stays in the
-        recipe -- so narrowing loses nothing on the only real event in the
-        window.
-
-    THE RESIDUAL RISK IS REAL AND IS ACCEPTED: a seed-path change touching no
-    engine-specific file would now escape this fingerprint. It did not happen
-    once in 60 days. `weight_revision` and `reference.source_ref_sha256` still
-    gate independently.
-    """
-    from nodes import _otr_voice_route as ROUTE
-
-    sources = ROUTE.RUNTIME_FINGERPRINT_SOURCES["indextts2"]
-    assert "nodes/_otr_voice_node_common.py" not in sources, (
-        "the shared dispatcher is back in the fingerprint -- that reinstates "
-        "18-in-19 false demotions; if it was restored deliberately, say why "
-        "here and invert this test again"
-    )
-    # The engine-SPECIFIC files must stay, or the gate proves nothing at all.
-    assert "nodes/_otr_audio_engines/eng_indextts2.py" in sources
-    assert "scripts/_otr_indextts2_worker.py" in sources
 
 
-def test_editing_the_shared_dispatcher_no_longer_costs_the_voice():
-    """The product test for the recipe change.
-
-    Proves the thing that actually matters: the exact edit that de-qualified
-    Lemmy earlier today -- appending a comment to the shared dispatcher -- now
-    leaves the route selected. Asserted against the REAL shipped policy.
-    """
-    from config import cast_pools as POOLS
-    from nodes import _otr_voice_route as ROUTE
-
-    ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-    before = ROUTE.live_engine_impl_version("indextts2")
-    selected_before = ROUTE.select_policy_route(
-        POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None
-
-    path = REPO_ROOT / "nodes" / "_otr_voice_node_common.py"
-    original = path.read_bytes()
-    try:
-        path.write_bytes(original + b"\n# transient probe comment\n")
-        ROUTE._LIVE_FINGERPRINT_CACHE.clear()
-        assert ROUTE.live_engine_impl_version("indextts2") == before, (
-            "a comment in the shared dispatcher still moves the fingerprint"
-        )
-        # A DELTA, NOT A VERDICT (2026-09-12). This asserted `is not None`
-        # outright, which coupled it to whether the route happened to be
-        # qualified that day -- so the IndexTTS2 timeout fix turned it red for
-        # a reason it is not about. What it exists to prove is that
-        # `_otr_voice_node_common.py` is not a fingerprint source, and that
-        # holds whatever the route tier is.
-        selected_after = ROUTE.select_policy_route(
-            POOLS.LEMMY_VOICE_POLICY, "indextts2") is not None
-        assert selected_after == selected_before, (
-            "a comment in the shared dispatcher changed whether the voice is "
-            "selected"
-        )
-    finally:
-        path.write_bytes(original)
-        ROUTE._LIVE_FINGERPRINT_CACHE.clear()
 
 
-def test_every_fingerprinted_source_actually_exists():
-    """A fingerprint over a path that does not exist would hash nothing and
-    fail OPEN -- the gate would pass while proving nothing."""
-    from nodes import _otr_voice_route as ROUTE
-
-    for engine, sources in ROUTE.RUNTIME_FINGERPRINT_SOURCES.items():
-        for rel in sources:
-            assert (REPO_ROOT / rel).is_file(), (
-                "%s fingerprints %r, which is not on disk" % (engine, rel)
-            )
 
 
-def test_the_fingerprint_is_recorded_for_indextts2_only():
-    """Pins today's REAL coverage rather than the coverage one might assume.
-
-    Only indextts2 has a recipe. bark / kokoro / chatterbox / dia have none,
-    which is a known open item -- their routes cannot be fingerprint-gated at
-    all. This test documents that honestly so nobody reads the mechanism as
-    covering every engine.
-    """
-    from nodes import _otr_voice_route as ROUTE
-
-    assert set(ROUTE.RUNTIME_FINGERPRINT_SOURCES) == {"indextts2"}, (
-        "a new engine gained a fingerprint recipe -- good, but update this "
-        "test and the open item that tracks the four missing recipes"
-    )

@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import importlib.util
 import hashlib
-import copy
 import json
 from pathlib import Path
 import wave
@@ -61,10 +60,16 @@ def test_portable_bank_preserves_non_index_rows_and_replaces_only_index(tmp_path
     index = [row for row in result["voices"] if row.get("engine") == "indextts2"]
 
     assert actual_non_index == expected_non_index
-    from config.cast_pools import LEMMY_VOICE_POLICY
-    approved_route_id = LEMMY_VOICE_POLICY[
-        "approved_native_routes"]["indextts2"]["route_id"]
-    assert result["unavailable_qualified_route_ids"] == [approved_route_id]
+    # THE ROUTE-EXCEPTION ASSERTION IS GONE, and dropping it is more honest
+    # than retargeting it. It used to compare the script's output against
+    # `LEMMY_VOICE_POLICY`, which was an INDEPENDENT source and therefore
+    # caught the script's hardcoded literal drifting from the live casting
+    # policy. Pointing it at the script's own constant instead -- the obvious
+    # way to survive the policy's deletion -- made it compare the producer to
+    # itself: true for any value the constant could hold, so it could not fail.
+    # A tautology that reads as coverage is worse than no assertion, and the
+    # field itself is removed two commits from here. The other eleven
+    # assertions in this test are unaffected and still independent.
     assert [(row["voice_ref_id"], row["gender"]) for row in index] == [
         ("idx_portable_male_v1", "male"),
         ("idx_portable_female_v1", "female"),
@@ -289,155 +294,12 @@ def test_shipped_bank_has_no_route_exception_and_metadata_is_sha_bound(tmp_path)
         source_sha256=later_sha) == {"later-route"}
 
 
-def test_exact_portable_exception_skips_private_route_and_casts_generic_lemmy(
-        tmp_path, monkeypatch, lemmy_route_qualified):
-    tool = _load()
-    male = tmp_path / "male.wav"
-    female = tmp_path / "female.wav"
-    _wav(male, 7)
-    _wav(female, -7)
-    output = tmp_path / "portable.json"
-    tool.build_portable_bank(
-        shipped_bank=str(ROOT / "config" / "voice_reference_bank.json"),
-        models_root=str(tmp_path / "models"), male_wav=str(male),
-        female_wav=str(female), output=str(output))
-    monkeypatch.setenv("OTR_VOICE_REFERENCE_BANK", str(output))
-
-    from nodes.cast_lock import CastLock
-
-    ledger = json.dumps({
-        "meta": {"episode_seed": 42},
-        "cast": [
-            {"char_id": "c01", "name": "MONTY", "gender": "male",
-             "voice_preset": "v2/en_speaker_1"},
-            {"char_id": "c02", "name": "LEMMY", "gender": "male",
-             "voice_preset": "v2/en_speaker_8"},
-            {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
-             "voice_preset": "v2/en_speaker_6"},
-        ],
-        "lines": [],
-    })
-    locked = json.loads(CastLock().lock(
-        script_json=ledger, cast_voice_policy="auto_registry")[0])
-    lemmy = next(row for row in locked["cast"] if row["name"] == "LEMMY")
-
-    assert lemmy["voice_ref_id"] in {
-        "idx_portable_male_v1", "idx_portable_female_v1"}
-    assert "voice_route" not in lemmy
-    assert lemmy["lemmy_route_tier"] == "unrouted"
-    assert lemmy["lemmy_route_id"] == \
-        "lemmy-indextts2-algenib-cockney-v2"
-    assert lemmy["lemmy_route_reason_code"] == \
-        "qualified_route_unavailable_in_bank"
 
 
-def test_missing_private_route_still_fails_closed_with_typo_exception(
-        tmp_path, monkeypatch, lemmy_route_qualified):
-    tool = _load()
-    male = tmp_path / "male.wav"
-    female = tmp_path / "female.wav"
-    _wav(male, 8)
-    _wav(female, -8)
-    output = tmp_path / "portable.json"
-    tool.build_portable_bank(
-        shipped_bank=str(ROOT / "config" / "voice_reference_bank.json"),
-        models_root=str(tmp_path / "models"), male_wav=str(male),
-        female_wav=str(female), output=str(output))
-    data = json.loads(output.read_text(encoding="utf-8"))
-    data["unavailable_qualified_route_ids"] = [
-        "lemmy-indextts2-algenib-cockney-v999"]
-    output.write_text(json.dumps(data), encoding="utf-8")
-    monkeypatch.setenv("OTR_VOICE_REFERENCE_BANK", str(output))
-
-    from nodes import _otr_voice_route as route
-    from nodes.cast_lock import CastLock
-
-    ledger = json.dumps({
-        "meta": {"episode_seed": 42},
-        "cast": [
-            {"char_id": "c02", "name": "LEMMY", "gender": "male",
-             "voice_preset": "v2/en_speaker_8"},
-        ],
-        "lines": [],
-    })
-    with pytest.raises(route.VoiceRouteError):
-        CastLock().lock(
-            script_json=ledger, cast_voice_policy="auto_registry")
 
 
-def test_private_route_id_on_wrong_engine_is_present_and_fails_closed(
-        tmp_path, monkeypatch, lemmy_route_qualified):
-    tool = _load()
-    male = tmp_path / "male.wav"
-    female = tmp_path / "female.wav"
-    _wav(male, 81)
-    _wav(female, -81)
-    output = tmp_path / "portable.json"
-    result = tool.build_portable_bank(
-        shipped_bank=str(ROOT / "config" / "voice_reference_bank.json"),
-        models_root=str(tmp_path / "models"), male_wav=str(male),
-        female_wav=str(female), output=str(output))
-    wrong_engine = copy.deepcopy(next(
-        row for row in result["voices"]
-        if row.get("voice_ref_id") == "idx_portable_male_v1"))
-    wrong_engine["voice_ref_id"] = "idx_lemmy_algenib_cockney_v1"
-    wrong_engine["engine"] = "kokoro"
-    result["voices"].append(wrong_engine)
-    output.write_text(json.dumps(result), encoding="utf-8")
-    monkeypatch.setenv("OTR_VOICE_REFERENCE_BANK", str(output))
-
-    from nodes import _otr_voice_route as route
-    from nodes.cast_lock import CastLock
-
-    ledger = json.dumps({
-        "meta": {"episode_seed": 42},
-        "cast": [{
-            "char_id": "c02", "name": "LEMMY", "gender": "male",
-            "voice_preset": "v2/en_speaker_8",
-        }],
-        "lines": [],
-    })
-    with pytest.raises(route.VoiceRouteError):
-        CastLock().lock(
-            script_json=ledger, cast_voice_policy="auto_registry")
 
 
-def test_exact_exception_does_not_waive_revoked_qualification(
-        tmp_path, monkeypatch, lemmy_route_qualified):
-    tool = _load()
-    male = tmp_path / "male.wav"
-    female = tmp_path / "female.wav"
-    _wav(male, 9)
-    _wav(female, -9)
-    output = tmp_path / "portable.json"
-    tool.build_portable_bank(
-        shipped_bank=str(ROOT / "config" / "voice_reference_bank.json"),
-        models_root=str(tmp_path / "models"), male_wav=str(male),
-        female_wav=str(female), output=str(output))
-    monkeypatch.setenv("OTR_VOICE_REFERENCE_BANK", str(output))
-
-    from config.cast_pools import LEMMY_VOICE_POLICY
-    from nodes import _otr_voice_route as route
-    from nodes.cast_lock import CastLock
-
-    rejected = copy.deepcopy(LEMMY_VOICE_POLICY)
-    rejected["approved_native_routes"]["indextts2"][
-        "qualification_record"]["rights"]["revoked_at"] = \
-        "2026-09-01T00:00:00Z"
-    monkeypatch.setattr(
-        "nodes.cast_lock._lemmy_voice_policy", lambda: rejected)
-    ledger = json.dumps({
-        "meta": {"episode_seed": 42},
-        "cast": [{
-            "char_id": "c02", "name": "LEMMY", "gender": "male",
-            "voice_preset": "v2/en_speaker_8",
-        }],
-        "lines": [],
-    })
-
-    with pytest.raises(route.VoiceRouteError, match="beyond the intentional"):
-        CastLock().lock(
-            script_json=ledger, cast_voice_policy="auto_registry")
 
 
 def test_exact_exception_is_safe_in_preserve_ledger_mode(tmp_path, monkeypatch):
