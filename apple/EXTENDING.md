@@ -177,9 +177,11 @@ partner stack, a Mac device policy.
 one workflow. Edit that file. Do not hand-edit anything in
 `workflows/variants/` -- those JSON files and their `.launch.md` recipes are
 generated, and the next rebuild silently undoes you. Do not add a
-`config/profiles/<id>.json` for something you intend to ship; that folder is
-the lab rigs (`otr_soak_*` and friends), loaded with `--profile`, not the
-shipping set.
+`config/profiles/<id>.json` for something you intend to ship -- the matrix is
+consulted first. That folder still holds twins of the current shipping rows
+from the migration, plus the lab rigs (`otr_soak_*` and friends) that
+`--profile` loads on the canonical runner. A new shipping graph is a matrix
+row only.
 
 This wants the git clone. `scripts/` is not in a registry install.
 
@@ -224,9 +226,12 @@ Copy the closest sibling. Then:
 4. **Metadata that is not a widget** -- `status`, `platform`, `allow_sidecars`,
    `toolchains`, `launch`, `preflight` -- defaults from the matrix `defaults`
    block. State only what differs. `device_backend` is required on every row;
-   omitting it does not inherit, it fails validation. `allow_sidecars`
-   defaults false; set it true only if this graph should offer engines that
-   declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
+   omitting it does not inherit, it fails validation. State `gpu_vendor` too
+   (`nvidia`, `amd`, `apple`, `none`): it is optional in the schema and
+   absent from `defaults`, so omitting it silently becomes none and the
+   launch recipe writes the NVIDIA CUDA lines. `allow_sidecars` defaults
+   false; set it true only if this graph should offer engines that declare
+   `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
 
 Do not put a JSON in `workflows/` for the new row. Browse Templates stays one
 card.
@@ -239,9 +244,9 @@ python scripts/build_variants.py --check
 ```
 
 `--all` writes the variant JSON, the launch recipe, and the generated docs
-(`[MACHINES.md](MACHINES.md)`, `docs/DROPDOWN_MATRIX.md`,
-`docs/MACHINE_MATRIX.md`) from the same matrix. `--check` diffs the committed
-variants against a fresh regeneration and fails on drift.
+(`apple/MACHINES.md`, `docs/DROPDOWN_MATRIX.md`, `docs/MACHINE_MATRIX.md`)
+from the same matrix. `--check` diffs the committed variants against a fresh
+regeneration and fails on drift.
 
 A wiring or widget change also wants these four green:
 
@@ -261,8 +266,10 @@ the one that would otherwise lie.
 
 Set `"ships"` false (or delete the row), **and delete** the matching files in
 `workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
-that id). `--all` does not remove leftovers; `--check` still validates every
-`otr_*.json` sitting in that folder (not the `.env.json` knob files).
+that id). If you delete the row, also delete any `config/profiles/<id>.json`
+twin -- `--check` falls through to that file and can pass on a graph that no
+longer ships. `--all` does not remove leftovers; `--check` still validates
+every `otr_*.json` sitting in that folder (not the `.env.json` knob files).
 
 ### The proof
 
