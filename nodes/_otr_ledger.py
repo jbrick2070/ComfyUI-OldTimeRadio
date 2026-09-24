@@ -824,7 +824,6 @@ def stamp_per_line_audio_meta(
     audio_cache_key: str = "",
     audio_sha256: str = "",
     provider_model_id: str = "",
-    voice_route_id: str = "",
     sample_rate: int = 0,
     voice_floor: str = "",
     voice_floor_words: int = 0,
@@ -858,11 +857,12 @@ def stamp_per_line_audio_meta(
     floored line destroyed the render evidence of every healthy line beside
     it. Caught in review before it ever ran. Add a field here first.
 
-    New optional kwargs (plan 5.3, 2026-08-10): ``voice_route_id`` names the
-    qualified voice route this line actually rendered on -- empty on every
-    non-policy line -- and ``sample_rate`` records the rate the clip came back
-    at. Both are per-line RENDER EVIDENCE: current, bounded, overwritten by a
-    re-render. Static route identity lives once on the cast row, not here.
+    ``sample_rate`` records the rate the clip actually came back at. It is
+    per-line RENDER EVIDENCE: current, bounded, overwritten by a re-render.
+    It arrived alongside a ``voice_route_id`` that named the qualified voice
+    route a line rendered on; that one left with the routes on 2026-09-24,
+    and old ledgers that carry the key simply keep it -- nothing reads it,
+    and rewriting shipped episodes to drop a field is not worth a migration.
 
     Returns True if a row was updated, False if no matching line_id.
     Never raises.
@@ -882,11 +882,8 @@ def stamp_per_line_audio_meta(
         fields["audio_sha256"] = str(audio_sha256)
     if provider_model_id:
         fields["provider_model_id"] = str(provider_model_id)
-    # Plan 5.3 per-line render evidence. Both skip-when-empty, like every field
-    # above, so a caller that computed neither cannot blank one that was already
-    # stamped by an earlier role.
-    if voice_route_id:
-        fields["voice_route_id"] = str(voice_route_id)
+    # Per-line render evidence, skip-when-empty like every field above, so a
+    # caller that did not compute it cannot blank one an earlier role stamped.
     if int(sample_rate or 0) > 0:
         fields["sample_rate"] = int(sample_rate)
     # Skip-when-empty like every field above: a healthy re-render of this line

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """What must still be true after the recurring-character voice rewrite.
 
-WHY THIS FILE EXISTS. A bespoke qualified/provisional/unrouted voice-ROUTE
+WHY THIS FILE EXISTS. A bespoke qualified/provisional/unrouted voice-route
 subsystem is being replaced by a plain table of recurring-character catalogue
 assignments. Most of what that subsystem tests dies with it -- the receipt
 validators, the degradation reason codes, the audition manifests. But a set of
@@ -35,7 +35,6 @@ import os
 
 import pytest
 
-from nodes import _otr_voice_route as ROUTE
 from nodes._otr_voice_bank import load_voice_bank
 from nodes.cast_lock import CastLock
 
@@ -293,14 +292,19 @@ def test_a_provider_assignment_reaches_the_provider_voice_id(assign):
     ("kokoro", KOKORO_REF),
     ("cloud_elevenlabs", PROVIDER_REF),
 ])
-def test_no_assignment_writes_a_route_and_none_of_them_raises(assign, engine, ref):
-    """The per-line dispatch call runs for every row of every episode."""
+def test_no_assignment_writes_any_retired_route_field(assign, engine, ref):
+    """A locked row carries NONE of the retired route vocabulary.
+
+    These three field names are spelled out as LITERALS on purpose. They name
+    fields of a module that no longer exists, so there is nothing left to
+    import them from -- and that is exactly why the assertion has to stay: a
+    re-introduced route stamp would otherwise be invisible to every test here.
+    """
     rows = _lock_recurring_row(assign, engine, ref)
     row = rows["c02"]
-    assert "voice_route" not in row
-    resolved = ROUTE.resolve_and_verify_reference(row, engine)
-    assert resolved is ROUTE.LEGACY_REFERENCE, resolved
-    assert resolved.is_policy_route is False
+    for retired in ("voice_route", "voice_route_id", "voice_route_reason"):
+        assert retired not in row, (
+            "a retired route field came back onto a locked row: %r" % retired)
 
 
 # ---------------------------------------------------------------------------
@@ -321,9 +325,6 @@ def _ledger_with_assignment(voice_ref_id, engine):
     cast[1].update({
         "voice_ref_id": voice_ref_id,
         "voice_engine": engine,
-        ROUTE.CAST_ROW_TIER_FIELD: ROUTE.ROUTE_TIER_PROVISIONAL,
-        ROUTE.CAST_ROW_ROUTE_ID_FIELD: "lemmy-%s-provisional-v1" % engine,
-        ROUTE.CAST_ROW_REASON_FIELD: "",
     })
     return _ledger(cast=cast)
 
@@ -363,7 +364,8 @@ def test_two_different_identities_fingerprint_differently():
 def test_an_unreadable_local_identity_fails_OPEN(monkeypatch):
     """A missing file reruns the node; it does not wedge the graph on a stale
     cache entry. NaN is how ComfyUI spells "always rerun"."""
-    monkeypatch.setattr(ROUTE, "sha256_of_file", lambda *_a, **_k: None)
+    from nodes import _otr_voice_node_common as VNC
+    monkeypatch.setattr(VNC, "sha256_of_file", lambda *_a, **_k: None)
     out = _voice_node().IS_CHANGED(
         script_json=_ledger_with_assignment(CLONE_REF, "chatterbox"),
         engine="chatterbox")
@@ -378,8 +380,8 @@ def test_a_cloud_identity_never_touches_the_filesystem(monkeypatch):
     def _forbidden(*_a, **_k):
         raise AssertionError("a cloud identity hashed a local file")
 
-    monkeypatch.setattr(ROUTE, "sha256_of_file", _forbidden)
-    out = VNC._provisional_identity_fingerprint("cloud_elevenlabs", PROVIDER_REF)
+    monkeypatch.setattr(VNC, "sha256_of_file", _forbidden)
+    out = VNC._bank_identity_fingerprint("cloud_elevenlabs", PROVIDER_REF)
     assert out == "provider:%s" % PROVIDER_VOICE_ID, out
 
 

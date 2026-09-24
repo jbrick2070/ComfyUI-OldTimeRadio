@@ -25,8 +25,6 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import _otr_voice_route as _ROUTE
-
 try:
     from ._otr_ledger_scrub import row_is_verbatim as _row_is_verbatim
     from ._otr_script_prep import keep_spoken_parentheticals as _keep_spoken_parentheticals
@@ -73,9 +71,8 @@ def _resolve_ref_to_disk(ref_path):
     if not ref_path:
         return None
     # A REMOTE REFERENCE IS NEVER RESOLVABLE, AND ASKING COSTS AN SMB SESSION
-    # (2026-09-05). A cast row carrying no `voice_route` is accepted as a LEGACY
-    # reference (`_otr_voice_route.py:1074-1076`), and `resolve_voice_ref_path`
-    # passes an already-absolute value straight through
+    # (2026-09-05). `resolve_voice_ref_path` passes an already-absolute
+    # value straight through
     # (`_otr_audio_engines/base.py:140`) -- so a `ledger_json` naming
     # `\\attacker\share\x.wav` reached `os.path.exists` at eleven call sites and
     # Windows authenticated to the host the workflow chose. That is the same
@@ -103,24 +100,66 @@ def _resolve_ref_to_disk(ref_path):
     from ._otr_audio_engines.base import resolve_voice_ref_path
     return resolve_voice_ref_path(ref_path)
 
+def sha256_of_file(path: str) -> "Optional[str]":
+    """Hash a file, or None if it cannot be read. Never raises.
 
-def _provisional_identity_fingerprint(engine, voice_ref_id):
-    """Cache-key material for ONE provisional identity, or ``None`` to fail open.
+    MOVED HERE 2026-09-24 from the deleted voice-route module. It was the one
+    generic thing in it -- an unreadable reference is a validation failure, not
+    a crash in the caller -- and the cache fingerprint below is now its only
+    consumer.
+    """
+    import hashlib
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:                     # noqa: BLE001 -- see docstring
+        return None
 
-    A provisional row deliberately carries no ``voice_route`` -- that field means
-    "a qualified route was proved" -- so the route-shaped fingerprint above cannot
-    see it, and a swapped reference under an unchanged id would replay the
-    PREVIOUS render's audio while the ledger named the new identity.
 
-    Both LOCAL identity kinds are fingerprinted by their bytes: a clone engine's
-    reference WAV and kokoro's ``.pt`` voice tensor alike. Hashing only the WAV
-    would leave the one identity kind that neither the qualified route nor the
-    clone rows cover silently cacheable.
+
+def _is_announcer_row(entry) -> bool:
+    """True for the ANNOUNCER row. Mirrors cast_lock's own check.
+
+    DUPLICATED RATHER THAN IMPORTED, deliberately: this module must stay
+    cold-import clean and importing cast_lock here would pull the whole casting
+    stack into a cache-key probe. The rule is three field comparisons and is
+    pinned against cast_lock's version by a test, so a drift is caught rather
+    than discovered.
+    """
+    if not isinstance(entry, dict):
+        return False
+    char_id = str(entry.get("char_id") or "").strip().lower()
+    name = str(entry.get("name") or "").strip().upper()
+    role = str(entry.get("speaker_role") or entry.get("role") or "").strip().lower()
+    return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
+
+
+def _bank_identity_fingerprint(engine, voice_ref_id):
+    """Cache-key material for ONE bank identity, or ``None`` to fail open.
+
+    RENAMED from `_provisional_identity_fingerprint` on 2026-09-24. There is no
+    provisional tier any more; what it always actually did was fingerprint a
+    BANK ROW, and that is what the recurring-character rows need.
+
+    WHY THE GRAPH CACHE HAS TO SEE THIS AT ALL. A cast row names a voice by ID.
+    Swap the bytes under that id -- re-record a reference WAV, replace a kokoro
+    `.pt` -- and the id is unchanged, so a cache keyed on the ledger alone would
+    replay the PREVIOUS render's audio while the ledger named the new identity.
+    Both local kinds are hashed for that reason: a clone engine's WAV and
+    kokoro's voice tensor alike.
+
+    EXACTLY ONE MATCHING `(engine, id)` ROW, or this fails open. Two rows
+    sharing an id on one engine is an ambiguous bank, and picking either would
+    make the cache key depend on file order.
 
     ``None`` means "expected a local file and could not read it", and the caller
-    turns that into NaN -- fail OPEN, rerun, and let the render path fail loudly,
-    rather than quietly serving audio nobody asked for. A provider voice has no
-    local bytes and is not a failure: it contributes its id and nothing else.
+    turns it into NaN -- rerun, and let the render path fail loudly, rather than
+    quietly serving audio nobody asked for. A provider voice has no local bytes
+    and is NOT a failure: it contributes its id and nothing else, and never a
+    network call.
     """
     try:
         from ._otr_voice_bank import load_voice_bank
@@ -128,18 +167,23 @@ def _provisional_identity_fingerprint(engine, voice_ref_id):
         bank, _sha = load_voice_bank()
     except Exception:                         # noqa: BLE001 -- unreadable bank
         return None
-    entry = next((e for e in bank
-                  if e.voice_ref_id == voice_ref_id and e.engine == engine), None)
-    if entry is None:
-        return None                           # the id names nothing -- fail open
+    matches = [e for e in bank
+               if e.voice_ref_id == voice_ref_id and e.engine == engine]
+    if len(matches) != 1:
+        return None                           # absent or ambiguous -- fail open
+    entry = matches[0]
     ref_path = str(getattr(entry, "ref_path", "") or "")
-    if not ref_path or ref_path.startswith("cloud:"):
+    if ref_path.startswith("cloud:"):
         # NEVER a network call. A provider voice is identified by its id, which
         # the caller already folded in.
         return "provider:%s" % (getattr(entry, "provider_voice_id", "") or "",)
+    if not ref_path:
+        # An empty path is UNRESOLVED, not a provider identity. Treating it as
+        # one would invent a stable key for a row that names no bytes.
+        return None
     full = _resolve_ref_to_disk(ref_path) or ref_path
-    digest = _ROUTE.sha256_of_file(full)
-    return digest
+    return sha256_of_file(full)
+
 
 
 def _resolve_clone_ref_path(engine, cast, episode_seed, role="char_voice",
@@ -713,18 +757,19 @@ def _resolve_engine_seed(runtime, seed_reduce, profile, engine, request,
     )
 
 
-def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
+def _persist_ledger_stamps(meta, stamps, log_) -> int:
     """Reload the on-disk ledger, stamp each line, save.
 
     Returns count of degraded stamps (a stamp helper False or a
     save_ledger_safe False counts). Never writes back the wire JSON --
     reload-before-save preserves prior roles' stamps (r2 MF#4).
 
-    ``failed_line_ids`` (plan 5.3) is an optional set the caller passes in to be
-    filled with the line_ids that did NOT persist. The COUNT alone cannot answer
-    "did the qualified route's own receipt land?" -- and punishing a proved route
-    because some unrelated line's stamp failed would throw away good, fully
-    evidenced audio. Which lines failed is the question; this answers it.
+    IT REPORTS A COUNT, NOT A SET OF IDS. It used to fill a caller-supplied set
+    of the line_ids that did not persist, for a gate that raised when a proved
+    voice route's own receipt was the one that failed. That gate went with the
+    routes on 2026-09-24, and the set went with it rather than being left behind
+    as a parameter nothing reads -- a degraded stamp is telemetry again, which
+    is what it was before the route existed.
     """
     from ._otr_ledger import (
         in_flight_ledger_path, save_ledger_safe, stamp_per_line_audio_meta)
@@ -758,13 +803,8 @@ def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
         except Exception as exc:  # noqa: BLE001 -- a refusal skips stamping, never raises here
             log_.warning("[OTR voice cache] ledger_path refused (%s); stamps skipped", exc)
             ledger_path = ""
-    def _mark_all_failed() -> None:
-        if failed_line_ids is not None:
-            failed_line_ids.update(lid for lid, _ in stamps)
-
     if not ledger_path or not os.path.exists(ledger_path):
         log_.warning("[OTR voice cache] no ledger_path in meta.paths; stamps skipped")
-        _mark_all_failed()
         return len(stamps)
     degraded = 0
     try:
@@ -773,19 +813,15 @@ def _persist_ledger_stamps(meta, stamps, log_, failed_line_ids=None) -> int:
         for lid, fields in stamps:
             if not stamp_per_line_audio_meta(full_ledger, lid, **fields):
                 degraded += 1
-                if failed_line_ids is not None:
-                    failed_line_ids.add(lid)
                 log_.warning("[OTR voice cache] stamp failed for line %s", lid)
         if not save_ledger_safe(Path(ledger_path), full_ledger):
             # Nothing reached disk, so every stamp failed -- including any that
             # the per-line loop above had reported as fine.
             degraded = len(stamps)
-            _mark_all_failed()
             log_.warning("[OTR voice cache] save_ledger_safe returned False")
     except Exception as exc:  # noqa: BLE001
         log_.warning("[OTR voice cache] ledger stamp failed: %s", exc)
         degraded = len(stamps)
-        _mark_all_failed()
     return degraded
 
 
@@ -927,7 +963,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
     audio = job["audio"]
     line_id = job["line_id"]
     occ = job["occ"]
-    resolved_ref = job["resolved_ref"]
     voice_preset = job["voice_preset"]
     cache_status = job["cache_status"]
     cached_record = job.get("cached_record")
@@ -942,8 +977,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
         )
         log_lines.append(_sr_msg)
         log.warning("[OTR voice P-OBS] %s", _sr_msg)
-    if resolved_ref.is_policy_route:
-        job["policy_line"] = True
     from ._otr_ledger import compute_audio_sample_hash
     _asample_hash = compute_audio_sample_hash(
         audio["waveform"] if isinstance(audio, dict) else audio
@@ -952,17 +985,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
         float(audio["waveform"].shape[-1]) / float(_got_sr)
         if _got_sr else 0.0
     )
-    if not cache_enabled and resolved_ref.is_policy_route:
-        ledger_stamps.append((line_id, {
-            "tts_engine": engine,
-            "voice_preset": voice_preset or "",
-            "render_ms": int(
-                (time.monotonic() - job["_render_start"]) * 1000),
-            "generated_dur_s": _dur_s,
-            "audio_sample_hash": _asample_hash,
-            "sample_rate": _got_sr,
-            "voice_route_id": resolved_ref.route_id,
-        }))
     if cache_enabled:
         if cache_status == "hit":
             ledger_stamps.append((line_id, {
@@ -975,7 +997,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                 "audio_sha256": cached_record.audio_sha256,
                 "provider_model_id": cached_record.provider_model_id or "",
                 "sample_rate": _got_sr,
-                "voice_route_id": resolved_ref.route_id,
             }))
         else:
             _elapsed_ms = int((time.monotonic() - job["_render_start"]) * 1000)
@@ -990,7 +1011,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                     "audio_sample_hash": _asample_hash,
                     "provider_model_id": provider_model_id_stamp,
                     "sample_rate": _got_sr,
-                    "voice_route_id": resolved_ref.route_id,
                 }))
             elif cache is not None:
                 try:
@@ -1014,7 +1034,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                         "audio_sha256": fresh_record.audio_sha256,
                         "provider_model_id": provider_model_id_stamp,
                         "sample_rate": _got_sr,
-                        "voice_route_id": resolved_ref.route_id,
                     }))
                 except Exception as _put_err:  # noqa: BLE001
                     log.warning("[OTR voice cache] put failed: %s", _put_err)
@@ -1028,7 +1047,6 @@ def _finish_voice_line(job, *, role, clips, cache, cache_enabled, cache_stats,
                         "audio_sample_hash": _asample_hash,
                         "provider_model_id": provider_model_id_stamp,
                         "sample_rate": _got_sr,
-                        "voice_route_id": resolved_ref.route_id,
                     }))
     clips.append(audio)
 
@@ -1097,27 +1115,32 @@ class OTRVoiceNodeBase:
 
             source = ledger_json if (ledger_json or "").strip() else script_json
             led = _OTRLC.load_ledger(source)
-            routes = [
-                e.get("voice_route") for e in (led.get("cast") or [])
-                if isinstance(e, dict) and isinstance(e.get("voice_route"), dict)
-                and e.get("voice_route")
-            ]
-            provisional_rows = [
+            # THE ROWS THAT CAN MOVE THIS KEY are the registered recurring
+            # characters, selected through the SAME registry lookup casting
+            # uses -- not a second rule that could drift from it. An ordinary
+            # drawn row is not fingerprinted here and never was; ANNOUNCER is
+            # excluded even when it holds the same shared catalogue voice,
+            # because it is a role, not a character.
+            try:
+                from config.cast_pools import recurring_character_key
+            except ImportError:              # pragma: no cover -- flat imports
+                from cast_pools import recurring_character_key  # type: ignore
+            character_rows = [
                 e for e in (led.get("cast") or [])
                 if isinstance(e, dict)
-                and str(e.get(_ROUTE.CAST_ROW_TIER_FIELD) or "")
-                == _ROUTE.ROUTE_TIER_PROVISIONAL
+                and str(e.get("voice_ref_id") or "").strip()
+                and not _is_announcer_row(e)
+                and recurring_character_key(e)
             ]
         except Exception:
             # No ledger yet, or one that will not parse. This is the ORDINARY
             # case at graph-eval time (upstream has not run), and it was
-            # "static" before this method learned about routes -- so it stays
-            # "static". Returning NaN here would make every local voice leg
-            # uncacheable in-graph, which is a performance regression dressed up
-            # as caution. Route safety is enforced on the render path, which
-            # fails closed regardless of what this method answers.
-            routes = []
-            provisional_rows = []
+            # "static" before this method learned about voice identity -- so it
+            # stays "static". Returning NaN here would make every local voice
+            # leg uncacheable in-graph, which is a performance regression
+            # dressed up as caution. Identity safety is enforced on the render
+            # path, which fails closed regardless of what this method answers.
+            character_rows = []
 
         # CALL-TIME NUMERIC PARAMS (Lemmy chunk A1), and they are read BEFORE
         # the no-routes shortcut because the defect has nothing to do with
@@ -1138,7 +1161,7 @@ class OTRVoiceNodeBase:
         except Exception:  # noqa: BLE001 -- unknown/duck-typed engine
             render_params = {}
 
-        if not routes and not render_params and not provisional_rows:
+        if not character_rows and not render_params:
             return "static"
 
         parts = [
@@ -1149,41 +1172,22 @@ class OTRVoiceNodeBase:
         ]
         for name in sorted(render_params):
             parts.append("%s=%s" % (name, render_params[name]))
-        for route in sorted(routes, key=lambda r: str(r.get("route_id") or "")):
-            runtime = route.get("runtime") or {}
-            parts.extend([
-                str(route.get("route_id") or ""),
-                str(route.get("route_contract_version") or ""),
-                str(route.get("status") or ""),
-                str(route.get("engine") or ""),
-                str(route.get("voice_ref_id") or ""),
-                str(route.get("reference_kind") or ""),
-                str(route.get("qualification_record_id") or ""),
-                str(runtime.get("model_id") or ""),
-                str(runtime.get("engine_impl_version") or ""),
-                str(runtime.get("weight_revision") or ""),
-            ])
-            if route.get("reference_kind") == "local_wav":
-                path = str(route.get("ref_path") or "")
-                full = _resolve_ref_to_disk(path) or path
-                digest = _ROUTE.sha256_of_file(full) if path else None
-                if digest is None:
-                    return float("nan")      # fail OPEN, never reuse
-                parts.append(digest)
-            else:
-                parts.append(str(route.get("source_ref_sha256") or ""))
-
-        for row in sorted(provisional_rows,
-                          key=lambda r: str(r.get(_ROUTE.CAST_ROW_ROUTE_ID_FIELD) or "")):
+        for row in sorted(
+                character_rows,
+                key=lambda r: (str(r.get("char_id") or ""),
+                               str(r.get("name") or ""),
+                               str(r.get("voice_engine") or ""),
+                               str(r.get("voice_ref_id") or ""))):
             row_engine = str(row.get("voice_engine") or engine or "")
             voice_ref_id = str(row.get("voice_ref_id") or "")
             parts.extend([
-                str(row.get(_ROUTE.CAST_ROW_ROUTE_ID_FIELD) or ""),
+                str(row.get("char_id") or ""),
+                str(row.get("name") or ""),
                 row_engine,
                 voice_ref_id,
                 str(row.get("provider_voice_id") or ""),
             ])
-            identity = _provisional_identity_fingerprint(row_engine, voice_ref_id)
+            identity = _bank_identity_fingerprint(row_engine, voice_ref_id)
             if identity is None:
                 return float("nan")          # fail OPEN, never reuse
             parts.append(identity)
@@ -1456,28 +1460,6 @@ class OTRVoiceNodeBase:
             log_lines.append(f"{self.ROLE}: cache enabled dir={cache_dir}")
         cache_stats = {"hit": 0, "miss": 0, "degraded_write": 0, "degraded_ledger": 0}
         ledger_stamps: list = []
-        # Plan 5.3 route resolution, per character, once per render. The bank is
-        # loaded lazily and only when some row actually carries a voice_route --
-        # today no row does, so this costs nothing on every shipping render.
-        _resolved_refs: dict = {}
-        _route_bank: list = []
-        # The lines that rendered on a QUALIFIED ROUTE, and the ones whose
-        # receipts did not land. The raise at the end compares these two sets --
-        # not a bare degraded COUNT, which cannot tell a failed Lemmy receipt
-        # apart from some unrelated line's failed stamp.
-        _policy_line_ids: set = set()
-        _failed_stamp_ids: set = set()
-
-        def _route_bank_lookup(voice_ref_id):
-            if not _route_bank:
-                from ._otr_voice_bank import load_voice_bank
-                _route_bank.append(load_voice_bank()[0])
-            return next(
-                (e for e in _route_bank[0]
-                 if e.voice_ref_id == voice_ref_id and e.engine == engine),
-                None,
-            )
-
         try:
             line_jobs = []
             for occ, ln in enumerate(lines):
@@ -1501,39 +1483,12 @@ class OTRVoiceNodeBase:
                 char_id = str(ln.get("char_id") or "")
                 line_id = str(ln.get("line_id") or "")
                 cast = _OTRLC.cast_lookup(led, char_id)
-                # Plan 5.3: immediately after cast_lookup, prove this row's
-                # route against the engine actually rendering, BEFORE either
-                # request is built. A row with no voice_route resolves to
-                # LEGACY_REFERENCE -- all-empty identity, so its cache_key is
-                # byte-identical to what it was before the schema grew.
-                #
-                # Memoized per char_id: the bytes are re-hashed once per render
-                # rather than once per LINE. Re-hashing at point of use is the
-                # point (a receipt proved at cast time says nothing about the
-                # file five minutes later); re-hashing forty times is just I/O.
-                resolved_ref = _resolved_refs.get(char_id)
-                if resolved_ref is None:
-                    resolved_ref = _ROUTE.resolve_and_verify_reference(
-                        cast, engine, bank_lookup=_route_bank_lookup,
-                        repo_root=_REPO_ROOT,
-                        path_resolver=_resolve_ref_to_disk)
-                    _resolved_refs[char_id] = resolved_ref
-                route_fields = resolved_ref.request_fields()
                 voice_ref_id = cast.get("voice_ref_id")
                 voice_preset = cast.get("voice_preset")
                 if ref_field == "voice_ref_path":
                     voice_ref = cast.get("voice_ref_path") or cast.get("ref_path")
                 else:
                     voice_ref = cast.get(ref_field)
-                # A PROVED local route renders ITS OWN bytes. Without this the
-                # route would prove one file and the generic resolver below would
-                # hand the adapter another -- a receipt describing audio nobody
-                # ever heard, which is the exact class of defect this whole
-                # contract exists to end.
-                if (resolved_ref.is_policy_route
-                        and resolved_ref.reference_kind == "local_wav"
-                        and ref_field == "voice_ref_path"):
-                    voice_ref = _resolve_ref_to_disk(resolved_ref.ref_path)                         or resolved_ref.ref_path
                 delivery_vector = None
                 _dv_source = "off"
                 if _delivery_on:
@@ -1610,7 +1565,6 @@ class OTRVoiceNodeBase:
                         commercial_clean=profile.commercial_clean,
                         provider_model_id=provider_model_id_stamp,
                         provider_voice_id=provider_voice_stamp,
-                        **route_fields,
                     )
                 else:
                     request = build_resolved_request(
@@ -1630,7 +1584,6 @@ class OTRVoiceNodeBase:
                         channels=1,
                         params=line_params,
                         commercial_clean=profile.commercial_clean,
-                        **route_fields,
                     )
                 # THE SEED IS DERIVED BELOW, NOT HERE [QA-5]. It used to be
                 # computed at this point, before the block that resolves a
@@ -1780,7 +1733,6 @@ class OTRVoiceNodeBase:
                     "google_tts_cache": bool(cache_enabled and engine == "google_tts"),
                     "provider_model_id_stamp": provider_model_id_stamp,
                     "request": request,
-                    "resolved_ref": resolved_ref,
                     "voice_preset": voice_preset,
                     "license_clean": (
                         cache_enabled
@@ -1878,8 +1830,6 @@ class OTRVoiceNodeBase:
                         raise RuntimeError(
                             "cloud TTS fan-out never rendered line %s"
                             % j["job_id"])
-                    if j["resolved_ref"].is_policy_route:
-                        _policy_line_ids.add(j["line_id"])
                     _finish_voice_line(
                         j, role=self.ROLE, clips=clips, cache=cache,
                         cache_enabled=cache_enabled, cache_stats=cache_stats,
@@ -1910,17 +1860,17 @@ class OTRVoiceNodeBase:
             # completed cleanly or a mid-loop exception is propagating out.
             # Any raise from _persist_ledger_stamps' pre-try setup is credited
             # as fully degraded so telemetry never lies (r4 SF#1 defensive wrap).
-            # Plan 5.3: the flush is no longer cache-only. Local renders collect
-            # receipts too, and a receipt that is collected but never written is
-            # not a receipt.
+            # WHATEVER WAS COLLECTED IS WRITTEN. The guard is on the stamps
+            # themselves, not on the cache: a stamp that was collected and then
+            # never written is not a stamp, and reading the cache flag here
+            # would be a second, drifting answer to "is there anything to
+            # flush?"
             if ledger_stamps:
                 try:
                     cache_stats["degraded_ledger"] += _persist_ledger_stamps(
-                        meta, ledger_stamps, log,
-                        failed_line_ids=_failed_stamp_ids)
+                        meta, ledger_stamps, log)
                 except Exception as _pe:  # noqa: BLE001
                     cache_stats["degraded_ledger"] += len(ledger_stamps)
-                    _failed_stamp_ids.update(lid for lid, _ in ledger_stamps)
                     log.warning(
                         "[OTR voice] ledger stamp flush failed in finally "
                         "(reporting %d stamps as degraded): %s",
@@ -1934,25 +1884,6 @@ class OTRVoiceNodeBase:
                 f"miss={cache_stats['miss']} degraded_write={cache_stats['degraded_write']} "
                 f"degraded_ledger={cache_stats['degraded_ledger']} "
                 f"api_saved={cache_stats['hit']} of {_total}"
-            )
-        # Plan 5.3, and it is deliberately the harshest rule in this method:
-        # failure to persist a SELECTED-ROUTE receipt fails BEFORE returning
-        # audio. A qualified route exists to make a claim provable after the
-        # fact; audio that shipped with its receipt silently dropped has un-made
-        # that claim, and handing it back would be the quiet lie the whole
-        # contract was built to prevent. Non-policy lines keep the existing
-        # degraded-telemetry behaviour -- this raises only when a proved route
-        # actually rendered.
-        _unproved = _policy_line_ids & _failed_stamp_ids
-        if _unproved:
-            raise RuntimeError(
-                f"{self.ROLE}: the per-line receipt did not persist for "
-                f"{len(_unproved)} line(s) rendered on a QUALIFIED VOICE ROUTE "
-                f"({', '.join(sorted(_unproved))}). The audio is not being "
-                f"returned: a route whose evidence did not land is an "
-                f"unprovable claim. Note this is scoped to the ROUTE's own "
-                f"lines -- an unrelated line's failed stamp stays telemetry and "
-                f"never throws away good, fully evidenced audio."
             )
         return packed, log_lines, n
 

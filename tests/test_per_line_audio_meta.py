@@ -205,12 +205,15 @@ def no_in_flight_ledger(monkeypatch):
     monkeypatch.setattr(_OTRL, "in_flight_ledger_path", lambda: None)
 
 
-def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(
+def test_one_unstampable_line_does_not_degrade_the_whole_batch(
         tmp_path, no_in_flight_ledger):
-    """The count alone cannot answer WHICH line failed to stamp.
+    """One line missing from the ledger counts ONE degraded stamp, not two.
 
-    Without the id set, one unrelated line's failed stamp makes the caller
-    discard good rendered audio for every other line in the batch."""
+    This used to also assert WHICH line failed, through an out-parameter the
+    flush filled for the voice route's receipt gate. The gate and the parameter
+    went on 2026-09-24; the count is the surviving contract, and it is the half
+    that says the good line was not blamed for the bad one.
+    """
     from nodes._otr_voice_node_common import _persist_ledger_stamps
 
     ledger_path = tmp_path / "ledger.json"
@@ -218,37 +221,27 @@ def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(
         {"lines": [{"line_id": "L1", "text": "hi"}]}), encoding="utf-8")
     meta = {"paths": {"ledger_path": str(ledger_path)}}
 
-    failed = set()
     degraded = _persist_ledger_stamps(
         meta,
         [("L1", {"tts_engine": "indextts2"}),
          ("L_NOT_IN_LEDGER", {"tts_engine": "indextts2"})],
         __import__("logging").getLogger("test"),
-        failed_line_ids=failed,
     )
-    assert degraded == 1
-    assert failed == {"L_NOT_IN_LEDGER"}, (
+    assert degraded == 1, (
         "the good line must not be blamed for the bad one")
+    # ...and the good line really was written, which the count alone cannot say.
+    rows = {r["line_id"]: r for r in
+            json.loads(ledger_path.read_text(encoding="utf-8"))["lines"]}
+    assert rows["L1"].get("tts_engine") == "indextts2"
 
 def test_a_missing_ledger_path_blames_every_stamp(tmp_path, no_in_flight_ledger):
     from nodes._otr_voice_node_common import _persist_ledger_stamps
 
-    failed = set()
     degraded = _persist_ledger_stamps(
         {"paths": {}}, [("L1", {"tts_engine": "bark"})],
-        __import__("logging").getLogger("test"), failed_line_ids=failed)
+        __import__("logging").getLogger("test"))
     assert degraded == 1
-    assert failed == {"L1"}
 
-def test_the_flush_still_works_without_the_new_argument(
-        tmp_path, no_in_flight_ledger):
-    """Three positional args is the existing call shape, including a spy in
-    tests/test_audio_cache_wiring.py."""
-    from nodes._otr_voice_node_common import _persist_ledger_stamps
-
-    assert _persist_ledger_stamps(
-        {"paths": {}}, [("L1", {"tts_engine": "bark"})],
-        __import__("logging").getLogger("test")) == 1
 
 # ---------------------------------------------------------------------------
 # Per-line receipts.

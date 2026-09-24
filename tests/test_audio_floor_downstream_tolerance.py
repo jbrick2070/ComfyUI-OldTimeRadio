@@ -208,7 +208,6 @@ def test_a_floored_line_stamp_lands_and_spares_its_healthy_neighbours(tmp_path, 
         {"line_id": "L2", "text": "the one that failed"},
     ]}), encoding="utf-8")
 
-    failed = set()
     degraded = _persist_ledger_stamps(
         {"paths": {"ledger_path": str(ledger_path)}},
         [("L1", {"tts_engine": "elevenlabs", "audio_sample_hash": "abc123",
@@ -216,10 +215,9 @@ def test_a_floored_line_stamp_lands_and_spares_its_healthy_neighbours(tmp_path, 
          ("L2", {"tts_engine": "elevenlabs", "render_ms": 0,
                  "generated_dur_s": 2.0, "sample_rate": SR,
                  "voice_floor": "timeout", "voice_floor_words": 4})],
-        logging.getLogger("test"), failed_line_ids=failed)
+        logging.getLogger("test"))
 
     assert degraded == 0, "no stamp should have failed"
-    assert failed == set(), failed
     rows = {r["line_id"]: r for r in
             json.loads(ledger_path.read_text(encoding="utf-8"))["lines"]}
     # The healthy line keeps its evidence.

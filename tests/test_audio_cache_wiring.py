@@ -83,8 +83,16 @@ def test_schema_versions_bumped():
     invalidation through the designed slim-migration path rather than letting
     keys drift silently. CACHE_SCHEMA_VERSION is unchanged: the SIDECAR record
     shape did not change, only what the key is computed over.
+
+    REQUEST 3 -> 4 on 2026-09-24: those same four fields LEFT IN_KEY_FIELDS with
+    the voice-route subsystem. Removing a key field moves every cache_key
+    exactly as adding one did, so it takes the same declared path. This test
+    failing is the mechanism working -- it is the reason the bump was not
+    forgotten -- so a future edit here is a deliberate act, never a way to make
+    red go green. CACHE_SCHEMA_VERSION is again unchanged, for the same reason
+    as last time: the sidecar record shape did not move.
     """
-    assert REQUEST_SCHEMA_VERSION == "3"
+    assert REQUEST_SCHEMA_VERSION == "4"
     assert CACHE_SCHEMA_VERSION == "2"
 
 
