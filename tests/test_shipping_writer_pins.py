@@ -53,11 +53,42 @@ def test_dropdown_default_is_live_small_qwen():
 BIGGEST = "Qwen/Qwen3.8-27B"
 
 
+def _shipped_writer_models(pid):
+    """The writer models the RENDERED graph carries, in bare-id form.
+
+    Reads the graph rather than the profile, because a matrix row does not carry a
+    key it inherits from the canonical -- and because what ships is the question.
+    `_strip_label_suffix` turns the stored COMBO label
+    ('Qwen/Qwen3.5-4B (8.7 GB download, ...)') back into the bare id; it is
+    idempotent, so an already-bare value passes through unchanged.
+    """
+    from nodes import _otr_workflow_apply as wa
+    from nodes._otr_model_catalog import _strip_label_suffix
+    import logging
+
+    canonical = json.load(open(
+        os.path.join(_REPO, "workflows", "otr_canonical.json"), encoding="utf-8"))
+    schemas = wa.build_offline_schemas()
+    logging.disable(logging.CRITICAL)
+    try:
+        graph = wa.apply_profile(canonical, cp.load_profile(pid))
+    finally:
+        logging.disable(logging.NOTSET)
+    names = wa.serialized_slot_names("OTR_LedgerScriptWriter", schemas)
+    node = next(n for n in graph["nodes"]
+                if n.get("type") == "OTR_LedgerScriptWriter")
+    values = node.get("widgets_values") or []
+    out = {}
+    for widget in ("creative_writing_model", "technical_model"):
+        out[widget] = _strip_label_suffix(values[names.index(widget)])
+    return out
+
+
 def test_shipping_writer_split_is_4b_except_16gb_nvidia():
     for pid in bv.SHIPPING_SET:
-        llm = _profile(pid)["llm"]
-        creative = llm["creative_model"]
-        technical = llm["technical_model"]
+        shipped = _shipped_writer_models(pid)
+        creative = shipped["creative_writing_model"]
+        technical = shipped["technical_model"]
         if pid.startswith("otr_16gb_"):
             assert creative == BIG, pid
             assert technical == BIG, pid

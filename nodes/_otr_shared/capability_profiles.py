@@ -101,11 +101,11 @@ _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "id": (True, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
     "display_name": (False, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
     "status": (False, lambda v: v in _STATUSES, f"one of {_STATUSES}"),
-    "platform": (False, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
-    "device_backend": (False, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
+    "platform": (True, lambda v: v in _PLATFORMS, f"one of {_PLATFORMS}"),
+    "device_backend": (True, lambda v: v in _DEVICE_BACKENDS, f"one of {_DEVICE_BACKENDS}"),
     "gpu_vendor": (False, lambda v: v in _GPU_VENDORS, f"one of {_GPU_VENDORS}"),
-    "toolchains": (False, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
-    "allow_sidecars": (False, lambda v: isinstance(v, bool), "bool"),
+    "toolchains": (True, lambda v: isinstance(v, list) and all(isinstance(t, str) for t in v), "list[str]"),
+    "allow_sidecars": (True, lambda v: isinstance(v, bool), "bool"),
     "role_overrides": (False, lambda v: _is_str_dict(v), "dict[str, str]"),
     "slot_overrides": (False, lambda v: _is_str_dict(v), "dict[str, str]"),
     "features": (False, lambda v: isinstance(v, dict), "dict"),
@@ -495,15 +495,21 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
         raise ProfileError(
             f"workflow matrix row {row['id']!r}: 'deltas' must be an object")
 
-    # THE BASELINE FIRST, THEN THE ROW. `defaults.values` holds the value the
-    # canonical graph already carries for every key a row is allowed to omit, in
-    # PROFILE form (bare ids, not the COMBO labels the graph stores). Resolving
-    # here rather than making every consumer handle absence is what keeps
-    # `load_profile`'s contract -- a complete document -- unchanged for the nine
-    # modules that index its fields directly.
-    resolved = dict(defaults.get("values") or {})
-    resolved.update(deltas)
-    doc.update(_unflatten(resolved))
+    # NO BASELINE. A key the row does not state is NOT WRITTEN, so `apply_profile`
+    # leaves that widget at whatever the canonical says -- which is the only way
+    # "an omitted key follows the canonical" can actually be true.
+    #
+    # A `defaults.values` block did exist here for one commit and was wrong. It was
+    # merged under the deltas and therefore APPLIED, so every omitted key was
+    # re-pinned from the baseline on every emit: with the canonical's writer moved
+    # to gemma, `otr_8gb_low` still rendered Qwen. That consolidated 614
+    # restatements into one 36-key restatement applied 24 times -- the same drift,
+    # centralized and harder to see, since `--check` compares a stale regeneration
+    # against an equally stale committed graph and passes.
+    #
+    # `launch` and `preflight` above DO default, and the difference is exactly this:
+    # they never reach a widget, so the canonical holds nothing for them to follow.
+    doc.update(_unflatten(deltas))
     return doc
 
 
@@ -730,9 +736,27 @@ def _fit_reason(decl: dict, profile: dict) -> str:
     return REASON_OK
 
 
+#: What `_fit_reason` indexes on the profile. All three are REQUIRED top-level
+#: keys, so a document that came through `validate_profile_shape` always has them;
+#: this exists for a caller handing us a raw dict.
+_FIT_REQUIRES = ("device_backend", "toolchains", "allow_sidecars")
+
+
 def availability(profile: dict, declarations: dict) -> dict:
     """The shared availability object: ``{engine_name: reason_code}`` for every
-    declared engine of ONE namespace. ``reason == "ok"`` means enabled."""
+    declared engine of ONE namespace. ``reason == "ok"`` means enabled.
+
+    Refuses an incomplete profile up front rather than letting `_fit_reason` raise
+    a bare `KeyError` out of a private helper. Guarded HERE, at the public entry
+    point, rather than with `.get()` inside `_fit_reason`: a missing
+    `device_backend` defaulted to anything would read as "this engine does not
+    fit", which is a wrong answer wearing the shape of a real one.
+    """
+    missing = [k for k in _FIT_REQUIRES if k not in profile]
+    if missing:
+        raise ProfileError(
+            f"availability: profile {profile.get('id')!r} is missing {missing!r}; "
+            f"engine fit cannot be decided without the host keys")
     out: dict[str, str] = {}
     for name in sorted(declarations):
         decl = validate_declaration(name, declarations[name])

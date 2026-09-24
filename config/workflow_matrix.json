@@ -1,5 +1,5 @@
 {
-  "_comment": "THE WORKFLOW MATRIX. One row per shipped workflow; the canonical graph is the base every row is read against. A row states ONLY what it changes -- a key it does not mention follows the canonical forever, by construction, which is what stops the drift that once left 82 configs pinned to a voice engine the canonical had moved off. Edit this file, run `python scripts/build_variants.py --all`, and the variants and the generated docs are rebuilt together. The variants are GENERATED and are never hand-edited.",
+  "_comment": "THE WORKFLOW MATRIX. One row per shipped workflow; the canonical graph is the base every row is read against. A row states ONLY what it changes, and a key it does not mention is NEVER WRITTEN -- so that widget keeps whatever the canonical says, which is what stops the drift that once left 82 configs pinned to a voice engine the canonical had moved off. `defaults` carries only `launch` and `preflight` and the row metadata, because those never reach a widget and the canonical holds nothing for them to follow. Edit this file, run `python scripts/build_variants.py --all`, and the variants and the generated docs are rebuilt together. The variants are GENERATED and are never hand-edited.",
   "version": 1,
   "defaults": {
     "status": "shipping",
@@ -14,44 +14,6 @@
     "preflight": {
       "required_keys": [],
       "required_models": []
-    },
-    "values": {
-      "features.act_count": "1",
-      "features.burn_captions": true,
-      "features.caption_style": "sdh_standard",
-      "image.dtype_policy": "fp8_ok",
-      "llm.attn_impl": "sdpa",
-      "llm.comfy_slot_a_model": "(enable Comfy Credits)",
-      "llm.comfy_slot_b_model": "(enable Comfy Credits)",
-      "llm.creative_model": "Qwen/Qwen3.5-4B",
-      "llm.google_api_slot_a_model": "(select Google API model)",
-      "llm.google_api_slot_b_model": "(select Google API model)",
-      "llm.openrouter_slot_a_model": "(enable OpenRouter)",
-      "llm.openrouter_slot_b_model": "(enable OpenRouter)",
-      "llm.quant_policy": "none",
-      "llm.technical_model": "Qwen/Qwen3.5-4B",
-      "llm.vram_ceiling_gb": 10.0,
-      "render.beats": 40,
-      "render.canvas_h": 480,
-      "render.canvas_w": 832,
-      "render.composite_h": 1080,
-      "render.composite_res": "1920x1080",
-      "render.composite_w": 1920,
-      "render.fps": 25,
-      "render.frame_budget": 25,
-      "role_overrides.announcer_image": "z_image_turbo",
-      "role_overrides.announcer_visual": "viz_mxc_cpu",
-      "role_overrides.character_image": "z_image_turbo",
-      "role_overrides.character_visual": "viz_camera",
-      "role_overrides.music_image": "z_image_turbo",
-      "role_overrides.music_visual": "viz_green",
-      "seed_policy.request_seed": 42,
-      "seed_policy.seed_mode": "request_hash",
-      "slot_overrides.announcer_voice_engine": "kokoro",
-      "slot_overrides.cast_voice_policy": "auto_registry",
-      "slot_overrides.music_engine": "stable_audio_3",
-      "slot_overrides.video_render_engine": "viz_camera",
-      "video.dtype_policy": "no_fp8_no_fp4"
     }
   },
   "rows": [

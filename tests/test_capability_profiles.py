@@ -135,9 +135,12 @@ def test_v2_unknown_llm_key_rejected():
         cp.validate_profile_shape(bad)
 
 
+#: `toolchains` was in this list and came out on 2026-09-24. It describes the
+#: HOST, so the canonical holds no value for it to fall back to, and `_fit_reason`
+#: indexes it directly -- see `test_the_host_identity_keys_stay_required`.
 @pytest.mark.parametrize("section", [
     "render", "llm", "seed_policy", "features", "video", "image", "audio",
-    "launch", "preflight", "role_overrides", "slot_overrides", "toolchains",
+    "launch", "preflight", "role_overrides", "slot_overrides",
 ])
 def test_an_absent_section_is_legal(section):
     """A CONFIG STATES ONLY WHAT IT CHANGES (2026-09-24).
@@ -170,7 +173,7 @@ def test_a_section_may_state_one_key_and_omit_the_rest(section, key):
     section failed.
     """
     full = cp.load_profile("16gb_full")
-    doc = {"id": full["id"], section: {key: full[section][key]}}
+    doc = _probe(**{section: {key: full[section][key]}})
     assert cp.validate_profile_shape(doc) is doc
 
 
@@ -184,7 +187,7 @@ def test_a_typo_inside_a_partial_section_is_still_fatal(section):
     typo would otherwise hide -- there is no longer a missing-key error to
     trip over it.
     """
-    doc = {"id": "probe", section: {"ths_is_not_a_key": 1}}
+    doc = _probe(**{section: {"ths_is_not_a_key": 1}})
     with pytest.raises(cp.ProfileError, match="unknown"):
         cp.validate_profile_shape(doc)
 
@@ -298,6 +301,30 @@ def test_v2_humo_fp8_dependency_is_table_visible():
     assert decls["humo_1.7B"]["needs_fp8_te"] is False
 
 
+#: The keys `validate_profile_shape` requires: an identity plus the four that
+#: describe the HOST. A probe document needs them before it can exercise anything
+#: else, because they are checked first.
+#:
+#: They are required because the canonical graph holds NOTHING for them -- unlike
+#: every widget-mapped key, there is no value for an omitted one to follow, and
+#: seven sites index them without `.get()`, one of them on the render path outside
+#: the guard that lets an unreadable profile still run.
+_HOST_KEYS = {
+    "platform": "any",
+    "device_backend": "cuda",
+    "toolchains": [],
+    "allow_sidecars": False,
+}
+
+
+def _probe(**extra):
+    """A minimal VALID document, plus whatever the caller is testing."""
+    doc = {"id": "probe"}
+    doc.update(_HOST_KEYS)
+    doc.update(extra)
+    return doc
+
+
 def test_unknown_top_level_key_rejected():
     profile = cp.load_profile("16gb_full")
     bad = copy.deepcopy(profile)
@@ -306,20 +333,46 @@ def test_unknown_top_level_key_rejected():
         cp.validate_profile_shape(bad)
 
 
-def test_id_is_the_only_required_key():
-    """`id` survives the relaxation as the one thing a config must state.
-
-    Not an arbitrary survivor: a row with no identity cannot be named as a
-    shipping workflow, stamped into the graph it generates, or reported by
-    `--check`. Everything else absent is a deliberate deferral to the
-    canonical.
-    """
+@pytest.mark.parametrize("key", ["id", "platform", "device_backend",
+                                 "toolchains", "allow_sidecars"])
+def test_a_required_key_cannot_be_omitted(key):
+    """The complete required set, one key per case so a failure names it."""
     doc = copy.deepcopy(cp.load_profile("16gb_full"))
-    del doc["id"]
+    del doc[key]
     with pytest.raises(cp.ProfileError, match="missing required key"):
         cp.validate_profile_shape(doc)
 
-    assert cp.validate_profile_shape({"id": "probe"}) == {"id": "probe"}
+
+def test_the_host_identity_keys_stay_required():
+    """THE FOUR KEYS THE DELTA RELAXATION SHOULD NOT HAVE TOUCHED (2026-09-24).
+
+    The relaxation's premise is that an omitted key follows the canonical. That
+    holds for every widget-mapped key, because the canonical graph carries a value
+    for it. `platform`, `device_backend`, `toolchains` and `allow_sidecars`
+    describe the HOST -- the canonical holds nothing for them and nothing
+    re-derives them -- so relaxing them handed them a fallback that does not exist.
+
+    It was not theoretical. `availability()` -> `_fit_reason` indexes
+    `device_backend`, `toolchains` and `allow_sidecars` directly, and
+    `_host_reality_problems` in the validator indexes `device_backend` and
+    `platform` on the render path, OUTSIDE the try/except that exists so an
+    unreadable profile still lets the workflow run. A document with only an id
+    validated cleanly and then raised a bare KeyError mid-render.
+    """
+    with pytest.raises(cp.ProfileError, match="missing required key"):
+        cp.validate_profile_shape({"id": "probe"})
+    assert cp.validate_profile_shape(_probe()) == _probe()
+
+
+def test_availability_refuses_an_incomplete_profile_rather_than_raising_keyerror():
+    """A caller handing `availability()` a raw dict gets a named refusal.
+
+    Not a `KeyError` out of a private helper, and not a silent "does not fit",
+    which is what a `.get()` default inside `_fit_reason` would have produced.
+    """
+    from nodes._otr_audio_engines.registry import CAPABILITIES
+    with pytest.raises(cp.ProfileError, match="missing"):
+        cp.availability({"id": "probe"}, CAPABILITIES)
 
 
 # S2 platform-portability (2026-07-10): mps + linux are FIRST-CLASS enum

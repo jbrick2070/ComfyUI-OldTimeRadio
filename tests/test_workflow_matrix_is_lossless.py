@@ -35,6 +35,7 @@ Headless. No engine, no model, no GPU.
 """
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
 import logging
@@ -176,44 +177,74 @@ def test_the_matrix_actually_has_material(matrix):
         "differences it exists to describe")
     assert all(r.get("id") for r in rows), "a row without an id names no workflow"
 
+def _omitted_probe_pairs():
+    """(row, key) for every row crossed with the probe keys it does NOT state.
 
-@pytest.mark.parametrize("dotted", sorted(json.loads(
-    MATRIX_PATH.read_text(encoding="utf-8"))["defaults"].get("values", {})))
-def test_every_baseline_value_is_a_no_op_against_the_canonical(
-        dotted, matrix, modules, canonical):
-    """THE ALARM ON THE BASELINE'S ONE FORK POINT.
-
-    `defaults.values` exists so a row can omit a key and still resolve to the
-    complete document `load_profile` has always returned. Its 36 values duplicate
-    what the canonical graph already holds -- once, rather than 24 times, but a
-    duplicate is a duplicate, and if the canonical moves the baseline keeps the
-    old value and every row that omitted that key silently inherits it. That is
-    the shape of the drift that left 82 files pinned to a voice engine the
-    canonical had already left.
-
-    So every baseline value must be a NO-OP: writing it alone must leave the
-    canonical graph byte-identical, because the canonical already says it. The
-    moment the canonical moves, this fails and names the key.
-
-    WHY A BASELINE IS STORED AT ALL rather than read off the graph: the graph
-    stores COMBO LABELS where a profile stores bare ids -- the canonical's
-    `creative_model` reads 'Qwen/Qwen3.5-4B (8.7 GB download, ...)' where the
-    profile form is 'Qwen/Qwen3.5-4B'. The inverse would be a parenthetical parse
-    of a label nobody promised to keep stable, so the value is stored in profile
-    form and guarded here instead.
+    Two keys of different kinds: `llm.creative_model` is COMBO-label transformed on
+    write, `render.fps` is a plain int no row states. Built from the matrix at
+    collection time, so nothing skips and every row is covered.
     """
-    _, _, wa = modules
-    value = matrix["defaults"]["values"][dotted]
-    doc = {"id": "baselineprobe"}
-    doc.update(_unflatten({dotted: value}))
+    doc = json.loads(MATRIX_PATH.read_text(encoding="utf-8"))
+    pairs = []
+    for row in doc["rows"]:
+        for key in ("llm.creative_model", "render.fps"):
+            if key not in (row.get("deltas") or {}):
+                pairs.append((row["id"], key))
+    return pairs
+
+
+@pytest.mark.parametrize("pid,probe_key", _omitted_probe_pairs(),
+                         ids=lambda v: str(v))
+def test_a_key_a_row_omits_follows_the_canonical(pid, probe_key, matrix, modules,
+                                                 canonical):
+    """THE PROPERTY THE WHOLE DESIGN RESTS ON, AND THE ONE THAT WAS UNTESTED.
+
+    Every other test here checks that a STATED delta is not inert. None checked the
+    other direction -- that a key a row does NOT state actually tracks the
+    canonical. That gap let a real defect through: a `defaults.values` block was
+    merged under the deltas and therefore APPLIED, so all 36 omitted keys were
+    re-pinned from a stale baseline on every emit. With the canonical's writer moved
+    to gemma, `otr_8gb_low` still rendered Qwen.
+
+    THE ENTIRE SUITE PASSED, INCLUDING `--check`, because the regenerated graph and
+    the committed graph were stale in the same way -- which is exactly why
+    byte-identical regeneration cannot be the only proof.
+
+    Moves the canonical IN MEMORY (never on disk) and asserts the row follows it.
+    """
+    _, cp, wa = modules
+    assert probe_key not in (_rows(matrix)[pid].get("deltas") or {})
+
+    # The node and widget this key drives, from the mapping rather than hardcoded,
+    # so the test survives a key being re-pointed at a different node.
+    mapping = wa.load_widget_mapping()
+    node_type, widget = mapping["managed"][probe_key]["targets"][0]
+    schemas = wa.build_offline_schemas()
+    slot = wa.serialized_slot_names(node_type, schemas).index(widget)
+
+    # A sentinel of the right TYPE: writing a string into an int widget would be
+    # refused by the applier's own validation and the test would fail for the wrong
+    # reason.
+    original = next(n for n in canonical["nodes"]
+                    if n.get("type") == node_type)["widgets_values"][slot]
+    sentinel = (original + 1) if isinstance(original, int) and not isinstance(
+        original, bool) else "google/gemma-4-12b-it"
+
+    moved = copy.deepcopy(canonical)
+    for node in moved.get("nodes") or ():
+        if node.get("type") == node_type:
+            node["widgets_values"][slot] = sentinel
+
     logging.disable(logging.CRITICAL)
     try:
-        applied = wa.apply_profile(canonical, doc)
+        rendered = wa.apply_profile(moved, cp.load_profile(pid))
     finally:
         logging.disable(logging.NOTSET)
-    assert applied == canonical, (
-        "baseline %s = %r is NOT what the canonical holds. Either the canonical "
-        "moved and this value is now stale -- in which case every row that omits "
-        "%s has been silently inheriting the old value -- or the baseline was "
-        "harvested wrong. Re-harvest it from the canonical; do not edit the rows."
-        % (dotted, value, dotted))
+    got = next(n for n in rendered["nodes"]
+               if n.get("type") == node_type)["widgets_values"][slot]
+
+    assert got == sentinel, (
+        "row %s does not state %s, so it must inherit whatever the canonical says. "
+        "The canonical was moved to %r and the row rendered %r instead -- something "
+        "is re-pinning an omitted key from a stored copy."
+        % (pid, probe_key, sentinel, got))
