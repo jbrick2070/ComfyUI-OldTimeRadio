@@ -56,10 +56,19 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
 
 ## Gate 2 -- Bank truth
 
-- **P2.1 Every routed `voice_ref_id` resolves to EXACTLY ONE bank row for its
-  engine.** The route resolver demands exactly one and has **no fallback**
-  (`nodes/_otr_voice_route.py:476-483`); zero or two is a hard failure at cast
-  time. *Twin:* `test_p2_1_every_routed_voice_ref_resolves_to_exactly_one...`.
+- **P2.1 A recurring character's bank match must be exactly one row.**
+  **UPDATED 2026-09-24.** This used to be the qualified-route resolver's
+  invariant (no fallback, zero-or-two a hard cast-time failure); that
+  resolver no longer runs. The invariant survived by moving to
+  `_recurring_character_bank_ref` (`nodes/cast_lock.py:271-388`), which
+  checks it against BOTH sources it consults -- a `reserved_for` bank row,
+  then a `RECURRING_CHARACTER_VOICES` id -- but its failure shape changed:
+  an ambiguous or missing match is now a SOFT MISS, reported while the
+  character takes the ordinary draw, not a hard failure at cast time.
+  *Twin:* `test_p2_1_every_routed_voice_ref_resolves_to_exactly_one...`
+  still checks the retired `LEMMY_VOICE_POLICY["approved_native_routes"]`
+  data for internal consistency, which is a narrower claim than this gate
+  now makes.
 - **P2.2 A preset engine may legitimately carry ZERO bank rows.** Do not read
   "no bank rows" as "engine is broken". Bark is preset-driven by design and its
   adapter reads `voice_preset`, so a route for it is *inexpressible* -- a route
@@ -79,8 +88,12 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   *No twin:* this is a procedure, not a state.
 - **P2.5 The bank's paths are relative to the MODELS root, not the repo.** On
   this box `models/TTS/refs/...` resolves under `C:\ComfyUI-Models\`, and a
-  repo-root join produces a path that has never existed
-  (`nodes/_otr_voice_route.py:144-155`). Always resolve through
+  repo-root join produces a path that has never existed. **Citation fixed
+  2026-09-24:** the stale `nodes/_otr_voice_route.py:144-155` pointer (that
+  file's importers under `nodes/` are gone) is replaced by the real current
+  location -- `resolve_voice_ref_path` (`nodes/_otr_audio_engines/base.py:120`),
+  called via `_resolve_ref_to_disk` in
+  `nodes/_otr_voice_node_common.py:58-101`. Always resolve through
   `resolve_voice_ref_path` / `_resolve_ref_to_disk`.
 - **P2.6 There is no accent or nationality field.** The schema has none; accent
   rides informally in `timbre` (`el_daniel` -> `"british"`) or `style_tags`
@@ -152,6 +165,13 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   *Twin:* `test_p4_1_qualification_still_requires_a_human` plus the fail-closed
   parametrize in `test_p4_2_an_unproven_route_is_never_qualified`.
 - **P4.2 NEVER stamp a non-qualified route into `cast_row["voice_route"]`.**
+  **NOTE 2026-09-24: this describes code that still exists but is unreachable.**
+  Casting stopped calling `resolve_and_verify_reference` or anything else in
+  `_otr_voice_route.py` at the recurring-character cutover; nothing under
+  `nodes/` imports that module any more, so nothing stamps
+  `cast_row["voice_route"]` today. Left as written rather than rewritten --
+  see the README and `docs/OTR_STANDING_RULINGS.md` 2026-09-24 entry for the
+  current casting path.
   `resolve_and_verify_reference` treats ANY non-empty `voice_route` dict as a
   route claim (`nodes/_otr_voice_route.py:595-597`) and **raises**
   `VoiceRouteError` unless `status` is exactly the qualified status
@@ -165,10 +185,11 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
 - **P4.4 `audition_manifest.path` / `.sha256` are shape-checked only** and never
   opened or verified against disk (`:305-312`). Hash audition artifacts at write
   time if the receipt is meant to be trustworthy later.
-- **P4.5 A new route TIER must be added to the CastLock dormancy gate.**
-  `nodes/cast_lock.py:817` returns early when `approved_native_routes` is falsy.
-  A second tier not named there goes silently dormant the moment the first dict
-  empties -- no error, no log.
+- **P4.5 RETIRED 2026-09-24 -- the mechanism is gone, not moved.** This gate
+  policed a route-tier dormancy trap: `grep approved_native_routes
+  nodes/cast_lock.py` now returns zero hits. Casting resolves a recurring
+  character through `_recurring_character_bank_ref` instead (see P2.1),
+  which has no tier concept and nothing to go dormant on an emptied dict.
 - **P4.6 A qualification manifest is EVIDENCE; do not point a general tool at
   its output directory.** The qualified IndexTTS2 route references
   `g1_lemmy_test_a/MANIFEST.json` by sha256, so a generalized harness that ever
@@ -196,11 +217,15 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
 
 ## Gate 6 -- Cloud engines
 
-- **P6.1 A cloud engine cannot be rendered under the local-only scope rule.**
-  `google_tts` resolves an API key from `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` /
-  `GOOGLE_API_KEY` and fails loudly without one; `elevenlabs` goes through
-  `invoke_partner_node` (credits + auth). CLAUDE.md scope discipline is *100%
-  local, no cloud services, no API keys, no paid services*.
+- **P6.1 A cloud engine is a user-opt-in lane, not a scope violation.**
+  **REFRAMED 2026-09-24 -- CLAUDE.md corrected the old "100% local, no cloud
+  services, no API keys" scope line.** OpenRouter, the Google API and Comfy
+  Cloud are opt-in lanes a cast may use when the operator chooses them; what
+  the scope rule still requires is that the pipeline renders a complete
+  episode fully offline with no cloud slot enabled. `google_tts` resolves an
+  API key from `OTR_GOOGLE_API_KEY` / `GEMINI_API_KEY` / `GOOGLE_API_KEY` and
+  fails loudly without one; `elevenlabs` goes through `invoke_partner_node`
+  (credits + auth). Neither may fire unless the cast opted into it.
 - **P6.2 Say "configured", never "rendered" or "working".** A cloud row that was
   mapped but never heard is `configured_unrendered`. It may appear in a listen
   page as pending; it may never appear as an audition arm.

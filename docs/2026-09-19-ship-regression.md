@@ -32,10 +32,20 @@ before the close-out fixes is 32. What matters is the set difference:
   (`..._does_not_waive_revoked_qualification`, `..._skips_private_route_and_
   casts_generic_lemmy`, `..._still_fails_closed_with_typo_exception`,
   `..._on_wrong_engine_is_present_and_fails_closed`). Those four are in the
-  33 at `cc62b2c1`: Lemmy is cast on kokoro `bm_george` where they expect
-  the portable IndexTTS2 route, and the cause has not been diagnosed.
-  The README's "Known failures at 2.3.0" section says the same in plain
-  words for an installing reader.
+  33 at `cc62b2c1`, and they are now diagnosed (2026-09-24, seven commits
+  `b1d522b6`..`1d5e18ff`): they exercise the qualified voice-route subsystem
+  (`VoiceRouteError`, `approved_native_routes`, `_lemmy_voice_policy`) that
+  casting stopped consulting at the recurring-character cutover;
+  `nodes/_otr_voice_route.py` has no importers left under `nodes/`, and
+  these four go with it once that module is deleted.
+  **UPDATE 2026-09-24:** at the time this file was written, Lemmy WAS being
+  cast on kokoro `bm_george` instead of his own clone on the three
+  clone-capable engines -- a real regression, not an artifact of these four
+  tests -- and it is fixed, the same day, in `1d5e18ff`: a bank row whose
+  `reserved_for` field names him now outranks the shared catalogue entry.
+  He is cast correctly today; the four tests above still fail only because
+  they test retired machinery. The README's "Known failures" section has
+  been corrected to match.
 
 ## The numbers
 
@@ -66,6 +76,13 @@ before the close-out fixes is 32. What matters is the set difference:
 | 10 | `test_lane_preflight_matrix.py::test_g2_canvas_truth` | `animatediff15_lightning_video`, `animatediff15_v3_haunted_video`, `ltx_8gb` declare `render_canvas 512x288` that the declaration overrules; not in `EXPECTED_RED` | profile config-vs-truth on three VIDEO lanes (8 GB / animatediff, the 4060's surface) | no (still lane) |
 | 11 | `test_lemmy_provisional_tier.py::test_the_writer_stage_bark_preset_SURVIVES_the_normalizer` | `'' == 'v2/en_speaker_8'` -- the normalizer drops bark's `voice_preset` | real regression on the Lemmy cameo provisional route | `lemmy_cameo` rolls ~11% on every episode -- **assess before the bump** |
 | 12 | `test_lemmy_provisional_tier.py::test_a_rendered_receipt_names_artifacts_that_exist_and_still_match` | `otr/episodes/lemmy_cross_engine/kokoro_neutral.wav is missing` | as 4 | no |
+
+**STALE NODEIDS (2026-09-24):** `tests/test_lemmy_provisional_tier.py` was
+deleted whole in `b7cafcbb` (the recurring-character casting cutover); its
+surviving coverage was transplanted into other test files before the delete,
+per that commit's own message. Neither #11's nor #12's nodeid above resolves
+to a real test today -- read the FIX below as history, not as a pointer to
+run.
 
 ## What this means for the bump
 
@@ -106,6 +123,10 @@ rather than twelve: ten cannot reach a shipped still-lane episode, two (#2,
 wants an owner, and the pair in #14 is variance to watch, not a regression.
 
 ## Closed after the close-out audit (2026-09-20, Composer 2.5 lane)
+
+**#11 and #12 below cite `tests/test_lemmy_provisional_tier.py`, deleted
+whole in `b7cafcbb` -- both nodeids are stale (2026-09-24 note, see the
+table above).**
 
 * **#11 FIXED** -- `cast_lock._stamp` cleared the Lemmy writer-stage bark
   preset on a provisional (audition) stamp; the clear now skips
