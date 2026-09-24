@@ -229,6 +229,15 @@ here that reaches strangers and cannot be taken back.
 
 ## 2. CODE -- decided, in order
 
+### 0. Windows HF_HOME -- always pin a short root (decided 2026-09-23)
+
+When the models-adjacent pin cannot fit MAX_PATH, do not decline.
+Choose a short root (registry if it fits, then models-adjacent if it
+fits, then `C:\ComfyUI-Models\huggingface` if that tree exists, else
+the huggingface_hub-shaped user cache). Spec:
+[HF_HOME_WINDOWS_PIN.md](HF_HOME_WINDOWS_PIN.md).
+`47703d7a`'s error-message half stays; its decline-to-pin does not.
+
 ### 1. Vendored public-domain Shakespeare translations
 
 **PARKED 2026-09-19 EVENING (operator: "cut our losses so we can ship").** The
