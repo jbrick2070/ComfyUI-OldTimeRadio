@@ -41,7 +41,7 @@ def configured_models_root():
     """Where THIS box keeps its models, off the ComfyUI runtime.
 
     ONE spelling for the whole project, FOR REAL (2026-09-04): this IS
-    ``_otr_gguf_backend._models_root`` -- the env pins, then the reference
+    ``_otr_models_root._models_root`` -- the env pins, then the reference
     box's tree if it exists, then ``folder_paths.models_dir`` -- so a reader
     who finds the answer in one place finds the same answer in the other.
     Until then this re-implemented the chain and drifted from it (it returned
@@ -456,7 +456,7 @@ class WanInitImageMixin:
         probe was ``<comfy_root>/models/<category>``, which on a box whose
         weights live somewhere else answers NO for a weight that is plainly
         there. So the same override chain the rest of the project already uses
-        (``_otr_gguf_backend._models_root``) is consulted last: it changes no
+        (``_otr_models_root._models_root``) is consulted last: it changes no
         answer that was previously a hit, and turns a false negative into the
         truth. Additive by construction -- every earlier probe still wins."""
         for category in categories:

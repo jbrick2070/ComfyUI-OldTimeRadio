@@ -86,7 +86,7 @@ class TestThePrecedenceSurvivedTheMove:
 
 
 def test_the_module_sits_where_its_file_arithmetic_assumes():
-    """Step 4 counts three dirname() calls from THIS file. Pin the depth.
+    """This module must live in nodes/, where step 4's walk is counted from.
 
     Asserted structurally rather than behaviourally: on a developer box an
     earlier step usually wins, so a behavioural test would pass with the module
@@ -105,41 +105,60 @@ def test_the_module_sits_where_its_file_arithmetic_assumes():
         "pack; got %r for a repo at %r" % (walked, repo))
 
 
-def test_step_4_finds_comfyuis_models_dir_BESIDE_custom_nodes():
-    r"""The off-by-one that caused the 2026-09-21 incident, pinned.
+def test_step_4_resolves_the_comfy_models_dir_not_one_inside_custom_nodes(
+        monkeypatch):
+    r"""The off-by-one, pinned BY BEHAVIOUR rather than by source text.
 
     Step 4 walked THREE dirname() calls until 2026-09-23, landing on
-    ``<comfy>/custom_nodes/models`` -- a directory INSIDE custom_nodes that a
-    normal install does not have. So on a Linux pod with no env var and no
-    running ComfyUI it found nothing, fell through, and returned the Windows
-    literal, which put 3.7 GB of weights into a directory literally named
-    ``C:\ComfyUI-Models`` inside the repo.
+    ``<comfy>/custom_nodes/models`` -- a directory inside custom_nodes that a
+    normal install does not have -- instead of the ``models/`` beside it. So the
+    step that exists to make a Linux or Docker box work with no environment
+    variable never resolved on one.
 
-    THE OLD TEST COULD NOT CATCH THIS. It monkeypatched ``isdir`` to accept any
-    path ending in "models", so it passed with three dirname() calls and would
-    have passed with five. It pinned the ORDERING (sibling before literal) and
-    said nothing about WHICH directory. This one names the path.
+    TWO EARLIER TESTS COULD NOT CATCH IT, each for its own reason, and both are
+    worth remembering:
+      * the sibling test in the neighbouring file monkeypatches ``isdir`` to
+        accept ANY path ending in "models", so it passes with three dirname()
+        calls and would pass with five -- it pins the ORDERING, not the path;
+      * the first version of THIS test matched the literal source text for four
+        nested ``os.path.dirname(`` calls. That killed the revert-to-three
+        mutation, but a review proved it also fails a loop, a small helper, and
+        ``pathlib.Path(__file__).resolve().parents[3]`` -- three refactors that
+        compute the identical directory. A test that forbids correct code is a
+        defect of its own kind.
+
+    So this drives the real function and asks which directory it returns, with
+    only one of the two candidates made to exist at a time.
     """
-    import re
-
-    src = inspect_source_of_models_root()
-    # The sibling expression, however it is formatted across lines.
-    joined = re.sub(r"\s+", "", src)
-    assert "os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(" in joined, (
-        "step 4 must walk FOUR dirname() calls from __file__ to reach the "
-        "models/ directory beside custom_nodes/; three lands inside it")
-
     here = os.path.abspath(mr.__file__)
-    walked = here
+    up = here
     for _ in range(4):
-        walked = os.path.dirname(walked)
-    assert os.path.basename(walked) != "custom_nodes", (
-        "the walk still ends inside custom_nodes/: %r" % walked)
+        up = os.path.dirname(up)
+    right = os.path.join(up, "models")            # <comfy>/models
+    wrong = os.path.join(os.path.dirname(here), "..", "..", "models")
+    wrong = os.path.normpath(wrong)               # <comfy>/custom_nodes/models
 
+    for key in _ENV:
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setattr(pathlib.Path, "is_dir", lambda self: False)
+    monkeypatch.setitem(sys.modules, "folder_paths", None)
 
-def inspect_source_of_models_root():
-    import inspect
-    return inspect.getsource(mr._models_root)
+    # Only the CORRECT directory exists -> it must be found.
+    monkeypatch.setattr(os.path, "isdir", lambda p: os.path.normpath(p) == right)
+    assert str(mr._models_root()) == right, (
+        "step 4 did not resolve the models dir beside custom_nodes")
+
+    # Only the WRONG directory exists -> it must NOT be returned. On Windows the
+    # function falls through to the literal; off Windows it refuses. Either is
+    # acceptable; returning `wrong` is not.
+    monkeypatch.setattr(os.path, "isdir", lambda p: os.path.normpath(p) == wrong)
+    try:
+        got = str(mr._models_root())
+    except mr.ModelsRootUnresolved:
+        got = None
+    assert got != wrong, (
+        "step 4 returned the directory INSIDE custom_nodes (%r); that is the "
+        "off-by-one this test exists for" % wrong)
 
 
 def test_the_retiring_backend_no_longer_owns_an_implementation():

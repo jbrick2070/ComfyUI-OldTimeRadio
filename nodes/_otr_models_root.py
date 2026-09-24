@@ -101,15 +101,18 @@ def _models_root() -> Path:
     #    INSIDE custom_nodes rather than the models/ dir beside it. The comment
     #    above has always described the fourth; the code only ever walked three.
     #
-    #    THAT OFF-BY-ONE IS WHY THE 2026-09-21 INCIDENT HAPPENED. On a Linux pod
-    #    with no env var and no running ComfyUI, this step looked for a
-    #    directory a normal install does not have, found nothing, fell through,
-    #    and returned the Windows literal -- which put 3.7 GB of weights into a
-    #    directory literally named "C:\ComfyUI-Models" inside the repo. Commit
-    #    fa87d1c4 fixed that by refusing the literal off Windows, which stopped
-    #    the damage but left the cause in place: had this step looked one level
-    #    up, it would have found the real models dir and never reached the
-    #    literal at all.
+    #    WHERE THE OFF-BY-ONE CAME FROM, stated correctly after a review found
+    #    an earlier version of this comment had the story backwards. Commit
+    #    fa87d1c4 (2026-09-21) INTRODUCED this step, together with the
+    #    off-Windows guard below, to fix a different and more basic defect:
+    #    before it there was no sibling lookup at all and the function ended in
+    #    an unconditional `return legacy`, which is what put 3.7 GB of weights
+    #    into a directory literally named "C:\ComfyUI-Models" inside the repo on
+    #    a Linux pod. So this step did not fail during that incident -- it did
+    #    not exist yet. It arrived with the wrong depth and has never once
+    #    resolved on a normal install, which is why nothing noticed for two
+    #    days: the guard below caught the fallout the step was meant to
+    #    prevent.
     #
     #    THE DEPTH IS COUNTED FROM THIS FILE'S LOCATION, so moving this module
     #    changes the answer silently. tests/test_models_root_is_one_owner.py

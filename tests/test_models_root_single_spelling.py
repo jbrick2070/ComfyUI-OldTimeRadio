@@ -1,4 +1,4 @@
-"""``wan_shared.configured_models_root()`` IS ``_otr_gguf_backend._models_root()``.
+"""``wan_shared.configured_models_root()`` IS ``_otr_models_root._models_root()``.
 
 The docstring claimed "the same override chain" for weeks while the two
 functions disagreed: one existence-gated the legacy literal and then asked

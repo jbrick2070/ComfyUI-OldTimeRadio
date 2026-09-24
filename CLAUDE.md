@@ -649,7 +649,7 @@ swept dir to be moved later.
 that was on disk all along.** The weights do NOT live under
 `C:\Users\jeffr\Documents\ComfyUI\models\` (that tree exists and holds *some* things, which is
 exactly what makes the mistake convincing) and they do NOT live under the ComfyUI-Installs tree.
-- **The authority is `nodes/_otr_gguf_backend.py::_models_root()`** -- read it rather than
+- **The authority is `nodes/_otr_models_root.py::_models_root()`** -- read it rather than
   guessing: `OTR_COMFYUI_MODELS_ROOT` -> `COMFYUI_MODELS_ROOT` -> default **`C:\ComfyUI-Models`**.
 - **GGUF writers resolve to `<models_root>\LLM\converted\<subdir>\<file>`**, e.g.
   `C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf` (7.12 GB, present).
