@@ -157,12 +157,12 @@ def audibility_rows(fs, master, rate, rows, lane_ids, fps):
     what production did, which is the entire point of measuring here rather
     than in a fresh script.
 
-    KNOWN LIMIT, stated rather than hidden: a PER-WINDOW lane (``ltx25_mime``,
+    KNOWN LIMIT, stated rather than hidden: a PER-WINDOW lane (a mime lane,
     master gain 0.00) punches its envelope down from the rows themselves, so
     the no-rows programme baseline does not carry that punch. On such a lane
     the programme in-window is really silence and the delta is meaningless.
     Those rows are labelled rather than dressed up as a number. The global
-    lane -- ``ltx25_foley_plus``, the one under investigation -- is exact.
+    lane -- a foley lane, the one under investigation -- is exact.
     """
     import numpy as np
 

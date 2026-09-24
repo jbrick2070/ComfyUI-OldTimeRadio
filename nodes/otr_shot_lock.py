@@ -144,7 +144,7 @@ def _read_setting(meta: dict) -> str:
 #: read one prompt for picture AND sound, and the standing ruling is that voice
 #: and identity words never reach them because they get VOCALIZED. Measured on
 #: shipped ledgers before this fix: `Voice:` appeared in 18 of 20 joint-AV
-#: prompts (90%) -- e.g. ltx25_mime receiving "Voice: raspy, deliberate,
+#: prompts (90%) -- e.g. a mime lane receiving "Voice: raspy, deliberate,
 #: punctuated by heavy breaths." Every one of those was the banned case.
 #:
 #: `Face:` and `Presence:` are deliberately KEPT. Presence is behaviour --
@@ -997,7 +997,7 @@ def _lane_preserves_dialogue(engine_id, role) -> bool:
     if not _registry.is_registered(lookup):
         # A PUBLIC MENU ID resolves; a typo does not. VideoDirector normalises
         # the ids it stamps, but a hand-written `video_policy_json` can carry
-        # the menu name (`ltx25_high_foley_plus`), and refusing that would fail
+        # the menu name (`ltx25_high_video`), and refusing that would fail
         # a policy the operator could legitimately write. Resolving HERE is a
         # read for CLASSIFICATION ONLY -- the resolved name never becomes the
         # engine, never reaches the shot row, and never re-freezes the route.

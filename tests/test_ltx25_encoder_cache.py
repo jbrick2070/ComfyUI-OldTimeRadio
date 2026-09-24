@@ -1,7 +1,7 @@
 """Episode-scoped text-encoder residency on the ``ltx25_video`` lane.
 
 WHY THIS EXISTS. A live canonical leg on 2026-08-20 rendered 15 shots and read
-the 8.86 GiB Gemma-4 12B Q5 GGUF text encoder off disk **13 times** -- a 1:1
+the Gemma-4 12B text encoder off disk **13 times** -- a 1:1
 ratio, ~63 s a shot, on top of a 54.2 s CPU encode. The lane rebuilt its whole
 graph per shot, including the ``te`` loader, and nothing owned the loaded CLIP
 between beats.
@@ -103,7 +103,7 @@ def test_an_unresolvable_encoder_path_is_a_MISS_not_a_KEY(eng, monkeypatch):
 
 def test_an_unstattable_encoder_path_is_a_MISS_not_a_KEY(eng, monkeypatch):
     monkeypatch.setattr(eng_ltx25, "_resolve",
-                        lambda folder, name: "/nope/does/not/exist.gguf")
+                        lambda folder, name: "/nope/does/not/exist.safetensors")
 
     def _boom(_path):
         raise OSError("gone")
@@ -116,7 +116,7 @@ def test_the_key_carries_inode_identity_not_just_size_and_mtime(eng, tmp_path):
     """This key spans a whole EPISODE, not one segment. A swapped symlink
     target at the same size and mtime is exactly what a longer-lived cache has
     to notice and what the per-segment receipt never had to."""
-    real = tmp_path / "encoder.gguf"
+    real = tmp_path / "encoder.safetensors"
     real.write_bytes(b"x" * 64)
     eng_ltx25_resolve = eng_ltx25._resolve
     try:
@@ -394,8 +394,8 @@ def test_a_gpu_resident_clip_is_NOT_live_under_the_default_expectation():
 
 
 def test_a_gpu_resident_clip_IS_live_when_the_lane_declined_the_pin():
-    """The actual fix. Found live 2026-09-21: ltx25_foley_plus_32gb wrote a
-    cache entry every beat and then failed its OWN liveness check on the very
+    """The actual fix. Found live 2026-09-21: a lane that declined the pin
+    wrote a cache entry every beat and then failed its OWN liveness check on the very
     next read, because the check demanded CPU placement unconditionally. A
     lane that declined the pin makes no placement promise, so a real,
     materialized handle on ANY device must read as live."""
@@ -428,13 +428,23 @@ def test_the_render_clip_call_site_passes_the_instances_own_expectation():
         "pin will fail its own cache's liveness check again")
 
 
-def test_every_existing_lane_still_expects_cpu_placement():
-    """The base declaration, and every family that has always pinned, must
-    keep demanding CPU -- this is the blast-radius pin for the whole fix."""
-    assert eng_ltx25.Ltx25VideoEngine._encoder_cache_expects_cpu is True
-    assert eng_ltx25.Ltx25FoleyPlusEngine._encoder_cache_expects_cpu is True
-    assert eng_ltx25.Ltx25FoleyPlus24gbEngine._encoder_cache_expects_cpu is True
-    assert eng_ltx25.Ltx25MimeEngine._encoder_cache_expects_cpu is True
+def test_every_16gb_lane_still_expects_cpu_placement():
+    """The base declaration, and every 16 GB lane that pins, must keep
+    demanding CPU -- this is the blast-radius pin for the whole fix. The big
+    cards decline the pin and say so."""
+    for cls in (eng_ltx25.Ltx25VideoEngine,
+                eng_ltx25.Ltx25FoleyPlusEngine,
+                eng_ltx25.Ltx25NativeFoley16gbEngine,
+                eng_ltx25.Ltx25NativeMime16gbEngine,
+                eng_ltx25.Ltx25NativeAudioIn16gbEngine):
+        assert cls._encoder_cache_expects_cpu is True, cls.__name__
+        assert cls._native_te_device == "cpu", cls.__name__
+    for cls in (eng_ltx25.Ltx25NativeFoleyWideEngine,
+                eng_ltx25.Ltx25NativeFoleyBlackwellEngine,
+                eng_ltx25.Ltx25NativeMime24gbEngine,
+                eng_ltx25.Ltx25NativeAudioIn24gbEngine):
+        assert cls._encoder_cache_expects_cpu is False, cls.__name__
+        assert cls._native_te_device == "default", cls.__name__
 
 
 # --- the mechanism the fast lane's safety claim did not account for -------- #
@@ -451,12 +461,12 @@ def test_run_graph_keeps_every_external_result_through_the_whole_run():
     assert "keep |= set(ext)" in src, (
         "run_graph no longer folds every external result into keep -- if "
         "this changed, the cache-hit VRAM finding below may no longer hold "
-        "and the docstring warning on Ltx25FoleyPlusFast32gbEngine should "
-        "be re-checked against the new code before it is trusted either way")
+        "and should be re-checked against the new code before it is "
+        "trusted either way")
 
 
 def test_the_cache_hit_path_holds_the_encoder_through_sampling():
-    """Pins the mechanism named in Ltx25FoleyPlusFast32gbEngine's docstring.
+    """Pins the cache-hit residency mechanism for lanes that decline the pin.
 
     Found 2026-09-22: on a cache HIT, the text encoder handle is routed as
     an external_results entry rather than a graph node -- so it lands in
@@ -464,8 +474,8 @@ def test_the_cache_hit_path_holds_the_encoder_through_sampling():
     sampling. On a MISS the encoder is an ordinary graph node instead, and
     free_after_use drops it once pos/neg consume it, BEFORE sampling. Those
     are two structurally different VRAM lifetimes, and only the MISS one is
-    the "encoder and sampling do not overlap" case the 24gb parent's own
-    peak measurement actually describes.
+    the "encoder and sampling do not overlap" case a peak measurement taken
+    on a pinned lane actually describes.
 
     This does not run a real graph (no GPU here) -- it pins the SOURCE
     routing decision that makes the two paths different, which is the fact

@@ -407,7 +407,7 @@ def test_a_voice_clause_never_reaches_a_picture_model():
     """No picture model can render a voice, and on the JOINT audio-video lanes
     a voice clause is actively banned because those models vocalize what they
     read. Measured on shipped ledgers before the fix: 18 of 20 joint-AV prompts
-    (90%) carried one, e.g. ltx25_mime receiving "Voice: raspy, deliberate,
+    (90%) carried one, e.g. a mime lane receiving "Voice: raspy, deliberate,
     punctuated by heavy breaths."
 
     Face and Presence must SURVIVE -- presence is behaviour, which is precisely

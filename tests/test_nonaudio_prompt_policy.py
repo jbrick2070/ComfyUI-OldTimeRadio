@@ -473,7 +473,7 @@ def test_a_public_menu_id_resolves_instead_of_being_refused():
     led = _ledger()
     c = sl.derive_creative_directives(
         _beats(), led["meta"], led, llm_fn=_directive_llm(),
-        video_policy=_policy("ltx25_high_foley_plus"))[0]["b1"]
+        video_policy=_policy("ltx25_native_foley_16gb (16:9)"))[0]["b1"]
     assert _LINE not in c["text_prompt"]          # foley is not an audio-in lane
     assert "grim resolve" in c["text_prompt"]
 
@@ -532,7 +532,7 @@ _CORE_FINISHED = (_CORE + ", a sharp switch snap and close mechanical clicks, "
 
 
 def test_the_foley_suffix_names_the_sound_of_the_action():
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE) == \
+    assert ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", _CORE) == \
         _CORE_FINISHED
 
 
@@ -552,8 +552,8 @@ def test_foley_and_mime_compose_the_IDENTICAL_PICTURE_too():
     mime = ltx25.compose_ltx25_mime(object(), inputs)
     assert foley == mime, "the lanes diverged again: %r vs %r" % (foley, mime)
     # and end to end, through the finisher
-    assert (ltx25.finish_joint_av_positive("ltx25_foley_plus", foley)
-            == ltx25.finish_joint_av_positive("ltx25_mime", mime))
+    assert (ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", foley)
+            == ltx25.finish_joint_av_positive("ltx25_native_mime_16gb", mime))
 
 
 def test_the_lanes_remain_INDEPENDENTLY_rewordable():
@@ -563,8 +563,8 @@ def test_the_lanes_remain_INDEPENDENTLY_rewordable():
     dispatcher resolves compose_prompt from each class's own __dict__, so
     collapsing these into one shared method would make it stop seeing the
     children at all."""
-    foley_fn = ltx25.Ltx25FoleyPlusEngine.__dict__.get("compose_prompt")
-    mime_fn = ltx25.Ltx25MimeEngine.__dict__.get("compose_prompt")
+    foley_fn = ltx25.Ltx25NativeFoley16gbEngine.__dict__.get("compose_prompt")
+    mime_fn = ltx25.Ltx25NativeMime16gbEngine.__dict__.get("compose_prompt")
     video_fn = ltx25.Ltx25VideoEngine.__dict__.get("compose_prompt")
     assert foley_fn is not None and mime_fn is not None and video_fn is not None
     assert foley_fn is not mime_fn
@@ -577,8 +577,8 @@ def test_foley_and_mime_receive_the_IDENTICAL_string():
     layer". Mime used to lead with the brief's mood terms and ask for
     "instrumental scene score" -- a category, and the same defect the foley
     tail had. One shape now, so the two cannot drift apart."""
-    assert ltx25.finish_joint_av_positive("ltx25_mime", _CORE) == \
-        ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE)
+    assert ltx25.finish_joint_av_positive("ltx25_native_mime_16gb", _CORE) == \
+        ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", _CORE)
 
 
 def test_the_finisher_takes_no_mood_argument_any_more():
@@ -586,12 +586,12 @@ def test_the_finisher_takes_no_mood_argument_any_more():
     `_otr_music_prompt`, which was always their real owner. Passing them here
     must be a hard error, not a silently ignored keyword."""
     with pytest.raises(TypeError):
-        ltx25.finish_joint_av_positive("ltx25_mime", _CORE,
+        ltx25.finish_joint_av_positive("ltx25_native_mime_16gb", _CORE,
                                        music_mood_terms=["tense"])
 
 
 @pytest.mark.parametrize("banned", _BANNED_CATEGORIES)
-@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+@pytest.mark.parametrize("engine", ["ltx25_native_foley_16gb", "ltx25_native_mime_16gb"])
 def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):
     """The regression guard for the whole fix. A category leaves the model to
     choose the sound; with a face in frame it chooses voice."""
@@ -608,13 +608,13 @@ def test_no_joint_av_prompt_may_ask_for_a_CATEGORY(engine, banned):
 ])
 def test_the_named_sounds_come_from_the_action_itself(core, expected_sound):
     assert expected_sound in ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", core)
+        "ltx25_native_foley_16gb", core)
 
 
 def test_an_action_with_no_cue_still_NAMES_sounds():
     """Falling back to a category here would reinstate the exact defect."""
     out = ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", "a figure stands looking out")
+        "ltx25_native_foley_16gb", "a figure stands looking out")
     assert "cloth shifting" in out
     assert out.endswith(_NO_VOICE)
     for banned in _BANNED_CATEGORIES:
@@ -626,7 +626,7 @@ def test_at_most_three_sounds_are_named():
     competes with the visual half of the very same string."""
     crowded = ("she runs through the rain past the fire, papers and glass "
                "underfoot, a door and a clock and a bell and an engine")
-    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", crowded)
+    out = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", crowded)
     assert len(ltx25.named_sounds_for(crowded)) == 3
     assert out.endswith(_NO_VOICE)
 
@@ -653,13 +653,13 @@ def test_the_composer_seats_sounds_inside_the_action_golden_shape():
     assert core.index(thud) < core.index("fast lateral move")
     assert core.index(_SOUND_FRAME) < core.index("fast lateral move")
     assert _NO_VOICE not in core, "the clause belongs to the finisher alone"
-    fin = ltx25.finish_joint_av_positive("ltx25_foley_plus", core)
+    fin = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", core)
     assert fin.endswith(_NO_VOICE)
     assert fin == core.rstrip(" ,.;:") + ". " + _NO_VOICE, (
         "finishing a composed core must append ONLY the clause -- a second "
         "derived tail would name the sounds twice")
     # and it is idempotent through the new predicate
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", fin) == fin
+    assert ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", fin) == fin
 
 
 def test_a_desk_slam_is_an_impact_never_furniture_scraping():
@@ -698,7 +698,7 @@ def test_finishedness_is_frame_present_plus_clause_last():
         "x, " + _SOUND_FRAME + ", steady push in")
     good = "x, " + _SOUND_FRAME + ", steady push in. " + _NO_VOICE
     assert ltx25.joint_av_prompt_is_finished(good)
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", good) == good
+    assert ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", good) == good
 
 
 def test_the_sounds_receipt_reads_phrases_off_the_finished_string():
@@ -724,7 +724,7 @@ def test_a_weapon_beat_names_NO_weapon_sound(capsys):
     rewrites, so it is gone. This test is the guard against it returning.
     """
     core = "the captain raises his revolver toward the hatch"
-    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", core)
+    out = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", core)
     for weapon_sound in ("hammer", "gunshot", "shot", "cocking"):
         assert weapon_sound not in out.split(core)[-1], \
             "a weapon sound came back into the lexicon: %r" % out
@@ -741,7 +741,7 @@ def test_a_style_cue_word_does_not_masquerade_as_an_action(cue, forbidden):
     style pack whose two-word video cue is literally "archival documentary" --
     so every beat of that pack was asking for rustling paper."""
     assert forbidden not in ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", cue)
+        "ltx25_native_foley_16gb", cue)
 
 
 def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
@@ -753,7 +753,7 @@ def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
     canonical terminator, so such a prompt gets properly finished.
     """
     bare = "an operator override that happens to end here. No speech, no voices."
-    out = ltx25.finish_joint_av_positive("ltx25_foley_plus", bare)
+    out = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", bare)
     assert out != bare
     assert out.rstrip(" ,.;:").endswith(
         ltx25.JOINT_AV_TERMINATOR.rstrip(" ,.;:"))
@@ -762,8 +762,8 @@ def test_a_bare_no_voice_clause_is_NOT_treated_as_finished():
 def test_a_properly_finished_prompt_IS_left_alone():
     """The other half of the same contract -- it must still be idempotent."""
     once = ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", "hands on the console")
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", once) == once
+        "ltx25_native_foley_16gb", "hands on the console")
+    assert ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", once) == once
 
 
 def test_the_fallback_names_exactly_ONE_sound():
@@ -779,7 +779,7 @@ def test_the_fallback_names_exactly_ONE_sound():
 def test_the_receipt_records_WHICH_sounds_were_named(_text_only_lane):
     """A receipt that cannot distinguish a good cue from a wrong one is not
     evidence. `joint_av_prompt=finished` alone could not."""
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     obs = req["observability"]
     assert obs["joint_av_prompt"] == "finished"
@@ -807,8 +807,9 @@ def test_a_joint_av_prompt_carries_NO_character_identity():
         "motion": "she lifts one hand toward him",
         "camera": "static medium shot",
     }
-    for engine in ("ltx25_foley_plus", "ltx25_mime"):
-        formatter = getattr(ltx25, "compose_" + engine.replace("ltx25_", "ltx25_"))
+    for engine, formatter in (
+            ("foley", ltx25.compose_ltx25_foley_plus),
+            ("mime", ltx25.compose_ltx25_mime)):
         out = formatter(object(), inputs)
         assert "Queen of the Fairies" not in out, (engine, out)
         assert "heart-shaped" not in out, (engine, out)
@@ -870,8 +871,8 @@ def test_the_identity_guard_is_quiet_on_todays_prompt():
         "motion": "she lifts one hand toward him",
         "camera": "static medium shot",
     }
-    for engine, fn in (("ltx25_mime", ltx25.compose_ltx25_mime),
-                       ("ltx25_foley_plus", ltx25.compose_ltx25_foley_plus)):
+    for engine, fn in (("ltx25_native_mime_16gb", ltx25.compose_ltx25_mime),
+                       ("ltx25_native_foley_16gb", ltx25.compose_ltx25_foley_plus)):
         prompt = ltx25.finish_joint_av_positive(engine, fn(object(), inputs))
         assert not ltx25.identity_leaks_in(
             prompt, appearance=inputs["appearance"],
@@ -902,20 +903,20 @@ def test_the_SILENT_ltx25_lane_keeps_its_identity():
 
 
 def test_the_finisher_is_idempotent():
-    once = ltx25.finish_joint_av_positive("ltx25_foley_plus", _CORE)
-    twice = ltx25.finish_joint_av_positive("ltx25_foley_plus", once)
+    once = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", _CORE)
+    twice = ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", once)
     # THREE passes, not two. The suffix is DERIVED FROM THE PROMPT, so once it
     # is appended the prompt carries sound words the lexicon would match on a
     # second read. A whole-suffix comparison would drift here; keying on the
     # invariant no-voice clause is what holds it stable.
     assert twice == once
-    assert ltx25.finish_joint_av_positive("ltx25_foley_plus", twice) == once
+    assert ltx25.finish_joint_av_positive("ltx25_native_foley_16gb", twice) == once
     assert once.count(_NO_VOICE) == 1
 
 
 def test_trailing_punctuation_is_trimmed_before_the_join():
     assert ltx25.finish_joint_av_positive(
-        "ltx25_foley_plus", _CORE + " ,.;: ") == _CORE_FINISHED
+        "ltx25_native_foley_16gb", _CORE + " ,.;: ") == _CORE_FINISHED
 
 
 @pytest.mark.parametrize("engine", ["ltx25_video", "minimax_h3_video", "humo",
@@ -925,7 +926,7 @@ def test_other_engines_are_untouched(engine):
     assert ltx25.finish_joint_av_positive(engine, "") == ""
 
 
-@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+@pytest.mark.parametrize("engine", ["ltx25_native_foley_16gb", "ltx25_native_mime_16gb"])
 @pytest.mark.parametrize("blank", ["", "   ", None])
 def test_a_blank_positive_raises_and_names_the_engine(engine, blank):
     with pytest.raises(ValueError, match=engine):
@@ -933,8 +934,8 @@ def test_a_blank_positive_raises_and_names_the_engine(engine, blank):
 
 
 @pytest.mark.parametrize("engine,tail", [
-    ("ltx25_foley_plus", "No speech, no voices."),
-    ("ltx25_mime", "No speech, no voices."),
+    ("ltx25_native_foley_16gb", "No speech, no voices."),
+    ("ltx25_native_mime_16gb", "No speech, no voices."),
 ])
 def test_the_non_speech_tail_is_last(engine, tail):
     """The tail is the whole point: it is what stops a lane that generates its
@@ -970,7 +971,7 @@ def test_a_non_latin_line_reaches_the_writer_unescaped():
     assert cyrillic in seen[0], "the line was escaped before the model saw it"
 
 
-@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+@pytest.mark.parametrize("engine", ["ltx25_native_foley_16gb", "ltx25_native_mime_16gb"])
 @pytest.mark.parametrize("trailing", [".", ", ", " ,", ";", ":", ".."])
 def test_stray_punctuation_after_the_suffix_does_not_stack_it(engine, trailing):
     """A prompt already carrying its suffix must not collect a second copy,
@@ -989,7 +990,7 @@ def test_stray_punctuation_after_the_suffix_does_not_stack_it(engine, trailing):
 
 def test_the_ordinary_idempotent_case_still_holds():
     """The guard above must not have broken the common path it protects."""
-    for engine in ("ltx25_foley_plus", "ltx25_mime"):
+    for engine in ("ltx25_native_foley_16gb", "ltx25_native_mime_16gb"):
         once = ltx25.finish_joint_av_positive(engine, _CORE)
         assert ltx25.finish_joint_av_positive(engine, once) == once
         assert once.count("No speech") == 1
@@ -1053,13 +1054,13 @@ def _open_ledger(meta=None):
 
 
 def test_a_foley_open_composes_a_real_prompt_and_finishes_it(_text_only_lane):
-    """TWO defects in one request. Before this change `ltx25_foley_plus`
+    """TWO defects in one request. Before this change `ltx25_native_foley_16gb`
     matched no prompt branch at all -- `roles = ROLES` makes it legal on the
     announcer bookend, that role arrives with `text_prompt` cleared, and it was
     absent from the scene allowlist -- so the beat shipped `build_request`'s
     hardcoded "a 1940s radio studio" with no `prompt_source` stamped. Now it
     composes the role motion prompt AND carries its audio requirement."""
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     prompt = req["text_prompt"]
     assert "a 1940s radio studio" not in prompt
@@ -1076,9 +1077,9 @@ def test_a_mime_open_IGNORES_the_briefs_mood_terms(_text_only_lane):
     meta = dict(_BRIEF_META)
     meta["music_mood_terms"] = ["tense", "elegiac", "hushed"]
     with_moods = rd.build_request_from_shot(
-        _open_shot("ltx25_mime"), _open_ledger(meta))["text_prompt"]
+        _open_shot("ltx25_native_mime_16gb"), _open_ledger(meta))["text_prompt"]
     without = rd.build_request_from_shot(
-        _open_shot("ltx25_mime"), _open_ledger())["text_prompt"]
+        _open_shot("ltx25_native_mime_16gb"), _open_ledger())["text_prompt"]
     assert with_moods == without
     assert with_moods.endswith(_NO_VOICE)
     for banned in _BANNED_CATEGORIES:
@@ -1086,7 +1087,7 @@ def test_a_mime_open_IGNORES_the_briefs_mood_terms(_text_only_lane):
 
 
 def test_a_mime_open_is_finished_with_named_sounds(_text_only_lane):
-    req = rd.build_request_from_shot(_open_shot("ltx25_mime"), _open_ledger())
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_mime_16gb"), _open_ledger())
     assert _SOUND_FRAME in req["text_prompt"]
     assert req["text_prompt"].endswith(_NO_VOICE)
     # TAG FORM, NOT PROSE (2026-08-28): this lane reads its prompt aloud, and
@@ -1162,7 +1163,7 @@ def test_the_operator_override_is_finished_too(monkeypatch, _text_only_lane):
     """OTR_LTX_RADIO_PROMPT is verbatim, and the audio requirement is not a
     rewrite of it -- it is appended, so the operator's words survive whole."""
     monkeypatch.setenv("OTR_LTX_RADIO_PROMPT", "OPERATOR SAYS EXACTLY THIS")
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     assert req["text_prompt"].startswith("OPERATOR SAYS EXACTLY THIS,")
     assert _SOUND_FRAME in req["text_prompt"]
@@ -1173,7 +1174,7 @@ def test_the_digest_and_length_describe_the_shipped_prompt(_text_only_lane):
     """Evidence here is cited by hash. A receipt describing the pre-tail text
     while a different string renders is a live defect, not a cosmetic one."""
     import hashlib
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     prompt = req["text_prompt"]
     obs = req["observability"]
@@ -1191,7 +1192,7 @@ def test_the_mandatory_tail_is_never_trimmed_by_a_prompt_budget(_text_only_lane)
     The banana route is ON by default (`OTR_BANANA_VIDEO`, default True), so
     this request really does pass through the funnel.
     """
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     prompt = req["text_prompt"]
     assert len(prompt) > 188, len(prompt)      # past the scene branch's budget
@@ -1213,21 +1214,22 @@ def test_an_already_finished_prompt_still_gets_its_budget_cleared(
         "OTR_LTX_RADIO_PROMPT",
         "a quiet console at midnight, switches clicking and dials "
         "turning, " + _SOUND_FRAME + ". " + _NO_VOICE)
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     assert req["text_prompt"].count(_NO_VOICE) == 1          # not stacked
     assert req["observability"]["joint_av_prompt"] == "finished"
     assert req["text_prompt"].endswith(_NO_VOICE)
 
 
-def test_a_public_menu_id_on_the_shot_row_still_gets_finished(_text_only_lane):
+def test_a_menu_spelling_on_the_shot_row_still_gets_finished(_text_only_lane):
     """`is_foley_route` resolves ids before comparing, for the stated reason
-    that a policy can hold a public menu string. The finisher compares the same
-    way, or a beat that really is on the route silently skips its audio
-    requirement."""
+    that a policy can hold a menu string with its display suffix. The finisher
+    compares the same way, or a beat that really is on the route silently
+    skips its audio requirement."""
     from nodes._otr_shared.public_engines import resolve_engine_id
-    assert resolve_engine_id("ltx25_high_foley_plus") == "ltx25_foley_plus"
-    shot = _open_shot("ltx25_high_foley_plus")
+    menu = "ltx25_native_foley_16gb (16:9)"
+    assert resolve_engine_id(menu) == "ltx25_native_foley_16gb"
+    shot = _open_shot(menu)
     req = rd.build_request_from_shot(shot, _open_ledger())
     prompt = req["text_prompt"]
     assert req["observability"].get("joint_av_prompt") == "finished"
@@ -1240,14 +1242,14 @@ def test_a_public_menu_id_on_the_shot_row_still_gets_finished(_text_only_lane):
     assert "a 1940s radio studio" not in prompt
     assert req["observability"]["prompt_source"] == "motion_role"
     # the row itself is NOT rewritten -- resolution was for the comparison only
-    assert shot["engine_id"] == "ltx25_high_foley_plus"
+    assert shot["engine_id"] == menu
 
 
-def test_a_public_menu_mime_id_is_also_finished(_text_only_lane):
+def test_a_menu_spelling_of_mime_is_also_finished(_text_only_lane):
     from nodes._otr_shared.public_engines import resolve_engine_id
-    assert resolve_engine_id("ltx25_high_mime") == "ltx25_mime"
-    req = rd.build_request_from_shot(_open_shot("ltx25_high_mime"),
-                                     _open_ledger())
+    menu = "ltx25_native_mime_16gb (16:9)"
+    assert resolve_engine_id(menu) == "ltx25_native_mime_16gb"
+    req = rd.build_request_from_shot(_open_shot(menu), _open_ledger())
     assert "a 1940s radio studio" not in req["text_prompt"]
     assert req["text_prompt"].endswith(_NO_VOICE)
     assert req["observability"]["prompt_source"] == "motion_role"
@@ -1256,7 +1258,7 @@ def test_a_public_menu_mime_id_is_also_finished(_text_only_lane):
 def test_the_composing_branchs_provenance_survives_the_finisher(_text_only_lane):
     """The audio tail FINISHES the prompt; it does not author it. Overwriting
     prompt_source here would erase where the prompt actually came from."""
-    req = rd.build_request_from_shot(_open_shot("ltx25_foley_plus"),
+    req = rd.build_request_from_shot(_open_shot("ltx25_native_foley_16gb"),
                                      _open_ledger())
     assert req["observability"]["prompt_source"] == "motion_role"
 
@@ -1265,7 +1267,7 @@ def test_the_empty_ltx25_negative_is_unchanged(_text_only_lane):
     """LTX 2.5 ships a locked empty negative. This change touches the POSITIVE
     only -- the non-speech instruction lives there because the audio half reads
     the same string the picture does."""
-    for engine in ("ltx25_video", "ltx25_foley_plus", "ltx25_mime"):
+    for engine in ("ltx25_video", "ltx25_native_foley_16gb", "ltx25_native_mime_16gb"):
         req = rd.build_request_from_shot(_open_shot(engine), _open_ledger())
         assert str(req.get("negative_prompt") or "") == ""
 
@@ -1276,10 +1278,10 @@ def test_a_character_beat_on_foley_gets_no_dialogue_end_to_end():
     led = _ledger()
     creative = sl.derive_creative_directives(
         _beats(), led["meta"], led, llm_fn=_directive_llm(),
-        video_policy=_policy("ltx25_foley_plus"))[0]["b1"]
+        video_policy=_policy("ltx25_native_foley_16gb"))[0]["b1"]
     assert _LINE not in creative["text_prompt"]
     shot = {"shot_id": "shot_b1", "source_line_ids": ["b1"],
-            "role": "character_video", "engine_id": "ltx25_foley_plus",
+            "role": "character_video", "engine_id": "ltx25_native_foley_16gb",
             "group_id": "grp_character_video", "target_frame_count": 50,
             "creative": creative}
     # A scene-init engine must have its per-beat still minted upstream; there
@@ -1297,7 +1299,7 @@ def test_a_character_beat_on_foley_gets_no_dialogue_end_to_end():
     assert req["text_prompt"].endswith(_NO_VOICE)
 
 
-@pytest.mark.parametrize("engine", ["ltx25_foley_plus", "ltx25_mime"])
+@pytest.mark.parametrize("engine", ["ltx25_native_foley_16gb", "ltx25_native_mime_16gb"])
 def test_a_foley_or_mime_open_is_a_healthy_ltx_open(engine):
     """They render the LTX 2.5 picture graph unchanged, so an open on one is a
     real LTX open -- not the procgen floor BUG-LOCAL-413 hunts for."""

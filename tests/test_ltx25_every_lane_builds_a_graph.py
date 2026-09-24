@@ -4,12 +4,10 @@
 WHY THIS FILE EXISTS, and it is worth reading before deleting a line of it.
 
 On 2026-09-23 commit ``7e309f1b`` added ``_ingraph_upscale`` to
-``Ltx25NativeFoleyBase`` and read it from ``Ltx25VideoEngine._build_graph``.
-``_build_graph`` is five inheritance levels ABOVE the class that declared the
-attribute, so every lane that does not descend from the native foley base raised
-``AttributeError`` the moment it built a graph: ``ltx25_video``,
-``ltx25_foley_plus``, ``ltx25_mime``, ``ltx25_foley_plus_24gb`` and
-``ltx25_foley_plus_32gb``. Five working lanes, dead.
+a subclass and read it from ``Ltx25VideoEngine._build_graph``. ``_build_graph``
+is several inheritance levels ABOVE the class that declared the attribute, so
+every lane that did not descend from that subclass raised ``AttributeError`` the
+moment it built a graph. Five working lanes, dead.
 
 THE WHOLE SUITE PASSED. Every fixture, every roster, every parity check, the
 widget audits, the AST parse -- all green, because no test anywhere built a graph

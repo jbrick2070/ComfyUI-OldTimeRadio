@@ -271,29 +271,14 @@
       "size_gb": 0.3,
       "note": "CPU proven 2026-09-13 on the same otr_cpu_low leg -- Kokoro ran at 0.12x realtime on the CPU, which is about eight seconds of a 34.5 minute run."
     },
-    "ltx25_foley_plus": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "proven",
-        "nv8": "fits"
-      },
-      "size_gb": 19.6
-    },
-    "ltx25_mime": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "proven",
-        "nv8": "fits"
-      },
-      "size_gb": 19.6
-    },
     "ltx25_video": {
       "memory": {
         "mac16": "oom",
-        "nv16": "proven",
-        "nv8": "proven"
+        "nv16": "measured",
+        "nv8": "measured"
       },
-      "size_gb": 19.6
+      "size_gb": 22.7,
+      "note": "Same mix4x8 DiT and w4a8 encoder as ltx25_native_foley_16gb. MEASURED, not proven: that weight rendered a 97-frame clip on an RTX 5080 Laptop (205.3 s) and on an RTX 4060 Laptop (707.0 s), but no episode has published on this silent lane with it."
     },
     "ltx_8gb": {
       "memory": {

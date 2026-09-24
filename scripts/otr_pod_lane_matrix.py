@@ -94,11 +94,8 @@ LANES = [
     ("otr_w45_ltx_8gb", "ltx_8gb"),
     ("otr_w45_razzle_ltx_8gb", "razzle_ltx_8gb"),
     ("otr_w45_ltx_video", "ltx_video"),
-    # The LTX 2.5 family is LAST on purpose: re-confirmed 2026-09-03 to OOM at
-    # `decode` on a 24 GB Ada card, matching the evidence ledger's existing
-    # 4090/LTX-2.5 negative. Kept in the list so a bigger card runs them.
-    ("otr_w45_ltx25_foley_plus", "ltx25_foley_plus"),
-    ("otr_w45_ltx25_mime", "ltx25_mime"),
+    # The LTX 2.5 silent lane is LAST on purpose: it is the heaviest graph in
+    # this list, so a card that cannot hold it fails after the others ran.
     ("otr_ltx25_high_video", "ltx25_video"),
 ]
 

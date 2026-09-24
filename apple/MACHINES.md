@@ -12,7 +12,7 @@ Three questions, in the order people ask them.
 |---|---|---|
 | Anything, to start | `workflows/otr_canonical.json` (Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; comfyui-old-time-radio) | nothing |
 | 8 GB NVIDIA -- RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_8gb_video.json` | nothing |
-| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` | ComfyUI-GGUF |
+| 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` | nothing |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` | nothing |
 | AMD ROCm -- Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` &mdash; in the shipping set, and an outside tester published an episode from it on a Radeon AI PRO R9700 under ROCm 7.2 (commit 0fc0fb90) -- see the AMD note at the foot | nothing |
 | CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
@@ -28,18 +28,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `animatediff15_v3_stillin_lab_video` | ComfyUI-AnimateDiff-Evolved |
 | `ltx23_high_video` | ComfyUI-GGUF |
 | `ltx23_low_audio_in` | ComfyUI-GGUF |
-| `ltx25_foley_plus_24gb` | ComfyUI-GGUF |
-| `ltx25_foley_plus_32gb` | ComfyUI-GGUF |
-| `ltx25_high_foley_plus` | ComfyUI-GGUF |
-| `ltx25_high_mime` | ComfyUI-GGUF |
-| `ltx25_high_video` | ComfyUI-GGUF |
-| `ltx25_native_audio_in_16gb` | ComfyUI-GGUF |
-| `ltx25_native_audio_in_24gb` | ComfyUI-GGUF |
-| `ltx25_native_foley_16gb` | ComfyUI-GGUF |
-| `ltx25_native_foley_24gb` | ComfyUI-GGUF |
-| `ltx25_native_foley_blackwell` | ComfyUI-GGUF |
-| `ltx25_native_mime_16gb` | ComfyUI-GGUF |
-| `ltx25_native_mime_24gb` | ComfyUI-GGUF |
 | `wan22_high_fast` | ComfyUI-GGUF |
 | `wan22_high_video` | ComfyUI-GGUF |
 
@@ -76,8 +64,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `ltx25_foley_plus_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_foley_plus_32gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
@@ -97,9 +83,7 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
-| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
-| `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `ltx25_high_video` | manual | 22.7 GiB | measured | measured | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
@@ -230,18 +214,6 @@ Selected by: `animatediff15_lightning_video`
 | `animatediff_lightning_8step_comfyui.safetensors` | [`ByteDance/AnimateDiff-Lightning`](https://huggingface.co/ByteDance/AnimateDiff-Lightning) | `models/animatediff_models/` | 0.85 GiB | no |
 | `vae-ft-mse-840000-ema-pruned.safetensors` | [`stabilityai/sd-vae-ft-mse-original`](https://huggingface.co/stabilityai/sd-vae-ft-mse-original) | `models/vae/` | 0.31 GiB | no |
 
-### ltx25 &mdash; 22.2 GiB total
-
-Selected by: `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `LTX-2.5-Distilled-Q3_K_M.gguf` | [`realrebelai/LTX-2.5_GGUFs`](https://huggingface.co/realrebelai/LTX-2.5_GGUFs) | `models/diffusion_models/` | 10.73 GiB | no |
-| `gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf` | [`elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF`](https://huggingface.co/elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF) | `models/text_encoders/` | 8.86 GiB | yes |
-| `ltx-2.5-video-vae-bf16.safetensors` | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) | `models/vae/` | 1.37 GiB | yes |
-| `ltx-2.5-audio-vae-bf16.safetensors` | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) | `models/vae/` | 0.34 GiB | yes |
-| `ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors` | [`Lightricks/LTX-2.5`](https://huggingface.co/Lightricks/LTX-2.5) | `models/latent_upscale_models/` | 0.93 GiB | yes |
-
 ### wan_ti2v_gguf
 
 Selected by: `wan22_high_video`
@@ -260,8 +232,7 @@ This pack cannot fetch them, and no table here can tell you the filename, becaus
 * `ideogram4_local`
 * `ltx23_high_video`
 * `ltx23_low_audio_in`
-* `ltx25_foley_plus_24gb`
-* `ltx25_foley_plus_32gb`
+* `ltx25_high_video`
 * `ltx25_native_audio_in_16gb`
 * `ltx25_native_audio_in_24gb`
 * `ltx25_native_foley_16gb`

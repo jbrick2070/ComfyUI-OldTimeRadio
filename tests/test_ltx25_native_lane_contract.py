@@ -1,119 +1,118 @@
 # -*- coding: utf-8 -*-
-"""What the three native (non-GGUF) LTX 2.5 lanes owe their operator.
+"""What every LTX 2.5 lane owes its operator.
 
-Written 2026-09-22 after the codex QA lane read the lanes' first commits and
-found three defects the author could not see. Each one is pinned here, because
-each is invisible to the checks that were run at the time: the suite was green,
-``ast.parse`` was happy, and a live leg rendered successfully with all three
-present.
+Every registered LTX 2.5 lane loads native safetensors through STOCK ComfyUI
+loaders. Each rule below was a real defect on this family once, invisible to
+the checks that ran at the time:
 
-  * the GGUF check was skipped by MUTATING THIS MODULE with ``unittest.mock``
-    inside ``assert_usable``. Overlapping calls unwind out of order and the
-    bypass can survive both -- silently disabling a real safety check on the
-    GGUF lanes, which is a different lane entirely.
-  * operator-facing text named ComfyUI-GGUF at two sites where the failure has
-    nothing to do with that pack, sending the reader to the wrong fix.
+  * operator-facing text named a third-party pack at a site where the failure
+    had nothing to do with it, sending the reader to the wrong fix;
+  * a lane that stopped pinning its text encoder without saying so wrote a
+    cache entry it then rejected on every read (found live 2026-09-21);
   * the lanes had no publication shortcode, so an episode they dominate
-    publishes its video identity as ``unk``.
+    published its video identity as ``unk``.
 """
-import ast
-import io
-
 import pytest
 
 from nodes._otr_video_engines import eng_ltx25
+from nodes._otr_video_engines import registry as _registry
+from nodes._otr_video_engines.registry import EngineUnusable
 from nodes._otr_shared import shortcodes
 
-NATIVE = (
+LANES = (
+    eng_ltx25.Ltx25VideoEngine,
     eng_ltx25.Ltx25NativeFoley16gbEngine,
     eng_ltx25.Ltx25NativeFoleyWideEngine,
     eng_ltx25.Ltx25NativeFoleyBlackwellEngine,
+    eng_ltx25.Ltx25NativeMime16gbEngine,
+    eng_ltx25.Ltx25NativeMime24gbEngine,
+    eng_ltx25.Ltx25NativeAudioIn16gbEngine,
+    eng_ltx25.Ltx25NativeAudioIn24gbEngine,
 )
 
 
-def test_the_gguf_check_is_declined_by_an_override_not_by_patching_the_module():
-    """The seam has to be an instance method, or concurrency can leak it.
-
-    ``mock.patch.object`` on the module is not re-entrant: with two overlapping
-    checks the restores run A-enter, B-enter, A-exit, B-exit and the last exit
-    writes back the PATCHED value, leaving the inspector bypassed for the rest
-    of the process. This repo's render routes run in unguarded daemon threads,
-    so that shape is reachable, and the lane it would silently un-gate is the
-    GGUF one.
-    """
-    # By AST, not by grep: the docstrings below deliberately SAY
-    # "unittest.mock" to explain why it is gone, and a text search cannot tell
-    # an explanation apart from the thing it explains.
-    tree = ast.parse(io.open(eng_ltx25.__file__, encoding="utf-8").read())
-    imported = [
-        n.names[0].name
-        for n in ast.walk(tree)
-        if isinstance(n, (ast.Import, ast.ImportFrom)) and n.names
-    ] + [
-        (n.module or "")
-        for n in ast.walk(tree) if isinstance(n, ast.ImportFrom)
-    ]
-    assert not [m for m in imported if "mock" in m], imported
-    # The real answer: a hook the parent defines and the native base overrides.
-    assert eng_ltx25.Ltx25NativeFoleyBase._inspect_te_loader is not \
-        eng_ltx25.Ltx25FoleyPlusEngine._inspect_te_loader
+#: The audio-in lanes stage a real reference waveform inside ``_build_graph``,
+#: so their graphs are built by tests/test_ltx25_audio_in_*.py with a real WAV.
+#: The loader nodes they emit come from the same base method as these.
+GRAPH_LANES = tuple(c for c in LANES
+                    if not issubclass(c, eng_ltx25.Ltx25NativeAudioInMixin))
 
 
-@pytest.mark.parametrize("cls", NATIVE)
-def test_a_native_lane_declines_the_gguf_inspection_without_touching_anything(cls):
-    before = eng_ltx25._inspect_ltx25_gguf_patch
-    assert cls()._inspect_te_loader(object()) == ("", [])
-    # The module-level function is exactly the object it was.
-    assert eng_ltx25._inspect_ltx25_gguf_patch is before
+def _plan(**kw):
+    return kw
 
 
-def test_the_gguf_family_still_runs_the_inspection():
-    """The override must not have neutered the check for the lanes that need it."""
-    calls = []
-
-    class Probe(eng_ltx25.Ltx25FoleyPlusEngine):
-        pass
-
-    real = eng_ltx25._inspect_ltx25_gguf_patch
-    try:
-        eng_ltx25._inspect_ltx25_gguf_patch = lambda cls: (calls.append(cls), ("p", []))[1]
-        assert Probe()._inspect_te_loader("SENTINEL") == ("p", [])
-    finally:
-        eng_ltx25._inspect_ltx25_gguf_patch = real
-    assert calls == ["SENTINEL"]
+def test_every_lane_under_test_is_registered():
+    for cls in LANES:
+        assert _registry.is_registered(cls.name), cls.name
 
 
-@pytest.mark.parametrize("cls", NATIVE)
-def test_no_operator_facing_string_on_a_native_lane_names_the_gguf_pack_as_the_fix(cls):
+@pytest.mark.parametrize("cls", LANES)
+def test_the_loaders_are_stock_comfyui_nodes(cls):
+    cand = cls()._node_candidates()
+    assert cand["unet"] == ("UNETLoader",)
+    assert cand["te"] == ("CLIPLoader",)
+
+
+@pytest.mark.parametrize("cls", GRAPH_LANES)
+def test_the_encoder_placement_is_a_widget_value_that_tracks_the_cache(cls):
+    """The pin is requested in the graph, and the cache expects what was asked."""
     eng = cls()
-    assert "GGUF" not in eng._weight_family()
-    remedy = eng._missing_node_remedy()
-    assert "update ComfyUI itself" in remedy
-    # It may MENTION the pack to say it is not used; it must not ask for it.
-    assert "install" not in remedy.lower()
+    graph = eng._build_graph(_plan(text_prompt="a hand turns a dial", seed=7),
+                             "still.png", 97, 832, 480)
+    assert graph["te"]["inputs"]["device"] == eng._native_te_device
+    assert graph["te"]["inputs"]["type"] == "ltxv"
+    assert graph["unet"]["inputs"]["weight_dtype"] == "default"
+    assert eng._encoder_cache_expects_cpu == (eng._native_te_device == "cpu")
 
 
-def test_the_gguf_lane_still_asks_for_the_gguf_pack():
-    eng = eng_ltx25.Ltx25FoleyPlusEngine()
-    assert eng._weight_family() == "GGUF"
-    assert "ComfyUI-GGUF" in eng._missing_node_remedy()
+@pytest.mark.parametrize("cls", LANES)
+def test_the_cache_expectation_tracks_the_requested_placement(cls):
+    """Every lane, audio-in included: the two flags are one fact."""
+    eng = cls()
+    assert eng._native_te_device in ("cpu", "default")
+    assert eng._encoder_cache_expects_cpu == (eng._native_te_device == "cpu")
 
 
-@pytest.mark.parametrize("cls", NATIVE)
-def test_a_missing_native_weight_is_labelled_by_its_real_format(cls, monkeypatch):
-    labels = [label for label, _path, _floor in cls()._weight_paths()]
-    assert labels, "a lane with no weights to check would gate on nothing"
-    assert not any("GGUF" in label for label in labels), labels
-    assert any("native safetensors" in label for label in labels), labels
+@pytest.mark.parametrize("cls", GRAPH_LANES)
+def test_the_graph_loads_the_lanes_own_weights(cls):
+    eng = cls()
+    graph = eng._build_graph(_plan(text_prompt="x", seed=1), "s.png",
+                             97, 832, 480)
+    assert graph["unet"]["inputs"]["unet_name"] == eng._dit_name()
+    assert graph["te"]["inputs"]["clip_name"] == eng._text_encoder_name()
+    assert eng._dit_name().endswith(".safetensors")
+    assert eng._text_encoder_name().endswith(".safetensors")
 
 
-@pytest.mark.parametrize("cls", NATIVE)
-def test_every_native_lane_has_a_publication_shortcode(cls):
+def test_the_silent_lane_loads_the_16gb_weight():
+    eng = eng_ltx25.Ltx25VideoEngine()
+    assert eng._dit_name() == eng_ltx25.LTX25_NATIVE_DIT_16GB
+    assert eng._native_te_device == "cpu"
+    assert eng._quant_label() == "mix4x8"
+
+
+@pytest.mark.parametrize("cls", LANES)
+def test_a_missing_node_names_comfyui_itself_as_the_fix(cls, monkeypatch):
+    from nodes._otr_video_engines import wrapper_bridge as _wb
+    from nodes._otr_video_engines import motion_common as _MC
+
+    monkeypatch.setattr(_wb, "node_class_mappings", lambda: {})
+    monkeypatch.setattr(_MC, "assert_sage_not_patched", lambda *a, **k: None)
+    with pytest.raises(EngineUnusable) as info:
+        cls().assert_usable({}, {})
+    msg = str(info.value)
+    assert "update ComfyUI itself" in msg
+    assert "UNETLoader" in msg and "CLIPLoader" in msg
+
+
+@pytest.mark.parametrize("cls", LANES)
+def test_every_lane_has_a_publication_shortcode(cls):
     code = shortcodes.VIDEO_LANE.get(cls.name)
     assert code, "%s would publish as 'unk'" % cls.name
     assert len(code) == 4 and code.isalnum()
 
 
-def test_the_native_shortcodes_collide_with_nothing():
+def test_the_shortcodes_collide_with_nothing():
     codes = list(shortcodes.VIDEO_LANE.values())
     assert len(codes) == len(set(codes))

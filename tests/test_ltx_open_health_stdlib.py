@@ -17,7 +17,7 @@ from unittest import mock
 
 REPO = Path(__file__).resolve().parents[1]
 PREVIOUS_LTX_ENGINES = frozenset({
-    "ltx_video", "ltx25_video", "ltx_audio_in", "ltx25_foley_plus", "ltx25_mime",
+    "ltx_video", "ltx25_video", "ltx_audio_in",
 })
 
 
@@ -87,7 +87,7 @@ class LtxOpenHealthTests(unittest.TestCase):
     def test_allowlist_is_pinned_to_exactly_the_lanes_we_intend(self):
         """Pinned so a lane joins DELIBERATELY, never by a broad pattern.
 
-        The nine LTX 2.5 tier/native ids were added 2026-09-23 after a QA
+        The LTX 2.5 tier ids were added 2026-09-23 after a QA
         lane found they were absent: because each is in
         ``_vreg.CAPABILITIES`` they passed the "unknown" check and then hit
         the ``not_requested`` branch, so the BUG-LOCAL-413 guard never
@@ -98,7 +98,6 @@ class LtxOpenHealthTests(unittest.TestCase):
                          PREVIOUS_LTX_ENGINES | {
                              "ltx_8gb", "razzle_ltx_8gb",
                              "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
-                             "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
                              "ltx25_native_foley_16gb",
                              "ltx25_native_foley_24gb",
                              "ltx25_native_foley_blackwell",
@@ -116,16 +115,20 @@ class LtxOpenHealthTests(unittest.TestCase):
         set above fails HERE rather than silently blinding the guard.
         """
         from nodes._otr_video_engines import eng_ltx25
+        from nodes._otr_video_engines import registry as _vreg
+        # REGISTERED, as the test's name says -- the foley base carries a
+        # family ``name`` but is never registered, so it is not a lane.
         registered = {getattr(obj, "name", "")
                       for obj in vars(eng_ltx25).values()
                       if isinstance(obj, type)
-                      and str(getattr(obj, "name", "")).startswith("ltx25")}
+                      and str(getattr(obj, "name", "")).startswith("ltx25")
+                      and _vreg.is_registered(getattr(obj, "name", ""))}
         missing = sorted(registered - set(self.rd._LTX_OPEN_ENGINES))
         self.assertEqual(missing, [], "LTX 2.5 lane(s) absent from "
                          "_LTX_OPEN_ENGINES, so BUG-LOCAL-413 cannot see "
                          "them: %r" % (missing,))
 
-    def test_previous_five_ltx_lanes_remain_healthy(self):
+    def test_previous_ltx_lanes_remain_healthy(self):
         for engine in sorted(PREVIOUS_LTX_ENGINES):
             with self.subTest(engine=engine), self.assertNoLogs(self.rd._LOG, level="WARNING"):
                 clips = manifest(row(engine=engine), row("music_opening_001", "music_visual", engine))

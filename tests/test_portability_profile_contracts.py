@@ -4,20 +4,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from nodes._otr_shared.capability_profiles import PROFILE_DIR
 from nodes._otr_video_engines import eng_humo
+from nodes._otr_video_engines import eng_ltx25
 from nodes._otr_video_engines import ltx25_recipe as ltx
 
 
-ROOT = Path(__file__).resolve().parents[1]
-PROFILES = ROOT / "config" / "profiles"
+PROFILES = Path(PROFILE_DIR)
 
 LTX_IDS = (
-    "otr_ltx25_foley_lumina",
-    "otr_ltx25_high_foley_plus",
-    "otr_ltx25_high_mime",
     "otr_ltx25_high_video",
-    "otr_w45_ltx25_foley_plus",
-    "otr_w45_ltx25_mime",
     "otr_w45_ltx25_video",
 )
 HUMO14_IDS = (
@@ -33,10 +29,14 @@ def _profile(profile_id: str) -> dict:
         return json.load(handle)
 
 
-def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract():
+def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract(
+        monkeypatch):
+    monkeypatch.delenv("OTR_LTX25_NATIVE_DIT", raising=False)
+    monkeypatch.delenv("OTR_LTX25_NATIVE_TE", raising=False)
+    engine = eng_ltx25.Ltx25VideoEngine()
     expected = [
-        ltx.LTX25_DIT_GGUF,
-        ltx.LTX25_TEXT_ENCODER_GGUF,
+        engine._dit_name(),
+        engine._text_encoder_name(),
         ltx.LTX25_VIDEO_VAE,
         ltx.LTX25_AUDIO_VAE,
         ltx.LTX25_UPSCALER_MODEL,
@@ -52,20 +52,6 @@ def test_every_shipping_ltx_profile_has_complete_model_and_launch_contract():
             "extra_args": [],
             "env": {},
         }
-
-
-def test_ltx_foley_lumina_profile_keeps_ltx_weights_only():
-    models = _profile("otr_ltx25_foley_lumina")["preflight"][
-        "required_models"]
-    assert "flux-2-klein-4b-Q4_K_M.gguf" not in models
-    assert models[:5] == [
-        "LTX-2.5-Distilled-Q3_K_M.gguf",
-        "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
-        "ltx-2.5-video-vae-bf16.safetensors",
-        "ltx-2.5-audio-vae-bf16.safetensors",
-        "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-    ]
-    assert len(models) == len(set(models)) == 5
 
 
 def test_humo_14b_profiles_follow_engine_loader_order(monkeypatch):

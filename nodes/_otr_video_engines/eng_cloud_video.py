@@ -1091,7 +1091,7 @@ def _snap_ltx25_duration(secs, legal):
 
 
 class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
-    """Cloud analogue of local ``ltx25_foley_plus``.
+    """Cloud analogue of the local LTX 2.5 foley lanes.
 
     NOT audio-in. Partner node ``LtxApi25ImageToVideo`` (Comfy template
     ``api_ltx2_5_i2v``): Fast, 1920x1080, 25 fps, ``generate_audio=True``.

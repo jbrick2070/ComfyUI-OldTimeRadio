@@ -80,10 +80,6 @@ without that map would play ~4% short.
 | humo_1.7B | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_1.7B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-177 step 4 | 1.32-7.08 s | 25 | soft_reference | yes |
 | humo_14B_169 | local | audio_driven_face | wide | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
-| ltx25_foley_plus | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_foley_plus_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_foley_plus_32gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_mime | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_audio_in_16gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_audio_in_24gb | local | audio_conditioned_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
@@ -130,10 +126,6 @@ without that map would play ~4% short.
 | humo_1.7B | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_1.7B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | humo_14B_169 | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
-| ltx25_foley_plus | text_prompt, init_image | text_prompt REQUIRED |
-| ltx25_foley_plus_24gb | text_prompt, init_image | text_prompt REQUIRED |
-| ltx25_foley_plus_32gb | text_prompt, init_image | text_prompt REQUIRED |
-| ltx25_mime | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_audio_in_16gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
 | ltx25_native_audio_in_24gb | text_prompt, init_image, audio_ref | text_prompt REQUIRED |
 | ltx25_native_foley_16gb | text_prompt, init_image | text_prompt REQUIRED |
@@ -184,10 +176,6 @@ the engine's own `aspect` column above.
 | humo_1.7B | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_1.7B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
 | humo_14B_169 | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
-| ltx25_foley_plus | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
-| ltx25_foley_plus_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
-| ltx25_foley_plus_32gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
-| ltx25_mime | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_audio_in_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_audio_in_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
@@ -240,10 +228,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | humo_1.7B | 480x832 | engine _native_dims |
 | humo_1.7B_169 | 832x480 | engine _native_dims |
 | humo_14B_169 | 832x480 | engine _native_dims |
-| ltx25_foley_plus | 832x480 | declared |
-| ltx25_foley_plus_24gb | 832x480 | declared |
-| ltx25_foley_plus_32gb | 832x480 | declared |
-| ltx25_mime | 832x480 | declared |
 | ltx25_native_audio_in_16gb | 832x480 | declared |
 | ltx25_native_audio_in_24gb | 832x480 | declared |
 | ltx25_native_foley_16gb | 832x480 | declared |
@@ -300,10 +284,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | humo_1.7B | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_1.7B_169 | jump | 3: 177, 177, 89 | 443 | 442 | 0 |
 | humo_14B_169 | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
-| ltx25_foley_plus | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
-| ltx25_foley_plus_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
-| ltx25_foley_plus_32gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
-| ltx25_mime | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_audio_in_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_audio_in_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
@@ -357,10 +337,6 @@ and it read exactly like a measured number until someone looked.
 | humo_1.7B | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_1.7B_169 | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
-| ltx25_foley_plus | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_foley_plus_24gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_foley_plus_32gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_mime | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_audio_in_16gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_audio_in_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_16gb | - | contract max | docs/PROD_BUG_LOG.md |
@@ -388,7 +364,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **45**
+* registered engine names: **41**
 * provider-side: **9**
-* local: **36**
-* can chain (strict_first_frame): **18**
+* local: **32**
+* can chain (strict_first_frame): **14**

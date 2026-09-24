@@ -21,7 +21,6 @@ suite red -- that would punish the wrong person for the wrong reason.
 
 from __future__ import annotations
 
-import inspect
 import json
 from pathlib import Path
 
@@ -96,43 +95,6 @@ def test_frames_and_fps_give_the_standard_otr_shot_length():
 # --------------------------------------------------------------------------
 # Weights
 # --------------------------------------------------------------------------
-
-def test_the_dit_is_the_q3_the_operator_locked():
-    _doc, g = _graph()
-    _k, n = _node(g, "UnetLoaderGGUF")
-    assert n["inputs"]["unet_name"] == R.LTX25_DIT_GGUF
-    assert "Q3" in R.LTX25_DIT_GGUF, (
-        "Q3 is the locked safe quant; Q5 breaches the clamp and is quarantined"
-    )
-
-
-def test_the_text_encoder_matches():
-    """The lab now names its CPU-pinned loader explicitly.
-
-    Production resolves the installed ``CLIPLoaderGGUF`` first and swaps in
-    ``_cpu_pinned_clip_loader`` immediately before execution; the two paths use
-    different transport class names but share the same required placement.
-    """
-    _doc, g = _graph()
-    _k, n = _node(g, "CLIPLoaderGGUFCPU")
-    assert n["inputs"]["clip_name"] == R.LTX25_TEXT_ENCODER_GGUF
-    # WAS A SOURCE GREP for the inline call. It broke the day that call became
-    # an overridable hook (so a big-card lane could decline the pin without
-    # copying render_clip), and it would equally have stayed green through a
-    # rewrite that deleted the pin outright, because it only ever read text.
-    # Two behavioural assertions replace it: the hook REACHES the graph, and
-    # the DEFAULT hook genuinely pins. That is the placement the lab's
-    # CLIPLoaderGGUFCPU node is asserting above.
-    assert 'self._wrap_text_encoder(classes["te"])' in (
-        inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
-    ), "render_clip no longer routes the text encoder through the hook"
-    _sentinel = type("Sentinel", (), {})
-    _base = eng_ltx25.Ltx25VideoEngine
-    assert _base._wrap_text_encoder(_base.__new__(_base), _sentinel) is not _sentinel, (
-        "the default hook must still pin the encoder to CPU -- the lab golden "
-        "names CLIPLoaderGGUFCPU and every 16 GB lane depends on that placement"
-    )
-
 
 def test_both_vaes_match_and_the_audio_vae_really_is_loaded():
     """The silent lane still needs the audio VAE -- LTXVEmptyLatentAudio mints

@@ -51,7 +51,7 @@ INF = float("inf")
 
 def _row(beat_id, delta):
     """A placed row carrying ``delta``; the other columns are never judged."""
-    return {"beat_id": beat_id, "lane": "ltx25_foley_plus", "state": "placed",
+    return {"beat_id": beat_id, "lane": "ltx25_native_foley_16gb", "state": "placed",
             "raw_stem_db": -40.0, "bed_db": -54.0, "programme_db": -14.0,
             "delta_db": delta}
 

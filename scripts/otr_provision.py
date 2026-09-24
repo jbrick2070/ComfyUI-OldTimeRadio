@@ -80,58 +80,6 @@ INDEXTTS2_PYTHON = "3.10"
 # downloads use `<destination>.part`, verification, then rename; see
 # docs/RUNPOD_INSTALL.md.
 MANUAL_TIERS = {
-    "ltx25": [
-        {
-            "role": "Q3 DiT",
-            "repo": "realrebelai/LTX-2.5_GGUFs",
-            "revision": "112436f97aaf99ce13ecb7b7eca7e2f6c128d3ec",
-            "path": "LTX-2.5-Distilled-Q3_K_M.gguf",
-            "destination": "diffusion_models/LTX-2.5-Distilled-Q3_K_M.gguf",
-            "bytes": 11_525_623_808,
-            "sha256": "4286f8de1074c0c4fddfb92f38bd7df9161782b53c1717ebd69f1189c7933265",
-            "gated": False,
-        },
-        {
-            "role": "Q5 encoder",
-            "repo": "elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF",
-            "revision": "085ceddbbac3c0370de7f59ebec8bef4763f04b5",
-            "path": "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
-            "destination": "text_encoders/gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
-            "bytes": 9_514_920_864,
-            "sha256": "1d35d4fbfa34cca1513d8e9fdd77c0573778b21ffdcbe4ca9c906f37a8c502f9",
-            "gated": True,
-        },
-        {
-            "role": "video VAE",
-            "repo": "Lightricks/LTX-2.5",
-            "revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9",
-            "path": "vae/ltx-2.5-video-vae-bf16.safetensors",
-            "destination": "vae/ltx-2.5-video-vae-bf16.safetensors",
-            "bytes": 1_472_223_346,
-            "sha256": "847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3",
-            "gated": True,
-        },
-        {
-            "role": "audio VAE",
-            "repo": "Lightricks/LTX-2.5",
-            "revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9",
-            "path": "vae/ltx-2.5-audio-vae-bf16.safetensors",
-            "destination": "vae/ltx-2.5-audio-vae-bf16.safetensors",
-            "bytes": 364_866_540,
-            "sha256": "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
-            "gated": True,
-        },
-        {
-            "role": "spatial upscaler",
-            "repo": "Lightricks/LTX-2.5",
-            "revision": "5e6e71018ee1756ed329b697a7b4aedc934dfce9",
-            "path": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-            "destination": "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-            "bytes": 995_778_752,
-            "sha256": "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
-            "gated": True,
-        },
-    ],
     "humo_1_7b": [
         {
             "role": "1.7B DiT",
@@ -1479,8 +1427,6 @@ ISOLATED_VOICES = {
 _PUBLIC_VIDEO_IDS = {
     "wan22_high_video": "wan_ti2v",
     "ltx25_high_video": "ltx25_video",
-    "ltx25_high_foley_plus": "ltx25_foley_plus",
-    "ltx25_high_mime": "ltx25_mime",
     "humo14_high_audio_in_portrait": "humo",
     "humo14_high_audio_in_wide": "humo_14B_169",
     "humo17_high_audio_in_portrait": "humo_1.7B",
@@ -1489,7 +1435,6 @@ _PUBLIC_VIDEO_IDS = {
     "h3_low_audio_in": "minimax_h3_audio_in",
     "ltx098_low_video": "ltx_8gb",
 }
-_LTX25_ENGINES = {"ltx25_video", "ltx25_foley_plus", "ltx25_mime"}
 _HUMO14_ENGINES = {"humo", "humo_14B_169"}
 _HUMO17_ENGINES = {"humo_1.7B", "humo_1.7B_169"}
 _H3_ENGINES = {"minimax_h3_video", "minimax_h3_audio_in", "minimax_h3_music"}
@@ -1649,15 +1594,7 @@ class Lane(NamedTuple):
 #:                 siblings would be telling a stranger it is ready.
 #:   "builtin"  -- pure code. No weights and no service; nothing to obtain.
 NO_LANE_REASON = {
-    # The Q5 sibling of the foley lane. Its DiT is an 18.1 GB manual
-    # fetch rather than a provisioned one -- the parent ships the Q3
-    # build, and a 24 GB card is a deliberate choice an operator makes,
-    # not a default anything auto-downloads into.
-    "ltx25_foley_plus_24gb": "manual_doc",
-    # Identical artifacts to the lane above.
-    "ltx25_foley_plus_32gb": "manual_doc",
-    # The NATIVE (non-GGUF) LTX 2.5 lanes, same reasoning as the two above and
-    # for the same reason: each is a 12.5-20 GB deliberate fetch that belongs
+    # The LTX 2.5 lanes: each is a 12.5-20 GB deliberate fetch that belongs
     # to a card class an operator chooses, not something a default install
     # should pull. All three are ungated on Hugging Face -- int8 and w4a8 from
     # joeygambino/LTX-2.5-Quantized, nvfp4 from either that repo or
@@ -1665,6 +1602,7 @@ NO_LANE_REASON = {
     # a download, never a licence gate. (Lightricks' own LTX-2.5 repo IS gated
     # and returns 401 without a token; the mirrors above are byte-comparable
     # and need none.)
+    "ltx25_video": "manual_doc",
     "ltx25_native_foley_24gb": "manual_doc",
     "ltx25_native_foley_16gb": "manual_doc",
     "ltx25_native_foley_blackwell": "manual_doc",
@@ -1761,8 +1699,6 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
     if kind == "video":
         if engine in _H3_ENGINES:
             return Lane("h3_operator_only", True)
-        if engine in _LTX25_ENGINES:
-            return Lane("ltx25", True)
         if engine in _HUMO14_ENGINES:
             return Lane("humo", False)
         if engine in _HUMO17_ENGINES:

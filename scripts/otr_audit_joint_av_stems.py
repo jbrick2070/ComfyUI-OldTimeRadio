@@ -1,7 +1,7 @@
 """Does a joint-AV lane's OWN generated audio contain intelligible speech?
 
 THE STEM IS THE ONLY HONEST TEST SURFACE. A final mix cannot answer this on
-the foley lane: `ltx25_foley_plus` keeps the master at 0.80, so real TTS
+the foley lane: it keeps the master at 0.50, so real TTS
 dialogue is present and any correlation or listening test is confounded. The
 per-beat stem under ``<episode>/audio/foley/`` is the model's own output with
 no TTS anywhere near it, on BOTH lanes.
@@ -32,7 +32,9 @@ import re
 import sys
 
 EPISODES_DEFAULT = r"C:/Users/jeffr/Documents/ComfyUI/output/otr/episodes"
-JOINT_AV = ("ltx25_mime", "ltx25_foley_plus")
+JOINT_AV = ("ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
+            "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
+            "ltx25_native_foley_blackwell")
 
 #: Whisper's stock hallucinations on silence/noise. Matching these is not
 #: evidence of speech, and counting them as such would make every foley bed

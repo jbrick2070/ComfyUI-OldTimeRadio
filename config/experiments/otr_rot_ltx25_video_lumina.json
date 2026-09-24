@@ -1,6 +1,6 @@
 {
     "id": "otr_rot_ltx25_video_lumina",
-    "display_name": "LTX 2.5 Distilled Q3: silent video, 832x480x97 (5080-only) + lumina_image (rotation)",
+    "display_name": "LTX 2.5 Distilled mix4x8: silent video, 832x480x97 (16 GB) + lumina_image (rotation)",
     "status": "draft",
     "platform": "any",
     "device_backend": "cuda",

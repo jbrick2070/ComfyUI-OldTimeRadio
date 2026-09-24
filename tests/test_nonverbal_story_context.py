@@ -105,7 +105,7 @@ def test_a_directive_quoting_the_beat_intent_is_dropped():
     policy = {"policy_version": 2, "video_models": {
         "announcer_video_model": {"engine_id": "ltx_video"},
         "music_video_model": {"engine_id": "ltx_video"},
-        "character_video_model": {"engine_id": "ltx25_foley_plus"}}}
+        "character_video_model": {"engine_id": "ltx25_native_foley_16gb"}}}
     creative, warnings = sl.derive_creative_directives(
         beats, _meta(), ledger, llm_fn=llm, video_policy=policy)
     row = creative["b001"]

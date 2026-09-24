@@ -89,9 +89,9 @@ def test_profile_helper_rejects_contract_environment_drift(tmp_path):
 def test_launch_fingerprint_groups_profiles_with_identical_process_state():
     helper = _load(PROFILE_HELPER, "otr_profile_launch_args_fingerprint_test")
     video = helper.resolve_launch(helper.load_profile("otr_w45_ltx25_video"))
-    mime = helper.resolve_launch(helper.load_profile("otr_w45_ltx25_mime"))
+    same = helper.resolve_launch(helper.load_profile("otr_ltx25_high_video"))
     humo = helper.resolve_launch(helper.load_profile("otr_w45_humo"))
-    assert video["fingerprint"] == mime["fingerprint"]
+    assert video["fingerprint"] == same["fingerprint"]
     assert video["fingerprint"] != humo["fingerprint"]
 
 

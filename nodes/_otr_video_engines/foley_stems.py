@@ -79,12 +79,12 @@ FOLEY_RECEIPT_KEYS = (
 #: reason they share this module. Operator, 2026-08-26: *"foley and mime, we
 #: need this feature for both."*
 #:
-#: * ``ltx25_foley_plus`` -- 0.50 / 0.50 (operator, 2026-08-29). A bed UNDER
+#: * foley -- 0.50 / 0.50 (operator, 2026-08-29). A bed UNDER
 #:   the episode. The master gain is GLOBAL: it applies to the whole timeline,
 #:   not only to the beats that carry a bed, because RULING 1 is explicit that
 #:   voice holds its gain *"whether or not a foley stem exists for that beat,
 #:   so a beat without foley does not get louder"*.
-#: * ``ltx25_mime`` -- 1.00 / 0.00. A silent performance carrying the video's
+#: * mime -- 1.00 / 0.00. A silent performance carrying the video's
 #:   own score. The master gain is PER-WINDOW: it zeroes only the mime beats'
 #:   own samples, because engines are ROLE-WIDE and an episode with a mime role
 #:   still has roles that speak -- all of them sharing ONE master WAV. Zeroing
@@ -94,7 +94,7 @@ FOLEY_RECEIPT_KEYS = (
 #: by zero. That waste is deliberate (RULING 4, superseding the 2026-08-10
 #: "mime generates no TTS" brief): nothing has to happen before the master
 #: freezes, because nothing is being REPLACED -- the master is simply
-#: attenuated to zero in that window at mux time, exactly as foley_plus
+#: attenuated to zero in that window at mux time, exactly as foley
 #: attenuates it to 0.50. Same pipeline, same code path, one different
 #: constant. It deletes a whole node and an execution-order inversion.
 #: RE-AFFIRMED BY THE OPERATOR 2026-08-28, in his words: *"mime should have
@@ -105,7 +105,7 @@ FOLEY_RECEIPT_KEYS = (
 #: audio entirely. BOTH are answered: the native audio STAYS at 1.00, and the
 #: programme (TTS, music cues, announcer) STAYS at 0.00 inside mime windows.
 #: Do not propose dropping mime's generated audio; the operator wants it.
-#: EVERY LANE THAT HARVESTS A FOLEY BED MUST HAVE A ROW HERE, AND FIVE DID
+#: EVERY LANE THAT HARVESTS A FOLEY BED MUST HAVE A ROW HERE, AND SEVERAL DID
 #: NOT (2026-09-23). Membership of this table is not a mixing preference; it is
 #: how `is_foley_route` decides an episode is a foley episode at all. A lane
 #: that is absent renders its foley per beat, writes its durable stem, and then
@@ -122,26 +122,19 @@ FOLEY_RECEIPT_KEYS = (
 #: the stem is on disk, nothing fails, and the receipt says the render
 #: succeeded.
 #:
-#: The missing rows were the two GGUF TIER lanes -- `ltx25_foley_plus_24gb`
-#: and `_32gb`, which have been shipping -- and the three NATIVE lanes added
-#: the same week. All five subclass `Ltx25FoleyPlusEngine` and harvest exactly
-#: as it does, so they take exactly its gains -- and they join
-#: `GLOBAL_MASTER_GAIN_LANES` below for the same reason, because a lane that
-#: mixes like foley_plus and ducks like foley_plus is foley_plus at a different
-#: weight. Leaving them out would have ducked the master only inside their own
-#: beats instead of across the episode, which is a DIFFERENT MIX from the lane
-#: they inherit, arrived at by omission rather than by choosing it.
+#: The missing rows were tier lanes. Every foley tier subclasses
+#: `Ltx25FoleyPlusEngine` and harvests exactly as it does, so it takes exactly
+#: its gains -- and joins `GLOBAL_MASTER_GAIN_LANES` below for the same reason,
+#: because a lane that mixes like foley and ducks like foley is foley at a
+#: different weight. Leaving one out would duck the master only inside its own
+#: beats instead of across the episode, which is a DIFFERENT MIX arrived at by
+#: omission rather than by choosing it.
 FOLEY_LANE_GAINS = {
-    "ltx25_foley_plus": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
-    "ltx25_foley_plus_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
-    "ltx25_foley_plus_32gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_16gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_24gb": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
     "ltx25_native_foley_blackwell": (FOLEY_GAIN, MASTER_GAIN_UNDER_FOLEY),
-    "ltx25_mime": (1.00, 0.00),
-    # The NATIVE mime lanes. Same 1.00/0.00 as ltx25_mime and the same reason:
-    # mime REPLACES the programme in its own beats rather than bedding under
-    # it. They stay OUT of GLOBAL_MASTER_GAIN_LANES for that reason -- see the
+    # The mime lanes: mime REPLACES the programme in its own beats rather
+    # than bedding under it. They stay OUT of GLOBAL_MASTER_GAIN_LANES for that reason -- see the
     # membership test on that set.
     "ltx25_native_mime_16gb": (1.00, 0.00),
     "ltx25_native_mime_24gb": (1.00, 0.00),
@@ -182,9 +175,6 @@ FOLEY_LANE_GAINS = {
 #: held two, and the count was wrong again the moment the tier lanes were
 #: added. A membership rule survives the next addition; a tally does not.
 GLOBAL_MASTER_GAIN_LANES = frozenset({
-    "ltx25_foley_plus",
-    "ltx25_foley_plus_24gb",
-    "ltx25_foley_plus_32gb",
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
@@ -219,8 +209,8 @@ def is_foley_route(video_policy_json):
 
     IDS ARE RESOLVED BEFORE THEY ARE COMPARED. ``effective_video_models`` can
     hold a public menu string, an internal id, or a legacy alias depending on
-    how the policy was frozen, so a bare ``== "ltx25_foley_plus"`` would answer
-    False for ``'ltx25_high_foley_plus (16:9)'`` -- an episode that really is on
+    how the policy was frozen, so a bare ``== "ltx25_native_foley_16gb"`` would
+    answer False for ``'ltx25_native_foley_16gb (16:9)'`` -- an episode that really is on
     the route. Both callers use THIS function for exactly that reason.
 
     Pure and total: unparseable, empty or absent policy means "not a foley
@@ -786,12 +776,12 @@ def mix_foley_under_master(master, master_rate, rows, *, fps,
     WHY AN ENVELOPE AND NOT A SCALAR, and it is two rulings rather than a
     generalisation for its own sake:
 
-    * ``ltx25_foley_plus`` attenuates the master GLOBALLY, to 0.50 since the
+    * a foley lane attenuates the master GLOBALLY, to 0.50 since the
       2026-08-29 ruling. RULING 1 is explicit -- *"voice holds its gain
       whether or not a foley stem exists for that beat, so a beat without
       foley does not get louder"* -- so this one really is a single scale
       across the whole timeline.
-    * ``ltx25_mime`` attenuates PER WINDOW, to 0.00. Engines are ROLE-WIDE, so
+    * a mime lane attenuates PER WINDOW, to 0.00. Engines are ROLE-WIDE, so
       an episode with a mime role still has roles that speak, and all of them
       share ONE master WAV. A global zero would silence the episode; what
       RULING 4 describes is zeroing *"a beat's window"*.

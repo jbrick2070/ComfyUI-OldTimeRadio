@@ -509,105 +509,34 @@ CAPABILITIES = {
         "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
                                "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
                                "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
-    # ltx25_video (LTX 2.5 Chunk A, 2026-08-19): LTX 2.5 Distilled I2V rendered
-    # SILENT. cuda, no vendor gate -- and note the difference from its LTX 2.3
-    # cousin ltx_audio_in, which DOES carry requires_vendor "nvidia" because it
-    # hard-gates on NVML telemetry in assert_usable. This lane does not: it
-    # SAMPLES a VRAM peak for the receipt via VramPeakProbe, which degrades to
-    # None when no NVML sample succeeds, and never refuses on the reading.
-    # A vendor gate here would advertise an enforcement that does not run.
-    #
-    # needs_fp8_te / needs_fp4_te are both False: the DiT is a Q3_K_M GGUF and
-    # the Gemma-4 12B text encoder is a Q5_K_M GGUF, so neither fp8 nor fp4
-    # describes this stack -- GGUF k-quants are their own thing and neither
-    # flag's tier filter is the right question to ask about them.
+    # ltx25_video: LTX 2.5 Distilled I2V rendered SILENT, on the 16 GB mix4x8
+    # DiT through stock loaders. cuda, no vendor gate -- and note the
+    # difference from its LTX 2.3 cousin ltx_audio_in, which DOES carry
+    # requires_vendor "nvidia" because it hard-gates on NVML telemetry in
+    # assert_usable. This lane does not: it SAMPLES a VRAM peak for the receipt
+    # via VramPeakProbe, which degrades to None when no NVML sample succeeds,
+    # and never refuses on the reading.
     #
     # FIVE model_requirements, and the AUDIO VAE IS ONE OF THEM even though
     # this lane emits no audio. LTXVEmptyLatentAudio mints the audio latent
     # with it and LTXVConcatAVLatent needs that latent to build the joint AV
     # tensor the sampler consumes, so preflight must fail CLOSED without it --
     # the opposite of the minimax_h3_video row above, which deliberately OMITS
-    # its audio VAE because that lane genuinely never loads one.
+    # its audio VAE because that lane genuinely never loads one. Identical to
+    # ltx25_native_foley_16gb below: same weights, the audio simply discarded.
     "ltx25_video": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-q3-gguf",
-                               "gemma4-12b-ltx-2.5-proj-gguf",
+        "model_requirements": ["ltx-2.5-distilled-mix4x8-native",
+                               "gemma4-12b-ltx-2.5-w4a8-native",
                                "ltx-2.5-video-vae",
                                "ltx-2.5-audio-vae",
                                "ltx-2.5-latent-spatial-upscaler-x2"]},
-    # ltx25_foley_plus (the foley bed, 2026-08-26): the SAME graph and the same
-    # five artifacts, KEEPING the audio the model already computed instead of
-    # discarding it. Every capability field is identical to its parent's on
-    # purpose -- the difference between the two lanes is one extra two-node
-    # decode after the DiT has been reclaimed, which changes nothing a preflight
-    # gate asks about. The audio VAE was already required above (the silent lane
-    # still MINTS an audio latent with it), so this lane adds no new fetch.
-    #
-    # This row is not decoration: audit_engine_roster compares CAPABILITIES
-    # against the live registry, and a registered engine with no row here is the
-    # roster hole that audit exists to catch.
-    "ltx25_foley_plus": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-q3-gguf",
-                               "gemma4-12b-ltx-2.5-proj-gguf",
-                               "ltx-2.5-video-vae",
-                               "ltx-2.5-audio-vae",
-                               "ltx-2.5-latent-spatial-upscaler-x2"]},
-    # ltx25_mime (2026-08-26): the same graph and the same five artifacts
-    # again. Every capability field matches both siblings because the
-    # difference between all three lanes is what happens to the model's audio
-    # AFTER the render -- discarded, mixed under, or mixed over -- and none of
-    # that changes anything a preflight gate asks about.
-    "ltx25_mime": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-q3-gguf",
-                               "gemma4-12b-ltx-2.5-proj-gguf",
-                               "ltx-2.5-video-vae",
-                               "ltx-2.5-audio-vae",
-                               "ltx-2.5-latent-spatial-upscaler-x2"]},
-    # The two 32 GB siblings (2026-09-21): the same three lanes on the less
-    # lossy Q5_K_M build of the same DiT. Every capability field matches its
-    # parent's because the difference is which file loads, which is not
-    # something a preflight gate asks about. The Q5 artifact is the ONLY row
-    # that differs from the parent's list.
-    "ltx25_foley_plus_24gb": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-q5-gguf",
-                               "gemma4-12b-ltx-2.5-proj-gguf",
-                               "ltx-2.5-video-vae",
-                               "ltx-2.5-audio-vae",
-                               "ltx-2.5-latent-spatial-upscaler-x2"]},
-    # The fast big-card sibling (2026-09-21): identical artifacts to
-    # ltx25_foley_plus_24gb. It differs only in leaving the text encoder
-    # on the GPU, which is a placement decision and not something a
-    # preflight gate asks about, so every field here matches.
-    "ltx25_foley_plus_32gb": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.5-distilled-q5-gguf",
-                               "gemma4-12b-ltx-2.5-proj-gguf",
-                               "ltx-2.5-video-vae",
-                               "ltx-2.5-audio-vae",
-                               "ltx-2.5-latent-spatial-upscaler-x2"]},
-    # --- NATIVE (non-GGUF) LTX 2.5, 2026-09-22 -------------------------
-    # Same joint-AV model as the GGUF lanes, loaded through STOCK
-    # UNETLoader/CLIPLoader instead of ComfyUI-GGUF. The model_requirements
-    # names are new because the ARTIFACTS are different files, even though
-    # the recipe and the VAEs are shared.
+    # --- the LTX 2.5 foley / mime / audio-in tiers, 2026-09-22 ----------
+    # Loaded through STOCK UNETLoader/CLIPLoader. Each tier names its DiT;
+    # the recipe, the text encoder and the VAEs are shared.
     #
     # needs_fp8_te stays False on all three: the "fp8"/"nvfp4" in the DiT
     # filenames describes the TRANSFORMER's own packing, which the loader

@@ -161,8 +161,8 @@ _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 #: no motion clause, no style, and `prompt_source` never stamped.
 #:
 #: EXTRACTED FROM AN INLINE TUPLE 2026-09-03, AND THE EXTRACTION IS THE POINT.
-#: As an inline literal this list went stale three times. `ltx25_foley_plus` and
-#: `ltx25_mime` were added 2026-08-26 with a comment describing the exact
+#: As an inline literal this list went stale three times. The LTX 2.5 foley and
+#: mime lanes were added 2026-08-26 with a comment describing the exact
 #: silent-degrade they had been suffering; the same comment was not read across
 #: to the other omissions. It still carried `wan_i2v`, an id RETIRED that same
 #: week and no longer in the registry at all, so that entry could never match a
@@ -188,19 +188,11 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     "ltx_video",
     "ltx_audio_in",
     "ltx25_video",
-    "ltx25_foley_plus",
-    # Same composer as its parent -- the Q5 sibling differs only in
-    # which DiT file loads, which a bookend prompt cannot see.
-    "ltx25_foley_plus_24gb",
-    # Same composer again: encoder placement is invisible to a prompt.
-    "ltx25_foley_plus_32gb",
-    "ltx25_mime",
-    # THE SIX NATIVE (non-GGUF) LANES. Same composer as their GGUF siblings for
-    # the same reason given twice above: a bookend prompt cannot see which DiT
-    # file loads, and these differ from `ltx25_foley_plus` in exactly that and
-    # in how their bed is mixed. The three foley ids were ALREADY missing here
-    # before the mime and audio-in pairs were registered -- this list is an
-    # inline literal precisely because it goes stale, and it had.
+    # THE LTX 2.5 TIERS. Same composer as the silent lane: a bookend prompt
+    # cannot see which DiT file loads, and these differ from `ltx25_video` in
+    # exactly that and in how their bed is mixed. The three foley ids were
+    # ALREADY missing here before the mime and audio-in pairs were registered
+    # -- this list is an inline literal precisely because it goes stale.
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
@@ -3990,7 +3982,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _google_text_provider = _engine_id in _GOOGLE_SILENT_TEXT_PROVIDERS
     _google_prompt_provider = _engine_id in _GOOGLE_PROVIDER_PROMPT_ENGINES
     # THE MEMBERSHIP TEST IS A NAMED SET NOW, not an inline literal. The list
-    # this replaced went stale three times: `ltx25_foley_plus` and `ltx25_mime`
+    # this replaced went stale three times: the LTX 2.5 foley and mime lanes
     # were added 2026-08-26 with a comment describing the exact silent degrade
     # they had been suffering -- "the beat shipped `build_request`'s hardcoded
     # 'a 1940s radio studio' default with `prompt_source` never stamped" -- and
@@ -4206,8 +4198,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             req["text_prompt"] = scene_prompt
             _stamp_prompt_meta(req, "brief+beat", scene_prompt,
                                beat=_beat_id_for_shot(shot))
-    # THE JOINT-AV AUDIO REQUIREMENT (2026-08-26). `ltx25_foley_plus` and
-    # `ltx25_mime` KEEP the audio LTX 2.5 generates alongside the picture, and
+    # THE JOINT-AV AUDIO REQUIREMENT (2026-08-26). The LTX 2.5 foley and mime
+    # lanes KEEP the audio LTX 2.5 generates alongside the picture, and
     # BOTH halves are conditioned on this one positive string -- so a prompt
     # that never mentions sound leaves the model to score the scene from
     # whatever it guesses. Neither lane is audio-IN: no dialogue reaches here,
@@ -4224,14 +4216,13 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     _jav_engine = _engine_id
     # ASK THE MODULE THAT OWNS THE ANSWER, rather than keeping a second literal
     # copy of it here. This tuple listed three ids while `_JOINT_AV_ENGINES`
-    # grew to twelve, so every tier lane -- GGUF 24/32 GB and all seven native
-    # ones -- skipped the joint-AV finisher entirely and shipped positives with
+    # grew, so every tier lane skipped the joint-AV finisher entirely and shipped positives with
     # no named sounds and no "No speech, no voices." terminator. Two literals
     # of the same set is how that happens; now there is one.
     try:
         from .eng_ltx25 import _JOINT_AV_ENGINES as _JAV
     except Exception:                      # noqa: BLE001 -- adapter may be absent
-        _JAV = ("ltx25_foley_plus", "ltx25_mime", "cloud_ltx25_foley_plus")
+        _JAV = ("cloud_ltx25_foley_plus",)
     if _jav_engine in _JAV:
         try:
             from .eng_ltx25 import (finish_joint_av_positive,
@@ -6999,12 +6990,11 @@ def apply_engine_override(ledger):
 #: the LTX 2.5 HQ I2V lane, and the additive LTX-AV audio lane.
 _LTX_OPEN_ENGINES = frozenset(
     {"ltx_video", "ltx_8gb", "razzle_ltx_8gb", "ltx25_video", "ltx_audio_in",
-     # The foley and mime lanes (2026-08-26) render the LTX 2.5 picture graph
-     # unchanged -- only the audio latent's fate differs -- so an open that
-     # renders on one is every bit as real an LTX open as `ltx25_video`.
-     # Omitting them would report a healthy open as a procgen soft-open and,
-     # under OTR_LTX_OPEN_STRICT=1, fail a build that did nothing wrong.
-     "ltx25_foley_plus", "ltx25_mime",
+     # The foley and mime lanes render the LTX 2.5 picture graph unchanged
+     # -- only the audio latent's fate differs -- so an open that renders on
+     # one is every bit as real an LTX open as `ltx25_video`. Omitting them
+     # would report a healthy open as a procgen soft-open and, under
+     # OTR_LTX_OPEN_STRICT=1, fail a build that did nothing wrong.
      "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
      # THE SAME REASONING, APPLIED TO THE LANES THAT AROSE AFTER IT WAS
      # WRITTEN (2026-09-23). Every one of these renders the LTX 2.5
@@ -7021,7 +7011,6 @@ _LTX_OPEN_ENGINES = frozenset(
      # It has now been missed once per lane family. The durable fix is a
      # capability declared on the engine and derived here; that is a
      # registry change and wants its own review, not a quiet edit.
-     "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
      "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
      "ltx25_native_foley_blackwell",
      "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",

@@ -137,61 +137,14 @@ _PUBLIC_ENGINES = {
     # receipt is 864x480, 124 model / 129 canvas frames, 6,678 MB cold absolute
     # on the 5080. This is not a physical-8-GB support receipt.
     "h3_low_audio_in": "minimax_h3_audio_in",
-    # LTX 2.5 Chunk A, 2026-08-19. An ADD with no alias to move: this lane has
-    # never shipped under any other id.
-    #
-    # `high` IS DECIDED BY A RULING, NOT BY A MEASUREMENT THAT NEVER RAN, and
-    # the distinction is worth stating because G7.4 demands a measured token.
-    # The token was held UNSET for most of a day precisely so it would not be
-    # guessed -- the open question was whether the lane fits a smaller card, and
-    # the operator was going to clamp-test on the 4060. He then ruled the 4060
-    # OUT ENTIRELY, which settles the naming by removing the question: the lane
-    # is 5080-only, and `high` is exactly what that means. No clamp test, no
-    # reserve-vram experiment, no lab question -- all three existed only to ask
-    # whether it would fit a smaller card.
-    #
-    # It is also true on the numbers we do have. The lab measured 14.48 GiB for
-    # the locked Q3 recipe at 832x480x97 against a 14.5 GiB clamp, which is the
-    # most expensive local lane in the roster by some distance -- `low` would
-    # have been false in the same way `wan_8gb` was false, which is the mistake
-    # that retired the `<vramtier>gb` token in the first place.
+    # LTX 2.5, 2026-08-19. The silent lane, on the 16 GB mix4x8 DiT.
     #
     # `video` and not `audio_in`, matching `h3_low_video`: LTX 2.5 natively
-    # produces audio and this lane deliberately does not decode it. The
-    # audio-carrying routes are `ltx25_high_mime` and `ltx25_high_foley_plus`,
-    # each of which will map to its OWN internal engine when Chunk B builds
-    # them -- three public ids on three internal ids, never one id with a
-    # switch, because two public ids on one internal id collapses
-    # _INTERNAL_TO_PUBLIC and trips the bijection assert below AT IMPORT
-    # (lesson L5). They are deliberately absent until they can render.
+    # produces audio and this lane deliberately does not decode it. Three
+    # public ids on three internal ids, never one id with a switch, because two
+    # public ids on one internal id collapses _INTERNAL_TO_PUBLIC and trips the
+    # bijection assert below AT IMPORT (lesson L5).
     "ltx25_high_video": "ltx25_video",
-    # THE FOLEY LANE, 2026-08-26. `high` for the same reason its sibling is:
-    # the picture is the identical 14.48 GiB two-stage Q3 recipe, 5080-only.
-    # The audio decode it adds runs AFTER the DiT is reclaimed, on a 348 MiB
-    # VAE, so it does not move the bucket -- which is precisely why the token
-    # is inherited rather than re-guessed.
-    #
-    # `foley_plus` and not `audio` or `sfx`: the model's OWN generated audio,
-    # mixed UNDER the TTS master (plus, not instead of). `sfx` would name the
-    # separately-generated effects bed that was ripped on 2026-08-06 and is
-    # staying dead -- a different feature the operator explicitly does not want
-    # confused with this one.
-    #
-    # (`ltx25_high_mime` was described here as "still absent and still spoken
-    # for" until 2026-09-05. It ARRIVED on 2026-08-26 and is mapped thirteen
-    # lines below, so the note had been contradicting the table it introduces.
-    # Corrected rather than deleted because a reader who remembers the older
-    # state deserves to know it moved, not to wonder which line is lying.)
-    "ltx25_high_foley_plus": "ltx25_foley_plus",
-    # MIME, 2026-08-26 -- the third and last row on this lane, and the same
-    # mechanism as its sibling at 1.00 foley / 0.00 master. Operator: "foley
-    # and mime, we need this feature for both."
-    #
-    # THREE public ids on THREE internal engines, exactly as lesson L5 requires
-    # and as the comment above this block promised. Two public ids on one
-    # internal id would collapse _INTERNAL_TO_PUBLIC and trip the bijection
-    # assert AT IMPORT, which empties most of the ComfyUI menu.
-    "ltx25_high_mime": "ltx25_mime",
 }
 
 #: Legacy engine-id aliases (renamed engines) -- MOVED here from otr_video_director
@@ -308,33 +261,9 @@ _PUBLIC_LABEL = {
         "MiniMax H3 33B audio-in - low VRAM (6.9-7.2 GiB at 864x480; reference "
         "portrait + the beat's own audio; needs the sage-free h3 boot, and it "
         "is as slow as its silent sibling)"),
-    # Do not print the old one-stage lab peak as if it measured this selected
-    # HQ graph. State the output-changing facts the operator needs instead.
     "ltx25_high_video": (
-        "LTX 2.5 Distilled Q3 HQ two-stage silent video - high VRAM "
-        "(832x480 first stage, 1664x960 refined decode, 5080-only, one "
-        "3.88 s rung)"),
-    # SAY WHAT IT CHANGES ABOUT THE EPISODE, because that is what the operator
-    # is choosing when he picks this row: it is not a picture option, it is a
-    # MIX decision that reaches the whole master. The ratio is in the label for
-    # the same reason -- 0.50/0.50 is an operator ruling (2026-08-29, raised
-    # from 0.20/0.80), not a tunable, and a label that hid it would invite
-    # someone to go looking for the knob.
-    "ltx25_high_foley_plus": (
-        "LTX 2.5 Distilled Q3 HQ two-stage + FOLEY BED - high VRAM (same "
-        "picture as ltx25_high_video; keeps the model's own footsteps, room "
-        "tone and score and mixes them with the episode master at 0.50 foley "
-        "/ 0.50 master. Affects the WHOLE episode mix, music included)"),
-    # SAY THE CONSEQUENCE FIRST. This row is ROLE-WIDE like every engine
-    # dropdown, so picking it for a role makes EVERY beat of that role a silent
-    # performance -- which is a much larger decision than picking a picture
-    # option, and the label is where the operator finds that out.
-    "ltx25_high_mime": (
-        "LTX 2.5 Distilled Q3 HQ two-stage + MIME - high VRAM (same picture as "
-        "ltx25_high_video; the video's OWN score replaces the episode audio "
-        "over these beats at 1.00 foley / 0.00 master. ROLE-WIDE: every beat of "
-        "the chosen role becomes a silent performance. TTS and music are still "
-        "generated for those beats and then discarded)"),
+        "LTX 2.5 Distilled mix4x8 HQ two-stage silent video - 16 GB "
+        "(832x480 first stage, 1664x960 refined decode, one 3.88 s rung)"),
     # GHOST SIGNAL (2026-08-22). A LABEL ONLY -- there is deliberately no
     # `_PUBLIC_ENGINES` self-alias, because the resolver already passes a bare
     # internal id through unchanged (the existing identity-engine precedent) and
@@ -369,8 +298,8 @@ def public_engine_id(internal) -> str:
     mapping.
 
     Written 2026-09-13 because the tier matrix was printing internal ids
-    (`ltx25_foley_plus`) into a README that shows the public ones
-    (`ltx25_high_foley_plus`) in the table 130 lines above it and in the saved
+    (`ltx25_video`) into a README that shows the public ones
+    (`ltx25_high_video`) in the table 130 lines above it and in the saved
     graph itself. A reader who opened the graph to check the claim found a
     different string. Docs render what the dropdown shows; nothing else.
     """

@@ -40,8 +40,9 @@ from nodes._otr_video_engines.frame_contract import (
 
 
 ENGINE = "ltx25_video"
-#: Its foley sibling: the SAME graph, keeping the audio this lane discards.
-FOLEY = "ltx25_foley_plus"
+#: Its foley sibling: the SAME graph and weights, keeping the audio this lane
+#: discards.
+FOLEY = "ltx25_native_foley_16gb"
 
 
 @pytest.fixture()
@@ -103,9 +104,7 @@ def test_nothing_is_reserved_and_the_RULE_still_stands():
     """THE CONSTRUCTION-SITE RULE (operator, 2026-08-19).
 
     An id named in the reserved tuple is spoken for and must NOT be
-    registered until it can actually render an episode. The two 32 GB
-    siblings sat there while their weights downloaded and are registered
-    now, so the tuple is empty again.
+    registered until it can actually render an episode.
 
     An EMPTY tuple is a statement, not a leftover: it says nothing is
     pending, and the next LTX 2.5 sibling reserves its name there first."""
@@ -119,29 +118,19 @@ def test_nothing_is_reserved_and_the_RULE_still_stands():
         % sorted(reserved & registered))
     for internal in reserved:
         assert internal not in pub._INTERNAL_TO_PUBLIC
-    # Both former reservations are now REAL, on their own internal engines.
-    assert {"ltx25_foley_plus", "ltx25_mime"} <= registered
-    assert pub._PUBLIC_ENGINES["ltx25_high_mime"] == "ltx25_mime"
+    assert {"ltx25_native_foley_16gb", "ltx25_native_mime_16gb"} <= registered
 
 
-def test_the_foley_lane_is_registered_public_and_on_the_capability_roster():
-    """The three surfaces a lane needs, and `registry IS the menu` means all
-    three or none: a registered engine with no CAPABILITIES row is the roster
-    hole `audit_engine_roster` exists to catch, and a public id with no
-    internal engine empties the ComfyUI menu at import (lesson L5)."""
+def test_the_foley_lane_is_registered_and_on_the_capability_roster():
+    """The surfaces a lane needs, and `registry IS the menu` means all or
+    none: a registered engine with no CAPABILITIES row is the roster hole
+    `audit_engine_roster` exists to catch."""
     assert FOLEY in vreg.all_engine_names()
     assert FOLEY in vreg.CAPABILITIES
     audit = vreg.audit_engine_roster()
     assert not audit["missing"], audit["missing"]
     assert not audit["unexpected"], audit["unexpected"]
-    assert pub._PUBLIC_ENGINES["ltx25_high_foley_plus"] == FOLEY
-    assert pub._INTERNAL_TO_PUBLIC[FOLEY] == "ltx25_high_foley_plus"
-    assert pub.resolve_engine_id("ltx25_high_foley_plus (16:9)") == FOLEY
-    # The label is what the operator picks from, and this lane changes the
-    # WHOLE episode mix -- a label that only described the picture would hide
-    # the actual consequence of choosing it.
-    label = pub._PUBLIC_LABEL["ltx25_high_foley_plus"].lower()
-    assert "foley" in label and "0.50" in label
+    assert pub.resolve_engine_id(FOLEY + " (16:9)") == FOLEY
 
 
 def test_the_foley_lane_never_wears_the_ripped_beds_name():
@@ -212,7 +201,7 @@ def test_the_foley_lane_inherits_the_picture_and_touches_nothing_about_it():
 def test_the_audio_decoder_is_resolved_by_the_foley_lane_and_ONLY_by_it():
     """V-1 for the silent lane, preflight for the foley one.
 
-    `ltx25_video` must not even RESOLVE the decoder; `ltx25_foley_plus` must,
+    `ltx25_video` must not even RESOLVE the decoder; a foley lane must,
     because `assert_usable` walks exactly this dict -- so a box whose ComfyUI
     predates nodes_lt_audio.py fails CLOSED by name at preflight instead of
     twenty minutes into a render."""
@@ -484,8 +473,8 @@ def test_the_weight_list_includes_the_audio_vae(eng):
 def test_capability_row_declares_every_shipping_weight():
     reqs = vreg.CAPABILITIES[ENGINE]["model_requirements"]
     assert reqs == [
-        "ltx-2.5-distilled-q3-gguf",
-        "gemma4-12b-ltx-2.5-proj-gguf",
+        "ltx-2.5-distilled-mix4x8-native",
+        "gemma4-12b-ltx-2.5-w4a8-native",
         "ltx-2.5-video-vae",
         "ltx-2.5-audio-vae",
         "ltx-2.5-latent-spatial-upscaler-x2",
@@ -654,141 +643,21 @@ def test_the_render_path_stamps_native_equal_to_delivered():
         "the pre-trim bookkeeping is gone; reintroducing it is the bug")
 
 
-def test_the_G8_measurement_is_recorded_as_OVER_the_clamp_and_not_tuned_away():
-    """THE G8 RECEIPT, pinned as arithmetic so it cannot soften into folklore.
-
-    Two renders, two instruments, one answer: this lane peaks at ~99% of the
-    card and 1324 MiB above what the lab reported. The point of pinning it is
-    that the temptation on a number like this is to make it smaller by moving
-    the canvas, and the operator's standing rule is the opposite -- a wrong
-    value is a finding to REPORT.
-
-    So this test asserts the uncomfortable facts stay stated: the measurement
-    is over the clamp, the independent sampler corroborates it, and the locked
-    recipe values are untouched.
-    """
-    over_clamp_mib = R.LTX25_OTR_MEASURED_PEAK_MIB - int(
-        R.LTX25_LAB_CLAMP_GIB * 1024)
-    assert over_clamp_mib > 0, (
-        "the measured peak is no longer over the clamp -- if that is a real "
-        "re-measurement, update the manifest narrative too")
-    assert R.LTX25_OTR_MEASURED_PEAK_MIB > int(
-        R.LTX25_LAB_OBSERVED_PEAK_GIB * 1024)
-    # the independent sampler is a FLOOR, not a competing answer
-    assert (R.LTX25_OTR_MEASURED_PEAK_FLOOR_MIB
-            <= R.LTX25_OTR_MEASURED_PEAK_MIB
-            <= R.LTX25_OTR_CARD_TOTAL_MIB)
-    # and the recipe was NOT tuned in response
+def test_the_silent_lane_is_the_16gb_weight_with_its_encoder_pinned(eng, graph):
+    """ltx25_video loads the same mix4x8 DiT as the 16 GB foley and mime
+    lanes, and asks for the text encoder on the CPU as a widget value on the
+    stock loader -- a GPU-side encode of the Gemma-4 12B encoder is what tips
+    a 16 GB card."""
+    assert eng._dit_name() == eng_ltx25.LTX25_NATIVE_DIT_16GB
+    assert eng._text_encoder_name() == eng_ltx25.LTX25_NATIVE_TEXT_ENCODER
+    assert graph["te"]["inputs"]["device"] == "cpu"
+    assert eng._encoder_cache_expects_cpu is True
+    cands = eng._node_candidates()
+    assert cands["unet"] == ("UNETLoader",)
+    assert cands["te"] == ("CLIPLoader",)
+    # and the recipe was NOT tuned in the move
     assert (R.LTX25_CANVAS_W, R.LTX25_CANVAS_H) == (832, 480)
     assert R.LTX25_FRAMES == 97 and R.LTX25_STEPS == 8
-    assert "Q3" in R.LTX25_DIT_GGUF
-
-
-class TestTheCpuPinnedTextEncoder:
-    """THE ACTUAL FIX for the encode OOM -- and the trap that hid it.
-
-    A GPU encode of the Gemma-4 12B Q5 GGUF transiently needs ~15.6 GiB on a
-    15.92 GiB card, so it is a coin flip per shot: four encodes won it on the
-    2026-08-19 leg and the fifth died. Pinning to CPU took the encode's VRAM
-    cost from ~13,760 MB to ~0 MB, measured on this box.
-
-    THE TRAP, which cost three wrong diagnoses: the stock loader ALREADY passes
-    ``initial_device = text_encoder_offload_device()``, so "the encoder loads to
-    CPU" reads true and is useless -- ``load_models_gpu`` still pulls it to
-    ``patcher.load_device`` at encode time. Only ``load_device`` and
-    ``offload_device`` actually pin it.
-    """
-
-    def test_all_three_device_keys_are_set_not_just_initial_device(self):
-        """The load-bearing assertion. Dropping any ONE of these silently
-        restores the GPU encode and the coin flip with it -- and the failure
-        would reappear as a random OOM mid-episode, not as a red test."""
-        src = inspect.getsource(eng_ltx25._cpu_pinned_clip_loader)
-        for key in ('"initial_device": cpu',
-                    '"load_device": cpu',
-                    '"offload_device": cpu'):
-            assert key in src, (
-                "%s missing -- initial_device ALONE is the trap that made three "
-                "diagnoses conclude the encoder was already on CPU" % key)
-
-    def test_the_loader_subclasses_whatever_is_installed(self):
-        """Built from the resolved class, not imported. The pack directory is
-        ``ComfyUI-GGUF`` and the hyphen makes it un-importable by name;
-        subclassing the installed class also inherits its file handling instead
-        of forking a copy that can drift."""
-
-        class _FakeInstalled:
-            FUNCTION = "load_clip"
-
-            def load_patcher(self, clip_paths, clip_type, clip_data):
-                raise AssertionError("the base implementation must be replaced")
-
-        sub = eng_ltx25._cpu_pinned_clip_loader(_FakeInstalled)
-        assert issubclass(sub, _FakeInstalled)
-        assert sub.load_patcher is not _FakeInstalled.load_patcher
-
-    def test_a_patcher_that_is_not_on_cpu_is_a_NAMED_refusal(self):
-        """FAIL LOUD before the forward. If a future ComfyUI ignores the device
-        options, that must be a named error in the first second -- not an OOM
-        on beat 15 after the writer, the stills and the audio are paid for."""
-        import sys
-        import types
-
-        fake_mod = types.ModuleType("fake_gguf")
-        fake_mod.GGMLOps = object
-
-        class _Patcher:
-            load_device = "cuda:0"        # the regression being guarded
-            offload_device = "cpu"
-
-        class _Clip:
-            patcher = _Patcher()
-
-        fake_mod.GGUFModelPatcher = type(
-            "P", (), {"clone": staticmethod(lambda p: _Patcher())})
-
-        class _Base:
-            FUNCTION = "load_clip"
-            __module__ = "fake_gguf"
-
-        sys.modules["fake_gguf"] = fake_mod
-        try:
-            sub = eng_ltx25._cpu_pinned_clip_loader(_Base)
-            import comfy.sd  # noqa: F401 -- only to prove the import path exists
-        except Exception:
-            pytest.skip("comfy.sd unavailable off the ComfyUI runtime")
-        finally:
-            sys.modules.pop("fake_gguf", None)
-        # The error type itself is the contract worth pinning here; the live
-        # device check is exercised on the GPU box by the G8 smoke.
-        assert issubclass(eng_ltx25.CpuPinnedEncoderPlacementError, RuntimeError)
-        assert (eng_ltx25.CpuPinnedEncoderPlacementError.reason_code
-                == "encoder_not_on_cpu")
-
-    def test_render_clip_swaps_the_loader_in(self):
-        """The subclass is worthless unless it actually reaches the graph, and
-        the swap happens AFTER resolution so ``assert_usable`` still gates on
-        the real installed ``CLIPLoaderGGUF``."""
-        # WAS A SOURCE GREP for the inline call, and it broke the day the
-        # call became an overridable hook -- correctly, but it would have
-        # stayed green through a rewrite that removed the pin entirely.
-        # Two assertions replace it: the hook REACHES the graph, and the
-        # default hook genuinely pins.
-        src = inspect.getsource(eng_ltx25.Ltx25VideoEngine.render_clip)
-        assert 'self._wrap_text_encoder(classes["te"])' in src, (
-            "render_clip no longer routes the text encoder through the "
-            "hook, so an override could never reach the graph")
-        sentinel = type("Sentinel", (), {})
-        base = eng_ltx25.Ltx25VideoEngine
-        wrapped = base._wrap_text_encoder(base.__new__(base), sentinel)
-        assert wrapped is not sentinel, (
-            "the DEFAULT hook must still pin the encoder to CPU: every "
-            "16 GB lane depends on it, and a GPU-side encode there is a "
-            "coin flip per shot")
-        cands = eng_ltx25.Ltx25VideoEngine()._node_candidates()
-        assert cands["te"] == ("CLIPLoaderGGUF",), (
-            "the preflight gate must still name the REAL installed class, so a "
-            "box without ComfyUI-GGUF fails closed by name")
 
 
 def test_every_logical_node_in_the_graph_has_a_class_candidate(graph, eng):

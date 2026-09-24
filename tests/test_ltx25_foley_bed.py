@@ -165,7 +165,7 @@ def test_a_format_change_mid_beat_is_a_refusal(tmp_path):
 # ---------------------------------------------------------------------------
 
 def _row(path, start_s, frames, space="master_mix",
-         engine="ltx25_foley_plus"):
+         engine="ltx25_native_foley_16gb"):
     """One manifest row. `engine_id` is load-bearing, not decoration: it is
     what tells the mix WHICH gains this row mixes at, and the two lanes
     attenuate the master differently."""
@@ -182,7 +182,7 @@ def test_the_operator_ratio_is_applied_exactly_once(tmp_path):
     mixed, stats = fs.mix_foley_under_master(
         master, RATE, [_row(bed, 0.0, 100)], fps=FPS)
     assert stats["placed"] == 1
-    assert stats["lanes"] == {"ltx25_foley_plus": 1}
+    assert stats["lanes"] == {"ltx25_native_foley_16gb": 1}
     assert stats["global_master_gain"] == 0.50
     assert stats["muted_samples"] == 0
     assert np.allclose(mixed, 0.5 * 0.5 + 0.25 * 0.5, atol=1e-3)
@@ -214,7 +214,7 @@ def test_stems_SPLAT_at_their_own_offsets_and_OVERLAPS_add(tmp_path):
     mixed, stats = fs.mix_foley_under_master(
         master, RATE, [_row(a, 0.0, 20), _row(b, 10 / FPS, 20)], fps=FPS)
     assert stats["placed"] == 2
-    gain = fs.FOLEY_LANE_GAINS["ltx25_foley_plus"][0]
+    gain = fs.FOLEY_LANE_GAINS["ltx25_native_foley_16gb"][0]
     assert np.allclose(mixed[:, :10 * STEP], 0.5 * gain, atol=1e-3)
     assert np.allclose(mixed[:, 10 * STEP:20 * STEP],
                        (0.5 + 0.25) * gain, atol=1e-3)
@@ -235,7 +235,7 @@ def test_the_offset_is_integer_frames_not_a_float_multiplication(tmp_path):
     edge = 97 * STEP                      # 3.88 s at 25 fps is frame 97 exactly
     assert np.allclose(mixed[:, edge - 1], 0.0, atol=1e-4)
     assert np.allclose(
-        mixed[:, edge], 0.5 * fs.FOLEY_LANE_GAINS["ltx25_foley_plus"][0],
+        mixed[:, edge], 0.5 * fs.FOLEY_LANE_GAINS["ltx25_native_foley_16gb"][0],
         atol=1e-3)
 
 
@@ -290,17 +290,17 @@ def test_a_mismatched_stem_is_conformed_EXPLICITLY_and_said_so(tmp_path):
 
 def test_mime_zeroes_ONLY_its_own_windows_never_the_whole_episode(tmp_path):
     """THE RULING THAT SHAPES THIS LANE. Engines are ROLE-WIDE dropdowns, so
-    `ltx25_high_mime` on the character role makes every character beat a silent
+    a mime lane on the character role makes every character beat a silent
     performance -- while the announcer and music roles still speak, out of the
     SAME single master WAV. A global 0.00 would silence the episode. So mime
     zeroes its own beats' samples and leaves the rest of the timeline alone."""
     master = np.full((1, 100 * STEP), 0.5, dtype=np.float32)
     bed = _stem(tmp_path, "mime.wav", 10, 0.25, channels=1)
     mixed, stats = fs.mix_foley_under_master(
-        master, RATE, [_row(bed, 10 / FPS, 10, engine="ltx25_mime")],
-        fps=FPS, lane_ids={"ltx25_mime"})
+        master, RATE, [_row(bed, 10 / FPS, 10, engine="ltx25_native_mime_16gb")],
+        fps=FPS, lane_ids={"ltx25_native_mime_16gb"})
 
-    assert stats["lanes"] == {"ltx25_mime": 1}
+    assert stats["lanes"] == {"ltx25_native_mime_16gb": 1}
     assert stats["global_master_gain"] == 1.0, (
         "mime must NOT attenuate the whole timeline -- that is the foley "
         "lane's global 0.50, and applying it here would duck every role")
@@ -323,10 +323,10 @@ def test_a_mixed_episode_gives_each_lane_its_OWN_gains(tmp_path):
     mime = _stem(tmp_path, "m.wav", 10, 0.25, channels=1)
     mixed, stats = fs.mix_foley_under_master(
         master, RATE,
-        [_row(foley, 0.0, 10), _row(mime, 20 / FPS, 10, engine="ltx25_mime")],
-        fps=FPS, lane_ids={"ltx25_foley_plus", "ltx25_mime"})
+        [_row(foley, 0.0, 10), _row(mime, 20 / FPS, 10, engine="ltx25_native_mime_16gb")],
+        fps=FPS, lane_ids={"ltx25_native_foley_16gb", "ltx25_native_mime_16gb"})
 
-    assert stats["lanes"] == {"ltx25_foley_plus": 1, "ltx25_mime": 1}
+    assert stats["lanes"] == {"ltx25_native_foley_16gb": 1, "ltx25_native_mime_16gb": 1}
     # The foley lane's 0.50 is GLOBAL, so it floors the whole timeline...
     assert stats["global_master_gain"] == 0.50
     assert np.allclose(mixed[:, :10 * STEP], 0.5 * 0.5 + 0.25 * 0.5, atol=1e-3)
@@ -344,7 +344,7 @@ def test_the_global_master_gain_applies_to_beats_with_no_bed_at_all(tmp_path):
     rows, because there are none."""
     master = np.full((1, 100 * STEP), 0.5, dtype=np.float32)
     mixed, stats = fs.mix_foley_under_master(
-        master, RATE, [], fps=FPS, lane_ids={"ltx25_foley_plus"})
+        master, RATE, [], fps=FPS, lane_ids={"ltx25_native_foley_16gb"})
     assert stats["placed"] == 0
     assert stats["global_master_gain"] == 0.50
     assert np.allclose(mixed, 0.25, atol=1e-3)
@@ -371,7 +371,7 @@ def test_an_UNPOSITIONED_beat_is_skipped_loudly_not_fatal(tmp_path):
         _row(placed_stem, 0.0, 10),
         # Exactly what build_clip_manifest emits for an unpositioned line.
         {"foley_path": orphan, "start_s": None, "frame_count": 10,
-         "start_s_space": "master_mix", "engine_id": "ltx25_foley_plus"},
+         "start_s_space": "master_mix", "engine_id": "ltx25_native_foley_16gb"},
     ]
     mixed, stats = fs.mix_foley_under_master(master, RATE, rows, fps=FPS)
 
@@ -393,7 +393,7 @@ def test_every_beat_unpositioned_still_delivers_a_master(tmp_path):
     mixed, stats = fs.mix_foley_under_master(
         master, RATE,
         [{"foley_path": orphan, "start_s": None, "frame_count": 10,
-          "engine_id": "ltx25_foley_plus"}], fps=FPS)
+          "engine_id": "ltx25_native_foley_16gb"}], fps=FPS)
     assert (stats["placed"], stats["unpositioned"]) == (0, 1)
     assert np.allclose(mixed, 0.5 * 0.5, atol=1e-3)
 
@@ -420,25 +420,24 @@ def test_the_route_is_decided_by_ONE_function_for_both_audio_stages():
     def policy(**roles):
         return json.dumps({"effective_video_models": roles})
 
-    assert fs.is_foley_route(policy(music="ltx25_foley_plus"))
+    assert fs.is_foley_route(policy(music="ltx25_native_foley_16gb"))
     # BOTH audio-keeping lanes put the episode on the route. They mix
     # differently, but they need the same provisional master to mix INTO.
-    assert fs.is_foley_route(policy(character="ltx25_mime"))
-    assert fs.is_foley_route(policy(character="ltx25_high_mime (16:9)"))
+    assert fs.is_foley_route(policy(character="ltx25_native_mime_16gb"))
+    assert fs.is_foley_route(policy(character="ltx25_native_mime_16gb (16:9)"))
     assert fs.route_lane_ids(
-        policy(character="ltx25_high_mime", music="ltx25_high_foley_plus")
-    ) == {"ltx25_mime", "ltx25_foley_plus"}
+        policy(character="ltx25_native_mime_16gb", music="ltx25_native_foley_16gb")
+    ) == {"ltx25_native_mime_16gb", "ltx25_native_foley_16gb"}
     assert fs.route_lane_ids(policy(music="ltx25_video")) == frozenset()
-    # PUBLIC ids and display suffixes resolve too -- a bare == would answer
-    # False for an episode that really is on the route.
-    assert fs.is_foley_route(policy(music="ltx25_high_foley_plus"))
-    assert fs.is_foley_route(policy(music="ltx25_high_foley_plus (16:9)"))
+    # Display suffixes resolve too -- a bare == would answer False for an
+    # episode that really is on the route.
+    assert fs.is_foley_route(policy(music="ltx25_native_foley_16gb (16:9)"))
     assert fs.is_foley_route(policy(music="cloud_ltx25_foley_plus"))
     assert "cloud_ltx25_foley_plus" in fs.GLOBAL_MASTER_GAIN_LANES
     # ANY role, not all: the episode has ONE master WAV, so one foley role puts
     # the whole thing on the route.
     assert fs.is_foley_route(
-        policy(announcer="ltx25_video", music="ltx25_foley_plus",
+        policy(announcer="ltx25_video", music="ltx25_native_foley_16gb",
                character="still_flat"))
     assert not fs.is_foley_route(policy(music="ltx25_video"))
     # Total on garbage: absent policy means the historical path, which is what
@@ -447,7 +446,7 @@ def test_the_route_is_decided_by_ONE_function_for_both_audio_stages():
         assert fs.is_foley_route(junk) is False
 
     # And the mux really uses it, rather than a second copy of the question.
-    assert MUX._foley_route(policy(music="ltx25_foley_plus")) is True
+    assert MUX._foley_route(policy(music="ltx25_native_foley_16gb")) is True
     assert MUX._foley_route(policy(music="ltx25_video")) is False
     assert MUX._foley_route(policy(music="cloud_ltx25_foley_plus")) is True
     assert MUX._foley_route(
@@ -458,7 +457,7 @@ def test_cloud_foley_mixes_at_the_same_gains_as_local(tmp_path):
     """Cloud Foley is the same 0.50/0.50 bed as local, including a saved
     display-suffix engine_id the mux would otherwise refuse."""
     assert (fs.FOLEY_LANE_GAINS["cloud_ltx25_foley_plus"]
-            == fs.FOLEY_LANE_GAINS["ltx25_foley_plus"]
+            == fs.FOLEY_LANE_GAINS["ltx25_native_foley_16gb"]
             == (0.50, 0.50))
     master = np.full((2, 100 * STEP), 0.5, dtype=np.float32)
     bed = _stem(tmp_path, "bed.wav", 100, 0.25)
@@ -472,7 +471,7 @@ def test_cloud_foley_mixes_at_the_same_gains_as_local(tmp_path):
         [_row(bed, 0.0, 100, engine="cloud_ltx25_foley_plus (16:9)")],
         fps=FPS)
     assert sl["global_master_gain"] == sc["global_master_gain"] == 0.50
-    assert sl["lanes"] == {"ltx25_foley_plus": 1}
+    assert sl["lanes"] == {"ltx25_native_foley_16gb": 1}
     assert sc["lanes"] == {"cloud_ltx25_foley_plus": 1}
     assert np.allclose(local, cloud)
     assert np.allclose(local, labelled)

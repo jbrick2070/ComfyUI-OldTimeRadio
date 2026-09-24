@@ -4,8 +4,6 @@ import importlib.util
 import hashlib
 from pathlib import Path
 import subprocess
-import sys
-import types
 
 import pytest
 
@@ -61,7 +59,7 @@ def test_runpod_manual_recipes_carry_every_authoritative_manifest():
         encoding="utf-8"
     )
     assert set(provision.MANUAL_TIERS) == {
-        "ltx25", "humo_1_7b",
+        "humo_1_7b",
     }
     for tier_id, artifacts in provision.MANUAL_TIERS.items():
         assert artifacts, f"manual tier {tier_id} has no artifacts"
@@ -114,19 +112,6 @@ def test_gguf_patch_applies_to_exact_normalized_preimage(tmp_path, monkeypatch, 
     assert provision._git_changed_paths(str(dest)) == ["loader.py"]
     assert provision._git_untracked_paths(str(dest)) == []
     assert installed == [(provision.GGUF_PACK_NAME, True)]
-
-    # The runtime gate must recognize the exact source the provisioner just
-    # produced, not a hand-built approximation or guessed install path.
-    from nodes._otr_video_engines import eng_ltx25
-    module_name = "_otr_provisioned_gguf_fixture"
-    registered_module = types.ModuleType(module_name)
-    registered_module.__file__ = str(dest / "nodes.py")
-    monkeypatch.setitem(sys.modules, module_name, registered_module)
-    registered_cls = type(
-        "CLIPLoaderGGUF", (), {"__module__": module_name})
-    loader_path, gaps = eng_ltx25._inspect_ltx25_gguf_patch(registered_cls)
-    assert loader_path == str((dest / "loader.py").resolve())
-    assert gaps == ()
 
 
 def test_gguf_already_patched_is_idempotent(tmp_path, monkeypatch):

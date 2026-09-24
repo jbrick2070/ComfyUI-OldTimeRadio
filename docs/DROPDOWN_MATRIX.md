@@ -47,8 +47,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `ltx25_foley_plus_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_foley_plus_32gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
@@ -68,9 +66,7 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
-| `ltx25_high_foley_plus` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
-| `ltx25_high_mime` | GATED + manual | 22.2 GiB | fits | **proven** | not offered | ? | not offered |
-| `ltx25_high_video` | GATED + manual | 22.2 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `ltx25_high_video` | manual | 22.7 GiB | measured | measured | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |

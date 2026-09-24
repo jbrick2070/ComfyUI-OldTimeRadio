@@ -610,7 +610,7 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     # They render the LTX 2.5 picture graph, so they compose scene prompts the
     # same way; without them a foley/mime announcer or music open matched no
     # branch at all and shipped build_request's hardcoded radio-studio default.
-    for joint_av in ("ltx25_foley_plus", "ltx25_mime"):
+    for joint_av in ("ltx25_native_foley_16gb", "ltx25_native_mime_16gb"):
         assert joint_av in rd.BOOKEND_SCENE_PROMPT_ENGINES, joint_av
 
     # The retired id is GONE. `wan_ti2v` is still deliberately NOT here: this

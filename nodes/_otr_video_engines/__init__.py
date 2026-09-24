@@ -170,27 +170,14 @@ except Exception:  # noqa: BLE001
     pass
 
 
-# ltx25_video (LTX 2.5 Chunk A, 2026-08-19): the LTX 2.5 Distilled I2V lane,
-# rendered SILENT -- the model's audio latent is computed and dropped at
-# LTXVSeparateAVLatent, exactly as the three sibling LTX/H3 lanes already do.
-# A NORMAL selectable row (requires_flag=None, empty default_roles); it fails
-# CLOSED until the Q3 DiT, the Gemma-4 encoder and BOTH VAEs are on disk.
-#
-# THREE registrations out of eng_ltx25 since 2026-08-26: `ltx25_video`,
-# `ltx25_foley_plus` and `ltx25_mime`. The foley lane is the same graph keeping
-# the audio the silent lane throws away, mixed UNDER the master at
-# OTR_MasterAudioMux -- which runs AFTER video, so the execution-order inversion
-# this comment used to cite as the blocker was never needed for a bed. It was
-# needed for a lane whose audio REPLACES the beat audio, which is `ltx25_mime`.
-#
-# MIME IS HERE. This comment said it was still reserved and out of the menu
-# until 2026-08-27, and that was stale from the day it was written: the operator
-# overrode the deferral mid-build ("foley and mime we need this feature for
-# both"), so mime shipped in the SAME change as foley with a per-window master
-# gain instead of the global 0.80. `LTX25_RESERVED_SIBLING_IDS` is now empty --
-# nothing is reserved. The 2026-08-19 rule it cited still stands on its own
-# terms (a dropdown row that cannot make an episode is worse than a missing
-# one); mime simply is not such a row any more.
+# eng_ltx25: the LTX 2.5 Distilled lanes, all on native safetensors through
+# stock ComfyUI loaders. `ltx25_video` renders SILENT -- the model's audio
+# latent is computed and dropped at LTXVSeparateAVLatent -- on the 16 GB mix4x8
+# DiT. The foley, mime and audio-in tiers are the same graph keeping that audio
+# (mixed UNDER the master at OTR_MasterAudioMux, which runs AFTER video), each
+# on its tier's DiT. Every row is a NORMAL selectable row (requires_flag=None,
+# empty default_roles) that fails CLOSED until its DiT, the Gemma-4 encoder and
+# BOTH VAEs are on disk.
 #
 # Cold-import clean (V-12: torch and every LTX node class are lazy inside
 # load/render_clip). Guarded so a packaging quirk never breaks the namespace

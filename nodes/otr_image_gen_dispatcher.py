@@ -1666,7 +1666,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # VRAM to load into. The ghost lane already releases the writer before its image
     # phase; the general path did not. Freed ONCE per dispatch, right before the first
     # LOCAL render (cloud adapters never touch the local GPU), through the same
-    # canonical call the LTX 2.5 engine and the GGUF backend make in their preflight.
+    # canonical call the LTX 2.5 engine makes in its preflight.
     # Nothing after the image stage requests an LLM slot, so there is no reload cost.
     _residue_freed = False
     pending_cloud = []

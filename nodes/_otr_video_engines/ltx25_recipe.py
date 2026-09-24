@@ -35,13 +35,8 @@ from __future__ import annotations
 # os.path.exists on a hardcoded default, which is the defect G1.1 exists for.
 # ---------------------------------------------------------------------------
 
-#: The DiT. Q3 is LOCKED and it is the SAFE one: the lab measured Q5_K_M
-#: breaching the clamp at 832x480 (15.58 GiB). The Q5 file is on this box under
-#: `C:\ComfyUI-Models\quarantine\` -- quarantined, not a candidate.
-LTX25_DIT_GGUF = "LTX-2.5-Distilled-Q3_K_M.gguf"
-
-#: The text encoder. Gemma-4 12B with the LTX 2.5 projection, Q5 quantised.
-LTX25_TEXT_ENCODER_GGUF = "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf"
+#: The DiT and the text encoder are per-tier and live in eng_ltx25
+#: (``LTX25_NATIVE_*``): the recipe below is the same on every tier.
 
 #: Native BF16 VAEs. The AUDIO vae is DECODED TODAY by the Foley and MIME
 #: lanes (a second decode pass in eng_ltx25; measured cheap in the lab at
@@ -388,62 +383,3 @@ LTX25_PEAK_DECOMPOSITION_GIB = {
 #: Staging is hygiene, not headroom. Pinned as a constant so the claim has one
 #: home and a test can hold the adapter's comments to it.
 LTX25_STAGING_REDUCES_PEAK = False
-
-# ---------------------------------------------------------------------------
-# OUR OWN MEASUREMENT -- the G8 solo smoke, 2026-08-19. THIS is the number that
-# describes this box; everything above describes the lab's.
-# ---------------------------------------------------------------------------
-
-#: WHAT THE G8 SOLO SMOKE ACTUALLY MEASURED, and it does NOT match the lab.
-#:
-#: Two renders on the Sage-free LTX boot, one on the lab's own 832x480 still and
-#: one on a real OTR 1472x832 scene still. Both succeeded (97 frames, 832x480,
-#: silence proved by ffprobe on the emitted file) and both reported the SAME
-#: peak, which is what makes this a measurement rather than a reading:
-#:
-#:   * adapter ``VramPeakProbe`` @0.1 s -- **16152 MiB** on both runs
-#:   * an INDEPENDENT ``nvidia-smi`` sampler @0.5 s -- **15848 MiB**
-#:   * card total on this box -- **16303 MiB**
-#:
-#: The two instruments differ by 304 MiB, which is what a 5x coarser sampler
-#: missing the top of a spike looks like; they corroborate rather than conflict.
-#: Take 16152 as the peak and 15848 as its independent floor.
-#:
-#: **THAT IS 1324 MiB ABOVE THE LAB'S 14.48 GiB AND 1304 MiB OVER THE 14.5 GiB
-#: CLAMP -- roughly 99% of the card.**
-#:
-#: **WHAT THIS NUMBER IS, CORRECTED 2026-08-19 (r4/r5 panel).** This block first
-#: read the 16152 as in-pipeline SAMPLING pressure, on the family precedent that
-#: pipeline peaks exceed isolation probes. That reading is now believed WRONG and
-#: it matters, because it points debugging at the wrong phase.
-#:
-#: The peak is almost certainly the **TEXT ENCODE**, not the sampler. Evidence,
-#: from the canonical leg that OOM'd:
-#:   * the failure is ``node 'neg' (encode)``, a ``CLIPTextEncode`` on the EMPTY
-#:     string -- 13.76 GiB allocated, 1.88 GiB requested, 15.92 GiB limit;
-#:   * the residue-freer logged ``allocated 97 MB ... free=14669`` FIFTEEN
-#:     SECONDS earlier, so the card was nearly empty and the 13.76 GiB was built
-#:     entirely inside that one encode (Gemma-4 12B Q5 moving to GPU plus GGML
-#:     dequant transients);
-#:   * every loader in the graph is innocent: ``CLIPLoaderGGUF`` loads with
-#:     ``initial_device = text_encoder_offload_device()`` (CPU), the audio VAE is
-#:     never executed by ``LTXVEmptyLatentAudio``, and the video VAE's first use
-#:     is ``i2v`` -- which runs AFTER the failing node.
-#:
-#: **AND IT IS A RACE, NOT A CEILING.** In one episode log four encode phases
-#: succeeded and the fifth died under identical preflight state. A solo smoke
-#: that passes at 16152 is one coin-flip that landed, not a qualification --
-#: which is exactly how this lane came to be described as "proven".
-#:
-#: So the lab's 14.48 GiB SAMPLING decomposition above is not contradicted by
-#: this number; the two describe different phases. Do not reconcile them.
-#:
-#: **THIS IS A FINDING, NOT A KNOB** (operator, standing: a wrong value is
-#: reported, never tuned). Nothing here is adjusted in response to it: Q3,
-#: 832x480, 97 frames and the 8-step ladder are unchanged. Do not "fix" this by
-#: lowering the canvas -- and note that the exact-16:9 rung the 2026-07-26 arc
-#: judgment would prefer, 1024x576, is 1.48x these pixels, so this measurement
-#: is evidence FOR the lab's OOM rejection of it rather than against.
-LTX25_OTR_MEASURED_PEAK_MIB = 16152
-LTX25_OTR_MEASURED_PEAK_FLOOR_MIB = 15848
-LTX25_OTR_CARD_TOTAL_MIB = 16303

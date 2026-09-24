@@ -121,7 +121,7 @@ VISUAL_STYLE = {
 #: engine is someone else's job and guessing it would put a wrong-but-plausible
 #: code in a filename, which is worse than the ``unk`` that would announce it.
 VIDEO_LANE = {
-    # Native (non-GGUF) LTX 2.5, 2026-09-22. Without these an episode that
+    # The LTX 2.5 tiers, 2026-09-22. Without these an episode that
     # any of them dominates publishes as "unk" -- the video identity missing
     # from the one artifact the operator actually reads.
     "ltx25_native_foley_16gb": "n16f",
@@ -153,12 +153,6 @@ VIDEO_LANE = {
     "humo_1.7B": "h17",
     "humo_1.7B_169": "h17w",
     "humo_14B_169": "h14w",
-    "ltx25_foley_plus": "l25f",
-    # The Q5 sibling: same lane, less lossy DiT, 24 GB tier.
-    "ltx25_foley_plus_24gb": "l24f",
-    # Same lane, text encoder left on the GPU.
-    "ltx25_foley_plus_32gb": "l32f",
-    "ltx25_mime": "l25m",
     "ltx25_video": "l25v",
     "ltx_8gb": "lx8g",
     "razzle_ltx_8gb": "rlx8",

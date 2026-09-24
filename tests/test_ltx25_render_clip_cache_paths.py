@@ -64,7 +64,7 @@ def eng(tmp_path, monkeypatch):
     """A real engine with every heavy collaborator replaced."""
     engine = eng_ltx25.Ltx25VideoEngine()
 
-    weight = tmp_path / "gemma-encoder.gguf"
+    weight = tmp_path / "gemma-encoder.safetensors"
     weight.write_bytes(b"x" * 4096)
     monkeypatch.setattr(eng_ltx25, "_resolve",
                         lambda folder, name: str(weight))
@@ -97,7 +97,6 @@ def eng(tmp_path, monkeypatch):
     # reach ComfyUI's real NODE_CLASS_MAPPINGS on a CPU box.
     engine._classes = {k: type("N", (), {"FUNCTION": "f", "f": lambda s: None})
                        for k in engine._node_candidates()}
-    monkeypatch.setattr(eng_ltx25, "_cpu_pinned_clip_loader", lambda base: base)
     engine._still = str(still)
     return engine
 
@@ -257,7 +256,7 @@ def test_a_CHANGED_weight_drops_the_stale_entry_before_reloading(
     _render(eng)
     first_clip = eng._encoder_scope["clip"]
 
-    replacement = tmp_path / "gemma-encoder-v2.gguf"
+    replacement = tmp_path / "gemma-encoder-v2.safetensors"
     replacement.write_bytes(b"y" * 8192)
     monkeypatch.setattr(eng_ltx25, "_resolve",
                         lambda folder, name: str(replacement))

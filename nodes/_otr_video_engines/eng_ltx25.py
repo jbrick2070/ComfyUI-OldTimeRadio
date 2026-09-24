@@ -1,70 +1,44 @@
-"""LTX 2.5 Distilled -- the silent video lane, and the foley lane beside it.
+"""LTX 2.5 Distilled -- the silent video lane, and the foley lanes beside it.
 
-ONE graph, two lanes. The beat's own wide scene still drives a 97-frame first
-stage at 832x480, the selected HQ stage doubles that latent and re-anchors the
-same still, and the only picture decode is 1664x960.
+ONE graph, several lanes. The beat's own wide scene still drives a 97-frame
+first stage at 832x480, the selected HQ stage doubles that latent and re-anchors
+the same still, and the only picture decode is 1664x960.
 
-* ``ltx25_video`` (Chunk A, 2026-08-19) DISCARDS the model's audio side at
-  ``LTXVSeparateAVLatent`` -- it never resolves ``LTXVAudioVAEDecode`` at all --
-  so the clip is silent and only ``OTR_MasterAudioMux`` ever adds audio.
-* ``ltx25_foley_plus`` (the foley bed, 2026-08-26) KEEPS it: the audio latent is
-  decoded to a WAV SIDECAR and mixed with the episode master at that same mux,
-  at a fixed 0.50 / 0.50 (operator, 2026-08-29; raised from 0.20 / 0.80). The
-  per-segment mp4s stay silent and prove it; the BEAT clip additionally gains
-  an AAC preview of the same audio at assembly (see the FoleyPlus class
-  docstring), which the silent composite strips -- so the mux remains the only
-  node that puts audio into the EPISODE.
+EVERY LANE HERE LOADS NATIVE SAFETENSORS THROUGH STOCK ComfyUI LOADERS
+(``UNETLoader`` / ``CLIPLoader``). There is no third-party node dependency and no
+gated weight: the DiT and the Gemma-4 12B text encoder come from
+joeygambino/LTX-2.5-Quantized, which serves them anonymously.
 
-THE FOUNDATION ARRIVED, SO THE SEAM DID TOO -- and this docstring used to say
-flatly that there is no hook. It was right to. The operator's construction-site
-ruling was *"you gotta close it until you can reopen the renovations"*, and the
-blocker was real: a lane whose audio REPLACES the beat audio must exist before
-the master freezes, and video renders four topological stages after that freeze
-(``OTR_EpisodeAssembler`` order 12, ``OTR_VideoRenderBatch`` order 16). A bed
-mixed UNDER the master at the mux does not need that inversion at all -- the mux
-runs after video -- which is what dissolved the blocker rather than solving it.
-So there are now exactly two seams, ``_on_graph_result`` and
-``_after_video_graph``, both no-ops on the silent lane, and they are the
-smallest pair that lets the sibling avoid copying either ``_build_graph`` or the
-200-line ``render_clip``.
+* ``ltx25_video`` DISCARDS the model's audio side at ``LTXVSeparateAVLatent`` --
+  it never resolves ``LTXVAudioVAEDecode`` at all -- so the clip is silent and
+  only ``OTR_MasterAudioMux`` ever adds audio. It is the 16 GB silent lane, on
+  the same mix4x8 DiT the 16 GB foley and mime lanes load.
+* The foley lanes KEEP it: the audio latent is decoded to a WAV SIDECAR and mixed
+  with the episode master at that same mux, at a fixed 0.50 / 0.50 (operator,
+  2026-08-29; raised from 0.20 / 0.80). The per-segment mp4s stay silent and
+  prove it; the BEAT clip additionally gains an AAC preview of the same audio at
+  assembly (see the FoleyPlus class docstring), which the silent composite
+  strips -- so the mux remains the only node that puts audio into the EPISODE.
+* The mime lanes are the SAME mechanism at 1.00 / 0.00 (generate-and-discard):
+  a silent performance carrying the video's own score.
 
-``ltx25_mime`` IS REGISTERED AND PUBLIC -- this paragraph said the opposite
-until 2026-08-27 and was wrong from the moment the lane shipped. It is the SAME
-mechanism at 1.00 / 0.00 (generate-and-discard), and the operator overrode the
-spec's deferral mid-build ("foley and mime we need this feature for both"), so
-both lanes landed in ONE change: ``@register class Ltx25MimeEngine`` below,
-public id ``ltx25_high_mime``, and ``LTX25_RESERVED_SIBLING_IDS`` is now empty
-because nothing is reserved any more. Two panel lanes flagged this text
-independently, which is what a stale comment costs: the next integrator reads
-top-down and leaves mime off an allowlist it belongs on. Per lesson L5 these are separate INTERNAL engines, never one id
-with a switch -- two public ids on one internal id collapses
-``_INTERNAL_TO_PUBLIC`` and trips the bijection assert AT IMPORT, which empties
-most of the ComfyUI menu.
+A bed mixed UNDER the master at the mux does not need an execution-order
+inversion -- the mux runs after video -- so there are exactly two seams,
+``_on_graph_result`` and ``_after_video_graph``, both no-ops on the silent lane,
+and they are the smallest pair that lets a sibling avoid copying either
+``_build_graph`` or the 200-line ``render_clip``. Per lesson L5 these are
+separate INTERNAL engines, never one id with a switch -- two public ids on one
+internal id collapses ``_INTERNAL_TO_PUBLIC`` and trips the bijection assert AT
+IMPORT, which empties most of the ComfyUI menu.
 
-THE PUBLIC ID IS ``ltx25_high_video``, AND ``high`` WAS SETTLED BY A RULING
-RATHER THAN BY THE MEASUREMENT THAT WAS PLANNED. The convention is
-``<model><version>_<low|high>_<capability>`` and G7.4 requires the token be
-measured, never guessed -- guessing is what retired ``<vramtier>gb``, since
-``wan_8gb`` really costs 12.5-13.2 GiB and cannot run on an 8 GB card. This
-token was held UNSET for most of a day for exactly that reason, pending a clamp
-test on a 4060. The operator then ruled the 4060 out entirely, which settles the
-name by DELETING the question instead of answering it: the lane is 5080-only, so
-``high`` is precisely what the token means. It also agrees with the only number
-in evidence -- 14.48 GiB against a 14.5 GiB clamp is the most expensive local
-lane in the roster, and ``low`` would have been false in the same direction the
-retired token was false.
-
-WHAT IS STILL UNMEASURED, SO NOTHING READS AS QUALIFIED: this lane has no cost
-row and no envelope key, the evidence manifest records it as admission-unenforced
-in words (G4.1), and it declares no ``compatible_boot_contracts``. The G8 solo
-smoke is what closes those, and it is a SEPARATE receipt from the naming.
+THE PUBLIC ID OF THE SILENT LANE IS ``ltx25_high_video``. The convention is
+``<model><version>_<low|high>_<capability>``.
 
 THE RECIPE IS NOT ON THE TABLE. Every number comes from :mod:`ltx25_recipe`,
 which transcribes the lab's locked graph and is drift-gated against the lab's
-actual file by ``tests/test_ltx25_recipe_matches_lab_golden.py``. Operator,
-standing: *"no chasing vram recipes please... we are running on the Q3, that's
-the safe one."* No Q5, no bigger canvas, no more frames, no CFG tuning. If a
-value here turns out to be wrong that is a finding to REPORT, not a knob to turn.
+actual file by ``tests/test_ltx25_recipe_matches_lab_golden.py``. No bigger
+canvas, no more frames, no CFG tuning. If a value here turns out to be wrong
+that is a finding to REPORT, not a knob to turn.
 
 Cold-import clean (V-12): module scope imports only stdlib plus the dep-free
 shared helpers and the registry. torch and every LTX node class are resolved
@@ -117,29 +91,78 @@ _LOG = logging.getLogger("OTR.eng_ltx25")
 #: copy of them here is exactly how two stages come to disagree about a mix. Cold-import clean --
 #: ``foley_stems`` is stdlib-only at module scope (V-12).
 
-#: EMPTY, AND DELIBERATELY KEPT. Both Chunk B siblings shipped on 2026-08-26 --
-#: ``ltx25_foley_plus`` and ``ltx25_mime`` are registered lanes now, so there is
-#: nothing left to reserve.
-#:
-#: The tuple stays because the CONTRACT it expresses is still live and still
-#: has a test: an id named here is spoken for and must not be registered until
-#: it can actually render an episode. The next LTX 2.5 sibling reserves its name
+#: EMPTY, AND DELIBERATELY KEPT. The tuple expresses a contract that still has
+#: a test: an id named here is spoken for and must not be registered until it
+#: can actually render an episode. The next LTX 2.5 sibling reserves its name
 #: here first. An empty tuple says "nothing is pending", which is a different
 #: and more useful statement than the symbol having been deleted.
-#: The less lossy build of the SAME DiT, for cards with room for it. The
-#: Q3 file every other lane loads is 12.9 GB; this is 18.1 GB, and with the
-#: fixed 4.68 GiB of activations and allocator context, that is a ~21.6 GiB
-#: peak: a 24 GB card. The text encoder and the VAEs are 0.0 at peak
-#: (LTX25_PEAK_DECOMPOSITION_GIB), so the DiT file size IS the tier.
-#: Overridable the same
-#: way the parent's is, so a bigger or smaller build can be tried without a
-#: code change.
-LTX25_DIT_GGUF_24GB = "LTX-2.5-Distilled-Q5_K_M.gguf"
-
-#: Empty again: both 32 GB siblings render, so they are REGISTERED below
-#: rather than held here. The rule is unchanged -- an id sits in this tuple
-#: only while it cannot yet render an episode.
 LTX25_RESERVED_SIBLING_IDS = ()
+
+#: The LTX 2.5 weights, by hardware tier. Sizes and the tier
+#: notes are the PUBLISHER'S OWN, from joeygambino/LTX-2.5-Quantized's
+#: MANIFEST.json, which also carries a sha256 per file:
+#:
+#:   comfy-w4a8      12.52 GB  "16 GB, no custom node"
+#:   comfy-nvfp4     12.50 GB  "Blackwell only"
+#:   comfy-fp8_e4m3fn 21.48 GB "24 GB+, widest GPU support"
+#:   gemma4 w4a8     10.60 GB  text encoder, 4-bit
+#:
+#: They are quantisations of the Lightricks bf16 originals, served ungated
+#: (verified HTTP 206 anonymously) -- the official repo is gated and needs a
+#: token, which is why the mirror is named here.
+#: THE 16 GB WEIGHT WAS CHOSEN BY A FOUR-WAY BAKE-OFF, not by file size.
+#: One RTX 5080 Laptop, one still, one seed, the full two-stage lane with the
+#: decode eviction in place -- the only variable being the DiT:
+#:
+#:   mix4x8-13.8GB   205.3 s   12.86 GB   quant_format "mixed:w4a8+int8"
+#:   w4a8            210.3 s   11.66 GB   quant_format "asym_w4a8_int8"
+#:   nvfp4           250.8 s   12.64 GB   BLACKWELL ONLY -- and the slowest
+#:
+#: mix4x8 IS w4a8 with 386 layers promoted to int8 -- read off the headers,
+#: which carry `quant_mixed_hi_layers: 386` on the one and nothing on the
+#: other. So it is not a speed-versus-precision trade: the same format family,
+#: strictly more precision, and it happened to be fastest too. The 1.2 GB it
+#: costs over w4a8 used to matter because the DiT had to share the card with
+#: the decode; it does not now that `_make_room_for_decode` evicts first.
+LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"
+LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
+#: 24 GB, ANY modern NVIDIA. NOT fp8_e4m3fn, which this lane shipped pointing
+#: at and which DOES NOT EXIST.
+#:
+#: The publisher's own MANIFEST.json still advertises
+#: ``LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors`` at 21.48 GB, noted
+#: "24 GB+, widest GPU support", with a sha256 -- and the repository does not
+#: contain it. A stat returns exists=false and a find for ``*fp8*`` returns
+#: nothing. The lineup was revised (fp8 dropped; int8 and two mix4x8 builds
+#: added) and the manifest was never updated. This lane was built from that
+#: manifest, so it was registered pointing at a file nobody can download.
+#:
+#: int8, AND IT WAS PICKED BY RUNNING IT, not by arithmetic.
+#:
+#: An earlier version of this comment reasoned that int8 "lands near 26.5 GB
+#: and does NOT fit a 24 GB card ... int8 is a 32 GB-class file". That was an
+#: estimate stated as a fact, and the operator rejected it on exactly those
+#: grounds -- "says who, did it crash, did we test on a 24 GB machine". It had
+#: not been run and we had not.
+#:
+#: MEASURED on a rented RTX 4090 (24,564 MiB, Ada, clean box, nothing else on
+#: the card), one 97-frame clip through this lane's own graph:
+#:
+#:      int8         20.03 GB file   peak 23.5 GB   101.3 s   renders
+#:      mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s   renders
+#:
+#: int8 fits with ~0.5 GB to spare and is 40% FASTER, which the static model
+#: got backwards in both direction and magnitude -- ComfyUI sizes residency
+#: against the card it finds, so weights-plus-activations arithmetic
+#: systematically over-predicts. The foley decodes and muxes (3.88 s, 48 kHz
+#: stereo AAC) and the operator judged the result good.
+#:
+#: It is also the PORTABLE choice, which decides the tier on its own: nvfp4 is
+#: Blackwell-only, while INT8 tensor cores have shipped since Turing, so this
+#: one file serves Ada, Ampere and Blackwell alike. And at 8 bits against
+#: nvfp4's 4 it is the higher-precision weight -- the size IS the precision.
+LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-int8.safetensors"
+LTX25_NATIVE_TEXT_ENCODER = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
 
 # ---------------------------------------------------------------------------
 # Weight resolution (G1). Every artifact resolves through ComfyUI's
@@ -158,196 +181,6 @@ _FLOOR_TEXT_ENCODER = 4 * _GiB
 _FLOOR_VIDEO_VAE = int(0.5 * _GiB)
 _FLOOR_AUDIO_VAE = int(0.1 * _GiB)
 _FLOOR_UPSCALER = int(0.5 * _GiB)
-
-# These three raw LTXV parameters bypass ComfyUI-GGUF's normal GGMLOps
-# materialization. The supported patch decodes their BF16 byte storage in the
-# loader itself; merely recognizing ``gemma4`` is not enough.
-_LTX25_GGUF_RAW_BF16 = frozenset({
-    "audio_embeddings_connector.learnable_registers",
-    "keyframes_abs_pos_embedding",
-    "video_embeddings_connector.learnable_registers",
-})
-
-
-def _inspect_ltx25_gguf_patch(loader_cls):
-    """Return ``(loader_path, missing_facts)`` for the registered GGUF pack.
-
-    The installed class owns provenance. We inspect its sibling ``loader.py``
-    semantically with the stdlib AST, so CRLF, whitespace, and a package name
-    containing a hyphen cannot turn this into a guessed-path or byte-hash
-    check. GGUF and torch remain unimported at module scope.
-    """
-    import ast
-
-    module_name = getattr(loader_cls, "__module__", "")
-    module = sys.modules.get(module_name)
-    module_file = getattr(module, "__file__", None)
-    if not module_file:
-        return "", (
-            "registered CLIPLoaderGGUF module %r has no readable __file__"
-            % module_name,
-        )
-
-    loader_path = os.path.realpath(os.path.join(
-        os.path.dirname(os.path.realpath(module_file)), "loader.py"))
-    try:
-        with open(loader_path, "r", encoding="utf-8-sig") as handle:
-            tree = ast.parse(handle.read(), filename=loader_path)
-    except (OSError, UnicodeError, SyntaxError) as exc:
-        return loader_path, (
-            "cannot parse sibling loader.py: %s: %s"
-            % (type(exc).__name__, exc),
-        )
-
-    def literal_string_set(name):
-        for statement in tree.body:
-            value = None
-            if isinstance(statement, ast.Assign):
-                if any(isinstance(target, ast.Name) and target.id == name
-                       for target in statement.targets):
-                    value = statement.value
-            elif (isinstance(statement, ast.AnnAssign)
-                  and isinstance(statement.target, ast.Name)
-                  and statement.target.id == name):
-                value = statement.value
-            if value is None:
-                continue
-            try:
-                result = ast.literal_eval(value)
-            except (ValueError, TypeError):
-                return None
-            if not isinstance(result, (set, frozenset, list, tuple)):
-                return None
-            if not all(isinstance(item, str) for item in result):
-                return None
-            return set(result)
-        return None
-
-    expected_branch = ast.parse(
-        "if tensor.tensor_type == gguf.GGMLQuantizationType.BF16 and "
-        "(len(shape) <= 1 or (arch_str == 'ltxv' and "
-        "tensor_name in LTXV_BF16_PARAMETERS)):\n"
-        "    state_dict[sd_key] = dequantize_tensor("
-        "state_dict[sd_key], dtype=torch.float32)\n"
-    ).body[0]
-    loader_fn = next(
-        (node for node in tree.body
-         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-         and node.name == "gguf_sd_loader"),
-        None,
-    )
-    dump = lambda node: ast.dump(node, include_attributes=False)
-    branch_ok = bool(loader_fn) and any(
-        isinstance(node, ast.If)
-        and dump(node.test) == dump(expected_branch.test)
-        and any(dump(statement) == dump(expected_branch.body[0])
-                for statement in node.body)
-        for node in ast.walk(loader_fn)
-    )
-
-    missing = []
-    text_arches = literal_string_set("TXT_ARCH_LIST")
-    if not text_arches or "gemma4" not in text_arches:
-        missing.append("TXT_ARCH_LIST lacks gemma4")
-
-    raw_names = literal_string_set("LTXV_BF16_PARAMETERS")
-    absent_names = sorted(_LTX25_GGUF_RAW_BF16 - (raw_names or set()))
-    if absent_names:
-        missing.append("LTXV_BF16_PARAMETERS lacks %s" %
-                       ", ".join(absent_names))
-
-    if not branch_ok:
-        missing.append(
-            "gguf_sd_loader lacks the complete LTXV BF16 materialization branch")
-    return loader_path, tuple(missing)
-
-
-class CpuPinnedEncoderPlacementError(RuntimeError):
-    """The text encoder did not end up on the CPU. FAIL LOUD, before any forward.
-
-    A RuntimeError rather than ``EngineUnusable``: the engine and the weights
-    are both fine. What is wrong is WHERE the encoder landed, and the cost of
-    not noticing is a random OOM twenty minutes into an episode rather than a
-    named refusal in the first second.
-    """
-
-    reason_code = "encoder_not_on_cpu"
-
-
-def _cpu_pinned_clip_loader(base_cls):
-    """Build a ``CLIPLoaderGGUF`` subclass that keeps the text encoder on CPU.
-
-    WHY THIS EXISTS -- the whole reason this lane crashed. A GPU-side encode of
-    the Gemma-4 12B Q5 GGUF transiently demands ~15.6 GiB: the quantised
-    weights move to the card and GGML dequant scratch lands on top. Against a
-    15.92 GiB limit with 1.5-2.2 GiB of Windows baseline, that is a COIN FLIP
-    per shot, and on the 2026-08-19 canonical leg four encodes won it and the
-    fifth did not (``node 'neg' (encode) raised OutOfMemoryError``).
-
-    MEASURED ON THIS BOX, not argued: pinning to CPU takes the encode's VRAM
-    cost from **~13,760 MB to ~0 MB**, at 26.6 s for the empty negative and
-    27.5 s for the positive. It does not mitigate the spike; it deletes it.
-
-    ``initial_device`` ALONE IS NOT ENOUGH, and that trap is why this is a
-    subclass rather than a one-line option. The stock loader already passes
-    ``initial_device = text_encoder_offload_device()``, which is why the
-    driver's first three diagnoses wrongly concluded the encoder was "already
-    on CPU" -- that key governs INITIAL placement only, and ``load_models_gpu``
-    still pulls the patcher to ``patcher.load_device`` when the encode runs.
-    Pinning requires ``load_device`` and ``offload_device`` too. ComfyUI's own
-    LTX loader uses exactly that pair.
-
-    Built DYNAMICALLY from the installed class rather than imported: the pack
-    directory is ``ComfyUI-GGUF``, whose hyphen makes it un-importable by name,
-    and subclassing whatever ``NODE_CLASS_MAPPINGS`` actually resolved means we
-    inherit the installed version's file handling instead of copying it.
-    """
-    ggml_module = sys.modules.get(base_cls.__module__)
-
-    class _CpuPinnedGgufClipLoader(base_cls):  # type: ignore[misc, valid-type]
-        """The stock loader with one method replaced."""
-
-        def load_patcher(self, clip_paths, clip_type, clip_data):
-            import torch
-            import comfy.sd
-            import folder_paths as _fp
-
-            cpu = torch.device("cpu")
-            clip = comfy.sd.load_text_encoder_state_dicts(
-                clip_type=clip_type,
-                state_dicts=clip_data,
-                model_options={
-                    "custom_operations": ggml_module.GGMLOps,
-                    # ALL THREE. Dropping any one of them silently restores the
-                    # GPU encode and the coin flip with it.
-                    "initial_device": cpu,
-                    "load_device": cpu,
-                    "offload_device": cpu,
-                },
-                embedding_directory=_fp.get_folder_paths("embeddings"),
-            )
-            clip.patcher = ggml_module.GGUFModelPatcher.clone(clip.patcher)
-
-            # FAIL LOUD, HERE, BEFORE THE FIRST FORWARD. A future ComfyUI that
-            # ignores these options must be a named refusal, not a mysterious
-            # OOM on beat 15 of somebody's episode.
-            load_dev = str(getattr(clip.patcher, "load_device", "?"))
-            off_dev = str(getattr(clip.patcher, "offload_device", "?"))
-            if "cpu" not in load_dev or "cpu" not in off_dev:
-                raise CpuPinnedEncoderPlacementError(
-                    "ltx25_video pins the Gemma text encoder to CPU because a "
-                    "GPU encode of this 12B Q5 GGUF transiently needs ~15.6 "
-                    "GiB and OOMs at random -- but the patcher came back with "
-                    "load_device=%s offload_device=%s. Refusing before the "
-                    "forward rather than rolling the dice."
-                    % (load_dev, off_dev))
-            _LOG.info("[ltx25_video] text encoder pinned to CPU "
-                      "(load=%s offload=%s); GPU encode spike avoided",
-                      load_dev, off_dev)
-            return clip
-
-    return _CpuPinnedGgufClipLoader
-
 
 #: Kill switch for the episode-scoped encoder residency below. It is an
 #: opt-OUT flag, so the parse is the MIRROR of the ``voice_cast_mode`` opt-IN
@@ -652,55 +485,44 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: `_weight_paths` are written against.
     #:
     #: IT BELONGS ON THIS CLASS BECAUSE THIS CLASS READS IT. `_build_graph` is
-    #: defined here, so every LTX 2.5 lane reaches the attribute -- and when it
-    #: was first added it sat on `Ltx25NativeFoleyBase` instead, five levels
-    #: down. `ltx25_video`, `ltx25_foley_plus`, `ltx25_mime`,
-    #: `ltx25_foley_plus_24gb` and `ltx25_foley_plus_32gb` do not inherit that
-    #: class, so all five raised AttributeError the moment they built a graph.
-    #: The entire suite passed, because no test builds those graphs -- the
-    #: defect was found by a review lane reading the inheritance, and it is the
-    #: same shape as the 2026-09-07 decorator incident CLAUDE.md records: valid
-    #: syntax, green tests, a working feature destroyed on every platform.
+    #: defined here, so every LTX 2.5 lane reaches the attribute. When it was
+    #: first added it sat on a subclass instead, and every lane that did not
+    #: inherit that subclass raised AttributeError the moment it built a graph
+    #: -- with the entire suite green, because no test built those graphs.
     #: tests/test_ltx25_every_lane_builds_a_graph.py is the guard now.
     _ingraph_upscale = True
 
     # ---- weight tokens (env pins name a FILE, they cannot make one exist) ----
+    #: The DiT this lane loads. Each tier subclass names its own; the base is
+    #: the 16 GB weight, which is what the silent ``ltx25_video`` lane renders.
+    _native_dit = LTX25_NATIVE_DIT_16GB
+
+    #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
+    #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
+    #:
+    #: MEASURED, not chosen by taste. A GPU-side encode of the Gemma-4 12B
+    #: encoder is what tips a 16 GB card, so the 16 GB lanes pin it to CPU. On
+    #: the RTX PRO 4500 a CPU-placed encode held the process at 701% CPU with
+    #: the GPU idle for minutes per beat, so a 24 GB+ lane paying the pin is
+    #: spending minutes to protect headroom it already has.
+    #:
+    #: ``_encoder_cache_expects_cpu`` MUST track this. The cache's liveness
+    #: check tests for CPU placement, so a lane that stops pinning and does
+    #: not say so writes a cache entry it then rejects on every single read
+    #: (the defect found live on 2026-09-21).
+    _native_te_device = "cpu"
+
     #: Whether THIS lane's cache is expected to find its handle on the CPU.
-    #: Read by ``_cached_clip_is_live`` -- default True keeps the liveness
-    #: check's ORIGINAL, unconditional requirement for every lane that has
-    #: always pinned. A lane that overrides ``_wrap_text_encoder`` to decline
-    #: the pin overrides this too, in the SAME change, or its own cache can
-    #: never pass its own liveness check (found live 2026-09-21: every beat
-    #: on ltx25_foley_plus_32gb dropped a cache entry it had just written,
-    #: because the check demanded CPU placement from an encoder that was
-    #: never going to have it).
+    #: Read by ``_cached_clip_is_live``. A lane that sets ``_native_te_device``
+    #: to ``"default"`` sets this False in the SAME change, or its own cache can
+    #: never pass its own liveness check.
     _encoder_cache_expects_cpu = True
 
-    def _wrap_text_encoder(self, base_cls):
-        """Pin the text encoder to CPU. Overridable, default unchanged.
-
-        Extracted 2026-09-21 so a big-card lane can decline the pin
-        without copying ``render_clip``. EVERY EXISTING LANE GETS THE
-        SAME WRAPPER IT ALWAYS DID -- this returns exactly what the
-        inline call returned, so their behaviour cannot move.
-
-        The pin is not a style choice: a GPU-side encode of the
-        Gemma-4 12B Q5 GGUF transiently wants ~13,760 MB, which against
-        a 15.92 GiB card is a coin flip per shot. It costs ~27 s per
-        encode to delete that risk, and on a card with room it is a
-        cost with nothing bought.
-
-        A subclass that overrides this to decline the pin MUST also set
-        ``_encoder_cache_expects_cpu = False`` -- the two describe the same
-        fact from two call sites and neither implies the other.
-        """
-        return _cpu_pinned_clip_loader(base_cls)
-
     def _dit_name(self):
-        return otr_env.get("OTR_LTX25_DIT", R.LTX25_DIT_GGUF)
+        return otr_env.get("OTR_LTX25_NATIVE_DIT", self._native_dit)
 
     def _text_encoder_name(self):
-        return otr_env.get("OTR_LTX25_TEXT_ENCODER", R.LTX25_TEXT_ENCODER_GGUF)
+        return otr_env.get("OTR_LTX25_NATIVE_TE", LTX25_NATIVE_TEXT_ENCODER)
 
     def _video_vae_name(self):
         return otr_env.get("OTR_LTX25_VIDEO_VAE", R.LTX25_VIDEO_VAE)
@@ -724,9 +546,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         at graph time instead of at the gate.
         """
         paths = [
-            ("LTX 2.5 DiT (%s)" % self._weight_family(),
+            ("LTX 2.5 DiT",
              _resolve("unet", self._dit_name()), _FLOOR_DIT),
-            ("Gemma-4 12B text encoder (%s)" % self._weight_family(),
+            ("Gemma-4 12B text encoder",
              _resolve("text_encoders", self._text_encoder_name()),
              _FLOOR_TEXT_ENCODER),
             ("LTX 2.5 video VAE", _resolve("vae", self._video_vae_name()),
@@ -772,12 +594,13 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         return R.LTX25_CANVAS_W, R.LTX25_CANVAS_H
 
     def _quant_label(self):
-        """The quant token from the DiT basename (``Q3_K_M``) for the per-beat
+        """The quantisation, read off the DiT filename, for the per-beat
         observability line and the clip's recipe receipt. Pure."""
-        import re
-        m = re.search(r"(Q\d+(?:_[A-Za-z0-9]+)*|fp8|fp16|bf16|int8)",
-                      os.path.basename(str(self._dit_name())))
-        return m.group(1) if m else ""
+        base = os.path.basename(str(self._dit_name()))
+        for tag in ("nvfp4", "fp8_e4m3fn", "w4a8", "w4a4", "int8", "mix4x8"):
+            if tag in base:
+                return tag
+        return "native"
 
     # ---- the graph spec (classes resolve through wrapper_bridge) ----
     def _node_candidates(self):
@@ -788,8 +611,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         their roles distinct while the resolver verifies each installed class.
         """
         return {
-            "unet": ("UnetLoaderGGUF",),
-            "te": ("CLIPLoaderGGUF",),
+            "unet": ("UNETLoader",),
+            "te": ("CLIPLoader",),
             "videovae": ("VAELoader",),
             "audiovae": ("VAELoader",),
             "pos": ("CLIPTextEncode",),
@@ -819,44 +642,6 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "decode": ("VAEDecodeTiled",),
         }
 
-    def _weight_family(self):
-        """What to call these weights in an operator-facing message.
-
-        The labels were hardcoded "GGUF" and inherited unchanged by the native
-        lanes, so a missing native safetensors reported itself as a missing
-        GGUF file -- a message that sends the reader to the wrong folder.
-        """
-        return "GGUF"
-
-    def _missing_node_remedy(self):
-        """The pack to name when a node class is absent, per family.
-
-        A native lane pointed the operator at ComfyUI-GGUF, which it does not
-        use and whose absence is not its problem -- found by the codex QA lane.
-        The remedy has to come from the lane, because the two families fail for
-        opposite reasons.
-        """
-        return " plus ComfyUI-GGUF for the two GGUF loaders"
-
-    def _inspect_te_loader(self, loader_cls):
-        """Is the resolved text-encoder loader LTX 2.5 compatible?
-
-        A SEAM, not a policy: the GGUF family answers with the ComfyUI-GGUF
-        patch inspection, and a lane loading a different class overrides this
-        to say "nothing to inspect".
-
-        IT IS AN INSTANCE METHOD ON PURPOSE. The first version of the native
-        lane skipped the check by patching this module with unittest.mock
-        inside assert_usable, and the codex QA lane reproduced the failure
-        that makes that unsafe: with overlapping calls the restores unwind out
-        of order (A-enter, B-enter, A-exit, B-exit) and the bypass survives
-        both -- after which a GGUF lane's own check silently passes without
-        running. This repo's render routes run in unguarded daemon threads, so
-        that is a live shape, not a theoretical one. An override mutates
-        nothing shared and cannot leak.
-        """
-        return _inspect_ltx25_gguf_patch(loader_cls)
-
     # ---- usability: fail CLOSED, cheapest refusal first ----
     def assert_usable(self, host_caps, profile, request_template=None):
         """Ordered gate, and the order is the contract.
@@ -877,10 +662,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         from . import wrapper_bridge as _wb
         mapping = _wb.node_class_mappings()
         absent = []
-        resolved = {}
         for logical, candidates in self._node_candidates().items():
             try:
-                resolved[logical] = _wb.resolve_node_class(candidates, mapping)
+                _wb.resolve_node_class(candidates, mapping)
             except Exception:  # noqa: BLE001 - collect every miss
                 absent.append("/".join(candidates))
         if absent:
@@ -888,22 +672,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "%s missing required ComfyUI node class(es): %s -- LTX 2.5 "
                 "needs a ComfyUI carrying comfy_extras/nodes_lt.py + "
-                "nodes_lt_audio.py%s; update and restart"
-                % (self.name, ", ".join(sorted(set(absent))),
-                   self._missing_node_remedy()), kind="video")
-
-        loader_path, patch_gaps = self._inspect_te_loader(resolved["te"])
-        if patch_gaps:
-            patch_path = os.path.realpath(os.path.join(
-                os.path.dirname(__file__), "..", "..", "patches",
-                "ComfyUI-GGUF-ltx25-gemma4.patch"))
-            raise EngineUnusable(
-                self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "%s found CLIPLoaderGGUF, but %r is not LTX 2.5 compatible: "
-                "%s. Stop ComfyUI and apply %r, or rerun the pinned "
-                "provisioner with --packs-only"
-                % (self.name, loader_path, "; ".join(patch_gaps), patch_path),
-                kind="video")
+                "nodes_lt_audio.py. These are STOCK ComfyUI nodes, so update "
+                "ComfyUI itself and restart"
+                % (self.name, ", ".join(sorted(set(absent)))), kind="video")
 
         for label, path, floor in self._weight_paths():
             real = os.path.realpath(path) if path else ""
@@ -942,7 +713,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     def _weight_receipt(self, path):
         """A BOUNDED, stable receipt for one weight file: (basename, size,
         mtime_ns). Deliberately NOT a content hash -- the identity is re-read
-        before every segment, and hashing a 10.7 GiB GGUF per segment would
+        before every segment, and hashing a 13.8 GB DiT per segment would
         cost more than the render it guards. Size plus mtime catches a swapped
         or rebuilt weight, which is the whole question being asked.
 
@@ -962,7 +733,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     # ---- episode-scoped text-encoder residency -------------------------
     #
     # THE PROBLEM, COUNTED ON A LIVE LEG (2026-08-20): 15 shot renders, 13
-    # reads of the 8.86 GiB Gemma-4 12B Q5 GGUF text encoder. A ratio of 1:1 --
+    # reads of the Gemma-4 12B text encoder. A ratio of 1:1 --
     # every shot re-read the whole encoder off disk, ~63 s each, on top of a
     # 54.2 s CPU encode. That wall clock is what decides how many episodes
     # reach ``otr/obs/`` in a night.
@@ -1302,10 +1073,18 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         graph = {
             # --- loaders ---
-            "unet": {"class": "unet",
-                     "inputs": {"unet_name": self._dit_name()}},
+            "unet": {"class": "unet", "inputs": {
+                "unet_name": self._dit_name(),
+                # 'default' lets ComfyUI honour whatever the checkpoint
+                # declares. The quantisation lives IN the file; forcing a
+                # dtype here would fight it.
+                "weight_dtype": "default"}},
             "te": {"class": "te", "inputs": {
-                "clip_name": self._text_encoder_name(), "type": "ltxv"}},
+                "clip_name": self._text_encoder_name(), "type": "ltxv",
+                # Stock CLIPLoader takes a placement widget, so the pin is
+                # an ordinary value. Per tier: small cards pin, big cards
+                # do not.
+                "device": self._native_te_device}},
             "videovae": {"class": "videovae",
                          "inputs": {"vae_name": self._video_vae_name()}},
             "audiovae": {"class": "audiovae",
@@ -1564,15 +1343,6 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         classes = dict(getattr(self, "_classes", None)
                        or _wb.resolve_graph_classes(self._node_candidates()))
-        # SWAP THE TEXT-ENCODER LOADER FOR THE CPU-PINNED SUBCLASS.
-        #
-        # Done HERE, after resolution, deliberately -- the same shape
-        # ``eng_ltx_av`` uses to inject its in-adapter sigmas node. Keeping
-        # ``CLIPLoaderGGUF`` in ``_node_candidates`` means ``assert_usable``
-        # still gates on the real installed class, so a box without
-        # ComfyUI-GGUF fails closed BY NAME at preflight; the resolver never
-        # has to know this subclass exists.
-        classes["te"] = self._wrap_text_encoder(classes["te"])
         image_name = _wb.stage_into_comfy_input(plan["init_image"])
         graph = self._build_graph(plan, image_name, length, width, height)
 
@@ -2273,7 +2043,6 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         }
 
 
-@register
 class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     """LTX 2.5 Distilled, KEEPING the audio the model already computed.
 
@@ -2321,10 +2090,12 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
     source, and ``OTRSilentComposite`` re-encodes every row with ``-an``, so
     the preview track can never reach the episode master -- V-1's real
     guarantee, "only ``OTR_MasterAudioMux`` puts audio into the EPISODE",
-    holds exactly as before. Mime (the same mechanism at 1.00 / 0.00)
-    SHIPPED ALONGSIDE THIS LANE rather than after it -- the operator
-    overrode the deferral mid-build -- so ``Ltx25MimeEngine`` below is
-    registered and public.
+    holds exactly as before. Mime is the same mechanism at 1.00 / 0.00.
+
+    NOT REGISTERED ITSELF. The per-tier subclasses below are the selectable
+    lanes; this class exists so a foley fix lands on every tier at once. Its
+    ``name`` is the family label its log lines and error messages carry until
+    a tier overrides it.
     """
 
     name = "ltx25_foley_plus"
@@ -2420,7 +2191,7 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
         import torch
         if not isinstance(latent, dict):
             raise TypeError(
-                "ltx25_foley_plus expected a LATENT dict from "
+                "the LTX 2.5 foley harvest expected a LATENT dict from "
                 "LTXVSeparateAVLatent slot 1 and got %r. NO GUESS -- decoding "
                 "the wrong object is how a lane ships noise as foley"
                 % (type(latent).__name__,))
@@ -2602,58 +2373,6 @@ class Ltx25FoleyPlusEngine(Ltx25VideoEngine):
         return clip
 
 
-@register
-class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
-    """LTX 2.5 Distilled as a SILENT PERFORMANCE carrying the video's own score.
-
-    THE SAME MECHANISM AS ``ltx25_foley_plus``, WITH ONE CONSTANT CHANGED.
-    Everything this class inherits is the point of it: the same picture, the
-    same harvest of the audio latent, the same second-pass decode, the same
-    durable stem, the same cut in the coverage assembler. What differs is
-    entirely at the mux, in a table -- 1.00 foley / 0.00 master instead of
-    0.50 / 0.50 -- which is why this class body is almost empty and should
-    stay that way.
-
-    THE TTS AND THE MUSIC CUE ARE STILL GENERATED, AND THEN MIXED TO ZERO.
-    That waste is deliberate. Operator, 2026-08-26: *"in the MIME, you are
-    going to ignore whatever generated music. So we're gonna waste some music.
-    I get it. It's not gonna be used. But we'll just render it anyway to make
-    things simpler."* It SUPERSEDES the 2026-08-10 design brief's requirement
-    that a mime lane generate no TTS at all -- and deleting that requirement
-    deletes everything it forced: a new pre-audio owner node
-    (``OTR_MimePlanRender``), an execution-order inversion, and a per-beat
-    ownership ledger. Nothing has to happen before the master freezes, because
-    nothing is being REPLACED. Cost: a few seconds of unheard TTS per mime beat
-    and one unheard cue.
-
-    THE ATTENUATION IS PER-WINDOW, AND THAT IS NOT AN OPTIMISATION. Engines are
-    ROLE-WIDE dropdowns, so ``ltx25_high_mime`` on ``character_video_model``
-    means every character beat of the episode is a silent performance -- while
-    the announcer and music roles still speak, out of the SAME single master
-    WAV. Zeroing that master globally would silence the whole episode. So mime
-    zeroes only its own beats' samples; see ``foley_stems.FOLEY_LANE_GAINS``.
-
-    THE ONE KNOWN EDGE CASE, and it is small. The master is one continuous WAV,
-    so zeroing a beat's window cuts whatever else occupies those samples --
-    including a theme or cue that spans the beat boundary. A cue crossing the
-    seam into a mime beat stops mid-phrase rather than resolving. Equal-power
-    crossfades already exist in the sequencer and a short splice at the window
-    edges is the fix IF it audibly clicks. Polish, and explicitly not required
-    for the first build.
-
-    PER-BEAT mime is still out of scope and still needs the 2026-08-10 node.
-    This lane is role-wide, which is the shape the operator chose.
-    """
-
-    name = "ltx25_mime"
-    engine_version = "1"
-
-    #: SELECTABLE, NEVER A DEFAULT -- and on this lane more emphatically than
-    #: on any other in the roster. Inheriting it would silence every beat of a
-    #: role nobody chose to mute.
-    default_roles = ()
-
-
 # ---------------------------------------------------------------------------
 # THE JOINT-AV POSITIVE FINISHER (2026-08-26)
 # ---------------------------------------------------------------------------
@@ -2681,7 +2400,7 @@ class Ltx25MimeEngine(Ltx25FoleyPlusEngine):
 
 #: The lanes that KEEP the model's own audio. Exact internal ids -- never a
 #: prefix match, because ``ltx25_video`` shares the prefix and must not finish.
-_JOINT_AV_ENGINES = ("ltx25_foley_plus", "ltx25_mime", "cloud_ltx25_foley_plus")
+_JOINT_AV_ENGINES = ("cloud_ltx25_foley_plus",)
 
 #: THE INVARIANT TERMINATOR. Every finished joint-AV positive ends with this
 #: exact clause, and the golden recipes are why it is worded this plainly.
@@ -2851,7 +2570,7 @@ _IDENTITY_SPAN_WORDS = 6
 def identity_leaks_in(positive, *, appearance="", names=()):
     """Names/description fragments that reached a JOINT-AV prompt. Pure.
 
-    THE MODEL SPEAKS WHAT IT READS. On `ltx25_mime` / `ltx25_foley_plus` the
+    THE MODEL SPEAKS WHAT IT READS. On the mime and foley lanes the
     picture and the audio decode from ONE latent, so the positive prompt is
     also an audio script -- proven live 2026-08-28, where a mime beat rendered
     a woman SAYING "Queen of the Fairies" because her `character_description`
@@ -3234,7 +2953,7 @@ def compose_ltx25_video(self, inputs):
 
 
 def compose_ltx25_foley_plus(self, inputs):
-    """``ltx25_foley_plus`` -- the action must be VISIBLY SOUND-PRODUCING.
+    """The foley lanes -- the action must be VISIBLY SOUND-PRODUCING.
 
     **NOT an audio-in lane** (operator, explicitly: *"mime and foley ... do need
     more motion than audio in lanes -- they are not audio in lanes"*). It takes
@@ -3260,7 +2979,7 @@ def compose_ltx25_foley_plus(self, inputs):
 
 
 def compose_ltx25_mime(self, inputs):
-    """``ltx25_mime`` -- BYTE-IDENTICAL to foley. The mux is the difference.
+    """The mime lanes -- BYTE-IDENTICAL to foley. The mux is the difference.
 
     Operator ruling, restated 2026-08-28: *"foley and mime should have the
     same prompting, the only difference is the mux layer setting."* The lanes
@@ -3299,322 +3018,16 @@ def compose_ltx25_mime(self, inputs):
 
 
 # THE EXPLICIT BINDINGS. One entry per class ``__dict__`` -- this is what makes
-# the three lanes independent in the dispatcher's eyes. Do NOT collapse these
+# the lanes independent in the dispatcher's eyes. Do NOT collapse these
 # into a base-class method: that would restore exactly the sharing the operator
 # ruled out, and the dispatcher would stop seeing the children entirely.
 Ltx25VideoEngine.compose_prompt = compose_ltx25_video
 Ltx25FoleyPlusEngine.compose_prompt = compose_ltx25_foley_plus
-Ltx25MimeEngine.compose_prompt = compose_ltx25_mime
-
-
-
-@register
-class Ltx25FoleyPlus24gbEngine(Ltx25FoleyPlusEngine):
-    """``ltx25_foley_plus`` on the Q5_K_M DiT instead of Q3_K_M.
-
-    Everything the parent does, byte for byte -- the same two-stage graph,
-    the same 97-frame rung, the same audio latent kept and mixed at
-    0.50 / 0.50 -- reading the less lossy build of the same model.
-
-    WHY A LANE AND NOT A PROFILE (operator, 2026-09-21). A lane is a value in
-    the video engine dropdown, so it reaches every graph including the
-    canonical: somebody with a big card sees a 32 GB option and turns it on.
-    A profile would have meant another variant JSON to find, and the graphs
-    in this pack are projections of one shape rather than forks.
-
-    THE CARD IS IN THE NAME ON PURPOSE, AND IT IS 24 AND NOT 32.
-    ``LTX25_PEAK_DECOMPOSITION_GIB`` records the text encoder and the VAEs
-    at 0.0 -- both are freed before sampling -- so the peak is the DiT plus
-    a fixed 4.68 GiB of activations and allocator context. Q3 measures
-    14.48 GiB against a 14.5 GiB clamp; Q5 is 18.1 GB on disk, which puts
-    the peak near 21.6 GiB and inside a 24 GB card with room. A 3090 or a
-    4090 runs this, which is a great deal more people than own a 5090.
-    A genuine 32 GB lane would be Q8_0 at 23.6 GB, and is not this one.
-    There is no guard stopping a 16 GB card from selecting it -- this pack
-    does not gate on models, and an OOM is the honest answer -- so the id
-    has to say what it wants.
-    """
-
-    name = "ltx25_foley_plus_24gb"
-    engine_version = "1"
-
-    #: SELECTABLE, NEVER A DEFAULT, for the parent's reason: this lane changes
-    #: the EPISODE MASTER, and acquiring it by inheritance would re-mix an
-    #: episode nobody asked to re-mix.
-    default_roles = ()
-
-    def _dit_name(self):
-        return otr_env.get("OTR_LTX25_DIT_24GB", LTX25_DIT_GGUF_24GB)
-
 
 
 @register
-class Ltx25FoleyPlusFast32gbEngine(Ltx25FoleyPlus24gbEngine):
-    """The 24 GB foley lane with the text encoder left on the GPU.
-
-    Same Q5 weights, same recipe, same mix as ``ltx25_foley_plus_24gb``. The
-    one difference is that this lane does NOT pin the Gemma text encoder to
-    CPU, which its parent does unconditionally and which the adapter measures
-    at 26.6 s for the negative and 27.5 s for the positive -- about a minute
-    per episode spent avoiding a VRAM spike that only a 16 GB card cannot
-    absorb.
-
-    THIS CLASS'S OWN SAFETY CLAIM WAS FALSE, FOUND 2026-09-22 AND NOT YET
-    FIXED. It used to say: the encode transiently wants ~13,760 MB, sampling
-    separately peaks near 21.6 GiB on Q5, the two do not overlap, so the
-    requirement is the LARGER of the two, not their sum. That "do not
-    overlap" fact is borrowed from ``LTX25_PEAK_DECOMPOSITION_GIB``, and that
-    table was measured with the encoder CPU-pinned -- i.e. measured on the
-    PARENT, which always pins. This class exists specifically to decline the
-    pin, so it does not get to inherit a measurement whose premise it opts
-    out of.
-
-    THE REAL MECHANISM, read at the source (render_clip, the ``_harvest``
-    comment above the ``keep`` set, and ``wrapper_bridge.run_graph``'s
-    ``keep |= set(ext)``): on a cache MISS the ``te`` node is IN the graph and
-    IS dropped by ``free_after_use`` once ``pos``/``neg`` consume it, BEFORE
-    sampling starts -- genuinely no overlap, exactly as claimed. On a cache
-    HIT the handle arrives as an ``external_results`` entry instead, and
-    ``run_graph`` adds every external to ``keep``, which ``free_after_use``
-    structurally cannot touch. So on a HIT the ~8.86 GiB resident encoder
-    is held ON THE CARD THROUGH SAMPLING -- overlapping the ~21.6 GiB Q5
-    peak by construction, not the ~21.6 GiB alone the docstring used to
-    promise. That is roughly a 30+ GiB peak on a 32.6 GiB card, with no
-    margin left for anything else resident (a writer LLM's unload is
-    ATTEMPTED at several points but never enforced -- see
-    ``free_otr_pipeline_residue`` and ``unload_llm_if_local_resident``,
-    none of which raise on failure).
-
-    WHY THIS WENT UNNOTICED: a separate bug (``_cached_clip_is_live``
-    hardcoding a CPU-only liveness check, fixed 2026-09-22) meant this
-    lane's cache always failed its own liveness check and was evicted every
-    beat, so a cache HIT -- the only path that creates the overlap -- could
-    never actually be reached. Fixing that bug is what makes this one live.
-
-    STANDING RULING: THIS LANE IS EXCLUDED FROM THE ROTATION AND FROM
-    ANY UNATTENDED PRODUCTION USE until the overlap is closed (most likely
-    by moving the cached encoder off the accelerator around the sampling
-    call specifically, keeping the cache's reload-avoidance benefit while
-    restoring the non-overlap property) or the VRAM accounting is corrected
-    to admit the true peak. See
-    ``test_the_cache_hit_path_holds_the_encoder_through_sampling`` in
-    ``tests/test_ltx25_encoder_cache.py`` for the pinned mechanism.
-
-    THE NAME SAYS 32 AND THE MEASUREMENT MAY SAY 24. Both stages are
-    individually inside a 24 GB card on paper, so the honest floor is
-    probably lower than the name. It is named for the card it is being
-    proven on, and the name moves once a leg reports a real peak -- the
-    24 GB lane was mislabelled 32 GB on exactly this kind of reasoning
-    before the decomposition was read properly.
-
-    NOTHING ELSE IS TOUCHED. Its parent keeps the pin, and so does every
-    other lane in the family: the base class's ``_wrap_text_encoder``
-    returns precisely what the inline call returned before the hook existed.
-    """
-
-    name = "ltx25_foley_plus_32gb"
-    engine_version = "1"
-    default_roles = ()
-    #: Paired with declining the pin below -- see that flag's own docstring
-    #: on the base class for why the two must move together.
-    _encoder_cache_expects_cpu = False
-
-    def _wrap_text_encoder(self, base_cls):
-        # Decline the pin. The spike this avoids is affordable here.
-        return base_cls
-
-
-
-#: Native (non-GGUF) LTX 2.5 weights, by hardware tier. Sizes and the tier
-#: notes are the PUBLISHER'S OWN, from joeygambino/LTX-2.5-Quantized's
-#: MANIFEST.json, which also carries a sha256 per file:
-#:
-#:   comfy-w4a8      12.52 GB  "16 GB, no custom node"
-#:   comfy-nvfp4     12.50 GB  "Blackwell only"
-#:   comfy-fp8_e4m3fn 21.48 GB "24 GB+, widest GPU support"
-#:   gemma4 w4a8     10.60 GB  text encoder, 4-bit
-#:
-#: They are quantisations of the Lightricks bf16 originals, served ungated
-#: (verified HTTP 206 anonymously) -- the official repo is gated and needs a
-#: token, which is why the mirror is named here.
-#: THE 16 GB WEIGHT WAS CHOSEN BY A FOUR-WAY BAKE-OFF, not by file size.
-#: One RTX 5080 Laptop, one still, one seed, the full two-stage lane with the
-#: decode eviction in place -- the only variable being the DiT:
-#:
-#:   mix4x8-13.8GB   205.3 s   12.86 GB   quant_format "mixed:w4a8+int8"
-#:   w4a8            210.3 s   11.66 GB   quant_format "asym_w4a8_int8"
-#:   nvfp4           250.8 s   12.64 GB   BLACKWELL ONLY -- and the slowest
-#:
-#: mix4x8 IS w4a8 with 386 layers promoted to int8 -- read off the headers,
-#: which carry `quant_mixed_hi_layers: 386` on the one and nothing on the
-#: other. So it is not a speed-versus-precision trade: the same format family,
-#: strictly more precision, and it happened to be fastest too. The 1.2 GB it
-#: costs over w4a8 used to matter because the DiT had to share the card with
-#: the decode; it does not now that `_make_room_for_decode` evicts first.
-LTX25_NATIVE_DIT_16GB = "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"
-LTX25_NATIVE_DIT_BLACKWELL = "LTX25-distilled-DiT-comfy-nvfp4.safetensors"
-#: 24 GB, ANY modern NVIDIA. NOT fp8_e4m3fn, which this lane shipped pointing
-#: at and which DOES NOT EXIST.
-#:
-#: The publisher's own MANIFEST.json still advertises
-#: ``LTX25-distilled-DiT-comfy-fp8_e4m3fn.safetensors`` at 21.48 GB, noted
-#: "24 GB+, widest GPU support", with a sha256 -- and the repository does not
-#: contain it. A stat returns exists=false and a find for ``*fp8*`` returns
-#: nothing. The lineup was revised (fp8 dropped; int8 and two mix4x8 builds
-#: added) and the manifest was never updated. This lane was built from that
-#: manifest, so it was registered pointing at a file nobody can download.
-#:
-#: int8, AND IT WAS PICKED BY RUNNING IT, not by arithmetic.
-#:
-#: An earlier version of this comment reasoned that int8 "lands near 26.5 GB
-#: and does NOT fit a 24 GB card ... int8 is a 32 GB-class file". That was an
-#: estimate stated as a fact, and the operator rejected it on exactly those
-#: grounds -- "says who, did it crash, did we test on a 24 GB machine". It had
-#: not been run and we had not.
-#:
-#: MEASURED on a rented RTX 4090 (24,564 MiB, Ada, clean box, nothing else on
-#: the card), one 97-frame clip through this lane's own graph:
-#:
-#:      int8         20.03 GB file   peak 23.5 GB   101.3 s   renders
-#:      mix4x8-17GB  15.84 GB file   peak 23.1 GB   168.7 s   renders
-#:
-#: int8 fits with ~0.5 GB to spare and is 40% FASTER, which the static model
-#: got backwards in both direction and magnitude -- ComfyUI sizes residency
-#: against the card it finds, so weights-plus-activations arithmetic
-#: systematically over-predicts. The foley decodes and muxes (3.88 s, 48 kHz
-#: stereo AAC) and the operator judged the result good.
-#:
-#: It is also the PORTABLE choice, which decides the tier on its own: nvfp4 is
-#: Blackwell-only, while INT8 tensor cores have shipped since Turing, so this
-#: one file serves Ada, Ampere and Blackwell alike. And at 8 bits against
-#: nvfp4's 4 it is the higher-precision weight -- the size IS the precision.
-LTX25_NATIVE_DIT_WIDE = "LTX25-distilled-DiT-comfy-int8.safetensors"
-LTX25_NATIVE_TEXT_ENCODER = "gemma4-12b-ltx25-comfy-w4a8.safetensors"
-
-
-class Ltx25NativeFoleyBase(Ltx25FoleyPlusEngine):
-    """The foley lane on NATIVE safetensors instead of GGUF.
-
-    Everything that makes an episode -- the two-stage recipe, the 97-frame
-    rung, the joint-AV latent, the foley decode and its 0.50/0.50 mix -- is
-    inherited unchanged. What changes is the two LOADER nodes and the files
-    they read.
-
-    NOT REGISTERED ITSELF. It carries no ``name``, so ``@register`` is never
-    applied to it; the per-tier subclasses below are the selectable lanes.
-    This exists so a recipe fix lands on every tier at once.
-
-    THE CPU PIN IS FREE HERE, and that is a real simplification. The GGUF
-    lane needs ``_cpu_pinned_clip_loader`` -- a synthesised subclass -- because
-    ``CLIPLoaderGGUF`` exposes no placement argument. Stock ``CLIPLoader``
-    takes ``device``, so the native lane asks for ``cpu`` as an ordinary widget
-    value and the encoder genuinely lands on the CPU. The cache's liveness
-    check therefore still expects CPU placement, exactly like every pinned
-    lane, so ``_encoder_cache_expects_cpu`` stays True.
-    """
-
-    #: Declared by the tier subclasses. Named here so the base reads complete.
-    _native_dit = None
-
-    #: Where the text encoder runs, as the stock ``CLIPLoader`` device widget
-    #: takes it: ``"cpu"`` or ``"default"`` (the accelerator).
-    #:
-    #: MEASURED, not chosen by taste. On the RTX PRO 4500 a CPU-placed encode
-    #: held the process at 701% CPU with the GPU idle for minutes per beat.
-    #: The pin is a SMALL-CARD survival measure -- a GPU-side encode of the
-    #: Gemma-4 12B encoder is what tips a 16 GB card -- so a 24/32 GB lane
-    #: paying it is spending minutes to protect headroom it already has.
-    #:
-    #: ``_encoder_cache_expects_cpu`` MUST track this. The cache's liveness
-    #: check tests for CPU placement, so a lane that stops pinning and does
-    #: not say so writes a cache entry it then rejects on every single read
-    #: (the defect found live on 2026-09-21).
-    _native_te_device = "cpu"
-
-    def _node_candidates(self):
-        """Stock loaders, everything else inherited.
-
-        ``UNETLoader``/``CLIPLoader`` ship with ComfyUI itself, so this lane
-        has NO third-party node dependency -- which is the operator's stated
-        reason for wanting it. eng_minimax_h3 already proves the pair loads
-        convrot-style safetensors in this stack.
-        """
-        cand = dict(super()._node_candidates())
-        cand["unet"] = ("UNETLoader",)
-        cand["te"] = ("CLIPLoader",)
-        return cand
-
-    def _dit_name(self):
-        return otr_env.get("OTR_LTX25_NATIVE_DIT", self._native_dit)
-
-    def _text_encoder_name(self):
-        return otr_env.get("OTR_LTX25_NATIVE_TE", LTX25_NATIVE_TEXT_ENCODER)
-
-    def _wrap_text_encoder(self, base_cls):
-        """No synthesised subclass -- the stock node takes ``device``.
-
-        Returning the class untouched is not "declining the pin": the pin is
-        requested in the graph instead (``device: "cpu"`` on the ``te`` node),
-        which is the same placement by a cheaper route.
-        """
-        return base_cls
-
-    def _inspect_te_loader(self, loader_cls):
-        """Nothing to inspect: this lane loads stock ``CLIPLoader``.
-
-        The inherited check asks whether the installed ``CLIPLoaderGGUF``
-        carries the LTX-2.5 Gemma-4 patch. This lane never loads that class,
-        so the question is not merely irrelevant -- answering it would refuse a
-        lane whose entire purpose is not needing that pack.
-        """
-        return ("", [])
-
-    def _missing_node_remedy(self):
-        """Stock nodes, so the remedy is ComfyUI itself -- never the GGUF pack."""
-        return (" -- these are STOCK ComfyUI nodes, so update ComfyUI itself; "
-                "this lane deliberately does not use ComfyUI-GGUF")
-
-    def _weight_family(self):
-        return "native safetensors"
-
-    def _quant_label(self):
-        """The quantisation, read off the native filename rather than a GGUF tag.
-
-        The parent greps for ``Q4_K_M``-style tags, which no native file
-        carries; left inherited it would label every native render "".
-        """
-        base = os.path.basename(str(self._dit_name()))
-        for tag in ("nvfp4", "fp8_e4m3fn", "w4a8", "w4a4", "int8", "mix4x8"):
-            if tag in base:
-                return tag
-        return "native"
-
-    def _build_graph(self, plan, image_name, length, width, height):
-        """Inherit the whole graph, then re-point the two loader nodes.
-
-        A full copy would fork the recipe; this way a change to any other node
-        still reaches this lane.
-        """
-        g = super()._build_graph(plan, image_name, length, width, height)
-        g["unet"] = {"class": "unet", "inputs": {
-            "unet_name": self._dit_name(),
-            # 'default' lets ComfyUI honour whatever the checkpoint declares.
-            # The quantisation lives IN the file; forcing a dtype here would
-            # fight it.
-            "weight_dtype": "default"}}
-        g["te"] = {"class": "te", "inputs": {
-            "clip_name": self._text_encoder_name(),
-            "type": "ltxv",
-            # The placement the GGUF lane has to synthesise a subclass for,
-            # asked for here as an ordinary widget value. Per tier: small
-            # cards pin, big cards do not.
-            "device": self._native_te_device}}
-        return g
-
-
-@register
-class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
-    """24 GB AND UP, ANY modern NVIDIA. No Blackwell-only format, no GGUF.
+class Ltx25NativeFoleyWideEngine(Ltx25FoleyPlusEngine):
+    """24 GB AND UP, ANY modern NVIDIA. No Blackwell-only format.
 
     int8 is the weight, and it was chosen by running it rather than by sizing
     it. INT8 tensor cores have shipped since Turing, so this one file serves
@@ -3646,7 +3059,7 @@ class Ltx25NativeFoleyWideEngine(Ltx25NativeFoleyBase):
 
 
 @register
-class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
+class Ltx25NativeFoleyBlackwellEngine(Ltx25FoleyPlusEngine):
     """24/32 GB BLACKWELL. NVFP4, and it is the small one.
 
     12.50 GB against the wide lane's 20.03 -- so Blackwell does not merely
@@ -3691,11 +3104,11 @@ class Ltx25NativeFoleyBlackwellEngine(Ltx25NativeFoleyBase):
 
 
 @register
-class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
+class Ltx25NativeFoley16gbEngine(Ltx25FoleyPlusEngine):
     """16 GB, for the 5080 -- so the native family covers the dev box too.
 
-    w4a8 at 12.52 GB is the publisher's 16 GB pick. The existing GGUF 16 GB
-    lane is NOT touched or replaced by this; it stays exactly as qualified.
+    mix4x8 won the 16 GB bake-off (see ``LTX25_NATIVE_DIT_16GB``). The silent
+    ``ltx25_video`` lane and both 16 GB mime/audio-in lanes load the same file.
     """
 
     name = "ltx25_native_foley_16gb"
@@ -4094,16 +3507,15 @@ class Ltx25NativeAudioIn24gbEngine(Ltx25NativeAudioInMixin,
 class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
     """The 16 GB NATIVE lane as a SILENT PERFORMANCE carrying its own score.
 
-    ``ltx25_native_foley_16gb`` is to this class what ``ltx25_foley_plus`` is
-    to ``ltx25_mime``, and for the same reason the older pair's body is almost
-    empty: the picture, the harvest of the audio latent, the second-pass
+    This class body is almost empty on purpose: the picture, the harvest of
+    the audio latent, the second-pass
     decode, the durable stem and the cut in the coverage assembler are all
     inherited unchanged. What differs is entirely at the mux, in a table --
     1.00 foley / 0.00 master instead of 0.50 / 0.50 -- and that row lives in
     ``foley_stems.FOLEY_LANE_GAINS``, not here.
 
-    THE TTS AND MUSIC ARE STILL GENERATED AND THEN MIXED TO ZERO, exactly as
-    on ``ltx25_mime``. That waste is the operator's own ruling (2026-08-26) and
+    THE TTS AND MUSIC ARE STILL GENERATED AND THEN MIXED TO ZERO. That waste
+    is the operator's own ruling (2026-08-26) and
     it is what lets this class be four lines instead of a new owner node and an
     execution-order inversion.
 
@@ -4118,7 +3530,7 @@ class Ltx25NativeMime16gbEngine(Ltx25NativeFoley16gbEngine):
     engine_version = "1"
 
     #: SELECTABLE, NEVER A DEFAULT -- and here more emphatically than anywhere
-    #: else in the roster, as on ``ltx25_mime``. Inheriting it would mute every
+    #: else in the roster. Inheriting it would mute every
     #: beat of a role nobody chose to mute.
     default_roles = ()
 
@@ -4145,10 +3557,9 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 # `render_driver` dispatches with
 # ``type(engine).__dict__.get("compose_prompt")`` -- deliberately ``__dict__``
 # and not ``hasattr``, so a subclass that merely INHERITS a formatter is
-# treated as having none and falls through to the legacy composer. The three
-# assignments above (Video / FoleyPlus / Mime) therefore covered exactly three
-# ids, while every TIER class -- the GGUF 24/32 GB lanes shipping for weeks,
-# and every native lane added this week -- silently used the legacy path.
+# treated as having none and falls through to the legacy composer. The
+# assignments above therefore covered only the classes they named, while every
+# TIER class silently used the legacy path.
 #
 # WHAT THAT COST, on beats those lanes render: no named sounds, and no
 # ``No speech, no voices.`` terminator, because `finish_joint_av_positive`
@@ -4158,8 +3569,7 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 #
 # This is PBUG-20260923-05's mechanism one level up -- a subclass relationship
 # the author reads as inheritance, against a dispatch that reads only what a
-# class binds itself. Found by a Fable review of the GGUF-rip plan, on lanes
-# nobody was reviewing.
+# class binds itself. Found by a Fable review, on lanes nobody was reviewing.
 #
 # Each tier takes the formatter its PARENT binds, which is the definition of
 # parity: a tier differs by which weight loads, never by how it is prompted.
@@ -4178,9 +3588,7 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 # proven, delicate behaviours a fresh formatter "would have to re-implement and
 # initially got wrong". The native audio-in lanes inherit that reasoning whole.
 # Found by a cursor QA pass on the commit that introduced it.
-for _tier_cls in (Ltx25FoleyPlus24gbEngine,
-                  Ltx25FoleyPlusFast32gbEngine,
-                  Ltx25NativeFoleyWideEngine,
+for _tier_cls in (Ltx25NativeFoleyWideEngine,
                   Ltx25NativeFoleyBlackwellEngine,
                   Ltx25NativeFoley16gbEngine):
     _tier_cls.compose_prompt = compose_ltx25_foley_plus
@@ -4198,8 +3606,6 @@ del _tier_cls
 #: to lanes conditioned on speech; `ltx_audio_in` and `cloud_ltx25_audio_in`
 #: are correctly absent and always were.
 _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
-    "ltx25_foley_plus_24gb",
-    "ltx25_foley_plus_32gb",
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
@@ -4208,7 +3614,7 @@ _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
 )
 
 
-__all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine", "Ltx25MimeEngine",
+__all__ = ["Ltx25VideoEngine", "Ltx25FoleyPlusEngine",
            "LTX25_RESERVED_SIBLING_IDS", "LTX25_FOLEY_RECEIPT_KEYS",
            "LTX25_FOLEY_GAIN", "LTX25_MASTER_GAIN_UNDER_FOLEY",
            "finish_joint_av_positive", "build_joint_av_suffix",

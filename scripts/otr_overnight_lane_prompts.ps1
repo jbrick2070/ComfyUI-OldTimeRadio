@@ -1,7 +1,7 @@
 # OVERNIGHT -- one act per lane, to put the new per-lane prompts on screen.
 #
 # WHY THIS EXISTS. Every video lane now composes its own prompt through the
-# compose_prompt seam, and only ONE of them (ltx25_foley_plus) has actually been
+# compose_prompt seam, and only ONE of them (the LTX 2.5 foley lane) has actually been
 # watched. The rest shipped proven-reachable by log line, which is not the same
 # as proven-good by eye. This queue renders one act on each so there is
 # something in otr/obs/ to judge in the morning.
@@ -28,14 +28,12 @@
 # The harness resets the box itself between legs; do not add external kills.
 param(
     [string[]]$Profiles = @(
-        "otr_ltx25_high_mime",
-        "otr_ltx25_high_foley_plus",
         "otr_ltx25_high_video",
         "otr_w45_minimax_h3_video",
         "otr_w45_minimax_h3_audio_in",
         "otr_16gb_ltx_audio_in"
     ),
-    # 3h. Mime took 1h39m and foley exceeded 2h -- 7200 was sized to the
+    # 3h. A mime leg took 1h39m and foley exceeded 2h -- 7200 was sized to the
     # fastest lane, which is exactly how a watcher under-times a slow one.
     [int]$LegTimeout = 10800,
     # How long the STILL-ALIVE wait loop will trail a timed-out watcher

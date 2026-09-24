@@ -170,17 +170,9 @@ _ENGINES_WITH_A_SESSION = {
     "animatediff15_lightning_video",
     "ltx_8gb",                 # B1b / B2b, 2026-07-27
     "razzle_ltx_8gb",          # 2026-09-17 -- inherits Ltx8gbEngine identity
-    # 2026-09-21 -- inherits Ltx25FoleyPlusEngine identity unchanged;
-    # the Q5 sibling differs only in which DiT file loads, and a beat
-    # session cannot see that.
-    "ltx25_foley_plus_24gb",
-    # 2026-09-21 -- inherits the same identity; it differs only in where
-    # the text encoder runs, which a beat session cannot see.
-    "ltx25_foley_plus_32gb",
-    # 2026-09-22 -- the NATIVE (non-GGUF) tier lanes. They inherit
-    # Ltx25FoleyPlusEngine's identity for the same reason the GGUF siblings
-    # do: a beat session keys on the engine plus its weight receipts, and
-    # these differ only in WHICH loader reads WHICH file. The recipe, the
+    # 2026-09-22 -- the LTX 2.5 tier lanes. They inherit
+    # Ltx25FoleyPlusEngine's identity: a beat session keys on the engine plus
+    # its weight receipts, and these differ only in WHICH file loads. The recipe, the
     # 97-frame rung and the joint-AV latent are the inherited ones.
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
@@ -247,25 +239,6 @@ _ENGINES_WITH_A_SESSION = {
     # even though the lane emits no audio, so a swapped audio VAE correctly
     # opens a new session.
     "ltx25_video",             # 2026-08-19, Chunk A
-    # THE FOLEY LANE, 2026-08-26. It joins by INHERITANCE rather than by
-    # arriving or being repaired -- the first of those in this set. It
-    # subclasses Ltx25VideoEngine and overrides neither `session_identity` nor
-    # `_weight_rows`, so it declares the same four-weight identity its parent
-    # does, and the roster gate admitted it the moment it registered.
-    #
-    # AND THE SHARED IDENTITY IS CORRECT HERE, which is worth stating because
-    # the H3 pair above is the opposite case. Lanes 19 and 20 must never be
-    # mistaken for one session because they load DIFFERENT weights. These two
-    # load exactly the same four artifacts and run exactly the same graph; the
-    # foley lane only keeps an output its parent discards, after the session's
-    # weights are already resolved. Two lanes with identical weights SHOULD
-    # share a session -- that is what the identity is for.
-    "ltx25_foley_plus",        # 2026-08-26, the foley bed
-    # MIME, 2026-08-26. Joins by inheritance for the same reason and with the
-    # same justification as its sibling directly above: identical weights,
-    # identical graph, identical session. All three LTX 2.5 lanes differ only
-    # in what happens to the model's audio AFTER the render.
-    "ltx25_mime",              # 2026-08-26, the mime lane
 }
 
 

@@ -12,9 +12,6 @@ Only receipt-backed rows appear here. **PROVEN** means a full OTR episode publis
 |---|---|---|---|---|
 | `animatediff15_v3_haunted_video` (AnimateDiff haunted video) | **PROVEN** | RTX 4060 Laptop, 8 GB, Ada | full published OTR episodes across five source banks; text-to-video path did not invoke the configured still-image engine | docs/4060_DRILL_LOG.md steps 7-19 |
 | `humo` (HuMo family) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episodes | 32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B, and humo; episode-ledger delivered_engine evidence |
-| `ltx25_high_foley_plus` (LTX 2.5 foley) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episodes | four finished episodes in the five days through 2026-09-01; episode-ledger delivered_engine is ltx25_foley_plus |
-| `ltx25_high_mime` (LTX 2.5 mime) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episodes | three finished episodes in the five days through 2026-09-01; episode-ledger delivered_engine is ltx25_mime |
-| `ltx25_high_video` (LTX 2.5) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episode | signal_lost_feline_visitor_a_space_oddity_20260831_191928; 1 act; 01:26:19; episode ledger records delivered_engine ltx25_video |
 | `ltx_8gb` (LTX 0.9.8 2B local video diffusion) | **PROVEN** | Mac mini M4, 16 GB unified, Apple Silicon (MPS) | full published OTR episodes with real local video diffusion on Metal, including one with all three video roles on LTX; the shipped device_backends row said ["cuda"] and was untested policy, corrected to ["cuda","mps"] by this receipt | otr/obs/ 20260908_012201 (vart/lx8g) and 20260908_030426 (sbke/lx8g); docs/MAC_PORTABILITY_GUIDE.md section 7 carries the install steps and the 16 GB cost |
 | `ltx_8gb` (LTX 0.9.8 2B local video diffusion) | **PROVEN** | RTX 4060 Laptop, 8 GB, Ada | full published OTR episode on 8 GB -- eight clips persisted at 512x288, credits passed, zero tracebacks in the whole log | docs/4060_DRILL_LOG.md -- the_ash_on_the_glass_20260906_170119__anime__ltx_8gb__z_image_turbo__kokoro__original_final.mp4, obs_publish OK, 42,524,256 bytes verified on disk. ADDED 2026-09-12: docs/dropdown_matrix.json had carried ltx_8gb nv8 as proven since the 2026-09-09 harvest while this file had no 8 GB row at all, so the two curated files disagreed. An audit proposed downgrading the verdict; the receipt above is why that would have been wrong, and the gap was here instead. |
 | `ltx_8gb` (LTX-2b 0.9.8 distilled) | **PROVEN** | RTX A4500, 20 GB, Ampere | full published OTR episode | signal_lost_static_whispers_20260901_001028; 1 act; 1925 s; 63.8 s at 1920x1080 |
@@ -118,7 +115,7 @@ Video engines they select: `wan_ti2v`
 
 </details>
 
-## 16 GB+  --  85 experimental profile(s), 43 shipping
+## 16 GB+  --  78 experimental profile(s), 38 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -128,7 +125,7 @@ Video engines they select: `wan_ti2v`
 | `otr_16gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_16gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_g4_fastwan` | fastwan_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_g4_humo` | humo | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_g4_ltx_8gb` | ltx_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
@@ -137,10 +134,7 @@ Video engines they select: `wan_ti2v`
 | `otr_g4_wan_ti2v` | wan_ti2v | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_h3_low_audio_in` | h3_low_audio_in | kokoro | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
 | `otr_h3_low_video` | h3_low_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_ltx25_foley_lumina` | ltx25_high_foley_plus | kokoro | stable_audio_3 | lumina_image | `shipping` | missing exact owner |
-| `otr_ltx25_high_foley_plus` | ltx25_high_foley_plus | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_ltx25_high_mime` | ltx25_high_mime | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_ltx25_high_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_ltx25_high_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
@@ -148,9 +142,7 @@ Video engines they select: `wan_ti2v`
 | `otr_w45_humo_14b_169` | humo_14B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_humo_1_7b` | humo_1.7B | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
 | `otr_w45_humo_1_7b_169` | humo_1.7B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_foley_plus` | ltx25_foley_plus | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_mime` | ltx25_mime | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
+| `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
 | `otr_w45_ltx_video` | ltx_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
@@ -166,9 +158,9 @@ Video engines they select: `wan_ti2v`
 | `otr_w45_viz_green` | viz_green | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>42 draft profile(s) here -- not vouched for</summary>
+<details><summary>40 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_foley_plus`, `ltx25_high_mime`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx25_native_mime_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
+Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx25_native_mime_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
 
 | profile | video | voice |
 |---|---|---|
@@ -186,8 +178,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
 | `otr_rot_h3_lumina` | h3_low_video | indextts2 |
 | `otr_rot_humo_lumina` | humo | indextts2 |
-| `otr_rot_ltx25_foley_fluxgen1` | ltx25_high_foley_plus | indextts2 |
-| `otr_rot_ltx25_mime_lumina` | ltx25_high_mime | indextts2 |
 | `otr_rot_ltx25_video_lumina` | ltx25_high_video | indextts2 |
 | `otr_rot_tts_ann_chatterbox` | ltx25_high_video | indextts2 |
 | `otr_rot_tts_ann_dia` | ltx25_high_video | indextts2 |
@@ -270,7 +260,6 @@ There is currently no separate 24/32 GB machine key or heavy-rental profile. Mor
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: LTX-2b episode with the z_image bf16 image path exercised; not the current Wan tuple. Evidence: ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute.
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: Wan 2.2 TI2V episode; current video family, but the receipt does not certify every other field of the current row. Evidence: wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here.
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX 5080 Laptop 16 GB (Blackwell sm_120) -- 1 episode(s), 2026-09-01. Scope: LTX 2.5 episode; not the current Wan tuple. Evidence: ltx25_high_video, 1 act: episode signal_lost_feline_visitor_a_space_oddity_20260831_191928, Prompt executed in 01:26:19. The episode ledger records delivered_engine ltx25_video. First OTR-published LTX 2.5 episode.
 
 ## Measured peaks, with their conditions
 
@@ -279,7 +268,6 @@ A VRAM number without its conditions is how somebody buys the wrong card.
 | engine | conditions | measured |
 |---|---|---|
 | `animatediff15_v3_haunted_video` | 1 act, 8 clips, 24 GB rented card | 2058 s, peak 15,990 MB, published |
-| `ltx25_high_video` | RTX 5080 Laptop 16 GB | peak 14.48 GiB; published 1-act episode in 01:26:19 |
 | `humo` | RTX 5080, 832x480x97 | 13.06 GiB VRAM / 27.53 GiB host RAM; published episode family |
 | `minimax_h3_video` | RTX 5080, legal 124-model / 129-canvas frames | 6,315 MB FL2VA / 6,678 MB REF2VA absolute VRAM; host RAM not captured |
 
@@ -302,8 +290,6 @@ The honest use of these numbers is COMPARATIVE -- which lane is heavier than whi
 * scifi_news_pro on a rented pod: the RSS bank works, and two wrong diagnoses were recorded here before the right one. It is NOT datacenter IP blocking -- with a real User-Agent, sciencedaily/BBC/MIT all return 200 from the pod and only cosmosmagazine 403s. It is NOT partial feed failure either; the fetcher already skips a refusing feed. The cause was `feedparser` missing from ComfyUI's own venv, declared in requirements.txt and pyproject.toml but installed by the provisioner into the SYSTEM python. Same root as the `accelerate` failure. Fixed in scripts/otr_pod_provision.sh.
 
 * voice_bank must match the voice engine: kokoro accepts only 'kokoro_builtin'. Setting 'default' with char_voice=kokoro raises VoiceCastingError at OTR_CastLock, 12 minutes into a leg. Found by running it, 2026-08-31.
-
-* ltx25_high_video is PROVEN on the RTX 5080 only, and is a RunPod lab candidate everywhere else -- not proven. Its gemma4-12b encoder is rejected by stock ComfyUI-GGUF ('Unexpected text model architecture type in GGUF file: gemma4'); the provisioner now pins that pack and applies OTR's public in-repo, hash-verified loader patch. On a rented A4500 it cleared the loader and was then SIGKILLed at the container's 57.7 GiB cgroup limit during the two-stage decode at 1664x960. It is promoted for a second machine only when that exact tuple publishes an episode.
 
 * humo is PROVEN on the RTX 5080 (32 published episodes across humo_14B_169, humo_1.7B_169, humo_1.7B and humo) and is a RunPod lab candidate elsewhere. Every node class resolves on a rented pod with no patching, and the public `humo` fetch lane now owns all five 14B files (26.7356 GiB) with pinned revisions, sizes, SHA-256 values, and atomic `.part` handling. Only the remote canonical receipt remains.
 
