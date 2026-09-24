@@ -374,49 +374,10 @@ def test_the_new_receipt_fields_are_skipped_when_empty():
     assert led["lines"][0]["sample_rate"] == 24000
 
 
-def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(tmp_path):
-    """The count alone cannot answer 'did the qualified route's own receipt
-    land?'. Without the id set, an unrelated line's failed stamp would throw
-    away good, fully evidenced route audio."""
-    from nodes._otr_voice_node_common import _persist_ledger_stamps
-
-    ledger_path = tmp_path / "ledger.json"
-    ledger_path.write_text(json.dumps(
-        {"lines": [{"line_id": "L1", "text": "hi"}]}), encoding="utf-8")
-    meta = {"paths": {"ledger_path": str(ledger_path)}}
-
-    failed = set()
-    degraded = _persist_ledger_stamps(
-        meta,
-        [("L1", {"tts_engine": "indextts2"}),
-         ("L_NOT_IN_LEDGER", {"tts_engine": "indextts2"})],
-        __import__("logging").getLogger("test"),
-        failed_line_ids=failed,
-    )
-    assert degraded == 1
-    assert failed == {"L_NOT_IN_LEDGER"}, (
-        "the good line must not be blamed for the bad one")
 
 
-def test_a_missing_ledger_path_blames_every_stamp(tmp_path):
-    from nodes._otr_voice_node_common import _persist_ledger_stamps
-
-    failed = set()
-    degraded = _persist_ledger_stamps(
-        {"paths": {}}, [("L1", {"tts_engine": "bark"})],
-        __import__("logging").getLogger("test"), failed_line_ids=failed)
-    assert degraded == 1
-    assert failed == {"L1"}
 
 
-def test_the_flush_still_works_without_the_new_argument(tmp_path):
-    """Three positional args is the existing call shape, including a spy in
-    tests/test_audio_cache_wiring.py."""
-    from nodes._otr_voice_node_common import _persist_ledger_stamps
-
-    assert _persist_ledger_stamps(
-        {"paths": {}}, [("L1", {"tts_engine": "bark"})],
-        __import__("logging").getLogger("test")) == 1
 
 
 def test_voice_route_id_is_in_the_null_shape_audit_vocabulary():

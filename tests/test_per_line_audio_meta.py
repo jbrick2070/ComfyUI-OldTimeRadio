@@ -19,6 +19,8 @@ Acceptance gates:
 """
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -166,3 +168,86 @@ class TestStampPerLineAudioMeta:
             {}, "l001", tts_engine="bark",
         )
         assert ok is False
+
+
+# ---------------------------------------------------------------------------
+# PARTIAL-STAMP AND FLUSH-REPORTING COVERAGE, moved here 2026-09-24.
+#
+# These lived in tests/test_voice_route_reference_contract.py, which is slated
+# for deletion with the voice-route subsystem. They are not about routes:
+# `stamp_per_line_audio_meta` and `_persist_ledger_stamps` are shared ledger
+# infrastructure every voice line goes through regardless of engine.
+#
+# Two of them were MIXED and have been split rather than moved whole -- the
+# route-id assertions stayed behind to die with their field, the sample-rate and
+# engine assertions came here. Moving a mixed test whole would have carried a
+# dying field into a surviving file.
+# ---------------------------------------------------------------------------
+
+def test_the_flush_reports_WHICH_lines_failed_not_just_how_many(tmp_path):
+    """The count alone cannot answer WHICH line failed to stamp.
+
+    Without the id set, one unrelated line's failed stamp makes the caller
+    discard good rendered audio for every other line in the batch."""
+    from nodes._otr_voice_node_common import _persist_ledger_stamps
+
+    ledger_path = tmp_path / "ledger.json"
+    ledger_path.write_text(json.dumps(
+        {"lines": [{"line_id": "L1", "text": "hi"}]}), encoding="utf-8")
+    meta = {"paths": {"ledger_path": str(ledger_path)}}
+
+    failed = set()
+    degraded = _persist_ledger_stamps(
+        meta,
+        [("L1", {"tts_engine": "indextts2"}),
+         ("L_NOT_IN_LEDGER", {"tts_engine": "indextts2"})],
+        __import__("logging").getLogger("test"),
+        failed_line_ids=failed,
+    )
+    assert degraded == 1
+    assert failed == {"L_NOT_IN_LEDGER"}, (
+        "the good line must not be blamed for the bad one")
+
+def test_a_missing_ledger_path_blames_every_stamp(tmp_path):
+    from nodes._otr_voice_node_common import _persist_ledger_stamps
+
+    failed = set()
+    degraded = _persist_ledger_stamps(
+        {"paths": {}}, [("L1", {"tts_engine": "bark"})],
+        __import__("logging").getLogger("test"), failed_line_ids=failed)
+    assert degraded == 1
+    assert failed == {"L1"}
+
+def test_the_flush_still_works_without_the_new_argument(tmp_path):
+    """Three positional args is the existing call shape, including a spy in
+    tests/test_audio_cache_wiring.py."""
+    from nodes._otr_voice_node_common import _persist_ledger_stamps
+
+    assert _persist_ledger_stamps(
+        {"paths": {}}, [("L1", {"tts_engine": "bark"})],
+        __import__("logging").getLogger("test")) == 1
+
+# ---------------------------------------------------------------------------
+# Per-line receipts.
+# ---------------------------------------------------------------------------
+def test_the_stamp_helper_records_the_sample_rate_and_engine():
+    """The route half of this test went with the route subsystem; the sample
+    rate and engine are ordinary per-line receipt fields every lane writes."""
+    from nodes._otr_ledger import stamp_per_line_audio_meta
+
+    led = {"lines": [{"line_id": "L1", "text": "hi"}]}
+    assert stamp_per_line_audio_meta(
+        led, "L1", tts_engine="indextts2", sample_rate=24000)
+    line = led["lines"][0]
+    assert line["sample_rate"] == 24000
+    assert line["tts_engine"] == "indextts2"
+
+def test_the_new_receipt_fields_are_skipped_when_empty():
+    """Skip-when-empty, like every field beside them: a later role must not be
+    able to blank a receipt an earlier one wrote."""
+    from nodes._otr_ledger import stamp_per_line_audio_meta
+
+    led = {"lines": [{"line_id": "L1", "text": "hi", "sample_rate": 24000}]}
+    stamp_per_line_audio_meta(led, "L1", tts_engine="bark")
+    assert led["lines"][0]["sample_rate"] == 24000
+    assert led["lines"][0]["tts_engine"] == "bark"
