@@ -194,6 +194,37 @@ LTX25_STAGE2_DECODE_TEMPORAL_OVERLAP = 16
 #: 100%-utilisation, low-memory-controller, low-wattage signature that reads
 #: like thrashing and is actually a card waiting on transfers over PCIe.
 #:
+#: THE STALL SIGNATURE, MEASURED ON TWO CARDS, and the reason a wattage
+#: threshold cannot be the detector:
+#:
+#:     4060 (90 W cap)   working 60-79 W    stalled 32.6 and 33.4 W  (~36% cap)
+#:     5080 laptop       working unmeasured stalled ~60 W  (operator's eye)
+#:
+#: A threshold tuned on the 4060 never fires on the 5080; one tuned on the 5080
+#: fires constantly on the 4060. What transfers is the RATIO to that card's own
+#: working baseline -- roughly a third of `power.max_limit`, or about half of
+#: what the same card draws doing real work in the same run. The sampler stage
+#: earlier in the same leg is a free per-run reference: it is unambiguously
+#: doing work, so its mean draw is that card's healthy figure on that day, at
+#: that clock, in that thermal envelope.
+#:
+#: BUT POWER IS THE HUMAN'S INSTRUMENT, NOT A WATCHDOG'S. The portable half of
+#: the pair is `utilization.memory`: 0% memory-controller while
+#: `utilization.gpu` reads 100%, against 55-65% in healthy phases. That ratio
+#: has no TDP dependence at all, so it needs no per-card calibration. Power is
+#: what lets a person spot a stall in one glance; an idle memory controller
+#: under pinned utilisation is what code can trust.
+#:
+#: AND `torch.cuda.memory_reserved() > mem_get_info()[1]` CANNOT BE THE ONLY
+#: CONDITION. It is definitive where it applies, but a 151-sample 4060 stall on
+#: 2026-09-23 never tripped it -- reserved stayed under physical throughout,
+#: with global sysmem fallback confirmed off and the CUDA context created after
+#: the change. A detector built on that check alone would have missed the one
+#: stall anybody has actually traced.
+#:
+#: The 4060 owns this watchdog: it is the portability surface and the only card
+#: here that reproduces the stall on demand.
+#:
 #: COMFYUI IS NOT THE ONE STREAMING IT -- corrected 2026-09-23. This paragraph
 #: said "ComfyUI streams the decode over PCIe", and that is wrong. The LTX
 #: diffusion-VAE branch in `comfy/sd.py` sets ``disable_offload = True``, which
