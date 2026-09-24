@@ -33,7 +33,6 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from . import _otr_voice_route as _ROUTE
 from ._otr_shared import device_options as _DEVOPTS
 
 try:
@@ -73,22 +72,6 @@ def _require_language_engines(meta, char_engine, announcer_engine) -> str:
     return iso
 
 
-def _lemmy_voice_policy():
-    """The character voice policy, or ``{}`` if the pack cannot be imported.
-
-    Fail-SOFT here and fail-CLOSED downstream: an unreadable policy yields no
-    approved routes, so nothing is selected and casting proceeds exactly as it
-    did before this path existed. The strictness lives where a route is actually
-    claimed -- refusing to import is not the place to break a render.
-    """
-    try:
-        from ..config import cast_pools as _POOLS  # type: ignore
-    except ImportError:
-        try:
-            from config import cast_pools as _POOLS  # type: ignore
-        except ImportError:
-            return {}
-    return getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
 
 # Leftover ``lock(voice_bank=...)`` kwargs still exist for old callers.
 # The bank is not a CastLock widget; ``_bank_following_engine`` derives it
@@ -111,23 +94,6 @@ _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 _DEFAULT_CHAR_ENGINE = "kokoro"
 
 
-@dataclass(frozen=True)
-class _RouteClaims:
-    """What the two voice-route tiers decided for this lock.
-
-    ``qualified`` is a ``PolicyRouteClaim`` or None -- proved, brutal, unchanged.
-    ``provisional`` is a ``ProvisionalPolicyClaim``, a
-    ``ProvisionalRouteDegradation`` carrying a closed reason code, or None when
-    the tier was never consulted (because a qualified route won, or because both
-    tiers are dormant).
-
-    Two separate fields rather than one polymorphic claim, deliberately: the two
-    tiers have different shapes, different failure behaviour, and only one of them
-    may ever be handed to the code that stamps ``voice_route``.
-    """
-
-    qualified: object = None
-    provisional: object = None
 
 
 #: Cast-row fields cleared before the claimed row is re-stamped at a DIFFERENT
@@ -149,19 +115,48 @@ class _RouteClaims:
 #: on it surviving: the frozen row keeps the writer-stage Bark preset while
 #: delivery resolves the qualified IndexTTS2 route. Clearing it here would delete
 #: a fact this module does not own.
-_TIER_SWITCH_CLEARED_FIELDS = (
+_STALE_IDENTITY_FIELDS = (
     "voice_route",
     "voice_ref_path",
     "ref_path",
     "provider_voice_id",
-    _ROUTE.CAST_ROW_TIER_FIELD,
-    _ROUTE.CAST_ROW_ROUTE_ID_FIELD,
-    _ROUTE.CAST_ROW_REASON_FIELD,
+    # THE THREE RETIRED ROUTE FIELDS, kept as LITERALS and kept on this list on
+    # purpose. Nothing writes them any more, but a ledger locked before
+    # 2026-09-24 still carries them, and a row re-cast today should shed them
+    # rather than keep a tier claim about a system that no longer exists. They
+    # are spelled out rather than imported because the module that defined them
+    # is gone; this is not a migration of finished episodes on disk, only a
+    # clear on a row this lock is re-stamping anyway.
+    "lemmy_route_tier",
+    "lemmy_route_id",
+    "lemmy_route_reason_code",
 )
 
 
-def _normalize_row_for_tier_switch(entry: dict) -> list:
-    """Clear stale policy-owned and engine-specific identity from ONE cast row.
+def _recurring_character_key(entry) -> str:
+    """The recurring-character key for this row, or "" -- import-safe.
+
+    Wrapped so cast_lock keeps its cold-import discipline and so a flat-import
+    test harness that cannot see `config` degrades to "ordinary row" instead of
+    raising inside casting.
+    """
+    try:
+        from config.cast_pools import recurring_character_key
+    except ImportError:  # pragma: no cover -- flat-import harnesses
+        try:
+            from cast_pools import recurring_character_key  # type: ignore
+        except ImportError:
+            return ""
+    return recurring_character_key(entry)
+
+
+def _clear_stale_voice_identity(entry: dict) -> list:
+    """Clear stale engine-specific identity from ONE cast row.
+
+    RENAMED 2026-09-24 from `_normalize_row_for_tier_switch`. There are no tiers
+    to switch between any more; what survives, and is the only reason this is
+    still here, is that a row re-cast onto a different engine must not keep one
+    field from the old one.
 
     Transactional in the only sense that matters here: the keys to remove are
     computed first and then removed together, so no caller can observe a row that
@@ -173,26 +168,12 @@ def _normalize_row_for_tier_switch(entry: dict) -> list:
     """
     if not isinstance(entry, dict):
         return []
-    doomed = [f for f in _TIER_SWITCH_CLEARED_FIELDS if f in entry]
+    doomed = [f for f in _STALE_IDENTITY_FIELDS if f in entry]
     for field in doomed:
         entry.pop(field, None)
     return doomed
 
 
-def _stamp_route_tier(entry: dict, tier: str, *, route_id: str = "",
-                      reason_code: str = "") -> None:
-    """Record WHICH TIER decided this row's voice, on the row itself.
-
-    This is the tier's only ledger surface, and it is on the cast row rather than
-    in ``voice_route`` because ``voice_route`` is the qualified tier's word and
-    means something stricter. Every claimed row carries all three fields so a
-    reader never has to tell "unrouted" apart from "the field was never written".
-    """
-    if not isinstance(entry, dict):
-        return
-    entry[_ROUTE.CAST_ROW_TIER_FIELD] = tier
-    entry[_ROUTE.CAST_ROW_ROUTE_ID_FIELD] = route_id
-    entry[_ROUTE.CAST_ROW_REASON_FIELD] = reason_code
 
 
 def _is_announcer_entry(entry: dict) -> bool:
@@ -279,6 +260,69 @@ def _delivered_commercial_clean(entry: dict, ref) -> bool:
         return clip_clean
     return model_clean
 
+
+
+
+def _recurring_character_bank_ref(entry, engine, bank_entries, language):
+    """The bank row a recurring character is delivered with here, or ``None``.
+
+    Returns ``(ref, miss_reason)``. ``ref`` is ``None`` on every miss and
+    ``miss_reason`` is a short string for the report; a miss is ORDINARY, not an
+    error, and the caller falls through to the normal draw.
+
+    THE MATCH IS EXACT AND UNAMBIGUOUS. Exactly one bank row must carry the
+    assigned id on this engine. Zero means the table names something the bank
+    does not ship; more than one means the bank is ambiguous and picking either
+    would be a coin flip that changes with file order. Both refuse.
+
+    LANGUAGE IS CHECKED AFTER THE MATCH, deliberately: "the assigned voice does
+    not speak this episode's language" is a different answer from "the assigned
+    voice does not exist", and collapsing them would hide a broken table behind
+    a language miss.
+
+    No ledger field is written here and no qualification is consulted. The row
+    either takes its assigned voice or takes the ordinary draw.
+    """
+    try:
+        from config.cast_pools import (
+            recurring_character_key, recurring_character_voice)
+    except ImportError:  # pragma: no cover -- flat-import harnesses
+        try:
+            from cast_pools import (  # type: ignore
+                recurring_character_key, recurring_character_voice)
+        except ImportError:
+            return None, "recurring table unavailable"
+
+    character_key = recurring_character_key(entry)
+    if not character_key:
+        return None, ""
+
+    # Imported at call time, like every other voice-bank name in this module:
+    # cast_lock must stay cold-import clean, and the bank pulls in the schema
+    # validator.
+    try:
+        from ._otr_voice_bank import voice_speaks_language
+    except ImportError:  # pragma: no cover -- flat-import harnesses
+        from _otr_voice_bank import voice_speaks_language  # type: ignore
+    if not engine:
+        # A preset-only lock resolved no engine; there is no bank to assign
+        # from. Bark rows reach this and keep the preset path.
+        return None, "no engine resolved"
+
+    voice_ref_id = recurring_character_voice(character_key, engine)
+    if not voice_ref_id:
+        return None, "no %s mapping for %s" % (engine, character_key)
+
+    matches = [e for e in (bank_entries or ())
+               if e.voice_ref_id == voice_ref_id and e.engine == engine]
+    if len(matches) != 1:
+        return None, "%s/%s matched %d bank rows" % (
+            engine, voice_ref_id, len(matches))
+
+    ref = matches[0]
+    if not voice_speaks_language(ref, language):
+        return None, "%s does not speak %s" % (voice_ref_id, language)
+    return ref, ""
 
 class CastLock:
     """Registered as ``OTR_CastLock``. Single v2 ledger authority."""
@@ -470,17 +514,6 @@ class CastLock:
             led, char_bank, ann_bank, char_voice_engine, announcer_voice_engine,
             bank_entries=bank_entries, voice_device=voice_device)
 
-        # STEP 4 (plan 5.2): prove the policy route BEFORE either caster runs, so
-        # a route that cannot prove itself stops the lock instead of losing a
-        # race with the generic selector. Returns None when no policy claims a
-        # row -- which is every render shipping today.
-        # Hand over the bank auto_registry already loaded. preserve_ledger passes
-        # None here by design and the claim path loads its own only if a route is
-        # actually selected -- which keeps the dormant case free of bank I/O.
-        route_claims = self._resolve_route_claims(
-            char_bank, target_engine, bank_entries=bank_entries, cast=cast,
-            bank_unavailable_route_ids=bank_unavailable_route_ids)
-
         if cast_voice_policy == "auto_registry":
             self._auto_registry(
                 led, cast, char_bank, allow_voice_reuse, report,
@@ -490,7 +523,6 @@ class CastLock:
                 bank_entries=bank_entries,
                 target_engine=target_engine,
                 announcer_engine=announcer_engine,
-                route_claims=route_claims,
                 bank_unavailable_route_ids=bank_unavailable_route_ids,
                 ann_bank=ann_bank,
                 language=language_iso)
@@ -499,7 +531,8 @@ class CastLock:
             # Every other row keeps the bytes it arrived with -- that is the
             # mode's whole contract, and an explicit re-pin is not a licence to
             # re-cast the cast.
-            claimed = self._apply_policy_claim(cast, route_claims, report)
+            claimed = self._apply_recurring_character_voices(
+                cast, char_voice_engine, language_iso, report)
             report.append(
                 f"preserve_ledger: {len(cast) - claimed} cast entries preserved "
                 f"(no re-cast)"
@@ -978,15 +1011,12 @@ class CastLock:
                        bank_entries=None,
                        target_engine=None,
                        announcer_engine=None,
-                       route_claims=None,
                        bank_unavailable_route_ids=None,
                        ann_bank=None,
                        language="en"):
         """Re-cast the registry rows.
 
         ``bank_entries`` / ``target_engine`` / ``announcer_engine`` /
-        ``route_claims`` are OPTIONAL pre-resolved values from ``lock``, which
-        now does that work once for both modes (plan 5.2 step 2). They stay
         optional because this method is also called directly, with five
         positional arguments, and must keep resolving its own inputs when it is.
         """
@@ -1057,36 +1087,6 @@ class CastLock:
             target_engine, announcer_engine = self._stamp_voice_engine_selection(
                 led, voice_bank, ann_bank, char_voice_engine, announcer_voice_engine,
                 bank_entries=bank_entries, voice_device=voice_device)
-            if route_claims is None:
-                route_claims = self._resolve_route_claims(
-                    voice_bank, target_engine, bank_entries=bank_entries,
-                    cast=cast,
-                    bank_unavailable_route_ids=bank_unavailable_route_ids)
-        if route_claims is None:
-            route_claims = _RouteClaims()
-        policy_claim = route_claims.qualified
-        provisional = route_claims.provisional
-        provisional_claim = (
-            provisional
-            if isinstance(provisional, _ROUTE.ProvisionalPolicyClaim) else None)
-        # The reason the provisional tier did NOT apply, for the row's ledger
-        # stamp. An empty string when a tier did apply -- the field is always
-        # written on a claimed row, so a reader never has to tell "no reason" from
-        # "never recorded".
-        provisional_reason = (
-            provisional.reason_code
-            if isinstance(provisional, _ROUTE.ProvisionalRouteDegradation) else "")
-        provisional_route_id = (
-            provisional.route_id
-            if isinstance(provisional, _ROUTE.ProvisionalRouteDegradation) else "")
-        # The row this policy claims, resolved ONCE. Empty when both tiers are
-        # dormant, which is what keeps a dormant policy byte-identical to the
-        # behaviour before this tier existed: no match, no stamp, no new field.
-        tier_character_key = ""
-        if policy_claim is not None or provisional is not None:
-            tier_character_key = _ROUTE.policy_character_key(
-                _lemmy_voice_policy() or {})
-
         if target_engine is None:
             report.append(
                 f"auto_registry: voice_bank {voice_bank!r} has no character "
@@ -1151,13 +1151,11 @@ class CastLock:
             the one row this policy claims, so two hundred unrelated rows keep
             their bytes.
             """
-            if (tier_character_key
-                    and not _is_announcer_entry(entry)
-                    and _ROUTE.cast_row_matches_policy(entry, tier_character_key)):
-                cleared = _normalize_row_for_tier_switch(entry)
+            if not _is_announcer_entry(entry) and _recurring_character_key(entry):
+                cleared = _clear_stale_voice_identity(entry)
                 if cleared:
                     report.append(
-                        "  %s: cleared stale route identity before re-stamp (%s)"
+                        "  %s: cleared stale voice identity before re-stamp (%s)"
                         % (entry.get("char_id") or entry.get("name"),
                            ", ".join(cleared)))
             self._stamp(entry, ref, fallback=fallback)
@@ -1215,61 +1213,33 @@ class CastLock:
                     report.append(f"  {char_id or 'ANNOUNCER'}: announcer NOT cast -- {exc}")
                 continue
 
-            # STEP 4/5 (plan 5.2): the EXPLICIT RE-PIN, ahead of both the hybrid
-            # LLM voice-fit and the generic seeded selection. The claim was
-            # already proved in `lock` -- bytes hashed, engine triple agreed,
-            # rights checked -- so all that happens here is the stamp.
+            # THE RECURRING-CHARACTER ASSIGNMENT, after the announcer check and
+            # before the ordinary draw. One table lookup, no tiers, no receipts:
+            # a character named in RECURRING_CHARACTER_VOICES is delivered with
+            # the catalogue voice that table names for this engine, and everyone
+            # else takes the normal seeded selection.
             #
-            # `_mark_used` runs regardless of allow_voice_reuse. The `used` set
-            # only changes other rows' draws when reuse is off, so marking
-            # unconditionally is free there and correct here: a pinned reference
-            # is spoken for either way.
-            if (policy_claim is not None
-                    and _ROUTE.cast_row_matches_policy(
-                        entry, policy_claim.character_key)
-                    and voice_speaks_language(policy_claim.bank_entry, language)):
-                _stamp_row(entry, policy_claim.bank_entry,
-                           fallback="policy_route")
-                entry["voice_route"] = dict(policy_claim.voice_route)
-                _stamp_route_tier(
-                    entry, _ROUTE.ROUTE_TIER_QUALIFIED,
-                    route_id=str(policy_claim.voice_route.get("route_id") or ""))
-                _mark_used(policy_claim.bank_entry)
+            # THE PIN IGNORES THE USED SET, exactly as the branch it replaced
+            # did. ANNOUNCER may already hold `bm_george` -- it is a shared
+            # catalogue row and both may have it. `_mark_used` runs AFTERWARDS so
+            # later ordinary rows still see it as spoken for.
+            _recurring_ref, _recurring_miss = _recurring_character_bank_ref(
+                entry, target_engine, bank_entries, language)
+            if _recurring_ref is not None:
+                _stamp_row(entry, _recurring_ref, fallback="character_voice")
+                _mark_used(_recurring_ref)
                 gated += 0 if _delivered_commercial_clean(
-                    entry, policy_claim.bank_entry) else 1
+                    entry, _recurring_ref) else 1
                 report.append(
-                    f"  {char_id}: {policy_claim.voice_ref_id} "
-                    f"({policy_claim.engine}, QUALIFIED policy route "
-                    f"{policy_claim.voice_route.get('route_id')})"
+                    f"  {char_id}: {_recurring_ref.voice_ref_id} "
+                    f"({_recurring_ref.engine}, recurring character)"
                 )
                 continue
-
-            # THE PROVISIONAL TIER, consulted only when no qualified route
-            # applied. It stamps the ORDINARY bank identity -- exactly what a
-            # normal drawn row carries -- plus the tier fields, and it NEVER
-            # writes `voice_route`: that field means "a qualified route was
-            # proved", and the voice node raises on any non-empty one whose
-            # status is not `qualified`. Writing it here would kill every render
-            # on these engines.
-            if (provisional_claim is not None
-                    and _ROUTE.cast_row_matches_policy(
-                        entry, provisional_claim.character_key)
-                    and voice_speaks_language(
-                        provisional_claim.bank_entry, language)):
-                _stamp_row(entry, provisional_claim.bank_entry,
-                           fallback="provisional_route")
-                _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_PROVISIONAL,
-                                  route_id=provisional_claim.route_id)
-                _mark_used(provisional_claim.bank_entry)
-                gated += 0 if _delivered_commercial_clean(
-                    entry, provisional_claim.bank_entry) else 1
+            if _recurring_miss:
                 report.append(
-                    f"  {char_id}: {provisional_claim.voice_ref_id} "
-                    f"({provisional_claim.engine}, PROVISIONAL route "
-                    f"{provisional_claim.route_id} -- "
-                    f"{provisional_claim.identity_kind}, not auditioned)"
+                    f"  {char_id}: recurring assignment missed "
+                    f"({_recurring_miss}); taking the ordinary draw"
                 )
-                continue
 
             if target_engine is None:
                 continue
@@ -1547,34 +1517,6 @@ class CastLock:
         # fallback, the ordinary draw -- and a field written at only some of them
         # is worse than no field at all.
         #
-        # IT REPORTS ONLY ON ROWS THIS LOCK ACTUALLY RE-CAST, and that condition
-        # is the whole correctness of the field. `unrouted` is the honest name for
-        # "the ordinary seeded draw chose this voice", which is what every
-        # unclaimed row in the tree takes -- but a row the caster never reached
-        # (no character engine in this bank, no available references)
-        # took no draw at all, and stamping `unrouted` on it would assert a
-        # decision that was never made. Such a row keeps exactly what it arrived
-        # with, in both modes, and the absence of the field says so.
-        #
-        # `unrouted` is not an error in production. It IS a sprint failure on an
-        # acceptance leg, which is a different question asked by a different
-        # reader.
-        if tier_character_key:
-            for entry in cast:
-                if (not isinstance(entry, dict) or _is_announcer_entry(entry)
-                        or id(entry) not in stamped_this_lock
-                        or _ROUTE.CAST_ROW_TIER_FIELD in entry
-                        or not _ROUTE.cast_row_matches_policy(
-                            entry, tier_character_key)):
-                    continue
-                _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_UNROUTED,
-                                  route_id=provisional_route_id,
-                                  reason_code=provisional_reason)
-                report.append(
-                    "  %s: no voice route applied -- ordinary draw (%s)"
-                    % (entry.get("char_id") or entry.get("name"),
-                       provisional_reason or "no reason recorded"))
-
         if gated:
             report.append(
                 f"auto_registry: {gated} assigned voice(s) are known-gated "
@@ -1583,282 +1525,95 @@ class CastLock:
             )
 
 
+
     # ------------------------------------------------------------------ #
-    def _resolve_route_claims(self, voice_bank, target_engine,
-                              bank_entries=None, cast=None,
-                              bank_unavailable_route_ids=None) -> _RouteClaims:
-        """Consult both voice-route tiers, in order, for this lock.
+    def _apply_recurring_character_voices(
+            self, cast, engine, language, report) -> int:
+        """Stamp recurring characters' assigned voices in preserve_ledger.
 
-        QUALIFIED FIRST, AND IT IS UNCHANGED. A route that IS selected and cannot
-        prove itself raises ``VoiceRouteError``: casting somebody else's voice
-        because the qualified one failed its own check is precisely the silent
-        substitution this path exists to prevent. A malformed qualified record
-        therefore never "falls through" to the lower tier -- only the absence of a
-        SELECTED qualified route consults it.
+        Returns the number of rows changed.
 
-        PROVISIONAL SECOND, AND IT NEVER RAISES. Everything that can go wrong
-        there comes back as a closed reason code and the row takes the ordinary
-        draw. Killing a render over an unauditioned convenience row would invert
-        the risk that tier exists to reduce.
+        THIS MODE IS A CASTING MODE, not an old-save compatibility layer, so a
+        configured assignment applies here exactly as it does in auto_registry.
+        What stays true is the mode's contract: ONLY a matching recurring row is
+        touched, and every other row keeps the bytes it arrived with. A row the
+        table does not name is not stamped, not cleared, and not annotated.
 
-        THE DORMANCY GATE TESTS BOTH KEYS, and that is not cosmetic. Keyed only on
-        ``approved_native_routes``, this early return would make the provisional
-        tier's reachability depend on an unrelated dict: demote the one qualified
-        route and every provisional route silently goes dormant with no error. The
-        cost of the widening is nothing -- a fully dormant policy still returns
-        before any bank I/O.
+        THE ENGINE COMES FROM THE NORMALIZED `char_voice_engine`, never from
+        `target_engine`. In this mode no bank is loaded up front, so
+        `target_engine` is None -- reading it would silently mean "no engine" and
+        every assignment would miss while the report said nothing was claimed.
+        `lock()` has already turned "auto" into a concrete engine before here.
+
+        THE BANK LOADS LAZILY, and only when a registered row and a mapped engine
+        actually need it. The dormant case -- no recurring character in the cast,
+        or an engine with no mapping -- stays free of bank I/O, which is what it
+        was before this existed.
         """
-        policy = _lemmy_voice_policy() or {}
-        if not (policy.get("approved_native_routes")
-                or policy.get("provisional_native_routes")):
-            return _RouteClaims()            # dormant -- do not touch the bank
-
-        # NO CLAIMED ROW, NO CLAIM (operator contract, 2026-08-10). A route
-        # guard may only speak about a cast this episode actually has.
-        #
-        # THIS IS NOT A MICRO-OPTIMISATION, IT IS THE FIDELITY RULE. Lemmy is a
-        # recurring-cameo character and the source-faithful banks EXCLUDE him
-        # outright -- `_source_bank_excludes_lemmy` in `_otr_casting.py` covers
-        # `shakespeare` and `public_domain` (and their bake-off variants), and it
-        # overrides BOTH the entropy roll and the operator's `always include`
-        # setting. So a Shakespeare episode legitimately has no Lemmy row, and
-        # anything this method decides about his route there is a decision about
-        # nobody. Without this check the fail-closed raise added minutes earlier
-        # could abort an episode that never cast him.
-        #
-        # `always include` must never override source fidelity, and this method
-        # must never be the thing that makes it look like it did.
-        if cast is not None:
-            character_key = _ROUTE.policy_character_key(policy)
-            if character_key and not any(
-                _ROUTE.cast_row_matches_policy(entry, character_key)
-                for entry in cast if isinstance(entry, dict)
-            ):
-                return _RouteClaims()
-
-        # A policy with real routes needs a concrete engine to prove agreement
-        # against, even in preserve_ledger, where `lock` deliberately leaves the
-        # engine stamp as "auto". Resolve one HERE, for the proof only -- this
-        # must not write meta["char_voice_engine"].
-        if bank_entries is None:
-            from ._otr_voice_bank import (
-                load_voice_bank, unavailable_qualified_route_ids)
-            bank_entries, _bank_sha = load_voice_bank()
-            if bank_unavailable_route_ids is None:
-                bank_unavailable_route_ids = unavailable_qualified_route_ids(
-                    source_sha256=_bank_sha)
-        if bank_unavailable_route_ids is None:
-            # Explicit callers that inject entries retain the old fail-closed
-            # contract unless they also inject the bank's validated exception
-            # list. Missing rows and portable-looking ids imply nothing.
-            bank_unavailable_route_ids = frozenset()
-        engine = target_engine
-        if engine is None:
-            engine = self._resolve_char_engine(voice_bank, bank_entries, "auto")
-        if engine is None:
-            # NO CHARACTER ENGINE RESOLVED. Two very different situations reach
-            # here and they must not be treated alike -- both a Sonnet 5 review
-            # and an agy sweep independently flagged that the first cut could
-            # not tell them apart:
-            #
-            #  (a) LEGITIMATE. The chosen bank has no reference entries for the
-            #      route's engine at all -- `bark_legacy` and `kokoro_builtin`
-            #      are preset banks. The route was never SELECTED here, so there
-            #      is nothing to fail, and raising would break a valid bank
-            #      choice merely because an unrelated engine is qualified.
-            #
-            #  (b) SUSPICIOUS. The bank DOES carry entries for the route's
-            #      engine, yet no engine resolved. That is not a bank choice, it
-            #      is the resolver declining for some other reason -- a
-            #      malformed profile, a bank the engine's profile does not
-            #      allow, or an exception swallowed by `_resolve_char_engine`'s
-            #      broad `except`. A qualified route silently not applying is
-            #      exactly the floor-evidence failure this path exists to end,
-            #      so this one is FAIL-CLOSED.
-            #
-            # Neither reviewer could construct a reachable trigger for (b) --
-            # `load_resolver` is fail-soft and `legacy_first_engines` is pure --
-            # so this is closing an ambiguity rather than patching a live bug.
-            # It costs one set comprehension and removes the need for the next
-            # reader to re-derive the same question.
-            # THE DISCRIMINATOR IS THE PROFILE, NOT THE BANK CONTENTS. A first
-            # cut asked "does bank_entries contain the route's engine", which is
-            # always true: `bank_entries` is the WHOLE reference bank, and the
-            # `voice_bank` id does not filter it -- it gates which engine is
-            # eligible, through each profile's `allowed_voice_banks`. So the
-            # right question is the one `_resolve_char_engine` itself asks: is
-            # the route's engine ALLOWED on this bank, and does it have refs?
-            route_engines = {
-                str(name) for name in (policy or {}).get(
-                    "approved_native_routes", {})
-            }
-            banked = {str(getattr(e, "engine", "")) for e in (bank_entries or ())}
-            servable = set()
+        try:
+            from config.cast_pools import (
+                recurring_character_key, recurring_character_voice)
+        except ImportError:  # pragma: no cover -- flat-import harnesses
             try:
-                from ._otr_engine_profiles import load_resolver
+                from cast_pools import (  # type: ignore
+                    recurring_character_key, recurring_character_voice)
+            except ImportError:
+                return 0
 
-                resolver = load_resolver()
-                for candidate in route_engines & banked:
-                    profile = (resolver.profile_for("char_voice", candidate)
-                               if resolver is not None else None)
-                    if profile and voice_bank in profile.allowed_voice_banks:
-                        servable.add(candidate)
-            except Exception:                 # noqa: BLE001
-                # Cannot tell -- say nothing rather than raise on a guess. The
-                # dispatch path calls require_resolver() and fails loudly there.
-                servable = set()
-            if servable:
-                raise _ROUTE.VoiceRouteError(
-                    "voice policy %r approves route(s) on %s, and voice bank %r "
-                    "DOES carry entries for %s, but no character voice engine "
-                    "resolved. A qualified route must not silently fail to "
-                    "apply -- fix the engine profile or the bank selection."
-                    % ((policy or {}).get("policy_version"),
-                       sorted(route_engines), voice_bank, sorted(servable)))
-            log.warning(
-                "[OTR_CastLock] voice policy %r has approved route(s) on %s but "
-                "bank %r carries no entries for %s -- no route applies to this "
-                "cast", (policy or {}).get("policy_version"),
-                sorted(route_engines), voice_bank, sorted(route_engines))
-            return _RouteClaims(None, _ROUTE.ProvisionalRouteDegradation(
-                "engine_unresolved",
-                "no character voice engine resolved for voice bank %r"
-                % (voice_bank,)))
-
-        # A portable bank cannot redistribute the operator's one private Lemmy
-        # reference. Honour that fact only for an exact SELECTED qualified route
-        # and only when its voice_ref_id is wholly absent from the bank.
-        # If a row exists, normal validation below still owns duplicates, rights,
-        # revocation, hashes, and bytes. A typo or unrelated route also falls
-        # through to the ordinary fail-closed resolver.
-        selected = _ROUTE.select_policy_route(policy, engine)
-        if isinstance(selected, dict):
-            route_id = str(selected.get("route_id") or "").strip()
-            qual = selected.get("qualification_record")
-            claimed_ref_id = str((qual or {}).get("voice_ref_id") or "").strip() \
-                if isinstance(qual, dict) else ""
-            claimed_rows = [
-                entry for entry in (bank_entries or ())
-                if str(getattr(entry, "voice_ref_id", "")) == claimed_ref_id
-            ]
-            if (route_id in bank_unavailable_route_ids and claimed_ref_id
-                    and not claimed_rows):
-                absence_reason = (
-                    "voice_ref_id %r is not present in the voice bank"
-                    % claimed_ref_id)
-                absence_validation = _ROUTE.validate_qualified_voice_route(
-                    selected, datetime.now(timezone.utc),
-                    active_engine=engine, bank_lookup=lambda _voice_id: None,
-                    require_local_bytes=False)
-                if absence_validation.reasons != (absence_reason,):
-                    raise _ROUTE.VoiceRouteError(
-                        "SELECTED voice route %r is declared unavailable in "
-                        "this bank, but its qualification has defect(s) beyond "
-                        "the intentional missing row: %s"
-                        % (route_id, absence_validation.summary))
-                return _RouteClaims(None, _ROUTE.ProvisionalRouteDegradation(
-                    "qualified_route_unavailable_in_bank",
-                    "qualified route %r intentionally has no redistributable "
-                    "reference in this voice bank" % route_id,
-                    engine=engine, route_id=route_id))
-
-        # Resolve reference paths the SAME way the render path does. A bank
-        # ref_path is relative to ComfyUI's MODELS root, not to this repo, so a
-        # naive repo-root join names a file that has never existed.
-        from ._otr_voice_node_common import _resolve_ref_to_disk
-
-        qualified = _ROUTE.resolve_policy_route_claim(
-            policy, engine, datetime.now(timezone.utc),
-            bank_entries=bank_entries, repo_root=_REPO_ROOT,
-            path_resolver=_resolve_ref_to_disk,
-        )
-        if qualified is not None:
-            # A proved route wins outright and the lower tier is never consulted.
-            return _RouteClaims(qualified, None)
-
-        provisional = _ROUTE.resolve_provisional_route_claim(
-            policy, engine, bank_entries=bank_entries, repo_root=_REPO_ROOT,
-            path_resolver=_resolve_ref_to_disk,
-        )
-        return _RouteClaims(None, provisional)
-
-    # ------------------------------------------------------------------ #
-    def _apply_policy_claim(self, cast, route_claims, report) -> int:
-        """Stamp a resolved claim onto its row in preserve_ledger. Returns rows changed.
-
-        Deliberately narrow: announcer rows are never claimed, and a policy that
-        matches no row at all is REPORTED rather than raised. The route proved
-        itself; that the episode did not cast that character is an ordinary fact
-        about the episode, not a qualification failure.
-
-        BOTH TIERS REACH THIS MODE, and that is not optional. The canonical graph
-        runs ``auto_registry``, so a provisional stamp wired only there would be
-        invisible in half of production while every unit test stayed green.
-
-        NO STAMP AT ALL WHEN NEITHER TIER APPLIES. ``auto_registry`` falls through
-        to the draw and records `unrouted`; this mode's whole contract is that a
-        preserved row keeps the bytes it arrived with, so a row nothing claimed is
-        not touched -- not even to write a tier field saying so.
-        """
-        if route_claims is None:
-            return 0
-        policy_claim = route_claims.qualified
-        provisional = route_claims.provisional
-        provisional_claim = (
-            provisional
-            if isinstance(provisional, _ROUTE.ProvisionalPolicyClaim) else None)
-        claim = policy_claim or provisional_claim
-        if claim is None:
+        engine = str(engine or "").strip()
+        if not engine:
             return 0
 
-        is_qualified = policy_claim is not None
-        route_id = (str(policy_claim.voice_route.get("route_id") or "")
-                    if is_qualified else provisional_claim.route_id)
-        changed = 0
+        # Which rows want an assignment, before paying for a bank load.
+        wanted = []
         for entry in cast:
             if not isinstance(entry, dict) or _is_announcer_entry(entry):
                 continue
-            if not _ROUTE.cast_row_matches_policy(entry, claim.character_key):
+            key = recurring_character_key(entry)
+            if not key:
                 continue
-            if is_qualified:
-                # BOTH DIRECTIONS, and both branches. `auto_registry` clears
-                # before every stamp including this one; doing it here too is
-                # what makes the two modes agree. A row stamped provisional on
-                # ElevenLabs and re-locked under the qualified IndexTTS2 route
-                # otherwise keeps `provider_voice_id` -- inert for that engine
-                # today, and exactly the half-a-fix shape this sprint spent a
-                # bug-log entry on elsewhere.
-                _normalize_row_for_tier_switch(entry)
-                self._stamp(entry, claim.bank_entry, fallback="policy_route")
-                entry["voice_route"] = dict(policy_claim.voice_route)
-                _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_QUALIFIED,
-                                  route_id=route_id)
-                report.append(
-                    f"  {entry.get('char_id') or entry.get('name')}: "
-                    f"{claim.voice_ref_id} ({claim.engine}, "
-                    f"QUALIFIED policy route {route_id})"
-                )
-            else:
-                # Clear first: this row may be carrying a qualified route from a
-                # previous lock, and the voice node raises ENGINE DISAGREEMENT on
-                # a leftover route for an engine that is not the one rendering.
-                _normalize_row_for_tier_switch(entry)
-                self._stamp(entry, claim.bank_entry,
-                            fallback="provisional_route")
-                _stamp_route_tier(entry, _ROUTE.ROUTE_TIER_PROVISIONAL,
-                                  route_id=route_id)
-                report.append(
-                    f"  {entry.get('char_id') or entry.get('name')}: "
-                    f"{claim.voice_ref_id} ({claim.engine}, PROVISIONAL route "
-                    f"{route_id} -- {claim.identity_kind}, not auditioned)"
-                )
-            changed += 1
-        if not changed:
+            voice_ref_id = recurring_character_voice(key, engine)
+            if voice_ref_id:
+                wanted.append((entry, key, voice_ref_id))
+        if not wanted:
+            return 0
+
+        try:
+            from ._otr_voice_bank import load_voice_bank
+        except ImportError:  # pragma: no cover -- flat-import harnesses
+            from _otr_voice_bank import load_voice_bank  # type: ignore
+        try:
+            bank_entries = load_voice_bank()[0]
+        except Exception as exc:  # noqa: BLE001 -- a bank fault is not a re-cast
             report.append(
-                f"voice route {route_id!r} resolved, but no cast row matches "
-                f"{claim.character_key!r} -- nothing re-pinned"
+                f"preserve_ledger: recurring assignment skipped, bank "
+                f"unavailable ({exc})"
+            )
+            return 0
+
+        changed = 0
+        for entry, key, voice_ref_id in wanted:
+            ref, miss = _recurring_character_bank_ref(
+                entry, engine, bank_entries, language)
+            if ref is None:
+                report.append(
+                    f"  {entry.get('char_id') or entry.get('name')}: "
+                    f"recurring assignment missed ({miss or 'no match'}); "
+                    f"row left as it arrived"
+                )
+                continue
+            # Clear first: this row may carry identity from a previous lock on a
+            # different engine, and a leftover provider id or reference path
+            # renders with the wrong voice while nothing reports it.
+            _clear_stale_voice_identity(entry)
+            self._stamp(entry, ref, fallback="character_voice")
+            changed += 1
+            report.append(
+                f"  {entry.get('char_id') or entry.get('name')}: "
+                f"{ref.voice_ref_id} ({ref.engine}, recurring character)"
             )
         return changed
+
 
     # ------------------------------------------------------------------ #
     def _stamp_voice_engine_selection(self, led, voice_bank, ann_bank,

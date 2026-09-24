@@ -80,61 +80,25 @@ def _rows(ledger_json):
 # that is the signal it exists to give.
 # ---------------------------------------------------------------------------
 
-def _assignment_record(engine, voice_ref_id, identity_kind):
-    """A record that makes CastLock assign `voice_ref_id` on `engine`."""
-    state = ("configured_unrendered" if identity_kind == "provider_voice"
-             else "rendered_pending_listen")
-    receipt = {
-        "engine": engine,
-        "identity_kind": identity_kind,
-        "identity_id": voice_ref_id,
-        "state": state,
-    }
-    if state == "rendered_pending_listen":
-        receipt.update({
-            "audition_manifest_path": "otr/episodes/lemmy_cross_engine/MANIFEST.json",
-            "audition_manifest_sha256": "a" * 64,
-            "neutral_clip_path": "otr/episodes/lemmy_cross_engine/%s_neutral.wav" % engine,
-            "neutral_clip_sha256": "b" * 64,
-            "emotional_clip_path": "otr/episodes/lemmy_cross_engine/%s_emotional.wav" % engine,
-            "emotional_clip_sha256": "c" * 64,
-            "rendered_utc": "2026-08-16T21:00:00Z",
-        })
-    if identity_kind == "provider_voice":
-        receipt.setdefault("provider", engine)
-        receipt.setdefault("provider_voice_id", PROVIDER_VOICE_ID)
-    return {
-        "route_id": "lemmy-%s-provisional-v1" % engine,
-        "route_contract_version": 1,
-        "engine": engine,
-        "voice_ref_id": voice_ref_id,
-        "provisional_receipt": receipt,
-    }
+def _registry(engine, voice_ref_id):
+    """A one-character registry mapping `engine` to `voice_ref_id`."""
+    return {RECURRING: {engine: voice_ref_id}}
 
 
 @pytest.fixture()
 def assign(monkeypatch):
-    """Install an assignment for the recurring character on one engine."""
-    def install(engine, voice_ref_id, identity_kind):
+    """Install a recurring-character assignment for one engine."""
+    def install(engine, voice_ref_id):
         monkeypatch.setattr(
-            "nodes.cast_lock._lemmy_voice_policy",
-            lambda: {
-                "policy_version": "recurring-character-characterization",
-                "character_key": "lemmy",
-                "approved_native_routes": {},
-                "provisional_native_routes": {
-                    engine: _assignment_record(engine, voice_ref_id, identity_kind),
-                },
-            },
-        )
+            "config.cast_pools.RECURRING_CHARACTER_VOICES",
+            _registry(engine, voice_ref_id))
     return install
 
 
-def _lock_recurring_row(assign, engine, voice_ref_id, identity_kind,
-                        *, cast=None, policy="auto_registry",
-                        voice_bank="default_clean"):
-    """Lock a cast and hand back the recurring character's stamped row."""
-    assign(engine, voice_ref_id, identity_kind)
+def _lock_recurring_row(assign, engine, voice_ref_id, *, cast=None,
+                        policy="auto_registry", voice_bank="default_clean"):
+    """Lock a cast and hand back every stamped row by char_id."""
+    assign(engine, voice_ref_id)
     out = CastLock().lock(
         script_json=_ledger(cast=cast), voice_bank=voice_bank,
         char_voice_engine=engine, cast_voice_policy=policy)[0]
@@ -164,7 +128,7 @@ def test_a_stale_engine_identity_is_cleared_on_a_re_stamp(assign, policy,
     cast = json.loads(json.dumps(CAST))
     cast[1][stale_field] = "STALE::from-a-previous-engine"
 
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav",
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                cast=cast, policy=policy)
     row = rows["c02"]
     assert row.get(stale_field) != "STALE::from-a-previous-engine", (
@@ -184,7 +148,7 @@ def test_a_stale_route_field_is_cleared_on_a_re_stamp(assign, policy):
     cast = json.loads(json.dumps(CAST))
     cast[1]["voice_route"] = {"status": "qualified", "route_id": "stale-v0"}
 
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav",
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                cast=cast, policy=policy)
     assert not rows["c02"].get("voice_route"), (
         "a stale voice_route survived a %s re-stamp" % policy)
@@ -197,7 +161,7 @@ def test_a_row_the_caster_never_reaches_is_left_exactly_as_it_arrived(assign):
     cast[1]["voice_preset"] = "v2/en_speaker_8"
     before = json.loads(json.dumps(cast[0]))       # MONTY, never claimed
 
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav",
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                cast=cast, policy="preserve_ledger")
     after = rows["c01"]
     for key, value in before.items():
@@ -208,10 +172,10 @@ def test_a_row_the_caster_never_reaches_is_left_exactly_as_it_arrived(assign):
 
 def test_only_the_recurring_row_takes_the_assignment(assign):
     """The other rows keep their own draw and gain none of its identity."""
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav")
-    assert rows["c02"].get("voice_ref_id") == CLONE_REF
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF)
+    assert rows["c02"].get("voice_ref_id") == KOKORO_REF
     for other in ("c01", "a1"):
-        assert rows[other].get("voice_ref_id") != CLONE_REF, (
+        assert rows[other].get("voice_ref_id") != KOKORO_REF, (
             "%s received the recurring character's assigned voice" % other)
 
 
@@ -222,13 +186,12 @@ def test_only_the_recurring_row_takes_the_assignment(assign):
 # how a row ends up describing two different voices.
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize("engine,ref,kind", [
-    ("chatterbox", CLONE_REF, "local_wav"),
-    ("kokoro", KOKORO_REF, "bank_voice_id"),
+@pytest.mark.parametrize("engine,ref", [
+    ("kokoro", KOKORO_REF),
+    ("cloud_elevenlabs", PROVIDER_REF),
 ])
-def test_a_non_bark_assignment_clears_the_writer_preset(assign, engine, ref,
-                                                        kind):
-    rows = _lock_recurring_row(assign, engine, ref, kind)
+def test_a_non_bark_assignment_clears_the_writer_preset(assign, engine, ref):
+    rows = _lock_recurring_row(assign, engine, ref)
     row = rows["c02"]
     assert row.get("voice_preset") == "", (
         "%s kept the Bark preset %r" % (engine, row.get("voice_preset")))
@@ -245,15 +208,15 @@ def test_a_non_bark_assignment_clears_the_writer_preset(assign, engine, ref,
 # ---------------------------------------------------------------------------
 
 def test_preserve_ledger_reaches_the_assignment(assign):
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav",
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                policy="preserve_ledger")
-    assert rows["c02"].get("voice_ref_id") == CLONE_REF
+    assert rows["c02"].get("voice_ref_id") == KOKORO_REF
     assert not rows["c02"].get("voice_route")
 
 
 def test_preserve_ledger_leaves_an_unassigned_row_with_nothing_added(assign):
     """No engine mapping for this row means it gains nothing -- not a blank."""
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav",
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF,
                                policy="preserve_ledger")
     monty = rows["c01"]
     assert "voice_ref_id" not in monty, (
@@ -288,44 +251,48 @@ def _dispatch_identity(engine, cast_row, episode_seed=42):
     return ref_field, voice_ref
 
 
-def test_a_local_wav_assignment_reaches_the_exact_bank_file(assign, bank):
-    rows = _lock_recurring_row(assign, "chatterbox", CLONE_REF, "local_wav")
+def test_a_clone_engine_takes_the_ordinary_draw_and_reaches_a_real_file(assign):
+    """The closest surviving relative of a test whose subject went away.
+
+    This used to assert that a `local_wav` IDENTITY KIND dispatched to the exact
+    bank file it named. Identity kinds were a property of the route system and
+    went with it. The table deliberately maps NO clone engine, because a clone
+    row is reserved and a recurring character does not need an assignment to
+    avoid being cast as somebody else.
+
+    What still has to hold, and is checked nowhere else, is that a clone engine
+    resolves to a REAL FILE ON DISK through the ordinary draw -- an engine that
+    requires a reference and is handed a path that is not there renders nothing.
+    """
+    rows = _lock_recurring_row(assign, "chatterbox", KOKORO_REF)
     ref_field, voice_ref = _dispatch_identity("chatterbox", rows["c02"])
     assert ref_field == "voice_ref_path"
-    assert voice_ref and os.path.isfile(voice_ref), voice_ref
-    entry = next(e for e in bank if e.voice_ref_id == CLONE_REF)
-    assert os.path.normpath(voice_ref).endswith(
-        os.path.normpath(entry.ref_path).split(os.sep)[-1]), (
-        "dispatch resolved %r, which is not the bank file %r -- a male "
-        "reference the gender fallback would also have been happy with is not "
-        "the same thing as the assigned one" % (voice_ref, entry.ref_path))
+    assert voice_ref and os.path.isfile(voice_ref), (
+        "chatterbox dispatch resolved %r, which is not a file on disk" % voice_ref)
 
 
 def test_a_bank_voice_id_assignment_reaches_voice_ref_id(assign):
-    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF, "bank_voice_id")
+    rows = _lock_recurring_row(assign, "kokoro", KOKORO_REF)
     ref_field, voice_ref = _dispatch_identity("kokoro", rows["c02"])
     assert ref_field == "voice_ref_id"
     assert voice_ref == KOKORO_REF
 
 
 def test_a_provider_assignment_reaches_the_provider_voice_id(assign):
-    rows = _lock_recurring_row(assign, "cloud_elevenlabs", PROVIDER_REF,
-                               "provider_voice")
+    rows = _lock_recurring_row(assign, "cloud_elevenlabs", PROVIDER_REF)
     row = rows["c02"]
     assert row.get("provider_voice_id") == PROVIDER_VOICE_ID or \
         row.get("voice_ref_id") == PROVIDER_REF, (
         "the provider identity reached neither field: %r" % (row,))
 
 
-@pytest.mark.parametrize("engine,ref,kind", [
-    ("chatterbox", CLONE_REF, "local_wav"),
-    ("kokoro", KOKORO_REF, "bank_voice_id"),
-    ("cloud_elevenlabs", PROVIDER_REF, "provider_voice"),
+@pytest.mark.parametrize("engine,ref", [
+    ("kokoro", KOKORO_REF),
+    ("cloud_elevenlabs", PROVIDER_REF),
 ])
-def test_no_assignment_writes_a_route_and_none_of_them_raises(assign, engine,
-                                                              ref, kind):
+def test_no_assignment_writes_a_route_and_none_of_them_raises(assign, engine, ref):
     """The per-line dispatch call runs for every row of every episode."""
-    rows = _lock_recurring_row(assign, engine, ref, kind)
+    rows = _lock_recurring_row(assign, engine, ref)
     row = rows["c02"]
     assert "voice_route" not in row or not row["voice_route"]
     resolved = ROUTE.resolve_and_verify_reference(row, engine)

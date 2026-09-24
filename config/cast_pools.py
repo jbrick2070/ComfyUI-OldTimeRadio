@@ -375,6 +375,87 @@ LEMMY_PROFILE = {
     "notes": "Male, gravelly/raspy, 50s, warm characterful voice, iconic",
 }
 
+
+#: WHICH CATALOGUE VOICE EACH RECURRING CHARACTER IS DELIVERED WITH, per engine.
+#:
+#: A recurring character is one a story lane writes on purpose and who should
+#: sound like himself across episodes. Today that is exactly one, LEMMY. A later
+#: character is ANOTHER KEY IN THIS TABLE -- not a new branch, not a new cameo,
+#: not a second selector. The helper below and its callers iterate the registry;
+#: nothing downstream may special-case a name.
+#:
+#: THESE IDS STAY SHARED. An assignment is not a reservation: `bm_george` is a
+#: kokoro catalogue row tagged preferred_announcer, and the two cloud ids are
+#: shared as well. ANNOUNCER still draws them through the announcer pool.
+#: Reserving them to protect a recurring character would starve that pool --
+#: reservation lives on the bank row (`reserved_for`) and covers only the clone
+#: recordings of the character's own voice.
+#:
+#: The table owns a DELIVERED VOICE for a mapped engine. It does not own story
+#: inclusion, a name, a description or a gender: those stay on the character
+#: profile and on the cameo decision, which remain the only authorities for
+#: whether the character appears at all.
+#:
+#: Engines absent from a character's map take the ordinary draw. There is
+#: deliberately no entry for Bark (it keeps its preset path) or for the clone
+#: engines, whose reserved rows are excluded from ordinary draws instead.
+RECURRING_CHARACTER_VOICES = {
+    "LEMMY": {
+        "kokoro": "bm_george",
+        "cloud_elevenlabs": "el_daniel",
+        "google_tts": "gt_algenib",
+    },
+}
+
+
+def recurring_character_key(entry, registry=None) -> str:
+    """The canonical registry key this cast row is, or "" if it is none of them.
+
+    Matches the row's ``name`` first and then its ``char_id``, each stripped and
+    casefolded, against the registry's keys compared the same way. Returns the
+    CANONICAL key as the table spells it, so callers index the table with the
+    answer rather than re-deriving it.
+
+    ``registry=None`` uses the configured table. AN EXPLICITLY EMPTY REGISTRY
+    STAYS EMPTY -- `{}` means "no recurring characters", not "use the default",
+    which is what lets a test inject a registry and get exactly it.
+
+    Returns "" for anything that is not a dict, so a malformed row is an
+    ordinary row rather than an exception inside casting. The caller's announcer
+    check runs BEFORE this lookup, so a row named ANNOUNCER never reaches it
+    even if someone adds that name to the table.
+    """
+    if registry is None:
+        registry = RECURRING_CHARACTER_VOICES
+    if not registry or not isinstance(entry, dict):
+        return ""
+    by_folded = {}
+    for key in registry:
+        by_folded[str(key).strip().casefold()] = key
+    for field in ("name", "char_id"):
+        value = str(entry.get(field) or "").strip().casefold()
+        if value and value in by_folded:
+            return by_folded[value]
+    return ""
+
+
+def recurring_character_voice(character_key, engine, registry=None) -> str:
+    """The catalogue id `character_key` is delivered with on `engine`, or "".
+
+    Separate from the key lookup so a caller that already knows the key does not
+    re-match the row, and so the "no mapping for this engine" answer is one
+    empty string rather than a KeyError the caller has to guard.
+    """
+    if registry is None:
+        registry = RECURRING_CHARACTER_VOICES
+    if not registry:
+        return ""
+    mapping = registry.get(character_key) or {}
+    if not isinstance(mapping, dict):
+        return ""
+    return str(mapping.get(str(engine or "").strip()) or "").strip()
+
+
 # What a REAL qualification receipt has to contain before a route may be called
 # approved. Every field answers "could someone else reproduce this judgement?" --
 # which is the whole difference between evidence and a label.
