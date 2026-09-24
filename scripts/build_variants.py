@@ -102,8 +102,10 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
 #: from `config/profiles/` exactly as before; they answer "which experiment am I
 #: running" rather than "which workflow ships".
 #:
-#: Kept as a module attribute because three readers import it by name:
-#: `otr_tier_matrix`, `otr_dropdown_matrix` and `tests/test_shipping_writer_pins`.
+#: Kept as a module attribute because two readers import it by name:
+#: `otr_dropdown_matrix` and `tests/test_shipping_writer_pins`.
+#: `otr_tier_matrix` was the third and was retired 2026-09-24 -- its doc
+#: held per-workflow configuration, which the matrix itself now owns.
 SHIPPING_SET = shipping_ids()
 
 class EmitRefused(RuntimeError):

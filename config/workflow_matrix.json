@@ -40,7 +40,7 @@
   "rows": [
     {
       "id": "otr_8gb_low",
-      "display_name": "8 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "8 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -69,7 +69,7 @@
     },
     {
       "id": "otr_8gb_still",
-      "display_name": "8 GB NVIDIA -- a still image with motion, minted by SD 1.5. Lane still_motion, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "8 GB NVIDIA -- a still image with motion, minted by SD 1.5. Lane still_motion, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -136,7 +136,7 @@
     },
     {
       "id": "otr_8gb_animatediff",
-      "display_name": "8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "8 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, which consumes no still, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -174,7 +174,7 @@
     },
     {
       "id": "otr_16gb_low",
-      "display_name": "16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -204,7 +204,7 @@
     },
     {
       "id": "otr_16gb_still",
-      "display_name": "16 GB NVIDIA -- a still image with motion, minted by Lumina-Image 2.0. Lane still_motion, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "16 GB NVIDIA -- a still image with motion, minted by Lumina-Image 2.0. Lane still_motion, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -233,7 +233,7 @@
     },
     {
       "id": "otr_16gb_video",
-      "display_name": "16 GB NVIDIA -- real video diffusion. Lane ltx25_high_video, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "16 GB NVIDIA -- real video diffusion. Lane ltx25_high_video, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -318,7 +318,7 @@
     },
     {
       "id": "otr_16gb_mime",
-      "display_name": "16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "16 GB NVIDIA -- a silent performance: the video's own sound carries its beats, with the voices and music muted there. Lane ltx25_mime, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -360,7 +360,7 @@
     },
     {
       "id": "otr_16gb_animatediff",
-      "display_name": "16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -396,7 +396,7 @@
     },
     {
       "id": "otr_mac16_low",
-      "display_name": "Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see docs/TIER_MATRIX.md.",
+      "display_name": "Apple Silicon -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 10.0 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "platform": "mac",
       "device_backend": "mps",
       "gpu_vendor": "apple",

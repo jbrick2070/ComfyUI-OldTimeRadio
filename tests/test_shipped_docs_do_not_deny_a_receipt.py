@@ -13,6 +13,8 @@ days saying the opposite of `README.md`'s own headline:
     config/profiles/...json        a display_name PRINTED INTO EVERY RUN'S LOG
     scripts/otr_dropdown_matrix.py "Nothing in this repo has an AMD receipt"
     scripts/otr_tier_matrix.py     "AMD ROCm (experimental -- no receipts)"
+                                   (that generator was retired 2026-09-24; the
+                                    workflow matrix owns per-workflow config now)
 
 The cost was not tidiness. An agent reading the shipped tree twice told the
 operator that AMD and Mac were unproven, because a hand-written sentence asserting
