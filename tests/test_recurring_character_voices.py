@@ -17,6 +17,8 @@ Headless. No engine, no model, no GPU.
 """
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from config import cast_pools as POOLS
@@ -188,3 +190,122 @@ def test_the_helpers_never_name_a_character_in_their_own_source():
 if __name__ == "__main__":
     import sys
     sys.exit(pytest.main([__file__, "-v"]))
+
+
+# ---------------------------------------------------------------------------
+# THE ANNOUNCER RULE, pinned across the two modules that each spell it.
+#
+# `_otr_voice_node_common._is_announcer_row` duplicates
+# `cast_lock._is_announcer_entry` rather than importing it, so the cache-key
+# probe stays cold-import clean. That is a deliberate duplication and it is
+# also a standing invitation to drift, which is why its docstring promises a
+# pin. Until 2026-09-24 that promise was false and no such test existed.
+# ---------------------------------------------------------------------------
+
+_ANNOUNCER_ROW_CASES = [
+    {"char_id": "a1", "name": "ANNOUNCER"},
+    {"char_id": "ANNOUNCER", "name": "MONTY"},
+    {"char_id": "c01", "name": "announcer"},
+    {"char_id": "c01", "name": "  Announcer  "},
+    {"char_id": "c01", "name": "MONTY", "speaker_role": "announcer"},
+    {"char_id": "c01", "name": "MONTY", "role": "ANNOUNCER"},
+    {"char_id": "c02", "name": "LEMMY"},
+    {"char_id": "c01", "name": "MONTY"},
+    {"char_id": "", "name": ""},
+    {"char_id": "c01", "name": "ANNOUNCERS"},
+    {"char_id": "c01", "name": "THE ANNOUNCER"},
+    {},
+]
+
+
+@pytest.mark.parametrize("row", _ANNOUNCER_ROW_CASES)
+def test_the_two_announcer_rules_agree_row_for_row(row):
+    """Whatever the rule is, both modules must answer it the same way."""
+    from nodes._otr_voice_node_common import _is_announcer_row
+    from nodes.cast_lock import _is_announcer_entry
+
+    assert _is_announcer_row(row) == _is_announcer_entry(dict(row)), (
+        "the cache-key probe and the caster disagree about whether %r is the "
+        "announcer; the fingerprint would then cover a different set of rows "
+        "than casting actually stamps" % (row,))
+
+
+def test_only_the_probe_survives_a_non_dict():
+    """The one DELIBERATE difference, stated so it is not read as drift.
+
+    The probe adds an isinstance guard because it reads a ledger that may have
+    come off disk in any shape; the caster is called with rows it has already
+    validated. Pinning the difference keeps the test above honest about what
+    "agree" means.
+    """
+    from nodes._otr_voice_node_common import _is_announcer_row
+
+    for junk in (None, "ANNOUNCER", 7, ["ANNOUNCER"]):
+        assert _is_announcer_row(junk) is False
+
+
+def test_an_announcer_sharing_the_recurring_voice_is_still_excluded():
+    """ANNOUNCER holding the SAME catalogue voice is not fingerprinted.
+
+    `bm_george` is a shared kokoro row, not anybody's private recording, so the
+    announcer and the recurring character can legitimately hold it at once.
+
+    MEASURED HONESTLY: this test passes even with the announcer guard removed
+    from the selection, because `recurring_character_key` already returns ""
+    for a name the table does not list. It pins the OUTCOME, which is the thing
+    that matters to the graph. The test below is the one that pins the guard.
+    """
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    shared = "bm_george"
+    announcer_only = json.dumps({
+        "meta": {"episode_seed": 42},
+        "cast": [
+            {"char_id": "c01", "name": "MONTY", "gender": "male"},
+            {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
+             "voice_ref_id": shared, "voice_engine": "kokoro"},
+        ],
+        "lines": [],
+    })
+    assert BatchCharacterVoices.IS_CHANGED(
+        script_json=announcer_only, engine="kokoro") == "static", (
+        "an ANNOUNCER holding a shared catalogue voice was fingerprinted; it "
+        "is a role, not a recurring character")
+
+
+def test_the_announcer_is_excluded_even_if_the_table_names_him(monkeypatch):
+    """THE TEST THAT ACTUALLY PINS THE GUARD, and the reason it is kept.
+
+    The announcer check in the IS_CHANGED selection is redundant against
+    today's table: `recurring_character_key` already returns "" for ANNOUNCER
+    because ANNOUNCER is not a key in it. Remove the guard with the table as
+    shipped and every test still passes -- which is exactly the kind of guard
+    that gets deleted as dead and is then missed.
+
+    It is not dead. `cast_lock` skips announcer rows at its CALL SITES, before
+    it consults the table -- note the skip is in `_auto_registry` and
+    `_apply_recurring_character_voices`, NOT inside `_recurring_character_key`,
+    which happily answers "ANNOUNCER" for a table that names him. So if the
+    table ever named ANNOUNCER, casting would still refuse to stamp him while
+    an unguarded IS_CHANGED would start fingerprinting him. The two selections
+    would then disagree about what a character is, which is what the
+    cross-module pin above exists to prevent.
+
+    Casting's own half of that is already covered by
+    `test_only_the_recurring_row_takes_the_assignment`; this pins the probe's
+    half, and it FAILS if the guard is removed from the selection.
+    """
+    from nodes.batch_character_voices import BatchCharacterVoices
+
+    monkeypatch.setattr(
+        "config.cast_pools.RECURRING_CHARACTER_VOICES",
+        {"ANNOUNCER": {"kokoro": "bm_george"}})
+
+    row = {"char_id": "a1", "name": "ANNOUNCER", "gender": "male",
+           "voice_ref_id": "bm_george", "voice_engine": "kokoro"}
+    led = json.dumps({"meta": {"episode_seed": 42}, "cast": [row], "lines": []})
+    assert BatchCharacterVoices.IS_CHANGED(
+        script_json=led, engine="kokoro") == "static", (
+        "IS_CHANGED fingerprinted the announcer while casting refuses to "
+        "stamp him -- the cache key now covers a different set of rows than "
+        "casting actually writes")

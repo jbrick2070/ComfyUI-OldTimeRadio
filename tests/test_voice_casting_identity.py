@@ -292,19 +292,57 @@ def test_a_provider_assignment_reaches_the_provider_voice_id(assign):
     ("kokoro", KOKORO_REF),
     ("cloud_elevenlabs", PROVIDER_REF),
 ])
-def test_no_assignment_writes_any_retired_route_field(assign, engine, ref):
-    """A locked row carries NONE of the retired route vocabulary.
+def test_a_locked_row_sheds_every_retired_route_field(assign, engine, ref):
+    """Seeded, then cleared. The seeding is the entire point.
 
-    These three field names are spelled out as LITERALS on purpose. They name
-    fields of a module that no longer exists, so there is nothing left to
-    import them from -- and that is exactly why the assertion has to stay: a
-    re-introduced route stamp would otherwise be invisible to every test here.
+    THE FIELD NAMES ARE THE REAL ONES, and getting them wrong is how the first
+    version of this test managed to be permanently true: it asserted
+    `voice_route_reason`, which `git log --all -S` shows never existed in this
+    repo, and `voice_route_id`, which is a LEDGER-LINE field and was never a
+    cast-row key. Both assertions passed by construction. The three fields a
+    cast row actually carried are below, and they match
+    `cast_lock._STALE_IDENTITY_FIELDS` -- if that tuple is edited and this is
+    not, one of them stops being cleared and nothing else notices.
+
+    A row locked before 2026-09-24 still carries these, so this is a real
+    migration path and not a hypothetical one.
     """
-    rows = _lock_recurring_row(assign, engine, ref)
+    retired = {
+        "lemmy_route_tier": "qualified",
+        "lemmy_route_id": "lemmy-indextts2-algenib-cockney-v1",
+        "lemmy_route_reason_code": "",
+        "voice_route": {"status": "qualified", "route_id": "stale-v0"},
+    }
+    cast = json.loads(json.dumps(CAST))
+    cast[1].update(retired)
+    # The seeded row must really carry them, or this proves nothing.
+    assert all(k in cast[1] for k in retired), cast[1]
+
+    rows = _lock_recurring_row(assign, engine, ref, cast=cast)
     row = rows["c02"]
-    for retired in ("voice_route", "voice_route_id", "voice_route_reason"):
-        assert retired not in row, (
-            "a retired route field came back onto a locked row: %r" % retired)
+    survivors = [k for k in retired if k in row]
+    assert not survivors, (
+        "a re-locked row kept %r -- it now carries a tier claim about a "
+        "subsystem that no longer exists, and the clear must DELETE the key "
+        "rather than blank it, so presence and truthiness cannot disagree"
+        % (survivors,))
+
+
+def test_the_retired_field_list_here_matches_the_one_the_code_clears():
+    """The two lists are spelled separately on purpose; pin them together.
+
+    `_STALE_IDENTITY_FIELDS` holds the retired names as literals because the
+    module that defined them is deleted. That is the right call and it is also
+    exactly how a test drifts from the code it guards -- so the drift is
+    caught here instead of being discovered on a stale ledger.
+    """
+    from nodes.cast_lock import _STALE_IDENTITY_FIELDS
+
+    for name in ("lemmy_route_tier", "lemmy_route_id",
+                 "lemmy_route_reason_code", "voice_route"):
+        assert name in _STALE_IDENTITY_FIELDS, (
+            "%r is no longer cleared by cast_lock, so a row re-locked today "
+            "would keep it" % (name,))
 
 
 # ---------------------------------------------------------------------------
