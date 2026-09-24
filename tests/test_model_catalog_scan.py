@@ -455,6 +455,53 @@ def test_validator_rejects_gguf_extension(empty_hub_root, monkeypatch):
     assert "gguf" in str(exc.value).lower() or "transformers" in str(exc.value)
 
 
+@pytest.mark.parametrize("handle", [
+    "unsloth/gemma-4-12b-it-GGUF",          # the retired writer's real handle
+    "unsloth/gemma-4-12b-it-gguf",          # same, lowercased
+    "someone/model_GGUF",                   # the _gguf spelling
+    "someone/gguf-model",                   # the /gguf spelling, mid-string
+])
+def test_validator_rejects_every_retired_gguf_writer_spelling(
+        handle, empty_hub_root, monkeypatch):
+    """A retired -GGUF handle must FAIL LOUDLY, not become a download.
+
+    WHY THIS EXISTS AS A BEHAVIOURAL TEST. When the writer backend was deleted
+    (2026-09-24) the rejection in `_is_gguf_writer_id` was deliberately KEPT --
+    without it a `-GGUF` handle stops being a known-retired id and starts being
+    an ordinary uncurated repo id, which `auto_download_if_missing` would then
+    try to fetch. The tests that covered it, however, went with the backend.
+
+    A QA pass proved the gap by deleting the `-gguf`/`_gguf` branches from
+    `_is_gguf_writer_id` and running every one of the 62 test files that mention
+    gguf: ZERO new failures. The code was right and nothing was watching it, so
+    a later "tidy-up" of a function whose subject no longer exists would have
+    silently reopened the download path. Asserting the ERROR, not the absence of
+    a catalog row, is the difference.
+    """
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    with pytest.raises(UnknownModelError) as exc:
+        catalog.validate_model_id(handle, hub_root=empty_hub_root)
+    assert "retired" in str(exc.value).lower(), (
+        "a retired GGUF writer handle must say so; got %s" % exc.value)
+
+
+def test_the_label_suffix_is_stripped_before_the_retired_check(
+        empty_hub_root, monkeypatch):
+    """A value saved from the dropdown still reaches the clear rejection.
+
+    The picker used to decorate rows with " [LOCAL GGUF]". A graph saved then
+    carries the decorated string, so the suffix stripper has to run BEFORE the
+    retired-handle check or the user gets "unknown model" instead of "retired
+    writer, use this instead". That ordering is the only reason the stripper was
+    kept when the lane went.
+    """
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    with pytest.raises(UnknownModelError) as exc:
+        catalog.validate_model_id(
+            "unsloth/gemma-4-12b-it-GGUF [LOCAL GGUF]", hub_root=empty_hub_root)
+    assert "retired" in str(exc.value).lower()
+
+
 def test_validator_recovery_hint_lists_top_installed(hub_root_with_mistral_nemo, monkeypatch):
     monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "0")
     monkeypatch.delenv("OTR_MODEL_CATALOG_ALLOW_REMOTE", raising=False)

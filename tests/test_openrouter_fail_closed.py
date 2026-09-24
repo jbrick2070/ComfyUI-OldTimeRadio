@@ -208,3 +208,63 @@ def test_remote_bound_schema_not_overridden_by_json_object(enabled, monkeypatch)
     structured_call(prompt="x", schema=Tiny, slot_fn=slot_fn,
                     base_temperature=0.3, structural_retry_temperature=0.1)
     assert seen["payload"]["response_format"]["type"] == "json_schema"
+
+# ---------------------------------------------------------------------------
+# THE NEGATIVE HALF OF THE SAME CONTRACT, recovered 2026-09-24.
+#
+# `test_remote_creative_structured_call_forces_json_object` above proves the
+# REMOTE lane gets `response_format={"type": "json_object"}` forced onto it for
+# a schema-less structured pass. The proof that the LOCAL transformers lane
+# never does lived in tests/test_gguf_registry.py, which was deleted wholesale
+# with the GGUF writer backend -- but that particular test was not about GGUF at
+# all, and a QA pass caught it going out with the bathwater.
+#
+# It matters because `invoke_structured_slot` is live shared code: it is reached
+# from several call sites in `_otr_structured_call`, which a long list of
+# production modules import. The local lane has no json_object mode, so forcing
+# the kwarg onto it is a runtime error on an ordinary writer pass -- and the
+# only thing standing between that and a release is this assertion.
+# ---------------------------------------------------------------------------
+
+def test_json_object_is_never_forced_on_the_local_transformers_lane(monkeypatch):
+    """A local slot fn must receive response_format=None, not json_object."""
+    from nodes import _otr_structured_call as SC
+    from nodes import _otr_model_loader as loader
+    from nodes.OTR_LedgerScriptWriter import _SlotScheduler
+
+    captured = {}
+
+    def fake_local_fn(messages, *, temperature, max_new_tokens, stop=None,
+                      response_format=None):
+        captured["response_format"] = response_format
+        return "ok"
+
+    # A local (transformers) slot has no json_object mode -> marker False.
+    monkeypatch.setattr(
+        loader, "request_slot",
+        lambda slot, model_id, policy=None: {
+            "model": object(), "tokenizer": object(),
+        },
+    )
+    monkeypatch.setattr(
+        "nodes.OTR_LedgerScriptWriter._build_truncating_generate_fn",
+        lambda cache_entry, **_kw: fake_local_fn,
+    )
+    sched = _SlotScheduler(
+        creative_id="mistralai/Mistral-Nemo-Instruct-2407",
+        technical_id="mistralai/Mistral-Nemo-Instruct-2407",
+        top_p=0.92, min_p=0.0, repetition_penalty=1.0,
+    )
+    fn = sched.for_slot("technical")
+    assert getattr(fn, "_otr_supports_json_object", False) is False, (
+        "the local lane must not advertise json_object support")
+
+    SC.invoke_structured_slot(
+        fn, [{"role": "user", "content": "x"}], temperature=0.2,
+        max_new_tokens=16,
+    )
+    assert captured["response_format"] is None, (
+        "response_format was forced onto the local transformers lane (%r); it "
+        "has no json_object mode and this is a runtime error on an ordinary "
+        "writer pass" % (captured["response_format"],))
+

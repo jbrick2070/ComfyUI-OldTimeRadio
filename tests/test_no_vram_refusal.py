@@ -71,25 +71,39 @@ def test_the_gate_reports_FAIL_without_refusing():
 
     A FAIL verdict is a recommendation. `_assert_policy_admits_vram` must log
     it and RETURN -- the runtime's own OOM is the only authority on whether a
-    model fits. Called for real rather than re-derived, because a test that
-    recomputes the arithmetic grades its own copy and stays green while the
-    real code regains a guard.
+    model fits.
+
+    THE FIXTURE HAS TO REACH FAIL THROUGH THE GATE'S OWN CALL, and the first
+    version of this test did not. It used an UNCURATED 70B with
+    `safetensors_gb_hint=140.0`, which prices FAIL -- but the gate never
+    forwards a hint (see the `check_vram_fit(...)` call in
+    `_assert_policy_admits_vram`), so what the gate actually saw was an
+    unparseable row priced UNKNOWN at 0.0 GB. The FAIL branch, the only place a
+    reintroduced `raise` could live, was never entered, and a QA pass proved it
+    by putting a `raise` there and watching this file stay green.
+
+    A CURATED row against a small ceiling needs no hint, because the catalog
+    already knows its size. That is what makes the branch reachable here.
     """
     import types
 
     from nodes import _otr_model_catalog as cat
     from nodes._otr_model_loader import _assert_policy_admits_vram
 
-    verdict = cat.check_vram_fit(
-        "meta-llama/Meta-Llama-3-70B-Instruct", 8192,
-        ceiling_gb=6.8, safetensors_gb_hint=140.0)
+    model_id = "google/gemma-4-12b-it"
+    ceiling = 1.0
+
+    # THE GUARD, asserted through the SAME call shape the gate uses -- no hint,
+    # positional context, nothing the gate would not pass. A guard that proves
+    # the fixture via a different path is how the first version passed while
+    # testing nothing.
+    verdict = cat.check_vram_fit(model_id, 8192, ceiling_gb=ceiling)
     assert verdict.tier == "FAIL", (
-        "fixture no longer prices as FAIL (%s at %s GB), so this test would "
-        "pass without exercising the refusal path at all"
+        "fixture no longer reaches FAIL through the gate's own call shape (%s "
+        "at %s GB); this test would pass without exercising the refusal path"
         % (verdict.tier, verdict.estimated_gb))
 
-    policy = types.SimpleNamespace(vram_ceiling_gb=6.8)
+    policy = types.SimpleNamespace(vram_ceiling_gb=ceiling)
     ctx = types.SimpleNamespace(value=8192, tier="UNKNOWN")
-    # The assertion IS that this returns.
-    _assert_policy_admits_vram(
-        "meta-llama/Meta-Llama-3-70B-Instruct", ctx, policy)
+    # The assertion IS that this returns rather than raising.
+    _assert_policy_admits_vram(model_id, ctx, policy)
