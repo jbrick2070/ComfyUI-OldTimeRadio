@@ -89,7 +89,6 @@ without that map would play ~4% short.
 | ltx25_native_foley_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_foley_blackwell | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
-| ltx25_native_foley_lowres | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_mime_16gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_native_mime_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
@@ -140,7 +139,6 @@ without that map would play ~4% short.
 | ltx25_native_foley_16gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_foley_24gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_foley_blackwell | text_prompt, init_image | text_prompt REQUIRED |
-| ltx25_native_foley_lowres | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_mime_16gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_native_mime_24gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
@@ -195,7 +193,6 @@ the engine's own `aspect` column above.
 | ltx25_native_foley_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_foley_blackwell | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
-| ltx25_native_foley_lowres | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_mime_16gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_native_mime_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
@@ -252,7 +249,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | ltx25_native_foley_16gb | 832x480 | declared |
 | ltx25_native_foley_24gb | 832x480 | declared |
 | ltx25_native_foley_blackwell | 832x480 | declared |
-| ltx25_native_foley_lowres | 832x480 | declared |
 | ltx25_native_mime_16gb | 832x480 | declared |
 | ltx25_native_mime_24gb | 832x480 | declared |
 | ltx25_video | 832x480 | declared |
@@ -313,7 +309,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | ltx25_native_foley_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_foley_blackwell | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
-| ltx25_native_foley_lowres | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_mime_16gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_native_mime_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_video | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
@@ -371,7 +366,6 @@ and it read exactly like a measured number until someone looked.
 | ltx25_native_foley_16gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_foley_blackwell | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_foley_lowres | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_mime_16gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_mime_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_video | - | contract max | docs/PROD_BUG_LOG.md |
@@ -394,7 +388,7 @@ and it read exactly like a measured number until someone looked.
 
 ## Counts
 
-* registered engine names: **46**
+* registered engine names: **45**
 * provider-side: **9**
-* local: **37**
-* can chain (strict_first_frame): **19**
+* local: **36**
+* can chain (strict_first_frame): **18**

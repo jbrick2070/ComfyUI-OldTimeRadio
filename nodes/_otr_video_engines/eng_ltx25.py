@@ -642,7 +642,14 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: TRUE ON EVERY LANE BUT ONE. The x2 in-graph latent upscale and the
     #: refinement pass after it are the accepted HQ path and stay the default;
     #: a subclass sets this False to decode the stage-one latent at its native
-    #: 832x480 instead. `Ltx25NativeFoleyLowResEngine` is the only one that does.
+    #: 832x480 instead. NOTHING OVERRIDES IT TODAY: the one lane that did,
+    #: `ltx25_native_foley_lowres`, was unregistered 2026-09-23 when the
+    #: operator settled that every LTX 2.5 8 GB lane keeps its upscaler --
+    #: `otr_8gb_ltx` already gives that tier a faster option on a 2B model
+    #: rather than on a degraded 12.86 GB one. The False branch stays proven
+    #: in both directions by tests/test_ltx25_every_lane_builds_a_graph.py,
+    #: and it is what `_output_canvas` and the conditional upscaler entry in
+    #: `_weight_paths` are written against.
     #:
     #: IT BELONGS ON THIS CLASS BECAUSE THIS CLASS READS IT. `_build_graph` is
     #: defined here, so every LTX 2.5 lane reaches the attribute -- and when it
@@ -3700,41 +3707,6 @@ class Ltx25NativeFoley16gbEngine(Ltx25NativeFoleyBase):
     #: it. _encoder_cache_expects_cpu stays True with it.
 
 
-@register
-class Ltx25NativeFoleyLowResEngine(Ltx25NativeFoley16gbEngine):
-    """LOW RES: the same foley lane, decoded at 832x480 instead of 1664x960.
-
-    THE ONE DIFFERENCE IS `_ingraph_upscale`. Everything that makes an episode
-    is inherited untouched from the 16 GB lane -- the same mix4x8 DiT, the same
-    Gemma-4 encoder, the same 97-frame rung, the same joint-AV latent, the same
-    0.50/0.50 foley mix. What this lane does not do is run the x2 latent
-    upscaler and the refinement sampler that follow stage one.
-
-    WHY A SEPARATE LANE RATHER THAN A WIDGET. A widget that changes output
-    geometry changes what a saved graph produces without changing the graph,
-    which is the same class of silent drift that positional `widgets_values`
-    already punishes us for. A lane is a name: the episode's receipt says which
-    one rendered it, the shortcode says so in the filename, and nobody has to
-    remember how a switch was left.
-
-    THE TRADE, PLAINLY. Stage two is where a large fraction of the render goes
-    on a small card: it samples the whole joint latent a second time at four
-    times the pixel count, then decodes that. Dropping it costs real detail --
-    this is the low-quality option and it is meant to be -- and buys back the
-    time. It also drops `ltx-2.5-latent-spatial-upscaler-x2` from the download
-    list, because nothing loads it here.
-
-    NOT PROVEN ON A LEG YET. Registered, wired and suite-green; the wall-clock
-    claim above is arithmetic about which nodes run, not a measurement. The
-    first leg that renders on it is what turns that into a number.
-    """
-
-    name = "ltx25_native_foley_lowres"
-    engine_version = "1"
-    default_roles = ()
-    _ingraph_upscale = False
-
-
 class Ltx25NativeAudioInMixin:
     """AUDIO-IN: condition the picture on a real waveform instead of inventing one.
 
@@ -4229,7 +4201,6 @@ _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_foley_plus_24gb",
     "ltx25_foley_plus_32gb",
     "ltx25_native_foley_16gb",
-    "ltx25_native_foley_lowres",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
     "ltx25_native_mime_16gb",

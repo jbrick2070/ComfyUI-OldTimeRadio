@@ -185,13 +185,6 @@ _ENGINES_WITH_A_SESSION = {
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
     "ltx25_native_foley_16gb",
-    # 2026-09-23 -- the LOW-RES lane. It inherits the 16 GB lane's identity
-    # because a beat session keys on the engine and its weight receipts, and
-    # this lane loads the same weights. What differs is which NODES the graph
-    # builds, which is a render-geometry decision a beat session does not and
-    # should not see: the conditioning and the encoder it caches are the same
-    # ones either way.
-    "ltx25_native_foley_lowres",
     # 2026-09-23 -- the native MIME and AUDIO-IN lanes. THESE WERE ALREADY
     # MISSING before the low-res lane was added, and this test was already
     # failing at 2c677bc6 for exactly that reason: all four were registered

@@ -158,17 +158,29 @@ def test_every_wire_points_at_a_node_that_exists(engine_id, tmp_path):
     assert not dangling, "%s has dangling wires: %s" % (engine_id, dangling)
 
 
-def test_only_the_low_res_lane_skips_the_ingraph_upscale():
-    """The flag's default must stay True, or every HQ lane silently degrades.
+def test_no_lane_skips_the_ingraph_upscale():
+    """EVERY LTX 2.5 lane runs the x2 upscale. The operator settled this.
 
-    Written as a membership rule rather than a count: a tally goes stale on the
-    next lane, and this file is precisely about what goes stale invisibly.
+    Operator 2026-09-23: "8gb ltx25 has upscaler, all of them". The one lane that
+    skipped it, `ltx25_native_foley_lowres`, was unregistered the same day -- not
+    because dropping the upscale was wrong, but because it was REDUNDANT: the
+    8 GB tier already has faster lanes on a genuinely smaller model
+    (`otr_8gb_ltx` and `otr_8gb_video` run `ltx_8gb`, ONE 2B checkpoint against
+    five files for LTX 2.5) and `otr_8gb_low` is faster still on procedural
+    `viz_camera` with no video model at all. Reaching for a smaller model beats
+    degrading a bigger one, because the x2 stage is a LATENT upscale plus a
+    refinement sampler and the detail it adds is real.
+
+    A membership rule rather than a count, so it fails in BOTH directions: a new
+    lane that quietly sets the flag False has to come here and say so, and if
+    the operator ever wants a low-res lane again this test is where the decision
+    gets re-recorded.
     """
     vreg = _registry()
     skipping = {name for name in _ltx25_lane_ids()
                 if not getattr(vreg.get_engine(name), "_ingraph_upscale", True)}
-    assert skipping == {"ltx25_native_foley_lowres"}, (
-        "exactly one lane should decode at its native canvas; these do: %r"
+    assert skipping == set(), (
+        "no LTX 2.5 lane should skip the in-graph upscale; these do: %r"
         % (sorted(skipping),))
 
 

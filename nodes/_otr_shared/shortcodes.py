@@ -125,10 +125,6 @@ VIDEO_LANE = {
     # any of them dominates publishes as "unk" -- the video identity missing
     # from the one artifact the operator actually reads.
     "ltx25_native_foley_16gb": "n16f",
-    # Low res, so the published filename says which geometry rendered it. Two
-    # episodes from the same weights at different resolutions are exactly the
-    # pair a reader needs the code to tell apart.
-    "ltx25_native_foley_lowres": "nlrf",
     "ltx25_native_foley_24gb": "n24f",
     "ltx25_native_foley_blackwell": "nbwf",
     # The native MIME and AUDIO-IN lanes, registered 2026-09-23 and missing

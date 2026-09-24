@@ -202,7 +202,6 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     # before the mime and audio-in pairs were registered -- this list is an
     # inline literal precisely because it goes stale, and it had.
     "ltx25_native_foley_16gb",
-    "ltx25_native_foley_lowres",
     "ltx25_native_foley_24gb",
     "ltx25_native_foley_blackwell",
     "ltx25_native_mime_16gb",
@@ -7023,8 +7022,7 @@ _LTX_OPEN_ENGINES = frozenset(
      # capability declared on the engine and derived here; that is a
      # registry change and wants its own review, not a quiet edit.
      "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
-     "ltx25_native_foley_16gb", "ltx25_native_foley_lowres",
-     "ltx25_native_foley_24gb",
+     "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
      "ltx25_native_foley_blackwell",
      "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
      "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb"})

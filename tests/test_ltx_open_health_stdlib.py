@@ -100,7 +100,6 @@ class LtxOpenHealthTests(unittest.TestCase):
                              "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
                              "ltx25_foley_plus_24gb", "ltx25_foley_plus_32gb",
                              "ltx25_native_foley_16gb",
-                             "ltx25_native_foley_lowres",
                              "ltx25_native_foley_24gb",
                              "ltx25_native_foley_blackwell",
                              "ltx25_native_mime_16gb",

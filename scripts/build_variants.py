@@ -143,7 +143,6 @@ SHIPPING_SET = (
     # Draft on the same reasoning as the 24 GB row above: the variant is how the
     # leg becomes possible, not a claim that the leg has run.
     "otr_8gb_ltx25_native_foley",
-    "otr_8gb_ltx25_native_foley_lowres",
     "otr_8gb_ltx25_native_mime",
     "otr_8gb_ltx25_native_audio_in",
 )

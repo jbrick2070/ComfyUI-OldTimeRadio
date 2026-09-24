@@ -54,7 +54,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 | `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_lowres` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_mime_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `ltx25_native_mime_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |

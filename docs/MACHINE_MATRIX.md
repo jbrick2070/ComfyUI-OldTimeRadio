@@ -66,18 +66,17 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  19 experimental profile(s), 9 shipping
+## 8 GB  --  18 experimental profile(s), 8 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `otr_8gb_animatediff` | animatediff15_v3_haunted_video | - | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_low` | viz_camera | - | stable_audio_3 | sd15 | `shipping` | complete |
-| `otr_8gb_ltx25_native_audio_in` | ltx25_native_foley_16gb | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_8gb_ltx25_native_foley` | ltx25_native_foley_16gb | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_8gb_ltx25_native_foley_lowres` | ltx25_native_foley_lowres | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_8gb_ltx25_native_mime` | ltx25_native_mime_16gb | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_8gb_still` | still_motion | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_8gb_video` | ltx_8gb | - | stable_audio_3 | sd15 | `shipping` | missing exact owner |
+| `otr_8gb_animatediff` | animatediff15_v3_haunted_video | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_low` | viz_camera | - | stable_audio_3 | z_image_turbo | `shipping` | complete |
+| `otr_8gb_ltx25_native_audio_in` | ltx25_native_foley_16gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_8gb_ltx25_native_foley` | ltx25_native_foley_16gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_8gb_ltx25_native_mime` | ltx25_native_mime_16gb | - | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_8gb_still` | still_motion | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_video` | ltx_8gb | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | - | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
 <details><summary>10 draft profile(s) here -- not vouched for</summary>
