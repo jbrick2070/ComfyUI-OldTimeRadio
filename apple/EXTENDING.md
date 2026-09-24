@@ -2,13 +2,15 @@
 
 What you can add: an **engine** (a way of rendering video, images, speech,
 music or an upscale), a **source bank** (a place stories come from), a
-**writer LLM** (the model that writes the script), and an **episode language**
-(a registry row that binds writing, voices, captions and credits). They are
+**writer LLM** (the model that writes the script), an **episode language**
+(a registry row that binds writing, voices, captions and credits), and a
+**shipped workflow** (a saved graph for a machine or a paid lane). They are
 different jobs.
 Engines are a Python file in this repo. A source bank can be a folder of your
 own that this repo never sees. A writer LLM is either a snapshot in your
 Hugging Face cache, or a curated row in the catalog. A language is data only
-when Kokoro already has a real code and voice set for it.
+when Kokoro already has a real code and voice set for it. A shipped workflow
+is a row in a JSON matrix, not a graph you type.
 
 Read the one page first. Then [PREFLIGHT.md](PREFLIGHT.md) is the checklist that
 says whether what you built will actually work. The writer page is
@@ -58,6 +60,11 @@ says whether what you built will actually work. The writer page is
 - **A language row is not a translation engine.** It asks the writer to author
   natively and filters voices, captions and credits. The full registry and
   add-your-own checklist are in [MULTILINGUAL.md](MULTILINGUAL.md).
+
+- **A shipped workflow is a matrix row, not a JSON you write.** Edit
+  `config/workflow_matrix.json`, then `python scripts/build_variants.py --all`.
+  The files in `workflows/variants/` are generated. The canonical is the one
+  graph you may author.
 
 - **Removing is the same job as adding, done atomically** — registry row, module,
   pipeline entries, tests, and a grep that returns exactly the survivors you
@@ -149,10 +156,116 @@ Then four things, none of them long:
    are regenerated, not hand-edited, and [PREFLIGHT.md](PREFLIGHT.md) has the
    commands.
 
-**Do not reach for a new profile and a new variant JSON to do this.** A
-profile is the right tool when the machine's *settings* differ. When the
-difference is which weights load, it is a lane, and a lane costs the user one
-dropdown instead of one download.
+**Do not reach for a new matrix row and a new variant JSON to do this.** When
+the difference is which weights load, it is a lane, and a lane costs the user
+one dropdown instead of one download. When the saved pins themselves should
+differ -- a smaller writer on 8 GB, a cloud partner stack -- that is
+[a shipped workflow](#adding-or-changing-a-shipped-workflow).
+
+---
+
+## Adding or changing a shipped workflow
+
+A **shipped workflow** is a saved graph a person can open: the canonical in
+Browse Templates, or a per-machine file they drag from `workflows/variants/`.
+It is not an engine and it is not a lane. A lane is a dropdown value every
+graph already has; the section above is that job. Reach for a new graph only
+when the *saved pins* should differ -- a smaller writer on 8 GB, a cloud
+partner stack, a Mac device policy.
+
+**The source of truth is one file: `config/workflow_matrix.json`.** Each row is
+one workflow. Edit that file. Do not hand-edit anything in
+`workflows/variants/` -- those JSON files and their `.launch.md` recipes are
+generated, and the next rebuild silently undoes you. Do not add a
+`config/profiles/<id>.json` for something you intend to ship; that folder is
+the lab rigs (`otr_soak_*` and friends), loaded with `--profile`, not the
+shipping set.
+
+This wants the git clone. `scripts/` is not in a registry install.
+
+### Two jobs, two files
+
+**Changing the authored graph** -- a new node, a new socket, a new widget -- is
+an edit to `workflows/otr_canonical.json`, in the same change as the node
+code. Unwired code is dead. Browse Templates lists exactly that one file. Do
+not add an `example_workflows/` folder -- ComfyUI mounts both at the same URL
+and the gallery 404s. Do not drop a second JSON next to the canonical;
+per-machine graphs live under `workflows/variants/`.
+
+A new optional widget is always **appended** at the end of `widgets_values`.
+Inserting in the middle silently shifts every saved value. Removing a widget
+that is not last is three edits, not one: drop the value, drop the `inputs`
+descriptor, and repair every later link's `dst_slot` (it is an index into that
+same array). Trailing widgets are cheap; mid-list ones are not.
+
+If the new widget is something a machine graph should pin, add it to
+`config/profiles/widget_mapping.json` as well, or the matrix cannot reach it.
+
+**Changing what a machine graph pins** -- writer, lanes, voices, ceiling,
+device -- is an edit to that row's `deltas` in the matrix. The canonical is
+left alone.
+
+### Adding a row
+
+Copy the closest sibling. Then:
+
+1. **Give it an id** (`otr_8gb_video` style) and a `display_name` a person can
+   read. Set `"ships": true` or it will not emit a graph -- a new row defaults
+   to *not* shipping, which is the safe direction.
+2. **State every key in `key_indicators`.** The list is at the top of the
+   matrix. Writer, ceiling, visual lanes, video engine, voices, act shape,
+   device -- even when the value matches the canonical. An unstated indicator
+   is inherited, and an 8 GB row that stops naming its writer follows the
+   canonical upward onto a model that will not fit.
+3. **Omit everything else** unless it actually changes a widget. An incidental
+   pin that restates the canonical is a fork: it keeps the old value when the
+   canonical moves. If a non-indicator key *is* a decision, add it to
+   `key_indicators` instead of leaving it looking accidental.
+4. **Metadata that is not a widget** -- `launch`, `preflight`, `status`,
+   `device_backend`, `gpu_vendor`, `allow_sidecars` -- defaults from the
+   matrix `defaults` block. State only what differs. `allow_sidecars: true` is
+   the ComfyUI-GGUF graphs; `preflight.required_keys` is the cloud graphs.
+
+Do not put a JSON in `workflows/` for the new row. Browse Templates stays one
+card.
+
+### Rebuild, then prove the rebuild
+
+```bash
+python scripts/build_variants.py --all
+python scripts/build_variants.py --check
+```
+
+`--all` writes the variant JSON, the launch recipe, and the generated docs
+(`[MACHINES.md](MACHINES.md)`, `docs/DROPDOWN_MATRIX.md`,
+`docs/MACHINE_MATRIX.md`) from the same matrix. `--check` diffs the committed
+variants against a fresh regeneration and fails on drift.
+
+A wiring or widget change also wants these four green:
+
+- `scripts/build_variants.py --check`
+- `tests/test_widget_value_alignment.py`
+- `tests/test_canonical_widget_input_parity.py`
+- `tests/test_workflow_link_target_indexes.py`
+
+The first three can all pass while the links are broken. The fourth is the one
+that catches a mid-list widget removal.
+
+Other apple pages that name a specific graph -- [WRITERS.md](WRITERS.md),
+[VIDEO_MODELS.md](VIDEO_MODELS.md), [MAC.md](MAC.md) -- are hand-kept. Update
+the one that would otherwise lie.
+
+### Stopping one
+
+Set `"ships"` false (or delete the row), **and delete** the matching files in
+`workflows/variants/` (`otr_<id>.json` and `otr_<id>.launch.md`). `--all` does
+not remove leftovers; `--check` still validates every JSON sitting in that
+folder.
+
+### The proof
+
+One real run of that graph that lands a file in `otr/obs/`. Green `--check`
+proves the generator, not the episode.
 
 ---
 
