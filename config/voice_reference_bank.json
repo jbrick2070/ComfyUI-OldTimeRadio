@@ -2493,6 +2493,7 @@
     },
     {
       "voice_ref_id": "idx_lemmy_algenib_cockney_v1",
+      "reserved_for": "lemmy",
       "engine": "indextts2",
       "gender": "male",
       "timbre": [
@@ -2509,6 +2510,7 @@
     },
     {
       "voice_ref_id": "cb_lemmy_algenib_cockney_v1",
+      "reserved_for": "lemmy",
       "engine": "chatterbox",
       "gender": "male",
       "timbre": [
@@ -2525,6 +2527,7 @@
     },
     {
       "voice_ref_id": "dia_lemmy_algenib_cockney_v1",
+      "reserved_for": "lemmy",
       "engine": "dia",
       "gender": "male",
       "timbre": [

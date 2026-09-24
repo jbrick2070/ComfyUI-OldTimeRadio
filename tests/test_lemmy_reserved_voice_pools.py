@@ -33,7 +33,8 @@ from __future__ import annotations
 
 import pytest
 
-from nodes._otr_voice_bank import _reserved_ids_from_policy, gender_agnostic_fallback_ref, load_voice_bank, reserved_voice_ref_ids
+from nodes._otr_voice_bank import (
+    gender_agnostic_fallback_ref, load_voice_bank, reserved_voice_ref_ids)
 
 GENDERS = ("male", "female")
 #: Every engine that draws a cloned character voice. The fallback below is
@@ -120,17 +121,59 @@ def test_the_gender_agnostic_fallback_still_returns_a_voice(engine):
     assert entry.engine == engine
 
 
-def test_a_broken_policy_reserves_nothing_instead_of_raising():
+def test_an_unreadable_bank_reserves_nothing_instead_of_raising(monkeypatch):
     """The helper is called by both pools, and the fallback promises never to
-    raise. A
-    malformed policy must degrade to reserving nothing -- the exact
-    pre-reservation behaviour -- rather than killing a render."""
-    for broken in ("not-a-dict", 12345, ["also", "wrong"]):
-        assert _reserved_ids_from_policy({}) == frozenset()
-        with pytest.raises(AttributeError):
-            # proves the raw walk really would raise on this input, so the
-            # wrapper's except clause is load-bearing and not decorative
-            _reserved_ids_from_policy(broken)
+    raise. An unreadable bank must degrade to reserving nothing -- the exact
+    pre-reservation behaviour -- rather than killing a render.
+
+    Retargeted 2026-09-24: this used to feed a malformed POLICY to the walk that
+    derived reservations from casting routes. The reservation now lives on the
+    bank row, so the failure with the same shape is a bank that will not load.
+    """
+    from nodes import _otr_voice_bank as VB
+
+    def _explode():
+        raise RuntimeError("bank file is corrupt")
+
+    monkeypatch.setattr(VB, "load_voice_bank", _explode)
+    assert VB.reserved_voice_ref_ids() == frozenset()
+
+
+def test_an_injected_bank_is_used_exactly_as_given():
+    """Including an empty one. A selector filtering a candidate list has to be
+    able to ask about THAT list, not about the whole shipped bank -- otherwise
+    the answer is right for a bank nobody is drawing from."""
+    assert reserved_voice_ref_ids(()) == frozenset()
+
+    bank = _bank()
+    owned = [e for e in bank if str(getattr(e, "reserved_for", "") or "").strip()]
+    ordinary = [e for e in bank
+                if not str(getattr(e, "reserved_for", "") or "").strip()]
+    assert owned and ordinary, "fixture needs both kinds to prove anything"
+
+    mixed = tuple(owned[:1] + ordinary[:3])
+    assert reserved_voice_ref_ids(mixed) == {owned[0].voice_ref_id}
+    assert reserved_voice_ref_ids(tuple(ordinary[:3])) == frozenset()
+
+
+def test_the_shipped_reserved_set_is_exactly_the_owned_clones():
+    """Named explicitly, so a fourth row quietly gaining `reserved_for` -- or
+    one of these losing it -- is a red test rather than a silent change to what
+    every other character can be cast as."""
+    assert reserved_voice_ref_ids() == {
+        "idx_lemmy_algenib_cockney_v1",
+        "cb_lemmy_algenib_cockney_v1",
+        "dia_lemmy_algenib_cockney_v1",
+    }
+
+
+def test_the_borrowed_catalogue_voices_are_not_reserved():
+    """He is POINTED AT these; he does not own them. `bm_george` is a shared
+    kokoro row tagged preferred_announcer, and reserving it to protect a cameo
+    would starve the announcer pool."""
+    reserved = reserved_voice_ref_ids()
+    for borrowed in ("bm_george", "el_daniel", "gt_algenib"):
+        assert borrowed not in reserved, borrowed
 
 
 def test_reserved_ids_are_unreachable_from_every_pool_at_once():

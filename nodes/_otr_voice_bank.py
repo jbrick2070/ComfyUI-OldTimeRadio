@@ -125,88 +125,42 @@ class VoiceCastingError(RuntimeError):
     """Raised when no castable voice can be assigned to a slot (fail-closed)."""
 
 
-def reserved_voice_ref_ids() -> frozenset:
+def reserved_voice_ref_ids(bank=None) -> frozenset:
     """Voice references that belong to ONE named character and nobody else.
 
-    DERIVED FROM THE POLICY, never a hand-kept list. Every `voice_ref_id` named
-    by a Lemmy route -- qualified or provisional, on any engine -- is reserved by
-    the act of being named there. Add a route and the reservation follows for
-    free; that is the whole reason this reads the policy instead of restating it,
-    because a second list is a list that drifts.
+    OWNED BY THE BANK ROW. A row whose ``reserved_for`` is non-empty is that
+    character's, and is excluded from every ordinary draw. This replaced a walk
+    over the casting policy's route records: the policy named the same three
+    rows, but it derived a property of a VOICE from a table about CASTING, so
+    the two could disagree and only one of them shipped in the bank file.
 
-    Fail-SOFT: an unimportable pack reserves nothing and casting behaves exactly
-    as it did before this existed. The strictness lives where a route is claimed,
-    not in a helper that would otherwise break every render on an import error.
+    A RESERVATION IS AN EXCLUSION, NOT AN ASSIGNMENT. It does not give the owner
+    his voice -- the recurring-character table does that, and it names SHARED
+    catalogue ids that stay unreserved on purpose. Reserving those would pull
+    the preferred announcer out of the pool to protect a cameo, trading one
+    defect for another.
 
-    FAIL-SOFT ON ANY EXCEPTION, not just ImportError (widened 2026-08-18 after a
-    QA pass). Its callers are ``assign_voice_for_slot`` and
-    ``gender_agnostic_fallback_ref`` -- the latter promises in its own docstring
-    to be pure and never raise. (It had four callers until the hybrid LLM
-    voice-fit was ripped the same day; ``build_voice_cards`` and
-    ``validate_voice_proposal`` went with it.) A malformed policy (say
-    ``LEMMY_VOICE_POLICY`` set to a truthy non-dict, so ``.get`` raises
-    ``AttributeError``) would otherwise propagate straight through those
-    promises and out of ``cast_lock.py``, turning a cosmetic config error into a
-    dead render. Reserving nothing is the correct degradation: it restores
-    exactly the pre-reservation behaviour rather than failing an episode.
+    ``bank=None`` loads the configured bank. An injected bank is used exactly as
+    given, INCLUDING AN EMPTY ONE, so a selector can ask about precisely the
+    candidate list it is filtering rather than about the whole shipped bank.
+
+    Fail-SOFT on a load failure with no argument: reserve nothing, log, and
+    behave exactly as casting did before reservations existed. Its callers
+    include ``gender_agnostic_fallback_ref``, which promises in its own
+    docstring never to raise, so a config error must not propagate out of
+    casting and kill a render.
     """
-    try:
-        from ..config import cast_pools as _POOLS  # type: ignore
-    except ImportError:
+    if bank is None:
         try:
-            from config import cast_pools as _POOLS  # type: ignore
-        except ImportError:
+            bank = load_voice_bank()[0]
+        except Exception:  # noqa: BLE001 -- an unreadable bank reserves nothing
+            log.warning("[OTR voice] voice bank unreadable; reserving none",
+                        exc_info=True)
             return frozenset()
-    try:
-        policy = getattr(_POOLS, "LEMMY_VOICE_POLICY", None) or {}
-        return _reserved_ids_from_policy(policy)
-    except Exception:  # noqa: BLE001 -- a broken policy reserves nothing
-        log.warning("[OTR voice] reserved-id policy unreadable; reserving none",
-                    exc_info=True)
-        return frozenset()
-
-
-def _reserved_ids_from_policy(policy) -> frozenset:
-    """The reserved-id walk itself, split out so the fail-soft wrapper above
-    covers every step of it rather than only the import."""
-    ids = set()
-
-    # ONLY A CLONE OF HIS OWN RECORDING IS HIS. The first cut of this reserved
-    # every voice any Lemmy route named, and that was too broad in a way that
-    # would have caused its own regression: `bm_george` is a shared kokoro
-    # catalogue voice tagged `preferred_announcer`, and `el_daniel` / `gt_algenib`
-    # are shared cloud voices. Lemmy is PROVISIONALLY POINTED AT those; he does
-    # not own them, and pulling the preferred announcer out of the pool to
-    # protect a cameo would trade one defect for another.
-    #
-    # A `local_wav` route is different in kind: those rows are clones of the
-    # operator-approved recording of Lemmy himself, so hearing that timbre IS
-    # hearing Lemmy. Those are reserved; the borrowed catalogue voices are not.
-    for key in ("approved_native_routes", "provisional_native_routes"):
-        routes = policy.get(key)
-        if not isinstance(routes, dict):
-            continue
-        for record in routes.values():
-            if not isinstance(record, dict):
-                continue
-            receipt = record.get("provisional_receipt")
-            if isinstance(receipt, dict):
-                if receipt.get("identity_kind") != "local_wav":
-                    continue
-                ref = str(record.get("voice_ref_id") or "").strip()
-                if ref:
-                    ids.add(ref)
-                continue
-            qual = record.get("qualification_record")
-            if isinstance(qual, dict):
-                ref_block = qual.get("reference")
-                if not (isinstance(ref_block, dict)
-                        and ref_block.get("kind") == "local_wav"):
-                    continue
-                ref = str(qual.get("voice_ref_id") or "").strip()
-                if ref:
-                    ids.add(ref)
-    return frozenset(ids)
+    return frozenset(
+        entry.voice_ref_id for entry in bank
+        if str(getattr(entry, "reserved_for", "") or "").strip()
+    )
 
 
 @dataclass(frozen=True)
@@ -233,6 +187,11 @@ class VoiceBankEntry:
     # from adapter metadata, NOT a disk sentinel. Empty for every local
     # (ref-clip / preset) engine -- behavior unchanged until a cloud bank ships.
     provider_voice_id: str = ""
+    #: Non-empty means this row belongs to ONE named character and is excluded
+    #: from every ordinary draw. Appended LAST: VoiceBankEntry is frozen and
+    #: constructed by keyword everywhere, but a field inserted mid-list would
+    #: still reorder the dataclass signature for any positional caller.
+    reserved_for: str = ""
     # The real HUMAN behind this reference, when two rows are two recordings of
     # one person. ref_path collision cannot catch that case: LibriVox's Mark F.
     # Smith has a plain and a grandfatherly take in two different files, so
@@ -323,6 +282,7 @@ def _entry_from_dict(d: dict) -> VoiceBankEntry:
         provider_voice_id=str(d.get("provider_voice_id") or ""),   # C3
         speaker_id=str(d.get("speaker_id") or ""),
         languages=tuple(str(x) for x in (d.get("languages") or []) if str(x).strip()),
+        reserved_for=str(d.get("reserved_for") or "").strip(),
     )
 
 
@@ -638,7 +598,7 @@ def assign_voice_for_slot(
     #
     # Same shape as the audited-reject filter above: a deterministic pool
     # pre-filter, never a score reweight.
-    reserved = reserved_voice_ref_ids()
+    reserved = reserved_voice_ref_ids(entries)
     if reserved:
         candidates = [e for e in candidates if e.voice_ref_id not in reserved]
     if require_commercial_clean:
@@ -834,7 +794,7 @@ def gender_agnostic_fallback_ref(
     exists so an audited reject cannot be rendered by the one path that used to
     skip the audit.
     """
-    reserved = reserved_voice_ref_ids()
+    reserved = reserved_voice_ref_ids(bank)
 
     def _eligible(entry) -> bool:
         return (entry.engine == engine

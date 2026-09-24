@@ -71,6 +71,10 @@
       "items": { "type": "string" },
       "description": "Whiny-fix P2b ADDITIVE curation tags, e.g. lead_safe / nasal_risk. Consumed by the deterministic tier pre-filter (filter_by_quality_tier); never reweights scores."
     },
+    "reserved_for": {
+      "type": "string",
+      "description": "Non-empty means this reference belongs to one named character and is excluded from every ordinary casting draw. Not an assignment: the recurring-character table is what gives that character a voice, and it names shared catalogue ids that stay unreserved."
+    },
     "provider_voice_id": {
       "type": "string",
       "description": "Cloud/direct-provider ADDITIVE: the provider's own voice identifier (e.g. ElevenLabs voice_id or Google prebuilt voice name) for non-local provider engines. Threaded end-to-end so provider casting resolves from adapter metadata, not a disk sentinel. Empty/absent for every local (ref-clip/preset) engine."
