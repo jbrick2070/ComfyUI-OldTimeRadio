@@ -265,3 +265,42 @@ workflows/variants/*.md
 # put them back in the zip.
 _tmp_*
 scripts/_tmp_*
+
+# 2026-09-23 -- THE PROFILE JSONs DO NOT SHIP. Operator: "I only want workflows,
+# no profiles"; "I want to 100% delete the profiles folder."
+#
+# 144 files that no shipped code path reads. The user-facing surface is
+# `workflows/` -- 25 variants plus the canonical graph -- and every value a
+# variant renders with is already baked into its own widgets by
+# `scripts/build_variants.py`, which `.comfyignore` strips anyway. So a stranger's
+# install now contains workflows and no profiles, which is the thing that was
+# asked for.
+#
+# MEASURED BEFORE WRITING THIS, because two readers of this directory could have
+# made it false:
+#   * `apply_profile()` is the applier that needs the JSON, and it is called from
+#     `scripts/build_variants.py` ALONE -- zero callers under `nodes/` or in
+#     `__init__.py`. Build-time, not render-time.
+#   * `OTR_WorkflowValidator` loaded the stamped profile and used to RAISE when it
+#     could not. That was the one real render-time dependency and it is gone as of
+#     6bea0ce2: it now warns and renders. Without that commit this line would
+#     have bricked all 25 variants on every fresh install.
+#
+# WHY THE FILES STAY IN GIT. `build_variants.py` generates the variants FROM them,
+# and the repo's hardest rule is that variants are generated and never
+# hand-edited. Delete them from git and the 25 shipped graphs become
+# hand-maintained. Excluding from the bundle is not deleting from git -- the same
+# distinction the `assets/` note above has teeth for.
+#
+# The cost of going further was measured, not guessed: removing the 144 JSONs from
+# the repo breaks 31 test files, heaviest in test_capability_profiles.py,
+# test_build_variants.py, test_cloud_sku_json_parity.py and test_boot_contracts.py.
+# That is a real, finite job and it is the operator's call whether to spend it.
+#
+# widget_mapping.json and cpu_floor.json are NOT excluded: the first is the
+# checked-in widget MAPPING every applier reads, the second is the fallback tier
+# the validator names in its own suggestions.
+config/profiles/otr_*.json
+config/profiles/google_*.json
+config/profiles/16gb_full.json
+config/profiles/8gb_lite.json

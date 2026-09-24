@@ -44,6 +44,15 @@ def test_dropdown_default_is_live_small_qwen():
         assert dead not in curated, dead
 
 
+#: The 24/32 GB native tiers pin a BIGGER writer than the 16 GB one, on purpose:
+#: a3cf5441 (2026-09-22) shipped them "with the beefier writer baked in". This
+#: test encoded a two-way 4B-or-12B policy and had been RED since that commit,
+#: unnoticed -- the profile declared an intent the policy test did not know about,
+#: which is the drift the profile layer keeps producing. Named here so the next
+#: tier that wants its own writer adds a row instead of going quietly red.
+BIGGEST = "Qwen/Qwen3.8-27B"
+
+
 def test_shipping_writer_split_is_4b_except_16gb_nvidia():
     for pid in bv.SHIPPING_SET:
         llm = _profile(pid)["llm"]
@@ -52,6 +61,9 @@ def test_shipping_writer_split_is_4b_except_16gb_nvidia():
         if pid.startswith("otr_16gb_"):
             assert creative == BIG, pid
             assert technical == BIG, pid
+        elif pid.startswith(("otr_24gb_", "otr_32gb_")):
+            assert creative == BIGGEST, pid
+            assert technical == BIGGEST, pid
         elif pid.startswith("otr_cloud_"):
             assert creative == "comfy:slot-a", pid
             assert technical == "comfy:slot-b", pid
@@ -75,6 +87,9 @@ def test_shipping_variant_widgets_carry_the_live_label():
             assert SMALL not in text, pid
         elif pid.startswith("otr_16gb_"):
             assert BIG in text, pid
+            assert SMALL not in text, pid
+        elif pid.startswith(("otr_24gb_", "otr_32gb_")):
+            assert BIGGEST in text, pid
             assert SMALL not in text, pid
         else:
             assert qwen_label in text, pid
