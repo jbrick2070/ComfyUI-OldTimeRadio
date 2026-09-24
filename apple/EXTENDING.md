@@ -223,8 +223,9 @@ Copy the closest sibling. Then:
    `key_indicators` instead of leaving it looking accidental.
 4. **Metadata that is not a widget** -- `launch`, `preflight`, `status`,
    `device_backend`, `gpu_vendor`, `allow_sidecars` -- defaults from the
-   matrix `defaults` block. State only what differs. `allow_sidecars: true` is
-   the ComfyUI-GGUF graphs; `preflight.required_keys` is the cloud graphs.
+   matrix `defaults` block. State only what differs. `allow_sidecars`
+   defaults false; set it true only if this graph should offer engines that
+   declare `requires_sidecar`. `preflight.required_keys` is the cloud graphs.
 
 Do not put a JSON in `workflows/` for the new row. Browse Templates stays one
 card.
@@ -258,9 +259,9 @@ the one that would otherwise lie.
 ### Stopping one
 
 Set `"ships"` false (or delete the row), **and delete** the matching files in
-`workflows/variants/` (`otr_<id>.json` and `otr_<id>.launch.md`). `--all` does
-not remove leftovers; `--check` still validates every JSON sitting in that
-folder.
+`workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
+that id). `--all` does not remove leftovers; `--check` still validates every
+JSON sitting in that folder.
 
 ### The proof
 
