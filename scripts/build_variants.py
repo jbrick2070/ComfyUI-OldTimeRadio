@@ -38,7 +38,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from nodes._otr_shared.capability_profiles import (  # noqa: E402
-    PROFILE_DIR, load_profile,
+    PROFILE_DIR, load_profile, shipping_ids,
 )
 from nodes._otr_shared.boot_contracts import (  # noqa: E402
     contract_for_profile, launch_args_for,
@@ -89,63 +89,22 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
                 "otr_soak_llmsweep_07")
 
 
-#: THE SHIPPING SET (2026-09-13). The ONLY profiles that emit a graph into
-#: `workflows/variants/`. Named `otr_<arch>_<tier>` so the filename says which
-#: machine it is for and what the episode will be; the tiers are the operator's
-#: -- low, still, video, foley, mime, animatediff.
+#: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
+#: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
+#: graph into `workflows/variants/`. Edit that file and this follows; there is no
+#: second list to keep in step, which is the entire reason it moved out of here.
 #:
-#: EVERY OTHER PROFILE STILL WORKS. `--profile <id>` loads any of the ~100 lab
-#: fixtures exactly as before, and about sixty of them are referenced by tests
-#: and sweep scripts, which is why they are not deleted. They simply do not
-#: write a file into the user-facing variant folder -- for the same reason
-#: LANE_PRESETS gives above: nobody installs OTR to run a soak.
+#: Still an allow-list, deliberately, exactly as the hand-kept tuple was: a row
+#: has to say `ships` to reach a user, so a new row defaults to NOT shipping --
+#: the safe direction to be wrong in. Nobody installs OTR to run a soak.
 #:
-#: An allow-list rather than a deny-list, deliberately: a new lab profile then
-#: defaults to NOT shipping, which is the safe direction to be wrong in.
-SHIPPING_SET = (
-    "otr_8gb_low",
-    "otr_8gb_still",
-    "otr_8gb_video",
-    "otr_8gb_animatediff",
-    "otr_16gb_low",
-    "otr_16gb_still",
-    "otr_16gb_video",
-    "otr_16gb_foley",
-    "otr_16gb_mime",
-    "otr_16gb_animatediff",
-    "otr_mac16_low",
-    "otr_mac16_still",
-    "otr_mac16_video",
-    "otr_mac16_animatediff",
-    "otr_amd_still",
-    "otr_cloud_low_1act",
-    "otr_cloud_low",
-    "otr_cloud_low_5act",
-    "otr_cloud_deluxe_3act",
-    "otr_cloud_deluxe_audio_in_3act",
-    # Native (non-GGUF) big-card tiers, 2026-09-22. Draft status until a live
-    # leg completes -- they build a variant so the graph can be run and
-    # measured, which is exactly how the qualification happens.
-    "otr_24gb_native_foley",
-    # THE 8 GB NATIVE TIER, 2026-09-23. Operator: "if it's a lane it should be
-    # in the workflows folder" -- which is the rule that put these here. A
-    # profile with no variant is not a lane a person can pick; it is internal
-    # config that happens to live beside the lanes, and four of these had been
-    # sitting in that state while being treated as lanes in conversation.
-    #
-    # THEY COST NO NEW DOWNLOAD. All four run mix4x8, the weight measured clean
-    # at 707.0 s for a 97-frame clip on a 4060 -- against 1018 s cold and
-    # 821-859 s warm for the GGUF lane this tier used to run. So the native tier
-    # is FASTER than the GGUF one it replaces and it auto-downloads, which GGUF
-    # cannot. The framing carried for weeks, "slower but installable", was wrong
-    # in both halves.
-    #
-    # Draft on the same reasoning as the 24 GB row above: the variant is how the
-    # leg becomes possible, not a claim that the leg has run.
-    "otr_8gb_ltx25_native_foley",
-    "otr_8gb_ltx25_native_mime",
-    "otr_8gb_ltx25_native_audio_in",
-)
+#: EVERY OTHER CONFIG STILL WORKS. `--profile <id>` loads any of the ~95 lab rigs
+#: from `config/profiles/` exactly as before; they answer "which experiment am I
+#: running" rather than "which workflow ships".
+#:
+#: Kept as a module attribute because three readers import it by name:
+#: `otr_tier_matrix`, `otr_dropdown_matrix` and `tests/test_shipping_writer_pins`.
+SHIPPING_SET = shipping_ids()
 
 class EmitRefused(RuntimeError):
     """Emission refused (ratify gate or self-check failure)."""

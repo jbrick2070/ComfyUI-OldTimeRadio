@@ -1,17 +1,21 @@
 # -*- coding: utf-8 -*-
 """The workflow matrix renders exactly what the 24 configs render.
 
-WHY THIS TEST EXISTS AND WHY IT IS NOT CIRCULAR. `build_variants.py --check`
+WHAT THIS PROVES, AND WHAT IT DOES NOT. `build_variants.py --check`
 regenerates the variants from their source and diffs against the committed
 graphs. That proves the generator is deterministic; it cannot prove the source is
 right, because "regenerate and commit" makes disk equal regeneration BY
 CONSTRUCTION. Put a wrong-but-registered engine id in the source, regenerate,
 commit both, and `--check` passes forever.
 
-This compares TWO INDEPENDENTLY AUTHORED SOURCES -- `config/workflow_matrix.json`
-and the 24 `config/profiles/*.json` files -- and asserts they render the same
-graph. Neither was derived from the other at test time, so agreement is real
-evidence rather than a tautology.
+This compares the matrix against the 24 `config/profiles/*.json` files it
+replaces and asserts they render the same graph. BE PRECISE ABOUT WHAT THAT BUYS:
+the matrix was GENERATED from those files, so this is not two people
+independently reaching the same answer. What it proves is that the CONSOLIDATION
+was lossless -- that stripping 614 restated values changed no rendered output --
+which is the thing that could plausibly have gone wrong and the thing worth a
+test. It does NOT prove any value is CORRECT; a wrong engine id in a profile file
+is faithfully carried into the matrix and passes here.
 
 THAT PROPERTY HAS A SHELF LIFE, AND IT IS WORTH STATING PLAINLY. The matrix was
 GENERATED from the configs once, during the migration. While both exist, this
@@ -171,3 +175,45 @@ def test_the_matrix_actually_has_material(matrix):
         "the rows carry almost no deltas; the matrix is not describing the "
         "differences it exists to describe")
     assert all(r.get("id") for r in rows), "a row without an id names no workflow"
+
+
+@pytest.mark.parametrize("dotted", sorted(json.loads(
+    MATRIX_PATH.read_text(encoding="utf-8"))["defaults"].get("values", {})))
+def test_every_baseline_value_is_a_no_op_against_the_canonical(
+        dotted, matrix, modules, canonical):
+    """THE ALARM ON THE BASELINE'S ONE FORK POINT.
+
+    `defaults.values` exists so a row can omit a key and still resolve to the
+    complete document `load_profile` has always returned. Its 36 values duplicate
+    what the canonical graph already holds -- once, rather than 24 times, but a
+    duplicate is a duplicate, and if the canonical moves the baseline keeps the
+    old value and every row that omitted that key silently inherits it. That is
+    the shape of the drift that left 82 files pinned to a voice engine the
+    canonical had already left.
+
+    So every baseline value must be a NO-OP: writing it alone must leave the
+    canonical graph byte-identical, because the canonical already says it. The
+    moment the canonical moves, this fails and names the key.
+
+    WHY A BASELINE IS STORED AT ALL rather than read off the graph: the graph
+    stores COMBO LABELS where a profile stores bare ids -- the canonical's
+    `creative_model` reads 'Qwen/Qwen3.5-4B (8.7 GB download, ...)' where the
+    profile form is 'Qwen/Qwen3.5-4B'. The inverse would be a parenthetical parse
+    of a label nobody promised to keep stable, so the value is stored in profile
+    form and guarded here instead.
+    """
+    _, _, wa = modules
+    value = matrix["defaults"]["values"][dotted]
+    doc = {"id": "baselineprobe"}
+    doc.update(_unflatten({dotted: value}))
+    logging.disable(logging.CRITICAL)
+    try:
+        applied = wa.apply_profile(canonical, doc)
+    finally:
+        logging.disable(logging.NOTSET)
+    assert applied == canonical, (
+        "baseline %s = %r is NOT what the canonical holds. Either the canonical "
+        "moved and this value is now stale -- in which case every row that omits "
+        "%s has been silently inheriting the old value -- or the baseline was "
+        "harvested wrong. Re-harvest it from the canonical; do not edit the rows."
+        % (dotted, value, dotted))

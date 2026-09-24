@@ -1,11 +1,58 @@
 {
   "_comment": "THE WORKFLOW MATRIX. One row per shipped workflow; the canonical graph is the base every row is read against. A row states ONLY what it changes -- a key it does not mention follows the canonical forever, by construction, which is what stops the drift that once left 82 configs pinned to a voice engine the canonical had moved off. Edit this file, run `python scripts/build_variants.py --all`, and the variants and the generated docs are rebuilt together. The variants are GENERATED and are never hand-edited.",
   "version": 1,
-  "meta_defaults": {
+  "defaults": {
     "status": "shipping",
     "platform": "any",
     "allow_sidecars": false,
-    "toolchains": []
+    "toolchains": [],
+    "launch": {
+      "env": {},
+      "extra_args": [],
+      "sage_attention": false
+    },
+    "preflight": {
+      "required_keys": [],
+      "required_models": []
+    },
+    "values": {
+      "features.act_count": "1",
+      "features.burn_captions": true,
+      "features.caption_style": "sdh_standard",
+      "image.dtype_policy": "fp8_ok",
+      "llm.attn_impl": "sdpa",
+      "llm.comfy_slot_a_model": "(enable Comfy Credits)",
+      "llm.comfy_slot_b_model": "(enable Comfy Credits)",
+      "llm.creative_model": "Qwen/Qwen3.5-4B",
+      "llm.google_api_slot_a_model": "(select Google API model)",
+      "llm.google_api_slot_b_model": "(select Google API model)",
+      "llm.openrouter_slot_a_model": "(enable OpenRouter)",
+      "llm.openrouter_slot_b_model": "(enable OpenRouter)",
+      "llm.quant_policy": "none",
+      "llm.technical_model": "Qwen/Qwen3.5-4B",
+      "llm.vram_ceiling_gb": 10.0,
+      "render.beats": 40,
+      "render.canvas_h": 480,
+      "render.canvas_w": 832,
+      "render.composite_h": 1080,
+      "render.composite_res": "1920x1080",
+      "render.composite_w": 1920,
+      "render.fps": 25,
+      "render.frame_budget": 25,
+      "role_overrides.announcer_image": "z_image_turbo",
+      "role_overrides.announcer_visual": "viz_mxc_cpu",
+      "role_overrides.character_image": "z_image_turbo",
+      "role_overrides.character_visual": "viz_camera",
+      "role_overrides.music_image": "z_image_turbo",
+      "role_overrides.music_visual": "viz_green",
+      "seed_policy.request_seed": 42,
+      "seed_policy.seed_mode": "request_hash",
+      "slot_overrides.announcer_voice_engine": "kokoro",
+      "slot_overrides.cast_voice_policy": "auto_registry",
+      "slot_overrides.music_engine": "stable_audio_3",
+      "slot_overrides.video_render_engine": "viz_camera",
+      "video.dtype_policy": "no_fp8_no_fp4"
+    }
   },
   "rows": [
     {
@@ -70,6 +117,12 @@
         "role_overrides.music_visual": "ltx_8gb",
         "slot_overrides.video_render_engine": "ltx_8gb",
         "video.device_policy": "cuda"
+      },
+      "preflight": {
+        "required_models": [
+          "ltxv-2b-0.9.8-distilled",
+          "t5xxl_fp16"
+        ]
       }
     },
     {
@@ -92,6 +145,14 @@
         "role_overrides.music_visual": "animatediff15_v3_haunted_video",
         "slot_overrides.video_render_engine": "animatediff15_v3_haunted_video",
         "video.device_policy": "cuda"
+      },
+      "preflight": {
+        "required_models": [
+          "google/gemma-4-E2B-it",
+          "v1-5-pruned-emaonly-fp16.safetensors",
+          "v3_sd15_mm.ckpt",
+          "v3_sd15_adapter.ckpt"
+        ]
       }
     },
     {
@@ -161,6 +222,18 @@
         "slot_overrides.video_render_engine": "ltx25_high_video",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX-2.5-Distilled-Q3_K_M.gguf",
+          "gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+        ]
       }
     },
     {
@@ -185,6 +258,18 @@
         "slot_overrides.video_render_engine": "ltx25_native_foley_16gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+        ]
       }
     },
     {
@@ -209,6 +294,18 @@
         "slot_overrides.video_render_engine": "ltx25_native_mime_16gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+        ]
       }
     },
     {
@@ -231,6 +328,14 @@
         "role_overrides.music_visual": "animatediff15_v3_haunted_video",
         "slot_overrides.video_render_engine": "animatediff15_v3_haunted_video",
         "video.device_policy": "cuda"
+      },
+      "preflight": {
+        "required_models": [
+          "google/gemma-4-12b-it",
+          "v1-5-pruned-emaonly-fp16.safetensors",
+          "v3_sd15_mm.ckpt",
+          "v3_sd15_adapter.ckpt"
+        ]
       }
     },
     {
@@ -251,6 +356,11 @@
         "role_overrides.character_image": "sd15",
         "role_overrides.music_image": "sd15",
         "video.device_policy": "mps"
+      },
+      "preflight": {
+        "required_models": [
+          "v1-5-pruned-emaonly-fp16.safetensors"
+        ]
       }
     },
     {
@@ -275,6 +385,11 @@
         "role_overrides.music_visual": "still_motion",
         "slot_overrides.video_render_engine": "still_motion",
         "video.device_policy": "mps"
+      },
+      "preflight": {
+        "required_models": [
+          "v1-5-pruned-emaonly-fp16.safetensors"
+        ]
       }
     },
     {
@@ -299,6 +414,11 @@
         "role_overrides.music_visual": "ltx098_low_video",
         "slot_overrides.video_render_engine": "ltx098_low_video",
         "video.device_policy": "mps"
+      },
+      "preflight": {
+        "required_models": [
+          "v1-5-pruned-emaonly-fp16.safetensors"
+        ]
       }
     },
     {
@@ -323,6 +443,11 @@
         "role_overrides.music_visual": "animatediff15_lightning_video",
         "slot_overrides.video_render_engine": "animatediff15_lightning_video",
         "video.device_policy": "mps"
+      },
+      "preflight": {
+        "required_models": [
+          "v1-5-pruned-emaonly-fp16.safetensors"
+        ]
       }
     },
     {
@@ -375,6 +500,17 @@
         "slot_overrides.music_engine": "sonilo",
         "slot_overrides.video_render_engine": "cloud_vidu_q2_pro_fast_720p",
         "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {
+          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+        }
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_COMFY_API_KEY"
+        ]
       }
     },
     {
@@ -405,6 +541,17 @@
         "slot_overrides.music_engine": "sonilo",
         "slot_overrides.video_render_engine": "cloud_vidu_q2_pro_fast_720p",
         "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {
+          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+        }
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_COMFY_API_KEY"
+        ]
       }
     },
     {
@@ -435,6 +582,17 @@
         "slot_overrides.music_engine": "sonilo",
         "slot_overrides.video_render_engine": "cloud_vidu_q2_pro_fast_720p",
         "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {
+          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+        }
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_COMFY_API_KEY"
+        ]
       }
     },
     {
@@ -465,6 +623,17 @@
         "slot_overrides.music_engine": "sonilo",
         "slot_overrides.video_render_engine": "cloud_ltx25_foley_plus",
         "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {
+          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+        }
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_COMFY_API_KEY"
+        ]
       }
     },
     {
@@ -495,6 +664,17 @@
         "slot_overrides.music_engine": "sonilo",
         "slot_overrides.video_render_engine": "cloud_ltx25_audio_in",
         "video.device_policy": "cpu"
+      },
+      "launch": {
+        "boot_contract": "cpu",
+        "env": {
+          "OTR_COMFY_MAX_TOKENS_PER_RUN": "1000000"
+        }
+      },
+      "preflight": {
+        "required_keys": [
+          "OTR_COMFY_API_KEY"
+        ]
       }
     },
     {
@@ -520,6 +700,19 @@
         "slot_overrides.video_render_engine": "ltx25_native_foley_24gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "note": "Native (non-GGUF) big-card tier, 2026-09-22. DRAFT: the variant is how a live leg becomes possible, not a claim that one has run. It builds a graph so the lane can be run and measured, which is how qualification happens here.",
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-int8.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+        ]
       }
     },
     {
@@ -541,6 +734,21 @@
         "slot_overrides.video_render_engine": "ltx25_native_foley_16gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- a workflow with no variant is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060, against 1018 s cold and 821-859 s warm for the GGUF lane this tier replaces. So the native tier is FASTER than the GGUF one and it auto-downloads, which GGUF cannot -- the \"slower but installable\" framing carried for weeks was wrong in both halves.",
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+          "stable_audio_3_small_music.safetensors",
+          "t5gemma_b_b_ul2.safetensors"
+        ]
       }
     },
     {
@@ -562,6 +770,21 @@
         "slot_overrides.video_render_engine": "ltx25_native_mime_16gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- a workflow with no variant is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060, against 1018 s cold and 821-859 s warm for the GGUF lane this tier replaces. So the native tier is FASTER than the GGUF one and it auto-downloads, which GGUF cannot -- the \"slower but installable\" framing carried for weeks was wrong in both halves.",
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+          "stable_audio_3_small_music.safetensors",
+          "t5gemma_b_b_ul2.safetensors"
+        ]
       }
     },
     {
@@ -583,6 +806,21 @@
         "slot_overrides.video_render_engine": "ltx25_native_foley_16gb",
         "video.device_policy": "cuda",
         "video.dtype_policy": "fp8_ok"
+      },
+      "note": "The 8 GB native tier, 2026-09-23. Operator: \"if it's a lane it should be in the workflows folder\" -- a workflow with no variant is not a lane a person can pick, and these had been discussed as lanes while sitting in that state. COSTS NO NEW DOWNLOAD: all three run mix4x8, measured clean at 707.0 s for a 97-frame clip on a 4060, against 1018 s cold and 821-859 s warm for the GGUF lane this tier replaces. So the native tier is FASTER than the GGUF one and it auto-downloads, which GGUF cannot -- the \"slower but installable\" framing carried for weeks was wrong in both halves.",
+      "launch": {
+        "boot_contract": "default"
+      },
+      "preflight": {
+        "required_models": [
+          "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+          "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+          "ltx-2.5-video-vae-bf16.safetensors",
+          "ltx-2.5-audio-vae-bf16.safetensors",
+          "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+          "stable_audio_3_small_music.safetensors",
+          "t5gemma_b_b_ul2.safetensors"
+        ]
       }
     }
   ]

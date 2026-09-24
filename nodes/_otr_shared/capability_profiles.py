@@ -35,6 +35,7 @@ pulls in no torch / comfy / model framework (V-12 cold-import clean).
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 from typing import Any, Optional
@@ -369,8 +370,154 @@ def validate_profile_shape(profile: Any, source: str = "<dict>") -> dict:
     return profile
 
 
+#: THE WORKFLOW MATRIX -- the source of truth for every SHIPPED workflow.
+#: One row per workflow, each stating only what it changes against the canonical
+#: graph. Operator, 2026-09-24: "you need a matrix to drive the variants ...
+#: ideally it's stored in a JSON and when it's updated it updates the variants
+#: AND the documentation, all at once."
+MATRIX_PATH = os.path.join(_REPO_ROOT, "config", "workflow_matrix.json")
+
+
+def load_matrix(path: Optional[str] = None) -> dict:
+    """The matrix document. Raises :class:`ProfileError` if it is unusable."""
+    p = path or MATRIX_PATH
+    try:
+        with open(p, "r", encoding="utf-8") as fh:
+            doc = json.load(fh)
+    except OSError as e:
+        raise ProfileError(f"workflow matrix {p!r} cannot be read: {e}") from e
+    except json.JSONDecodeError as e:
+        raise ProfileError(f"workflow matrix {p!r} is not valid JSON: {e}") from e
+    if not isinstance(doc, dict) or not isinstance(doc.get("rows"), list):
+        raise ProfileError(
+            f"workflow matrix {p!r}: expected an object with a 'rows' list")
+    return doc
+
+
+def matrix_rows(path: Optional[str] = None) -> dict:
+    """``{id: row}`` for every row in the matrix.
+
+    A duplicate id is refused rather than letting the later row win silently:
+    two rows for one workflow means one of them is never applied and nothing
+    would say which.
+    """
+    rows = {}
+    for row in load_matrix(path)["rows"]:
+        if not isinstance(row, dict) or not row.get("id"):
+            raise ProfileError("workflow matrix: a row has no 'id'")
+        rid = row["id"]
+        if rid in rows:
+            raise ProfileError(f"workflow matrix: duplicate row id {rid!r}")
+        rows[rid] = row
+    return rows
+
+
+def shipping_ids(path: Optional[str] = None) -> tuple:
+    """The ids that emit a graph into ``workflows/variants/``, matrix order.
+
+    An allow-list, deliberately, exactly as the hand-kept tuple this replaces
+    was: a row has to say `ships` to reach a user, so a new row defaults to NOT
+    shipping, which is the safe direction to be wrong in.
+    """
+    return tuple(r["id"] for r in load_matrix(path)["rows"] if r.get("ships"))
+
+
+#: Row keys that are metadata rather than graph values: they never reach a
+#: widget, and the doc generators read them.
+_ROW_META_KEYS = ("display_name", "status", "platform", "device_backend",
+                  "gpu_vendor", "allow_sidecars", "toolchains")
+
+
+def _unflatten(pairs: dict) -> dict:
+    """``{'llm.device': 'cuda'}`` -> ``{'llm': {'device': 'cuda'}}``"""
+    out: dict = {}
+    for dotted, value in pairs.items():
+        parts = str(dotted).split(".")
+        node = out
+        for part in parts[:-1]:
+            nxt = node.setdefault(part, {})
+            if not isinstance(nxt, dict):
+                raise ProfileError(
+                    f"workflow matrix: delta key {dotted!r} collides with a "
+                    f"value already set at {part!r}")
+            node = nxt
+        node[parts[-1]] = value
+    return out
+
+
+#: Non-widget sections that default from the matrix rather than the canonical.
+#: A row states only the keys that differ; the rest merge in from `defaults`.
+_ROW_MERGE_SECTIONS = ("launch", "preflight")
+
+
+def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
+    """Expand one matrix row into the dict every consumer reads.
+
+    TWO KINDS OF KEY, TWO DEFAULT SOURCES, and the distinction is the whole
+    design:
+
+    * A WIDGET-MAPPED key the row omits takes THE CANONICAL GRAPH's value. The
+      matrix keeps no copy, so such a key cannot become a stale pin -- the fix
+      for the drift that once left 82 configs on a voice engine the canonical had
+      moved off.
+    * A NON-WIDGET key -- `launch`, `preflight`, `status`, `platform` -- has no
+      canonical to fall back on, because it never reaches a widget. Those default
+      from the matrix's own `defaults` block, merged shallowly so a row states
+      only what differs.
+
+    Getting that second half wrong is what drifted all 24 launch recipes on the
+    first attempt: the graphs were perfect and the recipes read fields the row
+    had silently dropped. A `None` in a merge section means the row deliberately
+    does not have that key, as opposed to inheriting it.
+    """
+    if defaults is None:
+        try:
+            defaults = load_matrix().get("defaults") or {}
+        except ProfileError:
+            defaults = {}
+
+    doc = {"id": row["id"]}
+    for key in _ROW_META_KEYS:
+        if key in row:
+            doc[key] = row[key]
+        elif key in defaults:
+            doc[key] = copy.deepcopy(defaults[key])
+
+    for section in _ROW_MERGE_SECTIONS:
+        base = copy.deepcopy(defaults.get(section) or {})
+        base.update(row.get(section) or {})
+        merged = {k: v for k, v in base.items() if v is not None}
+        if merged or section in defaults or section in row:
+            doc[section] = merged
+
+    deltas = row.get("deltas") or {}
+    if not isinstance(deltas, dict):
+        raise ProfileError(
+            f"workflow matrix row {row['id']!r}: 'deltas' must be an object")
+
+    # THE BASELINE FIRST, THEN THE ROW. `defaults.values` holds the value the
+    # canonical graph already carries for every key a row is allowed to omit, in
+    # PROFILE form (bare ids, not the COMBO labels the graph stores). Resolving
+    # here rather than making every consumer handle absence is what keeps
+    # `load_profile`'s contract -- a complete document -- unchanged for the nine
+    # modules that index its fields directly.
+    resolved = dict(defaults.get("values") or {})
+    resolved.update(deltas)
+    doc.update(_unflatten(resolved))
+    return doc
+
+
 def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
-    """Load + shape-validate ``config/profiles/<id>.json``. Fail closed."""
+    """Resolve a workflow id to a shape-validated config. Fail closed.
+
+    THE MATRIX IS CONSULTED FIRST for every shipped workflow -- that is what
+    makes `config/workflow_matrix.json` the single source of truth rather than a
+    second copy of one. An id with no row falls through to
+    ``config/profiles/<id>.json``, which keeps the lab rigs (`otr_soak_*`,
+    `otr_w45_*`) working; they answer "which experiment", not "which workflow
+    ships". An explicit `profile_dir` also reads the folder, because that is how
+    tests point this at a fixture directory.
+    """
     d = profile_dir or PROFILE_DIR
     # A PROFILE ID NAMES A FILE IN THIS DIRECTORY, NEVER A LOCATION
     # (2026-09-05). `profile_id` reaches here from OTR_WorkflowValidator's free
@@ -383,6 +530,20 @@ def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
         raise ProfileError(
             f"profile {profile_id!r}: an id names a file in {d!r}, not a path"
         )
+
+    # THE MATRIX, unless the caller explicitly named a directory. Checked AFTER
+    # the traversal refusal above, so a hostile id cannot reach even this
+    # lookup -- and a matrix hit touches no filesystem path at all.
+    if profile_dir is None:
+        try:
+            rows = matrix_rows()
+        except ProfileError:
+            rows = {}                      # no matrix yet: the folder still works
+        row = rows.get(profile_id)
+        if row is not None:
+            return validate_profile_shape(
+                profile_from_row(row), f"workflow_matrix.json:{profile_id}")
+
     path = os.path.join(d, f"{profile_id}.json")
     if not os.path.isfile(path):
         try:
