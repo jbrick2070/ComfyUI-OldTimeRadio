@@ -716,7 +716,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         avoid paying for it", and omitting the weight here would fail the lane
         at graph time instead of at the gate.
         """
-        return [
+        paths = [
             ("LTX 2.5 DiT (%s)" % self._weight_family(),
              _resolve("unet", self._dit_name()), _FLOOR_DIT),
             ("Gemma-4 12B text encoder (%s)" % self._weight_family(),
@@ -726,10 +726,43 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
              _FLOOR_VIDEO_VAE),
             ("LTX 2.5 audio VAE", _resolve("vae", self._audio_vae_name()),
              _FLOOR_AUDIO_VAE),
-            ("LTX 2.5 latent spatial upscaler",
-             _resolve("latent_upscale_models", self._upscaler_name()),
-             _FLOOR_UPSCALER),
         ]
+        # THE UPSCALER IS ONLY REQUIRED BY A LANE THAT BUILDS ITS LOADER.
+        #
+        # This list feeds `assert_usable()`, which checks each file exists and
+        # clears a size floor and raises EngineUnusable otherwise. The low-res
+        # lane drops `upscale_loader` from its graph and its profile's
+        # `required_models` accordingly -- so while this entry was
+        # unconditional, a fresh install that fetched exactly the declared files
+        # had no upscaler and the lane refused to start. Declared six weights,
+        # demanded seven. Found by a refutation lane reading the inherited
+        # method rather than the diff.
+        #
+        # The alternative -- put the file back in `required_models` -- would make
+        # every install of this lane download 536 MB it never opens, which is
+        # the opposite of why the lane exists.
+        if self._ingraph_upscale:
+            paths.append(
+                ("LTX 2.5 latent spatial upscaler",
+                 _resolve("latent_upscale_models", self._upscaler_name()),
+                 _FLOOR_UPSCALER))
+        return paths
+
+    def _output_canvas(self):
+        """``(width, height)`` this lane really decodes at.
+
+        THREE PLACES REPORTED THE DOUBLED CANVAS UNCONDITIONALLY -- the PLAN log,
+        the tail-trim log and the clip RECEIPT -- so a low-res lane announced
+        1664x960 while writing 832x480. The receipt is the one that mattered: it
+        is copied into the canonical clip, carried into the manifest by
+        `render_driver`, and printed in the episode's CREDITS text by
+        `otr_credits_roll`. A viewer would have read a resolution the file does
+        not have. Found by a refutation lane grepping RENDER_CANVAS rather than
+        reading the diff.
+        """
+        if self._ingraph_upscale:
+            return R.LTX25_RENDER_CANVAS_W, R.LTX25_RENDER_CANVAS_H
+        return R.LTX25_CANVAS_W, R.LTX25_CANVAS_H
 
     def _quant_label(self):
         """The quant token from the DiT basename (``Q3_K_M``) for the per-beat
@@ -1540,8 +1573,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "[OTR video] %s PLAN dit=%s quant=%s source=%dx%d output=%dx%d frames=%d "
             "steps=%d sampler=%s cfg=%.1f/%.1f/%.1f anchor=%.1f",
             self.name, os.path.basename(str(self._dit_name())),
-            self._quant_label(), width, height, R.LTX25_RENDER_CANVAS_W,
-            R.LTX25_RENDER_CANVAS_H, length, R.LTX25_STEPS,
+            self._quant_label(), width, height, self._output_canvas()[0],
+            self._output_canvas()[1], length, R.LTX25_STEPS,
             R.LTX25_SAMPLER, R.LTX25_CFG_VIDEO, R.LTX25_CFG_AUDIO,
             R.LTX25_CFG_MODALITY, R.LTX25_I2V_ANCHOR_STRENGTH)
 
@@ -1808,8 +1841,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             _LOG.info(
                 "[OTR video] %s tail trim: delivered %d of %d frame(s) "
                 "(ratio %.3f) @ %dx%d", self.name, len(frames), length,
-                len(frames) / float(length), R.LTX25_RENDER_CANVAS_W,
-                R.LTX25_RENDER_CANVAS_H)
+                len(frames) / float(length), self._output_canvas()[0],
+                self._output_canvas()[1])
 
         out_path = otr_engine_tmp_mp4("otr_%s_" % self.name)
         path, n = _wb.encode_frames_to_silent_mp4(frames, out_path,
@@ -1829,8 +1862,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
             "recipe": R.LTX25_TWO_STAGE_RECIPE_ID,
             "unet": os.path.basename(str(self._dit_name())),
             "quant": self._quant_label(), "use_lora": False,
-            "canvas": "%dx%d" % (R.LTX25_RENDER_CANVAS_W,
-                                     R.LTX25_RENDER_CANVAS_H),
+            "canvas": "%dx%d" % self._output_canvas(),
             # THE HONESTY RECEIPTS, and ``native_frame_count`` is EQUAL to the
             # delivered count on this lane -- always, trimmed or not.
             #
