@@ -1875,44 +1875,46 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         first plateau, and on the 4060 the first plateau was 2.5 GB short.
         """
         import time
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.synchronize()
-        except Exception:                   # noqa: BLE001 -- telemetry only
-            pass
-        # TWO flat reads, a full second apart, before we believe it.
+        # SAY WHAT IT SAW. Three cuts at the exit condition have all returned
+        # the same 4940 MB on the 4060 -- four runs, three commits, identical
+        # to the megabyte -- while that card's TRUE floor moved more than 2 GB
+        # between legs (789 MiB used on one, 2821 MiB on the next). A reading
+        # that is merely EARLY tracks the floor and varies with it. One that
+        # does not move at all while the underlying quantity swings 2 GB is not
+        # sampling the floor, and a fourth guess at the predicate will not find
+        # out why.
         #
-        # This used to poll every 0.5 s and return on the FIRST reading that
-        # was not higher than the last. The release lands in ~1 s steps (the
-        # trace above), so two reads inside one step are IDENTICAL and the
-        # loop exited on a plateau that was not the end -- it read 4940 MB
-        # against a settled ~7399 MB and a decode then ground for 17 minutes
-        # 2.5 GB poorer than the card really was. Sampling faster than the
-        # thing you are measuring does not measure it sooner.
-        # `floor_mb` is the UNSETTLED reading -- it must not seed the
-        # flatness test, or the first real read matches it and counts as
-        # flat straight away. It is only the fallback when we cannot read
-        # at all. (Caught by the probe for this function: seeding with it
-        # reproduced the very bug this rewrite exists to fix.)
+        # Nobody has yet seen the sequence this loop observes on that card: an
+        # external nvidia-smi trace cannot see inside the twelve tries. So it
+        # logs every reading with its timestamp, once per call, and the next
+        # leg answers the question instead of extending it. The 4060 box asked
+        # for exactly this, and it is right that four attempts have been
+        # reasoned about and none measured.
+        trace = []
+        t0 = time.monotonic()
+
+        def _done(value, why):
+            _LOG.info("[OTR video] %s: settle %s -> %s | readings: %s",
+                      self.name, why,
+                      "None" if value is None else "%.0f MB" % value,
+                      " ".join(trace) or "(none)")
+            return value
+
         best = None
         flat = 0
         rose = False
         while True:
             now = _MC.free_vram_mb()
+            trace.append("%.1fs=%s" % (time.monotonic() - t0,
+                                       "None" if now is None else "%.0f" % now))
             if now is None:
-                # A FAILED PROBE IS NOT AN ANSWER. This used to return
-                # `floor_mb` -- the unsettled pre-eviction reading the rest of
-                # this function exists to avoid -- so one bad sample
-                # republished the exact number the rewrite was written to stop
-                # publishing. Skip the sample and keep waiting.
+                # A failed probe is not an answer: `floor_mb` is the UNSETTLED
+                # pre-eviction reading this function exists to avoid, so one
+                # bad sample must not republish it. Skip and keep waiting.
                 tries = int(tries) - 1
                 if tries <= 0:
-                    # NEVER RETURN None. `floor_mb` went dead here when the
-                    # None-skip landed, and the caller formats None as
-                    # "-1 MB" -- a worse figure in the diagnostic than the
-                    # 4940 this whole arc exists to stop publishing.
-                    return best if best is not None else floor_mb
+                    return _done(best if best is not None else floor_mb,
+                                 "gave up on unreadable card")
                 time.sleep(float(pause_s))
                 continue
             if best is None:
@@ -1923,47 +1925,30 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
                 flat = 0
                 rose = True                 # the release is demonstrably live
             elif now >= best - 50.0:
-                # At or near the high-water mark: a genuine plateau.
+                # At or near the high-water mark: a genuine plateau. RISE
+                # FIRST, THEN TWO FLATS -- the opening reading is taken while
+                # the release is still in flight, so a plateau never
+                # interrupted by a rise proves only that nothing has happened
+                # yet.
                 best = max(best, now)
                 flat += 1
-                # RISE FIRST, THEN TWO FLATS. The opening reading is taken
-                # while the release is still in flight, so a plateau that has
-                # never been interrupted by a RISE is the same false plateau
-                # the 0.5 s version returned -- four identical samples prove
-                # only that nothing has happened yet. An earlier draft
-                # justified a bare "minimum 4 reads" by the five-sample trace
-                # in the docstring above; that trace is USED memory FALLING,
-                # not free memory rising, so it never supported the claim.
-                # Waiting for a rise targets the defect instead of guessing a
-                # duration.
                 if rose and flat >= 2:
-                    return best
+                    return _done(best, "settled (rise then two flat)")
                 if flat >= 3 and not rose:
-                    # NOTHING IS COMING. The release starts moving within a
-                    # second of `reset_cast_buffers` returning, so three
-                    # consecutive 1 s reads with no movement at all mean the
-                    # eviction freed nothing -- a repeat call inside one beat,
-                    # say. Waiting out the full cap there is slower than the
-                    # version this replaced, which is a regression rather than
-                    # a fix. This is NOT the old bug: that returned after one
-                    # flat pair 0.5 s apart, which is shorter than the release
-                    # takes to begin.
-                    return best
+                    # Nothing is coming: three still reads at 1 s is longer
+                    # than the release takes to begin, so this is an eviction
+                    # that freed nothing rather than one still in flight.
+                    return _done(best, "never moved")
             else:
-                # A big DROP is not a plateau -- something else took memory,
-                # or the release is still moving. Keep waiting rather than
-                # reading the dip as "settled".
+                # A big DROP is not a plateau -- something else took memory, or
+                # the release is still moving. Keep waiting.
                 flat = 0
             tries = int(tries) - 1
             if tries <= 0:
-                # THE CAP REPORTS WHAT IS FREE NOW, not the peak. A high-water
-                # mark can publish a figure seen for a single read while a
-                # sustained collapse to a fraction of it goes unmentioned, and
-                # this number is logged immediately before the decode runs --
-                # so "what is free now" is the honest answer to the question
-                # being asked. On the normal settled exit above the two are the
-                # same value anyway.
-                return now if now is not None else best
+                # The cap reports what is free NOW, not the high-water mark: a
+                # peak seen once while a sustained collapse goes unmentioned is
+                # the wrong number to hand a decode that is about to run.
+                return _done(now if now is not None else best, "hit the cap")
             time.sleep(float(pause_s))
 
     def _total_vram_mb(self):
