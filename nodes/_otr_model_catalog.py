@@ -2099,6 +2099,19 @@ def _estimate_resident_gb(
     safetensors_gb_hint: float | None = None,
     context_cap: int | None = None,
 ) -> float | None:
+    # `context_cap` IS DELIBERATELY NOT READ, and that is the contract rather
+    # than an oversight. Its only reader was the removed writer-backend branch,
+    # where cost was weights + a KV cache that scaled with the requested
+    # context. Every surviving row is a safetensors download whose resident
+    # size does not move with context, so pricing one against a context would
+    # be the PBUG-20260829-08/-17/-20 defect returning: judging a request by a
+    # number the loader will not honour.
+    #
+    # The parameter stays because it is the handle the tripwire needs --
+    # tests/test_gate_prices_the_policy_context.py calls this at 8192 and at
+    # 262144 and asserts the estimate does not move. That assertion is
+    # tautological today BY CONSTRUCTION, which is the point: it fails the
+    # moment someone reintroduces context sensitivity here.
     """Rough heuristic for VRAM resident size on the OTR pipeline.
 
     OTR's loader (story_orchestrator._load_llm) uses 8-bit / NF4-style

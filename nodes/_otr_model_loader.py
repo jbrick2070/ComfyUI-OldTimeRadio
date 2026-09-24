@@ -2027,13 +2027,13 @@ def request_slot(
       5. Transformers cache hit (same model_id + same policy cache_key)
          -> return entry; a mismatched cache_key is a teardown, never
          a silent reuse.
-      7. auto_download_if_missing -- gated/disk-space pre-flight +
+      6. auto_download_if_missing -- gated/disk-space pre-flight +
          snapshot_download. Local-cache short-circuit fires inside the
          catalog helper.
-      8. _self_unload() (only if a different model was resident), then
+      7. _self_unload() (only if a different model was resident), then
          load_llm(model_id, context_cap=ctx_verdict.value) -- skips the
          second catalog walk by forwarding the resolved cap.
-      9. Cache the entry under (slot, model_id).
+      8. Cache the entry under (slot, model_id).
 
     `slot` is "creative" or "technical" -- used for log lines + cache
     keying. The cache holds at most one resident model regardless of

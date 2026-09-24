@@ -1410,23 +1410,34 @@ does not:
   14.47 on CUDA, because there is no Metal NF4 kernel. So `none` is the only
   reachable quant, and `none` is exactly the setting that peaks at 14 GB.
 
-**What fits: the GGUF writer row at `gguf_quant: Q4_K_M`** -- roughly 2.5 GB for
-a 4B writer, against 8.7 GB of bf16 safetensors. `nodes/_otr_gguf_backend.py`
-is genuinely device-aware here (`default_layers = DEFAULT_N_GPU_LAYERS if
-policy.device in ("cuda", "mps") else 0`), so llama.cpp's Metal backend takes
-`n_gpu_layers` exactly as CUDA does rather than silently falling back to CPU.
-Section 11 covers the install, which is high-friction but solved.
+**The answer this section used to give is gone, and saying so is the point.**
+It pointed at a GGUF writer row at `gguf_quant: Q4_K_M` -- roughly 2.5 GB for a
+4B writer against 8.7 GB of bf16 safetensors -- and at
+`nodes/_otr_gguf_backend.py`, which was genuinely device-aware (it passed
+`n_gpu_layers` on `mps` exactly as on `cuda`, so llama.cpp's Metal backend took
+it rather than silently falling back to CPU).
+
+**That backend was DELETED on 2026-09-24**, with its two widgets, its provider,
+its lane and its policy fields. The paragraph below already recorded that no row
+had ever been pinned for it, so the lane was unreachable in practice; what
+changed is that it is no longer one pinned artifact away from working. Anyone
+reviving it is rebuilding it, not filling in a blank.
+
+**So the sizing problem stated above stands, and this repo currently documents
+no in-tree answer to it.** That is the honest status, and it is deliberately not
+papered over with a substitute recommendation.
 
 So Apple Silicon wants its own writer lane. **This is stated here and enforced
 nowhere** -- operator directive, 2026-09-09: no gated dropdowns and no
 capability matrix in code, only documentation. A guard that refused the bf16
 lane on Metal was written and then removed for exactly that reason.
 
-**NOT YET SELECTABLE, and this is the honest status.** `GGUF_ROWS` in
-`nodes/_otr_gguf_backend.py` is currently EMPTY, so no GGUF writer appears in
-the picker at all -- there is nothing to point a Metal-named row at until a
-pinned artifact is added. The backend is ready and device-aware; the row is
-missing.
+**IT WAS NEVER SELECTABLE, which is why it could be removed.** `GGUF_ROWS` in
+`nodes/_otr_gguf_backend.py` was an empty tuple from the 2026-09-06 directive
+onward, so no GGUF writer ever appeared in the picker -- there was nothing to
+point a Metal-named row at, and no episode was ever written through it. The
+backend was device-aware and unreached, and on 2026-09-24 it was deleted rather
+than kept standing for a row nobody was going to pin.
 
 **The arithmetic, so you can size it yourself.** Resident runs about **1.61x**
 the bf16 download size -- `14 / 8.68`, the one measurement this repo has

@@ -169,12 +169,17 @@ usable script format at all.
 
 ---
 
-## The two GGUF widgets, and why they do nothing
+## There is no GGUF writer, and no GGUF widgets
 
-You will see `gguf_n_ctx` and `gguf_quant` further down the node. They belong to
-a GGUF writer lane, and **this pack ships no GGUF writer**. There is no GGUF
-entry in either model dropdown, so neither widget has anything to act on. They
-are inert, and that is the correct state.
+**This pack ships no GGUF writer.** There is no GGUF entry in either model
+dropdown.
+
+Two widgets, `gguf_n_ctx` and `gguf_quant`, used to sit further down the node
+with nothing to act on. They were REMOVED on 2026-09-24 along with the backend
+behind them, so if you are reading an older copy of this page and hunting for
+them on the node, stop -- they are gone, not hidden. A workflow you saved before
+that date still opens: the pack migrates it by widget name on load, or refuses
+it with a readable message rather than shifting your other values.
 
 This is deliberate and it is not a gap waiting to be filled. A GGUF writer row
 has no automatic download -- the file has to be fetched and placed by hand --

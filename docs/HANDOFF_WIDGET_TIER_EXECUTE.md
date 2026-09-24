@@ -72,7 +72,7 @@ include_act_breaks, visual_style, creativity, lemmy_cameo,
 story_characters, story_plot, story_setting, story_author
 ```
 
-The 23 that remain unplaced, after `perfect_run_spacesaver` is removed:
+The rest remain unplaced:
 
 ```
 creative_writing_model, technical_model, min_p, repetition_penalty,
@@ -80,12 +80,18 @@ max_new_tokens_cap, use_exchange, enable_production_stage3_validators,
 news_briefs_required, openrouter_slot_a_model, openrouter_slot_b_model,
 comfy_slot_a_model, comfy_slot_b_model, story_scaffold,
 google_api_slot_a_model, google_api_slot_b_model, source_ref, llm_device,
-llm_attn_impl, llm_quant_policy, llm_vram_ceiling_gb, gguf_n_ctx, gguf_quant,
-replay_from
+llm_attn_impl, llm_quant_policy, llm_vram_ceiling_gb, replay_from
 ```
 
-Propose one explicit ordering of all 36, get the operator's yes, and make that
-list an executable test before touching `INPUT_TYPES`.
+UPDATED 2026-09-24: this list used to name `gguf_n_ctx` and `gguf_quant` too,
+and used to count the widgets. Both widgets were removed with the writer backend
+behind them, and `episode_language` has been appended since. DO NOT resume this
+handoff against the counts in it -- read the live `INPUT_TYPES()` and rebuild
+both lists before proposing an order, because this plan was never executed and
+the schema has moved twice underneath it.
+
+Propose one explicit ordering of the live set, get the operator's yes, and make
+that list an executable test before touching `INPUT_TYPES`.
 
 ## The traps, measured
 
