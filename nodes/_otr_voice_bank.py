@@ -85,11 +85,6 @@ def _min_tier_pool() -> int:
                                     _MIN_TIER_POOL_DEFAULT)))
     except (TypeError, ValueError):
         return _MIN_TIER_POOL_DEFAULT
-VOICE_BANK_SCHEMA_VERSION = "1"
-# VOICE_FIT_POLICY_VERSION IS RETIRED (2026-08-18). It versioned the hybrid LLM
-# voice-fit's card schema and validation contract, and both were ripped along
-# with the pass -- a constant that versions nothing is worse than no constant,
-# because the next reader assumes something still honours it.
 
 # Engines whose announcer comes from a CURATED pool and is drawn per episode
 # rather than pinned to the lowest voice_ref_id. kokoro joined 2026-08-05: it

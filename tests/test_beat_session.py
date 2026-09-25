@@ -362,7 +362,7 @@ def test_render_one_with_a_session_reuses_the_handles_and_does_NOT_tear_down(
     _install(monkeypatch, eng)
     with bs.BeatSession(eng, beat_id="b001", segment_count=3) as session:
         for index in range(3):
-            rd._render_one(eng.name, {"shot_id": "s1"}, force_oom=False,
+            rd._render_one(eng.name, {"shot_id": "s1"},
                            segment=bs.SegmentSlot(session, index))
         # INSIDE the session the handles are still held -- a per-clip teardown
         # here is precisely the bug: segment 2 would reload what segment 1 had.
@@ -376,8 +376,8 @@ def test_render_one_without_a_session_keeps_the_historical_bracket(monkeypatch):
     """Every beat today. One prepare, one render, one teardown, per clip."""
     eng = _DriverStub()
     _install(monkeypatch, eng)
-    rd._render_one(eng.name, {"shot_id": "s1"}, force_oom=False)
-    rd._render_one(eng.name, {"shot_id": "s2"}, force_oom=False)
+    rd._render_one(eng.name, {"shot_id": "s1"})
+    rd._render_one(eng.name, {"shot_id": "s2"})
     assert (eng.prepare_calls, eng.load_calls, eng.teardown_calls) == (2, 2, 2)
 
 
@@ -390,9 +390,9 @@ def test_assert_usable_runs_PER_SEGMENT(monkeypatch):
         seen.append(request_template)
     _install(monkeypatch, eng)
     with bs.BeatSession(eng, beat_id="b001", segment_count=2) as session:
-        rd._render_one(eng.name, {"shot_id": "s1"}, force_oom=False,
+        rd._render_one(eng.name, {"shot_id": "s1"},
                        segment=bs.SegmentSlot(session, 0))
-        rd._render_one(eng.name, {"shot_id": "s2"}, force_oom=False,
+        rd._render_one(eng.name, {"shot_id": "s2"},
                        segment=bs.SegmentSlot(session, 1))
     assert [r["shot_id"] for r in seen] == ["s1", "s2"]
 
@@ -405,7 +405,7 @@ def test_a_session_holding_a_DIFFERENT_engine_is_refused(monkeypatch):
     _install(monkeypatch, rendering)
     with bs.BeatSession(other, beat_id="b001", segment_count=2) as session:
         with pytest.raises(rd.RenderError, match="one session, one engine"):
-            rd._render_one(rendering.name, {"shot_id": "s1"}, force_oom=False,
+            rd._render_one(rendering.name, {"shot_id": "s1"},
                            segment=bs.SegmentSlot(session, 0))
 
 
@@ -579,7 +579,7 @@ def test_the_single_clip_path_names_its_beat(monkeypatch):
     """So the adapter's session_ctx and the teardown log carry a real id."""
     eng = _DriverStub()
     _install(monkeypatch, eng)
-    rd._render_one(eng.name, {"shot_id": "shot_b007"}, force_oom=False)
+    rd._render_one(eng.name, {"shot_id": "shot_b007"})
     assert eng.seen_ctx[0]["beat_id"] == "shot_b007"
 
 
@@ -591,7 +591,7 @@ def test_a_request_that_is_not_a_dict_still_opens_a_session(monkeypatch):
 
     eng = _DriverStub()
     _install(monkeypatch, eng)
-    rd._render_one(eng.name, _RequestObject(), force_oom=False)
+    rd._render_one(eng.name, _RequestObject())
     assert eng.seen_ctx[0]["beat_id"] == "shot_b009"
 
 

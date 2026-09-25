@@ -215,10 +215,7 @@ def _live_openrouter_get_json(url: str) -> dict:
 
 
 def _live_google_get_json(path: str) -> dict:
-    try:
-        from .._otr_google_api.client import get_json
-    except ImportError:  # pragma: no cover
-        from nodes._otr_google_api.client import get_json
+    from .._otr_google_api.client import get_json
     return get_json(path)
 
 

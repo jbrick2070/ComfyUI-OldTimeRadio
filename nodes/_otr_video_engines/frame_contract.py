@@ -66,27 +66,6 @@ class FrameContractError(ValueError):
     """An adapter declared a frame contract that cannot be satisfied."""
 
 
-class ContractEnvConflict(RuntimeError):
-    """The ENVIRONMENT asked for something a static declaration forbids.
-
-    Deliberately NOT a :class:`FrameContractError`. That one means "the
-    declaration itself is incoherent" and is raised at construction, so it can
-    never reach a render. This one means "the declaration is fine and the box
-    was told something else", which is a runtime condition an operator caused
-    and an operator can fix -- so it carries the variable name and the legal
-    values, and is caught by nothing.
-
-    SCOPE, HONESTLY (2026-07-26). Raised by adapters whose env pin can leave
-    a declared menu (LTX duration, and historically the retired LTX-AV and
-    Pixverse ``word_razzle`` lanes). The wider question --
-    whether an env var may lower a declared CEILING at all -- is deliberately
-    NOT answered here: several of those vars are documented operator knobs for
-    VRAM-constrained boxes (the WAN 8GB launch contract depends on one), so
-    refusing them outright would break a real production path. The fork was
-    written up as an OPEN DECISION (2026-07-26) and is the operator's to settle.
-    """
-
-
 @dataclass(frozen=True)
 class FrameContract:
     """The STATIC, PURE set of render lengths an adapter will accept.

@@ -36,7 +36,7 @@ def test_every_registered_engine_declares_no_fallback():
 
 
 def test_classify_failure_is_always_hard():
-    assert rd.classify_failure(rd.OomSignal("x")) is rt.FailureKind.OOM
+    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rt.FailureKind.OOM
     assert rt.block_class_of(rd.classify_failure(LookupError())) is rt.BlockClass.HARD
     assert rt.block_class_of(
         rd.classify_failure(RuntimeError("boom"))) is rt.BlockClass.HARD

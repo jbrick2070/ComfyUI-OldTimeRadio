@@ -68,12 +68,8 @@ _LOG = logging.getLogger("OTR.video.render_driver")
 # E1). Engine failure = LOUD RenderError; still_motion remains a registered
 # SELECTABLE engine but has no floor role.
 
-#: engine_id -> family (covers the soak stub + the A/cheap engines).
+#: engine_id -> family (covers the A/cheap engines).
 ENGINE_FAMILY = {
-    "soak_oom_heavy": "audio_driven_face",  # synthetic soak stub (forced-OOM leg,
-                                            # rebased off character_3d 2026-08-23
-                                            # so the OOM contract survives the
-                                            # order-4 family retirement)
     "humo": "audio_driven_face",
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
@@ -279,11 +275,6 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
 }
 
 
-class OomSignal(RuntimeError):
-    """Stand-in for a render-time CUDA OOM (a HARD failure) -- the soak forces it
-    on the mid-episode injected stub shot to prove the LOUD-raise contract."""
-
-
 class RenderFloorError(RuntimeError):
     """A radio-open beat rendered on the procgen/still floor instead of an LTX
     engine (BUG-LOCAL-413 strict mode -- see :func:`check_ltx_open_health`).
@@ -331,7 +322,7 @@ def out_of_memory_in_chain(exc):
     seen, current = set(), exc
     while current is not None and id(current) not in seen:
         seen.add(id(current))
-        if type(current).__name__ in ("OutOfMemoryError", "OomSignal"):
+        if type(current).__name__ == "OutOfMemoryError":
             return True
         if "out of memory" in str(current).lower():
             return True
@@ -409,8 +400,6 @@ def _job_scoped_failure_kind(exc):
 
 def classify_failure(exc):
     """Map a render exception to a HARD :class:`FailureKind` (all escalate)."""
-    if isinstance(exc, OomSignal):
-        return _rt.FailureKind.OOM
     # BEFORE the type table: an OOM wearing a GraphExecutionError is an OOM.
     if out_of_memory_in_chain(exc):
         return _rt.FailureKind.OOM
@@ -4096,13 +4085,11 @@ def _assert_family_inputs_satisfiable(engine_name, request):
             "request to an engine)" % (engine_name, fam, missing))
 
 
-def _render_one(engine_name, request, *, force_oom, host_caps=None,
-                profile=None, segment=None):
+def _render_one(engine_name, request, *, host_caps=None, profile=None,
+                segment=None):
     """Attempt ONE candidate engine: assert_usable -> prepare -> render_clip ->
-    canonicalize, always teardown. ``force_oom`` raises BEFORE any work (the
-    soak's deterministic mid-episode OOM -- it precedes the family-input check
-    so the soak's expected OOM trail is exactly preserved). Raises on failure;
-    returns the canonical clip dict on success.
+    canonicalize, always teardown. Raises on failure; returns the canonical
+    clip dict on success.
 
     S4 platform-portability (2026-07-10): ``host_caps``/``profile`` carry
     REAL host facts (build_host_caps) + the ledger-stamped v2 device/dtype
@@ -4126,8 +4113,6 @@ def _render_one(engine_name, request, *, force_oom, host_caps=None,
     ``session_ctx`` (``beat_id``/``segment_count``/``multi_clip``) where it
     used to receive ``{}``, so an adapter can size for four clips before it
     loads. Every shipped adapter accepts and ignores that argument today."""
-    if force_oom:
-        raise OomSignal("forced soak OOM on %s" % engine_name)
     _assert_family_inputs_satisfiable(engine_name, request)
     # A RETIRED id must fail with the NAMED policy error BEFORE the generic
     # not-registered LookupError -- this is the boundary the shipped
@@ -4407,27 +4392,23 @@ def build_actual_receipt(engine, shot, request, clip, *, segment=None,
     return receipt
 
 
-def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
-                host_caps=None, profile=None, segment=None):
+def render_shot(shot, request, *, host_caps=None, profile=None, segment=None):
     """Render ONE shot with its selected engine. NO FALLBACKS (operator
     2026-06-16 'this is art, not a space shuttle'; hardened 2026-07-02 NO
     fallbacks / NO auto-defaults directive): a HARD render failure RAISES
     :class:`RenderError` LOUD -- there is NO engine swap and NO still-image
-    floor, so a proven model path must prove itself. A forced soak OOM simply
-    raises loud like any other failure.
+    floor, so a proven model path must prove itself.
 
     Returns ``(clip, shot, [engine], observed_peak_mb)``; an unknown peak is None."""
     sid = shot["shot_id"]
     eng = shot["engine_id"]
     out_shot = dict(shot)
-    force = (sid == oom_shot_id and eng in (oom_engines or frozenset()))
     _t_render = time.monotonic()
     try:
-        clip = _render_one(eng, request, force_oom=force,
-                           host_caps=host_caps, profile=profile,
-                           segment=segment)
+        clip = _render_one(eng, request, host_caps=host_caps,
+                           profile=profile, segment=segment)
     except Exception as exc:              # noqa: BLE001 - no fallback: fail LOUD
-        kind = _rt.FailureKind.OOM if force else classify_failure(exc)
+        kind = classify_failure(exc)
         _LOG.error(
             "[OTR video] render FAILED (no fallback) shot %s engine %s: %s: %s",
             sid, eng, type(exc).__name__,
@@ -4455,8 +4436,7 @@ def render_shot(shot, request, *, oom_engines=frozenset(), oom_shot_id=None,
 
 
 def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
-                         canvas=None, oom_engines=frozenset(),
-                         oom_shot_id=None, host_caps=None, profile=None):
+                         canvas=None, host_caps=None, profile=None):
     """Render ONE BEAT -- as one clip, or as its plan's segments assembled.
 
     Multi-clip coverage chunk 6c/6d (2026-07-26). This is the loop the whole
@@ -4522,8 +4502,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
         # what the plan OWES rather than how many pieces it is in.
         single = request if request is not None else request_builder(
             shot, ledger, canvas=canvas)
-        return render_shot(shot, single, oom_engines=oom_engines,
-                           oom_shot_id=oom_shot_id, host_caps=host_caps,
+        return render_shot(shot, single, host_caps=host_caps,
                            profile=profile)
 
     if request_builder is None:
@@ -4676,8 +4655,7 @@ def render_beat_coverage(shot, ledger, *, request=None, request_builder=None,
                         obs["init_source"] = "chain_terminal_frame"
                         obs["init_image"] = os.path.basename(terminal)
             clip, out_shot, seg_attempts, seg_used = render_shot(
-                shot, request, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
-                host_caps=host_caps, profile=profile,
+                shot, request, host_caps=host_caps, profile=profile,
                 segment=_bs.SegmentSlot(session, index, beat_id))
             attempts = list(attempts) + list(seg_attempts or ())
             if seg_used is not None:
@@ -5385,8 +5363,7 @@ def _report_cloud_floors(shots):
 
 
 def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
-                        canvas, oom_engines, oom_shot_id, host_caps, profile,
-                        prompt_id=None):
+                        canvas, host_caps, profile, prompt_id=None):
     """One provider-side beat. Safe to run beside other cloud beats.
 
     CHAIN segments inside the beat stay serial (they need the prior
@@ -5402,8 +5379,7 @@ def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
             request = build_request(shot, assets, frame_count, canvas)
         clip, out_shot, attempts, used = render_beat_coverage(
             shot, ledger, request=request, request_builder=request_builder,
-            canvas=canvas, oom_engines=oom_engines, oom_shot_id=oom_shot_id,
-            host_caps=host_caps, profile=profile)
+            canvas=canvas, host_caps=host_caps, profile=profile)
         return {
             "shot_id": str(out_shot.get("shot_id") or shot.get("shot_id") or ""),
             "request": request,
@@ -5420,9 +5396,8 @@ def _execute_cloud_shot(shot, ledger, *, request_builder, assets, frame_count,
     return _run()
 
 
-def run_episode(ledger, *, oom_shot_id=None,
-                oom_engines=frozenset(), assets=None, frame_count=25,
-                canvas=None, request_builder=None):
+def run_episode(ledger, *, assets=None, frame_count=25, canvas=None,
+                request_builder=None):
     """Drive one episode end-to-end on REAL engines (deep-copies the ledger; the
     frozen ``audio`` section is never touched). Returns
     ``{ledger, clips, trace, vram_peak_mb}``.
@@ -5599,7 +5574,6 @@ def run_episode(ledger, *, oom_shot_id=None,
                     shot, ledger,
                     request_builder=request_builder, assets=assets,
                     frame_count=frame_count, canvas=canvas,
-                    oom_engines=oom_engines, oom_shot_id=oom_shot_id,
                     host_caps=_episode_host_caps,
                     profile=_episode_profile,
                     prompt_id=None)
@@ -5884,8 +5858,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                     clip, out_shot, attempts, used = render_beat_coverage(
                         shot, ledger, request=request,
                         request_builder=request_builder,
-                        canvas=canvas, oom_engines=oom_engines,
-                        oom_shot_id=oom_shot_id,
+                        canvas=canvas,
                         host_caps=_episode_host_caps,
                         profile=_episode_profile)
                 except Exception as exc:
@@ -7287,7 +7260,7 @@ def build_clip_manifest(result, *, episode_id=""):
 __all__ = [
     "ENGINE_FAMILY",
     "FROZEN_AUDIO_SHA",
-    "OomSignal", "RenderError", "RenderFloorError",
+    "RenderError", "RenderFloorError",
     "FamilyInputGap",
     "classify_failure", "engine_family",
     "build_full_ledger", "build_request",

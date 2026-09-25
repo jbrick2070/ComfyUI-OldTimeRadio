@@ -147,7 +147,7 @@ def test_render_one_raises_named_before_the_generic_lookup(engine_id):
                "asset_refs": {"init_image": "probe.png",
                               "audio_ref": "probe.wav"}}
     with pytest.raises(RetiredEngineError, match=engine_id):
-        rd._render_one(engine_id, request, force_oom=False)
+        rd._render_one(engine_id, request)
 
 
 # ---------------------------------------------------------------------------

@@ -45,11 +45,6 @@ log = logging.getLogger("OTR")
 _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 
 
-def _episode_language_iso(meta) -> str:
-    from . import _otr_episode_languages as _EPLANG
-    return _EPLANG.iso_from_meta(meta if isinstance(meta, dict) else {})
-
-
 def _require_language_engines(meta, char_engine, announcer_engine) -> str:
     """Non-English rows admit only the engines listed on the row. English
     is unchanged -- bark / indextts / the rest still run."""
@@ -72,7 +67,6 @@ def _require_language_engines(meta, char_engine, announcer_engine) -> str:
     return iso
 
 
-
 # Leftover ``lock(voice_bank=...)`` kwargs still exist for old callers.
 # The bank is not a CastLock widget; ``_bank_following_engine`` derives it
 # from each engine profile's ``allowed_voice_banks``.
@@ -92,8 +86,6 @@ _VOICE_ENGINE_RESOLVE_EXTRA = frozenset()
 _VOICE_ENGINE_ALIASES = {"elevenlabs": "cloud_elevenlabs"}
 _DEFAULT_ANNOUNCER_ENGINE = "kokoro"
 _DEFAULT_CHAR_ENGINE = "kokoro"
-
-
 
 
 #: Cast-row fields cleared before the claimed row is re-stamped at a DIFFERENT
@@ -179,18 +171,11 @@ def _clear_stale_voice_identity(entry: dict) -> list:
     return doomed
 
 
-
-
 def _is_announcer_entry(entry: dict) -> bool:
     char_id = str(entry.get("char_id") or "").strip().lower()
     name = str(entry.get("name") or "").strip().upper()
     role = str(entry.get("speaker_role") or entry.get("role") or "").strip().lower()
     return char_id == "announcer" or name == "ANNOUNCER" or role == "announcer"
-
-
-def _is_bark_namespace_preset(preset) -> bool:
-    """Bark's live identity namespace. Do not treat this as a kokoro id."""
-    return str(preset or "").strip().startswith("v2/")
 
 
 def _row_has_resolvable_voice(row) -> bool:
@@ -264,8 +249,6 @@ def _delivered_commercial_clean(entry: dict, ref) -> bool:
     if model_clean is None:
         return clip_clean
     return model_clean
-
-
 
 
 def _recurring_character_bank_ref(entry, engine, bank_entries, language):
@@ -1628,7 +1611,6 @@ class CastLock:
                 f"(reference clip and/or model licence is not commercial-clean) "
                 f"-- non-blocking warning (I-8)"
             )
-
 
 
     # ------------------------------------------------------------------ #

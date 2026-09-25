@@ -127,10 +127,10 @@ class NullableVramConsumerTests(unittest.TestCase):
         self.patch(self.rd._vreg, "is_registered", side_effect=lambda name: name == engine.name)
         self.patch(self.rd._vreg, "get_engine", return_value=engine)
 
-        def render(engine_name, request, *, force_oom, host_caps=None,
-                   profile=None, segment=None):
-            if force_oom:
-                raise self.rd.OomSignal("forced telemetry fixture OOM")
+        def render(engine_name, request, *, host_caps=None, profile=None,
+                   segment=None):
+            if request.get("fail"):
+                raise RuntimeError("CUDA out of memory (telemetry fixture)")
             if segment is not None:
                 return engine.canonicalize(
                     engine.render_clip(request, segment.begin()), request, profile)
@@ -230,8 +230,7 @@ class NullableVramConsumerTests(unittest.TestCase):
     def test_render_error_still_raises_with_unknown_telemetry(self):
         self.install([None])
         with self.assertRaises(self.rd.RenderError), self.assertLogs(self.rd._LOG, level="ERROR"):
-            self.rd.render_shot(self.shot(), {}, oom_engines={ReceiptEngine.name},
-                                oom_shot_id="shot_0")
+            self.rd.render_shot(self.shot(), {"fail": True})
         self.post_read.assert_not_called()
 
     def test_adapter_raw_to_clip_preserves_optional_measurement(self):

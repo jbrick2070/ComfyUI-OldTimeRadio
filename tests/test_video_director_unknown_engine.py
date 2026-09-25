@@ -10,21 +10,16 @@ design, which is why order 4 (retiring the dormant 3D family the lock rides
 on) is FORBIDDEN until this boundary exists: without it, an unknown id would
 plan an episode for minutes and die mid-render at ``assert_usable``.
 
-Six pins, each naming the arrival path it closes or preserves:
+Five pins, each naming the arrival path it closes or preserves:
 
   1. unknown CUSTOM id        -> named ValueError at the director (this is the
                                  proof the boundary MOVED -- it passes today)
-  2. force map -> soak_oom_heavy -> named error at the director (closes the
-                                 ENGINE_FAMILY escape: in the family table for
-                                 the soak harness, never registered, and the
-                                 harness injects at ledger level so no soak leg
-                                 ever passes through this node)
-  3. canonical-shape picks    -> unchanged: effective == picked, no raise
-  4. '+ Add Custom Model'
+  2. canonical-shape picks    -> unchanged: effective == picked, no raise
+  3. '+ Add Custom Model'
      with no JSON entry       -> still a WARNING (declare-later), never a raise
-  5. humo with hosts unset    -> the redirect's OUTPUT is what must be
+  4. humo with hosts unset    -> the redirect's OUTPUT is what must be
                                  registered; the check never fires on it
-  6. a RETIRED id             -> still RetiredEngineError, not the new generic
+  5. a RETIRED id             -> still RetiredEngineError, not the new generic
                                  message (precedence pinned)
 """
 from __future__ import annotations
@@ -83,26 +78,7 @@ def test_unknown_custom_engine_fails_at_the_director_with_both_names(monkeypatch
 
 
 # --------------------------------------------------------------------------- #
-# 2. The ENGINE_FAMILY escape is closed at this boundary.
-# --------------------------------------------------------------------------- #
-def test_force_map_to_the_soak_stub_fails_at_the_director(monkeypatch):
-    """`soak_oom_heavy` is in ENGINE_FAMILY (so parse_force_map admits it) but is
-    NOT registered. The soak harness injects it at the ledger-fixture level and
-    never routes through this node -- verified before this test was written --
-    so refusing it here cannot break a soak leg, and DOES stop a leaked
-    OTR_FORCE_ENGINE_MAP from planning an episode on a synthetic stub."""
-    with pytest.raises(ValueError) as exc:
-        _direct(monkeypatch,
-                OTR_FORCE_ENGINE_MAP="character_video=soak_oom_heavy")
-    msg = str(exc.value)
-    assert "soak_oom_heavy" in msg
-    # The dual-knob hint: a force map was active, and the message says so,
-    # because the stale half may be the map rather than the pick.
-    assert "OTR_FORCE_ENGINE_MAP is active" in msg
-
-
-# --------------------------------------------------------------------------- #
-# 3. Known ids behave byte-for-byte as before.
+# 2. Canonical-shape picks are unchanged: effective == picked, no raise.
 # --------------------------------------------------------------------------- #
 def test_registered_picks_pass_and_freeze_to_themselves(monkeypatch):
     policy = _direct(monkeypatch)
@@ -113,7 +89,7 @@ def test_registered_picks_pass_and_freeze_to_themselves(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 4. Declare-later stays a warning, exactly as the carve-out above promises.
+# 3. Declare-later stays a warning, exactly as the carve-out above promises.
 # --------------------------------------------------------------------------- #
 def test_unresolved_custom_slot_is_still_a_warning_not_a_raise(monkeypatch):
     """An '+ Add Custom Model' pick with no custom_models_json entry resolves
@@ -127,7 +103,7 @@ def test_unresolved_custom_slot_is_still_a_warning_not_a_raise(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 5. A redirect's OUTPUT is validated; the check never fires on a valid one.
+# 4. A redirect's OUTPUT is validated; the check never fires on a valid one.
 # --------------------------------------------------------------------------- #
 def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
     """With OTR_ENABLE_HUMO_HOSTS unset, a humo pick freezes to the
@@ -149,7 +125,7 @@ def test_humo_redirect_output_is_registered_and_passes(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 6. Retired precedence: the OLD named error, never the new generic one.
+# 5. Retired precedence: the OLD named error, never the new generic one.
 # --------------------------------------------------------------------------- #
 def test_retired_id_still_raises_the_named_retired_error(monkeypatch):
     retired = sorted(RETIRED_ENGINE_IDS)[0]
@@ -160,7 +136,7 @@ def test_retired_id_still_raises_the_named_retired_error(monkeypatch):
 
 
 # --------------------------------------------------------------------------- #
-# 7. The force-map retired path fails with ITS named error, before the boundary.
+# 6. The force-map retired path fails with ITS named error, before the boundary.
 # --------------------------------------------------------------------------- #
 def test_retired_id_in_force_map_fails_before_the_boundary(monkeypatch):
     """QA finding, 2026-08-23: the two retired paths raise DIFFERENT named

@@ -42,21 +42,6 @@ VIDEO_SLOT_ROLES = {
     "character_video_model": ("character_video",),
 }
 
-#: The per-role video slots OTR_VideoDirector emits / the profile applier knows, in
-#: canonical (serialized-widget) order. EXCLUDES the legacy slot (a
-#: migration-only INPUT, never emitted fresh).
-PER_ROLE_VIDEO_SLOTS = (
-    "announcer_video_model",
-    "music_video_model",
-    "character_video_model",
-)
-
-#: The per-role slot Route-A added that survives the 2026-07-01 rip (the
-#: retired_role_a / retired_role_b slots were removed with their roles).
-NEW_ROUTE_A_VIDEO_SLOTS = (
-    "character_video_model",
-)
-
 
 def _engine_id_of(entry) -> str:
     """Bare engine id from a slot value: either a ``{"engine_id": ...}`` dict

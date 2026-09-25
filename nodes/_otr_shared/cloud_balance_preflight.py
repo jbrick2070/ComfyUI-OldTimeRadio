@@ -344,10 +344,7 @@ def comfy_balance(*, get_json: Callable = None, bearer: Callable = None,
 
 
 def _openrouter_bearer() -> str:
-    try:
-        from .._otr_openrouter_backend import _openrouter_key
-    except ImportError:  # pragma: no cover
-        from nodes._otr_openrouter_backend import _openrouter_key
+    from .._otr_openrouter_backend import _openrouter_key
     key = _openrouter_key()
     if not key:
         raise RuntimeError("no OpenRouter key")

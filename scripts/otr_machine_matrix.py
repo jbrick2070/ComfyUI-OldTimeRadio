@@ -341,7 +341,6 @@ def _tier(vram):
 _ORDER = ["8 GB", "10-15 GB", "16 GB+", "unstated"]
 
 
-
 #: ENGINE -> the third-party ComfyUI node pack it needs, and whether its weights
 #: are Hugging Face gated. NEITHER fact can live in requirements.txt or
 #: pyproject.toml: a node pack is not a pip distribution, and gating is a
@@ -625,41 +624,12 @@ _BEGIN = "<!-- BEGIN GENERATED: machine-matrix -->"
 _END = "<!-- END GENERATED: machine-matrix -->"
 
 
-def headline_block() -> str:
-    """Just the class table. No longer injected into README -- see below.
-
-    It WAS injected, for a good reason worth keeping written down: README is the
-    universal front door, and two hand-eyed surfaces answering "what do I run on
-    my machine" is how the page came to claim an 8 GB card had "rendered
-    nothing" while six documented episodes had published from one. Generating
-    the answer once and injecting it fixed that.
-
-    What changed on 2026-09-13 is that README gained a TIER matrix -- one row per
-    shipping graph -- and the two tables then answered the hardware question
-    differently, because they are answers to different questions. A machine-class
-    row is the PROVISIONER TUPLE (what `otr_provision.py --machine 16gb`
-    installs); a tier row is what the saved graph on disk actually selects, and
-    the two could name different engines and writer labels. Side by side and unlabelled, that reads as a contradiction, and two
-    independent reviewers read it as one.
-
-    So README now carries NO copy of this table and links to `apple/MACHINES.md`
-    instead. The original hazard does not return: the fix for a stale duplicate
-    is still "generate it once", and the place it is generated to now ships with
-    the pack. Do not re-inject this without also resolving it against the tier
-    matrix.
-    """
-    full = render()
-    start = full.index("## What works on what machine")
-    end = full.index("## How to read the confidence column")
-    return full[start:end].rstrip() + "\n"
-
-
 def inject_readme(check_only: bool = False) -> bool:
     """REMOVE the class table from README. True if README already has none.
 
     The name is kept because `--check` and `main` both call it and the job is
     still "make README agree with this generator" -- the agreement is now that
-    README carries no copy. See headline_block for why. A leftover block from an
+    README carries no copy (it links apple/MACHINES.md). A leftover block from an
     older checkout is stripped, markers and all; there is no re-injection path,
     so running this generator can no longer put the table back.
     """
@@ -676,7 +646,6 @@ def inject_readme(check_only: bool = False) -> bool:
         return False
     io.open(path, "w", encoding="utf-8", newline="\n").write(out)
     return False
-
 
 
 # Which voice engines a fresh install can use without doing anything, and what

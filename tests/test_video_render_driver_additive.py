@@ -40,7 +40,7 @@ def test_build_full_ledger_freezes_audio():
 
 
 def test_classify_failure_specific_kind_mappings():
-    assert rd.classify_failure(rd.OomSignal("x")) is rt.FailureKind.OOM
+    assert rd.classify_failure(RuntimeError("CUDA out of memory")) is rt.FailureKind.OOM
     for exc in (LookupError(), KeyError("k"), FileNotFoundError()):
         assert rd.classify_failure(exc) is rt.FailureKind.DEPENDENCY_MISSING
 
