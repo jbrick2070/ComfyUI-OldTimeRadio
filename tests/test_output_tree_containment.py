@@ -203,12 +203,11 @@ def test_the_blend_rejects_a_remote_scopes_path():
 
 
 def test_the_render_batch_rejects_remote_paths_at_all():
-    """This node had no remote refusal whatsoever while staging three
-    caller-named paths into ComfyUI's input dir."""
+    """This node had no remote refusal whatsoever while handing a
+    caller-named path to ffmpeg."""
     src = (_NODES / "otr_video_render_batch.py").read_text(encoding="utf-8")
-    assert "reject_remote_paths(" in src
-    for field in ("portrait_path", "audio_path", "master_audio_path"):
-        assert field in src
+    i = src.index("reject_remote_paths(")
+    assert "master_audio_path" in src[i:i + 200]
 
 
 # --------------------------------------------------------------------------
@@ -220,17 +219,6 @@ def test_the_scopes_episode_id_becomes_a_safe_filename_token():
     window = src[i:i + 400]
     assert "_re.sub" in window and "A-Za-z0-9_.-" in window, (
         "the manifest's episode_id is joined into a filename and must be "
-        "reduced to a token first")
-
-
-def test_the_render_batch_engine_becomes_a_safe_filename_token():
-    src = (_NODES / "otr_video_render_batch.py").read_text(encoding="utf-8")
-    # Anchor on the ASSIGNMENT, not the bare literal -- the comment above it
-    # quotes the old form, so the literal appears twice.
-    i = src.index('name = "node_single_%s.json"')
-    window = src[i:i + 300]
-    assert "_re.sub" in window and "A-Za-z0-9_.-" in window, (
-        "the engine label is joined into a report filename and must be "
         "reduced to a token first")
 
 

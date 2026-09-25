@@ -702,13 +702,12 @@ class TestVideoRenderBatchMasterAudioInput:
         node = OTRVideoRenderBatch()
         with mock.patch.object(OTRVideoRenderBatch, "_render_episode",
                                staticmethod(_fake_render_episode)):
-            node.render("episode", 1, 0, 25,
-                        master_audio_path="/my/master.mp4")
+            node.render(master_audio_path="/my/master.mp4")
 
         assert received == ["/my/master.mp4"], \
             "master_audio_path must reach _render_episode"
 
-    def test_widgets_values_unchanged_seven_slots(self):
+    def test_widgets_values_hold_only_the_engine_slot(self):
         """forceInput master_audio_path must NOT add a widgets_values slot."""
         import json, os
         wf_path = os.path.join(_REPO, "workflows", "otr_canonical.json")
@@ -716,11 +715,11 @@ class TestVideoRenderBatchMasterAudioInput:
             wf = json.load(f)
         n92 = next(n for n in wf["nodes"] if n["id"] == 92)
         wv = n92.get("widgets_values", [])
-        # 7 widget slots: mode, beats, oom_index, frame_count, engine,
-        # portrait_path, audio_path.  patched_ledger_json + master_audio_path
-        # are forceInput so they are NOT in widgets_values.
-        assert len(wv) == 7, (
-            "widgets_values must have exactly 7 entries (forceInput fields "
+        # One widget slot: engine (the soak/single harness widgets were
+        # removed 2026-09-24). patched_ledger_json + master_audio_path are
+        # forceInput so they are NOT in widgets_values.
+        assert len(wv) == 1, (
+            "widgets_values must have exactly 1 entry (forceInput fields "
             "excluded); got %d: %r" % (len(wv), wv))
 
     def test_workflow_link_264_wired(self):

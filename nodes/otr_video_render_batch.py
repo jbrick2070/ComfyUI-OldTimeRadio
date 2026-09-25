@@ -1,15 +1,12 @@
 """OTR_VideoRenderBatch -- the in-process render entry that walks the registry
 video engines via :mod:`nodes._otr_video_engines.render_driver` (A-S7.5).
 
-Three modes: ``soak`` runs the full-episode A-S7.5 diagnostic soak (40 beats,
-all roles, forced mid-episode fallback-trail testing with LOUD restamps, run
-TWICE back-to-back for determinism, frozen audio untouched);
-``single`` renders
-ONE shot via one engine (the focused in-process forward validation); ``episode``
-renders one REAL per-beat clip per shot from a ShotLock-planned ledger
+Renders one REAL per-beat clip per shot from a ShotLock-planned ledger
 (``run_real_episode``) and emits a beat-ordered clip manifest for the downstream
 OTR_SilentComposite. Emits the structured render report as a JSON STRING.
-Model-agnostic: no model is "primary".
+Model-agnostic: no model is "primary". The ``soak`` and ``single`` diagnostic
+harness modes were removed 2026-09-24 (only the canonical graph and its
+variants run; no rigs).
 
 Cold-import clean (V-12): heavy work + the driver import are LAZY inside the
 FUNCTION; module scope imports only stdlib. UTF-8, no BOM, ASCII-only source.
@@ -18,7 +15,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re as _re
 
 try:
     from ._otr_shared import env as otr_env
@@ -481,53 +477,17 @@ class OTRVideoRenderBatch:
     @classmethod
     def INPUT_TYPES(cls):
         return {
-            "required": {
-                "mode": (["soak", "single", "episode"], {"default": "episode", "tooltip": (
-                    "Run mode. 'episode' is the production path (renders one REAL "
-                    "per-beat clip per shot from patched_ledger_json). 'soak' and "
-                    "'single' are diagnostic harness modes -- some widgets below are "
-                    "read ONLY in a specific mode (see engine / oom_index)."
-                )}),
-                "beats": ("INT", {"default": 40, "min": 1, "max": 400, "tooltip": (
-                    "Diagnostic harness only (mode=soak): synthetic beat count. "
-                    "Ignored in mode=episode (beats come from the planned ledger)."
-                )}),
-                "oom_index": ("INT", {"default": 20, "min": 0, "max": 399, "tooltip": (
-                    "Diagnostic harness only -- read ONLY in mode=soak (the beat index "
-                    "at which to inject a simulated OOM for fallback-trail testing). "
-                    "Inert in mode=single and mode=episode."
-                )}),
-                "frame_count": ("INT", {"default": 25, "min": 1, "max": 240, "tooltip": (
-                    "Diagnostic harness only: per-clip frame count, consumed by "
-                    "mode=single AND mode=soak. Ignored in mode=episode (the "
-                    "per-shot frame budget is planned upstream)."
-                )}),
-            },
             "optional": {
                 "engine": ("STRING", {"default": "viz_camera", "tooltip": (
-                    "Diagnostic harness only -- read ONLY in mode=single (forces the "
-                    "single engine to render). Inert in mode=soak and mode=episode "
-                    "(episode routes each beat by its planned per-role engine)."
+                    "The row's declared video engine, written by the workflow "
+                    "matrix (slot_overrides.video_render_engine) so a saved graph "
+                    "names it. Not read at render time: each beat routes by its "
+                    "planned per-role engine."
                 )}),
-                "portrait_path": ("STRING", {
-                    "default": "",
-                    "tooltip": "Diagnostic harness only (mode=single and "
-                               "mode=soak): conditioning still for the "
-                               "harness render. Inert in mode=episode, where "
-                               "each beat's still comes from the planned "
-                               "ledger.",
-                }),
-                "audio_path": ("STRING", {
-                    "default": "",
-                    "tooltip": "Diagnostic harness only (mode=single and "
-                               "mode=soak): driving audio for the harness "
-                               "render. Inert in mode=episode, where per-beat "
-                               "audio comes from the episode's own clips.",
-                }),
                 "patched_ledger_json": ("STRING", {
                     "default": "{}", "multiline": True, "forceInput": True,
                     "tooltip": (
-                        "mode=episode: the OTR_ShotLock-planned (and image-genned) "
+                        "The OTR_ShotLock-planned (and image-genned) "
                         "ledger JSON. run_real_episode renders one REAL per-beat "
                         "clip per shot; the emitted clip manifest feeds "
                         "OTR_SilentComposite."
@@ -536,7 +496,7 @@ class OTRVideoRenderBatch:
                 "master_audio_path": ("STRING", {
                     "default": "", "forceInput": True,
                     "tooltip": (
-                        "mode=episode: path to the FROZEN master mix (MP4 or WAV). "
+                        "Path to the FROZEN master mix (MP4 or WAV). "
                         "Beats whose ledger line has no per-line *_wav_path get "
                         "audio_ref filled by slicing [start_s, start_s+dur_s] from "
                         "this file (read-only ffmpeg; master is NEVER mutated). "
@@ -561,10 +521,8 @@ class OTRVideoRenderBatch:
             "hidden": {"api_key_comfy_org": "API_KEY_COMFY_ORG"},
         }
 
-    def render(self, mode, beats, oom_index, frame_count,
-               engine="viz_camera", portrait_path="", audio_path="",
-               patched_ledger_json="{}", master_audio_path="",
-               image_done="", api_key_comfy_org=None):
+    def render(self, engine="viz_camera", patched_ledger_json="{}",
+               master_audio_path="", image_done="", api_key_comfy_org=None):
         from ._otr_shared.cloud_media_invoke import stash_comfy_api_key
         stash_comfy_api_key(api_key_comfy_org)
         # ``image_done`` is the W4 ordering gate (opaque STRING token from
@@ -578,49 +536,25 @@ class OTRVideoRenderBatch:
         # the selected engine wrapper. The frozen audio section is read-only
         # throughout.
         import os
-        # THIS NODE HAD NO REMOTE REFUSAL AT ALL (2026-09-05). Its three path
-        # widgets are staged into ComfyUI's input dir and handed to engines; a
-        # UNC value made this machine authenticate to the host the workflow
-        # named on the first stat. Same refusal, same place (the execute
-        # method), as the five ffmpeg nodes.
+        # THIS NODE HAD NO REMOTE REFUSAL AT ALL (2026-09-05). Its path input
+        # is handed to ffmpeg; a UNC value made this machine authenticate to
+        # the host the workflow named on the first stat. Same refusal, same
+        # place (the execute method), as the five ffmpeg nodes.
         try:
             from ._otr_paths import reject_remote_paths
         except ImportError:  # pragma: no cover -- flat (sys.path) load
             from _otr_paths import reject_remote_paths  # type: ignore
-        reject_remote_paths(portrait_path=portrait_path, audio_path=audio_path,
-                            master_audio_path=master_audio_path)
+        reject_remote_paths(master_audio_path=master_audio_path)
         from ._otr_video_engines import render_driver as _rd
-        manifest_payload = ""
-        if mode == "episode":
-            report, manifest_payload, name = self._render_episode(
-                _rd, patched_ledger_json,
-                master_audio_path=str(master_audio_path or ""))
-        elif mode == "single":
-            assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
-            report = _rd.render_single(engine, assets=assets,
-                                       frame_count=int(frame_count))
-            # THE ENGINE LABEL BECOMES A FILENAME (2026-09-05). `engine` is a
-            # workflow STRING, and `"node_single_%s.json" % engine` was written
-            # into the state tier with no whitelist -- separators or `..` walk
-            # the report out of it (on Windows the prefix does not save it,
-            # because `..` collapses lexically). A filename cannot hold a
-            # separator, so reduce it to a token; the report still names the
-            # engine that ran, and an unknown engine already returns a failure
-            # report rather than raising.
-            name = "node_single_%s.json" % (
-                _re.sub(r"[^A-Za-z0-9_.-]", "_", str(engine)).strip("._-") or "unknown")
-        else:
-            assets = {"init_image": portrait_path or "", "audio_ref": audio_path or ""}
-            report = _rd.run_gpu_soak(n_beats=int(beats), oom_index=int(oom_index),
-                                      frame_count=int(frame_count), assets=assets)
-            name = "node_soak.json"
+        report, manifest_payload, name = self._render_episode(
+            _rd, patched_ledger_json,
+            master_audio_path=str(master_audio_path or ""))
         ok = bool(report.get("ok"))
         payload = json.dumps(report, ensure_ascii=True, default=str)
-        # OUTPUT HYGIENE (output-tree contract OH-1, 2026-06-11): ALL JSON
-        # run artifacts (episode reports AND the soak/single probe reports
-        # that used to land in the now-retired top-level otr/aship) go to
-        # the per-machine state tier episodes/_shared/state via the ONE
-        # path authority -- never a hand-composed otr/<sub> join.
+        # OUTPUT HYGIENE (output-tree contract OH-1, 2026-06-11): the episode
+        # report and manifest go to the per-machine state tier
+        # episodes/_shared/state via the ONE path authority -- never a
+        # hand-composed otr/<sub> join.
         try:                                  # durable artifacts the operator polls
             from ._otr_paths import otr_state_dir
             out_dir = str(otr_state_dir())
@@ -633,7 +567,7 @@ class OTRVideoRenderBatch:
                     f.write(manifest_payload)
         except Exception as exc:              # noqa: BLE001
             log.warning("[OTR_VideoRenderBatch] report write failed: %s", exc)
-        log.warning("[OTR_VideoRenderBatch] mode=%s ok=%s -> %s", mode, ok, name)
+        log.warning("[OTR_VideoRenderBatch] ok=%s -> %s", ok, name)
         return {"ui": {"text": [payload[:6000]]},
                 "result": (payload, manifest_payload)}
 

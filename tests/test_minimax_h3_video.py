@@ -421,53 +421,6 @@ def test_the_reserve_clamp_REACHES_the_launcher():
     assert env["OTR_HEADLESS_DISABLE_PINNED"] == "1"
 
 
-def test_the_solo_smoke_path_leaves_multi_contract_h3_for_live_resolution():
-    """``render_single`` is how every lane smoke runs, and it invents its own
-    request -- so anything it does not ask for is absent from every smoke.
-
-    H3 now accepts the measured 16 GB streaming contract and the 8 GB lab
-    contract. Choosing either here would be a guess; the adapter resolves the
-    real running server against those two contracts before it renders.
-    """
-    from nodes._otr_video_engines import render_driver as rd
-
-    captured = {}
-
-    def _fake_render_one(engine_name, request, **kwargs):
-        captured.update(kwargs)
-        raise RuntimeError("stop here -- the profile is what is under test")
-
-    real = rd._render_one
-    rd._render_one = _fake_render_one
-    try:
-        out = rd.render_single("minimax_h3_video", frame_count=129)
-    finally:
-        rd._render_one = real
-    assert out["ok"] is False               # the deliberate stop, not a render
-    assert captured["profile"] is None
-
-
-def test_a_lane_with_more_than_one_contract_is_left_alone_by_that_selection():
-    """Selecting for a lane with a real CHOICE would be guessing, so it does
-    not: HuMo declares both `default` and `humo_diet` and keeps stock behaviour.
-    """
-    from nodes._otr_video_engines import render_driver as rd
-
-    captured = {}
-
-    def _fake_render_one(engine_name, request, **kwargs):
-        captured.update(kwargs)
-        raise RuntimeError("stop here")
-
-    real = rd._render_one
-    rd._render_one = _fake_render_one
-    try:
-        rd.render_single("humo", frame_count=33)
-    finally:
-        rd._render_one = real
-    assert captured["profile"] is None
-
-
 def test_selecting_a_contract_does_not_weaken_the_proof_against_the_server():
     """The selection is a CLAIM; the running server is still the judge.
 

@@ -3,7 +3,7 @@
 CPU-only coverage for the character_3d alpha handoff: the canonicalize-time
 validator (type / pixel_format=rgba / alpha=straight / has_audio=False /
 frame_count == frames on disk), the shared "dir exists + exactly N sorted
-nonzero frames" rule consumed by _clip_summary / build_clip_manifest, and the
+nonzero frames" rule consumed by build_clip_manifest, and the
 GOLDEN straight-alpha composite: frames sorted by name -> overlay -> flatten
 yuv420p, with the flattened pixels actually probed (half-alpha red over black
 == half red; alpha-0 regions show the background). The webm/vp9 +
@@ -123,7 +123,7 @@ def test_the_magic_byte_proof_accepts_a_real_exr(tmp_path):
 
 
 def test_the_tolerant_summary_also_refuses_an_impostor_frame(tmp_path):
-    """`frame_dir_summary` is the read path the manifests and _clip_summary
+    """`frame_dir_summary` is the read path the manifests
     use, and it never raises -- so if the proof lived only in the strict
     validator, a receipt could still call an impostor directory real."""
     d = tmp_path / "frames"
@@ -152,21 +152,8 @@ def test_frame_dir_summary_is_tolerant(tmp_path):
 
 
 # --------------------------------------------------------------------------- #
-# _clip_summary + build_clip_manifest directory semantics (7.2 p3)
+# build_clip_manifest directory semantics (7.2 p3)
 # --------------------------------------------------------------------------- #
-def test_clip_summary_directory_semantics(tmp_path):
-    d = tmp_path / "frames"
-    _write_frames(d)
-    s = rd._clip_summary(_dir_clip(d))
-    assert s["exists"] is True and s["size"] > 0
-    # wrong declared count -> NOT real (exactly-N rule)
-    s = rd._clip_summary(_dir_clip(d, n=N_FRAMES + 1))
-    assert s["exists"] is False
-    # missing dir -> not real
-    s = rd._clip_summary(_dir_clip(tmp_path / "nope"))
-    assert s["exists"] is False
-
-
 def test_build_clip_manifest_directory_row(tmp_path):
     d = tmp_path / "frames"
     _write_frames(d)

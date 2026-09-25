@@ -1,15 +1,12 @@
 """CPU tests for the in-process render driver's PURE logic (A-S7.5).
 
-The live engine forwards (render_shot / run_episode / _render_one) are the GPU
-soak gate and never run in pytest -- exactly as the engine adapters' forwards
-don't. Here we prove the model-agnostic glue the driver is responsible for:
-NO FALLBACKS (2026-07-02 rip) -- no chain machinery exists and every registered
-video engine declares fallback_engine=None, failures classify HARD, the fixture
-matches the shipped CPU-soak shape, requests are deterministic, and
-assert_soak_ok enforces every A-S7.5 invariant (incl. the LOUD-failure
-contract).
+The live engine forwards (render_shot / run_episode / _render_one) are proven
+by a live canonical episode and never run in pytest -- exactly as the engine
+adapters' forwards don't. Here we prove the model-agnostic glue the driver is
+responsible for: NO FALLBACKS (2026-07-02 rip) -- no chain machinery exists and
+every registered video engine declares fallback_engine=None, failures classify
+HARD, and requests are deterministic.
 """
-import copy
 
 import pytest
 
@@ -45,19 +42,6 @@ def test_classify_failure_is_always_hard():
         rd.classify_failure(RuntimeError("boom"))) is rt.BlockClass.HARD
 
 
-def test_fixture_matches_shipped_soak_shape():
-    section, meta = rd.build_soak_fixture(n_beats=40, oom_index=20)
-    assert len(section["shots"]) == 40
-    assert section["video_revision"] == 1
-    oom = section["shots"][20]
-    # Rebased 2026-08-23 (lean-mean order 4 prerequisite): the stub stands in
-    # for the LIVE audio_driven_face family so the OOM contract survives the
-    # character_3d retirement.
-    assert (oom["engine_id"], oom["family"]) == (
-        "soak_oom_heavy", "audio_driven_face")
-    assert meta["oom_shot_id"] == "shot_0020"
-
-
 def test_build_request_is_deterministic_per_shot():
     shot = {"shot_id": "shot_0007"}
     a = rd.build_request(shot, {"init_image": "p.png", "audio_ref": "a.wav"}, 25)
@@ -65,50 +49,6 @@ def test_build_request_is_deterministic_per_shot():
     assert a == b
     assert a["seed_bundle"]["request_seed"] == (7 * 1009 + 7) & 0x7FFFFFFF
     assert a["audio_ref"] == {"path": "a.wav"}
-
-
-def _passing_episode(n):
-    trace = [{"shot_id": "shot_%04d" % i, "attempts": ["x"],
-              "final_engine": "x"} for i in range(n)]
-    return {
-        "n_clips": n, "all_clips_real": True,
-        "video_revision": 1,
-        "audio_sha": rd.FROZEN_AUDIO_SHA, "humo_rendered": 2,
-        "vram_peak_mb": 10000, "trace": trace, "clips": {},
-    }
-
-
-def _passing_report(n=6):
-    ep = _passing_episode(n)
-    return {
-        "meta": {"n_beats": n, "oom_shot_id": None, "oom_index": None},
-        "episode_1": copy.deepcopy(ep), "episode_2": copy.deepcopy(ep),
-        "input_shot_count": n,
-        "oom_contract": {"raised": True, "error_type": "RenderError",
-                         "detail": "shot shot_0002 engine 'soak_oom_heavy' ..."},
-    }
-
-
-def test_assert_soak_ok_passes_on_a_valid_report():
-    checks = rd.assert_soak_ok(_passing_report())
-    assert any("determinism" in c for c in checks)
-    assert any("LOUD-failure contract" in c for c in checks)
-
-
-@pytest.mark.parametrize("mutate", [
-    lambda r: r["episode_1"].__setitem__("humo_rendered", 0),
-    lambda r: r["episode_1"].__setitem__("audio_sha", "tampered"),
-    lambda r: r["episode_1"].__setitem__("all_clips_real", False),
-    lambda r: r["episode_2"]["trace"].append({"shot_id": "x"}),
-    # LOUD-failure contract: the forced OOM must RAISE RenderError.
-    lambda r: r["oom_contract"].__setitem__("raised", False),
-    lambda r: r["oom_contract"].__setitem__("error_type", "OomSignal"),
-])
-def test_assert_soak_ok_rejects_violations(mutate):
-    report = _passing_report()
-    mutate(report)
-    with pytest.raises(rd.SoakError):
-        rd.assert_soak_ok(report)
 
 
 def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch, tmp_path):

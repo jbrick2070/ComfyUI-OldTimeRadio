@@ -2489,42 +2489,6 @@
           "link": 267
         },
         {
-          "localized_name": "mode",
-          "name": "mode",
-          "type": "COMBO",
-          "widget": {
-            "name": "mode"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "beats",
-          "name": "beats",
-          "type": "INT",
-          "widget": {
-            "name": "beats"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "oom_index",
-          "name": "oom_index",
-          "type": "INT",
-          "widget": {
-            "name": "oom_index"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "frame_count",
-          "name": "frame_count",
-          "type": "INT",
-          "widget": {
-            "name": "frame_count"
-          },
-          "link": null
-        },
-        {
           "localized_name": "engine",
           "name": "engine",
           "shape": 7,
@@ -2533,26 +2497,8 @@
             "name": "engine"
           },
           "link": null
-        },
-        {
-          "localized_name": "portrait_path",
-          "name": "portrait_path",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "portrait_path"
-          },
-          "link": null
-        },
-        {
-          "localized_name": "audio_path",
-          "name": "audio_path",
-          "shape": 7,
-          "type": "STRING",
-          "widget": {
-            "name": "audio_path"
-          },
-          "link": null
+
+
         }
       ],
       "outputs": [
@@ -2581,13 +2527,7 @@
         "Node name for S&R": "OTR_VideoRenderBatch"
       },
       "widgets_values": [
-        "episode",
-        40,
-        20,
-        25,
-        "viz_camera",
-        "",
-        ""
+        "viz_camera"
       ],
       "color": "#102F35",
       "bgcolor": "#3B3D42"

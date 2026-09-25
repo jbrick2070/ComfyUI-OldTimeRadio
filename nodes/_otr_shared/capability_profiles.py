@@ -167,9 +167,7 @@ _VIDEO_KEYS = {
 #: ceiling in frames (0 = unpinned = the engine's own max). It is the
 #: profile-carried twin of a launch-env render-length pin: the low-VRAM launch
 #: contract has to reach a PRODUCTION episode leg, which is submitted to an
-#: already-booted server and therefore never sees ``launch.env``. Distinct from
-#: ``render.frame_budget``, which is the soak/single harness per-clip frame
-#: count (every 16GB tier declares 25 there and must NOT be capped to it).
+#: already-booted server and therefore never sees ``launch.env``.
 _VIDEO_OPTIONAL_KEYS = {
     "max_render_frames": lambda v: (
         isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 240),
@@ -220,8 +218,6 @@ _RENDER_KEYS = {
     "composite_res": _is_res_string,
     "composite_w": _is_positive_int,
     "composite_h": _is_positive_int,
-    "frame_budget": _is_positive_int,
-    "beats": _is_positive_int,
 }
 _PREFLIGHT_KEYS = {
     "required_models": _is_str_list,

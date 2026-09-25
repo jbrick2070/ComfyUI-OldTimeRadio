@@ -164,15 +164,6 @@
         ]
       ]
     },
-    "render.beats": {
-      "registry": null,
-      "targets": [
-        [
-          "OTR_VideoRenderBatch",
-          "beats"
-        ]
-      ]
-    },
     "render.canvas_h": {
       "registry": null,
       "targets": [
@@ -240,15 +231,6 @@
         [
           "OTR_VideoDirector",
           "fps"
-        ]
-      ]
-    },
-    "render.frame_budget": {
-      "registry": null,
-      "targets": [
-        [
-          "OTR_VideoRenderBatch",
-          "frame_count"
         ]
       ]
     },

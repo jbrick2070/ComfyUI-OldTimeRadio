@@ -14,8 +14,8 @@ frozen).
 In-process (V invariant: no HTTP server, no GraphBuilder): the heavy engines call
 ComfyUI wrapper node classes directly via :mod:`wrapper_bridge`, so this driver
 MUST run inside the ComfyUI process (``NODE_CLASS_MAPPINGS`` populated). The pure
-pieces (``classify_failure`` / the fixture builder / ``assert_soak_ok``) are
-CPU-tested; the live render + the A-S7.5 GPU soak are the operator gate.
+pieces (``classify_failure`` / ``build_request`` / the manifest builders) are
+CPU-tested; a live canonical episode is the operator gate.
 UTF-8, no BOM, ASCII-only source.
 """
 from __future__ import annotations
@@ -97,38 +97,8 @@ ENGINE_FAMILY = {
     "cloud_ltx25_audio_in": "audio_conditioned_video",
 }
 
-#: The (role, engine, family) rotation covering the 3 roles + the non-3D
-#: families (kept identical to scripts/otr_video_soak so the GPU soak walks the
-#: same shape the shipped CPU harness proves). rip-sfx-broll (2026-07-01):
-#: the retired_role_a/retired_role_b legs died with their roles; the still
-#: families keep coverage via the extra announcer legs.
-_PROFILES = (
-    ("announcer_visual", "humo", "audio_driven_face"),
-    # The text_to_video seat: the local text_to_video engine, so the rotation
-    # walks one engine per family and the family does not silently drop out of
-    # soak coverage.
-    ("music_visual", "animatediff15_v3_haunted_video", "text_to_video"),
-    # The image_to_video seat, held by the cheapest local image_to_video lane.
-    # Dropping the row would leave the soak walking NO image_to_video lane at
-    # all -- a live family with several engines would go unexercised, and the
-    # fixture exists precisely to walk one row per family.
-    ("character_video", "ltx_8gb", "image_to_video"),
-    ("character_video", "still_motion", "static_motion"),
-    ("music_visual", "still_flat", "static_image_gen"),
-    ("announcer_visual", "still_pan", "static_image_gen"),
-)
-#: The forced-OOM group: the synthetic ``soak_oom_heavy`` stub, standing in for
-#: a LIVE heavy family (audio_driven_face -- humo's). Rebased off character_3d
-#: on 2026-08-23 so the contract does not die with that family's order-4
-#: retirement: what it proves was never about 3D, it is that under NO FALLBACKS
-#: a forced OOM RAISES a named RenderError -- the soak asserts the raise (no
-#: trail, no swap).
-_HEAVY_OOM = ("character_video", "soak_oom_heavy", "audio_driven_face")
-#: The heavy engines the soak forces to OOM on the injected shot -- the
-#: LOUD-failure contract leg asserts the resulting RenderError.
-OOM_ENGINES = frozenset({"soak_oom_heavy", "humo", "humo_1.7B"})
-#: The M1 frozen master-audio PCM marker the soak threads through + asserts is
-#: byte-identical after the run (the decision layer must never touch audio).
+#: The M1 frozen master-audio PCM marker a frozen ledger carries (the decision
+#: layer must never touch audio).
 FROZEN_AUDIO_SHA = "21aa71f6a4e5master_audio_pcm_marker"
 _GOOGLE_SILENT_TEXT_PROVIDERS = frozenset({
     "google_veo_video",
@@ -340,10 +310,6 @@ class FamilyInputGap(RuntimeError):
     fails LOUD instead of feeding a mismatched request to the engine."""
 
 
-class SoakError(AssertionError):
-    """An A-S7.5 soak invariant was violated (the soak FAILED)."""
-
-
 # --------------------------------------------------------------------------- #
 # Pure helpers (CPU-tested)
 # --------------------------------------------------------------------------- #
@@ -502,32 +468,6 @@ def _required_inputs_for_engine(engine_name, fam=None):
         required.update(str(t) for t in (
             getattr(_vreg.get_engine(name), "required_inputs", ()) or ()))
     return tuple(t for t in REQUIRED_INPUT_TOKENS if t in required)
-
-
-def build_soak_fixture(n_beats=40, oom_index=None):
-    """Build a synthetic ``ledger['video']`` section + meta (pure; identical
-    shape to scripts/otr_video_soak.build_soak_fixture).
-
-    ``oom_index=None`` (default since the 2026-07-02 NO-FALLBACKS rip) builds a
-    CLEAN all-profiles fixture; an integer injects the synthetic ``soak_oom_heavy``
-    heavy-engine stub at that index for the LOUD-failure contract leg (the
-    forced OOM must RAISE a named RenderError -- no trail, no swap)."""
-    if oom_index is not None and not 0 <= oom_index < n_beats:
-        raise ValueError("oom_index %d out of range for %d beats"
-                         % (oom_index, n_beats))
-    shots = []
-    for i in range(n_beats):
-        role, engine, family = _HEAVY_OOM if i == oom_index \
-            else _PROFILES[i % len(_PROFILES)]
-        shots.append({
-            "shot_id": "shot_%04d" % i, "beat_id": "b%04d" % i, "role": role,
-            "engine_id": engine, "family": family, "group_id": "grp_%04d" % i,
-            "target_frame_count": 25, "degradation_trail": [],
-        })
-    section = {"video_revision": 1, "fps": 25, "shots": shots}
-    meta = {"oom_shot_id": "shot_%04d" % oom_index, "oom_index": oom_index,
-            "n_beats": n_beats}
-    return section, meta
 
 
 def build_full_ledger(section):
@@ -7052,9 +6992,9 @@ def closing_theme_frame_window(lines, fps):
 
 
 #: THE CADENCE / DELIVERY RECEIPT KEYS (Ghost Signal, 2026-08-22). ONE tuple,
-#: because these travel through four INDEPENDENT hand-written projections --
-#: the clip manifest, `_clip_summary`, the strict run trace, and the render
-#: batch's lossless `per_clip` -- and a key list written four times is a key
+#: because these travel through three INDEPENDENT hand-written projections --
+#: the clip manifest, the strict run trace, and the render
+#: batch's lossless `per_clip` -- and a key list written three times is a key
 #: list that drifts once. Every projection copies PRESENT-KEY-ONLY, so a legacy
 #: row keeps its exact historical shape.
 _CADENCE_DELIVERY_RECEIPT_KEYS = (
@@ -7344,314 +7284,16 @@ def build_clip_manifest(result, *, episode_id=""):
     return manifest
 
 
-# --------------------------------------------------------------------------- #
-# A-S7.5 full-episode soak (two back-to-back episodes on REAL engines)
-# --------------------------------------------------------------------------- #
-def _clip_summary(clip):
-    """Compact, JSON-able view of a rendered clip + its on-disk reality.
-
-    Directory semantics (3D plan 7.2 p3): a ``type=="directory"`` clip is
-    "real" when the dir exists with EXACTLY ``frame_count`` sorted nonzero
-    frames (the shared :mod:`directory_clip` rule); ``size`` is the frames'
-    total bytes so ``all_clips_real``'s ``size > 0`` keeps working."""
-    path = (clip or {}).get("path", "")
-    if (clip or {}).get("type") == "directory":
-        from .directory_clip import frame_dir_summary
-        exists, _n, size = frame_dir_summary(
-            path, expect_frames=(clip or {}).get("frame_count"))
-    else:
-        exists = bool(path) and os.path.isfile(path)
-        size = os.path.getsize(path) if exists else 0
-    return {"engine_id": (clip or {}).get("engine_id"),
-            "family": (clip or {}).get("family"),
-            "frame_count": (clip or {}).get("frame_count"),
-            "path": path, "exists": exists, "size": size,
-            # Ghost Signal cadence/delivery, present-key-only. This projection
-            # is independent of the manifest above -- it is what reaches the
-            # episode manifest and the single-clip path -- so it must copy them
-            # too or the receipts silently vanish on exactly one of the routes.
-            **{k: (clip or {})[k] for k in _CADENCE_DELIVERY_RECEIPT_KEYS
-               if k in (clip or {})},
-            # THE TELEMETRY WAS BEING DROPPED HERE (relayed from the concurrent
-            # coder window, 2026-08-11; folded into lane 7 because this lane's
-            # solo smoke is what qualifies its new 1024x576 declaration, and a
-            # peak that never reaches disk cannot qualify anything).
-            #
-            # These six keys are produced by VramPeakProbe and the adapters'
-            # own receipts, and this summary -- the only shape that reaches the
-            # episode manifest (:5016) and the single-clip path (:5190) --
-            # returned six keys and none of them. So a lane could smoke green
-            # and leave no usable cost-row seed on disk; wan_ti2v and fastwan
-            # both did. Purely ADDITIVE: no existing key changes meaning.
-            #
-            # A cost row may be seeded ONLY from a true VramPeakProbe MAXIMUM.
-            # A single nvidia-smi reading is a LOWER BOUND, and a row built on
-            # a lower bound under-predicts -- which admits renders that then
-            # OOM. A missing peak must stay NULL here rather than be filled in
-            # from a watcher's sample.
-            "vram_peak_mb": (clip or {}).get("vram_peak_mb"),
-            "recipe": (clip or {}).get("recipe"),
-            "quant": (clip or {}).get("quant"),
-            "render_canvas": (clip or {}).get("render_canvas"),
-            "native_frame_count": (clip or {}).get("native_frame_count"),
-            "extension_mode": (clip or {}).get("extension_mode")}
-
-
-def _episode_facts(ep):
-    # `meta` was accepted and never read (removed 2026-08-28). The report this
-    # builds reads its meta at the enclosing layer, where the value is actually
-    # in scope.
-    led = ep["ledger"]
-    sec = led["video"]
-    shots = {s["shot_id"]: s for s in sec["shots"]}
-    clips = {sid: _clip_summary(c) for sid, c in ep["clips"].items()}
-    # Route-A (2026-06-28 HuMo-14B promotion): count the promoted 14B tier and
-    # assert it ONLY rendered on character_video shots (face + audio role). The
-    # histogram gate previously saw only "humo" (the portrait base), so the 14B
-    # promotion was invisible to acceptance. A non-empty misrouted list means the
-    # per-role routing leaked humo_14B_169 onto a non-character role.
-    humo_14b_169 = sorted(sid for sid, c in clips.items()
-                          if c["engine_id"] == "humo_14B_169" and c["exists"])
-    humo_14b_169_misrouted = sorted(
-        sid for sid in humo_14b_169
-        if (shots.get(sid) or {}).get("role") != "character_video")
-    return {
-        "n_clips": len(ep["clips"]),
-        "all_clips_real": all(c["exists"] and c["size"] > 0
-                              for c in clips.values()),
-        "video_revision": sec["video_revision"],
-        "audio_sha": led["audio"]["master_audio_sha256"],
-        "humo_rendered": sum(1 for c in clips.values()
-                             if c["engine_id"] == "humo" and c["exists"]),
-        "humo_14B_169_rendered": len(humo_14b_169),
-        "humo_14B_169_misrouted": humo_14b_169_misrouted,
-        "vram_peak_mb": ep["vram_peak_mb"],
-        "trace": ep["trace"],
-        "receipts": ep.get("receipts") or [],
-        "clips": clips,
-    }
-
-
-def assemble_report(meta, input_ledger, e1, e2, *, elapsed_s,
-                    oom_contract=None):
-    return {
-        "meta": meta,
-        "elapsed_s": round(float(elapsed_s), 1),
-        "episode_1": _episode_facts(e1),
-        "episode_2": _episode_facts(e2),
-        "input_shot_count": len(input_ledger["video"]["shots"]),
-        # NO-TRAIL LOUD contract (2026-07-02): the forced-OOM leg's outcome --
-        # {"raised": bool, "error_type": str, "detail": str} or None when the
-        # leg was not run.
-        "oom_contract": oom_contract,
-    }
-
-
-def assert_soak_ok(report):
-    """Assert every A-S7.5 GPU-soak invariant; raise :class:`SoakError` on any
-    violation. Returns the list of passed-check descriptions for the report.
-
-    NO-TRAIL LOUD contract (2026-07-02 NO-FALLBACKS rip): the two CLEAN
-    episodes must produce every clip deterministically with the frozen audio
-    untouched, and the forced-OOM leg (when present) must have RAISED a named
-    RenderError -- no trail matching, no decisions, no swap."""
-    meta = report["meta"]
-    n = meta["n_beats"]
-    checks = []
-    for tag in ("episode_1", "episode_2"):
-        f = report[tag]
-        if f["n_clips"] != n or not f["all_clips_real"]:
-            raise SoakError("%s: not every beat produced a real on-disk clip "
-                            "(%d/%d, all_real=%s)"
-                            % (tag, f["n_clips"], n, f["all_clips_real"]))
-        if f["video_revision"] != 1:
-            raise SoakError("%s: video_revision bumped to %r (rendering never "
-                            "re-locks the plan)" % (tag, f["video_revision"]))
-        if f["audio_sha"] != FROZEN_AUDIO_SHA:
-            raise SoakError("%s: frozen audio sha changed (%r) -- the render "
-                            "driver must never touch audio" % (tag, f["audio_sha"]))
-        if f["humo_rendered"] < 1:
-            raise SoakError("%s: humo never rendered in-process (0 real humo "
-                            "clips) -- the heavy in-process forward did not run"
-                            % tag)
-        # Route-A: the promoted 14B tier must NEVER land on a non-character role
-        # (it needs face + audio; render_shot has no fallbacks). .get keeps the
-        # synthetic-report path (which never routes the 14B) valid.
-        if f.get("humo_14B_169_misrouted"):
-            raise SoakError("%s: humo_14B_169 rendered on non-character_video "
-                            "shot(s) %r -- per-role routing leak"
-                            % (tag, f["humo_14B_169_misrouted"]))
-        checks.append("%s: %d real clips; %d humo in-process renders; "
-                      "VRAM peak %s MB (telemetry); frozen audio untouched"
-                      % (tag, n, f["humo_rendered"], f["vram_peak_mb"]))
-    if report["episode_1"]["trace"] != report["episode_2"]["trace"]:
-        raise SoakError("non-deterministic: the two episodes' render traces "
-                        "(per-shot attempts + final engine) differ")
-    checks.append("determinism: two back-to-back episodes identical (traces)")
-    oc = report.get("oom_contract")
-    if oc is not None:
-        if not oc.get("raised") or oc.get("error_type") != "RenderError":
-            raise SoakError(
-                "LOUD-failure contract violated: a forced OOM must RAISE "
-                "RenderError (got raised=%s error_type=%r) -- NO FALLBACKS"
-                % (oc.get("raised"), oc.get("error_type")))
-        checks.append("LOUD-failure contract: forced OOM raised RenderError "
-                      "(no swap, no trail)")
-    return checks
-
-
-def run_gpu_soak(*, n_beats=40, oom_index=20, frame_count=25, assets=None):
-    """Run the A-S7.5 full-episode soak on REAL GPU engines TWICE back-to-back
-    (CLEAN fixture -- no forced OOM), then prove the NO-TRAIL LOUD-failure
-    contract on a separate forced-OOM leg (``oom_index`` names the beat; the
-    forced OOM must RAISE RenderError). Asserts every invariant and returns
-    the structured report. Raises nothing itself -- failures are embedded
-    (never a fake pass). VRAM peak is recorded as telemetry -- no ceiling
-    enforcement (the operator's tier JSON owns the OOM budget)."""
-    section, meta = build_soak_fixture(n_beats=n_beats, oom_index=None)
-    ledger = build_full_ledger(section)
-    t0 = time.time()
-    e1 = run_episode(ledger, assets=assets, frame_count=frame_count)
-    e2 = run_episode(ledger, assets=assets, frame_count=frame_count)
-    # LOUD-failure contract leg: a forced OOM on the synthetic heavy-engine
-    # stub must RAISE RenderError -- no swap, no restamp, no trail.
-    oom_contract = {"raised": False, "error_type": "", "detail": ""}
-    if oom_index is not None:
-        _n_oom = max(1, min(n_beats, oom_index + 1))
-        oom_section, oom_meta = build_soak_fixture(
-            n_beats=_n_oom, oom_index=min(oom_index, _n_oom - 1))
-        oom_ledger = build_full_ledger(oom_section)
-        try:
-            run_episode(oom_ledger, oom_shot_id=oom_meta["oom_shot_id"],
-                        oom_engines=OOM_ENGINES, assets=assets,
-                        frame_count=frame_count)
-        except RenderError as exc:
-            oom_contract = {"raised": True, "error_type": "RenderError",
-                            "detail": str(exc).splitlines()[0][:200]}
-        except Exception as exc:  # noqa: BLE001 -- report the wrong type honestly
-            oom_contract = {"raised": True,
-                            "error_type": type(exc).__name__,
-                            "detail": str(exc).splitlines()[0][:200]}
-    report = assemble_report(meta, ledger, e1, e2,
-                             elapsed_s=time.time() - t0,
-                             oom_contract=(oom_contract
-                                           if oom_index is not None else None))
-    try:
-        report["passed_checks"] = assert_soak_ok(report)
-        report["ok"] = True
-    except SoakError as exc:             # embed the failure -- never a fake pass
-        report["ok"] = False
-        report["error"] = str(exc)
-    return report
-
-
-def render_single(engine_name="humo", *, assets=None, frame_count=33,
-                  canvas=None, profile=None):
-    """Render ONE shot via a SINGLE engine with NO fallback -- the focused
-    in-process validation (surfaces the real exception so the in-process forward
-    can be debugged in isolation before the full soak). Returns a result dict.
-
-    ``profile`` is the FOURTH thing this path has had to be taught to ask for,
-    and it is the same gap as lane 7's canvas one commit later: ``render_single``
-    builds its own inputs, so anything a production request carries and this
-    function does not invent is simply absent from every solo lane smoke.
-
-    Here that is the BOOT CONTRACT. ``_render_one`` passes ``profile or {}``
-    onward, and an empty profile SELECTS the ``default`` contract -- so a lane
-    that legitimately requires its own boot (lane 19's ``minimax_h3_video``, the
-    first such lane) could never be smoked on the boot it declares. When the
-    caller names no profile and the engine declares exactly ONE compatible
-    contract, that contract is selected here. An engine with several named
-    contracts is left unset here; its adapter matches the live server against
-    only its own compatible contracts before asserting the selected state.
-
-    THIS IS NOT A BYPASS, and the distinction is the whole reason it is safe:
-    selecting a contract is a CLAIM, and the claim is still proved against
-    ``comfy.cli_args`` on the running server by ``assert_running_server``. A
-    smoke on a wrongly-booted server still refuses by name -- it just refuses
-    for the true reason ("this server has no reserve clamp") instead of the
-    false one ("you asked for the stock boot"). An engine declaring two or more
-    contracts is left alone: there the selection is a real choice and inventing
-    one would be guessing. MiniMax H3 now exercises that path because its 16 GB
-    streaming and physical-8-GB lab launches intentionally differ.
-    """
-    if profile is None:
-        try:
-            from .._otr_shared import boot_contracts as _bc
-            declared = tuple(
-                getattr(_vreg.get_engine(engine_name),
-                        "compatible_boot_contracts", ()) or ())
-            if len(declared) == 1 and declared[0] != _bc.DEFAULT:
-                profile = {"launch": {"boot_contract": declared[0]}}
-        except Exception:  # noqa: BLE001 -- unknown engine -> stock behaviour
-            pass
-    shot = {"shot_id": "single_0000", "beat_id": "b0000",
-            "engine_id": engine_name,
-            "family": engine_family(engine_name, "audio_driven_face"),
-            "target_frame_count": int(frame_count), "degradation_trail": []}
-    # build_request defaults to the HuMo PORTRAIT canvas (480x832). For a WIDE
-    # engine (render_aspect='wide': ltx_video, wan_*, the _169 HuMos, ...) that
-    # letterboxes a 16:9 init still into a tall frame ("postage stamp" with black
-    # bars). With no explicit canvas, derive it from the engine's render_aspect so
-    # the single-engine validation renders in the engine's NATIVE aspect: wide ->
-    # 832x480 (the VRAM-safe proven render canvas, env OTR_VIDEO_RENDER_CANVAS),
-    # else the portrait default.
-    # A DECLARED RENDER CANVAS WINS HERE TOO (lane 7, 2026-08-11). This was the
-    # THIRD channel deciding a canvas, and the only one `declared_render_canvas`
-    # did not reach: `build_request_from_shot` applies the declaration last, but
-    # `render_single` builds its own request and never asked. Every solo lane
-    # smoke runs through here, so every lane's smoke was validating the ASPECT
-    # DEFAULT rather than the declaration -- invisible for lanes 1-6 only
-    # because all six declared exactly what this path already defaulted to
-    # (832x480 wide, 480x832 portrait). The first lane to declare something else
-    # failed its own /32 guard on a live render, which is the gate working.
-    #
-    # An explicit `canvas=` argument still wins, so a caller can deliberately
-    # probe an off-declaration size; the declaration only replaces the DERIVED
-    # default.
-    if canvas is None:
-        try:
-            _eng = _vreg.get_engine(engine_name)
-            _declared = declared_render_canvas(engine_name)
-            if _declared is not None:
-                canvas = tuple(_declared)
-            elif getattr(_eng, "render_aspect", "portrait") == "wide":
-                _rc = otr_env.get("OTR_VIDEO_RENDER_CANVAS", "832x480")
-                try:
-                    _rw, _rh = (int(x) for x in _rc.lower().split("x", 1))
-                except (ValueError, AttributeError):
-                    _rw, _rh = 832, 480
-                canvas = (_rw, _rh)
-        except Exception:  # noqa: BLE001 -- unknown engine -> portrait default
-            pass
-    request = build_request(shot, assets, frame_count, canvas)
-    t0 = time.time()
-    try:
-        clip = _render_one(engine_name, request, force_oom=False,
-                           profile=profile)
-        return {"ok": True, "engine": engine_name,
-                "elapsed_s": round(time.time() - t0, 1),
-                "clip": _clip_summary(clip),
-                "vram_used_mb": _mc.vram_used_mb()}
-    except Exception as exc:             # noqa: BLE001 - report honestly
-        import traceback
-        return {"ok": False, "engine": engine_name,
-                "elapsed_s": round(time.time() - t0, 1),
-                "error": "%s: %s" % (type(exc).__name__, exc),
-                "traceback": traceback.format_exc()[-1800:]}
-
-
 __all__ = [
     "ENGINE_FAMILY",
-    "OOM_ENGINES", "FROZEN_AUDIO_SHA",
-    "OomSignal", "RenderError", "RenderFloorError", "SoakError",
+    "FROZEN_AUDIO_SHA",
+    "OomSignal", "RenderError", "RenderFloorError",
     "FamilyInputGap",
     "classify_failure", "engine_family",
-    "build_soak_fixture", "build_full_ledger", "build_request",
+    "build_full_ledger", "build_request",
     "build_request_from_shot", "_slice_master_audio",
     "SLICER_VERSION", "slice_cache_key",
     "run_real_episode", "build_clip_manifest", "persist_episode_clips",
     "parse_engine_override", "apply_engine_override",
-    "render_shot", "run_episode", "assemble_report", "assert_soak_ok",
-    "run_gpu_soak", "render_single",
+    "render_shot", "run_episode",
 ]

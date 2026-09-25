@@ -1557,7 +1557,7 @@ class OTRSilentComposite:
                 "clip_manifest_json": ("STRING", {
                     "default": "{}", "multiline": True, "forceInput": True,
                     "tooltip": (
-                        "OTR_VideoRenderBatch(mode=episode) clip manifest. When "
+                        "OTR_VideoRenderBatch clip manifest. When "
                         "it carries per-beat clips the composite ASSEMBLES a "
                         "frame-accurate CFR timeline (each beat conformed to its "
                         "audio-derived frame count; gaps filled from "

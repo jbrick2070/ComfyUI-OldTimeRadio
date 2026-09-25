@@ -678,7 +678,7 @@ def _flatten_profile_values(profile: dict) -> dict:
             flat[f"llm.{k}"] = llm[k]
     rend = profile.get("render", {})
     for k in ("fps", "canvas_w", "canvas_h", "composite_res",
-              "composite_w", "composite_h", "frame_budget", "beats"):
+              "composite_w", "composite_h"):
         if k in rend:
             flat[f"render.{k}"] = rend[k]
     # S5: director + castlock policy widgets.

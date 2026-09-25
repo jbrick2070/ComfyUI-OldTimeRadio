@@ -4,8 +4,8 @@ The character_3d lane delivers ``CanonicalClip(type="directory",
 pixel_format="rgba", alpha="straight", has_audio=False, frame_count=N)``: a
 DIRECTORY of straight-alpha PNG/EXR frames, sorted by name, exactly N of them.
 This module is the canonicalize-time validator + the shared frame-listing rule
-("dir exists + exactly N sorted nonzero frames") that ``_clip_summary`` /
-``build_clip_manifest`` / the soak assertions and ``OTR_SilentComposite``'s
+("dir exists + exactly N sorted nonzero frames") that
+``build_clip_manifest`` and ``OTR_SilentComposite``'s
 directory read path all consume -- ONE rule, no per-caller drift.
 
 Never trust the schema defaults for a directory clip: ``container="mp4"`` /

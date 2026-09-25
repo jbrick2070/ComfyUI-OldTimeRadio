@@ -180,7 +180,7 @@ def test_an_absent_section_is_legal(section):
 
 
 @pytest.mark.parametrize("section,key", [
-    ("render", "frame_budget"),
+    ("render", "canvas_w"),
     ("llm", "vram_ceiling_gb"),
     ("seed_policy", "request_seed"),
 ])
@@ -241,7 +241,7 @@ def test_v2_mapping_declares_exempt_widget_names():
     # The writer's 8 model widgets are MANAGED (not exempt).
     assert "creative_writing_model" not in ewn["OTR_LedgerScriptWriter"]
     assert "llm.creative_model" in mapping["managed"]
-    assert "render.frame_budget" in mapping["managed"]
+    assert "render.canvas_w" in mapping["managed"]
 
 
 # ---------------------------------------------------------------------------

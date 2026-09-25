@@ -1,7 +1,7 @@
 """Additive CPU coverage for the in-process render driver (A-S7.5).
 
 New, self-contained tests complementing tests/test_video_render_driver.py. The
-pure helpers (engine_family / build_full_ledger / build_soak_fixture range guard
+pure helpers (engine_family / build_full_ledger
 / classify_failure kind map) plus a CPU exercise of
 the REAL render loop (run_episode) driven by STUB engines registered into a
 snapshot/restore registry: it proves a HARD failure RAISES LOUD (NO FALLBACKS --
@@ -37,28 +37,6 @@ def test_build_full_ledger_freezes_audio():
     assert led["audio"]["master_audio_sha256"] == rd.FROZEN_AUDIO_SHA
     assert led["audio"]["ledger_frozen"] is True
     assert led["video"] is section
-
-
-def test_build_soak_fixture_oom_index_out_of_range():
-    with pytest.raises(ValueError):
-        rd.build_soak_fixture(n_beats=40, oom_index=40)
-    with pytest.raises(ValueError):
-        rd.build_soak_fixture(n_beats=40, oom_index=-1)
-
-
-def test_build_soak_fixture_shape_and_empty_trails():
-    section, meta = rd.build_soak_fixture(n_beats=12, oom_index=5)
-    assert len(section["shots"]) == 12
-    assert meta["oom_shot_id"] == "shot_0005"
-    oom = section["shots"][5]
-    # Rebased 2026-08-23: stub identity is (soak_oom_heavy, audio_driven_face)
-    # so the forced-OOM contract outlives the character_3d retirement.
-    assert (oom["engine_id"], oom["family"]) == (
-        "soak_oom_heavy", "audio_driven_face")
-    # every shot starts with an empty degradation trail
-    assert all(s["degradation_trail"] == [] for s in section["shots"])
-    # shot 0 is the first profile in the rotation
-    assert section["shots"][0]["engine_id"] == "humo"
 
 
 def test_classify_failure_specific_kind_mappings():
@@ -618,7 +596,6 @@ def test_video_render_batch_episode_mode_emits_manifest(record_registry, tmp_pat
     from nodes.otr_video_render_batch import OTRVideoRenderBatch
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
     out = OTRVideoRenderBatch().render(
-        mode="episode", beats=2, oom_index=0, frame_count=25,
         patched_ledger_json=_json.dumps(_real_ledger()))
     report_json, manifest_json = out["result"]    # 2-tuple: report + manifest
     manifest = _json.loads(manifest_json)
@@ -632,19 +609,10 @@ def test_video_render_batch_episode_mode_bad_ledger_failsoft(monkeypatch, tmp_pa
     import json as _json
     from nodes.otr_video_render_batch import OTRVideoRenderBatch
     monkeypatch.setenv("OTR_OUTPUT_DIR", str(tmp_path))
-    out = OTRVideoRenderBatch().render(mode="episode", beats=2, oom_index=0,
-                                       frame_count=25, patched_ledger_json="{}")
+    out = OTRVideoRenderBatch().render(patched_ledger_json="{}")
     report_json, manifest_json = out["result"]
     assert manifest_json == ""                     # empty manifest, no crash
     assert _json.loads(report_json)["ok"] is False
-
-
-def test_video_render_batch_mode_combo_offers_episode():
-    # the mode PICKER must list "episode" (not just the render() branch) or the
-    # live ComfyUI /prompt validator rejects mode='episode' as value_not_in_list.
-    from nodes.otr_video_render_batch import OTRVideoRenderBatch
-    modes = OTRVideoRenderBatch.INPUT_TYPES()["required"]["mode"][0]
-    assert "episode" in modes and "soak" in modes and "single" in modes
 
 
 # --------------------------------------------------------------------------- #

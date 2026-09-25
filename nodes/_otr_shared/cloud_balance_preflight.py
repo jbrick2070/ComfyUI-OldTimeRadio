@@ -58,7 +58,7 @@ PAD_RATIO = 0.15
 PAD_MIN_USD = 1.0
 
 #: Conservative queue-time counts. The script does not exist yet.
-DEFAULT_BEATS = 40            # OTR_VideoRenderBatch.beats default
+DEFAULT_BEATS = 40            # upper bound on a planned episode's beats
 DEFAULT_FRESH_CAP = 15        # OTR_ImageDirector.fresh_cap default
 DEFAULT_ACT_COUNT = 3
 MUSIC_CUES = 4
@@ -84,7 +84,6 @@ _DIRECTOR = "OTR_VideoDirector"
 _CASTLOCK = "OTR_CastLock"
 _MUSIC = "OTR_StableAudioTheme"
 _IMAGE_DIRECTOR = "OTR_ImageDirector"
-_RENDER_BATCH = "OTR_VideoRenderBatch"
 _CAST_SLOTS = ("char_voice_engine", "announcer_voice_engine")
 
 
@@ -474,8 +473,6 @@ def estimate_lines(
     writer_price = writer_usd_fn or default_writer_usd
 
     beats = DEFAULT_BEATS
-    for node in _find_nodes(prompt, scoped, _RENDER_BATCH):
-        beats = max(beats, _int_widget(node.get("inputs"), "beats", DEFAULT_BEATS))
     fresh_cap = DEFAULT_FRESH_CAP
     for node in _find_nodes(prompt, scoped, _IMAGE_DIRECTOR):
         fresh_cap = max(fresh_cap,

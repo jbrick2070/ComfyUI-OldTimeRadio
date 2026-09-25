@@ -42,7 +42,7 @@ def _director_video(graph: dict) -> list[str]:
 def _render_engine(graph: dict) -> str:
     node = _node(graph, "OTR_VideoRenderBatch")
     wv = (node or {}).get("widgets_values") or []
-    return str(wv[4]) if len(wv) > 4 else ""
+    return str(wv[0]) if wv else ""
 
 
 def _profile(root: Path, pid: str) -> dict:

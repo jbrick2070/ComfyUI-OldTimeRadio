@@ -119,43 +119,6 @@ def test_engines_that_declare_NOTHING_are_left_alone():
     assert rd.declared_render_canvas("") is None
 
 
-def test_render_single_takes_the_DECLARATION_not_the_aspect_default(
-        monkeypatch):
-    """THE THIRD CANVAS CHANNEL, found on a live render in lane 7 (2026-08-11).
-
-    `build_request_from_shot` applies `declared_render_canvas` LAST so nothing
-    can clobber it -- but `render_single` builds its OWN request and never
-    asked. It derived the canvas from `render_aspect` plus
-    `OTR_VIDEO_RENDER_CANVAS`: wide -> 832x480, else the portrait default.
-
-    EVERY solo lane smoke runs through that function, so every lane was
-    validating the aspect default rather than its declaration. It stayed
-    invisible through six lanes because all six declared exactly what this path
-    already produced (832x480 wide, 480x832 portrait). A since-retired LTX
-    audio lane was the first to declare something else, and its stage-A /32
-    guard failed the live render immediately -- which is how this was found.
-
-    Asserted here on the 8 GB lane: the property belongs to the declaration
-    mechanism, not to one lane.
-    """
-    captured = {}
-    monkeypatch.setattr(rd, "build_request",
-                        lambda shot, assets, frames, canvas: captured.setdefault(
-                            "canvas", canvas) or {"canvas": canvas})
-    monkeypatch.setattr(rd, "_render_one",
-                        lambda *a, **k: (_ for _ in ()).throw(RuntimeError("stop")))
-    monkeypatch.setenv("OTR_VIDEO_RENDER_CANVAS", "832x480")
-    rd.render_single(LANE, frame_count=9)
-    assert captured["canvas"] == DECLARED, (
-        "render_single handed %r to build_request while %s declares %r -- the "
-        "declaration must reach every request builder, not just the shot one"
-        % (captured["canvas"], LANE, DECLARED))
-    # an EXPLICIT canvas still wins, so an off-declaration probe stays possible
-    captured.clear()
-    rd.render_single(LANE, frame_count=9, canvas=(640, 384))
-    assert captured["canvas"] == (640, 384)
-
-
 @pytest.mark.parametrize("bad,needle", [
     ((0, 0), "positive"),
     ((-512, -288), "positive"),
