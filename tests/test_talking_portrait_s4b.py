@@ -45,22 +45,6 @@ def test_talking_roles_policy_malformed_is_empty():
     assert _talking_roles_from_policy(json.dumps({"talking": "yes"})) == {}
 
 
-def test_video_director_role_talking_map():
-    from nodes.otr_video_director import OTRVideoDirector
-    resolved = {
-        "announcer_video_model": {"engine_id": "cloud_kling_avatar"},
-        "music_video_model": {"engine_id": "cloud_kling_avatar"},
-        "character_video_model": {"engine_id": "cloud_kling_avatar"},
-    }
-    talk = OTRVideoDirector._role_talking(resolved)
-    assert set(talk) == {"announcer_visual", "music_visual",
-                          "character_video"}
-    # the engine's own wants_talking_prompt() hook says it lip-syncs
-    assert talk["announcer_visual"] is True
-    assert talk["music_visual"] is True
-    assert talk["character_video"] is True
-
-
 def test_video_director_role_talking_false_on_a_non_lipsync_lane():
     # An audio-in lane conditions the picture on the waveform but declares no
     # talking hook, so its portraits keep the ordinary styling.

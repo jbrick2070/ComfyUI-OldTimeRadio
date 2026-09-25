@@ -22,7 +22,7 @@ EXPECTED_ROW_IDS = {
     "cloud_stability_audio", "cloud_sonilo_music",
     "cloud_flux_pro", "cloud_nano_banana_2",
     "cloud_krea_2_turbo", "cloud_luma_photon_flash",
-    "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
+    "cloud_seedance_2", "cloud_wan_i2v",
     "cloud_vidu_q2_i2v",
     "cloud_ltx25_i2v", "cloud_ltx25_a2v",
     # 2026-07-02 roster expansion:

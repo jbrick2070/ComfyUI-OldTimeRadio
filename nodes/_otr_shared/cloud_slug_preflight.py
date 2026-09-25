@@ -236,7 +236,6 @@ def _fix_hint(node_key: str, input_name: str, live) -> str:
     if input_name == "model" and spec.get("env"):
         env_name = spec["env"]
     extras = {
-        ("cloud_kling_avatar", "mode"): "OTR_CLOUD_KLING_MODE",
         ("cloud_elevenlabs_tts", "model"): "OTR_ELEVENLABS_MODEL_ID",
         ("cloud_luma_photon_flash", "model"): "OTR_CLOUD_LUMA_PHOTON_MODEL",
         ("cloud_ideogram_v4", "resolution"): "OTR_CLOUD_IDEOGRAM_RESOLUTION",

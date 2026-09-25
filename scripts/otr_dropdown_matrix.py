@@ -543,8 +543,8 @@ _FRICTION_CELL = {
 
 #: Every friction word that means "a hosted service, not a download". ``none*``
 #: is the SAME KIND of thing as ``none`` -- a cloud lane no shipping profile
-#: selects yet -- and testing only for ``none`` sent three cloud engines
-#: (`cloud_kling_avatar`, `cloud_seedance_2`, `cloud_vidu_q2_pro_fast_720p`)
+#: selects yet -- and testing only for ``none`` sent cloud engines
+#: (`cloud_seedance_2`, `cloud_vidu_q2_pro_fast_720p`, and others like them)
 #: into the catch-all below, so they printed under the heading "local
 #: diffusion" while their own cells read "key". The asterisk still marks the
 #: gap; it no longer moves them to the wrong table.

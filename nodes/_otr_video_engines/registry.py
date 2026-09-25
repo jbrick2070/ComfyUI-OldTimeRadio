@@ -701,12 +701,6 @@ CAPABILITIES = {
     # ffmpeg + credits can run them). NO enable flag (operator directive
     # 2026-07-02): rows always REGISTER + show; the dropdown pick is the enable;
     # missing credentials fail LOUD at invoke-time auth resolution.
-    "cloud_kling_avatar": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": True, "sidecar_conditional": False,
-        "model_requirements": []},
     "cloud_seedance_2": {
         "required_toolchain": None, "requires_sidecar": False,
         "device_backends": ["cuda", "cpu", "mps"], "requires_vendor": None,

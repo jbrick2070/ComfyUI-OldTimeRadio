@@ -87,8 +87,6 @@ CURATED_ROWS = {
                                "BEST stills; prompt continuity w/ flux_gen1"),
     "cloud_nano_banana_2":    ("GeminiNanoBanana2V2", "GEMINI", 0,
                                "BEST stills; reference-image consistency"),
-    "cloud_kling_avatar":     ("KlingAvatarNode", "KLING", 0,
-                               "talking default; reactivity=required_audio_ref"),
     "cloud_seedance_2":       ("ByteDance2ReferenceNode", "BYTEDANCE", 0,
                                "music/b-roll reactive default; audio-ref + identity"),
     "cloud_wan_i2v":          ("Wan2ImageToVideoApi", "WAN", 0,
@@ -367,9 +365,10 @@ def _classify_video_row(class_name, inputs, return_types):
     :func:`_pin_inputs` shape). Returns the audit record fields: the exact
     prompt kwarg NAME, the image-init NAME, a required-audio NAME (or None),
     seed support, duration inputs, a ``contains_dynamic_v3`` flag, per-filter
-    pass/fail, an overall ``pass`` and human ``reasons``. kling-Avatar-style
-    classes are EXEMPT from the no-required-audio filter (they still SUPPLY
-    audio_ref -- music/spoken beats have audio) but are scored, not auto-passed.
+    pass/fail, an overall ``pass`` and human ``reasons``. Avatar-style classes
+    (class name contains "avatar") are EXEMPT from the no-required-audio
+    filter (they still SUPPLY audio_ref -- music/spoken beats have audio) but
+    are scored, not auto-passed.
     """
     req = inputs.get("required", {}) or {}
     opt = inputs.get("optional", {}) or {}

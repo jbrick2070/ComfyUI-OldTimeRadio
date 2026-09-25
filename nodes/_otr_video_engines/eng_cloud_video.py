@@ -4,7 +4,6 @@
 Four rows from the S0 pin table, invoked through the S0 bridge
 (``invoke_partner_node``) and conformed by ``canonicalize_video``:
 
-    cloud_kling_avatar   required_audio_ref   (init_image, audio_ref)
     cloud_seedance_2     required_audio_ref   (init_image, audio_ref)
     cloud_wan_i2v        mute_only            (init_image, text_prompt)
     cloud_wan_i2v_audio  required_audio_ref   (init_image, audio_ref)
@@ -96,67 +95,6 @@ _CLOUD_VIDEO_SHAPE_A_BASE_PLAN = (
                  style_tail_policy="full"),
 )
 
-
-#: Kling Avatar (Comfy ``KlingAvatarNode``) is audio-in, not I2V. The
-#: canonical node takes ONE reference photo + ``sound_file`` + an optional
-#: prompt for actions / emotions / camera -- it does not take a scene still.
-#: Minting Shape-A wide scenes here spent image credits on stills the adapter
-#: never sends, and ``aspect="inherit_engine"`` against ``render_aspect=wide``
-#: minted 16:9 "portraits" instead of a face photo.
-#: https://docs.comfy.org/built-in-nodes/KlingAvatarNode
-_CLOUD_KLING_AVATAR_PLAN = (
-    StillPlanRow(kind="portrait", cardinality="per_subject",
-                 target_class="portrait", aspect="portrait",
-                 required="always",
-                 framing_geometry=(
-                     ("single avatar reference photo, head and shoulders, "
-                      "face clearly visible, mouth unobstructed, subject "
-                      "centred with natural headroom above the head "
-                      "(never crop the top of the head); fill the frame "
-                      "with the person -- this image is Kling Avatar's "
-                      "only visual input")),
-                 style_tail_policy="full"),
-)
-
-#: Comfy KlingAvatarNode image gate: min 300px on both edges, aspect
-#: between 1:2.5 and 2.5:1.
-_KLING_AVATAR_MIN_PX = 300
-_KLING_AVATAR_ASPECT_MIN = 1.0 / 2.5
-_KLING_AVATAR_ASPECT_MAX = 2.5
-
-#: kling avatar mode COMBO -- the pin excludes combo options (S0), so the
-#: adapter ships the provider's documented std tier; env-overridable.
-_KLING_MODE_ENV = "OTR_CLOUD_KLING_MODE"
-_KLING_MODE_DEFAULT = "std"
-_KLING_MODES = ("std", "pro")
-_KLING_MODE_ALIASES = {
-    "standard": "std",
-    "standard mode": "std",
-    "professional": "pro",
-    "professional mode": "pro",
-}
-_KLING_AVATAR_MARKER = (
-    "Kling avatar audio-in; lip sync leads, action is full and sustained.")
-#: SAME ACTION BUDGET AS WAN / VIDU / SEEDANCE, plus the audio-in contract.
-#: Operator 2026-09-15: no silly subtle prompts -- keep the shot's action
-#: prompt and append the lane clause, exactly as the other cloud lanes do.
-#: Operator 2026-08-27 still stands for the extra sentence: audio-in must
-#: name lip-sync and that we feed both the beat audio and the spoken line.
-#: Artifact guards (whip pans, jump cuts, warped faces) stay; "subtle" /
-#: "small natural head movement" / "no exaggerated gestures" stay gone.
-_KLING_AVATAR_BASE_CLAUSE = (
-    "Generate one continuous audio-driven shot from the reference photo and "
-    "the supplied audio. Natural lip sync follows the supplied audio exactly "
-    "and matches the spoken line word for word -- feed both the beat audio "
-    "and the dialogue; the sync leads identity. The subject performs a full, "
-    "decisive action that develops across the shot -- turning, reaching, "
-    "rising, gesturing, crossing the space -- and lands on a clear final "
-    "position, with a purposeful camera move that follows the action. Motion "
-    "begins immediately in the first frame and is sustained throughout. Keep "
-    "the face unobstructed so the mouth stays readable. Preserve the "
-    "reference-image subject and style. No whip pans, jump cuts, melting "
-    "geometry, warped faces, drifting text, black frames, or pillarbox bars. "
-    f"{_KLING_AVATAR_MARKER}")
 
 _SEEDANCE_MODEL_ALIASES = {
     # The installed ByteDance2ReferenceNode indexes SEEDANCE_MODELS by UI label.
@@ -298,28 +236,6 @@ _VIDU_Q2_SMOOTH_MOTION_CLAUSE = (
     "bars. "
     f"{_VIDU_Q2_SMOOTH_MARKER}")
 _VIDU_Q2_PROMPT_VARIANT = "vidu_q2_pro_fast_720p_action_v2"
-
-
-def _condition_kling_avatar_prompt(prompt: str) -> "tuple[str, dict]":
-    """Keep the shot's ACTION prompt, then append the audio-in lip-sync
-    clause -- the same append shape as Wan / Vidu / Seedance. Never replace
-    the action with a damped talking-head blurb.
-    """
-    original = str(prompt or "")
-    if _KLING_AVATAR_MARKER in original:
-        conditioned = original
-    elif original.strip():
-        conditioned = original.rstrip() + "\n\n" + _KLING_AVATAR_BASE_CLAUSE
-    else:
-        conditioned = _KLING_AVATAR_BASE_CLAUSE
-    conditioned = append_visual_safety_clause(conditioned)
-    return conditioned, {
-        "changed": conditioned != original,
-        "original_sha8": _sha8(original),
-        "conditioned_sha8": _sha8(conditioned),
-        "original_excerpt": _log_excerpt(original),
-        "conditioned_excerpt": _log_excerpt(conditioned),
-    }
 
 
 def _condition_wan_prompt(prompt: str) -> "tuple[str, dict]":
@@ -469,31 +385,6 @@ def _load_image_tensor(path: str):
     img = Image.open(path).convert("RGB")
     arr = np.asarray(img).astype("float32") / 255.0
     return torch.from_numpy(arr)[None, ...]
-
-
-def _assert_kling_avatar_image(tensor) -> None:
-    """Fail closed on the Comfy KlingAvatarNode image contract.
-
-    Width and height must be at least 300px; aspect must sit between
-    1:2.5 and 2.5:1. A too-small or ultra-wide still is a provider 400,
-    not a render we can salvage.
-    """
-    if tensor is None or not hasattr(tensor, "shape") or tensor.ndim != 4:
-        raise RuntimeError(
-            "cloud_kling_avatar: init_image is not an IMAGE tensor "
-            "[1,H,W,C] -- NO FALLBACK")
-    _n, height, width, _c = (int(v) for v in tensor.shape)
-    if height < _KLING_AVATAR_MIN_PX or width < _KLING_AVATAR_MIN_PX:
-        raise RuntimeError(
-            "cloud_kling_avatar: init_image %dx%d is below KlingAvatarNode "
-            "minimum %dpx on both edges -- mint a face photo, NO FALLBACK"
-            % (width, height, _KLING_AVATAR_MIN_PX))
-    aspect = float(width) / float(height) if height else 0.0
-    if not (_KLING_AVATAR_ASPECT_MIN <= aspect <= _KLING_AVATAR_ASPECT_MAX):
-        raise RuntimeError(
-            "cloud_kling_avatar: init_image %dx%d aspect %.4f is outside "
-            "KlingAvatarNode 1:2.5 .. 2.5:1 -- NO FALLBACK"
-            % (width, height, aspect))
 
 
 def _load_audio_dict(path: str):
@@ -763,81 +654,6 @@ class _CloudVideoBase:
                 f"provider maximum {float(max_duration_s):.3f}s -- "
                 f"split the shot before selecting this engine")
         return audio
-
-
-class CloudKlingAvatarEngine(_CloudVideoBase):
-    """Kling avatar: TALKING default row (audio CONDITIONS the clip)."""
-
-    name = "cloud_kling_avatar"
-    node_key = "cloud_kling_avatar"
-    #: THE FRAME LADDER (chunk 7a, 2026-07-26). Kling sends NO duration parameter at all --
-    #: the clip is as long as the sound_file, which _audio_input
-    #: bounds at min_duration_s=2.0 / max_duration_s=300.0.
-    #: 2-300 s at the 25 fps canvas rate = 50-7500 frames.
-    frame_contract = FrameContract(
-        min_frames=50,
-        max_frames=7500,
-        quantum=1,
-        native_fps=25,
-        allow_tail_trim=True,
-        continuity=CONTINUITY_SOFT_REFERENCE,
-    )
-    family = "audio_driven_face"
-    required_inputs = ("init_image", "audio_ref")
-    reactivity = "required_audio_ref"
-    #: S1 per-model still plan -- portrait REQUIRED because Kling consumes an
-    #: init face every beat (audio-driven-face family; spec section 3).
-    still_plan = _CLOUD_KLING_AVATAR_PLAN
-
-    def wants_talking_prompt(self):
-        """Stills must be minted face-forward with a readable mouth.
-
-        KlingAvatarNode lip-syncs the reference photo to ``sound_file``.
-        Without this hook the director stamps talking=false and the image
-        phase writes I2V scene stills instead of an avatar photo.
-        """
-        return True
-
-    def _init_image_input(self, request):
-        tensor = super()._init_image_input(request)
-        _assert_kling_avatar_image(tensor)
-        return tensor
-
-    def _mode(self) -> str:
-        raw = otr_env.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
-        folded = raw.lower()
-        mode = _KLING_MODE_ALIASES.get(folded, folded)
-        if mode not in _KLING_MODES:
-            raise RuntimeError(
-                f"{self.name}: {_KLING_MODE_ENV}={raw!r} is unsupported; "
-                f"expected one of {_KLING_MODES} or known aliases")
-        return mode
-
-    def cloud_selectors(self):
-        raw = otr_env.get(_KLING_MODE_ENV, _KLING_MODE_DEFAULT).strip()
-        folded = raw.lower()
-        mode = _KLING_MODE_ALIASES.get(folded, folded)
-        return {self.node_key: {"mode": (mode,)}}
-
-    def _partner_inputs(self, request):
-        prompt, prompt_meta = _condition_kling_avatar_prompt(
-            str(_req_get(request, "text_prompt") or ""))
-        log_fields = dict(prompt_meta)
-        log_fields.update({
-            "engine": self.name,
-            "prompt_variant": "kling_avatar_action_v2",
-        })
-        _LOG.info("[OTR.cloud.kling_avatar] prompt_conditioner %s",
-                  json.dumps(log_fields, sort_keys=True))
-        return {
-            "image": self._init_image_input(request),
-            "sound_file": self._audio_input(
-                request, min_duration_s=2.0, max_duration_s=300.0,
-                pad_to_min=True),
-            "mode": self._mode(),
-            "seed": self._seed_i32(request),
-            "prompt": prompt,
-        }
 
 
 class CloudSeedance2Engine(_CloudVideoBase):
@@ -1324,7 +1140,6 @@ class CloudLtx25AudioInEngine(_CloudVideoBase):
         }
 
 
-KlingAvatar = CloudKlingAvatarEngine()
 Seedance2 = CloudSeedance2Engine()
 WanI2V = CloudWanI2VEngine()
 WanI2VAudio = CloudWanI2VAudioEngine()
@@ -1333,12 +1148,12 @@ Ltx25FoleyPlus = CloudLtx25FoleyPlusEngine()
 Ltx25AudioIn = CloudLtx25AudioInEngine()
 
 for _eng in (
-        KlingAvatar, Seedance2, WanI2V, WanI2VAudio,
+        Seedance2, WanI2V, WanI2VAudio,
         ViduQ2ProFast720p, Ltx25FoleyPlus, Ltx25AudioIn):
     register(_eng)
 
 __all__ = [
-    "CloudKlingAvatarEngine", "CloudSeedance2Engine",
+    "CloudSeedance2Engine",
     "CloudWanI2VEngine", "CloudWanI2VAudioEngine",
     "CloudViduQ2ProFast720pEngine",
     "CloudLtx25FoleyPlusEngine", "CloudLtx25AudioInEngine",

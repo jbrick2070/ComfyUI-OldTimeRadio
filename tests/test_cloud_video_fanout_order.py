@@ -126,7 +126,6 @@ def _clear_finish():
 
 def test_vidu_default_concurrency_is_eight():
     assert cmb.provider_semaphore_size("vidu") == 8
-    assert cmb.provider_semaphore_size("kling") == 1
     assert cmb.provider_semaphore_size("luma") == 8
     assert cmb.provider_semaphore_size("elevenlabs") == 8
     assert cmb.provider_semaphore_size("sonilo") == 8

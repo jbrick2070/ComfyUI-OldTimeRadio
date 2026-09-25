@@ -46,7 +46,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_ltx25_audio_in` | none | -- | key | key | key | key | key |
 | `cloud_ltx25_foley_plus` | none | -- | key | key | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |

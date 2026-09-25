@@ -22,7 +22,7 @@ def _clean_state(monkeypatch, tmp_path):
         "OTR_CLOUD_MEDIA_BUDGET_USD",
         "OTR_CLOUD_MEDIA_CACHE_DIR",
         "OTR_VIDEO_MUTE_OK_ROLES",
-        "OTR_CLOUD_MAX_CONCURRENCY_KLING",
+        "OTR_CLOUD_MAX_CONCURRENCY_ACME",
         "OTR_CLOUD_MAX_CONCURRENCY_TESTPROV",
     ):
         monkeypatch.delenv(var, raising=False)
@@ -114,7 +114,7 @@ def test_stash_ignores_empty_and_non_string():
 
 
 def test_provider_id_normalizes():
-    assert cmb.normalize_provider_id("kling") == "KLING"
+    assert cmb.normalize_provider_id("vidu") == "VIDU"
     assert cmb.normalize_provider_id("byte-dance") == "BYTE_DANCE"
 
 
@@ -125,16 +125,15 @@ def test_provider_id_invalid_fails():
 
 
 def test_semaphore_defaults():
-    assert cmb.provider_semaphore_size("kling") == 1  # pinned default
-    assert cmb.provider_semaphore_size("vidu") == 8  # cheap-cloud video overlap
+    assert cmb.provider_semaphore_size("vidu") == 8  # pinned default
     assert cmb.provider_semaphore_size("seedream") == 8  # same overlap as Vidu
     assert cmb.provider_semaphore_size("luma") == 8
     assert cmb.provider_semaphore_size("elevenlabs") == 8
 
 
 def test_semaphore_env_override(monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_MAX_CONCURRENCY_KLING", "3")
-    assert cmb.provider_semaphore_size("kling") == 3
+    monkeypatch.setenv("OTR_CLOUD_MAX_CONCURRENCY_ACME", "3")
+    assert cmb.provider_semaphore_size("acme") == 3
 
 
 def test_semaphore_env_invalid(monkeypatch):

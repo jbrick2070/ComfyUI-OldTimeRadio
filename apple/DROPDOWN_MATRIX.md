@@ -33,7 +33,6 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `cloud_kling_avatar` | none, **but see below** | -- | key | key | key | key | key |
 | `cloud_ltx25_audio_in` | none | -- | key | key | key | key | key |
 | `cloud_ltx25_foley_plus` | none | -- | key | key | key | key | key |
 | `cloud_seedance_2` | none, **but see below** | -- | key | key | key | key | key |
@@ -220,7 +219,6 @@ box. Never paste a key into a workflow.
 
 These need no weights and no VRAM -- only a credential -- and the engines themselves are registered and selectable. But no shipping profile selects one, so they were never added to the provisioner's remote route, and `scripts/otr_provision.py` REFUSES a profile that names one rather than guessing. Using one today means selecting it in the graph, not through a profile. Worth closing before shipping.
 
-* `cloud_kling_avatar` (video)
 * `cloud_seedance_2` (video)
 
 ## Engines with no provisioning lane

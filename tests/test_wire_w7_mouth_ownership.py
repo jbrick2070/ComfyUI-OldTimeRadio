@@ -159,23 +159,6 @@ def test_a_CLOUD_AUDIO_CONDITIONED_lane_on_a_CHARACTER_beat_is_REFUSED():
         assert "NO FALLBACK" in str(caught.value)
 
 
-def test_a_CLOUD_AVATAR_on_a_character_beat_is_FINE():
-    """CONTROL for the test above, and it is what keeps that refusal narrow:
-    ``cloud_kling_avatar`` is ``audio_driven_face``, so the same empty ``roles``
-    tuple aimed at the same beat answers HUMAN. The refusal is about the
-    FAMILY's relationship to a face, not about being a cloud lane."""
-    from nodes._otr_video_engines.render_driver import _is_character_face_beat
-
-    if not vreg.is_registered("cloud_kling_avatar"):
-        pytest.skip("cloud_kling_avatar is not registered on this box")
-    shot = {"role": "character_video", "engine_id": "cloud_kling_avatar"}
-    assert mp.mouth_owner_for_beat(
-        engine_id="cloud_kling_avatar",
-        family=engine_family("cloud_kling_avatar", ""),
-        role="character_video",
-        is_character_face=_is_character_face_beat(shot)) == mp.MOUTH_HUMAN
-
-
 def test_cloud_ltx25_audio_in_on_a_character_beat_is_a_FACE():
     """Cloud LTX 2.5 A2V joins the other audio-in character engines: a
     character beat owns lips."""

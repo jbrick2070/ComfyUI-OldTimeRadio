@@ -139,7 +139,6 @@ VIDEO_LANE = {
     "animatediff15_v3_haunted_video": "adhv",
     "animatediff15_v3_stillin_lab_video": "adsl",
     "animatediff15_lightning_video": "adlt",
-    "cloud_kling_avatar": "ckla",
     "cloud_ltx25_audio_in": "clta",
     "cloud_ltx25_foley_plus": "cltf",
     "cloud_seedance_2": "csd2",

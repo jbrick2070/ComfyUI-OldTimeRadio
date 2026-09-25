@@ -28,7 +28,7 @@ from nodes._otr_video_engines import render_driver as rd
 _FFMPEG = shutil.which("ffmpeg")
 
 _CLOUD_ROWS = (
-    "cloud_kling_avatar", "cloud_seedance_2", "cloud_wan_i2v",
+    "cloud_seedance_2", "cloud_wan_i2v",
     "cloud_wan_i2v_audio", "cloud_vidu_q2_pro_fast_720p",
     "cloud_ltx25_foley_plus", "cloud_ltx25_audio_in",
 )
@@ -55,7 +55,7 @@ def test_cloud_rows_never_default():
     # so automatic selection can never land on one (menu ORDER is cosmetic;
     # default_engine_for_role is the automatic-selection surface).
     for eng in (
-            ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
+            ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
             ecv.ViduQ2ProFast720p, ecv.Ltx25FoleyPlus, ecv.Ltx25AudioIn):
         assert tuple(eng.default_roles) == ()
     for role in ("announcer_visual", "music_visual", "character_video"):
@@ -64,7 +64,6 @@ def test_cloud_rows_never_default():
 
 
 def test_reactivity_descriptors_match_pass04():
-    assert ecv.KlingAvatar.reactivity == "required_audio_ref"
     assert ecv.Seedance2.reactivity == "required_audio_ref"
     assert ecv.WanI2V.reactivity == "mute_only"
     assert ecv.WanI2VAudio.reactivity == "required_audio_ref"
@@ -72,7 +71,7 @@ def test_reactivity_descriptors_match_pass04():
     assert ecv.Ltx25FoleyPlus.reactivity == "mute_only"
     assert ecv.Ltx25AudioIn.reactivity == "required_audio_ref"
     assert all(e.must_strip_audio for e in
-               (ecv.KlingAvatar, ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
+               (ecv.Seedance2, ecv.WanI2V, ecv.WanI2VAudio,
                 ecv.ViduQ2ProFast720p, ecv.Ltx25FoleyPlus, ecv.Ltx25AudioIn))
 
 
@@ -99,7 +98,7 @@ def test_assert_usable_no_enable_flag(monkeypatch):
     assert_usable must NOT gate on OTR_ENABLE_COMFY_CLOUD_MEDIA (only
     ffmpeg presence + a healthy pin row)."""
     monkeypatch.delenv("OTR_ENABLE_COMFY_CLOUD_MEDIA", raising=False)
-    ecv.KlingAvatar.assert_usable({}, {})            # must not raise
+    ecv.Seedance2.assert_usable({}, {})              # must not raise
 
 
 # --------------------------------------------------------------------------- #
@@ -158,89 +157,6 @@ def _assert_negative_safety(prompt: str):
     lower = prompt.lower()
     for term in ("guns", "knives", "nudity"):
         assert term not in lower
-
-
-def test_kling_avatar_partner_inputs(tmp_path, monkeypatch):
-    captured = {}
-
-    def _fake_invoke(node_key, inputs, *, timeout_s, estimated_usd=0.0):
-        captured.update(node_key=node_key, inputs=inputs,
-                        timeout_s=timeout_s, estimated_usd=estimated_usd)
-        return {"path": _fixture_png(tmp_path), "content_type": "video/mp4",
-                "duration_s": None, "provider_job_id": "j1", "raw_meta": {}}
-
-    import nodes._otr_shared.cloud_media_invoke as cmi
-    monkeypatch.setattr(cmi, "invoke_partner_node", _fake_invoke)
-    raw = ecv.KlingAvatar.render_clip(_request(tmp_path), {})
-    assert captured["node_key"] == "cloud_kling_avatar"
-    ins = captured["inputs"]
-    assert ins["mode"] and ins["seed"] == 7
-    assert ins["prompt"].startswith("a person")
-    assert ecv._KLING_AVATAR_MARKER in ins["prompt"]
-    _assert_visual_safety(ins["prompt"])
-    assert hasattr(ins["image"], "ndim") and ins["image"].ndim == 4
-    assert set(ins["sound_file"]) == {"waveform", "sample_rate"}
-    assert ins["sound_file"]["waveform"].shape[-1] == 32000
-    assert raw["provider_job_id"] == "j1"
-
-
-def test_kling_avatar_missing_audio_fails_loud(tmp_path):
-    req = _request(tmp_path, audio_ref="")
-    with pytest.raises(RuntimeError, match="audio_ref"):
-        ecv.KlingAvatar._partner_inputs(req)
-
-
-def test_kling_avatar_mode_alias_and_seed_clamp(tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_KLING_MODE", "Professional Mode")
-    req = _request(tmp_path, seed_bundle={"request_seed": 2147483656})
-    ins = ecv.KlingAvatar._partner_inputs(req)
-    assert ins["mode"] == "pro"
-    assert ins["seed"] == 8
-
-
-def test_kling_avatar_rejects_unknown_mode(tmp_path, monkeypatch):
-    monkeypatch.setenv("OTR_CLOUD_KLING_MODE", "turbo")
-    with pytest.raises(RuntimeError, match="OTR_CLOUD_KLING_MODE"):
-        ecv.KlingAvatar._partner_inputs(_request(tmp_path))
-
-
-def test_kling_avatar_pads_request_audio_to_provider_floor(tmp_path):
-    req = _request(tmp_path, audio_ref=_fixture_wav(tmp_path, dur_s=0.5))
-    ins = ecv.KlingAvatar._partner_inputs(req)
-    assert ins["sound_file"]["sample_rate"] == 16000
-    assert ins["sound_file"]["waveform"].shape[-1] == 32000
-
-
-def test_kling_avatar_keeps_the_shot_action_prompt_and_never_says_subtle(
-        tmp_path):
-    action = (
-        "She slams the studio door, strides to the microphone, and "
-        "points at the dials as the camera dollies in.")
-    ins = ecv.KlingAvatar._partner_inputs(
-        _request(tmp_path, text_prompt=action))
-    assert ins["prompt"].startswith(action)
-    assert "full, decisive action" in ins["prompt"]
-    assert "supplied audio" in ins["prompt"]
-    assert "spoken line" in ins["prompt"]
-    assert "subtle" not in ins["prompt"].lower()
-    assert "small natural head" not in ins["prompt"].lower()
-    assert "no exaggerated gestures" not in ins["prompt"].lower()
-
-
-def test_kling_avatar_wants_talking_stills_and_a_face_photo_plan():
-    assert ecv.KlingAvatar.wants_talking_prompt() is True
-    kinds = tuple(row.kind for row in ecv.KlingAvatar.still_plan)
-    assert kinds == ("portrait",)
-    row = ecv.KlingAvatar.still_plan[0]
-    assert row.required == "always"
-    assert row.aspect == "portrait"
-    assert row.target_class == "portrait"
-
-
-def test_kling_avatar_rejects_init_image_below_comfy_minimum(tmp_path):
-    tiny = _fixture_png(tmp_path, size=(64, 36))
-    with pytest.raises(RuntimeError, match="minimum 300px"):
-        ecv.KlingAvatar._partner_inputs(_request(tmp_path, init_image=tiny))
 
 
 def test_wan_i2v_sends_v3_model_dict_without_audio(tmp_path, monkeypatch):
@@ -537,12 +453,6 @@ def test_prompt_conditioners_use_engine_specific_markers(
     assert ecv._SEEDANCE_SMOOTH_MARKER not in wan["model"]["prompt"]
     _assert_visual_safety(wan["model"]["prompt"])
 
-    kling = ecv.KlingAvatar._partner_inputs(req)
-    assert kling["prompt"].startswith(prompt)
-    assert ecv._KLING_AVATAR_MARKER in kling["prompt"]
-    assert ecv._SEEDANCE_SMOOTH_MARKER not in kling["prompt"]
-    _assert_visual_safety(kling["prompt"])
-
 
 # --------------------------------------------------------------------------- #
 # canonicalize_video (real ffmpeg on a generated AV fixture)
@@ -617,9 +527,9 @@ def test_engine_canonicalize_returns_clip_dict(tmp_path):
     src = _make_av_fixture(tmp_path)
     raw = {"path": str(src), "content_type": "video/mp4",
            "duration_s": None, "provider_job_id": "job-5", "raw_meta": {}}
-    clip = ecv.KlingAvatar.canonicalize(raw, _request(tmp_path), {})
+    clip = ecv.Seedance2.canonicalize(raw, _request(tmp_path), {})
     assert clip["has_audio"] is False
-    assert clip["engine_id"] == "cloud_kling_avatar"
+    assert clip["engine_id"] == "cloud_seedance_2"
     assert clip["type"] == "video" and clip["container"] == "mp4"
     assert clip["fps"] == 25 and clip["frame_count"] > 0
     assert Path(clip["path"]).is_file()

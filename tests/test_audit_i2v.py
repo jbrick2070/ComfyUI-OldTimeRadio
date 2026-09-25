@@ -76,7 +76,7 @@ def test_required_audio_non_avatar_fails():
 
 def test_avatar_is_audio_exempt():
     rec = aud._classify_video_row(
-        "KlingAvatarNode",
+        "PartnerAvatarNode",
         _inp(required={"image": "IMAGE", "audio": "AUDIO"},
              optional={"prompt": "STRING"}),
         ["VIDEO"])

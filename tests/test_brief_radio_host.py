@@ -292,9 +292,12 @@ def test_humo_console_face_prompts_preserve_authored_atmosphere():
         {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
 
 
-#: The live engine whose ``wants_talking_prompt()`` hook answers True: it
-#: lip-syncs its reference image, so a bookend routed to it is a talking role.
-_TALKING_ENGINE = "cloud_kling_avatar"
+#: A placeholder engine id for a lip-syncing announcer pick. No currently
+#: registered engine implements ``wants_talking_prompt()`` (the sole one that
+#: did was retired 2026-09-25) -- but the test below forces
+#: ``talking_roles={"announcer_visual": True}`` explicitly, so the engine id
+#: never needs to resolve through the registry for this assertion.
+_TALKING_ENGINE = "cloud_lipsync_placeholder"
 
 
 def test_talking_announcer_keeps_the_faceless_radio_object_row(monkeypatch):

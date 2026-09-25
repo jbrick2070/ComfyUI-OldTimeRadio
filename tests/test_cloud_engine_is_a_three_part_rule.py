@@ -9,9 +9,9 @@ It answers it with THREE clauses -- a `cloud_` id prefix, a `provider_side`
 attribute, or a `cloud_` `node_key` -- and the reason each one is load-bearing
 is not a style preference, it is two shipped engines that disagree:
 
-* `cloud_kling_avatar` declares NO `provider_side` attribute at all, so a
-  builder written as `getattr(eng, "provider_side", False)` classifies a Kling
-  avatar row as LOCAL and routes an audio-driven face to the local lane.
+* `cloud_seedance_2` declares NO `provider_side` attribute at all, so a
+  builder written as `getattr(eng, "provider_side", False)` classifies a
+  Seedance row as LOCAL.
 * `google_veo_video` declares `provider_side = True` but carries NO `cloud_`
   prefix and NO `node_key`, so a builder written on the prefix alone
   classifies a Veo row as LOCAL.
@@ -28,7 +28,7 @@ from nodes._otr_video_engines import render_driver as rd
 
 
 #: The engine that fails the ATTRIBUTE clause and is carried by the prefix.
-KLING_AVATAR = "cloud_kling_avatar"
+SEEDANCE = "cloud_seedance_2"
 #: The engine that fails the PREFIX clause and is carried by the attribute.
 VEO = "google_veo_video"
 
@@ -44,7 +44,7 @@ def _engine(engine_id):
 # 1. The verdict itself, on the picked path.
 # --------------------------------------------------------------------------- #
 
-@pytest.mark.parametrize("engine_id", [KLING_AVATAR, VEO])
+@pytest.mark.parametrize("engine_id", [SEEDANCE, VEO])
 def test_a_provider_side_engine_is_cloud_however_it_declares_itself(engine_id):
     assert rd._is_cloud_video_engine(engine_id) is True
 
@@ -60,17 +60,17 @@ def test_a_local_engine_is_not_cloud():
 # 2. Each clause is load-bearing -- MEASURED on the two engines, not asserted.
 # --------------------------------------------------------------------------- #
 
-def test_the_bare_attribute_alone_would_misroute_the_kling_avatar():
+def test_the_bare_attribute_alone_would_misroute_seedance():
     """This is the defect the three-part rule exists to prevent."""
-    eng = _engine(KLING_AVATAR)
+    eng = _engine(SEEDANCE)
     assert bool(getattr(eng, "provider_side", False)) is False, (
-        "cloud_kling_avatar has grown a provider_side attribute -- good, but "
+        "cloud_seedance_2 has grown a provider_side attribute -- good, but "
         "this test's premise is now stale: re-pin it on whichever engine "
         "still declares none, or retire it if none do")
     # ... and the rule still gets it right, because two other clauses see it.
-    assert KLING_AVATAR.startswith("cloud_")
+    assert SEEDANCE.startswith("cloud_")
     assert str(getattr(eng, "node_key", "")).startswith("cloud_")
-    assert rd._is_cloud_video_engine(KLING_AVATAR) is True
+    assert rd._is_cloud_video_engine(SEEDANCE) is True
 
 
 def test_the_prefix_alone_would_misroute_veo():
@@ -91,26 +91,26 @@ def test_no_single_clause_covers_both_shipped_engines():
         return bool(getattr(eng, "provider_side", False))
 
     for clause in (by_prefix, by_attribute):
-        verdicts = {eid: clause(eid) for eid in (KLING_AVATAR, VEO)}
+        verdicts = {eid: clause(eid) for eid in (SEEDANCE, VEO)}
         assert not all(verdicts.values()), (
             "a single clause now covers both engines (%r) -- if that is "
             "deliberate, simplify the rule and delete this test; if it is "
             "accidental, the other clauses are still what protect the third "
             "engine nobody has added yet" % verdicts)
-    assert all(rd._is_cloud_video_engine(eid) for eid in (KLING_AVATAR, VEO))
+    assert all(rd._is_cloud_video_engine(eid) for eid in (SEEDANCE, VEO))
 
 
 # --------------------------------------------------------------------------- #
 # 3. The FORCED path reaches the same verdict as the picked one.
 # --------------------------------------------------------------------------- #
 
-def test_a_forced_kling_avatar_classifies_exactly_as_a_picked_one(monkeypatch):
+def test_a_forced_seedance_classifies_exactly_as_a_picked_one(monkeypatch):
     """`OTR_FORCE_ENGINE_MAP` must not be able to smuggle a cloud row local."""
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % KLING_AVATAR})
+    snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=%s" % SEEDANCE})
     forced = rf.effective_engine_for_role(
         "announcer", "ltx25_high_video", snapshot=snap)
-    assert forced == KLING_AVATAR
+    assert forced == SEEDANCE
     assert rd._is_cloud_video_engine(forced) is True
 
 
@@ -127,8 +127,8 @@ def test_forcing_a_local_engine_over_a_cloud_pick_flips_the_verdict(monkeypatch)
     """The verdict follows the EFFECTIVE engine, not the picked one."""
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     snap = rf.routing_env_snapshot({"OTR_FORCE_ENGINE_MAP": "*=still_flat"})
-    forced = rf.effective_engine_for_role("announcer", KLING_AVATAR,
+    forced = rf.effective_engine_for_role("announcer", SEEDANCE,
                                           snapshot=snap)
     assert forced == "still_flat"
-    assert rd._is_cloud_video_engine(KLING_AVATAR) is True
+    assert rd._is_cloud_video_engine(SEEDANCE) is True
     assert rd._is_cloud_video_engine(forced) is False

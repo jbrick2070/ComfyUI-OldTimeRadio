@@ -52,14 +52,6 @@
       },
       "size_gb": null
     },
-    "cloud_kling_avatar": {
-      "memory": {
-        "mac16": "fits",
-        "nv16": "fits",
-        "nv8": "fits"
-      },
-      "size_gb": null
-    },
     "cloud_krea_2_turbo": {
       "memory": {
         "mac16": "fits",

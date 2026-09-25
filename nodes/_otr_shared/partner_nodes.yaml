@@ -153,36 +153,6 @@ rows:
     seed_supported: true
     selected_output: 0
     status: OK
-  cloud_kling_avatar:
-    api_node: true
-    auth_hidden_present:
-    - auth_token_comfy_org
-    - api_key_comfy_org
-    category: partner/video/Kling
-    class_name: KlingAvatarNode
-    function: EXECUTE_NORMALIZED_ASYNC
-    import_path: comfy_api_nodes.nodes_kling
-    inputs:
-      hidden:
-        api_key_comfy_org:
-        auth_token_comfy_org:
-        comfy_usage_source:
-        unique_id:
-      optional:
-        prompt: STRING
-      required:
-        image: IMAGE
-        mode: COMBO
-        seed: INT
-        sound_file: AUDIO
-    is_async: true
-    notes: talking default; reactivity=required_audio_ref
-    provider_id: KLING
-    return_types:
-    - VIDEO
-    seed_supported: true
-    selected_output: 0
-    status: OK
   cloud_krea_2_turbo:
     api_node: true
     auth_hidden_present:

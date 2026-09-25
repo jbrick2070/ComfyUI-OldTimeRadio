@@ -594,14 +594,14 @@ def test_v3_partner_hidden_via_clone_not_kwargs(monkeypatch, rig):
 # ---------------------------------------------------------------------------
 
 
-def test_real_partner_table_loads_and_has_kling(rig):
+def test_real_partner_table_loads_and_has_seedance(rig):
     invoke._set_rows_for_tests(None)  # drop the fake, read the real yaml
     rows = invoke.partner_rows()
-    assert "cloud_kling_avatar" in rows
-    row = rows["cloud_kling_avatar"]
-    assert row["provider_id"] == "KLING"
+    assert "cloud_seedance_2" in rows
+    row = rows["cloud_seedance_2"]
+    assert row["provider_id"] == "BYTEDANCE"
     assert row["function"] == "EXECUTE_NORMALIZED_ASYNC"
-    assert "sound_file" in row["inputs"]["required"]
+    assert "model" in row["inputs"]["required"]
     hidden = row["inputs"]["hidden"]
     assert "api_key_comfy_org" in hidden
     not_ok = {rid: r.get("status") for rid, r in rows.items()

@@ -155,31 +155,6 @@ def test_humo_portrait_and_wide_siblings_keep_their_declared_aspects():
             vreg.get_engine(engine_id), "render_aspect", "") == aspect, engine_id
 
 
-def test_talking_capability_is_read_through_the_hook_not_truthiness():
-    """Golden nugget (S4b 2026-07-02 + proof8): which lane needs LIPS decides
-    whether stills are minted face-forward.
-
-    `cloud_kling_avatar` exposes ``wants_talking_prompt`` as a bound METHOD, so a
-    bare ``getattr(...)`` truthiness test reports True for ANY engine that
-    defines it, inverting lips/no-lips. The director calls the hook instead.
-    This pins the call semantics so a refactor cannot regress to truthiness.
-    """
-    from nodes._otr_video_engines import registry as vreg
-    from nodes.otr_video_director import OTRVideoDirector
-
-    hook = getattr(vreg.get_engine("cloud_kling_avatar"), "wants_talking_prompt",
-                   None)
-    assert callable(hook), "the talking capability is a hook, not a flag"
-
-    resolved = OTRVideoDirector._role_talking({
-        slot: {"engine_id": "viz_mxc_cpu", "custom": False}
-        for slot in _role_slots.ROLE_TO_VIDEO_SLOT.values()
-    })
-    # A visualizer defines no hook at all -> False, never a truthy method object.
-    assert resolved == {"announcer_visual": False, "music_visual": False,
-                        "character_video": False}
-
-
 def test_no_video_engine_is_silently_exempt_from_the_image_dropdown():
     """Operator invariant, 2026-08-21: *"All video dropdowns should obey the
     image gen dropdowns unless of course viz -- there is no image gen for

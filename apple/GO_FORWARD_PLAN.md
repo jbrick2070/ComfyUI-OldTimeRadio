@@ -169,16 +169,6 @@ writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
 the pin still governs Bark, MusicGen, the visual assets and the provisioner,
 and the 162-character tail it sizes for was always the visual one.
 
-### 0b. Remove the Kling Avatar engine (operator 2026-09-25: "remove it")
-
-No shipped graph or matrix row selects `cloud_kling_avatar`; it was a
-hand-pick cloud lane only, and its still-plan framing text had no
-production reader (the last red in the suite,
-`test_still_plan_layer2_parity`). Rip it fully: adapter code in
-`eng_cloud_video.py`, registry row, partner-node pin row, shortcode,
-slug preflight, provisioner route, generated docs, and every test that
-names it. Grep for `kling` after; nothing may remain but history.
-
 ### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
 
 Found by asking "what assumes the developer's machine?" after the models

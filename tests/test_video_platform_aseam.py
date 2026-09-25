@@ -966,8 +966,8 @@ def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch
     assert shots[0]["engine_id"] == "humo_1.7B_169"
 
 
-def test_preflight_keeps_cloud_avatar_bookend_cloud(monkeypatch):
-    """Cloud avatar selections must not be validated as redirected local LTX.
+def test_preflight_keeps_cloud_engine_bookend_cloud(monkeypatch):
+    """Cloud selections must not be validated as redirected local LTX.
     The selected Partner engine owns the request shape."""
     import nodes._otr_video_engines  # noqa: F401  self-register cloud engines
     from nodes._otr_video_engines import render_driver as rd
@@ -984,7 +984,7 @@ def test_preflight_keeps_cloud_avatar_bookend_cloud(monkeypatch):
     beats = [{"beat_id": "bcloud", "role": "announcer_visual", "char_id": "",
               "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"bcloud": 50}}
-    policy = {"video_models": {"announcer_video_model": "cloud_kling_avatar"}}
+    policy = {"video_models": {"announcer_video_model": "cloud_wan_i2v"}}
     ledger = {
         "lines": [{"line_id": "bcloud", "char_id": "",
                    "start_s": 0.0, "dur_s": 2.0}],
@@ -995,9 +995,9 @@ def test_preflight_keeps_cloud_avatar_bookend_cloud(monkeypatch):
 
     groups, shots = sl.build_execution_plan(beats, budget, {}, policy, ledger=ledger)
 
-    assert groups[0]["engine_id"] == "cloud_kling_avatar"
-    assert shots[0]["engine_id"] == "cloud_kling_avatar"
-    assert "cloud_kling_avatar" in seen
+    assert groups[0]["engine_id"] == "cloud_wan_i2v"
+    assert shots[0]["engine_id"] == "cloud_wan_i2v"
+    assert "cloud_wan_i2v" in seen
     assert rd._NEVER_HUMO_REDIRECT_ENGINE not in seen
 
 

@@ -8,8 +8,8 @@ would send a cloud avatar down a local LTX path.
 
 THE RULE, and why it has three arms:
 
-* `cloud_` ID PREFIX -- the `cloud_*` family (`cloud_kling_avatar`,
-  `cloud_seedance_2`, ...). These declare NO `provider_side` attribute at all.
+* `cloud_` ID PREFIX -- the `cloud_*` family (`cloud_seedance_2`,
+  `cloud_wan_i2v`, ...). These declare NO `provider_side` attribute at all.
 * the `provider_side` ATTRIBUTE -- the `google_*` BYO-API lanes, whose ids do
   NOT start with `cloud_`, so the prefix arm cannot see them.
 * the `node_key` PREFIX -- the third path, for an engine whose registered id and
@@ -53,7 +53,7 @@ def _engine(engine_id):
 # --------------------------------------------------------------------------- #
 # the three arms, each on its own
 # --------------------------------------------------------------------------- #
-@pytest.mark.parametrize("engine_id", ["cloud_kling_avatar", "cloud_seedance_2"])
+@pytest.mark.parametrize("engine_id", ["cloud_seedance_2", "cloud_wan_i2v"])
 def test_the_cloud_prefix_arm_classifies_the_cloud_family(engine_id):
     if engine_id not in _roster_ids():
         pytest.skip("%s is not registered in this build" % engine_id)
@@ -93,16 +93,16 @@ def test_a_bare_provider_side_getattr_would_MISCLASSIFY_the_cloud_family():
     asserts the gap directly, so the "tidy-up" fails here rather than by routing
     a provider-side avatar into a local model path."""
     ids = _roster_ids()
-    if "cloud_kling_avatar" not in ids:
-        pytest.skip("cloud_kling_avatar is not registered in this build")
+    if "cloud_seedance_2" not in ids:
+        pytest.skip("cloud_seedance_2 is not registered in this build")
 
-    engine = _engine("cloud_kling_avatar")
+    engine = _engine("cloud_seedance_2")
     naive = bool(getattr(engine, "provider_side", False))
-    real = _RD._is_cloud_video_engine("cloud_kling_avatar")
+    real = _RD._is_cloud_video_engine("cloud_seedance_2")
 
     assert real is True
     assert naive is False, (
-        "cloud_kling_avatar now declares provider_side -- good, but this test "
+        "cloud_seedance_2 now declares provider_side -- good, but this test "
         "is the record that the bare-getattr shortcut was UNSAFE while it did "
         "not. Re-point it at whichever cloud_* engine still omits the attribute, "
         "or retire it once every cloud_* engine declares one.")

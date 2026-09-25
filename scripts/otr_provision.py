@@ -1535,7 +1535,6 @@ NO_LANE_REASON = {
     # Hosted video lanes registered after the remote sets below were written,
     # and never added to them because no shipping profile selects one. Naming
     # them here records the gap instead of hiding it.
-    "cloud_kling_avatar": "remote_unprovisioned",
     "cloud_seedance_2": "remote_unprovisioned",
     # Upscale ships one model. "off" does nothing at all, which is neither a
     # download nor a service.

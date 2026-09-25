@@ -131,9 +131,9 @@ def resolve_effective_engine(role, engine_id, *, snapshot, force_mapping,
     * ``force_mapping`` -- the parsed force map (``{}`` when unset).
     * ``redirect_applies`` -- callable ``(engine_id) -> bool``; the authority is
       ``render_driver._radio_is_host_redirect_applies``, which is LOCAL-only by
-      design (a cloud audio-driven-face engine such as ``cloud_kling_avatar``
-      must stay cloud, and is caught by the ``cloud_`` id prefix alone because
-      it carries no ``provider_side`` attribute).
+      design (a cloud audio-driven-face engine must stay cloud, and is caught
+      by the ``cloud_`` id prefix alone because it carries no
+      ``provider_side`` attribute).
     * ``redirect_target`` -- the authority is
       ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``; never a literal.
 

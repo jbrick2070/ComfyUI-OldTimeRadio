@@ -87,8 +87,6 @@ def _resolution(engine, name):
         return "env OTR_CLOUD_LTX25_RESOLUTION, default 1920x1080"
     if name == "cloud_ltx25_audio_in":
         return "env OTR_CLOUD_LTX25_A2V_RESOLUTION, default 1920x1080"
-    if name == "cloud_kling_avatar":
-        return "provider default (none sent)"
     if name.startswith("google_") and "omni" in name:
         return "720p (fixed)"
     if name.startswith("google_"):
@@ -101,12 +99,13 @@ def _resolution(engine, name):
 def _prompt_contract(engine):
     """Whether this lane takes text, and who rewrites it before it is sent.
 
-    ``required_inputs`` alone is not the answer. ``cloud_kling_avatar`` does
-    not require a text_prompt and DOES send one -- ``_condition_kling_avatar_
-    prompt`` builds it, falling back to a standing broadcast clause when the
-    beat supplies nothing. Reading only the required list would record "no text
-    input" for a lane that sends a conditioned prompt on every call, so the
-    adapter's own source is asked whether it ever reaches for the field.
+    ``required_inputs`` alone is not the answer. ``humo`` does not require a
+    text_prompt and DOES send one -- its graph builder reads
+    ``plan.get("text_prompt")``, falling back to a standing no-beat-text
+    default when the beat supplies nothing. Reading only the required list
+    would record "no text input" for a lane that sends a conditioned prompt on
+    every call, so the adapter's own source is asked whether it ever reaches
+    for the field.
 
     THE WHOLE MRO, not just the class body. ``humo_1.7B`` is a four-line
     subclass of ``HuMoEngine`` that changes a checkpoint and inherits every

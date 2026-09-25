@@ -252,9 +252,6 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
                      "fix-or-rip decision as humo, and it inherits its answer.",
     "humo_14B_169": "audio-driven face lane in the humo family. OWED: the same "
                     "fix-or-rip decision as humo, and it inherits its answer.",
-    "cloud_kling_avatar": "cloud audio-driven face lane; same owed decision as "
-                          "humo, and additionally verify it is ever actually "
-                          "selected for a bookend role by a shipping profile",
     "cloud_seedance_2": "cloud text-driven lane. VERIFIED 2026-09-03: appears "
                         "in ZERO profiles, so it is unreachable on a bookend "
                         "today. OWED: keep it here until it is either wired "
@@ -2309,9 +2306,9 @@ def _is_strict_text_only_engine(engine_id: str) -> bool:
 def _radio_is_host_redirect_applies(engine_id: str) -> bool:
     """True iff the radio-host guard should rewrite this selected engine.
 
-    The guard is a LOCAL HuMo-family policy escape hatch. Partner cloud engines
-    can also be audio-driven-face engines (for example Kling Avatar), but those
-    must remain cloud requests; rewriting them to local LTX creates the hybrid
+    The guard is a LOCAL HuMo-family policy escape hatch. A partner cloud
+    engine could also be an audio-driven-face engine, but such a pick must
+    remain a cloud request; rewriting it to local LTX creates the hybrid
     cloud/local behavior the cloud profiles exist to avoid.
     """
     eid = str(engine_id or "")

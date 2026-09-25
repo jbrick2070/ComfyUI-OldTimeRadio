@@ -71,8 +71,9 @@ _OFF = {"force_engine_map": "", "enable_humo_hosts": False}
 _ON = {"force_engine_map": "", "enable_humo_hosts": True}
 
 #: Stand-in for ``render_driver._radio_is_host_redirect_applies``: LOCAL
-#: audio-driven-face only. ``cloud_kling_avatar`` is deliberately excluded --
-#: it IS an audio-driven-face engine but it is provider-side.
+#: audio-driven-face only. A cloud id (below, a synthetic placeholder -- no
+#: real engine of this shape is currently registered) is deliberately
+#: excluded -- it might be audio-driven-face-shaped but it is provider-side.
 def _redirects(engine_id):
     return engine_id in ("humo", "humo_1.7B", "humo_14B")
 
@@ -119,11 +120,11 @@ def test_hosts_on_disables_the_redirect():
 
 
 def test_cloud_audio_driven_face_stays_cloud():
-    """``cloud_kling_avatar`` has a ``cloud_`` id and NO ``provider_side``
-    attribute, so it is caught by the id prefix alone in the real predicate.
-    Redirecting it to local LTX would create the hybrid cloud/local behaviour
-    the cloud profiles exist to avoid."""
-    assert _resolve("announcer_visual", "cloud_kling_avatar") == "cloud_kling_avatar"
+    """A cloud id (a ``cloud_`` prefix and NO ``provider_side`` attribute) is
+    caught by the id prefix alone in the real predicate. Redirecting it to
+    local LTX would create the hybrid cloud/local behaviour the cloud
+    profiles exist to avoid."""
+    assert _resolve("announcer_visual", "cloud_example_avatar") == "cloud_example_avatar"
 
 
 def test_order_is_force_map_then_redirect():
