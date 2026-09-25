@@ -1,3 +1,43 @@
+## 2026-09-25 -- HEAD eaf07017 (main) -- CODE + PLAN (orphan cleanup d245cc27, asset-cleanup design row 0b)
+
+Did (5080 window; the 1-act chain on port 8000 was not touched):
+  d245cc27: the orphan/stale-reference cleanup. `_validate_scene_envelope`
+  wired at `_build_envelope`'s one call site (standing ruling #3 satisfied);
+  the VRAM sentinel chain ripped whole (`vram_sentinel`, `force_vram_offload`,
+  `_CLEANUP_CALLBACKS`, `register_vram_cleanup` and the one registration in
+  story_orchestrator) on the operator's word that the VRAM measures say
+  little (ruling #4 records it); the Bark squeal metric,
+  `slot_matrix.eligible_engines_for_role`, `SCIFI_ORCHESTRA` and
+  `MAX_PROVENANCE_NOTE_CHARS` gone with their test mentions; about twenty
+  stale references repointed (docs/ -> apple/ and the sibling
+  vram-recipe-lab/docs/, config/profiles/ -> the matrix row). Two review
+  recommendations were wrong and were not applied: the `otr_soak` reset
+  marker (its launcher exists) and `animatediff15_v2_video` (a RETIRED_ENGINE_IDS
+  tombstone). Only story_orchestrator's own two hunks were staged; the other
+  window's unfinished patch at ~774 and ~901 stays in the working tree.
+  eaf07017: GO_FORWARD_PLAN row 0b, the asset-cleanup design (`asset_cleanup`
+  off / partial / full on the writer; the delete is the last step inside the
+  mux after publish, ledger stamp and canvas preview; identity guard from
+  BUG-LOCAL-014; partial is a delete-list plus a receipt in the surviving
+  ledger). Measured: 90.5 GB in 135 media-bearing episode dirs, partial keeps
+  0.3%. A ChatGPT design-review prompt was handed to the operator.
+  Output-tree facts for the next window: otr/ top level carries more than
+  episodes/ + obs/ (audio, replay_bundles, _gemini_judge, _probe_clips,
+  _quarantine_model_translated_20260920, a smoke still, the chain scripts and
+  logs); the ComfyUI-Installs output/otr tree is 8.3 GB and last written
+  2026-06-13; 2,291 episode dirs hold only ledger and text (his hand cleanup).
+Suite: scoped set 1062 passed / 3 skipped before d245cc27; build_variants
+  --check 24 / 0; touched .py AST-clean, no BOM, no CRLF. Bug Bible not run.
+Next: fold whatever survives of ChatGPT's lettered answers into row 0b, then
+  build 0b. 5080: TEST_WAVE Part A once the chain ends (08:00 local). The
+  10-file red-test patch stays uncommitted and separate.
+Models: QA on d245cc27, all three no must-fix -- Sonnet subagent (executed
+  the envelope guard for act_count 1..7, grep for every ripped name), Cursor
+  lane cursor-grok-4.6-high in ask mode via kibitz (no defect in the commit;
+  it mostly critiqued the brief's scoping), Antigravity Gemini 3.8 Flash
+  (High) via kibitz. Codex is out of credits until 2026-09-29 14:59 PDT.
+  Reviewers left HEAD and the tree untouched (checked).
+
 ## 2026-09-25 -- HEAD d167f0ab +branch claude/practical-hamilton-ftvd2j -- CODE + PLAN (AnimateDiff auto-download, required_models, test wave)
 
 Did (cloud window, no hardware touched; the 5080 chain was not reached):
