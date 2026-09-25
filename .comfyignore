@@ -346,3 +346,4 @@ scripts/_tmp_*
 # config/workflow_matrix.json DO ship: the first is the widget mapping every
 # applier reads, the second is the one file that says what each workflow is.
 config/experiments/
+apple/FRESH_INSTALL_4060_2026-09-25.md
