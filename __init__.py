@@ -667,6 +667,24 @@ except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
     print(f"[OldTimeRadio] janitor boot sweep skipped: {_otr_janitor_err}")
 
 # =====================================================================
+# THE WRITER'S MODEL FOLDER (2026-09-25): register ComfyUI's `LLM` model
+# category, default `<models root>/LLM`. New writer downloads land there as
+# real files (no hub symlinks, no Windows Developer Mode warning), and a
+# user's extra_model_paths.yaml `LLM:` entry -- loaded by ComfyUI before any
+# custom node -- keeps its place in front. Models already in the hub cache
+# keep loading from there; nothing is moved. Fail-soft: a registration
+# problem must never block node registration.
+# =====================================================================
+if _otr_dup is None:
+    try:
+        from .nodes._otr_llm_folder import register_llm_category as _otr_register_llm
+        _otr_llm_root = _otr_register_llm()
+        if _otr_llm_root is not None:
+            log.info("[OldTimeRadio] LLM model folder: %s", _otr_llm_root)
+    except Exception as _otr_llm_err:  # noqa: BLE001 -- PD1
+        print(f"[OldTimeRadio] LLM folder registration skipped: {_otr_llm_err}")
+
+# =====================================================================
 # WEB_DIRECTORY -- the saved-graph schema boundary (js/workflow_schema.js).
 #
 # LiteGraph restores widget values POSITIONALLY, so a node that drops a widget

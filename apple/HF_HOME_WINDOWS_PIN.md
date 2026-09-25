@@ -41,6 +41,13 @@ When `HF_HOME` is not already in the process environment, prestartup
 `room` remains `259 - longest_tail - 1`. The 162 tail is the visual
 `_SOURCES` bound, not a writer/TTS claim.
 
+Companion, 2026-09-25: the WRITER no longer downloads into this cache at
+all -- it lands as real files under ComfyUI's `LLM` model folder
+(`nodes/_otr_llm_folder.py`, standing ruling of the same day). That does
+not change this row: the hub cache still serves Bark, MusicGen, the visual
+assets and the provisioner, and the 162 tail above was never the writer's.
+A writer already in the hub cache keeps loading from it.
+
 ## Same-change companions (not a second row)
 
 - `_otr_hf_env._default_hf_home()`: on Windows, return

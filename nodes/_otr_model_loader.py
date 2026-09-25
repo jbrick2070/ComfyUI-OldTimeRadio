@@ -1222,9 +1222,10 @@ def load_llm(
         except Exception as local_err:
             raise ModelLoaderError(
                 f"Failed to load tokenizer for {_stripped_model_id!r} from "
-                f"the local HF cache at {cache_dir_path!r}; OTR does not use "
-                "a network fallback inside load_llm. Ensure the complete "
-                "snapshot is under C:\\ComfyUI-Models."
+                f"the local files at {load_target!r}; OTR does not use a "
+                "network fallback inside load_llm. A complete model is a "
+                "folder in ComfyUI's LLM model category (where new downloads "
+                f"go) or a snapshot under {cache_dir_path!r}."
             ) from local_err
 
         # Gemma 4 12B is cached as two HF revisions on the production box:
@@ -1235,11 +1236,22 @@ def load_llm(
         # and no synthetic overlay/LoRA is required.
         if not getattr(tokenizer, "chat_template", None) and _OTR_HF is not None:
             try:
-                _template_path = _OTR_HF.resolve_snapshot_file(
-                    _weights_id,
-                    "chat_template.jinja",
-                    hf_home=_hf_home_resolved,
-                )
+                # The SELECTED directory first (a real-file LLM folder or a
+                # hub snapshot, whichever resolved above), then every other
+                # place the model's metadata may live -- resolved on its own,
+                # never by treating a metadata-only folder as the model
+                # (Bug Bible 02.16; Grok QA 2026-09-25).
+                _template_path = None
+                if snapshot_path:
+                    _own = Path(snapshot_path) / "chat_template.jinja"
+                    if _own.is_file() and _own.stat().st_size > 0:
+                        _template_path = str(_own)
+                if not _template_path:
+                    _template_path = _OTR_HF.resolve_snapshot_file(
+                        _weights_id,
+                        "chat_template.jinja",
+                        hf_home=_hf_home_resolved,
+                    )
                 if _template_path:
                     tokenizer.chat_template = Path(_template_path).read_text(
                         encoding="utf-8",

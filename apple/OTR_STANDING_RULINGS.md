@@ -23,6 +23,44 @@ Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
 with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
 is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
+## 2026-09-25 -- THE WRITER LLM DOWNLOADS AS REAL FILES INTO ComfyUI's `LLM` FOLDER
+
+Operator: "real folder" -- "what's best practice" -- "by no means will people
+assume Developer Mode". The writer (Qwen3.5-4B on 12 shipping rows,
+gemma-4-12b-it on 6, Qwen3.8-27B on 1) used to download into the Hugging Face
+hub cache, whose blobs-plus-snapshots layout is symlinks: on Windows without
+Developer Mode that prints a warning on every first download and can duplicate
+multi-GB files, in a folder no ComfyUI user looks in. The 4060's fresh-user
+walk surfaced it.
+
+- New writer downloads go to `<first LLM path>/<org>--<name>/` through
+  `snapshot_download(local_dir=...)`: ordinary files, no symlinks, resumable.
+  The `LLM` model category is registered at pack load with default
+  `_models_root()/LLM`; a user's `extra_model_paths.yaml` `LLM:` entry loads
+  before any custom node and stays in front (`nodes/_otr_llm_folder.py`).
+- A model already complete in the hub cache keeps loading from there.
+  NOTHING IS MIGRATED, MOVED OR DELETED, EVER. Measured on the 5080 before and
+  after: gemma-4-12b-it resolved to the same hub snapshot, the same
+  split-revision `chat_template.jinja`, and the download short-circuited both
+  times. Anyone proposing an auto-migration or an auto-delete of the hub
+  cache is reopening this.
+- A plain folder is COMPLETE only when the pack's own receipt (written after
+  `snapshot_download` returned) lists every file at its recorded size, or --
+  for a hand-placed folder -- a weight index is present and every shard it
+  names is on disk. "Any nonzero weight file" is not complete: hub downloads
+  are concurrent, so a first shard can land before its index (Grok QA).
+- A complete folder wins over the hub; a complete hub copy wins over a
+  half-downloaded folder, so an interrupted new download never hides a
+  working old one. Metadata (`chat_template.jinja`) resolves on its own,
+  selected directory first (Bug Bible 02.16).
+- The disk-space check measures the drive the bytes land on.
+- Row 0a (the short Windows `HF_HOME` root) is UNCHANGED: Bark, MusicGen, the
+  visual assets and the provisioner still use the hub cache, and the 162-char
+  tail it guards is the visual bound, not the writer's.
+- Other LLM packs' bare-named folders in the same category are ignored; ours
+  carry the org (`google--gemma-4-12b-it`) so two orgs' same-named models
+  never collide.
+
 ## 2026-09-25 -- THE VARIANTS LIVE BESIDE THE CANONICAL; THE GALLERY LISTS ALL 25
 
 Operator: "we can't store the variants in a subfolder", then "All 24" when asked

@@ -195,9 +195,18 @@ That stores a token in your Hugging Face config. **Do not paste a token into a
 workflow widget** — no node here asks for one, and a token saved in a graph
 travels with the graph.
 
-**By default the cache is inside your ComfyUI install**, not in your home
-directory: if `HF_HOME` is unset, this pack points it at
-`ComfyUI/models/huggingface` during startup. That is where the ~12 GB lands.
+**Everything lands inside your ComfyUI models tree**, not in your home
+directory, in two places:
+
+- **The writer** (`Qwen/Qwen3.5-4B` on most graphs, ~8.7 GB) goes to
+  `models/LLM/Qwen--Qwen3.5-4B/` as ordinary files -- a normal ComfyUI model
+  folder, relocatable with an `LLM:` entry in `extra_model_paths.yaml`. No
+  symlinks, so Windows never asks for Developer Mode. If you already have the
+  writer in the Hugging Face cache from an earlier version, it stays there and
+  keeps working; nothing is moved or downloaded twice.
+- **The rest** (the music model and its text encoder) goes to the Hugging Face
+  cache: if `HF_HOME` is unset, this pack points it at
+  `ComfyUI/models/huggingface` during startup.
 
 If that volume is short of room, set `HF_HOME` yourself **before launching
 ComfyUI**. Setting it later does not move the cache, it adds a second one, and

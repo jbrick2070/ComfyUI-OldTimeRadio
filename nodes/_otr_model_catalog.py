@@ -47,6 +47,13 @@ except ImportError:  # pragma: no cover -- flat / standalone load
         _sys_boot.path.insert(0, _NODES_DIR)
     from _otr_shared import env as otr_env  # type: ignore
 
+# The writer's REAL-FILE folder, ComfyUI's `LLM` category (2026-09-25). New
+# downloads go there; the hub cache below is still read, so nothing re-downloads.
+try:
+    from . import _otr_llm_folder as _LLM
+except ImportError:  # pragma: no cover -- flat / standalone load (nodes/ on sys.path above)
+    import _otr_llm_folder as _LLM  # type: ignore
+
 # ---------------------------------------------------------------------------
 # Canonical constants -- single source of truth for tests + wiring code.
 # Any future rename / casing fix happens here, not in scattered string literals.
@@ -941,12 +948,44 @@ def _snapshot_has_weights(snapshot_path: Path) -> bool:
     return False
 
 
-def scan_local_llm_cache(hub_root: Path | None = None) -> list[ScanResult]:
-    """Walk HF_HOME/hub/models--*/snapshots/* and return one ScanResult
-    per resolved snapshot. Offline-only -- no HF API calls.
+def scan_local_llm_cache(
+    hub_root: Path | None = None,
+    llm_roots: list[Path] | None = None,
+) -> list[ScanResult]:
+    """Every writer model on disk, one ScanResult per repo. Offline-only.
 
-    `hub_root` override lets tests point at a fixture directory.
+    TWO LAYOUTS, ONE ANSWER (2026-09-25). A COMPLETE folder in ComfyUI's `LLM`
+    category (`_otr_llm_folder`, real files, where new downloads go) wins. For
+    any other repo the hub cache answers exactly as before -- including a repo
+    whose `LLM` folder is still half-downloaded while a complete hub copy
+    exists, so an interrupted new download never hides a working old one.
+    Nothing is migrated or deleted.
+
+    `hub_root` / `llm_roots` overrides let tests point at fixture directories.
     """
+    plain_complete: dict[str, ScanResult] = {}
+    plain_partial: dict[str, ScanResult] = {}
+    for repo_id, folder, complete in _LLM.scan_plain_models(llm_roots):
+        if complete:
+            plain_complete[repo_id] = ScanResult(
+                repo_id, True, str(folder), _read_advertised_context(folder))
+        else:
+            plain_partial[repo_id] = ScanResult(repo_id, False, str(folder), None)
+    hub = _scan_hub_cache(hub_root)
+    out: list[ScanResult] = list(plain_complete.values())
+    for result in hub:
+        if result.repo_id in plain_complete:
+            continue
+        if result.on_disk or result.repo_id not in plain_partial:
+            plain_partial.pop(result.repo_id, None)
+            out.append(result)
+    out.extend(plain_partial.values())
+    return sorted(out, key=lambda r: r.repo_id)
+
+
+def _scan_hub_cache(hub_root: Path | None = None) -> list[ScanResult]:
+    """Walk HF_HOME/hub/models--*/snapshots/* and return one ScanResult
+    per resolved snapshot. Offline-only -- no HF API calls."""
     root = hub_root if hub_root is not None else _hf_hub_root()
     if root is None or not root.is_dir():
         return []
@@ -2406,7 +2445,14 @@ def auto_download_if_missing(
         # Fall back to default location for the disk-usage check; the
         # actual download will create the dir.
         hub_root_path = Path.home() / ".cache" / "huggingface" / "hub"
-    free_bytes = _free_disk_bytes_for(hub_root_path)
+    # WHERE THE BYTES LAND (2026-09-25): a real folder in ComfyUI's `LLM`
+    # category, through `local_dir` -- ordinary files, no hub symlinks, so no
+    # Windows Developer Mode warning and no duplicated blobs. A box with no
+    # models root at all keeps the hub cache, exactly as before.
+    local_dir = _LLM.download_destination(weights_id)
+    dest_path = local_dir if local_dir is not None else hub_root_path
+    # The disk check measures the drive the bytes actually land on.
+    free_bytes = _free_disk_bytes_for(dest_path)
     margin = size_bytes + _DISK_SPACE_MARGIN_BYTES
     if size_bytes > 0 and (free_bytes - margin) < 0:
         free_gb = free_bytes / 1024**3
@@ -2414,14 +2460,14 @@ def auto_download_if_missing(
             f"InsufficientDiskSpaceError: downloading {repo_id} requires "
             f"{size_gb:.1f} GB + {_DISK_SPACE_MARGIN_BYTES / 1024**3:.0f} GB "
             f"margin = {(size_gb + 5):.1f} GB, but only {free_gb:.1f} GB free "
-            f"at {hub_root_path}. Free up disk space and retry."
+            f"at {dest_path}. Free up disk space and retry."
         )
 
     # Announce download intent to the console (cheap; queue UI gets the
     # ProgressBar separately).
     print(
         f"[OTR] Downloading {weights_id} -- {size_gb:.1f} GB -> "
-        f"{hub_root_path} (first run only)"
+        f"{dest_path} (first run only)"
     )
 
     if _snapshot_download is None:
@@ -2430,33 +2476,35 @@ def auto_download_if_missing(
     # Forward the token + allow_patterns; let the caller wire a
     # ProgressBar via tqdm_class if they're on the worker-thread.
     #
-    # cache_dir is NOT optional (fixed 2026-08-25). Every other step in this
-    # function already resolves `hub_root_path` and uses it -- the local-cache
-    # scan at :1822, the disk-space check at :1849, and the "Downloading ... ->
-    # {hub_root_path}" line printed at :1863. Only the download itself did not
-    # receive it, so the console announced one destination and the bytes landed
-    # in another, and every later reader (scan_local_llm_cache, load_llm) looked
-    # where the message said rather than where the file went. The model then
-    # reads as MISSING forever and re-downloads on every run.
-    #
-    # Passing it explicitly is the whole fix, and it has to be explicit:
-    # huggingface_hub freezes `constants.HF_HUB_CACHE` at IMPORT time, so
-    # `ensure_hf_home()`'s os.environ write and prestartup_script.py's HF_HOME
-    # default only reach snapshot_download if they happened before
-    # huggingface_hub was first imported. The loader's own comment
-    # (_otr_model_loader.py:1150-1152) describes exactly the case where they
-    # cannot -- ComfyUI Desktop inheriting a stale HF_HUB_CACHE that the helper
-    # has to REPAIR after import. An env var cannot win that race; an argument
-    # always does.
+    # THE DESTINATION IS AN ARGUMENT, NEVER AN ENV VAR (fixed 2026-08-25, kept
+    # through the 2026-09-25 move to `local_dir`). Before 08-25 the console
+    # announced one destination and the bytes landed in another, and every
+    # later reader (scan_local_llm_cache, load_llm) looked where the message
+    # said rather than where the file went: the model read as MISSING forever
+    # and re-downloaded on every run. huggingface_hub freezes
+    # `constants.HF_HUB_CACHE` at IMPORT time, so an os.environ write can lose
+    # the race with ComfyUI Desktop's inherited HF_HUB_CACHE
+    # (_otr_model_loader.py:1150-1152); an explicit argument always wins.
+    # `local_dir` is the same discipline: the folder printed above is the
+    # folder passed below.
     kwargs: dict[str, object] = {
         "repo_id": weights_id,
         "allow_patterns": list(ALLOW_PATTERNS),
         "token": resolve_hf_token(),
-        "cache_dir": str(hub_root_path),
     }
+    if local_dir is not None:
+        kwargs["local_dir"] = str(local_dir)
+    else:
+        kwargs["cache_dir"] = str(hub_root_path)
     if progress_pbar is not None:
         kwargs["tqdm_class"] = _make_pbar_tqdm_adapter(progress_pbar)
     result = str(_snapshot_download(**kwargs))  # type: ignore[operator]
+    if local_dir is not None:
+        # The receipt is what makes the folder count as COMPLETE: written only
+        # after snapshot_download RETURNED, so a folder interrupted after its
+        # first shard never reads as a finished model (Grok QA, 2026-09-25).
+        _LLM.write_receipt(local_dir, weights_id)
+        result = str(local_dir)
     # Drive the node's bar to complete explicitly. The mirrored bars only ever
     # see bytes that actually TRANSFER: a file already in the blob cache
     # returns from hf_hub_download before any progress object exists, so on a

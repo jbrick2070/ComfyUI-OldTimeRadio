@@ -47,6 +47,12 @@ try:
     from ._otr_shared import env as otr_env
 except ImportError:  # pragma: no cover -- flat test imports
     from _otr_shared import env as otr_env  # type: ignore
+# The writer's REAL-FILE folder (2026-09-25). Stdlib only, so this module still
+# imports on its own before the catalog does.
+try:
+    from . import _otr_llm_folder as _LLM
+except ImportError:  # pragma: no cover -- flat test imports
+    import _otr_llm_folder as _LLM  # type: ignore
 
 log = logging.getLogger("OTR._otr_hf_env")
 
@@ -261,8 +267,12 @@ def _snapshot_candidates(model_id: str, hf_home: str) -> list[Path]:
 
 
 def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | None:
-    """Return the absolute path to the model's snapshot directory under
-    the canonical HF cache, or None if the model is not cached.
+    """Return the absolute path to the model's weights on disk, or None.
+
+    A COMPLETE folder in ComfyUI's ``LLM`` category (``_otr_llm_folder``, real
+    files, where new downloads go since 2026-09-25) wins. Otherwise the model's
+    snapshot directory under the canonical HF cache -- every install that
+    downloaded before then keeps loading from there, and nothing is moved.
 
     Layout expected:
         <hf_home>/hub/models--<org>--<name>/snapshots/<commit_sha>/
@@ -278,6 +288,10 @@ def resolve_snapshot_dir(model_id: str, hf_home: str | None = None) -> str | Non
     ``AutoModelForCausalLM.model_loader(snapshot_dir, ...)`` --
     bypasses transformers' Hub-resolution layer entirely.
     """
+    plain = _LLM.find_plain_model(model_id)
+    if plain is not None:
+        log.info("[OTR_HF_ENV] model folder resolved %s -> %s", model_id, plain)
+        return str(plain)
     home = hf_home or ensure_hf_home()
     candidates = _snapshot_candidates(model_id, home)
     if not candidates:
@@ -307,7 +321,13 @@ def resolve_snapshot_file(
     filename: str,
     hf_home: str | None = None,
 ) -> str | None:
-    """Return the newest cached copy of ``filename`` across snapshots.
+    """Return a local copy of ``filename`` for the model: any ``LLM`` folder for
+    it first, then the newest hub snapshot that has it.
+
+    Resolved INDEPENDENTLY of where the weights are (Bug Bible 02.16): optional
+    metadata such as ``chat_template.jinja`` can live in another revision or
+    another layout than the weighted one, and a folder holding only metadata is
+    never treated as the model root.
 
     Only a simple basename is accepted; callers cannot escape the snapshot
     directory. Files must resolve to a materialized, non-empty target.
@@ -315,6 +335,11 @@ def resolve_snapshot_file(
     name = str(filename or "").strip()
     if not name or Path(name).name != name:
         raise ValueError("filename must be one non-empty basename")
+    plain = _LLM.find_plain_file(model_id, name)
+    if plain is not None:
+        log.info("[OTR_HF_ENV] model folder metadata resolved %s:%s -> %s",
+                 model_id, name, plain)
+        return str(plain)
     home = hf_home or ensure_hf_home()
     for snapshot in _snapshot_candidates(model_id, home):
         candidate = snapshot / name

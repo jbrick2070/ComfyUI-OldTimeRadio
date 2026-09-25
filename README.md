@@ -530,11 +530,21 @@ that names the pack and its URL.
 **Most engines fetch their own weights** the first time a dropdown selects them
 -- either through the engine's own library and the Hugging Face cache, or through
 `OTR_WorkflowValidator`, a node inside the graph that looks at what you actually
-picked and pulls only that, before the writer runs. The cache lives inside your
-ComfyUI install at **`models/huggingface`** -- this pack points `HF_HOME` there
-at startup if you have not set it yourself -- so that is the volume the ~12 GB
-lands on. If it is short of room, set `HF_HOME` **before** launching, because
-setting it later creates a second cache rather than moving the first.
+picked and pulls only that, before the writer runs. Two places, both inside
+your ComfyUI models tree:
+
+- **The writer** (Qwen or Gemma, the biggest single download) lands as ordinary
+  files in **`models/LLM/<org>--<name>/`**, the same way any other model folder
+  in ComfyUI works: you can see it, move it, or point an `LLM:` entry in
+  `extra_model_paths.yaml` somewhere else. No symlinks, so Windows never asks
+  for Developer Mode. A writer you downloaded before this folder existed stays
+  in the Hugging Face cache below and keeps working; nothing is moved or
+  fetched twice.
+- **Everything else** (the music model and its text encoder, the voices'
+  extras) uses the Hugging Face cache at **`models/huggingface`** -- this pack
+  points `HF_HOME` there at startup if you have not set it yourself. If that
+  volume is short of room, set `HF_HOME` **before** launching, because setting
+  it later creates a second cache rather than moving the first.
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
 selects, and everything the 8 GB and Mac graphs select, is ungated. A token is
