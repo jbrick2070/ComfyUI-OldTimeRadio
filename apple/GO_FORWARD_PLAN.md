@@ -316,6 +316,25 @@ to today's balanced -- never greedy, which would flatten dialogue. The dial
 either goes, or becomes tighter / model default / looser as offsets from
 the model's own baseline. Mind `compose_line`'s +0.1 per retry, which needs
 a base number. Seed is separate and untouched.
+DECIDED (operator, same day): "great, null, and let's rip the creativity";
+"find the canonical temp baseline for each model and that's it"; "remember
+we have various safetensor quants". Reading generation_config alone is NOT
+enough -- the default writer ships none -- so the baseline is a per-model
+field on each catalog row (quant twins inherit through their row), sourced
+and dated. Measured 2026-09-25:
+
+| catalog row | temperature / top_p / top_k | source |
+|---|---|---|
+| Qwen/Qwen3.5-4B (default) | 0.7 / 0.8 / 20 (+ presence_penalty 1.5) | model card, non-thinking general (no generation_config: 404) |
+| Qwen/Qwen3.8-27B | 1.0 / 0.95 / 20 | generation_config.json |
+| google/gemma-4-E2B-it, E4B-it, 12b-it | 1.0 / 0.95 / 64 | generation_config.json |
+| unsloth/Llama-3.2-3B-Instruct | 0.6 / 0.9 / - | generation_config.json |
+| mistralai/Mistral-Nemo-Instruct-2407 | 0.35 / - / - | model card examples (generation_config has none) |
+| google/gemma-2-2b-it | none published | fallback 0.85 / 0.95, never greedy |
+| openrouter / comfy / google_api slots | none | send no sampling keys; provider default |
+
+Design reviewed by a Sonnet contrarian before code; built after the Kling
+removal lands (both regenerate the workflow files).
 
 ## 3. TEST
 
