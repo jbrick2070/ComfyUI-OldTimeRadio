@@ -43,8 +43,11 @@ Models: QA on 3e01b1c6 -- Sonnet subagent (REFUTE, executed the planner and
   (production_ledger.py:808, so row 0b's review record was wrong about
   ChatGPT), and the stem-prefix identity (held: a replay's silent video sits
   in its own folder, so the inside-the-folder check refuses). Antigravity Gemini 3.8 Flash (High) via
-  kibitz: still running at push time (started 08:25); its result follows
-  as its own commit.
+  kibitz (r4): ran its OWN junction and locked-file probes independently
+  of Sonnet's, got the same results (refused/target untouched; skipped,
+  named, receipt still written), and read the mux ordering, the replay
+  drop test, and build_variants --check the same way. HOLD, no must-fix;
+  one nice-to-have (a debug log on an empty-dir full run) not taken.
   Codex out of credits until 2026-09-29 14:59 PDT. Reviewers left HEAD and
   the tree untouched (checked).
 Next risk (not a defect): a replay keeps its source's delivery_token, so the
