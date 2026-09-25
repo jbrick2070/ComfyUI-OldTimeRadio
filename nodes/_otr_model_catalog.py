@@ -1880,7 +1880,10 @@ def validate_model_id(
     env vars OTR_MODEL_CATALOG_AUTO_DOWNLOAD (default 1) and
     OTR_MODEL_CATALOG_ALLOW_REMOTE (default 0) when None.
     """
-    from ._otr_model_inputs import UnknownModelError
+    try:
+        from ._otr_model_inputs import UnknownModelError
+    except ImportError:  # pragma: no cover -- flat / standalone load
+        from _otr_model_inputs import UnknownModelError  # type: ignore
 
     if auto_download_enabled is None:
         auto_download_enabled = otr_env.get(
@@ -2335,7 +2338,13 @@ def estimate_model_size_gb(repo_id: str, *, _hf_api: object | None = None) -> fl
     try:
         info = _hf_api.model_info(repo_id, files_metadata=True)  # type: ignore[union-attr]
     except Exception as exc:  # noqa: BLE001 -- broad to also catch network errors
-        from ._otr_model_inputs import UnknownModelError
+        # Guarded: the provisioner loads this module by path (see the note in
+        # auto_download_if_missing); this branch is the one it takes when the
+        # Hub cannot be reached, and it must raise UnknownModelError there too.
+        try:
+            from ._otr_model_inputs import UnknownModelError
+        except ImportError:  # pragma: no cover -- flat / standalone load
+            from _otr_model_inputs import UnknownModelError  # type: ignore
 
         raise UnknownModelError(
             _unknown_recovery_hint(
@@ -2387,12 +2396,28 @@ def auto_download_if_missing(
     huggingface_hub.snapshot_download) and `_hf_api` (object with
     model_info() method) to drive tests without network calls.
     """
-    from ._otr_hf_auth import resolve_hf_token_runtime as resolve_hf_token
-    from ._otr_model_inputs import (
-        GatedModelError,
-        InsufficientDiskSpaceError,
-        UnknownModelError,
-    )
+    # GUARDED, like every other cross-module import in this file: the
+    # provisioner loads this module BY PATH under a non-package name
+    # (scripts/otr_provision.py::_load_writer_catalog, deliberately), and its
+    # writer warmer now calls this function. A bare relative import raised
+    # ImportError on entry there and the warmer's broad except turned it into
+    # a silent "FAILED" -- a provisioned box downloaded nothing (Sonnet QA on
+    # 02758478). The standalone header put nodes/ on sys.path for exactly the
+    # flat spelling below.
+    try:
+        from ._otr_hf_auth import resolve_hf_token_runtime as resolve_hf_token
+        from ._otr_model_inputs import (
+            GatedModelError,
+            InsufficientDiskSpaceError,
+            UnknownModelError,
+        )
+    except ImportError:  # pragma: no cover -- flat / standalone load
+        from _otr_hf_auth import resolve_hf_token_runtime as resolve_hf_token  # type: ignore
+        from _otr_model_inputs import (  # type: ignore
+            GatedModelError,
+            InsufficientDiskSpaceError,
+            UnknownModelError,
+        )
 
     # EXECUTION path -- use the Hub-aware resolver so a cached
     # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).

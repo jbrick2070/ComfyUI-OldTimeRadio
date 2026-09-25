@@ -999,10 +999,14 @@ def _refuse_missing_node_packs(engines):
     except ImportError as exc:
         log.warning("[OTR.assets] node-class check skipped (no engine registry): %s", exc)
         return
-    try:
-        mapping = _wb.node_class_mappings()
-    except Exception as exc:  # noqa: BLE001 -- no ComfyUI registry to read
-        log.warning("[OTR.assets] node-class check skipped: %s", exc)
+    # `node_class_mappings` never raises: with no ComfyUI registry it returns
+    # {} (wrapper_bridge.py:79-83). An empty map is "nothing to check", not
+    # "every class is missing" -- refusing the whole graph with an install
+    # message for CheckpointLoaderSimple would be the wrong failure (agy QA).
+    # Inside the server the map always holds the core nodes.
+    mapping = _wb.node_class_mappings()
+    if not mapping:
+        log.warning("[OTR.assets] node-class check skipped: no ComfyUI node registry")
         return
     problems = []
     for name in sorted(engines):

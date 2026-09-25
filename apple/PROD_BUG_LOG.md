@@ -15416,3 +15416,17 @@ not promote it to the Bug Bible on this evidence alone.
   or the 5080 should judge admission-index coverage.
 - promotion: (pending -- candidate only, not yet checked against
   otr_coverage_index.yaml / BUG_BIBLE.yaml)
+- fix (2026-09-25, 5080): built as direction (1) plus (2). Commit 02758478
+  and the follow-up that folded its reviews the same day:
+  `nodes/_otr_visual_assets._refuse_missing_node_packs` reads every planned
+  video engine's `_node_candidates()` at queue time, BEFORE any weight
+  download, and raises VisualAssetError whose first sentence is the fix
+  ("Install ComfyUI-AnimateDiff-Evolved (Kosinkadink) from ComfyUI Manager,
+  then restart ComfyUI -- ..."); Ghost Signal's own assert_usable leads with
+  the same hint. Node classes only, on purpose: the engine's assert_usable
+  also checks weight files, which the gate is about to fetch. An empty or
+  unimportable registry skips rather than refusing. Coverage:
+  tests/test_queue_time_node_pack_gate.py (the refusal, the fix-first text,
+  the ordering before native_requests, the skips). Live verify: the 4060's
+  B3 retry on the fresh 2.3.4 install (pull 02758478 or later, queue
+  otr_8gb_animatediff without ADE, expect the refusal at t=0).

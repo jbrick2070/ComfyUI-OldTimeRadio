@@ -213,12 +213,18 @@ def structurally_complete(folder: Path) -> bool:
     folder = Path(folder)
     if not _nonempty(folder / "config.json"):
         return False
+    # A transfer still in progress is not complete on EITHER branch: a
+    # sharded folder can hold its index and every shard at their final names
+    # while a tokenizer or a re-fetched shard is still an .incomplete (cursor
+    # QA on 02758478 -- the unsharded branch alone checked this).
+    if _transfer_in_progress(folder):
+        return False
     declared = _shards_named_by_index(folder)
     if declared is not None:
         if not declared:
             return False
         return all(_nonempty(folder / shard) for shard in declared)
-    return _nonempty(folder / "model.safetensors") and not _transfer_in_progress(folder)
+    return _nonempty(folder / "model.safetensors")
 
 
 def plain_folder_complete(folder: Path) -> bool:

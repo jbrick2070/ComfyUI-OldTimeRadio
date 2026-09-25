@@ -68,6 +68,13 @@ def test_an_engine_without_a_node_table_and_an_unknown_id_pass_through(monkeypat
     VA._refuse_missing_node_packs({"viz_mxc_cpu", "no_such_engine_xyz"})
 
 
+def test_an_empty_node_registry_is_nothing_to_check(monkeypatch):
+    """`node_class_mappings` returns {} with no ComfyUI registry rather than
+    raising (agy QA): that must skip, not refuse every core class."""
+    monkeypatch.setattr(WB, "node_class_mappings", lambda mapping=None: mapping or {})
+    VA._refuse_missing_node_packs({GHOST})
+
+
 def test_no_registry_at_all_is_nothing_to_check(monkeypatch):
     """The runtime-bridge tests fake the package tree; a gate that cannot reach
     the engine registry skips, it does not raise."""

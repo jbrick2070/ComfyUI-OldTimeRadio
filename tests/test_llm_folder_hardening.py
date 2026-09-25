@@ -99,6 +99,16 @@ def test_an_unsharded_hand_placed_model_is_complete(tmp_path):
     assert not LF.plain_folder_complete(folder)
 
 
+def test_a_sharded_folder_with_a_transfer_in_progress_is_not_complete(tmp_path):
+    """cursor QA on 02758478: index and every shard at their final names, but
+    a file still downloading -- not complete on the sharded branch either."""
+    folder = _plain(tmp_path, receipt=False)
+    assert LF.plain_folder_complete(folder)
+    (folder / ".cache" / "huggingface" / "download").mkdir(parents=True)
+    (folder / ".cache" / "huggingface" / "download" / "tokenizer.json.incomplete").write_bytes(b"?")
+    assert not LF.plain_folder_complete(folder)
+
+
 def test_a_lone_first_shard_is_never_complete_even_with_config(tmp_path):
     folder = _partial(tmp_path)
     (folder / "config.json").write_text("{}", encoding="utf-8")
