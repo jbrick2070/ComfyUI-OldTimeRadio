@@ -184,7 +184,7 @@ def new_quota_budget() -> dict:
     return {"used": 0}
 
 
-def _quota_retry(call, *, label: str, budget: dict | None = None):
+def _quota_retry(call, *, label: str, quota: dict | None = None):
     """Run ``call()``; on an HTTP 429 sleep (Retry-After, else 5s doubling,
     capped at 60s) and try again while the budget lasts
     (OTR_GOOGLE_QUOTA_RETRIES waits, default 4). Any other error, including
@@ -193,23 +193,23 @@ def _quota_retry(call, *, label: str, budget: dict | None = None):
     import logging
     log = logging.getLogger("OTR.google_api")
     retries = _quota_retries()
-    if budget is None:
-        budget = new_quota_budget()
+    if quota is None:
+        quota = new_quota_budget()
     while True:
         try:
             return call()
         except GoogleAPIBillingOrQuotaError as exc:
-            if getattr(exc, "http_status", None) != 429 or budget["used"] >= retries:
+            if getattr(exc, "http_status", None) != 429 or quota["used"] >= retries:
                 raise
             if _processing_interrupted():
                 raise
             wait = getattr(exc, "retry_after_s", None) or min(
-                _QUOTA_BACKOFF_BASE_S * (2 ** budget["used"]), _QUOTA_BACKOFF_CAP_S)
+                _QUOTA_BACKOFF_BASE_S * (2 ** quota["used"]), _QUOTA_BACKOFF_CAP_S)
             wait = min(float(wait), _QUOTA_BACKOFF_CAP_S)
-            budget["used"] += 1
+            quota["used"] += 1
             log.warning(
                 "[OTR.google_api] %s: HTTP 429 rate limit; waiting %.0fs then "
-                "retry %d/%d", label, wait, budget["used"], retries)
+                "retry %d/%d", label, wait, quota["used"], retries)
             if not _interruptible_sleep(wait):
                 log.warning("[OTR.google_api] %s: cancelled during the 429 wait; "
                             "no further request sent", label)
@@ -520,7 +520,7 @@ def create_interaction(
                     timeout_s=timeout,
                 ),
                 label=f"interactions {payload.get('model')}",
-                budget=quota_budget)
+                quota=quota_budget)
         except GoogleAPIBillingOrQuotaError:
             raise
         except GoogleAPIModelUnavailableError:

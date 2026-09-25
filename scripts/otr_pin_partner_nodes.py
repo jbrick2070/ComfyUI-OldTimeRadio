@@ -52,7 +52,11 @@ def _resolve_comfy_root() -> Path:
     env = os.environ.get("OTR_COMFY_CORE_ROOT", "").strip()
     if env:
         candidates.append(Path(env))
-    candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI (1)\ComfyUI"))
+    # The install the render server boots (scripts/_otr_soak_server_launch.cmd
+    # runs THIS main.py on the pack's venv). A second install on the same box
+    # ("ComfyUI (1)") used to be tried first; its core wants a newer
+    # comfy-aimdo than the venv carries, every comfy_api_nodes import failed,
+    # and the pin reported live partner nodes as "not found" (2026-09-25).
     candidates.append(Path(r"C:\Users\jeffr\ComfyUI-Installs\ComfyUI\ComfyUI"))
     candidates.append(REPO_ROOT.parent.parent)
     for cand in candidates:
@@ -184,9 +188,41 @@ def _comfy_commit() -> str:
         return "unknown"
 
 
-def pin_all() -> dict:
+def _enter_core() -> None:
+    """Make the core importable, booted on the CPU.
+
+    Reading node schemas never needs a GPU, and asking for one made the check
+    machine-bound: under the test suite's ``CUDA_VISIBLE_DEVICES=''`` every
+    ``comfy_api_nodes`` import failed with "Invalid device id" and the pin read
+    every partner node as missing. ComfyUI's own switch is ``--cpu``; its
+    parser reads ``sys.argv`` only once ``enable_args_parsing()`` is on, so the
+    script's own flags are swapped out for that one while the core imports.
+    It also means a check run beside a live render never touches the card.
+
+    ``--cpu`` ALONE WAS NOT ENOUGH (measured 2026-09-25). With no visible
+    device a CUDA-built torch reports ``is_available() == True`` and
+    ``device_count() == 0``; ``comfy_kitchen``'s own guard trusts the first,
+    so importing the core ran ``get_device_capability`` and asserted "Invalid
+    device id". This process only reads schemas, so when torch sees no device
+    it is told so consistently. The suite's GPU mask stays in force: it exists
+    so a test never opens a CUDA context beside a resident render server."""
+    import torch  # noqa: PLC0415 -- the core imports it anyway
+    if torch.cuda.device_count() == 0:
+        torch.cuda.is_available = lambda: False
     sys.path.insert(0, str(COMFY_ROOT))
     os.chdir(COMFY_ROOT)
+    import comfy.options  # noqa: PLC0415 -- live-install import is the point
+    comfy.options.enable_args_parsing()
+    saved_argv = sys.argv
+    sys.argv = [saved_argv[0], "--cpu"]
+    try:
+        import comfy.cli_args  # noqa: F401,PLC0415 -- parses --cpu once, here
+    finally:
+        sys.argv = saved_argv
+
+
+def pin_all() -> dict:
+    _enter_core()
     module_cache: dict = {}
     rows = {}
     for row_id, (class_name, provider_id, out_idx, notes) in CURATED_ROWS.items():
@@ -459,8 +495,7 @@ def _iter_video_classes(module_cache):
 def audit_i2v() -> dict:
     """Walk the live catalog, classify every video-returning class, and return
     the report dict. REPORT-ONLY; never mutates the yaml."""
-    sys.path.insert(0, str(COMFY_ROOT))
-    os.chdir(COMFY_ROOT)
+    _enter_core()
     module_cache: dict = {}
     rows = []
     for mod_name, cname, cls in _iter_video_classes(module_cache):

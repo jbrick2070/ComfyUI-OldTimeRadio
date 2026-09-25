@@ -493,30 +493,38 @@ def _fake_unified_torch():
     return fake
 
 
-def test_the_impure_half_actually_raises_on_an_oversized_engine(monkeypatch):
+def test_the_impure_half_warns_loudly_on_an_oversized_engine(monkeypatch, caplog):
     """The mutation test: stub the guard's body to `return` and this fails.
+
+    IT WARNS, IT DOES NOT REFUSE (operator directive 2026-09-23, "never refuse
+    on numbers, only OOM decided"; the banner above the guard in
+    motion_common). The prediction still has to reach the log -- a gutted guard
+    would say nothing -- and it must not end the run.
 
     PINNED TO THE 16 GB BUDGET (2026-09-12): the guard budgets against
     `unified_memory_budget_mb`, which reads PHYSICAL RAM (PBUG-20260908-02),
     not `free_vram_mb`; on the 63 GB reference box a 20 GB weight fits and
-    nothing raised, so this test failed in every run here."""
+    nothing fired, so this test failed in every run here."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
     monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "unified_memory_budget_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 20000.0)
-    with pytest.raises(mc.MotionBudgetError) as excinfo:
+    with caplog.at_level("WARNING", logger=mc._LOG.name):
         mc.refuse_if_weights_exceed_unified_memory("some_engine")
-    assert "MACHINE down" in str(excinfo.value)
+    assert any("MACHINE down" in r.getMessage() for r in caplog.records), (
+        "the oversized-weight prediction never reached the log")
 
 
-def test_the_impure_half_allows_an_engine_that_fits(monkeypatch):
-    """The other half of the mutation test: a guard hard-wired to raise fails
+def test_the_impure_half_allows_an_engine_that_fits(monkeypatch, caplog):
+    """The other half of the mutation test: a guard hard-wired to warn fails
     here, and a guard hard-wired to return fails above."""
     monkeypatch.setitem(sys.modules, "torch", _fake_unified_torch())
     monkeypatch.setattr(mc, "free_vram_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "unified_memory_budget_mb", lambda: M4_16GB_BUDGET_MB)
     monkeypatch.setattr(mc, "resolved_weight_mb", lambda name: 3000.0)
-    mc.refuse_if_weights_exceed_unified_memory("some_engine")
+    with caplog.at_level("WARNING", logger=mc._LOG.name):
+        mc.refuse_if_weights_exceed_unified_memory("some_engine")
+    assert not any("MACHINE down" in r.getMessage() for r in caplog.records)
 
 
 def test_a_discrete_card_is_not_refused_even_when_the_weights_are_huge(

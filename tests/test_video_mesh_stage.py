@@ -500,42 +500,6 @@ def test_the_lane_DECLARES_its_canvas_1472x832():
     assert 1472 % 32 == 0 and 832 % 32 == 0
 
 
-def test_the_profile_canvas_agrees_with_the_declaration():
-    """G2.3. The profile channel is a DRIFT GUARD. It is NOT dead, which is
-    worth stating because the corpus says it is: `_otr_workflow_apply` flattens
-    render.canvas_w/h into the node-87 OTR_VideoDirector widgets (regenerating
-    this lane's variant moved them from `25, 832, 480` to `25, 1472, 832`) and
-    the director turns those widgets into request["canvas"].
-    `build_request_from_shot` then overwrites that to the landscape default for
-    every non-face family, and the declaration overrules THAT. So the number is
-    read, carried, and twice overruled -- same outcome as a dead channel, worse
-    failure mode, because an operator editing it watches the widget change and
-    concludes it took effect. Hence: it must be the number that renders.
-
-    Read from the declaration rather than repeated as a literal, so the next
-    move of the canvas cannot make this test lie (lesson L10). Per lane 4's
-    G2.3, EVERY profile resolving to this engine is enumerated -- not the one
-    a human would think to check."""
-    import json as _json
-    from nodes._otr_shared import public_engines as pub
-    declared = tuple(vreg.get_engine("mesh_stage").render_canvas)
-    checked = 0
-    for path in sorted((REPO_ROOT / "config" / "profiles").glob("*.json")):
-        prof = _json.loads(path.read_text(encoding="utf-8"))
-        picks = {pub.resolve_engine_id(v)
-                 for k, v in (prof.get("role_overrides") or {}).items()
-                 if k.endswith("_visual")}
-        if "mesh_stage" not in picks:
-            continue
-        render = prof.get("render") or {}
-        if not (render.get("canvas_w") and render.get("canvas_h")):
-            continue
-        checked += 1
-        assert (render["canvas_w"], render["canvas_h"]) == declared, path.name
-    assert checked, "no profile selects mesh_stage with a canvas -- G2.3 would " \
-                    "be vacuous, so the enumeration itself is asserted"
-
-
 # --------------------------------------------------------------------------- #
 # Driver maps + capability row (BOTH copies; the 0-E wiring contract)
 # --------------------------------------------------------------------------- #

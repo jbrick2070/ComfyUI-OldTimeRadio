@@ -8,9 +8,9 @@ the A-S7 retry / fallback / QC surface:
   every registered engine declares ``fallback_engine = None`` (nothing may
   reference another engine as a degrade target -- ghost or otherwise); the
   A-S7 helpers add no ghost node mapping.
-* VRAM-leak (V-4 / BUG-291) -- the entire NEW video-platform surface never CALLS
-  ``unload_all_models()`` (AST-checked, so docstring mentions do not count); the
-  OOM block_class tears down with zero retries and fails LOUD.
+* VRAM-leak (V-4 / BUG-291) -- the OOM block_class tears down with zero retries
+  and fails LOUD. (The "never call unload_all_models()" clause was struck by the
+  operator on 2026-09-22; video runs after every other stage has finished.)
 * widget-serialization (BUG-258) -- the A-S7 helper modules add no ComfyUI node
   or widget surface, so there is nothing new to mis-serialize.
 * pipe-deadlock (BUG 09.02) -- the retry taxonomy BOUNDS every retry (finite
@@ -21,9 +21,6 @@ All CPU; the live subprocess / ffmpeg behavior is the operator smoke, NOT here.
 """
 from __future__ import annotations
 
-import ast
-import pathlib
-
 from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_video_engines import registry as vreg
 # Register every engine so the no-fallback declarations can be checked.
@@ -31,28 +28,6 @@ from nodes._otr_video_engines import eng_humo            # noqa: F401
 from nodes._otr_video_engines import eng_ltx25           # noqa: F401
 from nodes._otr_video_engines import eng_ltx_8gb         # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
-
-REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
-NODES = REPO_ROOT / "nodes"
-PLATFORM_DIRS = (NODES / "_otr_video_engines", NODES / "_otr_shared")
-
-
-def _platform_py_files():
-    for d in PLATFORM_DIRS:
-        for p in sorted(d.glob("*.py")):
-            yield p
-
-
-def _calls_function(source: str, fn_name: str) -> bool:
-    """True iff ``source`` CALLS ``fn_name`` (AST -- ignores docstrings / comments)."""
-    for node in ast.walk(ast.parse(source)):
-        if isinstance(node, ast.Call):
-            f = node.func
-            if isinstance(f, ast.Name) and f.id == fn_name:
-                return True
-            if isinstance(f, ast.Attribute) and f.attr == fn_name:
-                return True
-    return False
 
 
 # --------------------------------------------------------------------------- #
@@ -74,17 +49,10 @@ def test_a_s7_modules_register_no_ghost_node():
 
 
 # --------------------------------------------------------------------------- #
-# VRAM-leak (V-4 / BUG-291 -- never unload_all_models)
+# VRAM-leak (V-4 / BUG-291): OOM tears down with zero retries. The "never call
+# unload_all_models()" half was struck by the operator on 2026-09-22 (see
+# motion_common._detach_patchers) and its AST test died with it.
 # --------------------------------------------------------------------------- #
-def test_new_platform_never_calls_unload_all_models():
-    offenders = [p.name for p in _platform_py_files()
-                 if _calls_function(p.read_text(encoding="utf-8"),
-                                    "unload_all_models")]
-    assert offenders == [], (
-        "V-4 / BUG-291: the new video platform must never CALL "
-        "unload_all_models(); offenders: %s" % offenders)
-
-
 def test_oom_block_class_tears_down_zero_retries():
     d = rt.classify(rt.FailureKind.OOM)
     assert d.is_hard

@@ -76,13 +76,23 @@ for _google_key_env in ("OTR_GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_API_KEY"
 # collected -- makes every downstream `if "folder_paths" not in
 # sys.modules` guard a no-op, so the whole suite sees a single
 # consistent stub and the order-dependence is gone.
+import tempfile as _tempfile
+
+#: Filled by pytest_sessionstart; the fallback only serves an import before it.
+_TEST_COMFY_OUTPUT = [os.path.join(_tempfile.gettempdir(), "otr_pytest_comfy_output")]
+
 if "folder_paths" not in sys.modules:
     import types as _types
     from pathlib import Path as _Path
 
     _fp_stub = _types.ModuleType("folder_paths")
-    # Matches the attribute the prior partial stubs provided.
-    _fp_stub.get_output_directory = lambda: str(_Path.cwd())  # noqa: E731
+    # ComfyUI's output dir, AS THE SUITE SEES IT: a folder inside pytest's own
+    # session temp tree, set in pytest_sessionstart below. Until 2026-09-25 this
+    # returned the cwd -- the repo root when pytest runs from it -- so every test
+    # that resolved an output path (comfy_output_dir() tier 2) wrote into
+    # <repo>/otr/, inside the installed pack, and the OpenRouter "cache leaves
+    # the pack" guard failed on the harness rather than on the code.
+    _fp_stub.get_output_directory = lambda: _TEST_COMFY_OUTPUT[0]  # noqa: E731
     # The missing piece: node INPUT_TYPES() bodies call this to build
     # checkpoint / text-encoder pickers. An empty list is a valid combo
     # spec -- the contract validator introspects key NAMES, not members.
@@ -149,6 +159,8 @@ def pytest_sessionstart(session):
     existing = (os.environ.get("OTR_EXTRA_OUTPUT_ROOTS") or "").strip()
     os.environ["OTR_EXTRA_OUTPUT_ROOTS"] = (
         "%s;%s" % (existing, base) if existing else base)
+    _TEST_COMFY_OUTPUT[0] = os.path.join(base, "comfy_output")
+    os.makedirs(_TEST_COMFY_OUTPUT[0], exist_ok=True)
     sys.stderr.write(
         f"[OTR conftest] CUDA_VISIBLE_DEVICES='{os.environ.get('CUDA_VISIBLE_DEVICES','<unset>')}' "
         f"OTR_TEST_MODE={os.environ.get('OTR_TEST_MODE','0')} "

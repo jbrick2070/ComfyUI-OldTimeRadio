@@ -37,7 +37,7 @@ One section per per-machine graph in `workflows/`: the ComfyUI launch arguments,
 - workflow: `otr_16gb_animatediff` (16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.)
 - status: shipping
 - platform/backend/vendor: any/cuda/nvidia
-- master_hash: `910bc0449eb8e9b16552ec2a42c02ab06d5c14aadcd6619308c49cfc78f64712`
+- master_hash: `596b94be30782c44440f636c5886444ea11ff4339439b78c2c0e79a395884cbe`
 
 ### ComfyUI launch
 
@@ -887,7 +887,7 @@ One section per per-machine graph in `workflows/`: the ComfyUI launch arguments,
 - workflow: `otr_mac16_animatediff` (Apple Silicon -- AnimateDiff Lightning, the variant proven on Apple Silicon (the haunted lane is OOM here). SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `2bf3ebe23ae3602d2f803e2307910a0a822a0c4db3254f1a027f585a53439853`
+- master_hash: `b7e179ae59e3403ceaec4a5ecd884a0e6cc4369b3dd8d669daf9186b16a3b5c8`
 
 ### ComfyUI launch
 
@@ -1007,7 +1007,7 @@ One section per per-machine graph in `workflows/`: the ComfyUI launch arguments,
 - workflow: `otr_mac16_video` (Apple Silicon -- real video diffusion on LTX 0.9.8 -- the only video engine that downloads itself. SD 1.5 stills, Kokoro voices, Stable Audio 3, no upscaler. Proven on a 16 GB M4.)
 - status: shipping
 - platform/backend/vendor: mac/mps/apple
-- master_hash: `af6132ceea83b8617c95ba8ecdcb9b7e85854744051349090eb0f703f815ad81`
+- master_hash: `91b6d9a71bc6847f814999ea8132519e653bea8c09a6cb9256fa62118abdae37`
 
 ### ComfyUI launch
 
