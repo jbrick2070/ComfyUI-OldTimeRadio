@@ -1,7 +1,7 @@
 """S5: variant generator + semantic master_hash + validator tripwire.
 
 docs/2026-07-09-platform-portability-final.md section 1: a platform
-variant = stamped regenerated JSON + launch recipe from ONE canonical;
+variant = stamped regenerated JSON + its launch-recipe section from ONE canonical;
 the SAME semantic normalizer guards both the generator (stamp time) and
 OTR_WorkflowValidator._assert_stamp (verify time); ratify_before_emit
 refuses emission until the operator clears it; the otr_api stale-variant
@@ -318,8 +318,26 @@ def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
     vdir.mkdir()
     (vdir / "otr_cloud_low.json").write_text(bv._dump(variant),
                                              encoding="utf-8")
-    (vdir / "otr_cloud_low.launch.md").write_text(recipe, encoding="utf-8")
+    recipes_doc = tmp_path / "LAUNCH_RECIPES.md"
+    recipes_doc.write_text(bv.render_launch_recipes([("otr_cloud_low", recipe)]),
+                           encoding="utf-8", newline="\n")
     monkeypatch.setattr(bv, "VARIANTS_DIR", vdir)
+    monkeypatch.setattr(bv, "LAUNCH_RECIPES", recipes_doc)
+    assert bv.cmd_check() == 0
+
+    # A hand-edited recipes doc is drift.
+    good_doc = recipes_doc.read_text(encoding="utf-8")
+    recipes_doc.write_text(good_doc + "hand edit\n", encoding="utf-8",
+                           newline="\n")
+    assert bv.cmd_check() == 1
+    recipes_doc.write_text(good_doc, encoding="utf-8", newline="\n")
+
+    # A per-graph recipe file back in the graph folder fails the check: the
+    # folder the template gallery reads holds graphs only.
+    stray = vdir / "otr_cloud_low.launch.md"
+    stray.write_text(recipe, encoding="utf-8")
+    assert bv.cmd_check() == 1
+    stray.unlink()
     assert bv.cmd_check() == 0
 
     # Hand-edit a managed widget on disk -> drift + stamp disagreement.

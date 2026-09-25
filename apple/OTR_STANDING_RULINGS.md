@@ -102,9 +102,20 @@ one level deep, so the 24 graphs in `workflows/variants/` shipped in every
 install and no user could find them from the menu; the 4060's fresh-user walk
 is what surfaced it.
 
-- The 24 variant JSONs and their `.launch.md` recipes are in `workflows/`,
-  beside `otr_canonical.json`. `scripts/build_variants.py` writes there, and
+- The 24 variant JSONs are in `workflows/`, beside `otr_canonical.json`, and
+  that folder holds graphs only. `scripts/build_variants.py` writes there, and
   `--check` fails if `workflows/variants/` comes back with a file in it.
+- Their launch recipes are ONE generated doc, `apple/LAUNCH_RECIPES.md` (one
+  section per graph). They were 24 `workflows/*.launch.md` files until later
+  the same day; Fable's call, adopted: the gallery folder is for loadable
+  graphs, and 24 near-identical 4 KB files are one doc. `--check` fails if a
+  `.launch.md` returns to `workflows/`. The folder keeps the name `workflows/`
+  -- `example_workflows/` would only silence a debug log line, against about
+  245 references and every user's drag path.
+- The 4060's "Showing 1 of 1 templates" on 2.3.5 was the Desktop frontend's
+  stale template list: the backend's `/workflow_templates` served all 25 at
+  that moment, and the graphs reappeared on their own. Curl that route before
+  blaming the pack layout.
 - Still ONE template folder. The 2026-09-01 silent 404 came from a SECOND
   template-named folder (`example_workflows/` beside `workflows/`), never from
   how many graphs one folder holds; the earlier plan note that said otherwise
@@ -112,8 +123,9 @@ is what surfaced it.
   set to the canonical plus exactly the matrix's shipping rows.
 - The canonical is still the first run. The boot banner names it and says the
   other entries are per-machine presets.
-- `.comfyignore` excludes `workflows/*.launch.md` and nothing else there; a
-  `*.json` glob would strip every graph out of every install.
+- `.comfyignore` excludes nothing under `workflows/` (it excludes
+  `apple/LAUNCH_RECIPES.md` instead); a `*.json` glob there would strip every
+  graph out of every install.
 
 ## 2026-09-25 -- ASSET CLEANUP IS THE SECOND SANCTIONED AUTO-DELETE, CHOSEN PER RUN
 

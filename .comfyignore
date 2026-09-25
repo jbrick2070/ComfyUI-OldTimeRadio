@@ -284,18 +284,16 @@ tools/
 # whitespace.
 assets/
 #
-# workflows/*.launch.md -- the generated LAUNCH RECIPES, one per variant,
-# written by scripts/build_variants.py. Every one of them is a headless command
-# built on runners under scripts/, which `scripts/*` above already stops
+# apple/LAUNCH_RECIPES.md -- the generated LAUNCH RECIPES, one section per
+# variant, written by scripts/build_variants.py. Every one of them is a headless
+# command built on runners under scripts/, which `scripts/*` above already stops
 # shipping, so on a registry install they document commands the installer
-# cannot run. THE .json VARIANTS THEMSELVES KEEP SHIPPING. Until 2026-09-25 they
-# sat in workflows/variants/, where ComfyUI's template browser (it globs one
-# directory level, `*/workflows/*.json`) never listed them; they now sit beside
-# the canonical in workflows/ and the gallery lists all 25 (operator: "we can't
-# store the variants in a subfolder"). This pattern is deliberately
-# .launch.md-only: never widen it to a *.json glob, which would strip the
-# graphs out of every install.
-workflows/*.launch.md
+# cannot run. Until 2026-09-25 they were 24 workflows/*.launch.md files beside
+# the graphs; workflows/ now holds only graphs, and ALL of it ships -- the 25
+# .json files are what ComfyUI's template browser lists (it globs one directory
+# level, `*/workflows/*.json`; operator: "we can't store the variants in a
+# subfolder"). Never add a workflows/ pattern here.
+apple/LAUNCH_RECIPES.md
 
 # 2026-09-17: session scratch, and it is the second line of defence -- the
 # header above is right that untracked files never ship, which is exactly why
