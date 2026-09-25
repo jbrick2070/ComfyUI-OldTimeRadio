@@ -236,7 +236,8 @@ of them (operator: "all LLM models, video, voice TTS, music"): Video
 Director (node 87) `announcer_video_model`, `music_video_model`,
 `character_video_model` and the three `*_image_model` picks; Cast Lock
 (node 80) `char_voice_engine`, `announcer_voice_engine`; Theme Music
-(node 83) `engine`, and `music_style` for My Story. Output: node 14 (Mux and Publish). Open questions for one design
+(node 83) `engine`, and `music_style` for My Story; Silent Composite
+(node 84) `upscale_engine` (operator: "upscaler"). Output: node 14 (Mux and Publish). Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
 the premise/title text belongs; how variants inherit it; whether an older
 frontend ignores the metadata harmlessly.
