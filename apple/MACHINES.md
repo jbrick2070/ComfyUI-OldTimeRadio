@@ -60,9 +60,9 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
-| `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
+| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** | ? | not offered |
+| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
@@ -163,16 +163,6 @@ Selected by: `h3_low_audio_in`, `h3_low_video`
 | `minimax_h3_video_vae_fp16.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/vae/` | 4.85 GiB | no |
 | `minimax_h3_audio_vae_fp32.safetensors` | [`Comfy-Org/MiniMax-H3`](https://huggingface.co/Comfy-Org/MiniMax-H3) | `models/vae/` | 0.56 GiB | no |
 
-### haunted
-
-Selected by: `animatediff15_v3_haunted_video`, `animatediff15_v3_stillin_lab_video`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/checkpoints/` | -- | no |
-| `v3_sd15_mm.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/animatediff_models/` | -- | no |
-| `v3_sd15_adapter.ckpt` | [`guoyww/animatediff`](https://huggingface.co/guoyww/animatediff) | `models/loras/` | -- | no |
-
 ### humo &mdash; 26.7 GiB total
 
 Selected by: `humo14_high_audio_in_portrait`, `humo14_high_audio_in_wide`
@@ -195,16 +185,6 @@ Selected by: `humo17_high_audio_in_portrait`, `humo17_high_audio_in_wide`
 | `umt5_xxl_fp8_e4m3fn_scaled.safetensors` | [`Comfy-Org/Wan_2.1_ComfyUI_repackaged`](https://huggingface.co/Comfy-Org/Wan_2.1_ComfyUI_repackaged) | `models/text_encoders/` | 6.27 GiB | no |
 | `whisper_large_v3_fp16.safetensors` | [`Comfy-Org/HuMo_ComfyUI`](https://huggingface.co/Comfy-Org/HuMo_ComfyUI) | `models/audio_encoders/` | 2.88 GiB | no |
 | `wan_2.1_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/vae/` | 0.24 GiB | no |
-
-### lightning &mdash; 3.1 GiB total
-
-Selected by: `animatediff15_lightning_video`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `v1-5-pruned-emaonly-fp16.safetensors` | [`Comfy-Org/stable-diffusion-v1-5-archive`](https://huggingface.co/Comfy-Org/stable-diffusion-v1-5-archive) | `models/checkpoints/` | 1.99 GiB | no |
-| `animatediff_lightning_8step_comfyui.safetensors` | [`ByteDance/AnimateDiff-Lightning`](https://huggingface.co/ByteDance/AnimateDiff-Lightning) | `models/animatediff_models/` | 0.85 GiB | no |
-| `vae-ft-mse-840000-ema-pruned.safetensors` | [`stabilityai/sd-vae-ft-mse-original`](https://huggingface.co/stabilityai/sd-vae-ft-mse-original) | `models/vae/` | 0.31 GiB | no |
 
 ### No manifest ships for these
 

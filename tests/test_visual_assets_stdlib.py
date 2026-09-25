@@ -216,6 +216,10 @@ class FakeFolders:
         return [str(path) for path in self.roots[self.ALIASES.get(category, category)]]
 
     def get_full_path(self, category, token):
+        # As in ComfyUI: an unregistered category resolves nothing, while
+        # get_folder_paths raises KeyError for it.
+        if self.ALIASES.get(category, category) not in self.roots:
+            return None
         for folder in self.get_folder_paths(category):
             candidate = Path(folder) / token
             if candidate.is_file():
@@ -389,6 +393,31 @@ class NativeRequestTests(_NativeFixtureCase):
         self.folders.put("diffusion_models", DEFAULT_UNET, b"")
         with self.assertRaises(bridge.VisualAssetError):
             self.requests({"z_image_turbo"})
+
+
+class AnimateDiffRequestTests(_NativeFixtureCase):
+    LANE = "animatediff15_v3_haunted_video"
+
+    def _lane(self):
+        return SimpleNamespace(_weight_tokens=lambda: [
+            ("animatediff_models", "v3_sd15_mm.ckpt"),
+            ("loras", "v3_sd15_adapter.ckpt")])
+
+    def test_registered_folders_plan_the_allowlisted_downloads(self):
+        self.folders.roots["animatediff_models"] = [self.root / "primary models" / "animatediff_models"]
+        self.folders.roots["loras"] = [self.root / "primary models" / "loras"]
+        reqs = self.requests({self.LANE}, animatediff={self.LANE: self._lane()})
+        self.assertEqual([(r["category"], r["token"], r["path"]) for r in reqs],
+                         [("animatediff_models", "v3_sd15_mm.ckpt", None),
+                          ("loras", "v3_sd15_adapter.ckpt", None)])
+        self.assertEqual({r["spec"]["repo_id"] for r in reqs}, {"guoyww/animatediff"})
+
+    def test_an_unregistered_motion_folder_is_a_named_refusal(self):
+        # ComfyUI's get_folder_paths raises KeyError for a category nobody
+        # registered; AnimateDiff-Evolved is what registers this one.
+        with self.assertRaisesRegex(bridge.VisualAssetError,
+                                    "no native model folder registered for animatediff_models"):
+            self.requests({self.LANE}, animatediff={self.LANE: self._lane()})
 
 
 class MetadataTests(NoNetworkTestCase):

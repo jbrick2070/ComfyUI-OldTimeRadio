@@ -105,6 +105,21 @@ def _is_str_list(v: Any) -> bool:
     return isinstance(v, list) and all(isinstance(s, str) and s for s in v)
 
 
+#: Weight-file suffixes ComfyUI's folder_paths enumerates. A closed list, not
+#: "contains a dot": `ltx-2.3-22b-dev` has dots and is an id, not a file.
+WEIGHT_FILE_SUFFIXES = (".safetensors", ".ckpt", ".pth", ".pt", ".bin",
+                        ".onnx", ".sft")
+
+
+def is_weight_filename(name: Any) -> bool:
+    """True for a weight FILENAME; false for a logical id or an HF repo id."""
+    return isinstance(name, str) and name.lower().endswith(WEIGHT_FILE_SUFFIXES)
+
+
+def _is_weight_filename_list(v: Any) -> bool:
+    return isinstance(v, list) and all(is_weight_filename(s) for s in v)
+
+
 # key -> (required, validator-callable, human description)
 _TOP_LEVEL_KEYS: dict[str, tuple[bool, Any, str]] = {
     "id": (True, lambda v: isinstance(v, str) and bool(v), "non-empty str"),
@@ -219,8 +234,11 @@ _RENDER_KEYS = {
     "composite_w": _is_positive_int,
     "composite_h": _is_positive_int,
 }
+#: `required_models` names weight FILES only -- the runner checks each against
+#: the server's /object_info, which lists filenames. An LLM is not declared
+#: here: the writer fetches its own weights.
 _PREFLIGHT_KEYS = {
-    "required_models": _is_str_list,
+    "required_models": _is_weight_filename_list,
     "required_keys": _is_str_list,
 }
 
