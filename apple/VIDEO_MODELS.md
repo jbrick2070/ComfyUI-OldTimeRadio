@@ -106,15 +106,22 @@ just do not carry the label, which is reserved for the audio-reactive family.
 | `ltx098_low_video` | animates the beat's still. The cheapest local video lane, and the only one that downloads itself | automatic, about 16 GB |
 | `ltx23_low_audio_in` | animates the still, conditioned on the beat's audio | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
 | `ltx23_high_video` | the LTX 2.3 22B silent lane | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
-| `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent | licence + manual weights + ComfyUI-GGUF |
-| `ltx25_high_foley_plus` | the same picture, and it **keeps the model's own sound** | licence + manual weights + ComfyUI-GGUF |
-| `ltx25_high_mime` | the same picture, and the model's sound **replaces** the episode audio over those beats | licence + manual weights + ComfyUI-GGUF |
+| `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent. 16 GB weights | licence + manual weights |
+| `ltx25_native_foley_16gb` | the same picture, and it **keeps the model's own sound**. 16 GB weights | licence + manual weights |
+| `ltx25_native_foley_24gb` | the same, on the 24 GB+ weights (any modern NVIDIA) | licence + manual weights |
+| `ltx25_native_foley_blackwell` | the same, on Blackwell-only weights | licence + manual weights |
+| `ltx25_native_mime_16gb`, `ltx25_native_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | licence + manual weights |
+| `ltx25_native_audio_in_16gb`, `ltx25_native_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | licence + manual weights |
+
+Every LTX 2.5 row loads through ComfyUI's own stock loaders -- no extra node
+pack -- and every weight it asks for is ungated, so no Hugging Face token is
+needed.
 
 `ltx098_low_video` is the one lane in this whole page that needs no manual step.
 Pick it and queue, and the weights arrive. It is what the 8 GB and Mac graphs
 ship with.
 
-Read the foley and mime rows twice before picking them -- see **Two lanes that
+Read the foley and mime rows twice before picking them -- see **The lanes that
 change the sound**, below.
 
 ### Wan
@@ -232,20 +239,20 @@ from are in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and
 
 ---
 
-## Two lanes that change the sound
+## The lanes that change the sound
 
-`ltx25_high_foley_plus` and `ltx25_high_mime` are the same picture as
-`ltx25_high_video`. The difference is that they keep the audio the model
+The `ltx25_native_foley_*` and `ltx25_native_mime_*` rows are the same picture
+as `ltx25_high_video`. The difference is that they keep the audio the model
 generated alongside it.
 
-- **foley_plus** mixes that audio with the episode master at an even split. It
+- **foley** mixes that audio with the episode master at an even split. It
   reaches the whole episode mix, music included.
 - **mime** replaces the episode audio entirely over those beats. Picking it for
   a role makes **every beat of that role a silent performance** -- the voices
   and music are still generated for those beats and then thrown away.
 
 These are mix decisions wearing a picture dropdown, which is why they are the
-two rows worth reading twice.
+rows worth reading twice.
 
 **And there is a reason the prompts for those lanes look bare.** On these lanes
 the picture and the sound are decoded from one latent, off one piece of text --

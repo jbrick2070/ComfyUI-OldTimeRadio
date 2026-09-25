@@ -907,11 +907,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         """Re-assert the placement invariant THIS LANE actually promises.
 
         Structural only -- no tensor work. A False here does NOT raise: it
-        drops the cache and falls through to a full load, and a CPU-pinned
-        lane's load runs the pinned loader, which raises
-        :class:`CpuPinnedEncoderPlacementError` if placement is genuinely
-        broken. The loud refusal still happens, at the site that already owns
-        it, instead of being duplicated here.
+        drops the cache and falls through to a full load, which asks the stock
+        loader for the lane's placement again through its ``device`` widget.
 
         ``expect_cpu`` DEFAULTS TRUE so every existing call site, and every
         existing test that calls this UNBOUND on the class, keeps its exact

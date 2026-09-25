@@ -123,17 +123,15 @@ included -- without adding a single JSON file. Somebody with a bigger card
 picks it and renders; nobody has to find a special graph.
 
 If your lane is the same recipe on a different build of the same model, it is
-a subclass that changes one thing. The three LTX 2.5 lanes are already built
-this way: `ltx25_foley_plus` subclasses `ltx25_video`, and `ltx25_mime`
-subclasses that.
+a subclass that changes one thing. The LTX 2.5 tiers are already built this
+way: `ltx25_native_foley_24gb` is the 16 GB foley lane with a different DiT
+file and the text encoder left on the GPU.
 
 ```python
 @register
 class MyLaneOnBiggerWeights(TheClosestExistingLane):
     name = "that_lane_bigger"
-
-    def _dit_name(self):
-        return "The-Model-You-Actually-Want.gguf"
+    _native_dit = "The-Model-You-Actually-Want.safetensors"
 ```
 
 Then four things, none of them long:
