@@ -1,3 +1,43 @@
+## 2026-09-25 -- HEAD a841b98d (main) -- LIVE PROOF + GALLERY + PUBLISH 2.3.4
+
+Did (5080, the only window; the 4060 runs the fresh-user walk):
+  Live asset_cleanup regression, operator's call: canonical + otr_16gb_still,
+  act_count 1, server restarted first (it predated the widget -- /object_info
+  lacked asset_cleanup and apply_profile refused 36 vs 35). All three RESULT
+  SUCCESS and verified on disk, not by log:
+    off     prompt 300f33b6, 8 beats: folder kept (31 files), obs 55.3 MB,
+            no asset_cleanup key, no receipt.
+    partial prompt 0a80024e, 35 beats: "removed 81 files (560.9 MB), kept 6,
+            skipped 0"; ledger, treatment, canon, QA json, captions .ass and
+            stills manifest kept; emptied dirs gone; receipt state done;
+            obs 81.1 MB.
+    full    prompt eb487964: "removed 31 files (550.4 MB), kept 0"; folder
+            gone; obs 99.8 MB; the canvas still got its poster frame (the
+            preview is taken before the delete); both sibling test episodes
+            and the other 2,437 episode dirs untouched.
+  c0c286be: the 24 variants moved from workflows/variants/ into workflows/
+  (operator: "we can't store the variants in a subfolder"; "All 24"). The
+  gallery globs one level, so they shipped and never listed. Reverses the
+  09-02 one-JSON ruling (recorded in the standing rulings). One template
+  folder still; tests/_support/shipped_graphs.py tells canonical from
+  variants for 18 tests; --check skips the canonical and fails if
+  variants/ returns. `build_variants --all` hit WinError-22 "Invalid
+  argument" writing a random freshly moved file twice (Cursor's ~25 watcher
+  processes and Defender were on the tree); --check was 24/0 throughout, so
+  nothing was left half-written. Generated docs rebuilt by their own scripts.
+  a841b98d: 2.3.4 published on his word. Registry: Pending, 23 deps. The
+  downloaded zip carries 25 top-level graphs, no launch recipes, no
+  variants/, nodes/_otr_asset_cleanup.py.
+Suite: full run on the gallery move, the same 12 inherited reds as
+  fe17f426, nothing new.
+4060: re-cloned main, found PBUG-20260925-01 (Desktop Manager install
+  showed success and installed nothing; a later reboot then loaded the pack
+  -- it is confirming which). Briefed to relaunch and install 2.3.4 by
+  picking it explicitly in the version picker, confirm the 25-entry gallery,
+  and keep logging every step in apple/FRESH_INSTALL_4060_2026-09-25.md.
+Server: the 5080 server on :8000 is resident and idle (PID from
+  scripts/_otr_soak_server_launch.cmd); nothing queued.
+
 ## 2026-09-25 -- HEAD e7a4806a (main) -- CODE + DOCS (row 0b asset_cleanup built; stale pointers; one local copy)
 
 Did (5080 window, now the only window; the server on :8000 was not touched):
