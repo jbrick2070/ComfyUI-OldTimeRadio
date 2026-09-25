@@ -237,7 +237,19 @@ Director (node 87) `announcer_video_model`, `music_video_model`,
 `character_video_model` and the three `*_image_model` picks; Cast Lock
 (node 80) `char_voice_engine`, `announcer_voice_engine`; Theme Music
 (node 83) `engine`, and `music_style` for My Story; Silent Composite
-(node 84) `upscale_engine` (operator: "upscaler"). Output: node 14 (Mux and Publish). Open questions for one design
+(node 84) `upscale_engine` (operator: "upscaler").
+THE RULE (operator: "basically almost everything in our variant matrix"):
+the app shows the matrix's USER-CHOICE deltas -- `features.act_count`,
+`features.num_characters`, the `llm.*_model` and cloud slot picks,
+`role_overrides.*`, `slot_overrides.*` -- plus the story knobs the matrix
+does not vary (cleanup, Lemmy, language, bank, visual style, upscaler).
+It HIDES the matrix's machine-tuning deltas (`llm.device`,
+`llm.quant_policy`, `llm.vram_ceiling_gb`, `audio.voice_device`,
+`image.dtype_policy`, `video.dtype_policy`, `video.device_policy`,
+`render.canvas_*`, `seed_policy.*`): the per-machine graph already set them
+for that card. Generate the app's input list from the matrix plus that
+extras list in `build_variants.py`, so a new matrix knob cannot be missing
+from the app. Output: node 14 (Mux and Publish). Open questions for one design
 round before code: canonical itself or a separate `otr_app.json`; whether
 the premise/title text belongs; how variants inherit it; whether an older
 frontend ignores the metadata harmlessly.
