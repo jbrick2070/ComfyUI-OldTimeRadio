@@ -91,7 +91,7 @@ def test_device_map_summary_reports_cpu_layers_truthfully():
 
 
 def test_no_test_still_expects_vram_fit_failed_error_raise():
-    """Skipped GGUF rows used to keep a VRAMFitFailedError raise expectation
+    """Skipped retired rows used to keep a VRAMFitFailedError raise expectation
     alive after request_slot stopped raising. Scan so that cannot rot."""
     needle = "pytest.raises(" + "VRAMFitFailedError"
     root = Path(__file__).resolve().parent

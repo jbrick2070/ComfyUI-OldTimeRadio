@@ -260,7 +260,7 @@ def test_default_dry_run_uses_canonical_values_without_profile(tmp_path):
     # longer appears in the prompt at all, so there is nothing to assert
     # here. 2026-07-20: the canonical writer uses official Gemma4Unified on the
     # in-process Transformers lane. NF4 is measured below 7.3 GiB and the
-    # lane binds LMFE schema constraints; this is not the Q8 GGUF path.
+    # lane binds LMFE schema constraints.
     #
     # 2026-08-04: THE SIZE SUFFIX IS PART OF THE VALUE. A bare repo id matches
     # no choice: the operator saw both dropdowns render RED on opening the

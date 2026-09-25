@@ -215,9 +215,9 @@ def test_remote_bound_schema_not_overridden_by_json_object(enabled, monkeypatch)
 # `test_remote_creative_structured_call_forces_json_object` above proves the
 # REMOTE lane gets `response_format={"type": "json_object"}` forced onto it for
 # a schema-less structured pass. The proof that the LOCAL transformers lane
-# never does lived in tests/test_gguf_registry.py, which was deleted wholesale
-# with the GGUF writer backend -- but that particular test was not about GGUF at
-# all, and a QA pass caught it going out with the bathwater.
+# never does lived in a registry test file deleted wholesale with a retired
+# writer backend -- but that particular test was not about that backend at all,
+# and a QA pass caught it going out with the bathwater.
 #
 # It matters because `invoke_structured_slot` is live shared code: it is reached
 # from several call sites in `_otr_structured_call`, which a long list of

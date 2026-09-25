@@ -210,8 +210,8 @@ def _writer_schemas_s5() -> dict:
         ["bnb_nf4", "bnb_8bit", "none"], {"default": "bnb_nf4"},
     )
     required["llm_vram_ceiling_gb"] = ("FLOAT", {"default": 14.5})
-    # 2026-09-24: `gguf_n_ctx` / `gguf_quant` were deleted from the live node
-    # with the writer backend they configured. Same reasoning as the two
+    # 2026-09-24: two writer widgets were deleted from the live node with the
+    # retired writer backend they configured. Same reasoning as the two
     # removals above -- only this helper follows the live writer; the frozen
     # synthetic double stays put, because it tests the by-name patch mechanism
     # against a fixed shape rather than against today's schema.
@@ -552,8 +552,8 @@ def test_round_trip_canonical_node1_inputs_correct():
     # 37 since 2026-09-18: `episode_language` (the multilingual one-switch)
     # appended as the trailing widget -- declared after replay_from and before
     # the gate_in socket, which holds no slot, so nothing earlier moved.
-    # 35 since 2026-09-24: `gguf_n_ctx` and `gguf_quant` were removed MID-LIST
-    # with the writer backend they configured, via the same three-part
+    # 35 since 2026-09-24: two writer widgets were removed MID-LIST with the
+    # retired writer backend they configured, via the same three-part
     # migration -- descriptor, saved value, and link 279's dst_slot, which
     # moved 31 -> 30 with the gate_in socket.
     assert len(dump) == 35, f"node 1 widgets_values length drift: {len(dump)}"

@@ -396,14 +396,14 @@ def test_a_weight_receipt_is_stable_and_moves_when_the_file_moves(name, tmp_path
     and rewriting the file changes the answer.
     """
     engine = vreg.get_engine(name)
-    weight = tmp_path / "fake_weight.gguf"
+    weight = tmp_path / "fake_weight.safetensors"
     weight.write_bytes(b"x" * 2048)
 
     first = engine._weight_receipt(str(weight))
     assert engine._weight_receipt(str(weight)) == first, (
         "two quiet reads of the same untouched file disagree -- every "
         "multi-segment beat would die as SessionIdentityDrift")
-    assert first[0] == "fake_weight.gguf"
+    assert first[0] == "fake_weight.safetensors"
     assert first[1] == 2048
 
     weight.write_bytes(b"y" * 4096)
@@ -411,8 +411,8 @@ def test_a_weight_receipt_is_stable_and_moves_when_the_file_moves(name, tmp_path
         "the receipt did not change when the file did -- a swapped weight "
         "would be invisible")
 
-    missing = engine._weight_receipt(str(tmp_path / "not_here.gguf"))
-    assert missing == ("not_here.gguf", -1, -1), (
+    missing = engine._weight_receipt(str(tmp_path / "not_here.safetensors"))
+    assert missing == ("not_here.safetensors", -1, -1), (
         "a missing weight must return a NAMED absence, not raise: "
         "assert_usable owns that refusal and says it far better")
     assert engine._weight_receipt("") == ("<unresolved>", -1, -1)

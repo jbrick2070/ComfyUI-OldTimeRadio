@@ -217,8 +217,8 @@ def test_every_curated_local_row_is_pass_tier():
     (or UNKNOWN/FAIL) row still fails HERE, by name.
 
     2026-09-21 amends the roster again, for a row the operator asked for by
-    description: the best writer that fits a big card, auto-downloading, no
-    GGUF, present in every graph and default in none. Qwen3.8-27B is WARN
+    description: the best writer that fits a big card, auto-downloading
+    safetensors, present in every graph and default in none. Qwen3.8-27B is WARN
     because no episode has shipped on it -- three gates passed on an RTX 5090
     (NF4 load at 17.7 GiB, prose, constrained JSON) and a published episode
     is a different claim.

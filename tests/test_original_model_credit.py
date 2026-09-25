@@ -24,7 +24,7 @@ def invoke(sched, helper="compose_line", slot="creative"):
                                     temperature=.5, max_new_tokens=16)
 
 
-@pytest.mark.parametrize("provider,key", [("local", "model_id"), ("gguf", "model_id"),
+@pytest.mark.parametrize("provider,key", [("local", "model_id"),
                                          ("comfy_credits", "slug"), ("google_api", "google_model")])
 def test_request_identity_is_primitive_and_episode_local(monkeypatch, provider, key):
     class Model:

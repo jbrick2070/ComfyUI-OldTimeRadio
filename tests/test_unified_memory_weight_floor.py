@@ -69,7 +69,7 @@ GROUND_TRUTH = [
      9787.0 + 6340.0, False),
     ("lumina_image: TE 4986 + diffusion 4977 + vae peak under swap budget",
      4986.0 + 4977.0 + 336.0, False),
-    ("5B video lane GGUF: its shipped set, Q5_K_M 3810 + umt5 3860 + VAE 1310",
+    ("a retired 5B video lane: its shipped set, 3810 + umt5 3860 + VAE 1310",
      3810.0 + 3860.0 + 1310.0, False),
     ("animatediff haunted: sd15 1990 + mm 1560 + adapter 95 (4060: 4.9 GB)",
      1990.0 + 1560.0 + 95.0, False),

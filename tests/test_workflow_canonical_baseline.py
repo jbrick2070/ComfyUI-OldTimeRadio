@@ -98,8 +98,7 @@ class TestWriterCanonicalModelSlots:
         # writer reorder (docs/GO_FORWARD_PLAN.md row A4) put them.
         # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
-        # the safetensors/HF lane, not the independent GGUF Q8 row whose
-        # context downgrade motivated the earlier Mistral canvas pin.
+        # the safetensors/HF lane.
         # 2026-08-04: THE SIZE SUFFIX IS PART OF THE COMBO VALUE. A bare repo
         # id matches nothing: the operator reported both dropdowns rendering
         # RED on opening the graph, and an unmatched COMBO can resolve to index

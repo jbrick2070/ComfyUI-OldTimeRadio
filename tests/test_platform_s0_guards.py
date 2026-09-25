@@ -102,7 +102,7 @@ def test_plan_max_memory_none_when_unquantized(model_id, total_vram):
     Parametrized across every branch of the function, including the
     total_vram >= 12.0 branch: that one is not reachable by any shipped
     profile today (no profile pairs quant_policy="none" with a large
-    non-GGUF model on a >=12GB target), but it is the identical bug class
+    safetensors model on a >=12GB target), but it is the identical bug class
     and would silently reappear the moment a 16GB-tier bf16 profile existed.
     """
     assert ml._plan_max_memory(

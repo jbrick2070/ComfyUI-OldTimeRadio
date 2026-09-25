@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from nodes import _otr_models_root as gguf
+from nodes import _otr_models_root as models_root
 from nodes._otr_video_engines import wan_shared as ws
 
 _ENV = ("OTR_COMFYUI_MODELS_ROOT", "COMFYUI_MODELS_ROOT")
@@ -21,7 +21,7 @@ def test_one_spelling_under_each_env_state(pinned, monkeypatch, tmp_path):
         monkeypatch.delenv(key, raising=False)
     if pinned:
         monkeypatch.setenv(pinned, str(tmp_path / "weights"))
-    assert ws.configured_models_root() == str(gguf._models_root())
+    assert ws.configured_models_root() == str(models_root._models_root())
     if pinned:
         assert ws.configured_models_root() == str(tmp_path / "weights")
 
@@ -30,7 +30,7 @@ def test_the_first_env_pin_wins_over_the_second(monkeypatch, tmp_path):
     monkeypatch.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path / "first"))
     monkeypatch.setenv("COMFYUI_MODELS_ROOT", str(tmp_path / "second"))
     assert ws.configured_models_root() == str(tmp_path / "first")
-    assert ws.configured_models_root() == str(gguf._models_root())
+    assert ws.configured_models_root() == str(models_root._models_root())
 
 
 def test_the_module_stays_cold_import_clean():

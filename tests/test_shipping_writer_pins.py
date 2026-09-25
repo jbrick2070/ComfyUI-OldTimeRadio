@@ -1,6 +1,6 @@
 """Shipping writer pins: small Qwen locally, 12B on 16 GB NVIDIA, cloud on CPU.
 
-Stops a stale Qwen2.5 / GGUF 2507 id from returning, and keeps the
+Stops a stale Qwen2.5 id from returning, and keeps the
 shipping CPU graph on Sonnet 5 + Luna instead of a local 4B.
 """
 from __future__ import annotations

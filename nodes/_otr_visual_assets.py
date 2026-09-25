@@ -94,8 +94,12 @@ _SOURCES = (
     # its own weights at queue time exactly like Z-Image and SD 1.5 do.
     # Lightricks' own LTX-2.5 repo is gated (401 without a token,
     # PBUG-20260923-03); the VAEs and the upscaler come from a byte-identical
-    # ungated mirror (same SHA-256 as Lightricks' copies). One DiT per card
-    # class; each lane names its own through `_dit_name()`, so a 16 GB lane
+    # ungated mirror (same SHA-256 as Lightricks' copies) that stores them at
+    # the REPO ROOT -- chosen for that: the HF cache path of the upscaler under
+    # a `latent_upscale_models/` subfolder is 169 characters, past the 162 that
+    # prestartup_script.py budgets for Windows MAX_PATH, and would fail to
+    # materialise on a stock ComfyUI Desktop root. At the root it is 138.
+    # One DiT per card class; each lane names its own through `_dit_name()`, so a 16 GB lane
     # never pulls the 24 GB weight.
     ("diffusion_models", "joeygambino/LTX-2.5-Quantized",
      "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"),  # 13,810,250,240 B
@@ -105,13 +109,12 @@ _SOURCES = (
      "LTX25-distilled-DiT-comfy-nvfp4.safetensors"),          # 12,499,335,336 B
     ("text_encoders", "joeygambino/LTX-2.5-Quantized",
      "gemma4-12b-ltx25-comfy-w4a8.safetensors"),              # 10,604,342,914 B
-    ("vae", "vonkaiser/LTX-2.5-FP8-NVFP4",
-     "vae/ltx-2.5-video-vae-bf16.safetensors"),               #  1,472,223,346 B
-    ("vae", "vonkaiser/LTX-2.5-FP8-NVFP4",
-     "vae/ltx-2.5-audio-vae-bf16.safetensors"),               #    364,866,540 B
-    ("latent_upscale_models", "vonkaiser/LTX-2.5-FP8-NVFP4",
-     "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),
-                                                              #    995,778,752 B
+    ("vae", "yuvraj108c/LTX-2.5",
+     "ltx-2.5-video-vae-bf16.safetensors"),                   #  1,472,223,346 B
+    ("vae", "yuvraj108c/LTX-2.5",
+     "ltx-2.5-audio-vae-bf16.safetensors"),                   #    364,866,540 B
+    ("latent_upscale_models", "yuvraj108c/LTX-2.5",
+     "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),  # 995,778,752 B
 )
 #: Windows MAX_PATH is 260 including the terminating NUL, so 259 is what a
 #: path may actually occupy. Named here because _scrub_transfer_error reports

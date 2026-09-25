@@ -697,8 +697,8 @@ class TestWriterB2aSurface:
         # and no link dst_slot moved. The shipped bake ships "English", which
         # is today's behaviour byte for byte and says so on the ledger.
         #
-        # 2026-09-24: `gguf_n_ctx` and `gguf_quant` were REMOVED with the
-        # writer backend they configured, taking the vector 37 -> 35. They sat
+        # 2026-09-24: two writer widgets were REMOVED with the retired writer
+        # backend they configured, taking the vector 37 -> 35. They sat
         # mid-list, immediately before the `gate_in` forceInput, so this is the
         # second removal here carried by scripts/otr_widget_surgery.py rather
         # than by hand: descriptor, saved value AND link table moved together,

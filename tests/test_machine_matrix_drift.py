@@ -107,32 +107,28 @@ def test_experimental_shipping_status_is_separate_from_install_ownership():
     import otr_machine_matrix as M          # noqa: E402
 
     profiles = {row["id"]: row for row in M.load_profiles()}
-    # Shipping rows whose selections the provisioner has no lane for: the Mac
-    # still/video rows pin `sd15` stills, the low cloud rows a hosted video
-    # route no provisioning set covers.
-    missing = {
-        "otr_mac16_still",
-        "otr_mac16_video",
-        "otr_cloud_low",
-        "otr_cloud_low_1act",
-        "otr_cloud_low_5act",
-    }
-    assert all(profiles[pid]["status"] == "shipping" for pid in missing)
-    assert all(profiles[pid]["install_recipe"] == "missing exact owner"
-               for pid in missing)
+    # EVERY SHIPPED WORKFLOW HAS AN EXACT INSTALL OWNER (2026-09-25). Five
+    # shipping rows used to read "missing exact owner" -- the Mac still/video
+    # rows pin `sd15` stills and the low cloud rows a hosted video lane -- until
+    # the provisioner gained an sd15 lane and learned the hosted one. A new
+    # shipping row that the provisioner cannot install fails here by name.
+    shipping = [pid for pid, row in profiles.items() if row["status"] == "shipping"]
+    assert shipping, "the matrix ships nothing; this test would prove nothing"
+    unowned = sorted(pid for pid in shipping
+                     if "missing exact owner" in profiles[pid]["install_recipe"])
+    assert unowned == [], unowned
     # "complete; Python <=3.13", not bare "complete" (2026-09-24). This row
     # selects kokoro, which genuinely needs Python <=3.13; the recipe column
     # has to say so rather than read as an unconditional install.
     assert profiles["otr_8gb_low"]["install_recipe"].startswith("complete")
-    assert "missing exact owner" not in profiles["otr_8gb_low"]["install_recipe"]
 
     text = M.render()
     assert "| confidence | install recipe |" in text
     assert "runtime-ready on a preloaded machine" in text
-    for pid in missing:
+    for pid in shipping:
         row_start = text.index("| `%s` |" % pid)
         row_end = text.index("\n", row_start)
-        assert "missing exact owner" in text[row_start:row_end]
+        assert "missing exact owner" not in text[row_start:row_end], pid
 
 
 def test_every_machine_profile_is_schema_valid_and_applies_to_canonical(tmp_path):

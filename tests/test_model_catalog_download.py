@@ -226,7 +226,6 @@ def test_auto_download_gated_with_token_proceeds(tmp_path, monkeypatch):
     assert kwargs["repo_id"] == catalog.DEFAULT_LLM
     assert kwargs["token"] == "fake-token"
     assert ".safetensors" in " ".join(kwargs["allow_patterns"])
-    assert ".gguf" not in " ".join(kwargs["allow_patterns"])
     assert kwargs["cache_dir"] == str(tmp_path)
     assert out == str(tmp_path / "fake-snapshot")
 

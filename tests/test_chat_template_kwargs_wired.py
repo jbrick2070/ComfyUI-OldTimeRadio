@@ -16,7 +16,7 @@ So the kwarg is load-bearing in BOTH directions. Passed as false, the prompt
 carries a CLOSED think envelope and the model answers directly. Omitted, the
 prompt ends with an OPEN `<think>` and the model is forced to reason -- which
 under the writer's LMFE-constrained JSON pass produces the degenerate empty
-object the GGUF lane already measured on this family.
+object already measured on this family.
 
 A missed call site therefore fails SILENTLY and expensively: no exception, no
 warning, just worse output hours into a render. Jinja does not raise on an

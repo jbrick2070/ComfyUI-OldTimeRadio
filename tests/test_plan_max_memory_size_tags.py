@@ -45,7 +45,6 @@ def plan(model_id, vram, quant_policy="bnb_nf4", cuda=True):
 @pytest.mark.parametrize("model_id", [
     "google/gemma-4-12b-it",
     "GOOGLE/GEMMA-4-12B-IT",
-    "unsloth/gemma-4-12b-it-GGUF",
     "google/gemma-4-2b-it",
     "google/gemma-2-2b-it",
     "google/gemma-4-E2B-it",

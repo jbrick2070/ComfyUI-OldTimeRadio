@@ -7,19 +7,18 @@ CRASH. It did not touch the arithmetic that produced the bad prediction.
 
 `_draft_fits_repair_turn` estimated fit against `HARD_VRAM_CONTEXT_LIMIT` -- one
 flat number, resolved from the VRAM budget of the machine the writer happens to
-run on. The three transports do not share a window, and each had already
-resolved its own and stamped it into its cache entry as `context_cap`:
+run on. The transports do not share a window, and each had already resolved
+its own and stamped it into its cache entry as `context_cap`:
 
-  * local transformers -- from the tokenizer/model config
-  * GGUF-native       -- llama.cpp's `n_ctx`, which the 8 GB profiles set well
-                          below 8192
+  * local transformers -- from the tokenizer/model config, which on a small
+                          local model can sit well below 8192
   * OpenRouter        -- the provider's advertised `context_window`, often 128k
 
 So the flat cap was wrong in BOTH directions, and the two failures look nothing
 alike:
 
-  * OVERSTATEMENT is the expensive one. On a GGUF row loaded at n_ctx 4096 the
-    predicate says a full-length draft fits, the draft rides, and the transport
+  * OVERSTATEMENT is the expensive one. On a local row with a 4096-token window
+    the predicate says a full-length draft fits, the draft rides, and the transport
     refuses. Before this morning that ended the episode; it now costs a wasted
     round trip and a cold regeneration -- the exact outcome the repair turn was
     built to avoid.
@@ -35,7 +34,7 @@ own constants, because the FIRST test written for this predicate asserted on a
 for (2026-08-12). A test that cannot notice a constant moving is not covering
 the arithmetic, it is covering a coincidence. The prompt sizes and the two
 transport windows below ARE fixtures: 4096 and 131072 are representative of a
-real GGUF n_ctx and a real remote window, not measurements taken from a run.
+small local window and a real remote window, not measurements taken from a run.
 """
 from __future__ import annotations
 
@@ -53,8 +52,8 @@ FLAT_CAP = int(catalog.HARD_VRAM_CONTEXT_LIMIT)
 BASE = "b" * 6100
 SYSTEM = "s" * 200
 
-#: A real GGUF `n_ctx` from the 8 GB profiles, and a real OpenRouter window.
-GGUF_N_CTX = 4096
+#: A small local context window, and a real OpenRouter window.
+SMALL_LOCAL_WINDOW = 4096
 REMOTE_WINDOW = 131072
 
 
@@ -86,17 +85,17 @@ def fits(draft: str, **kwargs) -> bool:
 # ---------------------------------------------------------------------------
 # 1. The predicate reads the window it was given
 # ---------------------------------------------------------------------------
-def test_the_flat_cap_OVERSTATES_a_small_gguf_window():
+def test_the_flat_cap_OVERSTATES_a_small_local_window():
     """The crash direction, and the reason this half was worth finishing.
 
     A full-length draft fits the flat 8192-shaped cap and does NOT fit the
-    4096-token window an 8 GB GGUF row actually loads with. Under the old code
+    4096-token window a small local row actually loads with. Under the old code
     it rode anyway and the transport refused at the door."""
     draft = draft_costing(FLAT_CAP * 0.9)
     assert fits(draft) is True, (
         "premise broken: this draft is supposed to pass the flat cap")
-    assert fits(draft, cap=GGUF_N_CTX) is False, (
-        "a draft that cannot fit llama.cpp's n_ctx was still declared to fit")
+    assert fits(draft, cap=SMALL_LOCAL_WINDOW) is False, (
+        "a draft that cannot fit the transport's window was still declared to fit")
 
 
 def test_the_flat_cap_UNDERSTATES_a_large_remote_window():
@@ -297,10 +296,10 @@ def test_creative_cap_fn_reads_the_CREATIVE_slot():
     class Scheduler:
         def context_cap_for(self, slot):
             asked.append(slot)
-            return GGUF_N_CTX
+            return SMALL_LOCAL_WINDOW
 
     resolver = scifi_news_pro._creative_context_cap_fn(Scheduler())
-    assert resolver() == GGUF_N_CTX
+    assert resolver() == SMALL_LOCAL_WINDOW
     assert asked == ["creative"]
 
 
@@ -335,10 +334,10 @@ def test_context_cap_for_reads_the_entry_WITHOUT_counting_a_generation(
     def fake_entry(slot, *, count_generation=True):
         seen["slot"] = slot
         seen["count_generation"] = count_generation
-        return {"context_cap": GGUF_N_CTX}
+        return {"context_cap": SMALL_LOCAL_WINDOW}
 
     monkeypatch.setattr(sched, "_account_and_get_entry", fake_entry)
-    assert sched.context_cap_for("creative") == GGUF_N_CTX
+    assert sched.context_cap_for("creative") == SMALL_LOCAL_WINDOW
     assert seen == {"slot": "creative", "count_generation": False}
     assert sched.calls_by_slot["creative"] == 0
 

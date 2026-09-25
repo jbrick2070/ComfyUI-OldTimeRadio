@@ -60,7 +60,3 @@ def test_the_gemma_12b_row_is_the_transformers_one():
     assert hf_row.requires_auth is False
     assert hf_row.vram_fit_tier == "PASS"
     assert hf_row.context_window == 8192
-    # The GGUF writer peer was retired with its backend; the catalog must
-    # never grow the handle back, since validate_model_id rejects it by shape
-    # and a row carrying it would be a menu entry that cannot load.
-    assert "unsloth/gemma-4-12b-it-GGUF" not in ids

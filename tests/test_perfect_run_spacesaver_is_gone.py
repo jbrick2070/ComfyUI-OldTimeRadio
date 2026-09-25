@@ -112,7 +112,7 @@ def test_the_writer_still_has_exactly_one_widget_per_saved_value():
     # matters here; the literal is the total, and any add or removal moves it.
     assert len(descriptors) == 35, (
         "the writer should carry 35 widgets (37 before the 2026-09-24 removal "
-        "of gguf_n_ctx and gguf_quant); got %d" % len(descriptors))
+        "of two retired writer widgets); got %d" % len(descriptors))
 
 
 def test_gate_in_kept_its_link_through_the_removal():
