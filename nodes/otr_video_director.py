@@ -52,8 +52,8 @@ def _resolve_device_policy(device_policy) -> str:
 def _engine_for_role(resolved_video, effective_by_role, role):
     """The engine a per-role derivation should read (2026-07-25, chunk 1b).
 
-    When the caller supplies the FROZEN route map, that map wins -- derived
-    values (still aspect, talking flag) must describe the engine that actually
+    When the caller supplies the FROZEN route map, that map wins -- a derived
+    value (still aspect) must describe the engine that actually
     renders, not the one the operator picked, or a redirected beat gets a still
     sized for an engine that never runs. When it is absent, this falls back to
     the picked slot map, which preserves every pre-1b caller's meaning exactly.
@@ -315,7 +315,7 @@ class OTRVideoDirector:
                 # emitted policy under "seed". Nothing read it back: no module
                 # under nodes/ reads video_policy["seed"], and OTR_ImageDirector
                 # (the live image dispatcher, whose OWN seed widgets stay)
-                # reads image_models, device_policy, aspects, talking,
+                # reads image_models, device_policy, aspects,
                 # video_models and effective_video_models -- not seed. Every
                 # ["seed"] read in the engines comes from ImageDirector's own
                 # params.
@@ -575,14 +575,6 @@ class OTRVideoDirector:
             # still was minted and the wide render centre-cropped it, lopping
             # the subject's head off.
             "aspects": self._role_aspects(resolved_video, effective_video),
-            # Per-role TALKING flag (S4b 2026-07-02): whether the engine
-            # lip-syncs (its wants_talking_prompt hook), so
-            # the image node mints FACE-FORWARD portraits for that lane --
-            # proof8 showed brief-styled profile portraits cannot drive lips.
-            # Also EFFECTIVE as of chunk 1b: MetaBrief's _effective_talking_roles
-            # already upgraded False->True off the effective engine, but only in
-            # that one direction and only in that one node.
-            "talking": self._role_talking(resolved_video, effective_video),
             "image_models": {
                 "announcer_image_model": announcer_image_model,
                 "music_image_model": music_image_model,
@@ -632,30 +624,6 @@ class OTRVideoDirector:
             "announcer_visual": _asp_for_role("announcer_visual"),
             "music_visual": _asp_for_role("music_visual"),
             "character_video": _asp_for_role("character_video"),
-        }
-
-    @staticmethod
-    def _role_talking(resolved_video, effective_by_role=None):
-        """Map each video ROLE to whether its EFFECTIVE engine renders TALKING
-        lip-sync (the engine's ``wants_talking_prompt`` hook), so stills can be
-        minted face-forward for that lane (S4b).
-        Hook errors resolve False here: the RENDER path stays the loud
-        enforcer of a misconfigured recipe; the director only styles stills.
-
-        ``effective_by_role`` is the frozen route map (chunk 1b), OPTIONAL for
-        the same reason as :meth:`_role_aspects`."""
-        def _talk_for_role(role):
-            eid = _engine_for_role(resolved_video, effective_by_role, role)
-            try:
-                eng = _vreg.get_engine(eid)
-                fn = getattr(eng, "wants_talking_prompt", None)
-                return bool(fn()) if callable(fn) else False
-            except Exception:  # noqa: BLE001 -- unknown/misconfigured -> False
-                return False
-        return {
-            "announcer_visual": _talk_for_role("announcer_visual"),
-            "music_visual": _talk_for_role("music_visual"),
-            "character_video": _talk_for_role("character_video"),
         }
 
     @staticmethod

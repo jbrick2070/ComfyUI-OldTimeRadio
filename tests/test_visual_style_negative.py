@@ -281,7 +281,7 @@ class TestStyleToken:
         class _Style:
             style_id = "paper_origami"
             positive_tail = "origami style"
-            portrait_look_talking = ""
+            portrait_look = ""
         out = vs.prefix_style_cue(_Style(), "Origami, a man in a doorway")
         assert ". ," not in out
         assert "  " not in out

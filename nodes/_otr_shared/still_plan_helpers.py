@@ -106,9 +106,7 @@ VALID_ASPECTS = frozenset((
 ))
 
 #: The closed activation enum (never a bool, never an expression per spec
-#: section 5). ``when_engine_talking`` evaluates the engine's own
-#: ``wants_talking_prompt()`` hook. Adding a fourth token is an operator
-#: decision.
+#: section 5). Adding a new token is an operator decision.
 #:
 #: ``when_ltx_i2v_enabled`` WAS REMOVED 2026-08-28 and must not come back. It
 #: was an ad-hoc token invented for exactly one engine, gating on the
@@ -118,14 +116,19 @@ VALID_ASPECTS = frozenset((
 #: under the operator ruling "no switches nor flags, all video models request
 #: and ingest stills". A closed enum with a dead member invites a future
 #: declaration nothing honours.
+#:
+#: The talking-face-portrait activation token WAS REMOVED 2026-09-25
+#: (operator ruling): it evaluated a per-engine lip-sync capability hook,
+#: but the sole engine that ever declared that capability (Kling Avatar)
+#: was retired, no other engine was ever wired to it, and no ``still_plan``
+#: row ever set this token. The talking-face still mode is ripped, not
+#: reassigned to another engine.
 REQUIRED_ALWAYS = "always"
 REQUIRED_NEVER = "never"
-REQUIRED_WHEN_ENGINE_TALKING = "when_engine_talking"
 
 VALID_REQUIRED = frozenset((
     REQUIRED_ALWAYS,
     REQUIRED_NEVER,
-    REQUIRED_WHEN_ENGINE_TALKING,
 ))
 
 #: Style-tail policy consulted by the visual-style authority at prompt time.
@@ -334,7 +337,6 @@ __all__ = [
     "VALID_ASPECTS",
     "REQUIRED_ALWAYS",
     "REQUIRED_NEVER",
-    "REQUIRED_WHEN_ENGINE_TALKING",
     "VALID_REQUIRED",
     "STYLE_TAIL_FULL",
     "STYLE_TAIL_MINIMAL_CLEAN",

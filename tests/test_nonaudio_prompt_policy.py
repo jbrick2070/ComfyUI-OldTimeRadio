@@ -128,13 +128,13 @@ class _StyledPack:
     attributes `compact_style_cue` reads."""
     style_id = "anime"
     positive_tail = "anime style, cel shaded, clean linework"
-    portrait_look_talking = ""
+    portrait_look = ""
 
 
 class _DefaultPack:
     style_id = "sci_fi_radio"
     positive_tail = "whatever"
-    portrait_look_talking = ""
+    portrait_look = ""
 
 
 def test_a_style_cue_never_precedes_the_H3_required_opener():

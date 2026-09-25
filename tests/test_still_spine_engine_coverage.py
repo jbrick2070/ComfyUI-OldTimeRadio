@@ -66,7 +66,7 @@ def _required_target_ids(engine_id):
         still_aspects={},
         mesh_fodder_roles=imgdir.mesh_fodder_roles_from_video_policy(
             video_policy),
-        talking_roles={}, still_word_roles=None,
+        still_word_roles=None,
         video_models=video_policy["video_models"],
     )
     required = [str(row["object_id"])

@@ -18,7 +18,7 @@ judges prose, so none of them can collide with THE LAW:
 
 1. **Every row's ``framing_geometry`` IS the producer's constant** for that
    row's ``kind`` (and, for ``portrait``, the engine's shipped
-   ``render_aspect`` / talking register). Not "contains", not "looks like" --
+   ``render_aspect``). Not "contains", not "looks like" --
    equality. If someone reworders the producer's geometry without updating the
    plans, or vice versa, this test names the engine and the row.
 
@@ -26,7 +26,7 @@ judges prose, so none of them can collide with THE LAW:
    (``otr_meta_brief_image_prompt.py:96-104``) makes geometry ENGINE-SAFETY
    framing owned by Python and the LOOK segment (costume / environment /
    lighting) PACK-OWNED (``VisualStyle.portrait_look`` /
-   ``portrait_look_talking`` / ``plate_look``). A plan row that swallowed a
+   ``plate_look``). A plan row that swallowed a
    ``*_LOOK_DEFAULT`` would hard-code the sci_fi_radio pack's look into an
    engine and quietly take a decision away from the style authority -- spec
    section 4: a plan "may only contribute layer 2 ... it may never decide
@@ -86,7 +86,7 @@ from nodes._otr_video_engines import registry as _vreg  # noqa: E402
 
 
 #: kind -> the producer constant that IS that kind's layer 2. ``portrait`` is
-#: resolved separately because the producer switches on aspect + talking.
+#: resolved separately because the producer switches on aspect.
 _KIND_GEOMETRY = {
     "scene_open": _sbh.STILL_FRAMING_OPEN,
     "scene_beat": _sbh.STILL_FRAMING_SCENE_BEAT,
@@ -98,7 +98,6 @@ _KIND_GEOMETRY = {
 #: The pack-owned LOOK segments. None of these may appear inside a plan row.
 _LOOK_SEGMENTS = (
     _mb.PORTRAIT_LOOK_DEFAULT,
-    _mb.TALKING_PORTRAIT_LOOK_DEFAULT,
     _mb.PLATE_LOOK_DEFAULT,
 )
 
@@ -110,27 +109,20 @@ def _registered():
 def _expected_portrait_geometry(engine, row):
     """The producer's portrait geometry for one row.
 
-    Three cases, in the order the producer resolves them:
+    Two cases, in the order the producer resolves them:
 
     - ``per_bookend_role`` is the LTX radio face. The producer mints it at
       ``otr_meta_brief_image_prompt.py:1782-1790`` via
       ``build_radio_host_prompt(meta, "wide", radio_host_style=
       "ltx_radio_mouth")``, and that branch calls
-      ``_style_anchor_for_aspect("wide", style=...)`` with NO talking flag --
-      so it is the WIDE portrait anchor, not the talking close-up bust. This
-      case is checked FIRST because the row is also
-      ``required="when_engine_talking"`` and would otherwise fall into the
-      talking branch below.
-    - a row gated on the talking register is the CAST portrait, which DOES pass
-      ``talking=True`` (``otr_meta_brief_image_prompt.py:1166``).
+      ``_style_anchor_for_aspect("wide", style=...)`` -- so it is the WIDE
+      portrait anchor.
     - everything else follows the engine's shipped aspect: wide gets the
       head-and-shoulders medium because a three-quarter body shot decapitates
       the subject in a short landscape frame (the 2026-06-17 operator catch).
     """
     if row.cardinality == "per_bookend_role":
         return _mb.WIDE_PORTRAIT_GEOMETRY
-    if row.required == "when_engine_talking":
-        return _mb.TALKING_PORTRAIT_GEOMETRY
     aspect = getattr(engine, "render_aspect", None)
     if aspect == "portrait":
         return _mb.PORTRAIT_GEOMETRY

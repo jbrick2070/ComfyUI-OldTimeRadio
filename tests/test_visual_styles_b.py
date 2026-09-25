@@ -32,7 +32,7 @@ _NON_DEFAULT_IDS = ("anime", "archival_documentary", "cartoon",
 #: The chunk-B AUTHORED field set (A1/A2-consumed surfaces). still_word_*
 #: fields are chunk-C and stay at the sci-fi defaults.
 _AUTHORED_STR_FIELDS = (
-    "portrait_look", "portrait_look_talking", "portrait_instruction_look",
+    "portrait_look", "portrait_instruction_look",
     "scene_instruction_look", "announcer_subject_face",
     "announcer_subject_ltx_mouth", "announcer_subject_object",
     "radio_object_look", "plate_look", "non_character_emblem_fallback")
@@ -126,17 +126,11 @@ class TestSurfaceDeltas:
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_portrait_anchors_delta(self, style_id):
         s = vs.resolve_visual_style(style_id)
-        for talking in (False, True):
-            for aspect in ("portrait", "wide"):
-                styled = imgp._style_anchor_for_aspect(aspect,
-                                                       talking=talking,
-                                                       style=s)
-                default = imgp._style_anchor_for_aspect(aspect,
-                                                        talking=talking)
-                assert styled != default
-                look = (s.portrait_look_talking if talking
-                        else s.portrait_look)
-                assert styled.endswith(look)
+        for aspect in ("portrait", "wide"):
+            styled = imgp._style_anchor_for_aspect(aspect, style=s)
+            default = imgp._style_anchor_for_aspect(aspect)
+            assert styled != default
+            assert styled.endswith(s.portrait_look)
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     @pytest.mark.parametrize("arm", ["console_face", "ltx_radio_mouth",
@@ -233,15 +227,9 @@ class TestVideoArtCondensedCue:
         meta = _meta_for("video_art")
         assert s.positive_tail.startswith("video-art feedback style")
         assert s.portrait_look.startswith("video-art feedback portrait")
-        assert s.portrait_look_talking.startswith(
-            "video-art feedback talking portrait")
         assert s.portrait_instruction_look.startswith(
             "video-art feedback style")
         assert s.scene_instruction_look.startswith("video-art feedback scene")
-
-        portrait = imgp.compose_image_prompt_fallback(
-            meta, _CHAR, "portrait", talking=True)
-        assert "video-art feedback talking portrait" in portrait
 
         scene_req = imgp._build_char_scene_request(
             _CHAR, meta, "village square", _LINE, style=s)
@@ -278,16 +266,10 @@ class TestRecursiveFractalExplicitStyleCue:
         assert s.positive_tail.startswith("recursive fractal light field")
         assert s.portrait_look.startswith(
             "recursive fractal light field")
-        assert s.portrait_look_talking.startswith(
-            "recursive fractal light field talking portrait")
         assert s.portrait_instruction_look.startswith(
             "recursive fractal light field")
         assert s.scene_instruction_look.startswith(
             "recursive fractal light field scene")
-
-        portrait = imgp.compose_image_prompt_fallback(
-            meta, _CHAR, "portrait", talking=True)
-        assert "recursive fractal light field talking portrait" in portrait
 
         scene_req = imgp._build_char_scene_request(
             _CHAR, meta, "village square", _LINE, style=s)

@@ -9,7 +9,6 @@
   "era_tail": "",
   "schema_version": "v2",
   "portrait_look": "hand-drawn anime character art, clean expressive linework, cel-shaded color, dramatic rim light",
-  "portrait_look_talking": "hand-drawn anime character art, clean cel shading, bright even key light",
   "portrait_instruction_look": "illustrated and era-consistent, in a clean cel-shaded anime style",
   "scene_instruction_look": "hand-drawn cel-shaded anime scene with expressive linework and a painterly background",
   "announcer_subject_face": "its glowing tuning dial drawn as an expressive anime face -- two huge shining dial-eyes and a bold needle-fan mouth, an anthropomorphic radio hero that hosts the broadcast",

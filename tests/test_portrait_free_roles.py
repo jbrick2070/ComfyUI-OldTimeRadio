@@ -3,12 +3,12 @@
 Operator, 2026-08-22: *"still_word never needs a portrait, only words"*, and
 *"the video lanes must be telling the image lanes what to do -- we built it in
 each video lane."* He is right on both counts, and the second one names the
-existing seam: `derive_image_prompts` is already handed FOUR lane-derived role
+existing seam: `derive_image_prompts` is already handed lane-derived role
 sets -- `still_aspects` (dimensions), `mesh_fodder_roles` (kind),
-`talking_roles` (framing) and `still_word_roles` (which composer). Portraits
+and `still_word_roles` (which composer). Portraits
 were the one image kind minted unconditionally, outside that mechanism.
 
-`_portrait_free_roles_from_policy` is the fifth member of that family, and its
+`_portrait_free_roles_from_policy` is another member of that family, and its
 truth is the lane's OWN `still_plan` declaration -- never a hardcoded engine
 name. The cheap family has declared `kind="portrait" required="never"` since it
 was written; nothing read it (`still_plan_helpers`: *"Nothing in this module

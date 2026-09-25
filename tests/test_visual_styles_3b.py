@@ -40,7 +40,7 @@ _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 _V2_KEYS = {"style_id", "label", "positive_tail", "image_grade_tail",
             "broadcast_tail", "allow_radio_tails",
             "era_tail", "schema_version",
-            "portrait_look", "portrait_look_talking",
+            "portrait_look",
             "portrait_instruction_look", "scene_instruction_look",
             "announcer_subject_face", "announcer_subject_ltx_mouth",
             "announcer_subject_object", "radio_object_look", "plate_look",

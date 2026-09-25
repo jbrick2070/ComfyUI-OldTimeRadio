@@ -83,7 +83,6 @@ _V1_FIELDS: "dict[str, type]" = {
 #: non-empty except scene_instruction_look (r4 AG M1 exemption).
 _V2_STR_FIELDS = (
     "portrait_look",
-    "portrait_look_talking",
     "portrait_instruction_look",
     "scene_instruction_look",
     "announcer_subject_face",
@@ -204,7 +203,6 @@ class VisualStyle:
     schema_version: str
     # -- v2 LOOK/SUBJECT surfaces (geometry stays Python) --
     portrait_look: str
-    portrait_look_talking: str
     portrait_instruction_look: str
     scene_instruction_look: str
     announcer_subject_face: str
@@ -327,7 +325,6 @@ def compose_pack_from_card(card: VisualStyleCardModel | dict) -> dict:
         "era_tail": "",
         "schema_version": "v2",
         "portrait_look": f"{c_art}, {m_long} character rendering, {line}, {light}",
-        "portrait_look_talking": f"{c_art}, {line}, bright even key light",
         "portrait_instruction_look": f"rendered in {m_long} style, tactile and era-consistent",
         "scene_instruction_look": f"{m_long} scene with {line} and a {tex} background",
         "announcer_subject_face": f"its tuning dial crafted as an expressive face -- two dial-eyes and a speaker-grille mouth, an anthropomorphic {r_mat} radio console hosting the broadcast",
@@ -506,7 +503,6 @@ def validate_pack(raw: dict, expected_style_id: str | None = None) -> VisualStyl
         era_tail=raw["era_tail"],
         schema_version=raw["schema_version"],
         portrait_look=raw["portrait_look"],
-        portrait_look_talking=raw["portrait_look_talking"],
         portrait_instruction_look=raw["portrait_instruction_look"],
         scene_instruction_look=raw["scene_instruction_look"],
         announcer_subject_face=raw["announcer_subject_face"],
@@ -673,7 +669,7 @@ def compact_style_cue(vstyle) -> str:
         return ""
     raw = str(getattr(vstyle, "positive_tail", "") or "").strip()
     if not raw:
-        raw = str(getattr(vstyle, "portrait_look_talking", "") or "").strip()
+        raw = str(getattr(vstyle, "portrait_look", "") or "").strip()
     words = re.findall(r"[A-Za-z0-9][A-Za-z0-9-]*", raw)
     lowered = [word.lower() for word in words]
     if lowered[:4] == ["recursive", "fractal", "light", "field"]:
@@ -889,7 +885,7 @@ def prefix_style_cue(vstyle, prompt: str) -> str:
 #: that one of these asks for is a self-veto, by definition.
 _POSITIVE_SURFACES = (
     "positive_tail", "image_grade_tail", "broadcast_tail", "era_tail",
-    "portrait_look", "portrait_look_talking", "portrait_instruction_look",
+    "portrait_look", "portrait_instruction_look",
     "scene_instruction_look", "plate_look",
     "announcer_subject_face", "announcer_subject_ltx_mouth",
     "announcer_subject_object", "radio_object_look",

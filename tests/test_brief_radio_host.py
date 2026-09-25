@@ -292,28 +292,6 @@ def test_humo_console_face_prompts_preserve_authored_atmosphere():
         {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
 
 
-#: A placeholder engine id for a lip-syncing announcer pick. No currently
-#: registered engine implements ``wants_talking_prompt()`` (the sole one that
-#: did was retired 2026-09-25) -- but the test below forces
-#: ``talking_roles={"announcer_visual": True}`` explicitly, so the engine id
-#: never needs to resolve through the registry for this assertion.
-_TALKING_ENGINE = "cloud_lipsync_placeholder"
-
-
-def test_talking_announcer_keeps_the_faceless_radio_object_row(monkeypatch):
-    # A lip-syncing announcer engine does not turn the announcer row into a
-    # face: the row that points at the portrait stays the faceless radio object.
-    out, _w = mbp.derive_image_prompts(
-        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={"announcer_visual": True},
-        video_models={"announcer_video_model": {"engine_id": _TALKING_ENGINE}})
-    objs = {o["object_id"]: o for o in out["objects"]}
-    assert "rubbery" not in objs["announcer"]["prompt"]
-    assert objs["announcer"]["radio_host_style"] == "radio_object"
-    assert objs["announcer"]["prompt"] == mbp.build_radio_host_prompt(
-        _SPACE_META, "portrait", "radio_object")
-
-
 def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
@@ -334,7 +312,6 @@ def test_humo_host_portrait_uses_console_face(monkeypatch):
     monkeypatch.setenv("OTR_ENABLE_HUMO_HOSTS", "1")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={},
         video_models={"announcer_video_model": {"engine_id": "humo"}})
     objs = {o["object_id"]: o for o in out["objects"]}
     assert objs[mbp.RADIO_HOST_PORTRAIT_ID]["prompt"] == mbp.build_radio_host_prompt(

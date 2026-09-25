@@ -53,7 +53,7 @@ _ALL_IDS = ("anime", "archival_documentary", "cartoon", "paper_origami",
 _NON_DEFAULT_IDS = tuple(i for i in _ALL_IDS if i != "sci_fi_radio")
 
 _NEW_STR_FIELDS = (
-    "portrait_look", "portrait_look_talking", "portrait_instruction_look",
+    "portrait_look", "portrait_instruction_look",
     "scene_instruction_look", "announcer_subject_face",
     "announcer_subject_ltx_mouth", "announcer_subject_object",
     "radio_object_look", "plate_look", "non_character_emblem_fallback",
@@ -181,7 +181,6 @@ class TestExtractionFixtures:
     def test_portrait_looks(self):
         s = vs.resolve_visual_style("sci_fi_radio")
         assert s.portrait_look == imgp.PORTRAIT_LOOK_DEFAULT
-        assert s.portrait_look_talking == imgp.TALKING_PORTRAIT_LOOK_DEFAULT
         assert (s.portrait_instruction_look
                 == imgp.PORTRAIT_INSTRUCTION_LOOK_DEFAULT)
 
@@ -230,9 +229,6 @@ class TestExtractionFixtures:
             imgp.PORTRAIT_GEOMETRY, imgp.PORTRAIT_LOOK_DEFAULT)
         assert imgp.STYLE_ANCHOR_WIDE == "%s, %s" % (
             imgp.WIDE_PORTRAIT_GEOMETRY, imgp.PORTRAIT_LOOK_DEFAULT)
-        assert imgp.STYLE_ANCHOR_TALKING == "%s, %s" % (
-            imgp.TALKING_PORTRAIT_GEOMETRY,
-            imgp.TALKING_PORTRAIT_LOOK_DEFAULT)
 
 
 # ---------------------------------------------------------------------------
@@ -241,17 +237,12 @@ class TestExtractionFixtures:
 class TestSeamByteIdentity:
     def test_style_anchor_seams(self):
         s = vs.resolve_visual_style("sci_fi_radio")
-        for talking in (False, True):
-            for aspect in ("portrait", "wide"):
-                styled = imgp._style_anchor_for_aspect(
-                    aspect, talking=talking, style=s)
-                legacy = imgp._style_anchor_for_aspect(aspect,
-                                                       talking=talking)
-                assert styled == legacy
+        for aspect in ("portrait", "wide"):
+            styled = imgp._style_anchor_for_aspect(aspect, style=s)
+            legacy = imgp._style_anchor_for_aspect(aspect)
+            assert styled == legacy
         assert imgp._style_anchor_for_aspect("portrait") == imgp.STYLE_ANCHOR
         assert imgp._style_anchor_for_aspect("wide") == imgp.STYLE_ANCHOR_WIDE
-        assert imgp._style_anchor_for_aspect(
-            "portrait", talking=True) == imgp.STYLE_ANCHOR_TALKING
 
     def test_radio_host_three_arms_byte_identical(self):
         # Reconstruct each arm's pre-change prompt from the FIXTURE constants
@@ -307,15 +298,13 @@ class TestSeamByteIdentity:
 
     def test_llm_instruction_texts_byte_identical(self):
         s = vs.resolve_visual_style("sci_fi_radio")
-        for talking in (False, True):
-            for aspect in ("portrait", "wide"):
-                styled = imgp._build_char_prompt_request(
-                    _CHAR, _META_BRIEF, "mars post", aspect,
-                    talking=talking, style=s)
-                entry = imgp._build_char_prompt_request(
-                    _CHAR, _META_BRIEF, "mars post", aspect, talking=talking)
-                assert styled == entry
-                assert "photographic and period-consistent" in styled
+        for aspect in ("portrait", "wide"):
+            styled = imgp._build_char_prompt_request(
+                _CHAR, _META_BRIEF, "mars post", aspect, style=s)
+            entry = imgp._build_char_prompt_request(
+                _CHAR, _META_BRIEF, "mars post", aspect)
+            assert styled == entry
+            assert "photographic and period-consistent" in styled
         req = imgp._build_char_scene_request(_CHAR, _META_BRIEF, "mars post",
                                              _LINE, style=s)
         assert req == imgp._build_char_scene_request(
@@ -335,12 +324,11 @@ class TestSeamByteIdentity:
 
     def test_portrait_fallback_byte_identical(self):
         s = vs.resolve_visual_style("sci_fi_radio")
-        for talking in (False, True):
-            styled = imgp.compose_image_prompt_fallback(
-                _META_BRIEF, _CHAR, "portrait", talking=talking, style=s)
-            entry = imgp.compose_image_prompt_fallback(
-                _META_BRIEF, _CHAR, "portrait", talking=talking)
-            assert styled == entry
+        styled = imgp.compose_image_prompt_fallback(
+            _META_BRIEF, _CHAR, "portrait", style=s)
+        entry = imgp.compose_image_prompt_fallback(
+            _META_BRIEF, _CHAR, "portrait")
+        assert styled == entry
 
 
 # ---------------------------------------------------------------------------
@@ -351,8 +339,7 @@ class TestGeometryGuards:
                    "warm dramatic lighting", "costume")
 
     @pytest.mark.parametrize("name", ["PORTRAIT_GEOMETRY",
-                                      "WIDE_PORTRAIT_GEOMETRY",
-                                      "TALKING_PORTRAIT_GEOMETRY"])
+                                      "WIDE_PORTRAIT_GEOMETRY"])
     def test_geometry_has_no_look_vocabulary(self, name):
         geo = getattr(imgp, name)
         for term in self._LOOK_VOCAB:
@@ -367,10 +354,10 @@ class TestGeometryGuards:
 _IMGP = _NODES / "otr_meta_brief_image_prompt.py"
 _HELPERS = _NODES / "_otr_story_brief_helpers.py"
 
-_ANCHOR_NAMES = ("STYLE_ANCHOR", "STYLE_ANCHOR_WIDE", "STYLE_ANCHOR_TALKING")
+_ANCHOR_NAMES = ("STYLE_ANCHOR", "STYLE_ANCHOR_WIDE")
 _SUBJECT_FIXTURES = ("_RADIO_CONSOLE_FACE", "_RADIO_CONSOLE_MOUTH",
                      "_RADIO_OBJECT_SUBJECT")
-_LOOK_DEFAULTS = ("PORTRAIT_LOOK_DEFAULT", "TALKING_PORTRAIT_LOOK_DEFAULT",
+_LOOK_DEFAULTS = ("PORTRAIT_LOOK_DEFAULT",
                   "PORTRAIT_INSTRUCTION_LOOK_DEFAULT")
 _OPEN_DEFAULTS = ("OPEN_SUBJECT_SYNTHETIC_DEFAULT",
                   "OPEN_SUBJECT_ANNOUNCER_DEFAULT",
