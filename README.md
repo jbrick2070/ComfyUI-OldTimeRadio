@@ -269,6 +269,7 @@ All on **OTR_LedgerScriptWriter**. Everything else has a considered default.
 | `creativity` | `balanced` by default. |
 | `lemmy_cameo` | Whether a character named Lemmy drops by. Ships on *roll*, about an 11% chance. |
 | `episode_language` | One switch. See [apple/MULTILINGUAL.md](apple/MULTILINGUAL.md). |
+| `asset_cleanup` | What to delete from the episode's working folder once it is published: `off (keep everything)`, `partial (keep only the text files)` or `full (keep only the published video)`. Ships **off**. See [Where things land](#where-things-land). |
 
 Pin `source_bank` and `visual_style` when you want to compare two runs; a rolled
 bank and a rolled style change more than anything else you could adjust.
@@ -571,6 +572,15 @@ Everything for an episode goes under your ComfyUI output folder:
 - `otr/episodes/<episode>/` -- the working files: stems, frames, intermediate
   clips, and the ledger.
 - `otr/obs/` -- the **finished, playable episodes**.
+
+The working folders add up fast. `asset_cleanup` on **OTR_LedgerScriptWriter**
+tidies each one after its episode is published: `partial` deletes the sound and
+the pictures and keeps every text file (ledger, canon, captions, QA), `full`
+deletes the whole folder, and `off`, the default, keeps everything. None of them
+touch `otr/obs/`, nothing is deleted unless the published copy is there, and an
+episode whose publication was withheld is never cleaned. A cleaned episode can
+no longer be frozen into a replay bundle, so freeze first if you want one. More
+in [apple/RUN.md](apple/RUN.md#saving-disk-space).
 
 The published file is named after what produced it, so a folder of episodes reads
 at a glance without opening any of them:
