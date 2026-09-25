@@ -1,3 +1,61 @@
+## 2026-09-25 -- HEAD e7a4806a (main) -- CODE + DOCS (row 0b asset_cleanup built; stale pointers; one local copy)
+
+Did (5080 window, now the only window; the server on :8000 was not touched):
+  3e01b1c6: row 0b built as written. `asset_cleanup` on OTR_LedgerScriptWriter,
+  three full-text labels, default off, the trailing widget (canonical node 1
+  widgets_values[35], descriptor last in inputs[], no dst_slot moved; 24
+  variants regenerated, --check 24/0). The writer stamps the first word beside
+  delivery_intent, and inside the replay branch with led.save() before the
+  wire is built; `asset_cleanup` is run-volatile on a replay. New pure module
+  `nodes/_otr_asset_cleanup.py` (plan + execute, stdlib only), called ONLY
+  from `OTRMasterAudioMux._asset_cleanup`, the last step of mux() after the
+  preview frame. Linked folders inside the episode are a REFUSAL (the row's
+  test list and the standing ruling; the row's prose said unlink-as-entry --
+  refusal is the stricter reading and is what shipped). Paths compare by
+  realpath so a junctioned output tree still binds. Docs: RUN.md "Saving disk
+  space", the standing ruling, the janitor header.
+  c292539c: two stale pointers -- `__init__.py` named `otr_4060_floor` as live
+  and said workflows/variants/ was deleted; the rulings named
+  docs/GO_FORWARD_ARCHIVE.md as a live file (it is `a0ff6c8c~1`).
+  e7a4806a: README widget row + "Where things land" paragraph; INSTALL.md's
+  "one thing the pack deletes" is now two.
+  Local cleanup (operator): one OTR copy on disk. Removed the stray baseline
+  worktree and the 2026-09-24 agent worktree (its WIP commit 40aef8ab stays on
+  local branch worktree-agent-aaf3612b6248a9d9e; main already supersedes all
+  of it except a client.py rename and three EXPECTED_RED G2 entries, which
+  are a matrix-row call for him). Six retired projects moved out of
+  custom_nodes and deleted by the operator; their six GitHub repos deleted by
+  him too (confirmed gone).
+Suite: full run on the tree, 16 reds; the 16 re-run at fe17f426 in a temp
+  worktree outside custom_nodes: 12 inherited. The 4 new ones were mine and
+  are fixed in 3e01b1c6: the one-act writer count pin, and a ledger-singleton
+  leak from the new replay tests into test_audio_cache_wiring (alphabetically
+  next) -- the fixture now restores `production_ledger._CURRENT`. New file 40
+  passed, incl. a real junction and two real Windows locks. build_variants
+  --check 24/0. Touched .py AST-clean, no BOM, LF. Bug Bible not run.
+Models: QA on 3e01b1c6 -- Sonnet subagent (REFUTE, executed the planner and
+  executor on temp trees: real junction refused and target untouched, locked
+  file skipped and named with the done receipt still written, replay of a
+  `full` source with the widget off leaves no key on wire or disk): HOLD, no
+  must-fix. Cursor lane cursor-grok-4.6-high in ask mode via kibitz: critiqued
+  the brief, not the code; its three code claims checked -- linked-dir
+  policy (shipped as refusal, above), `peek_ledger` DOES exist
+  (production_ledger.py:808, so row 0b's review record was wrong about
+  ChatGPT), and the stem-prefix identity (held: a replay's silent video sits
+  in its own folder, so the inside-the-folder check refuses). Antigravity Gemini 3.8 Flash (High) via
+  kibitz: still running at push time (started 08:25); its result follows
+  as its own commit.
+  Codex out of credits until 2026-09-29 14:59 PDT. Reviewers left HEAD and
+  the tree untouched (checked).
+Next risk (not a defect): a replay keeps its source's delivery_token, so the
+  token alone cannot tell a replay from its source; the stem check and the
+  inside-the-folder check are what do. A fresh token per replay import would
+  close it.
+Next: 2.3.4 carries asset_cleanup, when he says (plan, registry section).
+  4060: re-cloned main at c292539c, confirmed node 1 is 36 wide, has the GO for
+  Part B once his ComfyUI Desktop reinstall is done. The plan's "Live box"
+  note describes the 1-act chain that was due to end at 08:00.
+
 ## 2026-09-25 -- HEAD eaf07017 (main) -- CODE + PLAN (orphan cleanup d245cc27, asset-cleanup design row 0b)
 
 Did (5080 window; the 1-act chain on port 8000 was not touched):
