@@ -169,6 +169,71 @@ writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
 the pin still governs Bark, MusicGen, the visual assets and the provisioner,
 and the 162-character tail it sizes for was always the visual one.
 
+### 0b. Remove the Kling Avatar engine (operator 2026-09-25: "remove it")
+
+No shipped graph or matrix row selects `cloud_kling_avatar`; it was a
+hand-pick cloud lane only, and its still-plan framing text had no
+production reader (the last red in the suite,
+`test_still_plan_layer2_parity`). Rip it fully: adapter code in
+`eng_cloud_video.py`, registry row, partner-node pin row, shortcode,
+slug preflight, provisioner route, generated docs, and every test that
+names it. Grep for `kling` after; nothing may remain but history.
+
+### 0c. Portability fixes (Composer audit 2026-09-25, each claim grounded)
+
+Found by asking "what assumes the developer's machine?" after the models
+root defect (PBUG-20260925-03). Ranked by what a stranger would hit:
+
+1. `llm_policy.py:51,76-78` rejects `cuda:N`, but the writer advertises
+   `gpu:N` and `device_options.resolve_device` returns `cuda:N`: a second-GPU
+   pick crashes the writer build.
+2. `_otr_bark_lib.py:201` calls `torch.cuda.empty_cache()` unguarded: first
+   Bark load crashes on a Mac or CPU-only torch.
+3. `_otr_model_catalog.py` `effective_quant_policy` reads ROCm's "cuda" as
+   NVIDIA and turns the AMD graph's `quant_policy="none"` into NF4, which
+   bitsandbytes cannot run on ROCm. Use `device_options.vendor()`.
+4. `prestartup_script.py:126-144` pins HF_HOME to `<comfy>/models/huggingface`
+   by file depth before `_otr_hf_env` runs. Folds into item 0a above.
+5. Kokoro (`eng_kokoro.py:72-77`, `_otr_kokoro_voice_prefetch.py`) joins
+   `TTS/KokoroTTS` onto `models_dir`; register a `TTS` category and use
+   `model_type_dir`. Move both together.
+6. `_otr_model_loader.py` hardcodes CUDA device 0 (~1030, ~1289) and tells
+   Accelerate the CPU has 64 GiB (~556). Thread the resolved device; size
+   the CPU lane from available RAM.
+7. Writes inside the pack folder: cloud cache
+   (`cloud_media_backend.py:446-450`), Chatterbox/Dia stderr
+   (`eng_chatterbox.py:109`, `eng_dia.py:114`, outside any try), and
+   `otr_runtime.log` (`_vram_log.py`, `story_orchestrator.py`,
+   `video_engine.py`). Move to the output-tree state/tmp dirs.
+8. Lower: Chatterbox/Dia default venv path is Windows-only (`Scripts/`);
+   `video_engine.py:2342-2346` falls back to `~/Documents/ComfyUI/output`;
+   NVFP4 is preferred among installed files without a hardware check;
+   `config/otr_windows_extra_model_paths.yaml` names `C:/ComfyUI-Models`.
+Every fix measures the 5080 unchanged (CLAUDE.md section 0B).
+
+### 0d. "Start here" note on the canonical canvas
+
+Comfy's official templates all carry an on-canvas Markdown note; ours has
+none, so a stranger sees 21 boxes and no instructions. One note in the
+SCRIPT / START HERE group: type a premise or pick a bank, press Queue,
+where the episode lands, where to report problems. Canonical + variants
+regenerated; widget/link audits as usual.
+
+### 0e. OTR app mode -- design first (operator 2026-09-25)
+
+ComfyUI's app view (`extra.linearMode: true`, `extra.linearData.inputs` =
+`[node_id, widget]` pairs, `outputs` = node ids; supported by frontend
+1.52.7) shows a graph as a simple form. The operator's input list: act
+count, the models, asset cleanup, the Lemmy roll, language, story bank,
+visual style. Mapped: Story Writer (node 1) `act_count`,
+`creative_writing_model`, `technical_model`, `asset_cleanup`,
+`lemmy_cameo`, `episode_language`, `source_bank`, `visual_style`; plus the
+video/image picks on node 87 and voices on node 80 if "the models" includes
+them. Output: node 14 (Mux and Publish). Open questions for one design
+round before code: canonical itself or a separate `otr_app.json`; whether
+the premise/title text belongs; how variants inherit it; whether an older
+frontend ignores the metadata harmlessly.
+
 ## 3. TEST
 
 Open by his word (2026-09-25). The wave -- the 5080 overnight review, the 4060
