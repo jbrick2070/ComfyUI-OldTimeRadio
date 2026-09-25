@@ -73,23 +73,6 @@ def test_runpod_manual_recipes_carry_every_authoritative_manifest():
     assert 'rm -f "$part"' in playbook
 
 
-@pytest.mark.parametrize("name", [
-    "RUNPOD_DEPLOYMENT.md",
-    "RUNPOD_TEMPLATE_README.md",
-    "RUNPOD_PORTABILITY_LAB.md",
-])
-def test_legacy_runpod_docs_are_redirect_only(name):
-    """No retired path may grow into a second RunPod playbook again."""
-    redirect = (REPO / "docs" / name).read_text(encoding="utf-8")
-
-    assert "[RUNPOD_INSTALL.md](RUNPOD_INSTALL.md)" in redirect
-    assert "fetch_exact" not in redirect
-    assert "otr_canonical_api_run.py" not in redirect
-    assert "```" not in redirect
-    assert not any(line.startswith("    ") for line in redirect.splitlines())
-    assert len(redirect) < 1000
-
-
 def _ltxvideo_pyramid_fixture() -> bytes:
     return (
         b"""import math

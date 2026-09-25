@@ -93,8 +93,7 @@ non-issue — unlike Linux, where a headless image often has none.
 
 Every row above is backed by a named run on a physical Mac mini M4 / 16 GB: the
 the shipping graphs, the AnimateDiff re-tests, and the MPS decode fix that came
-out of them. Two lab notebooks in the GitHub tree hold the evidence —
-`docs/MAC_LAB_LOG.md` (harness run ids, per-leg logs, MPS allocation numbers,
-tracebacks) and `docs/MAC_PORTABILITY_GUIDE.md` (every measurement and dead end
-behind the rows above). Neither ships in a Manager install, and neither needs to:
+out of them. The lab notebook in the GitHub tree holds the evidence —
+`docs/MAC_PORTABILITY_GUIDE.md` (every measurement and dead end behind the rows
+above). It does not ship in a Manager install, and it does not need to:
 what you need to run OTR on a Mac is above this line.

@@ -62,7 +62,6 @@
 # is not valid JSON, and union-merging a .py produces code that parses and is
 # wrong.
 docs/PROD_BUG_LOG.md   merge=union
-docs/4060_DRILL_LOG.md merge=union
 docs/known-failures.md merge=union
 BUG_LOG.md             merge=union
 

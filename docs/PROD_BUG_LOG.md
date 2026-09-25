@@ -9095,7 +9095,7 @@ fails closed. Downgrading all of Kornia was rejected because it would widen the
 dependency blast radius to preserve one re-export.
 
 **LIVE VERIFY:** after applying the exact patch, the server imported
-ComfyUI-LTXVideo in 3.0 seconds, imported GGUF and all 25 OTR nodes, and exposed
+ComfyUI-LTXVideo in 3.0 seconds, imported all 25 OTR nodes, and exposed
 the healthy queue endpoint. `tests/test_otr_provision_pinned_packs.py` verifies
 the patch identity, exact synthetic pre/post images, idempotent reprovisioning,
 and refusal of unrelated checkout drift.
@@ -9159,7 +9159,7 @@ published with kokoro announcer and characters (`backend=onnx provider=CPUExecut
 **Verified on two live headless legs in the 4060 clean room (RTX 4060 Laptop
 8 GB, portable v0.34.0, Python 3.13, pack at c0ebe31f, profile
 `otr_cleanroom_8gb_klein_ltx25`, 2026-09-02 00:18 and 01:38).** Klein 4B Q4
-GGUF, the ruled low-VRAM image default, minted a clean 832x480 still but took
+quant, the ruled low-VRAM image default, minted a clean 832x480 still but took
 ~42 minutes to do it. The server log shows why, identically under stock flags
 (DynamicVRAM on) and under the lowvram flag pair:
 
@@ -9204,7 +9204,7 @@ the clean room with aimdo initialised exactly as main.py does it
 dropping the pack's last reference cleans the weakref out of
 `current_loaded_models` but the VBAR pages stay allocated (`ModelPatcherDynamic.
 __del__` calls `detach(unpatch_all=False)`, which never reaches `unpatch_model`),
-and only pressure from ANOTHER dynamic model reclaims them. The GGUF DiT is a
+and only pressure from ANOTHER dynamic model reclaims them. The quantized DiT is a
 classic patcher, so it never applies that pressure. The one call that releases
 the encoder mid-prompt is `comfy.model_management.unload_model_and_clones(
 clip.patcher)` while it is still registered: free 620 MB -> 6998 MB, the DiT then
@@ -9248,7 +9248,7 @@ model registry) composes the still prompts in ShotLock moments before the
 dispatcher renders them. The canonical residue freer,
 `_otr_vram_levers.free_otr_pipeline_residue()` (writer LLM + Bark + a surgical
 detach of tracked patchers + the allocator flush), was called only by the
-LTX 2.5 engine and the GGUF backend in their load preflight, and the ghost lane
+LTX 2.5 engine and the quantized backend in their load preflight, and the ghost lane
 had its own `_ghost_unload_writer`; `OTR_ImageGenDispatcher` had nothing.
 `OTR_LedgerFreezeCascade` does unload the writer after the script, but
 ShotLock reloads it for the visual briefs and the still prompts, and no node
@@ -10414,7 +10414,7 @@ tree/background capture); progress is from disclosed read-only persisted logs.
   selection; README455+ advertised absent CLI scripts. Corrected canonical
   description and qualification warning in development docs this checkpoint.
 - Do NOT use the development provisioner wholesale: install_node_packs571+
-  unconditionally installs GGUF/LTXVideo/AnimateDiff. It violates this trial's
+  unconditionally installs LTXVideo/AnimateDiff. It violates this trial's
   zero-new-pack boundary. No such installer, environment override, manual
   checkpoint copy, fallback, model switch or requeue was attempted.
 - Candidate direction, NOT implemented: ship a GUI-accessible selected-engine
@@ -12501,7 +12501,7 @@ for any REGISTERED engine, falling back to the literal scan only for modules
 that register nothing. Not done here because it changes three other lanes' rows
 in the same generated file and deserves its own review -- and because
 `model_requirements` holds S5 WIZARD ASSET IDS for some lanes, not filenames
-(`wan_ti2v` declares `wan2.2-ti2v-5b` for `Wan2.2-TI2V-5B-Q5_K_M.gguf`), so the
+(a lane declared an asset id rather than its weight filename), so the
 mapping is not the one-liner it looks like.
 
 ---
@@ -13352,7 +13352,7 @@ spans:null on both attempts. Its schema requires a list (omission/[] are valid),
 so the original line retained an unclean flag. It had an available scheduler
 schema binder but passed the unbound creative slot to structured_call. The
 affected owner now binds _ScopeAuthorization once and reuses the result on both
-existing attempts. Missing capability retains remote/GGUF routing; binder errors
+existing attempts. Missing capability retains remote routing; binder errors
 propagate. No global binder or nullable relaxation. Public-cleaner tests and real
 LMFE admission prove the path; Bible11.63 is extended. Fresh live closure pending.
 
@@ -14544,7 +14544,7 @@ are needed, in order: `pip uninstall -y unidic` then `pip install unidic-lite`.
 
 **Fix.** `unidic-lite>=1.0.8` is declared in `requirements.txt` -- it carries
 its dictionary inside the wheel, so nothing is fetched at render time, which
-is the same offline-first reason GGUF auto-download was cut. Because a
+is the same offline-first reason quantized-weight auto-download was cut. Because a
 requirements line cannot uninstall the shadow on someone else's box,
 `_kokoro_backends._mecab_dictionary_error` rewords this one failure at the
 point it is raised and names BOTH commands and why the uninstall is not
@@ -14604,7 +14604,7 @@ source words by a flat 4 tokens. The output is not English, and a script that
 costs more per source word than the source did is truncated mid-JSON.
 
 **Fix, and why it GROWS rather than predicts.** NOT because the ratio cannot
-be measured -- this entry first claimed the GGUF writers ship no tokenizer to
+be measured -- this entry first claimed the quantized writers ship no tokenizer to
 measure against, and that is false: `llama_cpp.Llama` exposes `tokenize()` and
 the backend already holds that object (corrected 2026-09-18 by the Fable
 architecture review). The real reason is that a measured table would be a
@@ -14772,7 +14772,7 @@ script, and a whitespace chunker cannot cut one; promote at wrap-up with the ind
 
 ## PBUG-20260922-05 -- a wrapper executor that drives node classes outside ComfyUI's PromptExecutor must supply `torch.inference_mode()` itself (fixed `4d3db6cd`, `b5734c02`, `f0b49cdb`)
 
-**Artifact:** the first live leg of the native (non-GGUF) LTX 2.5 Blackwell lane on the
+**Artifact:** the first live leg of the native LTX 2.5 Blackwell lane on the
 RunPod RTX PRO 4500, `/workspace/probe_native.log`. The graph resolved all five
 weights, loaded the 12.5 GB nvfp4 DiT, and sampled BOTH stages at 100% GPU / 27.7 GB
 VRAM -- then died on its last node:
@@ -14931,8 +14931,8 @@ migrated pod -- `comfy_kitchen` 0.2.10 too old, then `accelerate` missing, then
 symlink after the host migration (built against python3.13; the new image ships
 3.12). Seeing that, this window moved to `/usr/bin/python3` and hand-installed
 packages into it for hours. **`.venv-cu128` was alive the whole time** -- created
-2026-09-20, already carrying `accelerate`, `kokoro`, `feedparser`, `pyloudnorm`
-and `gguf`. One dead venv was taken as proof that there was no venv.
+2026-09-20, already carrying `accelerate`, `kokoro`, `feedparser`, and `pyloudnorm`.
+One dead venv was taken as proof that there was no venv.
 
 **The repo had already solved this, twice, and neither tool was used.**
 `scripts/otr_venv_audit.py` answers "does the interpreter that runs ComfyUI
@@ -14992,7 +14992,7 @@ actually fetches, from the pod, with no token present:
 
 **The gate is not a surprise to this repo -- it is already declared.** The
 `ltx25` entry in `MANUAL_TIERS` carries `"gated": True` on the Q5 encoder
-(`elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF`), and the video VAE, audio VAE and
+(a gated quantized text-encoder repo), and the video VAE, audio VAE and
 spatial upscaler all point at `Lightricks/LTX-2.5`, which returns 401 for every
 path without a token. So the SHIPPED LTX 2.5 lane cannot be provisioned
 unattended on a fresh box, and the failure arrives as an HTTP 401 mid-fetch
@@ -15012,9 +15012,9 @@ and a 17.44 GiB nvfp4 matching Lightricks' own to within ~200 KB is ungated at
 `BennyDaBall/LTX-2.5-22b-distilled-nvfp4-comfy-v2`.
 
 **So a COMPLETE native LTX 2.5 stack can be fetched unattended with no
-credential anywhere** -- which is the operator's stated goal ("remove all GGUF
-with things that are non-gated and can auto download", 2026-09-23) and was not
-previously known to be reachable. The GGUF path cannot make the same claim: it
+credential anywhere** -- which is the operator's stated goal (replace every quantized weight
+with things that are non-gated and can auto download, 2026-09-23) and was not
+previously known to be reachable. The quantized path cannot make the same claim: it
 depends on two gated repos.
 
 **NOT YET DONE, and deliberately not claimed as done:** no provisioning lane
@@ -15072,8 +15072,8 @@ free VRAM is below `R.LTX25_STAGE2_DECODE_NEEDS_MB`**:
     decode                 34.7 s   (was 400+ s, never finished)
     whole two-stage render 196.3 s  97 frames, 1664x960, foley decoded and muxed
 
-For scale, the lab's GGUF two-stage at the same geometry on the same card is
-255.4 s. With this seam the NATIVE lane is faster than the GGUF one on 16 GB.
+For scale, the lab's quantized two-stage at the same geometry on the same card is
+255.4 s. With this seam the NATIVE lane is faster than the quantized one on 16 GB.
 
 **THE SAME MECHANISM, NAMED BY COMFYUI, ON A 24 GB POD.** `server_4090.log`
 mid-episode: `Model LTXAV prepared for dynamic VRAM loading. 20484MB Staged.`
@@ -15110,7 +15110,7 @@ leg with it has not been run.
 **Membership of `FOLEY_LANE_GAINS` is not a mixing preference.** It is how
 `is_foley_route` decides an episode is a foley episode at all, and five
 shipping foley engines were absent from it: `ltx25_foley_plus_24gb` and
-`_32gb` (GGUF, shipping for weeks) and the three `ltx25_native_foley_*` lanes.
+`_32gb` (quantized, shipping for weeks) and the three `ltx25_native_foley_*` lanes.
 
 **The chain, and every link is silent:**
 

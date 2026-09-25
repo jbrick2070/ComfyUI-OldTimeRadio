@@ -493,11 +493,10 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
   Bug Bible lives in a SEPARATE repo: `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide`
   -- `cd` to its root and use the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
   path fails to collect).
-- **Knowledge gate before implementation or diagnosis:** read `docs\PRODUCTION_SPRINT_LESSONS.md`, then the
-  relevant entries in `docs\PROD_BUG_LOG.md`, and the matching portable rules in
-  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`. The lessons are
-  mandatory project context, the production log is the staging record, and the Bible is the reusable
-  cross-project contract. A newly fixed, repeatable production failure must be recorded in the log and
+- **Knowledge gate before implementation or diagnosis:** read the relevant entries in
+  `docs\PROD_BUG_LOG.md` and the matching portable rules in
+  `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`. The
+  production log is the staging record, and the Bible is the reusable cross-project contract. A newly fixed, repeatable production failure must be recorded in the log and
   promoted with a Bible entry plus executable coverage whenever its verify condition is automatable.
 - **Admission rule:** only a bug verified by a live production artifact, headless run, smoke, soak, or
   published episode may enter `PROD_BUG_LOG.md` or be promoted to the Bug Bible. A review observation,
@@ -546,7 +545,7 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
   quickly behind a single-writer queue.
   **THE SPLIT -- every file has exactly one owner, and the owner pushes it:**
   * **The 4060 (MRKT) owns the portability surface:** any profile IT has proven on 8 GB hardware,
-    `docs/4060_DRILL_LOG.md`, and the fresh-install / least-friction path. It is the only box that
+    and the fresh-install / least-friction path. It is the only box that
     can answer "does this work somewhere other than where it was written", which is the one question
     the dev box structurally cannot answer about itself.
   * **The 5080 (IDREAM) owns the shipping surface:** `pyproject.toml` and anything registry-facing,

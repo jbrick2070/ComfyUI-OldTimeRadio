@@ -12,5 +12,5 @@ alwaysApply: true
 - Generated episode content is unfiltered (no profanity/violence prompt bans). Authoring stays clean: no curse words in code, comments, logs, or commits; never the name `dummy`.
 - Story quality is closed. Do not chase prose, writer models, or word-count gates. Gender/voice/face/ledger faults remain bugs.
 - Never invent a Jeffrey-only path. Portable means that install's `output/otr/obs` via Comfy's live output directory (`folder_paths` / `--output-directory`).
-- Knowledge gate before diagnosis or implementation: `docs/PRODUCTION_SPRINT_LESSONS.md`, relevant `docs/PROD_BUG_LOG.md`, Bug Bible in `comfyui-custom-node-survival-guide`.
+- Knowledge gate before diagnosis or implementation: relevant `docs/PROD_BUG_LOG.md`, Bug Bible in `comfyui-custom-node-survival-guide`.
 - A helper is wired in the same change that builds it, or the row says why not. Grep `nodes/` for a non-test caller.
