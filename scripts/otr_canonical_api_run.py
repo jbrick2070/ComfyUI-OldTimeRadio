@@ -297,15 +297,22 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     # allowlist is still checked, because another lane fetching it proves
     # nothing about this one (found by review 2026-09-25: an engine-blind skip
     # let the AnimateDiff rows through with their checkpoint unchecked).
-    # A selection the preflight would refuse skips nothing.
+    # PLANNED ONE ENGINE AT A TIME. A selection the preflight would refuse
+    # skips nothing -- but only for ITS OWN files. Planning the row as one set
+    # let any single refusal empty the whole skip-list: on otr_16gb_animatediff
+    # the z_image_turbo image slot (nvfp4 on Blackwell, no allowlisted
+    # download) raised, and the gate then refused the SD 1.5 checkpoint that
+    # the AnimateDiff lane downloads for itself (measured live 2026-09-24).
     selected = set((profile.get("role_overrides") or {}).values())
     slots = profile.get("slot_overrides") or {}
     selected.update(slots.get(k) for k in ("video_render_engine", "music_engine"))
-    try:
-        self_fetched = {name for (_category, name) in planned_downloads(
-            {resolve_engine_id(str(e)) for e in selected if e})}
-    except VisualAssetError:
-        self_fetched = set()
+    self_fetched = set()
+    for engine in {resolve_engine_id(str(e)) for e in selected if e}:
+        try:
+            self_fetched.update(name for (_category, name)
+                                in planned_downloads({engine}))
+        except VisualAssetError:
+            continue
     required = [n for n in required if os.path.basename(str(n)) not in self_fetched]
     if not required:
         return []

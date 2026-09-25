@@ -106,8 +106,12 @@ def test_every_matrix_row_gates_only_what_its_own_engines_do_not_fetch(monkeypat
         picks = set((profile.get("role_overrides") or {}).values())
         slots = profile.get("slot_overrides") or {}
         picks.update(slots.get(k) for k in ("video_render_engine", "music_engine"))
-        fetched = {name for _c, name in VA.planned_downloads(
-            {p for p in picks if p})}
+        fetched = set()
+        for pick in {p for p in picks if p}:
+            try:
+                fetched.update(name for _c, name in VA.planned_downloads({pick}))
+            except VA.VisualAssetError:
+                continue
         try:
             runner._assert_profile_models_present(rid, {})
         except SystemExit as refused:
@@ -115,3 +119,26 @@ def test_every_matrix_row_gates_only_what_its_own_engines_do_not_fetch(monkeypat
             assert not any(name in text for name in fetched), (
                 "%s was refused over a file its own engines download: %s"
                 % (rid, text))
+
+
+def test_one_engine_that_cannot_plan_does_not_empty_the_skip_list(monkeypatch):
+    """MEASURED LIVE 2026-09-24 on otr_16gb_animatediff: the row's z_image_turbo
+    image slot could not be planned (its nvfp4 file has no allowlisted
+    download), the whole-row plan raised, and the gate refused the SD 1.5
+    checkpoint the AnimateDiff lane downloads for itself. Each engine is now
+    planned on its own, so one refusal skips only that engine's files."""
+    real = VA.planned_downloads
+
+    def planned(engines):
+        if "z_image_turbo" in engines:
+            raise VA.VisualAssetError("no allowlisted download for this box")
+        return real(engines)
+
+    monkeypatch.setattr(VA, "planned_downloads", planned)
+    profile = {
+        "role_overrides": {"character_image": "z_image_turbo",
+                           "character_visual": "animatediff15_v3_haunted_video"},
+        "slot_overrides": {"video_render_engine": "animatediff15_v3_haunted_video"},
+        "preflight": {"required_models": [_SD15]},
+    }
+    assert _gate(monkeypatch, profile) == []
