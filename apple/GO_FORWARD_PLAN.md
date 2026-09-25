@@ -131,13 +131,13 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 
 ### The registry -- his clicks and his word
 
-* **2.3.5, when he says.** 2.3.4 (published 2026-09-25: `asset_cleanup`, the
-  25-entry gallery) is Pending, and the scan replica predicts it will Flag: an
-  internal plan doc shipped in it, fixed on `main` in `5d9c4ee3` and now
-  guarded by `tests/test_registry_scan_oracle_clean.py`. The tree scans clean;
-  a bump publishes a scannable version. His call: now, or after the registry
-  rules on 2.3.4. Everything since (the writer folder, the queue-time gate)
-  rides the same bump.
+* **2.3.5 published 2026-09-25** on his word (the 4060 reinstalls from the
+  registry): the writer LLM folder, the queue-time node-pack gate, the
+  dependency-doc fix, and everything in 2.3.4. 2.3.4 came back **Flagged**, as
+  the scan replica predicted (an internal doc shipped in it); 2.3.5's tree reads
+  clean, and `tests/test_registry_scan_oracle_clean.py` keeps it that way.
+  Pending until Comfy-Org's scan; the 4060 installs it by picking 2.3.5 in the
+  Manager's version picker.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
   at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
   RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
