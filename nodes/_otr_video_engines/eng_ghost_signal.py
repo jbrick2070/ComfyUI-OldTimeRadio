@@ -138,7 +138,7 @@ def _resolve_hold_factor(class_default):
 
     WHY AN ENV KNOB RATHER THAN A NEW ENGINE ID. "Is a slower cadence better"
     is answerable by one same-bundle A/B, while a peer engine id costs the
-    eight-item registration surface in `docs/VIDEO_LANE_PREFLIGHT.md` BEFORE
+    eight-item registration surface in `apple/VIDEO_LANE_PREFLIGHT.md` BEFORE
     anyone knows the answer. This mirrors `GhostSignalV3HauntedEngine
     .lora_strength`, which exists for exactly the same reason. Once there is a
     verdict, the permanent shape -- a peer lane, or a deliberate re-baseline of
@@ -614,7 +614,7 @@ class GhostSignalEngine(_MC.MotionEngineBase):
     #: same reason ``motion_module_name`` and ``motion_min_bytes`` above were.
     #: They were module-level constants read from inside ``sampler_inputs_for``
     #: and ``render_clip``, which is the exact shape this repo's own
-    #: docs/ADDING_IMAGE_AND_VIDEO_LANES.md calls out: "a method reading the
+    #: apple/ADDING_IMAGE_AND_VIDEO_LANES.md calls out: "a method reading the
     #: module constant loads the PARENT's weights while stamping its own
     #: receipt: wrong pixels under a confident label."
     #:

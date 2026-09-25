@@ -208,7 +208,7 @@ even on NVIDIA**, so a 16 GB Radeon is the better first test.
 ## The receipts behind this page
 
 Commit `0fc0fb90` records the run above from the tester's own artifacts, marks
-the proven engines in `docs/dropdown_matrix.json`, and fixes the bug they
+the proven engines in `apple/dropdown_matrix.json`, and fixes the bug they
 hit: `scripts/otr_fetch_lane_weights.py` resolved the models directory through
 an import that only works inside a running ComfyUI, swallowed the failure, and
 returned a hardcoded Windows path -- on Ubuntu. An explicit

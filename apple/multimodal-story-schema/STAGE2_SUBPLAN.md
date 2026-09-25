@@ -1,6 +1,6 @@
 # Multi-Modal Story Schema -- STAGE 2 HARDENED SUB-PLAN (v3 FINAL, post-kibitz r1+r2)
 
-Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `docs/multimodal-story-schema/BUILD_PLAN.md`.
+Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `apple/multimodal-story-schema/BUILD_PLAN.md`.
 Status: CONVERGED (kibitz r1+r2, codex + antigravity, Claude anchor+judge;
 artifacts `kibitz-runs/2026-07-05-multimodal-stage2/{r1,r2}/`). BUILD-READY.
 Precondition SHIPPED @843ced43 (outline-resolver swallow removed + AST pin).

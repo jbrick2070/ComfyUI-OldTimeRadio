@@ -1,8 +1,8 @@
-"""THE LANE PREFLIGHT MATRIX -- `docs/VIDEO_LANE_PREFLIGHT.md` as executable law.
+"""THE LANE PREFLIGHT MATRIX -- `apple/VIDEO_LANE_PREFLIGHT.md` as executable law.
 
 Spec S8c (`docs/2026-08-09-SPEC-lab-findings-into-otr.md`): the transplant
 plan's five "working right" criteria and the lessons ledger
-(`docs/LANE_BUILD_LESSONS.md`) become ONE parametrized suite that runs over
+(`apple/LANE_BUILD_LESSONS.md`) become ONE parametrized suite that runs over
 `registry.all_engine_names()` and asserts, per lane, everything the matrix page
 claims. A lane is IN the matrix when its row is green here; a future lane -- or
 a future card in the 5070-Ti-and-down ladder -- inherits the whole checklist for
@@ -48,8 +48,8 @@ from tests._support.frame_contract_reader import declares_continuity_kwarg
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MANIFEST_PATH = os.path.join(
-    REPO_ROOT, "docs", "evidence", "video_evidence_manifest.json")
-ENGINE_MATRIX_PATH = os.path.join(REPO_ROOT, "docs", "ENGINE_MATRIX.md")
+    REPO_ROOT, "apple", "evidence", "video_evidence_manifest.json")
+ENGINE_MATRIX_PATH = os.path.join(REPO_ROOT, "apple", "ENGINE_MATRIX.md")
 
 #: The canvas rate the whole timeline is expressed at. A 24 fps model declares
 #: 25 and CONVERTS at delivery (the Veo/H3 pattern); it never relabels.
@@ -964,10 +964,10 @@ def gate_g7_surface(name, eng):
     if os.path.isfile(ENGINE_MATRIX_PATH):
         with open(ENGINE_MATRIX_PATH, "r", encoding="utf-8") as fh:
             if name not in fh.read():
-                bad.append("has no row in docs/ENGINE_MATRIX.md, the "
+                bad.append("has no row in apple/ENGINE_MATRIX.md, the "
                            "generated drift gate")
     else:
-        bad.append("docs/ENGINE_MATRIX.md is missing")
+        bad.append("apple/ENGINE_MATRIX.md is missing")
     return bad
 
 

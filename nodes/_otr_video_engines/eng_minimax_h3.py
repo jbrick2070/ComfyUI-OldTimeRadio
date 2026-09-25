@@ -190,7 +190,7 @@ H3_GRID_OFFSET = 5
 #: The trained band, from the node's own ``length`` tooltip ("trained range is
 #: ~124-362, longer is untested"). It is a REAL floor, not advice: the lab's
 #: only sub-floor render, ``h3_i2v_canonical_832x480_f107``, is recorded in
-#: ``docs/evidence/video_evidence_manifest.json`` as
+#: ``apple/evidence/video_evidence_manifest.json`` as
 #: ``MEASURED_BELOW_RANGE_FAILURE``.
 H3_TRAINED_MIN_MODEL_FRAMES = 124
 H3_TRAINED_MAX_MODEL_FRAMES = 362
@@ -452,7 +452,7 @@ class _MiniMaxH3Base(_WS.WanInitImageMixin, _MC.MotionEngineBase):
     _UNET_DEFAULT = None
 
     #: MiniMax H3 Community License, plus written authorization from MiniMax
-    #: dated 2026-08-07 (docs/H3_LICENSE_ATTESTATION.md). NOT OSI, so this is
+    #: dated 2026-08-07 (apple/H3_LICENSE_ATTESTATION.md). NOT OSI, so this is
     #: False: ``commercial_clean`` drives the release-gate warning and the
     #: release filename tag, never selection, and a conditional grant to one
     #: licensee is not a clean commercial license for a published open-source

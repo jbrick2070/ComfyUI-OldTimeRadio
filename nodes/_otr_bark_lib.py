@@ -917,7 +917,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 # no node class, no NODE_CLASS_MAPPINGS.
 #
 # Voice-path-cleanbreak Sprint 7.2 (2026-05-12): module renamed
-# nodes/_bark_lib.py -> nodes/_otr_bark_lib.py per docs/conventions.md
+# nodes/_bark_lib.py -> nodes/_otr_bark_lib.py per apple/conventions.md
 # (project-prefix discipline for private library modules).
 # Underscore prefix marks this as a private internal library; otr_
 # prefix scopes the name to this project; _lib suffix flags it as

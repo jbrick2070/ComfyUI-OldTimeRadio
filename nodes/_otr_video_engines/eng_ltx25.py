@@ -3040,7 +3040,7 @@ class Ltx25NativeFoleyWideEngine(Ltx25FoleyPlusEngine):
     both fits a 24 GB card and is forty percent faster than the alternative.
     ComfyUI sizes residency against the card it finds and offloads when it is
     tight, so weights-plus-activations arithmetic systematically over-predicts.
-    The receipts live in docs/PROD_BUG_LOG.md; what belongs here is the file.
+    The receipts live in apple/PROD_BUG_LOG.md; what belongs here is the file.
     """
 
     name = "ltx25_native_foley_24gb"

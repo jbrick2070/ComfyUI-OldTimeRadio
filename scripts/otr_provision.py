@@ -70,7 +70,7 @@ INDEXTTS2_PYTHON = "3.10"
 # belong only to ``otr_fetch_lane_weights.py``; in particular, HuMo 14B is the
 # receipt-bearing ``humo`` lane there and is not duplicated here. Manual
 # downloads use `<destination>.part`, verification, then rename; see
-# docs/RUNPOD_INSTALL.md.
+# apple/RUNPOD_INSTALL.md.
 MANUAL_DOWNLOADS = {
     "humo_1_7b": [
         {

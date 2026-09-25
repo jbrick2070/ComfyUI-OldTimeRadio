@@ -21,7 +21,7 @@ ROOT = Path(__file__).resolve().parent.parent  # repo root
 # re-open can fail with OSError(22) (caught 2026-05-31 -- forbidden
 # sweep red baseline). Callers (the regression test) point these at the
 # OS temp dir, which is not synced, to make the sweep deterministic.
-DIFF_PATH = Path(os.environ.get("OTR_S28_DIFF_PATH") or (ROOT / "docs" / "s28_diff_tmp.txt"))
+DIFF_PATH = Path(os.environ.get("OTR_S28_DIFF_PATH") or (ROOT / "apple" / "s28_diff_tmp.txt"))
 OUT_PATH = Path(os.environ.get("OTR_S28_OUT_PATH") or (ROOT / "tmp" / "s28_new_forbidden_hits.txt"))
 
 forbidden = re.compile(

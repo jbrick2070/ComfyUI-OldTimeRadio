@@ -450,7 +450,7 @@ class TestAddYourOwnSignpost:
         assert bank.guide_ref in message
         # It names the landed path, not a runner that never shipped.
         assert "otr_check bank" in message
-        # apple/EXTENDING.md, not docs/EXTENDING_OTR.md, and the move was a FIX
+        # apple/EXTENDING.md, not apple/EXTENDING_OTR.md, and the move was a FIX
         # rather than churn: `.comfyignore` excludes the whole `docs/` tree from
         # the published bundle, so a registry user who clicked "+ Add Your Own"
         # was pointed at a file their install had never received. `apple/` is

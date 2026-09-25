@@ -827,7 +827,7 @@ def _check_g15_scene_coherence(
 
     ``info`` carries ``{scene_coherence_required, scene_coherence_checked,
     scene_coherence_verdict, scene_coherence_issues}`` per
-    ``docs/GO_FORWARD_PLAN.md``'s "Split request from verdict" instruction --
+    ``apple/GO_FORWARD_PLAN.md``'s "Split request from verdict" instruction --
     always written when the gate is armed, so a reader auditing a REQUIRED
     ledger's report can see the request even on a clean run.
     """

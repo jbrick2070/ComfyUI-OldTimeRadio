@@ -1,6 +1,6 @@
 """The verbatim executor: a Folger scene's own speeches become the dialogue.
 
-Operator ruling (docs/OTR_STANDING_RULINGS.md, "THE PASSAGE LANE"): a play
+Operator ruling (apple/OTR_STANDING_RULINGS.md, "THE PASSAGE LANE"): a play
 episode is a contiguous window of consecutive speeches "carried verbatim ...
 no paraphrasing"; "`shakespeare` is VERBATIM and gets the executor." Before
 this change the selector existed with zero production callers and the lane's

@@ -1188,7 +1188,7 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
     # splitting it into a qualified-slope and a qualified-overhead half would
     # invent a second authority with no evidence under it.
     #
-    # So an unqualified row PREDICTS and never REFUSES. ``docs/evidence/
+    # So an unqualified row PREDICTS and never REFUSES. ``apple/evidence/
     # README.md`` already states the resulting posture plainly -- "NO local lane
     # is guarded" -- and this makes the code agree with it on both paths rather
     # than on one. The OOM exposure is real and is stated rather than papered

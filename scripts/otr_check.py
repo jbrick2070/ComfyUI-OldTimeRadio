@@ -42,7 +42,7 @@ EXIT_USAGE = 2
 
 # A client's module-level code gets one minute to import. Anything slower is a
 # bug in the bundle, not a slow machine: heavy imports belong inside the
-# functions that need them (docs/EXTENDING_OTR.md section 2).
+# functions that need them (apple/EXTENDING_OTR.md section 2).
 DEFAULT_PROBE_TIMEOUT_S = 60.0
 
 
@@ -113,7 +113,7 @@ def _check_fixtures(fixtures_dir: Path) -> int:
 # The keyword sets the TRUSTED WRITER actually passes, re-derived from the live
 # call sites -- `OTR_LedgerScriptWriter._resolve_inputs` (the fetch call) and
 # `_run_source_interpreter` (the interpreter call) -- and cross-checked against
-# docs/EXTENDING_OTR.md section 2, which agrees. Derived from the CALLER on
+# apple/EXTENDING_OTR.md section 2, which agrees. Derived from the CALLER on
 # purpose: the caller is what a client's function actually meets, so if the two
 # ever drift, this list must follow the code and the doc gets fixed.
 _WRITER_KEYWORDS = {
@@ -161,7 +161,7 @@ def _probe_verdict(bundle_root: Path, base: "Path | None") -> dict:
     # `check_compatibility` is deliberately NOT examined. It is a reserved
     # name with no runtime consumer, so there is nothing true for activation
     # to assert about it; enforcing callability would reject a bundle over an
-    # interface production never touches. docs/EXTENDING_OTR.md says so too.
+    # interface production never touches. apple/EXTENDING_OTR.md says so too.
     return {"ok": True, "code": "", "detail": "", "bank_id": pre.bank_id,
             "digest": pre.digest, "entry_points": entry_points,
             "fixtures": _check_fixtures(pre.fixtures_dir)}

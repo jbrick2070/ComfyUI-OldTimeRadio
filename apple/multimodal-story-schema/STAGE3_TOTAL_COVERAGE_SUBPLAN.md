@@ -1,6 +1,6 @@
 # Visual-Style TOTAL COVERAGE -- Stage-3 section-8 slice (v5 FINAL)
 
-Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `docs/multimodal-story-schema/STAGE3_SUBPLAN.md`
+Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `apple/multimodal-story-schema/STAGE3_SUBPLAN.md`
 section 8 (PROMOTED by operator directive 2026-07-05: a selected visual_style must impact ALL
 downstream prompts -- stills, video, 3D, announcer_visual + music_visual included). Status:
 **CONVERGED, BUILD-READY** -- kibitz r1-r4 complete (codex + antigravity, Claude anchor+judge;

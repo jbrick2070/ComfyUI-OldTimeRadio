@@ -590,7 +590,7 @@ class ComfyCreditsBackend:
                 f"scripts/otr_api.py with OTR_COMFY_API_KEY in the SUBMITTER's "
                 f"environment (sent as extra_data.api_key_comfy_org). See "
                 f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                f"main/docs/comfy-credits-setup.md."
+                f"main/apple/comfy-credits-setup.md."
             )
         letter = _slot_letter(repo_id)
         slug = resolve_slug(repo_id)
@@ -655,7 +655,7 @@ class ComfyCreditsBackend:
                 "(or set a Comfy API key) so ComfyUI injects the hidden "
                 "auth into the writer node. See "
                 "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-                "main/docs/comfy-credits-setup.md."
+                "main/apple/comfy-credits-setup.md."
             )
         slug = cache_entry.get("slug") or resolve_slug(cache_entry["model_id"])
         effort = reasoning_effort_for_slug(slug)

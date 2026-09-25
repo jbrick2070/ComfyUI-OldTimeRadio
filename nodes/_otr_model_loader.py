@@ -142,7 +142,7 @@ LLM_CACHE: dict[str, Any] = {
 #
 # _CACHE_EPOCH closes that specific window without the larger
 # orphan-occupancy registry (deferred to a dedicated session -- see
-# docs/PROD_BUG_LOG.md PBUG-20260825-04). Every invalidation path bumps the
+# apple/PROD_BUG_LOG.md PBUG-20260825-04). Every invalidation path bumps the
 # epoch; request_slot snapshots it on entry and only performs the Step-9
 # store if the epoch is UNCHANGED. An abandoned call's late write is then
 # silently skipped -- its caller is gone, the entry dies with the orphan's

@@ -1,6 +1,6 @@
 # Lane-Enablement CHUNK 3 -- Source-Payload Fetcher/Interpreter Contracts (v5 FINAL)
 
-Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `docs/multimodal-story-schema/STAGE2_SUBPLAN.md`
+Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `apple/multimodal-story-schema/STAGE2_SUBPLAN.md`
 section 4b item 3. Status: **CONVERGED, BUILD-READY** -- kibitz r1-r4 complete (codex +
 antigravity panel, Claude anchor+judge; judgments
 `kibitz-runs/2026-07-05-multimodal-chunk3/{r1,r2,r3,r4}/final.md`).

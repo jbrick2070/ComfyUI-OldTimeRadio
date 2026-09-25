@@ -1,7 +1,7 @@
 """Client-authored source-bank bundles -- discovery, integrity, quarantine.
 
 Independent source banks v1 (plan of record 2026-07-24; requirements
-contract: docs/EXTENDING_OTR.md). A client adds a 7th+ bank EQUAL to the shipped six by
+contract: apple/EXTENDING_OTR.md). A client adds a 7th+ bank EQUAL to the shipped six by
 dropping a self-contained bundle under `user_packs/source_banks/<bank_id>/`
 and activating it with `otr_check bank <path> --activate`.
 
@@ -35,7 +35,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-# Bundle layout (docs/EXTENDING_OTR.md section 2).
+# Bundle layout (apple/EXTENDING_OTR.md section 2).
 USER_PACKS_DIRNAME = "user_packs"
 SOURCE_BANKS_DIRNAME = "source_banks"
 SNAPSHOTS_DIRNAME = ".snapshots"
@@ -686,7 +686,7 @@ def load_bundle_module(bundle: UserBankBundle):
     `importlib` is imported function-locally so this module keeps its zero-I/O,
     stdlib-leaf import posture. The module executes in-process, user-trusted,
     like any custom node -- `otr_check bank <path> --activate` was the consent
-    act (docs/EXTENDING_OTR.md section 2), and integrity/staleness were already
+    act (apple/EXTENDING_OTR.md section 2), and integrity/staleness were already
     proven at discovery. One run imports it once."""
     import importlib.util
     import sys

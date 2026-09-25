@@ -292,7 +292,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         "unquantized load really costs 5.98 GiB. The badge understates this "
         "row on exactly the hosts it is for. "
         "LICENCE IS NOT PERMISSIVE -- Llama 3.2 Community Licence, see "
-        "docs/model-license-unsloth--llama-3.2-3b-instruct.md. Ungated on this "
+        "apple/model-license-unsloth--llama-3.2-3b-instruct.md. Ungated on this "
         "mirror (meta-llama's own repo is gated), verified 2026-09-06. "
         "8 GB speed, memory and episode qualification all pending; no AMD "
         "hardware has run it.",
@@ -474,7 +474,7 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="OpenRouter remote model A (opt-in, default-off). Binds "
             "to OPENROUTER_MODEL_A; zero local VRAM. See "
             "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            "main/docs/openrouter-setup.md.",
+            "main/apple/openrouter-setup.md.",
             **common,
         ),
         CuratedModel(
@@ -482,7 +482,7 @@ def _openrouter_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="OpenRouter remote model B (opt-in, default-off). Binds "
             "to OPENROUTER_MODEL_B; zero local VRAM. See "
             "https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            "main/docs/openrouter-setup.md.",
+            "main/apple/openrouter-setup.md.",
             **common,
         ),
     )
@@ -527,7 +527,7 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="Comfy Credits remote model A (opt-in, default-off). "
             "Credit-billed via ComfyUI's partner-node proxy; zero local "
             "VRAM. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/"
-            "blob/main/docs/comfy-credits-setup.md.",
+            "blob/main/apple/comfy-credits-setup.md.",
             **common,
         ),
         CuratedModel(
@@ -535,7 +535,7 @@ def _comfy_virtual_rows() -> tuple[CuratedModel, ...]:
             notes="Comfy Credits remote model B (opt-in, default-off). "
             "Credit-billed via ComfyUI's partner-node proxy; zero local "
             "VRAM. See https://github.com/jbrick2070/ComfyUI-OldTimeRadio/"
-            "blob/main/docs/comfy-credits-setup.md.",
+            "blob/main/apple/comfy-credits-setup.md.",
             **common,
         ),
     )
@@ -1652,7 +1652,7 @@ MEASURED_NVIDIA_NF4_GB = {
 #: is wrong for at least one shipped row.
 #:
 #: `gemma-4-E2B-it` measures ~10 GB at bf16 -- LARGER than Qwen3.5-4B's ~9 GB --
-#: while its download is 6.0 GB against Qwen's 8.68 (docs/MAC_LESSONS_LEARNED.md
+#: while its download is 6.0 GB against Qwen's 8.68 (apple/MAC_LESSONS_LEARNED.md
 #: "Levers that do NOT work"). Scaling by download size therefore gets the two
 #: rows in the WRONG ORDER, and briefly had this table recommending E2B to Mac
 #: users as the safer pick. The catalog's small figure for E2B is its NF4
@@ -1664,7 +1664,7 @@ MEASURED_NVIDIA_NF4_GB = {
 #: never infer one.
 MEASURED_METAL_BF16_GB = {
     # IN COMFYUI, not standalone, and the difference is the whole number:
-    # docs/MAC_LESSONS_LEARNED.md records Qwen3.5-4B at "~9 GB standalone /
+    # apple/MAC_LESSONS_LEARNED.md records Qwen3.5-4B at "~9 GB standalone /
     # ~14 GB in ComfyUI". This table feeds a dropdown inside ComfyUI, so the
     # standalone figure would understate every row by ~5 GB.
     "Qwen/Qwen3.5-4B": 14.0,          # PBUG-20260907-06, footprint -p
@@ -1883,7 +1883,7 @@ def validate_model_id(
             f"(plus OPENROUTER_MODEL_A / OPENROUTER_MODEL_B), then restart "
             f"ComfyUI in a fresh terminal. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            f"main/docs/openrouter-setup.md."
+            f"main/apple/openrouter-setup.md."
         )
 
     # In-app hint: a Comfy Credits handle that reached here means the lane
@@ -1897,7 +1897,7 @@ def validate_model_id(
             f"with OTR_COMFY_API_KEY in the submitter's environment), pick "
             f"a comfy:slot-* handle the writer lists, and re-queue. See "
             f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-            f"main/docs/comfy-credits-setup.md."
+            f"main/apple/comfy-credits-setup.md."
         )
 
     if normalized.startswith("google_api:"):

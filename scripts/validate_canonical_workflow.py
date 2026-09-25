@@ -135,7 +135,7 @@ def _run_validator_contract(wf: dict, source: str) -> "list[str]":
     reported OK and exited 0 having validated nothing. This script's own
     docstring advertises the contract check and calls itself callable from the
     suite gate and CI, so a green that skipped the headline check is a lie to
-    every caller. Reproduced live and recorded in docs/HANDOFF_LOG.md."""
+    every caller. Reproduced live and recorded in apple/HANDOFF_LOG.md."""
     try:
         from nodes._workflow_validation import validate_workflow_contract
     except Exception as e:  # noqa: BLE001

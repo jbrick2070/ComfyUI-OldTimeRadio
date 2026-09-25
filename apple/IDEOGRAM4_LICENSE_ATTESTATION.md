@@ -1,7 +1,7 @@
 # Ideogram 4 -- licence attestation
 
 Records the terms this build must honor for the locally-installed Ideogram 4
-weights. Modelled on `docs/H3_LICENSE_ATTESTATION.md`, which is the established
+weights. Modelled on `apple/H3_LICENSE_ATTESTATION.md`, which is the established
 shape for a restrictively-licensed model in this repo.
 
 **This is NOT a grant.** Unlike H3 -- where MiniMax issued a named written

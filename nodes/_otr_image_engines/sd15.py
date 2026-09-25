@@ -58,7 +58,7 @@ ENABLE_FLAG = "OTR_ENABLE_SD15"
 
 #: One ordinary checkpoint: MODEL + CLIP + VAE together. Env-overridable so a
 #: user can point this at any SD-1.5-architecture checkpoint they already have
-#: (see docs/ADDING_IMAGE_AND_VIDEO_LANES.md, level 1) without touching code.
+#: (see apple/ADDING_IMAGE_AND_VIDEO_LANES.md, level 1) without touching code.
 CKPT_ENV = "OTR_SD15_CKPT"
 _DEFAULT_CKPT = "v1-5-pruned-emaonly-fp16.safetensors"
 

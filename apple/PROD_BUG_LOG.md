@@ -30,7 +30,7 @@ So the rule now splits by SIZE, not by authority:
   historical incident deserves a rule are not a window's to make.
 * **When in doubt, record the candidate and leave it.** A window that cannot
   cleanly establish "genuinely uncovered" writes the candidate into
-  `docs/GO_FORWARD_PLAN.md` for the fan-out rather than guessing. Never
+  `apple/GO_FORWARD_PLAN.md` for the fan-out rather than guessing. Never
   re-scrape indexed history; only the delta past the index date is ever scraped.
 
 This amendment resolves a real contradiction, not a hypothetical one: the
@@ -3167,7 +3167,7 @@ out until they independently meet the same production-only admission rule.
   path opens -- and PBUG-20260729-03's hard-limit refusal is the same trap from
   the other side, so both belong in one design. THE LAW is untouched: word
   length stays telemetry. PARKED by the operator until the video pipe engines
-  work as expected; queued as the next step in `docs/GO_FORWARD_PLAN.md`
+  work as expected; queued as the next step in `apple/GO_FORWARD_PLAN.md`
   ("THE WRITER NEVER VETOES").
 
 ## PBUG-20260729-03 -- a P0 repair is refused for being too big to attempt
@@ -6202,7 +6202,7 @@ EXPECTED result, not a regression signal.
     written up as an open item; that was the dangerous kind of wrong, because
     a window reading "dead filter, real defect" would repair it, music rows
     would reach the reflection prompt, and story output would change. The
-    standing rule now lives in `docs/GO_FORWARD_PLAN.md` under "DO NOT 'FIX'
+    standing rule now lives in `apple/GO_FORWARD_PLAN.md` under "DO NOT 'FIX'
     `_otr_story_brief.py:354`".
 - suite at the fix: **12097 passed / 120 skipped / 1 xfailed, EXIT=0** (356 s).
   **+43 collected tests, itemised:** 41 from the new
@@ -7088,7 +7088,7 @@ EXPECTED result, not a regression signal.
   acts) proving production reachability and giving the operator a listening
   gate -- the 5080 was rendering a mime/H3 chain for the whole of this window,
   and a lexical sample could never prove bleed impossible anyway.
-- bible-worthy: candidate -- see `docs/GO_FORWARD_PLAN.md`. The reusable class
+- bible-worthy: candidate -- see `apple/GO_FORWARD_PLAN.md`. The reusable class
   is a style/policy instruction whose GATE is a membership test over a
   population while its SCOPE is left unwritten, delivered as a subjectless
   imperative into a prompt that renders several subjects at once. Nearest
@@ -7105,7 +7105,7 @@ Two different defects carry that id -- the stills face-anchor loss (`bd1aa021`,
 promoted as Bible `12.135`) and the foley `music_inter` bridge (`499312bb`).
 They were filed by different windows on the same day. Left as-is rather than
 renumbered unilaterally, because both ids are already cited in commit messages,
-in the Bible coverage index and in `docs/GO_FORWARD_PLAN.md`; a silent
+in the Bible coverage index and in `apple/GO_FORWARD_PLAN.md`; a silent
 renumber would break those citations. Whoever owns the ledger should pick one
 to re-id and update its references in the same change.
 
@@ -9296,7 +9296,7 @@ long-line chunking: a line is one generation, and bark's semantic window is abou
 does. The announcer clips carry no audio stream (`shot_b001_announcer_visual_ltx25_video.mp4`
 is video-only), so the tone is bark's output, not clip audio mixed in.
 
-**STATUS:** ROOT-OPEN. Two fixes, both on `docs/GO_FORWARD_PLAN.md`:
+**STATUS:** ROOT-OPEN. Two fixes, both on `apple/GO_FORWARD_PLAN.md`:
 1. The shipped answer is the operator's ruling: kokoro for both voice slots on every
    lane (queue item 2, kokoro-onnx on Python 3.13 -- landed 70a1d33b; proof B is the
    same clean room rendering the same shape with kokoro). `otr_4060_floor`, the
@@ -9344,7 +9344,7 @@ cause is bark's own non-speech roll, not the graph, the knobs or the line length
    if all three fail (the ledger field is still filled; a hole is never the answer).
    This is a legitimate guard by the standing rule -- the alternative is a silent wrong
    render -- and it is a design choice (threshold, retry count), so it gets the arc
-   before code. Section 1.4 of `docs/GO_FORWARD_PLAN.md`.
+   before code. Section 1.4 of `apple/GO_FORWARD_PLAN.md`.
 
 **Bug Bible (revised candidate):** an autoregressive TTS can emit non-speech (a tone
 or a noise floor) on any roll and still return success; validate the output's shape
@@ -9459,7 +9459,7 @@ as the flag's cause.
 * `tests/test_registry_prohibited_strings.py`: walks every Python file the bundle ships (mirrors
   `.comfyignore`) and refuses the session-bearer type name anywhere, assembled at runtime so the
   test never spells it. `tests/test_comfy_slot_widgets.py` asserts the hidden input stays absent.
-* `docs/comfy-credits-setup.md`: the lane requires signing in with a Comfy API key; a plain
+* `apple/comfy-credits-setup.md`: the lane requires signing in with a Comfy API key; a plain
   account sign-in no longer enables it.
 * `docs/2026-09-02-registry-manual-review-request.md`: the review request to file on the tracker
   once the fixed version is published (the 156 info findings will keep it Flagged until an admin
@@ -10120,7 +10120,7 @@ but declares no session_identity()". Not hardware, not credentials: the same
 refusal fires on the 5080 for any beat over the lane's `max_frames`, on every
 one of the seven remote adapters the partitioner will split
 (`tests/test_multiclip_session_identity_roster.py::EXPECTED_CLOUD_GAP`). Recorded
-in `docs/RUNPOD_INSTALL.md` evidence ledger and in GO_FORWARD_PLAN, where a
+in `apple/RUNPOD_INSTALL.md` evidence ledger and in GO_FORWARD_PLAN, where a
 paragraph then called it "already fixed" for a day while the refusal was
 untouched.
 
@@ -11389,7 +11389,7 @@ during a run. On a rented remote Mac that reads as a hung machine, not as memory
 pressure.
 
 **No fix applied.** The canonical is CUDA-and-Mac shared and the sizing decision
-is the operator's. Options are recorded in `docs/GO_FORWARD_PLAN.md`.
+is the operator's. Options are recorded in `apple/GO_FORWARD_PLAN.md`.
 
 ## PBUG-20260907-08 -- `voice_device` is silently unused by the Kokoro backend every Python 3.13 install gets
 
@@ -12404,7 +12404,7 @@ Stable Audio 3 invokes attention -- masks, chunking thresholds, `attn_precision`
 
 #### Consequence if it holds
 
-Every cost figure in `docs/MAC_PORTABILITY_GUIDE.md` was measured under the slow
+Every cost figure in `apple/MAC_PORTABILITY_GUIDE.md` was measured under the slow
 backend: the ~22 min still-lane episode, `ltx_8gb`'s 39-67 min, `flux2_klein`'s
 ~8 min per still, AnimateDiff's ~44 min per beat. They are upper bounds, not the
 platform's capability.
@@ -12421,10 +12421,10 @@ platform's capability.
 
 Two docs give opposite instructions for the same file:
 
-* `docs/evidence/README.md:3-5` -- *"`video_evidence_manifest.json` is GENERATED
+* `apple/evidence/README.md:3-5` -- *"`video_evidence_manifest.json` is GENERATED
   by `scripts/build_video_evidence_manifest.py`. Edit the script's `ROWS` table
   and regenerate; never hand-edit the JSON."*
-* `docs/VIDEO_LANE_PREFLIGHT.md` (Registration surface) -- *"append the lane's
+* `apple/VIDEO_LANE_PREFLIGHT.md` (Registration surface) -- *"append the lane's
   `admission_unenforced` sentence BY HAND (G4). The generator emits
   `manifest_version: 1` against the live version 7 and refuses to overwrite; do
   not run it."*
@@ -12453,7 +12453,7 @@ stale ancestor of it.
 
 Reconciling them is a real change with its own blast radius -- it either
 rewrites the script to match seven versions of hand-appended history, or demotes
-the script and rewrites `docs/evidence/README.md`. Either is a reviewable change
+the script and rewrites `apple/evidence/README.md`. Either is a reviewable change
 of its own, and folding it into a lane registration would hide it. The Lightning
 entry was appended by hand, matching how the stillin-lab lane was added and what
 the preflight says.
@@ -12462,7 +12462,7 @@ the preflight says.
 
 Decide which artifact is authoritative and make the other say so. If the JSON
 wins: delete the generator or reduce it to a validator, and correct
-`docs/evidence/README.md`. If the script wins: port all seven versions of
+`apple/evidence/README.md`. If the script wins: port all seven versions of
 appended rows into `ROWS`, drop the retired id, add the two missing lanes, and
 bump its `manifest_version` to match.
 
@@ -12475,7 +12475,7 @@ bump its `manifest_version` to match.
 says install instructions are exactly what it is.
 **Status:** OPEN, pre-existing, not caused by the Lightning lane.
 
-`docs/MODEL_ASSET_INDEX.md` opens with *"what to download for each mode ...
+`apple/MODEL_ASSET_INDEX.md` opens with *"what to download for each mode ...
 Every requirement below is read out of the engine module named in its row"* and
 *"if I want to use engine X, what has to be on disk first?"*.
 

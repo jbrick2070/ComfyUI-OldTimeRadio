@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate `docs/MACHINE_MATRIX.md` -- what runs on which machine.
+"""Generate `apple/MACHINE_MATRIX.md` -- what runs on which machine.
 
     python scripts/otr_machine_matrix.py            # write the doc
     python scripts/otr_machine_matrix.py --stdout   # print it
@@ -761,7 +761,7 @@ def main(argv=None) -> int:
                          "writes nothing. For CI and the test suite.")
     args = ap.parse_args(argv)
     text = render()
-    dest = os.path.join(_REPO, "docs", "MACHINE_MATRIX.md")
+    dest = os.path.join(_REPO, "apple", "MACHINE_MATRIX.md")
 
     if args.stdout:
         sys.stdout.write(text)
@@ -793,7 +793,7 @@ def main(argv=None) -> int:
             print("  in sync")
             return 0
         if not doc_ok:
-            print("  STALE: docs/MACHINE_MATRIX.md differs from the profiles")
+            print("  STALE: apple/MACHINE_MATRIX.md differs from the profiles")
         if not readme_ok:
             print("  STALE: README still carries a machine-matrix block; "
                   "this generator no longer puts one there")

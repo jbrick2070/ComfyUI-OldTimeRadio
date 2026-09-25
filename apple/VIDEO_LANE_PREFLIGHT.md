@@ -85,7 +85,7 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   free - feed the positive conditioning into both guider slots and skip a whole
   12B encode per shot - which would have silently changed every render. It was
   proposed during a panel, SURVIVED one reviewer, and died only because another
-  checked which sampler was selected. Full write-up: `docs/OTR_STANDING_RULINGS.md`, section
+  checked which sampler was selected. Full write-up: `apple/OTR_STANDING_RULINGS.md`, section
   "CFG ON THE LTX 2.5 LANE".*
 
 - G3.6 **`accepts_still` declared explicitly on every adapter, never left to
@@ -251,11 +251,11 @@ registration commit:
 
 - `tests/fixtures/still_plan_head_parity.json` -- regenerate:
   `python tests/test_still_plan_parity.py --regenerate` (four parity tests).
-- `docs/MODEL_ASSET_INDEX.md` -- `python scripts/otr_asset_index.py`.
-- `docs/MACHINE_MATRIX.md` + the README's generated block -- `python scripts/otr_machine_matrix.py`
+- `apple/MODEL_ASSET_INDEX.md` -- `python scripts/otr_asset_index.py`.
+- `apple/MACHINE_MATRIX.md` + the README's generated block -- `python scripts/otr_machine_matrix.py`
   (fires when the lane's profile lands).
-- `docs/ENGINE_MATRIX.md` -- `python tools/engine_matrix.py` (writes; `--check` verifies; G7.3).
-- `docs/evidence/video_evidence_manifest.json` -- append the lane's `admission_unenforced`
+- `apple/ENGINE_MATRIX.md` -- `python tools/engine_matrix.py` (writes; `--check` verifies; G7.3).
+- `apple/evidence/video_evidence_manifest.json` -- append the lane's `admission_unenforced`
   sentence BY HAND (G4). The generator emits `manifest_version: 1` against the live version 7 and
   refuses to overwrite; do not run it.
 - `tests/test_frame_contract.py` (the unbounded-engine roster) and
@@ -279,7 +279,7 @@ registration commit:
   when imported, so without it the lane is declared and absent.
 - If the lane lands a PROFILE of any kind (including a `otr_w45_*` campaign row, which
   `scripts/otr_w45_campaign.py::build_legs` REFUSES to run without), then
-  `docs/MACHINE_MATRIX.md` + the README block go stale immediately --
+  `apple/MACHINE_MATRIX.md` + the README block go stale immediately --
   `scripts/otr_machine_matrix.py`, enforced by `tests/test_machine_matrix_drift.py`.
   Profiles also reject unknown top-level keys outright, so a `_note` field is not a place
   to explain the profile; use `display_name`.

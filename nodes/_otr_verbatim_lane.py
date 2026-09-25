@@ -1,6 +1,6 @@
 """The verbatim executor's PLAN step: a play's own speeches become the dialogue.
 
-Operator ruling (docs/OTR_STANDING_RULINGS.md, "THE PASSAGE LANE"): *"For
+Operator ruling (apple/OTR_STANDING_RULINGS.md, "THE PASSAGE LANE"): *"For
 shakespeare I'm open to a version that is very strict and finds, based on word
 count and random choice, hones in on a specific part of a play to get real
 specific dialogue, no paraphrasing."* And: *"`shakespeare` is VERBATIM and gets

@@ -36,7 +36,7 @@ def test_matrix_and_readme_are_in_sync_with_the_profiles():
         # comparing, and there is nothing this test can prove here.
         pytest.skip(r.stdout.strip() or "registry unavailable in this interpreter")
     assert r.returncode == 0, (
-        "docs/MACHINE_MATRIX.md or README's generated block no longer matches "
+        "apple/MACHINE_MATRIX.md or README's generated block no longer matches "
         "config/workflow_matrix.json. Regenerate with:\n"
         "    python scripts/otr_machine_matrix.py\n\n" + r.stdout + r.stderr)
 

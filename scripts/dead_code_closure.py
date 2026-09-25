@@ -51,8 +51,8 @@ ROOT_FILES = ["__init__.py", "prestartup_script.py"]
 #: reachability and none of them read the rulings; a QA pass caught it before
 #: the commit. Reachability is not the only question. Permission is the other.
 PROTECTIVE_DOCS = [
-    "docs/OTR_STANDING_RULINGS.md",
-    "docs/PROD_BUG_LOG.md",
+    "apple/OTR_STANDING_RULINGS.md",
+    "apple/PROD_BUG_LOG.md",
     "CLAUDE.md",
 ]
 

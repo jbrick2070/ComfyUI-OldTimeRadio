@@ -2,7 +2,7 @@
 
 Makes the ``fetcher`` / ``interpreter`` ids on banks.json rows LIVE routing
 coordinates behind a typed, fail-loud contract. Plan of record:
-docs/multimodal-story-schema/CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md (v5 FINAL,
+apple/multimodal-story-schema/CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md (v5 FINAL,
 kibitz r1-r4 converged 2026-07-05).
 
 SCOPE: this contract is the ``legacy_many_pass`` ARTICLE ADAPTER -- the uniform

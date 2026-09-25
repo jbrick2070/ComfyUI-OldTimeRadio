@@ -41,7 +41,7 @@ def test_catalog_license_fields_match_audit_files_for_every_row() -> None:
         if audit_id not in audit_targets:
             failures.append(
                 f"catalog row {row.repo_id!r} (weights {audit_id!r}) has no "
-                f"entry in docs/model-license-audit-targets.txt; D0b "
+                f"entry in apple/model-license-audit-targets.txt; D0b "
                 f"framework cannot validate it"
             )
             continue

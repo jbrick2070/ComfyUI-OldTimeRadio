@@ -25,7 +25,7 @@ loudly when someone runs it; a proof claim that goes stale is simply believed.
 
 WHAT THIS CHECKS, and deliberately nothing more: no shipped page may pair a
 denial phrase with a machine class that has at least one `proven` cell in
-`docs/dropdown_matrix.json`. It is lexical and it is crude. A sentence that
+`apple/dropdown_matrix.json`. It is lexical and it is crude. A sentence that
 truthfully scopes a gap -- "the 8 GB AMD profile is untested" -- names a tier
 rather than the class, and passes. If a legitimate sentence ever trips it, add it
 to ALLOWED with the reason, rather than loosening the phrase list: the phrases are
@@ -39,9 +39,17 @@ import re
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 
-#: Files a stranger or an agent reads. `docs/` is excluded from the package
-#: (`.comfyignore`), so it is out of scope by the operator's own ruling.
-SHIPPED = sorted((REPO / "apple").glob("*.md")) + [REPO / "README.md"]
+#: Files a stranger or an agent reads. The internal docs that also live in
+#: apple/ are excluded from the package by name (`.comfyignore`), so they are
+#: out of scope by the operator's own ruling.
+_NOT_SHIPPED = {
+    line.strip() for line in (REPO / ".comfyignore").read_text(
+        encoding="utf-8").splitlines()
+    if line.strip().startswith("apple/")
+}
+SHIPPED = sorted(
+    p for p in (REPO / "apple").glob("*.md")
+    if "apple/" + p.name not in _NOT_SHIPPED) + [REPO / "README.md"]
 
 #: Prose that asserts an ABSENCE of proof. Every one of the fourteen sites above
 #: contained one of these.
@@ -78,7 +86,7 @@ ALLOWED = (
 
 def _proven_classes() -> set:
     """Machine classes with at least one `proven` engine cell."""
-    data = json.loads((REPO / "docs" / "dropdown_matrix.json").read_text(encoding="utf-8"))
+    data = json.loads((REPO / "apple" / "dropdown_matrix.json").read_text(encoding="utf-8"))
     out = set()
 
     def walk(node):

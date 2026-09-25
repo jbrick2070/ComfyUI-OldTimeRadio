@@ -1,6 +1,6 @@
 # Multi-Modal Story Schema -- STAGE 3 SUB-PLAN (v5 FINAL -- kibitz r1-r4 CONVERGED)
 
-Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `docs/multimodal-story-schema/BUILD_PLAN.md`
+Date: 2026-07-05. Branch: `v2.0-alpha`. Parent: `apple/multimodal-story-schema/BUILD_PLAN.md`
 (Stage 3). Predecessors: Stage 1 @36e8b4cb/c8a9be74, Stage 2 @1d06f5c3 + 2C @78bee5d5.
 Status: v5 FINAL, BUILD-READY (kibitz r1-r4 converged; r3 ran codex + a
 3-lens Sonnet grounded fan-out -- all four reviewers independently converged

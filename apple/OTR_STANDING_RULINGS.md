@@ -2,7 +2,7 @@
 
 **Operator, 2026-08-23: "go forward should only have the go forward plans. Only."**
 
-So `docs/GO_FORWARD_PLAN.md` is now a PLAN -- open work, in order, and nothing
+So `apple/GO_FORWARD_PLAN.md` is now a PLAN -- open work, in order, and nothing
 else. Everything that is a RULE rather than a task lives here: the laws, the
 standing operator rulings, the review routing, the model/credit ladder, how to
 talk to the operator, the obs-path override, window packing, the tombstones and
@@ -412,7 +412,7 @@ WE FIXED IT"*; looking for LTX 2.5 as a foley/mime substitute;
   index strangers and agents should read: `VIDEO_MODELS.md`,
   `IMAGE_MODELS.md`, `WRITERS.md`, `VOICES.md`, `MUSIC.md`,
   `UPSCALERS.md`, `MACHINES.md`, `INSTALL.md`. Do not reopen
-  `docs/MODEL_ASSET_INDEX.md` as a user-facing campaign. It is a
+  `apple/MODEL_ASSET_INDEX.md` as a user-facing campaign. It is a
   generated lab cross-check. Its filename-key lies stay parked unless
   someone is already inside `scripts/otr_asset_index.py`.
 
@@ -1900,8 +1900,8 @@ worse than none: it is the one line a fresh window pastes without checking.
 > resume the OTR build as a CODER window. Repo:
 > `C:\Users\jeffr\Documents\ComfyUI\custom_nodes\ComfyUI-OldTimeRadio`, branch
 > `v2.0-alpha`, HEAD `<sha>` == origin. Read `CLAUDE.md`, then
-> `docs/GO_FORWARD_PLAN.md` from THE CURRENT STEP and BASELINES, then the top
-> entry of `docs/HANDOFF_LOG.md`. Work THE CURRENT STEP in order. Do not download
+> `apple/GO_FORWARD_PLAN.md` from THE CURRENT STEP and BASELINES, then the top
+> entry of `apple/HANDOFF_LOG.md`. Work THE CURRENT STEP in order. Do not download
 > any model without an explicit exact-name authorization. Use the `CLAUDE.md`
 > design-choice test to decide whether an arc is owed; after code, one clean
 > independent finished-diff review is enough. Test, publish to live `otr/obs`,
@@ -1971,7 +1971,7 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
 
 ## Tombstones -- the only three a window might wrongly revive
 
-Full list in `docs/HANDOFF_LOG.md` + `docs/PROD_BUG_LOG.md`. These three are
+Full list in `apple/HANDOFF_LOG.md` + `apple/PROD_BUG_LOG.md`. These three are
 here because each has been re-proposed at least once:
 
 * **The 20 fabricated-fixture `public_domain` episodes and the fixture itself** --
@@ -1986,11 +1986,11 @@ here because each has been re-proposed at least once:
 - `CLAUDE.md` -- hard operator rules; wins over this file wherever they disagree
 - `ROADMAP.md` (later-runway schedule)
 - `docs/LEAN_MEAN_CLEANUP.md` (current lean-mean scope, loss matrix, and coding order)
-- `docs/HANDOFF_LOG.md` (all completed-work history, newest at top)
+- `apple/HANDOFF_LOG.md` (all completed-work history, newest at top)
 - `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 11 pointer-not-proof; 24 lost-anchor; 25 bank-teardown)
 - `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate + the Teardown protocol
-- `docs/PROD_BUG_LOG.md` (promotion is tracked in the Bible repo's `otr_coverage_index.yaml`)
-- `docs/EXTENDING_OTR.md`
+- `apple/PROD_BUG_LOG.md` (promotion is tracked in the Bible repo's `otr_coverage_index.yaml`)
+- `apple/EXTENDING_OTR.md`
 - `workflows/otr_canonical.json` (the workflow source of truth)
 
 
@@ -2006,7 +2006,7 @@ The one-coder-window law still serializes every code edit. Lemmy is runway row 2
 not a parallel window. Re-ground Phases 2-4 and PBUG-20260811-01/-02/-03 against
 the then-current tree, preserve the qualification-receipt contract, wire any new
 authority into `workflows/otr_canonical.json` atomically, and document each green
-chunk in `docs/HANDOFF_LOG.md` while removing it from this forward plan.
+chunk in `apple/HANDOFF_LOG.md` while removing it from this forward plan.
 
 The render runner must be recreated only after Lemmy is green. Its seven legs
 prove the code that will ship; no stale pre-Lemmy runner or prompt is admissible.
@@ -2122,7 +2122,7 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
   the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
   move caps.
 
-**Standing traps and recorded limits moved here from `docs/GO_FORWARD_PLAN.md` on
+**Standing traps and recorded limits moved here from `apple/GO_FORWARD_PLAN.md` on
 2026-09-02 (carried knowledge; no scheduled work):**
 
 * **The B7 forbidden sweep cannot see an UNTRACKED file**, so a new test file passes the
@@ -2432,7 +2432,7 @@ the same day: *"kokoro onnx is our new go-to."*
 * indextts2, chatterbox, dia and bark stay in the dropdowns as upgrades the user installs
   on their own. They are not defaults anywhere, and no shipped graph may depend on a
   reference WAV that does not ship.
-* What "compatible" means is published as ONE generated table in `docs/MACHINE_MATRIX.md`
+* What "compatible" means is published as ONE generated table in `apple/MACHINE_MATRIX.md`
   from the audio engine registry, never a hand-kept list; README points at it.
 * This closes the 2026-09-01 ship-audit blocker about the indextts2 default without
   shipping WAVs, and it makes the Python 3.12 / 3.13 split irrelevant to voices.
@@ -2468,7 +2468,7 @@ the 16 GB default "work, be less friction and fit VRAM for our 8 GB and 16 GB de
 > Mac episodes, and the Mac profile has used it throughout.
 >
 > **STILL STANDING FOR AMD**, and untouched: nothing in this repo has ever run
-> on AMD hardware, and `docs/DROPDOWN_MATRIX.md` records AMD at 0 of 68 cells.
+> on AMD hardware, and `apple/DROPDOWN_MATRIX.md` records AMD at 0 of 68 cells.
 > The ruling's logic is intact there -- only the Mac half expired, exactly as it
 > said it would.
 
@@ -2500,7 +2500,7 @@ three of the four had not been. They are the authority now; the plan keeps a poi
 * **Operator acceptance 2026-08-28: LTX 2.5 vocalizing its prompt is CLOSED as an
   investigation -- do not re-open it from older text.** The named-sounds cue table, the
   joint-AV identity/prose removal, the runtime identity-leak guard and the ASR stem auditor
-  are the shipped answer (receipts in `docs/GO_FORWARD_ARCHIVE.md`, `docs/PROD_BUG_LOG.md`
+  are the shipped answer (receipts in `docs/GO_FORWARD_ARCHIVE.md`, `apple/PROD_BUG_LOG.md`
   and `git log` `d3cca496`..`5cd4dcc8`). AMENDED 2026-08-29 by the operator for the
   loudness fix: golden-shaped foley prose IS allowed in the joint-AV prompt; dialogue,
   identity and voice words stay banned.

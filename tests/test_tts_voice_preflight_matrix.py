@@ -1,4 +1,4 @@
-"""Machine enforcement for `docs/TTS_VOICE_PREFLIGHT.md`.
+"""Machine enforcement for `apple/TTS_VOICE_PREFLIGHT.md`.
 
 The house rule for a preflight sibling (`VIDEO_LANE_PREFLIGHT.md`, "The
 family") is that the enforcement code exists BEFORE the doc, never an empty

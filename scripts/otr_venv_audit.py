@@ -94,7 +94,7 @@ def top_level_imports() -> dict:
         dirs[:] = [d for d in dirs
                    if d not in {".git", "__pycache__", ".venv", "kibitz-runs",
                                 ".claude", "node_modules", "tests", "tmp",
-                                "docs", "outputs", "workflows", "_otr_b_spikes"}]
+                                "docs", "apple", "outputs", "workflows", "_otr_b_spikes"}]
         for fn in files:
             if not fn.endswith(".py"):
                 continue

@@ -3,7 +3,7 @@
 Schema-positive gate over per-row markdown audit files.
 
 Inputs:
-    docs/model-license-audit-targets.txt -- one repo_id per line,
+    apple/model-license-audit-targets.txt -- one repo_id per line,
         comments (#) and blank lines ignored.
 
 For each repo_id in the targets file:
@@ -28,8 +28,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-TARGETS_FILE = REPO_ROOT / "docs" / "model-license-audit-targets.txt"
-AUDIT_DIR = REPO_ROOT / "docs"
+TARGETS_FILE = REPO_ROOT / "apple" / "model-license-audit-targets.txt"
+AUDIT_DIR = REPO_ROOT / "apple"
 AUDIT_FILENAME_TEMPLATE = "model-license-{sanitized}.md"
 
 REQUIRED_KEYS: tuple[str, ...] = (

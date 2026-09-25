@@ -39,7 +39,7 @@ def test_the_doc_and_readme_match_the_live_code():
     r = subprocess.run([sys.executable, _SCRIPT, "--check"],
                        capture_output=True, text=True, cwd=_REPO)
     assert r.returncode == 0, (
-        "docs/DROPDOWN_MATRIX.md or README's generated block no longer matches "
+        "apple/DROPDOWN_MATRIX.md or README's generated block no longer matches "
         "the registries, the profiles or the fetch manifests. Regenerate in "
         "this commit:\n    python scripts/otr_dropdown_matrix.py\n\n"
         + r.stdout + r.stderr)
@@ -132,7 +132,7 @@ def test_the_two_questions_stay_separate():
     for engine, row in curated.items():
         extra = set(row) - allowed
         assert not extra, (
-            "%s carries %s in docs/dropdown_matrix.json; only %s may be "
+            "%s carries %s in apple/dropdown_matrix.json; only %s may be "
             "curated -- everything else is derived from the code."
             % (engine, sorted(extra), sorted(allowed)))
         verdicts = set(row.get("memory", {}).values())

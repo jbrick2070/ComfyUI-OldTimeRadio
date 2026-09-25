@@ -354,8 +354,8 @@ DOC_GENERATORS = (
     # No README block: both generators only STRIP the old BEGIN/END markers and
     # neither re-injects, and README.md carries no marker any more. The earlier
     # label here claimed one and was written from an assumption.
-    ("docs/MACHINE_MATRIX.md", "otr_machine_matrix.py"),
-    ("docs/DROPDOWN_MATRIX.md + apple/MACHINES.md", "otr_dropdown_matrix.py"),
+    ("apple/MACHINE_MATRIX.md", "otr_machine_matrix.py"),
+    ("apple/DROPDOWN_MATRIX.md + apple/MACHINES.md", "otr_dropdown_matrix.py"),
 )
 
 

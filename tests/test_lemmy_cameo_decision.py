@@ -387,7 +387,7 @@ def test_public_domain_story_is_a_CORPUS_DIRECTORY_not_a_bank_id():
     `config/source_banks/public_domain_story/` holds fetched source TEXTS
     (`scripts/otr_fetch_public_domain.py --dest-dir ...`), and every occurrence
     of the string as a `source_bank_id` VALUE lives in
-    `docs/multimodal-story-schema/schema-examples/`. The shipped runtime id is
+    `apple/multimodal-story-schema/schema-examples/`. The shipped runtime id is
     `public_domain`, which IS excluded. If that ever stops being true -- if a
     bank really is named `public_domain_story` -- this test fails and the
     exclusion set genuinely does need it.

@@ -5,7 +5,7 @@ keep every row's receipt path and SHA-256 true to the file it names.
 
 ## What it is for
 
-Lesson L7 in `docs/LANE_BUILD_LESSONS.md`: a number without its evidence key is
+Lesson L7 in `apple/LANE_BUILD_LESSONS.md`: a number without its evidence key is
 not evidence. Every numeric claim the video build makes must carry engine,
 recipe and quant, canvas, measured model-frame rung, delivered frame count,
 boot lane, cache state, measurement surface, wall-time boundary, receipt path,

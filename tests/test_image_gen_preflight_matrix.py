@@ -1,4 +1,4 @@
-"""THE IMAGE-GEN PREFLIGHT MATRIX -- `docs/IMAGE_GEN_PREFLIGHT.md` as executable law.
+"""THE IMAGE-GEN PREFLIGHT MATRIX -- `apple/IMAGE_GEN_PREFLIGHT.md` as executable law.
 
 The house pattern (`SOURCE_BANK_PREFLIGHT.md`, and the S8c video suite in
 `tests/test_lane_preflight_matrix.py`): a preflight document is never written
@@ -132,7 +132,7 @@ def test_IG2_2_every_engine_declares_every_role_the_menu_offers_it_for(role, slo
     so calling this "serves" was a promise the code never kept. The honest
     strengthening is a per-KIND declaration surface, which no image engine has
     today and which wants an arc; see the gap note in
-    `docs/IMAGE_GEN_PREFLIGHT.md` under IG2.2.
+    `apple/IMAGE_GEN_PREFLIGHT.md` under IG2.2.
     """
     assert set(ireg.engines_for_role(role)) == set(_registered()), (role, slot)
 

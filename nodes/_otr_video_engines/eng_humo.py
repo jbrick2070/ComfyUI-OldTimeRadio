@@ -324,7 +324,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     #: one, which is why it held the "declares NOTHING" differential control
     #: until now. Portrait 480x832 is where the 14B was measured on both boot
     #: lanes (14.98 GiB default / 13.22 GiB diet warm, HUMO_BAKEOFF +
-    #: ENVELOPE_LADDERS, indexed in docs/evidence/video_evidence_manifest.json).
+    #: ENVELOPE_LADDERS, indexed in apple/evidence/video_evidence_manifest.json).
     #: Without it the request fell through to the 1472x832 landscape default on
     #: the tier whose whole job is the pillarbox talking head. Both axes
     #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is a named
@@ -1340,7 +1340,7 @@ class HuMo17BEngine(HuMoEngine):
     fallback_engine = None               # NO FALLBACKS (2026-07-02): fail LOUD
     #: THE CANVAS, DECLARED (lane 3, 2026-08-11). Portrait 480x832 is where the
     #: diet leg was measured -- 12.84 GiB warm at 480x832x129 (HUMO_DIET,
-    #: indexed in docs/evidence/video_evidence_manifest.json) -- and without a
+    #: indexed in apple/evidence/video_evidence_manifest.json) -- and without a
     #: declaration the request fell through to the 1472x832 landscape default
     #: on a lane whose entire identity is the pillarbox talking head. Both axes
     #: /32-legal (15 x 26). A contradicting OTR_HUMO_WIDTH/HEIGHT is now a
@@ -1465,7 +1465,7 @@ class HuMo14BLandscapeEngine(HuMoEngine):
     #: 832x480 is not a preference, it is where the hero cast was MEASURED:
     #: 13.06 GiB warm / 13.17 cold at 832x480x97 under the ``humo_diet`` boot
     #: (ENVELOPE_LADDERS job A, indexed in
-    #: docs/evidence/video_evidence_manifest.json), 1.44 GiB under the gate,
+    #: apple/evidence/video_evidence_manifest.json), 1.44 GiB under the gate,
     #: against 14.98 GiB unclamped. Declaring it makes the request match the
     #: render the number was taken from. Both axes /32-legal (26 x 15).
     #: See :meth:`HuMoEngine._native_dims` for why OTR_HUMO_WIDTH/HEIGHT now

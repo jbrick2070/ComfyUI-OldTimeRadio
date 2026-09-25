@@ -167,9 +167,9 @@ def pytest_sessionstart(session):
 #     so CI surfaces a regression.
 #   - promotable (expected - actual): print a PROMOTABLE message --
 #     the known-fail entry is now passing and should be removed
-#     from this set + docs/known-failures.md.
+#     from this set + apple/known-failures.md.
 #
-# Matches docs/known-failures.md schema rewrite (S15.2).
+# Matches apple/known-failures.md schema rewrite (S15.2).
 # ---------------------------------------------------------------------------
 
 
@@ -202,7 +202,7 @@ EXPECTED_FAILED_NODEIDS: frozenset[str] = frozenset()
 # restricted Gemma Terms of Use. The catalog rows and the
 # docs/model-license-google--gemma-4-e{2,4}b-it.md audit files were
 # corrected in lockstep to apache_2_0 / mit_equivalent, so the gate
-# now passes. See docs/known-failures.md Resolution log
+# now passes. See apple/known-failures.md Resolution log
 # KNOWN-FAIL-007/008.
 #
 # The quarantine set is now empty -- there are no known failures. The
@@ -240,7 +240,7 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
 
     PROMOTABLE (expected - actual): a known-fail is now passing.
     Print a PROMOTABLE banner naming the nodeid; the contributor
-    updates EXPECTED_FAILED_NODEIDS + docs/known-failures.md in
+    updates EXPECTED_FAILED_NODEIDS + apple/known-failures.md in
     lockstep. Don't fail the session for promotables -- they're
     good news, just news.
 
@@ -278,7 +278,7 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
             "\n[KNOWN-FAIL-GUARD] PROMOTABLE -- the following expected "
             "failures now PASS. Remove them from "
             "tests/conftest.py::EXPECTED_FAILED_NODEIDS AND from "
-            "docs/known-failures.md in lockstep:\n"
+            "apple/known-failures.md in lockstep:\n"
         )
         for nid in sorted(promotable):
             sys.stderr.write(f"  - {nid}\n")
@@ -293,7 +293,7 @@ def pytest_sessionfinish(session, exitstatus):  # kept: pytest hook signature co
             sys.stderr.write(f"  - {nid}\n")
         sys.stderr.write(
             "If these are intentional new known-fails, add them to "
-            "EXPECTED_FAILED_NODEIDS + docs/known-failures.md in the "
+            "EXPECTED_FAILED_NODEIDS + apple/known-failures.md in the "
             "same commit. Otherwise fix the regression.\n"
         )
         # Hard exit so CI distinguishes this from a normal pytest

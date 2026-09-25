@@ -442,7 +442,7 @@ echo "  runtime env : $OTR_RUNTIME_ENV (non-secret)"
 
 if ! "$COMFY_PY" scripts/otr_provision.py "${PROVISION_ARGS[@]}" "${VOICE_ARGS[@]}"; then
   echo "=== provision INCOMPLETE  $(date -u '+%H:%M:%SZ') ===" >&2
-  echo "Read docs/RUNPOD_INSTALL.md for every named manual file." >&2
+  echo "Read apple/RUNPOD_INSTALL.md for every named manual file." >&2
   exit 1
 fi
 

@@ -70,6 +70,6 @@ def test_profile_usage_counts_resolve_public_video_ids_to_internal_owners():
 
 def test_committed_asset_index_has_no_generator_drift():
     index = _load("scripts/otr_asset_index.py", "_otr_asset_index_drift_test")
-    committed = (ROOT / "docs" / "MODEL_ASSET_INDEX.md").read_text("utf-8")
+    committed = (ROOT / "apple" / "MODEL_ASSET_INDEX.md").read_text("utf-8")
 
     assert index.render() == committed

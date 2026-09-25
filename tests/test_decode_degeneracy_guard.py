@@ -328,7 +328,7 @@ def test_the_ladder_can_still_see_a_halted_completion():
 # --------------------------------------------------------------------------
 # SIGNAL 2: the ELABORATION SPIRAL. A runaway that never repeats.
 #
-# Three specimens were captured on 2026-08-13 (docs/HANDOFF_LOG.md:150-157):
+# Three specimens were captured on 2026-08-13 (apple/HANDOFF_LOG.md:150-157):
 # P3 an anaphoric loop, P5 escalating repetition, and P2 a pure elaboration
 # spiral -- 15,355 tokens, 83k chars, NO repetition anywhere. The cycle
 # detector catches the first two and is structurally blind to the third.

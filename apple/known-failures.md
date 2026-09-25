@@ -57,7 +57,7 @@ Closed in this recovery (My Story alias now routes through
 
 CastLock leftover Bark `v2/` after kokoro `auto_registry` is no longer a
 plan row: `_stamp` already clears it. Regenerating
-`docs/MODEL_ASSET_INDEX.md` left the live plan (apple/ is the index).
+`apple/MODEL_ASSET_INDEX.md` left the live plan (apple/ is the index).
 
 The other 30 stay on the SET until a later row owns them. Do not add them
 to `EXPECTED_FAILED_NODEIDS`.
@@ -79,7 +79,7 @@ What replaced it is stronger than the original rule: the general check now
 sweeps EVERY pydantic model reachable under `nodes/` (92 of them) and asserts no
 field default can fail `json.dumps`, with a companion test proving the sweep
 actually found the models so a broken import cannot make it vacuously green.
-See `docs/PROD_BUG_LOG.md` PBUG-20260812-02 (status FIXED).
+See `apple/PROD_BUG_LOG.md` PBUG-20260812-02 (status FIXED).
 
 When a nodeid enters `EXPECTED_FAILED_NODEIDS`, document it here IN THE SAME
 COMMIT: the nodeid, why it fails, the tracking item, and the exit condition.

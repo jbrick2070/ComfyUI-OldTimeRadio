@@ -26,7 +26,7 @@ shipped default-workflow creative-binding JSON without further review.
 
 Gemma 1 / 2 / 3 ship under the restricted Gemma Terms of Use. Gemma 4
 (E2B / E4B / 26B A4B / 31B) ships under Apache 2.0 -- see
-`docs/model-license-google--gemma-4-e2b-it.md`. The two families are NOT
+`apple/model-license-google--gemma-4-e2b-it.md`. The two families are NOT
 interchangeable for licensing purposes. gemma-2-2b-it is a Gemma 2 row
 and inherits the restricted license.
 

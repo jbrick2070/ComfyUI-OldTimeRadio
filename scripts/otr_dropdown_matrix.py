@@ -8,7 +8,7 @@ are NOT the same question:
      a fact about the code and it is DERIVED here -- never typed, never stale.
   2. **Will it fit, and has anyone run it?**  Answered by receipts and by
      memory measurement. Nothing can derive this, so it is curated in
-     ``docs/dropdown_matrix.json``.
+     ``apple/dropdown_matrix.json``.
 
 WHAT IS CURATED, EXACTLY -- stated because an earlier draft of this docstring
 claimed the memory verdicts were the ONLY curated input, and that was false. The
@@ -46,8 +46,8 @@ import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
-_DOC = os.path.join(_REPO, "docs", "DROPDOWN_MATRIX.md")
-_CURATED = os.path.join(_REPO, "docs", "dropdown_matrix.json")
+_DOC = os.path.join(_REPO, "apple", "DROPDOWN_MATRIX.md")
+_CURATED = os.path.join(_REPO, "apple", "dropdown_matrix.json")
 _README = os.path.join(_REPO, "README.md")
 #: The SHIPPING copy. `docs/` is excluded from the registry bundle
 #: (`.comfyignore` line 178) and `apple/` is not, so this is the only machine
@@ -719,7 +719,7 @@ def render_doc(rows: list) -> str:
          "`CAPABILITIES` row against the shipped profile named in its column; "
          "sizes and gating are read out of the fetch manifests. Only the "
          "memory verdicts and receipts are curated, in "
-         "`docs/dropdown_matrix.json`.\n\n",
+         "`apple/dropdown_matrix.json`.\n\n",
          "You never need all the weights in this workflow. One graph ships; "
          "the dropdowns decide what it loads, and therefore what you have to "
          "fetch.\n\n",
@@ -1151,8 +1151,8 @@ def render_apple(rows: list) -> str:
         L.append("\n")
 
     L.append("## What the words mean\n\n")
-    # The legend is shared with docs/DROPDOWN_MATRIX.md and the README block,
-    # where docs/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
+    # The legend is shared with apple/DROPDOWN_MATRIX.md and the README block,
+    # where apple/MODEL_ASSET_INDEX.md is a live relative link. Here it is not:
     # .comfyignore excludes docs/ from the bundle, so a shipped reader following
     # that pointer finds nothing -- and the weights table above answers the question
     # better anyway, with a repository and a destination folder per file.
@@ -1294,7 +1294,7 @@ def main(argv=None) -> int:
     if args.check:
         stale = []
         if current != doc:
-            stale.append("docs/DROPDOWN_MATRIX.md")
+            stale.append("apple/DROPDOWN_MATRIX.md")
         if current_apple != apple:
             stale.append("apple/MACHINES.md")
         if not inject_readme(block, write=False):

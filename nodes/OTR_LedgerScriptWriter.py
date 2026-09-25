@@ -2176,7 +2176,7 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                             "'otr_check bank <path> --activate', restart, and "
                             "your bank joins this list as its own entry "
                             "(contract: apple/EXTENDING.md, which ships with the "
-                            "pack; docs/EXTENDING_OTR.md is the longer "
+                            "pack; apple/EXTENDING_OTR.md is the longer "
                             "version in the git tree). A bank's own "
                             "default_story_model picks its story pack -- there "
                             "is no separate pack widget. "

@@ -70,7 +70,7 @@ def test_the_floor_is_below_its_own_artifact_and_not_the_parents(eng):
     ``v3_sd15_mm.ckpt`` (1,673,262,583) and about half of ``mm-p_0.5``. The
     inherited 1.7 GB floor would refuse it as truncated while the file is
     byte-perfect -- the exact failure that killed the v3 lane's first live leg,
-    and the reason ``docs/ADDING_IMAGE_AND_VIDEO_LANES.md`` says to ask what
+    and the reason ``apple/ADDING_IMAGE_AND_VIDEO_LANES.md`` says to ask what
     ELSE was sized for the parent."""
     real_bytes = 908_929_664
     assert eng.motion_min_bytes < real_bytes, (
@@ -587,7 +587,7 @@ def test_the_alignment_is_NOT_expressed_as_a_frame_contract_quantum(eng):
     with a real quantum invites `PLANNING_CAP_ENGINES` membership, and with
     ``continuity=NONE`` the planner joins segments with ``join_mode="jump"`` --
     about fifteen jump cuts and ~240 latents where one continuous beat sampled
-    125. `docs/MAC_PORTABILITY_GUIDE.md` 10.7 carries the arithmetic.
+    125. `apple/MAC_PORTABILITY_GUIDE.md` 10.7 carries the arithmetic.
 
     So the alignment lives at the SOURCE REQUEST, and the contract stays
     unbounded. This test is the tripwire for anyone who tries to move it."""

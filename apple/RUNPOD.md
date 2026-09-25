@@ -100,6 +100,6 @@ machine.
 
 ---
 
-`docs/RUNPOD_INSTALL.md` in the GitHub tree carries the rest: the failure atlas,
+`apple/RUNPOD_INSTALL.md` in the GitHub tree carries the rest: the failure atlas,
 the unattended sweep and soak procedure, driving a pod from a second machine, and
 the evidence ledger. It does not ship in a Manager install.

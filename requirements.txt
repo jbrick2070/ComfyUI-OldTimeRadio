@@ -116,7 +116,7 @@ PyYAML>=6.0
 # The marker lets the other 17 install; the kokoro ENGINE then reports itself
 # unusable by name and the announcer/character voice falls to the operator's
 # dropdown choice (bark installs everywhere). What the 3.13 DEFAULT voice
-# should be is an open operator decision -- see docs/GO_FORWARD_PLAN.md
+# should be is an open operator decision -- see apple/GO_FORWARD_PLAN.md
 # 2026-09-01. Mirror this marker into pyproject.toml on the next bump.
 kokoro>=0.7.16; python_version < "3.13"
 # 2026-09-02 (queue item 2): the SAME kokoro voices on Python 3.13, through ONNX

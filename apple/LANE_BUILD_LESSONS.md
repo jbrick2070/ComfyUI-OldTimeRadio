@@ -266,7 +266,7 @@ all machine-qualified (f277 hit 14.72 GiB, over the gate) and not all
 episode-legal.
 
 **Runnable check:** every lane's evidence rows land in
-`docs/evidence/video_evidence_manifest.json` with the full key, and gate G4
+`apple/evidence/video_evidence_manifest.json` with the full key, and gate G4
 reads that manifest rather than a comment.
 
 **Twin assertion:** `test_lane_preflight_matrix.py::test_evidence_manifest_is_well_formed`.
@@ -730,10 +730,10 @@ the retired `8gb` token made without evidence.
 Lanes 4, 5 and 6 closed green and pushed **without appending to this file**.
 Step 9 of the per-lane loop is "append what bit you to the lessons ledger", and
 three lanes in a row skipped it; the sections above were reconstructed from
-`docs/evidence/lane_receipts/lane0{4,5,6}-*.md` at the start of lane 7.
+`apple/evidence/lane_receipts/lane0{4,5,6}-*.md` at the start of lane 7.
 
 **Runnable check:** the commit that closes a lane touches
-`docs/LANE_BUILD_LESSONS.md`. If `git show --stat <lane-commit>` does not list
+`apple/LANE_BUILD_LESSONS.md`. If `git show --stat <lane-commit>` does not list
 this file, the lane is not closed -- the receipt records what happened, the
 ledger records what the NEXT lane must check, and they are not the same
 document.
@@ -787,7 +787,7 @@ non-null `vram_peak_mb`. If it is null, do not re-render -- find what dropped
 it between the adapter and the file.
 
 **Twin assertion:** the passthrough in `render_driver._clip_summary`, plus
-`seeds_cost_row` in `docs/evidence/video_evidence_manifest.json` so an
+`seeds_cost_row` in `apple/evidence/video_evidence_manifest.json` so an
 unqualified number cannot be picked up by accident.
 
 ---
@@ -1403,7 +1403,7 @@ that found the bugs.
 
 ## Lane 21 -- `h3_low_mime`, closed 2026-08-12 -- THE LAST PACKET, AND IT KEEPS ITS AUDIO
 
-Full receipt: `docs/evidence/lane_receipts/lane21-h3_low_mime.md`. No matrix row
+Full receipt: `apple/evidence/lane_receipts/lane21-h3_low_mime.md`. No matrix row
 and no gates to flip, because it registers nothing.
 
 **What bit (1): the whole lane is an EXEMPTION, so every inherited instinct is
@@ -1502,7 +1502,7 @@ test_lane_20s_adapter_arrived_as_a_SEPARATE_internal_engine`.
 
 ## Lane 20 -- `h3_low_audio_in` / `minimax_h3_audio_in`, closed 2026-08-12
 
-Full receipt: `docs/evidence/lane_receipts/lane20-h3_low_audio_in.md`. The
+Full receipt: `apple/evidence/lane_receipts/lane20-h3_low_audio_in.md`. The
 cheapest lane in the campaign because lane 19 paid for it, and it rendered live
 on the FIRST attempt against lane 19's three.
 
@@ -1577,7 +1577,7 @@ nothing -- which renders successfully, with no references.
 
 ## Lane 19 -- `h3_low_video` / `minimax_h3_video`, closed 2026-08-12 -- THE FIRST NEW ENGINE
 
-Full receipt: `docs/evidence/lane_receipts/lane19-h3_low_video.md`. Lanes 10-18
+Full receipt: `apple/evidence/lane_receipts/lane19-h3_low_video.md`. Lanes 10-18
 repaired lanes that already existed; this one ADDS a 33.1B packed AV DiT, and the
 shelf's defaults inverted in two places.
 

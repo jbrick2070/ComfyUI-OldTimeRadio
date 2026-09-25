@@ -1,4 +1,4 @@
-"""S10.3 + S19.2 -- Test enforcement of docs/conventions.md.
+"""S10.3 + S19.2 -- Test enforcement of apple/conventions.md.
 
 Pins the three structural rules from the conventions doc:
 
@@ -36,7 +36,7 @@ def test_lib_modules_have_otr_prefix():
             bad.append(f.name)
     assert not bad, (
         f"Library modules without _otr_ prefix: {bad}. "
-        "Per docs/conventions.md, private library modules under "
+        "Per apple/conventions.md, private library modules under "
         "nodes/ must follow _otr_<name>_lib.py."
     )
 
@@ -68,7 +68,7 @@ def test_lib_modules_have_no_node_class_mappings():
                     bad.append((f.name, node.lineno))
     assert not bad, (
         f"_otr_*_lib.py modules defining NODE_CLASS_MAPPINGS: {bad}. "
-        "Per docs/conventions.md, library-only modules must not "
+        "Per apple/conventions.md, library-only modules must not "
         "register node classes. Move the class to a non-prefixed "
         "module and import the helpers from the _lib module."
     )
@@ -116,16 +116,16 @@ def test_node_display_names_have_no_placeholder_strings():
 
 def test_conventions_doc_lists_every_lib_module():
     """S19.2 (IMP-15, IMP-16): every ``nodes/_otr_*_lib.py`` on disk
-    MUST be mentioned in docs/conventions.md.
+    MUST be mentioned in apple/conventions.md.
 
     Catches: a 6th library module lands on disk but the "current
     modules" table in the doc isn't refreshed in lockstep. The
     doc and the filesystem are two surfaces of the same contract;
     they drift apart silently without a test like this one.
     """
-    doc_path = NODES_DIR.parent / "docs" / "conventions.md"
+    doc_path = NODES_DIR.parent / "apple" / "conventions.md"
     assert doc_path.exists(), (
-        "docs/conventions.md missing -- the naming-convention doc is "
+        "apple/conventions.md missing -- the naming-convention doc is "
         "load-bearing for the doc-freshness guard."
     )
     doc_text = doc_path.read_text(encoding="utf-8")
@@ -133,7 +133,7 @@ def test_conventions_doc_lists_every_lib_module():
     missing = [m for m in fs_modules if m not in doc_text]
     assert not missing, (
         f"nodes/_otr_*_lib.py modules exist on disk but are NOT "
-        f"listed in docs/conventions.md: {missing!r}\n\n"
+        f"listed in apple/conventions.md: {missing!r}\n\n"
         f"Add them to the 'current modules' table in lockstep with "
         f"the file creation."
     )

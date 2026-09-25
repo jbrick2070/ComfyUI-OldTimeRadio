@@ -61,8 +61,8 @@
 # JSON, or to the workflow files -- union-merging a .json produces a file that
 # is not valid JSON, and union-merging a .py produces code that parses and is
 # wrong.
-docs/PROD_BUG_LOG.md   merge=union
-docs/known-failures.md merge=union
+apple/PROD_BUG_LOG.md   merge=union
+apple/known-failures.md merge=union
 BUG_LOG.md             merge=union
 
 # Preserve exact handoff snapshots and evidence hashes across checkouts.

@@ -252,7 +252,7 @@
       "net_mb": 11911,
       "wall_time_s": 271.3,
       "seeds_cost_row": true,
-      "receipt": "docs/evidence/lane_receipts/lane04-humo14_high_audio_in_portrait.md",
+      "receipt": "apple/evidence/lane_receipts/lane04-humo14_high_audio_in_portrait.md",
       "note": "First render after a fresh boot, so the model load sits inside the measured window."
     },
     {
@@ -269,7 +269,7 @@
       "net_mb": 12664,
       "wall_time_s": 249.2,
       "seeds_cost_row": true,
-      "receipt": "docs/evidence/lane_receipts/lane02-humo14_high_audio_in_wide.md",
+      "receipt": "apple/evidence/lane_receipts/lane02-humo14_high_audio_in_wide.md",
       "note": "The ruled hero cast. Net sits BELOW the lab's 13.06 GiB warm figure, which is the expected direction once the baseline is removed from a cold total."
     },
     {
@@ -286,7 +286,7 @@
       "net_mb": 13321,
       "wall_time_s": 210.9,
       "seeds_cost_row": true,
-      "receipt": "docs/evidence/lane_receipts/lane03-humo17_high_audio_in_portrait.md",
+      "receipt": "apple/evidence/lane_receipts/lane03-humo17_high_audio_in_portrait.md",
       "note": "The most expensive of the three HuMo legs because it renders a third more frames at the same pixel area, NOT because it is a heavier model. Frame count dominates on this family."
     },
     {
@@ -303,7 +303,7 @@
       "net_mb": 6835,
       "wall_time_s": 22.1,
       "seeds_cost_row": true,
-      "receipt": "docs/evidence/lane_receipts/lane08-ltx098_low_video.md",
+      "receipt": "apple/evidence/lane_receipts/lane08-ltx098_low_video.md",
       "note": "The FIRST measurement of any kind for this lane on this box, and the one the low/high marker was waiting on. Cheapest lane in the roster. Recipe ltx098_distilled_2b_i2v_single_pass_v2, no quant. 5,394 MB of absolute headroom under the ceiling."
     }
   ]

@@ -1,4 +1,4 @@
-"""Emit docs/ENGINE_MATRIX.md -- the per-engine requirements record.
+"""Emit apple/ENGINE_MATRIX.md -- the per-engine requirements record.
 
     python tools/engine_matrix.py            # rewrite the doc
     python tools/engine_matrix.py --check    # fail if the doc has drifted
@@ -28,7 +28,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC = ROOT / "docs" / "ENGINE_MATRIX.md"
+DOC = ROOT / "apple" / "ENGINE_MATRIX.md"
 
 #: Generated with the box in test mode so no adapter reaches for a GPU while
 #: the matrix is only asking it what it declares.
@@ -150,13 +150,13 @@ def _stills(engine):
 #: the columns show real partitions rather than a row of "1 segment".
 REFERENCE_BEAT_FRAMES = 442
 
-#: Matches a docs/ citation inside an adapter's own source, so the evidence
+#: Matches an apple/ (or retired docs/) citation inside an adapter's own source, so the evidence
 #: column can say whether the receipt a cap cites is actually IN the repo. This
 #: exists because `eng_humo.py` once justified its 49-frame ceiling with a
 #: bakeoff receipt that was never in the tree -- the load-
 #: bearing safety number for the heaviest engine cited a receipt nobody could
 #: open, and nothing surfaced that until a human went looking.
-_DOC_CITATION = re.compile(r"docs/[A-Za-z0-9._-]+")
+_DOC_CITATION = re.compile(r"(?:apple|docs)/[A-Za-z0-9._-]+")
 
 #: Wording that marks a doc path as REFUTED rather than relied upon, so a
 #: comment explaining that a receipt is missing does not itself get counted as
@@ -472,7 +472,7 @@ def render() -> str:
                         row["mc_render"], row["mc_visible"], row["mc_remints"]))
 
     lines += ["", "## Frame caps and the evidence behind them", "",
-              "`evidence` lists every `docs/` receipt the adapter's own source",
+              "`evidence` lists every `apple/` receipt the adapter's own source",
               "cites. **MISSING** means the adapter cites a document that is not",
               "in this repo -- a safety number nobody can check. This column",
               "exists because the HuMo 49-frame ceiling cited a bakeoff receipt",

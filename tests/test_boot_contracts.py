@@ -461,7 +461,7 @@ def test_exactly_one_live_menu_option_and_the_id_states_what_the_lane_is():
 
 def test_the_lane_has_an_evidence_row_and_an_admission_confession():
     manifest = json.loads(
-        (REPO / "docs" / "evidence" / "video_evidence_manifest.json")
+        (REPO / "apple" / "evidence" / "video_evidence_manifest.json")
         .read_text(encoding="utf-8"))
     rows = [e for e in manifest["entries"] if e["lane"] == LANE]
     assert rows and any("f97" in r["envelope_key"] for r in rows)

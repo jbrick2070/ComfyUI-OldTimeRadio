@@ -469,7 +469,7 @@ def resolve_slug(repo_id: str) -> str:
         f"openrouter_slot_{letter.lower()}_model widget, OPENROUTER_MODEL_{letter}, "
         f"or OTR_OPENROUTER_SLOT_{letter}_DEFAULT. See "
         f"https://github.com/jbrick2070/ComfyUI-OldTimeRadio/blob/"
-        f"main/docs/openrouter-setup.md."
+        f"main/apple/openrouter-setup.md."
     )
 
 

@@ -365,7 +365,7 @@ def test_require_json_does_not_narrow_curated_aliases(enabled_cached, monkeypatc
     _filter_catalog_models, so REQUIRE_JSON does not remove them. Filtering
     them against a cache that may be cold would empty the curated block in
     exactly the state it exists to survive. The slot-B tooltip and
-    docs/openrouter-setup.md say so explicitly."""
+    apple/openrouter-setup.md say so explicitly."""
     monkeypatch.setenv("OTR_OPENROUTER_SLOT_B_REQUIRE_JSON", "1")
     b = cat.openrouter_catalog_dropdown_choices("b")
     for slug in cat.OPENROUTER_CURATED_ALIASES:

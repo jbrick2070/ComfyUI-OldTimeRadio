@@ -236,7 +236,7 @@ profiles:
     warn_text: ""
 
   # Bark as an announcer alternative (2026-08-24). Bark is preset-driven
-  # (P2.2: no bank rows, ever -- see docs/TTS_VOICE_PREFLIGHT.md), so this
+  # (P2.2: no bank rows, ever -- see apple/TTS_VOICE_PREFLIGHT.md), so this
   # mirrors char_bark_v1's params exactly rather than the bank-backed
   # profiles above it. The announcer's v2/* preset is drawn by
   # OTR_CastLock._assign_bark_voices, same owner as character Bark casting,

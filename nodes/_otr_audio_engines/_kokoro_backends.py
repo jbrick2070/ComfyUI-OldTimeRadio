@@ -2,7 +2,7 @@
 (the `kokoro-onnx` package over onnxruntime).
 
 WHY TWO BACKENDS BEHIND ONE ENGINE (operator ruling 2026-09-01, queue item 2 of
-docs/GO_FORWARD_PLAN.md): the torch `kokoro` package cannot be pip-installed on
+apple/GO_FORWARD_PLAN.md): the torch `kokoro` package cannot be pip-installed on
 Python 3.13 (PBUG-20260901-04), which is the interpreter ComfyUI Desktop and the
 portable ship, while the saved dropdown value is the one string "kokoro" on every
 machine. So the ENGINE keeps its name, its voice ids, its ledger contract and its

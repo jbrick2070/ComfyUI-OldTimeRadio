@@ -95,7 +95,7 @@ class TestWriterCanonicalModelSlots:
         # tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER;
         # this test only needs that creative_writing_model and
         # technical_model carry the measured default, wherever the 2026-09-14
-        # writer reorder (docs/GO_FORWARD_PLAN.md row A4) put them.
+        # writer reorder (apple/GO_FORWARD_PLAN.md row A4) put them.
         # 2026-07-20: official Gemma4Unified Transformers 5.10.4 + NF4
         # measured ~7.15 GiB and hard-constrained JSON through LMFE. This is
         # the safetensors/HF lane.

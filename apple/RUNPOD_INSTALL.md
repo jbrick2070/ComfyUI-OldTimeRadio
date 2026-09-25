@@ -346,7 +346,7 @@ To fetch a lane's files ahead of the first render instead of at queue time:
 ### H3: local-only authorization boundary
 
 This operator's H3 weights never go to RunPod. The boundary is recorded in
-`docs/H3_LICENSE_ATTESTATION.md`. On authorized owned/offline hardware only:
+`apple/H3_LICENSE_ATTESTATION.md`. On authorized owned/offline hardware only:
 
 ```bash
 "$COMFY_PY" scripts/otr_provision.py --profile otr_w45_minimax_h3_video --list

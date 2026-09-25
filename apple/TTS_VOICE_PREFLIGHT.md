@@ -169,7 +169,7 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   `_otr_voice_route.py` at the recurring-character cutover; nothing under
   `nodes/` imports that module any more, so nothing stamps
   `cast_row["voice_route"]` today. Left as written rather than rewritten --
-  see the README and `docs/OTR_STANDING_RULINGS.md` 2026-09-24 entry for the
+  see the README and `apple/OTR_STANDING_RULINGS.md` 2026-09-24 entry for the
   current casting path.
   `resolve_and_verify_reference` treats ANY non-empty `voice_route` dict as a
   route claim (`nodes/_otr_voice_route.py:595-597`) and **raises**

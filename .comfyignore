@@ -150,7 +150,7 @@ scripts/*
 # OpenRouter model silently ran at `DEFAULT_CONTEXT_WINDOW = 8192` instead of
 # its real window, and the empty-cache sentinel read "(no OpenRouter models
 # cached -- run refresh_catalog_cache)" to a user who had no way to run it.
-# `docs/openrouter-setup.md:108,155` documents the command in both directions.
+# `apple/openrouter-setup.md:108,155` documents the command in both directions.
 # The script is 63 lines of stdlib: no exec, no eval, no subprocess, no network
 # call of its own (the backend module owns the fetch).
 !scripts/otr_openrouter_refresh.py
@@ -178,7 +178,46 @@ AGENTS.md
 BUG_LOG.md
 BUG_LOG_2026-06.md
 session_handoff.md
-docs/
+# Internal docs that live in apple/ since 2026-09-24 (moved from the retired
+# docs/ folder). They never shipped from docs/ and must not start shipping now.
+apple/ADDING_IMAGE_AND_VIDEO_LANES.md
+apple/DEPENDENCIES.md
+apple/DROPDOWN_MATRIX.md
+apple/ENGINE_MATRIX.md
+apple/EXTENDING_OTR.md
+apple/GO_FORWARD_PLAN.md
+apple/H3_LICENSE_ATTESTATION.md
+apple/HANDOFF_LOG.md
+apple/IDEOGRAM4_LICENSE_ATTESTATION.md
+apple/IMAGE_GEN_PREFLIGHT.md
+apple/LANE_BUILD_LESSONS.md
+apple/MACHINE_MATRIX.md
+apple/MAC_LESSONS_LEARNED.md
+apple/MAC_PORTABILITY_GUIDE.md
+apple/MODEL_ASSET_INDEX.md
+apple/OTR_STANDING_RULINGS.md
+apple/PROD_BUG_LOG.md
+apple/RUNPOD_INSTALL.md
+apple/SPEC_haunted_image_to_video.md
+apple/TTS_VOICE_PREFLIGHT.md
+apple/VIDEO_LANE_PREFLIGHT.md
+apple/comfy-credits-setup.md
+apple/conventions.md
+apple/dropdown_matrix.json
+apple/evidence/
+apple/known-failures.md
+apple/model-license-audit-targets.txt
+apple/model-license-google--gemma-2-2b-it.md
+apple/model-license-google--gemma-4-12b-it.md
+apple/model-license-google--gemma-4-e2b-it.md
+apple/model-license-google--gemma-4-e4b-it.md
+apple/model-license-mistralai--mistral-nemo-instruct-2407.md
+apple/model-license-qwen--qwen3.5-4b.md
+apple/model-license-qwen--qwen3.8-27b.md
+apple/model-license-unsloth--llama-3.2-3b-instruct.md
+apple/multilingual-one-switch.md
+apple/multimodal-story-schema/
+apple/openrouter-setup.md
 kibitz-plugin/
 tmp/
 
@@ -225,7 +264,7 @@ viewer/
 tools/
 
 # 2026-09-05, bundle-hygiene rung 1 of the strip-down ladder
-# (docs/GO_FORWARD_PLAN.md). Two groups that ship to every installer and that
+# (apple/GO_FORWARD_PLAN.md). Two groups that ship to every installer and that
 # nothing a user runs ever reads. EXCLUDING FROM THE BUNDLE IS NOT DELETING
 # FROM GIT, and here that distinction has teeth: `pyproject.toml` publishes the
 # registry card art as a RAW GITHUB URL

@@ -134,7 +134,7 @@ MIN_CYCLE_WORDS = 32
 #: Tokens ONE JSON string may stay open before the decode is called degenerate.
 #:
 #: THE SECOND SIGNAL, AND IT IS NOT REDUNDANT WITH THE FIRST. Three runaway
-#: specimens were captured on 2026-08-13 (docs/HANDOFF_LOG.md):
+#: specimens were captured on 2026-08-13 (apple/HANDOFF_LOG.md):
 #:   P3 -- an anaphoric peroration loop        13,828 tok  (repeats)
 #:   P5 -- escalating repetition               14,521 tok  (repeats)
 #:   P2 -- a pure ELABORATION SPIRAL           15,355 tok  (NEVER repeats)

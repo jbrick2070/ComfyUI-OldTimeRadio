@@ -596,7 +596,7 @@ CAPABILITIES = {
         # Mac test host, so no render has ever happened on mps (the pack is
         # present on the CUDA proving machines). A device_backends row is a claim
         # about proven execution, not about read-the-source plausibility
-        # (docs/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
+        # (apple/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
         # Add "mps" here only after a clip lands in otr/obs/.
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,
@@ -619,7 +619,7 @@ CAPABILITIES = {
         # Mac test host, so no render has ever happened on mps (the pack is
         # present on the CUDA proving machines). A device_backends row is a claim
         # about proven execution, not about read-the-source plausibility
-        # (docs/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
+        # (apple/ADDING_IMAGE_AND_VIDEO_LANES.md, the 30-second grep test).
         # Add "mps" here only after a clip lands in otr/obs/.
         "device_backends": ["cuda"], "requires_vendor": None,
         "needs_fp8_te": False, "needs_fp4_te": False,

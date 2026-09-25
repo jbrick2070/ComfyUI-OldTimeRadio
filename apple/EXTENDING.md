@@ -238,7 +238,7 @@ python scripts/build_variants.py --check
 ```
 
 `--all` writes the variant JSON, the launch recipe, and the generated docs
-(`apple/MACHINES.md`, `docs/DROPDOWN_MATRIX.md`, `docs/MACHINE_MATRIX.md`)
+(`apple/MACHINES.md`, `apple/DROPDOWN_MATRIX.md`, `apple/MACHINE_MATRIX.md`)
 from the same matrix. `--check` diffs the committed variants against a fresh
 regeneration and fails on drift.
 

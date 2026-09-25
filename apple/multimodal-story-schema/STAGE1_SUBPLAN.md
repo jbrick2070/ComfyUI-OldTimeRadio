@@ -1,6 +1,6 @@
 # Multi-Modal Story Schema -- STAGE 1 HARDENED SUB-PLAN (v3, post-kibitz r1+r2)
 
-Date: 2026-07-04. Branch: `v2.0-alpha`. Parent: `docs/multimodal-story-schema/BUILD_PLAN.md`.
+Date: 2026-07-04. Branch: `v2.0-alpha`. Parent: `apple/multimodal-story-schema/BUILD_PLAN.md`.
 Status: CONVERGED through kibitz r1+r2 (codex + antigravity, Claude judge; judgments
 in `kibitz-runs/2026-07-04-multimodal-stage1/`). Next: Fable structural gate, then code.
 

@@ -247,7 +247,7 @@ receipt that lies. Section 6's table missed it entirely.
 | `tests/fixtures/still_plan_matrix.json` | parity test; needs regeneration |
 | `public_engines.py` `_PUBLIC_LABEL` | 1:1 bijection assert |
 | `content_oracle.py` `_FAMILY_FALLBACK` | bare-script family resolution |
-| `docs/ENGINE_MATRIX.md` via `tools/engine_matrix.py` | `test_engine_matrix_doc` asserts every registered engine is documented |
+| `apple/ENGINE_MATRIX.md` via `tools/engine_matrix.py` | `test_engine_matrix_doc` asserts every registered engine is documented |
 | frame-contract tests | sweep new engines automatically |
 
 ### Its answers to the four open questions
@@ -357,7 +357,7 @@ Verified present in the repo and enforced by tests:
 
 * `workflows/variants/<profile>.json` **and** `<profile>.launch.md` — generated
   for every committed profile (70 launch files exist today).
-* `docs/ENGINE_MATRIX.md` — regenerate via `tools/engine_matrix.py`; parity is
+* `apple/ENGINE_MATRIX.md` — regenerate via `tools/engine_matrix.py`; parity is
   enforced.
 * `tests/fixtures/still_plan_head_parity.json` — regenerate the roster.
   (Round 1 named `still_plan_matrix.json`; **no such file exists.**)
@@ -365,7 +365,7 @@ Verified present in the repo and enforced by tests:
   not automatic.
 * `scripts/otr_w45_campaign.py` — every new local engine joins the roster or
   gets a deliberate `PROFILE_EXCEPTIONS` mapping.
-* `docs/evidence/video_evidence_manifest.json` — needs an explicit
+* `apple/evidence/video_evidence_manifest.json` — needs an explicit
   `admission_unenforced` statement until a real measurement lands. No estimated
   cost may ever kill a render.
 * `nodes/_otr_video_engines/registry.py` — a `CAPABILITIES` row is required;

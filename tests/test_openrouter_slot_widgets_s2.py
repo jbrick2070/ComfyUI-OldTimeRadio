@@ -44,7 +44,7 @@ from nodes.OTR_LedgerScriptWriter import _resolve_inputs
 # REORDERED 2026-09-14 after three independent readers (Claude Fable, GPT-5.6
 # Sol, DeepSeek v4 Pro) proposed an order blind to each other and a fourth pass
 # converged them. Reasoning, the contested placements and one driver overrule
-# are recorded in docs/GO_FORWARD_PLAN.md row A4.
+# are recorded in apple/GO_FORWARD_PLAN.md row A4.
 #
 # `source_bank` is the ONLY `required` entry, and that is load-bearing rather
 # than cosmetic: ComfyUI iterates input.required BEFORE input.optional into one

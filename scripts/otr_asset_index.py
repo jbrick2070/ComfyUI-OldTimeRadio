@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate `docs/MODEL_ASSET_INDEX.md` -- "to use X, download Z".
+"""Generate `apple/MODEL_ASSET_INDEX.md` -- "to use X, download Z".
 
     python scripts/otr_asset_index.py            # write the doc
     python scripts/otr_asset_index.py --stdout   # print it instead
@@ -409,7 +409,7 @@ def main(argv=None) -> int:
     if args.stdout:
         sys.stdout.write(text)
         return 0
-    dest = os.path.join(_REPO, "docs", "MODEL_ASSET_INDEX.md")
+    dest = os.path.join(_REPO, "apple", "MODEL_ASSET_INDEX.md")
     io.open(dest, "w", encoding="utf-8", newline="\n").write(text)
     print("wrote %s (%d bytes)" % (dest, len(text)))
     return 0

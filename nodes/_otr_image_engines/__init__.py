@@ -29,7 +29,7 @@ HOW TO ADD YOUR OWN IMAGE ENGINE (same shape as the other three namespaces):
    ``name`` field, decorate with ``@register`` from :mod:`registry`. There is
    no validated-subset filter: registering IS joining the dropdown (C4).
 
-2. DECLARE, never inherit-by-silence (docs/IMAGE_GEN_PREFLIGHT.md, Gate IG1):
+2. DECLARE, never inherit-by-silence (apple/IMAGE_GEN_PREFLIGHT.md, Gate IG1):
      name              -- the dropdown id, permanent once shipped.
      engine_version    -- str. Part of the still cache key
                           (role, object_id, prompt_hash, seed, engine_id,
@@ -53,7 +53,7 @@ HOW TO ADD YOUR OWN IMAGE ENGINE (same shape as the other three namespaces):
 4. Add a CAPABILITIES row in :mod:`registry` (one row per engine and vice
    versa -- tests/test_capability_profiles.py holds the bijection).
 
-5. Run the preflight: docs/IMAGE_GEN_PREFLIGHT.md, enforced by
+5. Run the preflight: apple/IMAGE_GEN_PREFLIGHT.md, enforced by
    tests/test_image_gen_preflight_matrix.py, which sweeps the LIVE registry --
    your engine is covered the moment it registers, no test edits needed.
    If your provider can REFUSE a prompt, read Gate IG4 first: a refusal can
@@ -112,7 +112,7 @@ except Exception:  # noqa: BLE001
 # Ideogram 4 (LOCAL weights, 2026-08-22) -- the typography-first still engine for
 # the still_word card. OPT-IN (default_roles=()); z_image_turbo stays the shipped
 # default. commercial_clean=False (non-commercial model agreement -- the code
-# ships, the weights never do; docs/IDEOGRAM4_LICENSE_ATTESTATION.md). Greyed by
+# ships, the weights never do; apple/IDEOGRAM4_LICENSE_ATTESTATION.md). Greyed by
 # assert_usable until all four artifacts are installed. Cold-import clean: the
 # module imports only the registry, the role vocabulary and stdlib. Own guard.
 try:  # pragma: no cover - trivial guard

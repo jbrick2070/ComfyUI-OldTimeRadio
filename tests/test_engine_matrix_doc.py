@@ -1,4 +1,4 @@
-"""docs/ENGINE_MATRIX.md may not drift from the live engine registry.
+"""apple/ENGINE_MATRIX.md may not drift from the live engine registry.
 
 Multi-clip coverage chunk 7a (2026-07-26). The matrix answers the operator's
 standing question -- aspect, resolution, seconds per clip, prompt contract,
@@ -21,7 +21,7 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
-DOC = ROOT / "docs" / "ENGINE_MATRIX.md"
+DOC = ROOT / "apple" / "ENGINE_MATRIX.md"
 TOOL = ROOT / "tools" / "engine_matrix.py"
 
 
@@ -37,7 +37,7 @@ def _tool():
 def test_the_generator_exists_and_the_doc_was_generated():
     assert TOOL.exists(), "tools/engine_matrix.py is the only writer of the doc"
     assert DOC.exists(), (
-        "docs/ENGINE_MATRIX.md is missing. Run: python tools/engine_matrix.py")
+        "apple/ENGINE_MATRIX.md is missing. Run: python tools/engine_matrix.py")
 
 
 def test_the_doc_matches_the_live_registry():
@@ -45,7 +45,7 @@ def test_the_doc_matches_the_live_registry():
     fresh = _tool().render()
     current = DOC.read_text(encoding="utf-8")
     assert current == fresh, (
-        "docs/ENGINE_MATRIX.md no longer matches the live engine registry. "
+        "apple/ENGINE_MATRIX.md no longer matches the live engine registry. "
         "Regenerate it in this commit: python tools/engine_matrix.py")
 
 
@@ -61,7 +61,7 @@ def test_the_doc_is_ascii_and_has_no_BOM():
     try:
         raw.decode("ascii")
     except UnicodeDecodeError as exc:
-        pytest.fail("docs/ENGINE_MATRIX.md is not ASCII: %s" % exc)
+        pytest.fail("apple/ENGINE_MATRIX.md is not ASCII: %s" % exc)
 
 
 def test_every_registered_engine_has_a_row():

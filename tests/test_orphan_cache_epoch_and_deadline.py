@@ -82,7 +82,7 @@ Both are fixed with two new atomic-locked primitives:
   hit-check-and-return under one lock acquisition.
 
 Neither fix requires or attempts the larger orphan-occupancy registry
-(deferred to a dedicated session -- see docs/PROD_BUG_LOG.md). All of it is
+(deferred to a dedicated session -- see apple/PROD_BUG_LOG.md). All of it is
 independently testable without CUDA, and provably inert on a box where no
 orphan is ever created (the epoch never moves; the deadline is never set).
 """

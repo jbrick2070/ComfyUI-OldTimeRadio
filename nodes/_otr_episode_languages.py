@@ -1,6 +1,6 @@
 """Episode language registry -- the multilingual one-switch.
 
-Plan: ``docs/multilingual-one-switch.md``. Built per the 2026-09-18
+Plan: ``apple/multilingual-one-switch.md``. Built per the 2026-09-18
 all-Kokoro day-1 coder prompt.
 
 ONE dropdown, ``episode_language`` on ``OTR_LedgerScriptWriter``, appended

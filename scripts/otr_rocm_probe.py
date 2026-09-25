@@ -9,7 +9,7 @@ models downloaded and NO render, so the expensive ask only goes to someone whose
 card has already cleared the cheap one.
 
 WHAT IS ACTUALLY UNKNOWN, and every check below maps to one of these. Measured
-2026-09-12: `docs/dropdown_matrix.json` carries an AMD verdict for ZERO of its
+2026-09-12: `apple/dropdown_matrix.json` carries an AMD verdict for ZERO of its
 61 engines, and the `amd` machine class is `status: draft` with no receipts at
 all. That column is not weak, it is empty.
 

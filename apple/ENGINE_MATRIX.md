@@ -291,7 +291,7 @@ JUMP plan on a still-consuming lane ever re-mints.
 
 ## Frame caps and the evidence behind them
 
-`evidence` lists every `docs/` receipt the adapter's own source
+`evidence` lists every `apple/` receipt the adapter's own source
 cites. **MISSING** means the adapter cites a document that is not
 in this repo -- a safety number nobody can check. This column
 exists because the HuMo 49-frame ceiling cited a bakeoff receipt
@@ -300,9 +300,9 @@ and it read exactly like a measured number until someone looked.
 
 | engine | cap | set by | evidence |
 |---|---|---|---|
-| animatediff15_lightning_video | - | contract max | docs/ADDING_IMAGE_AND_VIDEO_LANES.md |
+| animatediff15_lightning_video | - | contract max | apple/ADDING_IMAGE_AND_VIDEO_LANES.md |
 | animatediff15_v3_haunted_video | - | contract max | none cited |
-| animatediff15_v3_stillin_lab_video | - | contract max | docs/SPEC_haunted_image_to_video.md |
+| animatediff15_v3_stillin_lab_video | - | contract max | apple/SPEC_haunted_image_to_video.md |
 | cloud_kling_avatar | - | contract max | none cited |
 | cloud_ltx25_audio_in | - | contract max | none cited |
 | cloud_ltx25_foley_plus | - | contract max | none cited |
@@ -316,14 +316,14 @@ and it read exactly like a measured number until someone looked.
 | humo_1.7B | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_1.7B_169 | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
 | humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
-| ltx25_native_audio_in_16gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_audio_in_24gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_foley_16gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_foley_24gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_foley_blackwell | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_mime_16gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_native_mime_24gb | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx25_video | - | contract max | docs/PROD_BUG_LOG.md |
+| ltx25_native_audio_in_16gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_audio_in_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_foley_16gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_foley_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_foley_blackwell | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_mime_16gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_native_mime_24gb | - | contract max | apple/PROD_BUG_LOG.md |
+| ltx25_video | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx_8gb | - | contract max | none cited |
 | mesh_stage | - | contract max | none cited |
 | minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |

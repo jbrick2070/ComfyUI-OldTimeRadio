@@ -54,7 +54,7 @@ def _comfy(tmp_path: Path) -> Path:
 def test_runpod_manual_recipes_carry_every_authoritative_manifest():
     """No manual receipt may point at a playbook that omits its exact files."""
     provision = _load_provision()
-    playbook = (REPO / "docs" / "RUNPOD_INSTALL.md").read_text(
+    playbook = (REPO / "apple" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8"
     )
     assert set(provision.MANUAL_DOWNLOADS) == {

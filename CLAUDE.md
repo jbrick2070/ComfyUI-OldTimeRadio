@@ -494,7 +494,7 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
   -- `cd` to its root and use the RELATIVE path `tests\bug_bible_regression.py` (an absolute forward-slash
   path fails to collect).
 - **Knowledge gate before implementation or diagnosis:** read the relevant entries in
-  `docs\PROD_BUG_LOG.md` and the matching portable rules in
+  `apple\PROD_BUG_LOG.md` and the matching portable rules in
   `C:\Users\jeffr\Documents\ComfyUI\comfyui-custom-node-survival-guide\BUG_BIBLE.yaml`. The
   production log is the staging record, and the Bible is the reusable cross-project contract. A newly fixed, repeatable production failure must be recorded in the log and
   promoted with a Bible entry plus executable coverage whenever its verify condition is automatable.
@@ -550,7 +550,7 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
     the dev box structurally cannot answer about itself.
   * **The 5080 (IDREAM) owns the shipping surface:** `pyproject.toml` and anything registry-facing,
     `workflows/otr_canonical.json` and its variants, `nodes/`, and profile `status` promotions.
-  * **`docs/PROD_BUG_LOG.md` is shared and append-only** -- both boxes write it, by appending.
+  * **`apple/PROD_BUG_LOG.md` is shared and append-only** -- both boxes write it, by appending.
   **WHAT MAKES THIS SAFE IS STRUCTURAL, NOT ETIQUETTE.** `.gitattributes` marks the append-only logs
   `merge=union`, so a tail collision keeps BOTH sides automatically instead of raising conflict
   markers that a tired window resolves by picking one. That resolution was performed BY HAND twice
@@ -559,7 +559,7 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
   **STILL TRUE AND UNCHANGED:** two windows editing THE SAME FILE at once is how it gets corrupted,
   and the workflow JSON is the worst case. The split exists precisely so that does not happen; when
   work genuinely crosses the boundary, the owner of the file makes the edit, or the two windows
-  agree in-message first. `docs/GO_FORWARD_PLAN.md` remains the place to serialize a genuinely
+  agree in-message first. `apple/GO_FORWARD_PLAN.md` remains the place to serialize a genuinely
   shared multi-step effort.
 - **THE WINDOWS TALK TO EACH OTHER DIRECTLY. THE OPERATOR IS NEVER THE TRANSPORT LAYER
   (operator directive 2026-09-03, shouted, after a morning of hand-pasting registry findings
@@ -581,7 +581,7 @@ pass. "Passes the suite" is not the same claim as "the 5080's numbers did not mo
     him. On 2026-09-03 the other window held the alpha.17 bump on exactly this reasoning, correctly,
     after this window told it to take the bump -- deciding WHICH window acts is a peer call, and
     deciding WHETHER to publish is his.
-  * When the peer is offline, fall back to `docs/GO_FORWARD_PLAN.md` and push -- async, but still
+  * When the peer is offline, fall back to `apple/GO_FORWARD_PLAN.md` and push -- async, but still
     not through him.
 - Use **AskUserQuestion** for genuine operator decisions; use the **task list** for any multi-step work.
 ## 2. AUTONOMY / PRIME DIRECTIVE

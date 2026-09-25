@@ -19,7 +19,7 @@ Then the plate's LATENT is repeated in Python to the sampler batch (no cap,
 no new node class) and the video sampler runs at ``denoise < 1.0`` (E1).
 
 WHY THIS IS A PROBE, NOT A BUILD. The 2026-08-30 arc on this same lane
-(``docs/SPEC_haunted_image_to_video.md``) found that a repeated init latent
+(``apple/SPEC_haunted_image_to_video.md``) found that a repeated init latent
 plausibly suppresses motion by construction -- identical cross-frame keys in
 the temporal attention -- so the lane exists to run the denoise grid
 0.35 / 0.50 / 0.65 / 0.80 through the canonical graph, published to

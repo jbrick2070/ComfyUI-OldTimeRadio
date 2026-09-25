@@ -1,6 +1,6 @@
 """Lane-enablement chunk 3 -- source-payload fetcher/interpreter contracts.
 
-Plan of record: docs/multimodal-story-schema/CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md
+Plan of record: apple/multimodal-story-schema/CHUNK3_SOURCE_PAYLOAD_SUBPLAN.md
 (v5 FINAL, kibitz r1-r4 converged 2026-07-05). Proves:
 
 (1) payload validator matrix (EXACT keys, str values, non-empty seed_text);

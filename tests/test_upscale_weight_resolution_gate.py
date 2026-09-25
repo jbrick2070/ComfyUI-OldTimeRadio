@@ -1,7 +1,7 @@
 """THE UPSCALE LANE'S MISSING WEIGHT GATE (2026-08-19).
 
 WHY THIS FILE EXISTS. The video namespace has Gate 1 of
-`docs/VIDEO_LANE_PREFLIGHT.md` -- "every declared weight resolves via
+`apple/VIDEO_LANE_PREFLIGHT.md` -- "every declared weight resolves via
 folder_paths or a documented env pin" -- and `tests/test_lane_preflight_matrix.py`
 enforces it per lane. The UPSCALE namespace has thirteen test files and not one
 of them asks whether the engine's checkpoint is reachable. That asymmetry is how

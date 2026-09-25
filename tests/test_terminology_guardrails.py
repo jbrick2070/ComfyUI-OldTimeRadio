@@ -20,7 +20,7 @@ def test_source_bank_selector_has_only_canonical_ids():
 
 def test_active_operator_surfaces_use_bank_names():
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
-    plan = (REPO_ROOT / "docs" / "GO_FORWARD_PLAN.md").read_text(
+    plan = (REPO_ROOT / "apple" / "GO_FORWARD_PLAN.md").read_text(
         encoding="utf-8"
     )
     assert "NewsPro lane" not in readme

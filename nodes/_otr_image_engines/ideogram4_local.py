@@ -618,7 +618,7 @@ class Ideogram4LocalEngine:
     roles = ROLES
     #: OPT-IN. z_image_turbo stays the shipped default; no model is "primary".
     default_roles = ()
-    #: Non-commercial model agreement -- docs/IDEOGRAM4_LICENSE_ATTESTATION.md.
+    #: Non-commercial model agreement -- apple/IDEOGRAM4_LICENSE_ATTESTATION.md.
     #: The code ships; the weights never do.
     commercial_clean = False
     requires_flag = None            # vestigial: the registry IS the menu

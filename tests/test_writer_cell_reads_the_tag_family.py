@@ -103,7 +103,7 @@ def test_every_curated_writer_row_renders_a_defensible_nv16_cell():
 def test_the_legend_defines_every_word_the_writer_table_prints():
     """A table may not print a mark the legend leaves undefined."""
     legend = matrix._LEGEND
-    doc = (REPO_ROOT / "docs" / "DROPDOWN_MATRIX.md").read_text(encoding="utf-8")
+    doc = (REPO_ROOT / "apple" / "DROPDOWN_MATRIX.md").read_text(encoding="utf-8")
     assert "**24 GB+**" in legend, (
         "the cell can print '24 GB+' but the legend never says what it means")
     if "**24 GB+**" in doc:

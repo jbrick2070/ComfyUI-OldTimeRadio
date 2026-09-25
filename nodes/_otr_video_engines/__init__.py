@@ -16,7 +16,7 @@ module scope, so registering them here stays cold-import clean.
 HOW TO ADD YOUR OWN VIDEO ENGINE (same shape as the other three namespaces):
 ---------------------------------------------------------------------------
 
-The full checklist is docs/VIDEO_LANE_PREFLIGHT.md (enforced by
+The full checklist is apple/VIDEO_LANE_PREFLIGHT.md (enforced by
 tests/test_lane_preflight_matrix.py); EXTENDING_OTR.md gives the adapter
 walkthrough. One declaration deserves calling out here because silence about
 it is invisible until an episode quietly stops obeying the operator:

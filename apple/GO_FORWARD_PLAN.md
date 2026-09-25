@@ -177,7 +177,7 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   a key and raises exposes it. On the desktop boxes the server binds
   127.0.0.1, so that reader is already on the machine. **On the pod it is
   not:** `scripts/otr_pod_runtime.sh:458` launches with `--listen 0.0.0.0
-  --enable-cors-header` and `docs/RUNPOD_INSTALL.md` documents reaching it
+  --enable-cors-header` and `apple/RUNPOD_INSTALL.md` documents reaching it
   through the RunPod proxy, so on a pod a key-bearing queue that raises
   exposes the key to anyone the proxy admits (codex r3). Until the V3 shape
   lands, a pod run that spends Comfy credits should be treated as sharing
@@ -446,4 +446,4 @@ policy receipts, cfg promotion
 comparisons, the AMD scoped pod and platform acceptance, cloud billing opt-in
 routing, operator-parked casting/adaptation ideas, OTR-Lite after v2, the release
 runway, the missing `device_options` test module, regenerating
-`docs/MODEL_ASSET_INDEX.md`, and writer widget-label cosmetics.
+`apple/MODEL_ASSET_INDEX.md`, and writer widget-label cosmetics.

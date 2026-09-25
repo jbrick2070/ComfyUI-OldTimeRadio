@@ -249,7 +249,7 @@ class GhostSignalLightningEngine(GhostSignalEngine):
     #: All six recipe cells, through the seam. Declaring fewer would sample on
     #: the golden 20-step / cfg-8.0 recipe while stamping a Lightning receipt --
     #: wrong pixels under a confident label, which is the exact failure
-    #: ``docs/ADDING_IMAGE_AND_VIDEO_LANES.md`` names.
+    #: ``apple/ADDING_IMAGE_AND_VIDEO_LANES.md`` names.
     steps = LIGHTNING_STEPS
     sampler_name = LIGHTNING_SAMPLER_NAME
     scheduler = LIGHTNING_SCHEDULER

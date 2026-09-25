@@ -12,7 +12,7 @@ And the resolution could never succeed. The package directory is
 `importlib.import_module(REPO_ROOT.name.replace("-", "_"))` was permanently
 unsatisfiable -- ComfyUI loads the pack BY PATH. So the headline check had never
 run on any box, while the script reported OK. It was reproduced live and
-recorded in docs/HANDOFF_LOG.md, and `scripts/otr_macbeth_probe.py` had to route
+recorded in apple/HANDOFF_LOG.md, and `scripts/otr_macbeth_probe.py` had to route
 around it to get a real contract check.
 
 A comment cannot fail. These tests can.

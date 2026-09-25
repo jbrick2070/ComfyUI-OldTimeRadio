@@ -298,7 +298,7 @@ def test_the_overlays_are_not_wired_anywhere():
     owners = {(_REPO / p).resolve() for p in _OWNERS.values()}
     owners.update((_REPO / p).resolve() for p in _PROSE_ONLY_MENTIONS)
     skip = {".git", ".claude", "__pycache__", "tests", "node_modules",
-            "kibitz-runs", "kibitz", "otr", "output", "docs", "site-packages"}
+            "kibitz-runs", "kibitz", "otr", "output", "docs", "apple", "site-packages"}
     offenders = []
     for path in _REPO.rglob("*.py"):
         if any(part in skip for part in path.parts):

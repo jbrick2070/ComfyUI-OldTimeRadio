@@ -465,7 +465,7 @@ def test_windows_installer_honors_locked_and_runtime_overrides():
     assert '$env:TRANSFORMERS_OFFLINE = "1"' in script
     assert "Push-Location (Split-Path -Parent $Ckpt)" in script
 
-    runpod = (ROOT / "docs" / "RUNPOD_INSTALL.md").read_text(encoding="utf-8")
+    runpod = (ROOT / "apple" / "RUNPOD_INSTALL.md").read_text(encoding="utf-8")
     assert "UV_PYTHON_INSTALL_DIR" in runpod
     assert "uv python install 3.10        # IndexTTS2" in runpod
 
@@ -489,7 +489,7 @@ def test_posix_default_index_root_is_a_persistent_sibling_not_core_drift(
               "eng_indextts2.py").read_text(encoding="utf-8")
     downloader = (ROOT / "scripts" /
                   "_otr_idx_download_weights.py").read_text(encoding="utf-8")
-    playbook = (ROOT / "docs" / "RUNPOD_INSTALL.md").read_text(
+    playbook = (ROOT / "apple" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8")
     pod_owner = (ROOT / "scripts" / "otr_pod_provision.sh").read_text(
         encoding="utf-8")

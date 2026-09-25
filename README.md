@@ -312,10 +312,11 @@ folder name is historical; the guides cover every platform.)
 | [apple/PREFLIGHT.md](apple/PREFLIGHT.md) | Will what I built actually work? |
 | [apple/LLM_PREFLIGHT.md](apple/LLM_PREFLIGHT.md) | How do I add a writer LLM? |
 
-The development record -- bug logs, measurements, design notes -- lives under
-`docs/` in the
-[GitHub tree](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/docs)
-and is **not** part of a Manager install. Nothing in this file depends on it.
+The development record -- the bug log, the plan, generated matrices, design
+notes -- also lives in `apple/` in the
+[GitHub tree](https://github.com/jbrick2070/ComfyUI-OldTimeRadio/tree/main/apple)
+but is **not** part of a Manager install (`.comfyignore` excludes it by name).
+Nothing in this file depends on it.
 
 ---
 
@@ -772,6 +773,6 @@ canonical ships:
   tag, and the auto-download disk-space precheck reads this machine's free
   space.
 
-[docs/known-failures.md](docs/known-failures.md) explains why the
+[apple/known-failures.md](apple/known-failures.md) explains why the
 expected-failure set is kept empty on purpose. If one of these reaches you
 in practice, open an issue with the episode's ledger attached.

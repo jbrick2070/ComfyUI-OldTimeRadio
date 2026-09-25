@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Generate `docs/DEPENDENCIES.md` -- everything OTR needs, in install order.
+"""Generate `apple/DEPENDENCIES.md` -- everything OTR needs, in install order.
 
     python scripts/otr_dependency_doc.py
 
@@ -223,7 +223,7 @@ def render() -> str:
 
 def main() -> int:
     text = render()
-    dest = os.path.join(_REPO, "docs", "DEPENDENCIES.md")
+    dest = os.path.join(_REPO, "apple", "DEPENDENCIES.md")
     io.open(dest, "w", encoding="utf-8", newline="\n").write(text)
     print("wrote %s (%d bytes)" % (dest, len(text)))
     return 0
