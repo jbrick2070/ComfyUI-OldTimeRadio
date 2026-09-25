@@ -14,15 +14,10 @@ this file does not restate them, and does not restate the review or push rules.
 
 ## Live box -- 5080 (2026-09-25, afternoon)
 
-ComfyUI is on port 8000, resident and idle: relaunched at 09:23 by
-`scripts/_otr_soak_server_launch.cmd` (the overnight server predated the
-writer's `asset_cleanup` widget and refused it), then used for the three
-live cleanup legs (off / partial / full, all in `otr/obs`). Nothing is
-queued. It is safe to use; reset per section 4 of CLAUDE.md before any
-headless run. The overnight 1-act chain (`yt_chain.ps1`) ended in the
-morning; its review is Part A of [TEST_WAVE](TEST_WAVE.md) and has NOT been
-done. Full suite at every push today: the same 12 inherited reds as
-`fe17f426`, nothing new. The tree stays clean: no unpushed patches.
+ComfyUI is resident on port 8000 (`scripts/_otr_soak_server_launch.cmd`).
+Before any headless run, check `/queue`: if a prompt is running, it is someone's
+leg -- do not reset. When the queue is empty, reset per CLAUDE.md section 4. The
+tree stays clean: no unpushed patches.
 
 ## Operating order (hard)
 
@@ -39,7 +34,10 @@ code row (operator 2026-09-12 / 2026-09-17).
 **Operator 2026-09-25: "the only thing is to regress test."** The regression
 wave is open and is [TEST_WAVE](TEST_WAVE.md). The section 1 forks are his words
 and do not hold it; the section 2 rows land on their own and each wave receipt
-records the HEAD it ran.
+records the HEAD it ran. **Active now:** TEST_WAVE Part B on the 4060, run
+against ONE pinned commit the 5080 names (the operator's rule of 2026-09-25: no
+moving target), and Part C's Bug Bible run. Everything else here is open and not
+this wave's.
 
 ## 0. The bar
 
@@ -55,8 +53,10 @@ proven wrong. Aesthetic drift is closed.
 
 Open forks. One word from him closes a row into section 2, or cuts it.
 
-* **Pre-push hook.** `build_variants --check` plus the sibling matrix checks
-  from `.githooks/pre-push`. Changes how both boxes push.
+* **Pre-push hook.** No hook exists (`.githooks/` is not in the repo). The fork:
+  add one that runs `build_variants --check` plus the widget / link / doc-parity
+  / registry-scan tests before a push, or keep relying on the full suite each
+  window runs. Changes how both boxes push.
 
 * **Google BYO lane: stills-only by his ruling (67332dc5).** Veo on his paid
   Tier 1 project allows 2 requests a minute and 10 a day per model, and an
@@ -72,7 +72,7 @@ Open forks. One word from him closes a row into section 2, or cuts it.
 * **Non-English episodes admit only Kokoro, so Shakespeare-in-translation
   cannot run on the Google lane until he says which languages Google TTS
   may voice.** Measured 2026-09-19: French Hamlet on `google_veo_low_1act`
-  stopped in 29 s at `cast_lock.py:70` -- "engine 'google_tts' is not
+  stopped in 29 s at `cast_lock.py:62-65` -- "engine 'google_tts' is not
   admitted on a French episode (row engines: ['kokoro']). Kokoro is the
   dance leader day 1." That is his 2026-09-12 ruling working as written
   (`config/episode_languages.json` rows list the admitted engines; English
@@ -88,8 +88,8 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   landed on `my_story`, two of three characters (Stomp, Whiskers) carried
   `gender: None` because the operator's story never states one -- and
   `_otr_my_story.py:26` says so on purpose ("a gender they did not state is
-  never guessed from a name"). `cast_lock.py:1303` (citation fixed
-  2026-09-24; was `:1282`) then raises `VoiceCastingError ... NO FALLBACK`
+  never guessed from a name"). `cast_lock.py:1332-1336` (re-grounded
+  2026-09-25) then raises `VoiceCastingError ... NO FALLBACK`
   for `google_tts`, where the Kokoro
   path takes the gender-agnostic draw and ships. Two rules that are each
   right collide only on this lane. The fork: (a) let `google_tts` take the
@@ -138,8 +138,9 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   a bump publishes a scannable version. His call: now, or after the registry
   rules on 2.3.4. Everything since (the writer folder, the queue-time gate)
   rides the same bump.
-* **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
-  points at `/main/`. One click, his.
+* **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active, the registry icon points
+  at `/main/`, and the last live pin -- the RunPod bootstrap `curl` in
+  RUNPOD_INSTALL -- moved to `/main/` on 2026-09-25. One click, his.
 * **Flagged registry versions.** 2.1.5, 2.1.6, 2.3.0 and 2.3.1 are Flagged;
   2.3.2 and 2.3.3 are Active (read 2026-09-25). The API gives no reason. His
   Discord, not a code change.
@@ -168,28 +169,15 @@ writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
 the pin still governs Bark, MusicGen, the visual assets and the provisioner,
 and the 162-character tail it sizes for was always the visual one.
 
-### 0b. Retire the ComfyUI-LTXVideo dependency (measured 2026-09-25; lands after B4)
-
-`scripts/otr_provision.py` clones ComfyUI-LTXVideo at a pinned commit and
-applies `patches/ComfyUI-LTXVideo-kornia-pad.patch`; DEPENDENCIES.md 3b and
-README's node-pack paragraph name it for `ltx_8gb` / `ltx098_low_video`.
-Measured: every class the LTX 2.5 and LTX 8 GB engines ask for is ComfyUI
-core (`comfy_extras.nodes_lt*`, live `/object_info`), the pack's own registry
-(75 ids) holds none of them, and no OTR module imports its Python. It is a
-dependency of nothing shipped. Wait for the 4060's B4 (`otr_8gb_video` on a
-wiped box with no such pack) to publish; then rip the clone, the patch, its
-provisioner checks and tests, and the two doc mentions in one change. If B4
-fails for want of the pack, this row flips to "document why".
-
 ## 3. TEST
 
 Open by his word (2026-09-25). The wave -- the 5080 overnight review, the 4060
 regression on the 8 GB rows, the suite and the Bug Bible -- is
 [TEST_WAVE](TEST_WAVE.md). Do not freeze a head for it: each receipt records
-the HEAD it ran. Standing 2026-09-25 afternoon: Part A reviewed (4 queued /
-4 published, no failure; the AnimateDiff leg never queued before the cutoff,
-so A3 and the Ghost Half B measurement A4 stay OWED on the 16 GB row -- one
-`otr_16gb_animatediff` leg on the 5080 settles both). Part B on the 4060: B2 PASSED through the GUI on a fresh
+the HEAD it ran. Standing 2026-09-25 afternoon: Part A done (the chain: 4
+queued / 4 published, no failure; A3 and A4 settled by one
+`otr_16gb_animatediff` leg on the 5080 that published in 28 minutes). Part B
+on the 4060: B2 PASSED through the GUI on a fresh
 2.3.4 install (`c2f14301`); B3's weight auto-download proof PASSED and the
 leg then FAILED on the missing AnimateDiff-Evolved pack (PBUG-20260925-02,
 fixed `02758478`); the operator is wiping the 4060 for a fresh start, so the
@@ -202,32 +190,6 @@ ComfyUI core, so a missing one of those means an old ComfyUI, and the gate
 now says "Update ComfyUI" for them. Part C: the
 suite has run at every push today (12 inherited reds); the Bug Bible
 regression against the pack has not.
-
-## Already scoped -- do not build
-
-8 GB ship set (its physical wave is [TEST_WAVE](TEST_WAVE.md) Part B) · `scene_coherence_check`
-stays inert · no IP-Adapter on AnimateDiff · do not ping the Radeon tester ·
-`stable_audio_3` listing `cpu` (re-read the published `--cpu` leg log before
-editing the capability test) · **native-language science feeds for SciFi News
-Pro -- OUT OF SCOPE (operator 2026-09-19: "forget it, delete, out of scope").
-The lane reads the English feed and authors natively, and that is the shipped
-behaviour. Do not reopen it as a feed-selection question.**
-
-## Constraints specific to this plan
-
-- Full listener source, no RSS. Cast count is flexible and records requested vs
-  actual; the house announcer is excluded from the dramatic cast.
-- **We do not chase act count** (operator 2026-09-11), the same rule as word
-  count: the value is a request and a run delivers the closest performable
-  episode.
-- Model checking and a fixed attempt budget only -- no separate chunker, no
-  recursive loop.
-- An exhausted optional correction still yields a usable ledger; no predictive
-  word or duration gate.
-- Byline and attribution rules differ for My Story, Original and the adaptation
-  banks.
-- No replay, migration or re-render project: a saved input means fresh
-  generation.
 
 ## Parked
 

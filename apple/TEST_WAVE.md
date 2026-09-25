@@ -80,11 +80,20 @@ A2: 4 queued / 4 published, in order: `covenant_ink_20260924_232810`
 `counting_three_20260925_033216` (otr_16gb_mime, 04:48:18 -- a measurement,
 not a failure; his judgement whether a one-act mime leg should take that).
 Every weight the legs used read `[OTR.assets] EXISTING`.
-A3: NOT RUN (the leg never queued). Still owed for the 16 GB row. The 4060
-proved the auto-download half on the 8 GB row the same day (B3, `297f65ef`),
-and the node-class half is now the queue-time gate (`02758478`).
-A4: NOT MEASURED -- zero `Ghost Half B` lines all night, because only the
-AnimateDiff leg emits them. Owed with A3.
+A3: DONE the same afternoon on the 5080 at `884cacf9` (pack `a553ac3b`
+code): one `otr_16gb_animatediff` leg, 1 act, through
+`scripts/otr_canonical_api_run.py` (prompt `ec7d0d3b`). The queue-time gate
+passed it (ADE classes registered), every weight read `[OTR.assets] EXISTING`
+(SD 1.5, v3 motion module, v3 adapter), no `PREFLIGHT FAIL`. RESULT SUCCESS in
+00:28:08, 8 clips, published
+`deed_summary_20260925_122647__shst__adhv__none__koko__marc__g412__sa3_final.mp4`
+(137 MB) to `otr/obs`.
+A4: MEASURED on that leg. `[OTR_ShotLock] Ghost Half B: eligible=4
+submitted=4 admitted=4 candidates=5`. `kernel_source` over the 8 shots (from
+`node_episode_report.json`; it is not in the ledger): `bookend_radio` 4 (the
+music and announcer bookends), `key_object_in_beat` 2, `authored_subject` 2,
+`key_object` 0. Ghost modes: signal 3, object 3, figure 2. One leg, so a
+first reading, not a distribution.
 A5: nothing to classify. The five WARNING tracebacks at boot are the known
 duplicate-pack / `models` folder scan noise (same on every boot); the three
 ERROR tracebacks at the END of the log are `/object_info` probes at 08:33
@@ -103,15 +112,31 @@ merged to main) or B3 cannot prove it. Boot the headless server with the UTF-8
 launcher (CLAUDE.md section 5). One leg at a time, in this order -- cheapest
 weights first, so an early failure costs the least:
 
-| leg | row | video lane | what it proves |
-|---|---|---|---|
-| B1 | `otr_8gb_low` | `viz_camera` (no video weights) | Qwen3.5-4B writer at the 6.8 GB ceiling, Kokoro, Stable Audio 3, publish |
-| B2 | `otr_8gb_still` | `still_motion` | Z-Image Turbo stills on 8 GB |
-| B3 | `otr_8gb_animatediff` | `animatediff15_v3_haunted_video` | SD 1.5 checkpoint, v3 motion module and v3 adapter all download at queue time; no `PREFLIGHT FAIL` |
-| B4 | `otr_8gb_video` | `ltx_8gb` | LTX 0.9.8 2B plus T5 fetched at queue time |
-| B5 | `otr_8gb_ltx25_native_foley` | `ltx25_native_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card |
-| B6 | `otr_8gb_ltx25_native_mime` | `ltx25_native_mime_16gb` | same weights, `EXISTING` |
-| B7 | `otr_8gb_ltx25_native_audio_in` | `ltx25_native_audio_in_16gb` | same weights, `EXISTING` |
+| leg | row | video lane | what it proves | status 2026-09-25 |
+|---|---|---|---|---|
+| B1 | `otr_8gb_low` | `viz_camera` (no video weights) | Qwen3.5-4B writer at the 6.8 GB ceiling, Kokoro, Stable Audio 3, publish | owed |
+| B2 | `otr_8gb_still` | `still_motion` | Z-Image Turbo stills on 8 GB | PASSED through the GUI on a wiped 2.3.4 install (`c2f14301`, 32:09) |
+| B3 | `otr_8gb_animatediff` | `animatediff15_v3_haunted_video` | SD 1.5 checkpoint, v3 motion module and v3 adapter all download at queue time; no `PREFLIGHT FAIL` | the download half PASSED (`297f65ef`); the leg FAILED at render on the missing AnimateDiff-Evolved pack (PBUG-20260925-02, gate fixed `02758478`); retry owed on the fresh start |
+| B4 | `otr_8gb_video` | `ltx_8gb` | LTX 0.9.8 2B plus T5 fetched at queue time | owed on the fresh start, WITHOUT ComfyUI-LTXVideo installed (see below) |
+| B5 | `otr_8gb_ltx25_native_foley` | `ltx25_native_foley_16gb` | the ~25 GB LTX 2.5 stack on 8 GB; measured 707 s per 97-frame clip on this card | owed |
+| B6 | `otr_8gb_ltx25_native_mime` | `ltx25_native_mime_16gb` | same weights, `EXISTING` | owed |
+| B7 | `otr_8gb_ltx25_native_audio_in` | `ltx25_native_audio_in_16gb` | same weights, `EXISTING` | owed |
+
+**The fresh-start order (operator 2026-09-25: wipe the 4060's OTR install and
+models root first).** Test ONE commit the 5080 names, not a moving `main`.
+Install the pack; queue `otr_8gb_animatediff` BEFORE installing
+AnimateDiff-Evolved and log the refusal verbatim with its wall time -- it must
+arrive in seconds, lead with "Install ComfyUI-AnimateDiff-Evolved", and download
+nothing (PBUG-20260925-02's live verify). Then install the pack via Manager, B3,
+B4, then B1 and B5-B7.
+
+**B4 decides the ComfyUI-LTXVideo dependency.** Measured 2026-09-25: every class
+the LTX engines ask for is ComfyUI core, the pack's own registry (77 node ids)
+holds none of them, and no OTR module imports its Python. If B4 publishes on a
+box WITHOUT the pack, the provisioner's clone, its kornia pad patch and their
+checks and tests, and the pack's mentions in DEPENDENCIES and the README come
+out in one change. If B4 fails for want of the pack, that is the evidence the
+measurement missed something: record which class, and the docs say why instead.
 
 - Each is 1 act, `--timeout 0`. Record peak VRAM and any partial-load or
   offload lines; those are the 8 GB facts the 5080 cannot produce.
@@ -121,7 +146,7 @@ weights first, so an early failure costs the least:
 - A fix found here that touches shared code must show the 5080's path
   unchanged, measured (CLAUDE.md section 0B).
 
-## Part C -- suite and Bug Bible (not run since 2.3.3)
+## Part C -- suite and Bug Bible (the suite runs at every push; the Bible is owed)
 
 On whichever box is idle, after its GPU legs: the full suite with the Windows
 venv (`$env:PYTHONUTF8=1`, `pytest -q -p no:cacheprovider`, backgrounded to a

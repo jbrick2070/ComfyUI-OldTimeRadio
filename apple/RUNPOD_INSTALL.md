@@ -105,7 +105,7 @@ Run the owner:
 
 ```bash
 curl -fL --retry 4 \
-  https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/v2.0-alpha/scripts/otr_pod_provision.sh \
+  https://raw.githubusercontent.com/jbrick2070/ComfyUI-OldTimeRadio/main/scripts/otr_pod_provision.sh \
   -o /tmp/otr_pod_provision.sh
 bash /tmp/otr_pod_provision.sh
 ```

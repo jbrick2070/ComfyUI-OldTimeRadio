@@ -23,6 +23,38 @@ Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
 with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
 is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
+## 2026-09-25 -- MOVED FROM THE PLAN: "already scoped" and the plan's constraints
+
+The plan holds only unfinished work (its first rule); these two sections are
+standing rules, so they live here now, verbatim as they stood in the plan at
+`884cacf9` (the plan-hardening lane, 2026-09-25, cursor).
+
+### Already scoped -- do not build
+
+8 GB ship set (its physical wave is [TEST_WAVE](TEST_WAVE.md) Part B) · `scene_coherence_check`
+stays inert · no IP-Adapter on AnimateDiff · do not ping the Radeon tester ·
+`stable_audio_3` listing `cpu` (re-read the published `--cpu` leg log before
+editing the capability test) · **native-language science feeds for SciFi News
+Pro -- OUT OF SCOPE (operator 2026-09-19: "forget it, delete, out of scope").
+The lane reads the English feed and authors natively, and that is the shipped
+behaviour. Do not reopen it as a feed-selection question.**
+
+### Constraints specific to this plan
+
+- Full listener source, no RSS. Cast count is flexible and records requested vs
+  actual; the house announcer is excluded from the dramatic cast.
+- **We do not chase act count** (operator 2026-09-11), the same rule as word
+  count: the value is a request and a run delivers the closest performable
+  episode.
+- Model checking and a fixed attempt budget only -- no separate chunker, no
+  recursive loop.
+- An exhausted optional correction still yields a usable ledger; no predictive
+  word or duration gate.
+- Byline and attribution rules differ for My Story, Original and the adaptation
+  banks.
+- No replay, migration or re-render project: a saved input means fresh
+  generation.
+
 ## 2026-09-25 -- THE WRITER LLM DOWNLOADS AS REAL FILES INTO ComfyUI's `LLM` FOLDER
 
 Operator: "real folder" -- "what's best practice" -- "by no means will people
