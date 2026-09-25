@@ -304,7 +304,7 @@
       "wall_time_s": 22.1,
       "seeds_cost_row": true,
       "receipt": "docs/evidence/lane_receipts/lane08-ltx098_low_video.md",
-      "note": "The FIRST measurement of any kind for this lane on this box, and the one the low/high marker was waiting on. Cheapest lane in the roster: 1.75x cheaper than ltx23_low_audio_in by NET and 13.8x faster per beat. Recipe ltx098_distilled_2b_i2v_single_pass_v2, no quant. 5,394 MB of absolute headroom under the ceiling."
+      "note": "The FIRST measurement of any kind for this lane on this box, and the one the low/high marker was waiting on. Cheapest lane in the roster. Recipe ltx098_distilled_2b_i2v_single_pass_v2, no quant. 5,394 MB of absolute headroom under the ceiling."
     }
   ]
 }

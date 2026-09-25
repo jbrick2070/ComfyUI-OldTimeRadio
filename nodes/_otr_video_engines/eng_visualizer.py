@@ -53,7 +53,7 @@ class VisualizerEngine:
     required_inputs = ("audio_ref",)    # audio only; no init_image, no weights
     #: Coverage arch opt-OUT (explicit): the CRT scope floor synthesizes from audio
     #: and IGNORES a still -> mint NO image, so an all-visualizer episode needs no
-    #: image model at all (the accessible floor). See docs/2026-06-18-coverage-arch-wiring/.
+    #: image model at all (the accessible floor).
     accepts_still = False
     render_aspect = "wide"              # 16:9; no portrait geometry branch exists
     #: THIS LANE DELIBERATELY DECLARES NO ``render_canvas`` (lane 11,

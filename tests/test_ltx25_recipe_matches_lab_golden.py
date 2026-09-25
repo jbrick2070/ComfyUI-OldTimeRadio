@@ -289,7 +289,7 @@ def test_the_entire_selected_stage_two_matches_the_lab_byte_for_byte_semanticall
 
 def test_the_tiled_decode_knobs_match_the_lab_and_are_not_the_siblings():
     """The decode knobs are RECIPE values and drift silently if left as
-    literals. The sibling ``eng_ltx_av`` decodes whole-clip at 4096/8 by
+    literals. A retired sibling lane decoded whole-clip at 4096/8 by
     default; inheriting that by resemblance would change a measured recipe on
     a lane with 0.02 GiB of headroom, and nothing would say so."""
     _doc, g = _graph()
@@ -299,7 +299,8 @@ def test_the_tiled_decode_knobs_match_the_lab_and_are_not_the_siblings():
     assert dec["inputs"]["temporal_size"] == R.LTX25_DECODE_TEMPORAL_SIZE
     assert dec["inputs"]["temporal_overlap"] == R.LTX25_DECODE_TEMPORAL_OVERLAP
     assert R.LTX25_DECODE_TEMPORAL_SIZE != 4096, (
-        "4096 is eng_ltx_av's whole-clip default, not this lane's recipe")
+        "4096 is a retired sibling lane's whole-clip default, not this "
+        "lane's recipe")
 
 
 def test_the_peak_decomposition_sums_to_the_observed_peak():

@@ -55,8 +55,7 @@ class VizCameraEngine:
     #: the one visualizer that ignores that lever. The profile canvas channel is
     #: declared INERT instead, in
     #: ``test_lane_preflight_matrix.PROFILE_CANVAS_DOCUMENTED_DEAD``.
-    #: S1 (2026-07-25) per-model still plan (spec
-    #: ``docs/2026-07-25-still-plans-locked-build-spec.md`` section 3, Shape
+    #: S1 (2026-07-25) per-model still plan (spec section 3, Shape
     #: C -- "nothing"). ``viz_camera`` mints NO still. The empty tuple is
     #: the EXPLICIT "needs no images" declaration; a missing ``still_plan``
     #: would be treated as UNKNOWN and fail closed by the S1 audit.

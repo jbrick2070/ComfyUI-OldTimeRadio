@@ -88,10 +88,6 @@ driver) mapped into the address space and `IOAccelerator` regions resident.
   behind a cuda guard, so it is `0` here and the ceiling widget enforces nothing
   on Mac.
 
-**The one already-correct device-aware line** is the GGUF backend:
-`default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0`.
-That is the idiom the rest of the tree should converge on.
-
 ---
 
 ## 2. NF4 QUANTIZATION IS DEAD ON METAL. This is the biggest trap.
@@ -138,18 +134,6 @@ Levers that do NOT work, all measured:
   Qwen's ~9 GB. The catalog's "~3 GB resident" for E2B is its NF4 figure, and NF4
   is unusable here. **Qwen3.5-4B at quant `none` is the smallest viable Mac
   config**, which is why the canonical ships exactly that.
-
-The lever that should work and is not wired up: **GGUF via llama.cpp.**
-llama.cpp has real Metal kernels, `Q4_K_M` on a 4B writer is roughly 2.5 GB, and
-`_otr_gguf_backend.py` DID honour `mps` for `n_gpu_layers` -- but that file was
-DELETED on 2026-09-24 with the whole writer GGUF lane, so this is no longer a
-lever that is merely unwired: reviving it means rebuilding the backend. The
-sizing problem it answered is still real and currently has no in-tree answer.
-The README
-documents the build
-(`CMAKE_ARGS="-DGGML_METAL=on" pip install llama-cpp-python==0.3.33`), but
-`llama-cpp-python` is declared in neither `requirements.txt` nor
-`pyproject.toml`, so a clean install cannot reach it. See PBUG-20260907-07.
 
 ---
 

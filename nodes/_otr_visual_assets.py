@@ -138,6 +138,19 @@ _LTX25_WEIGHT_ENGINES = frozenset({
 })
 _COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
                      | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES)
+#: The registered AnimateDiff lanes load SD 1.5 INSIDE their own graph (a
+#: CheckpointLoaderSimple on ``GHOST_CHECKPOINT_NAME``), not through an image
+#: slot -- they declare ``accepts_still = False``, so the image-slot pass never
+#: asks for it, and until 2026-09-25 nothing fetched it for them. Only that
+#: checkpoint is allowlisted: their motion module and adapter are not, the
+#: engine's own ``assert_usable`` still checks those, and so these lanes stay
+#: OUT of ``_COVERED`` (which the dropdown matrix reads as "fetches everything").
+_ANIMATEDIFF_CHECKPOINT_ENGINES = frozenset({
+    "animatediff15_lightning_video",
+    "animatediff15_v3_haunted_video",
+    "animatediff15_v3_stillin_lab_video",
+})
+_REQUESTED = _COVERED | _ANIMATEDIFF_CHECKPOINT_ENGINES
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -406,7 +419,11 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
         picked = _literal(node.get("inputs") or {}, "engine")
         if picked and not picked.startswith("+ Add Custom"):
             result["engines"].add(picked)
-    for engine in sorted(result["engines"] - _COVERED):
+    for engine in sorted(result["engines"] & _ANIMATEDIFF_CHECKPOINT_ENGINES):
+        result["skipped"].append("%s: only its SD 1.5 checkpoint downloads automatically; "
+                                 "the motion module and adapter remain adapter-checked"
+                                 % engine)
+    for engine in sorted(result["engines"] - _REQUESTED):
         result["skipped"].append("%s: automatic visual-weight coverage unavailable; "
                                  "existing adapter checks remain" % engine)
     return result
@@ -431,7 +448,7 @@ def _same_file(left, right):
 
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
-                    sd15=None, lumina=None, ltx25=None, env=None):
+                    sd15=None, lumina=None, ltx25=None, animatediff=None, env=None):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -554,6 +571,13 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
+    if engines & _ANIMATEDIFF_CHECKPOINT_ENGINES:
+        # The token the lane's own graph hands CheckpointLoaderSimple. When an
+        # sd15 image slot is also selected it names the same default file, and
+        # `add` requests it once.
+        if animatediff is None:
+            raise VisualAssetError("AnimateDiff adapter resolution is unavailable")
+        add(animatediff.GHOST_CHECKPOINT_CATEGORY, animatediff.GHOST_CHECKPOINT_NAME)
     selected_ltx25 = sorted(engines & _LTX25_WEIGHT_ENGINES)
     if selected_ltx25:
         # ASK EACH LANE, same rule as every branch above: `_dit_name()` and its
@@ -826,6 +850,100 @@ def _progress_tqdm(progress, total_bytes):
     return _ProgressTqdm
 
 
+def _load_adapters(engines):
+    """The adapter objects :func:`native_requests` asks, loaded for exactly
+    ``engines`` -- no adapter module is imported for a lane nobody selected."""
+    adapters = dict.fromkeys(
+        ("zimage", "ltx", "sa3", "sd15", "lumina", "ltx25", "animatediff"))
+    if "z_image_turbo" in engines:
+        from ._otr_image_engines import z_image_turbo
+        adapters["zimage"] = z_image_turbo
+    if engines & _LTX_8GB_WEIGHT_ENGINES:
+        from ._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
+        adapters["ltx"] = Ltx8gbEngine()
+    if "stable_audio_3" in engines:
+        from ._otr_audio_engines import eng_stable_audio_3
+        adapters["sa3"] = eng_stable_audio_3
+    if "sd15" in engines:
+        from ._otr_image_engines import sd15
+        adapters["sd15"] = sd15
+    if "lumina_image" in engines:
+        from ._otr_image_engines import lumina_image
+        adapters["lumina"] = lumina_image
+    if engines & _ANIMATEDIFF_CHECKPOINT_ENGINES:
+        from ._otr_video_engines import eng_ghost_signal
+        adapters["animatediff"] = eng_ghost_signal
+    if engines & _LTX25_WEIGHT_ENGINES:
+        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
+        from ._otr_video_engines import registry as _vreg
+        ltx25 = {}
+        for eid in engines & _LTX25_WEIGHT_ENGINES:
+            engine = _vreg.get_engine(eid)
+            ltx25[eid] = engine() if isinstance(engine, type) else engine
+        adapters["ltx25"] = ltx25
+    return adapters
+
+
+class _NothingInstalled:
+    """A ``folder_paths`` stand-in for planning: no weight is installed, and
+    every category has one native root that does not exist."""
+
+    _ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "__otr_nothing_installed__")
+
+    @staticmethod
+    def get_full_path(category, token):
+        return None
+
+    @classmethod
+    def get_folder_paths(cls, category):
+        return [cls._ROOT]
+
+
+def planned_downloads(engines, env=None):
+    """``{(category, basename)}`` the queue-time preflight would fetch for
+    ``engines`` on a box that holds none of them.
+
+    The same adapters and the same :func:`native_requests` the validator runs,
+    so the answer cannot drift from the download it describes; no disk is
+    read and nothing is fetched. An engine outside ``_REQUESTED`` contributes
+    nothing, and a selection the preflight would refuse raises
+    :class:`VisualAssetError` exactly as it would at queue time.
+    """
+    engines = {str(e) for e in engines if e} & _REQUESTED
+    if not engines:
+        return set()
+    adapters = _load_adapters(engines)
+    if adapters["ltx"] is not None:
+        adapters["ltx"] = _NothingInstalledLtx(adapters["ltx"])
+    requests = native_requests(engines, folder_paths=_NothingInstalled,
+                               env=dict(env or {}), **adapters)
+    return {(r["category"], r["token"]) for r in requests}
+
+
+class _NothingInstalledLtx:
+    """The LTX 0.9.8 adapter's names, with its on-disk lookups answering
+    "not installed" to match :class:`_NothingInstalled` -- its path methods
+    read the real models root, which a planning call must not touch."""
+
+    def __init__(self, inner):
+        self._inner = inner
+
+    def _ckpt_name(self):
+        return self._inner._ckpt_name()
+
+    def _t5_name(self):
+        return self._inner._t5_name()
+
+    @staticmethod
+    def _ckpt_path():
+        return None
+
+    @staticmethod
+    def _t5_path():
+        return None
+
+
 def ensure_prompt_visual_assets(prompt, unique_id):
     """Called by the already-wired validator before the writer may execute."""
     from ._otr_shared.public_engines import resolve_engine_id
@@ -846,35 +964,16 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                        role_video_slots=role_video_slots)
     for note in plan["skipped"]:
         log.warning("[OTR.assets] %s", note)
-    engines = plan["engines"] & _COVERED
+    engines = plan["engines"] & _REQUESTED
     if not engines:
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths
     from comfy import model_management
-    zimage = ltx = sa3 = sd15 = lumina = ltx25 = None
-    if "z_image_turbo" in engines:
-        from ._otr_image_engines import z_image_turbo as zimage
-    if engines & _LTX_8GB_WEIGHT_ENGINES:
-        from ._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
-        ltx = Ltx8gbEngine()
-    if "stable_audio_3" in engines:
-        from ._otr_audio_engines import eng_stable_audio_3 as sa3
-    if "sd15" in engines:
-        from ._otr_image_engines import sd15
-    if "lumina_image" in engines:
-        from ._otr_image_engines import lumina_image as lumina
-    if engines & _LTX25_WEIGHT_ENGINES:
-        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
-        from ._otr_video_engines import registry as _vreg
-        ltx25 = {}
-        for eid in engines & _LTX25_WEIGHT_ENGINES:
-            engine = _vreg.get_engine(eid)
-            ltx25[eid] = engine() if isinstance(engine, type) else engine
+    adapters = _load_adapters(engines)
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
-    requests = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                               ltx=ltx, sa3=sa3, sd15=sd15, lumina=lumina,
-                               ltx25=ltx25, env=otr_env.snapshot())
+    requests = native_requests(engines, folder_paths=folder_paths,
+                               env=otr_env.snapshot(), **adapters)
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -949,9 +1048,8 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                      receipt["status"].upper(), item["token"], receipt["bytes_verified"],
                      time.monotonic() - started, native)
         # Re-resolve adapter picks as well as native token identity after writes.
-        after = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
-                                ltx=ltx, sa3=sa3, sd15=sd15, lumina=lumina,
-                                ltx25=ltx25, env=otr_env.snapshot())
+        after = native_requests(engines, folder_paths=folder_paths,
+                                env=otr_env.snapshot(), **adapters)
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):

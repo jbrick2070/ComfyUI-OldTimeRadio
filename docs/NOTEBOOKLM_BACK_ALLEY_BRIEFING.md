@@ -127,9 +127,8 @@ want to clone.
 
 ## Chapter: Foley and mime, the two mix decisions
 
-`ltx25_high_foley_plus` and `ltx25_high_mime` (the profiles also say
-`ltx25_foley_plus` and `ltx25_mime`) draw the same LTX 2.5 picture as
-the 16 GB video graph. They keep the audio the model invented next to
+`ltx25_native_foley_16gb` and `ltx25_native_mime_16gb` draw the same
+LTX 2.5 picture as the 16 GB video graph. They keep the audio the model invented next to
 that picture.
 
 **Foley** pours that invented room into the episode master at an even
@@ -144,9 +143,8 @@ radio for a while.
 
 Two Cloud cousins exist as saved deluxe graphs: hosted Foley and hosted
 audio-in. Those are costumes. The local foley and mime rows are the
-alley of the 16 GB card -- gated weights, a licence click, about 22 GiB
-placed by hand, Q3 GGUF because the official safetensors do not fit
-16 GB.
+alley of the 16 GB card -- about 25 GB of LTX 2.5 weights that download
+themselves the first time the graph is queued.
 
 ---
 
@@ -161,7 +159,7 @@ turns.
 
 ---
 
-## Chapter: HuMo, Wan, H3 -- the big local walks
+## Chapter: HuMo, H3 -- the big local walks
 
 None of these are a shipping default. All of them are in the video menu.
 
@@ -169,21 +167,11 @@ None of these are a shipping default. All of them are in the video menu.
 sound moves the mouth. Large. 16 GB territory. Proven there. Out of
 memory on 8 GB.
 
-**Wan 2.2** (`wan22_high_video`, `wan22_high_fast`) is local diffusion
-with a still pinned as the first frame. The high lane is proven on
-16 GB. The fast lane fits and has no published episode. Both refuse an
-8 GB card.
-
 **MiniMax H3** is the largest download on the board -- low-40s of
 gigabytes -- and the slowest local walk. `h3_low_video` is picture only.
 `h3_low_audio_in` takes a portrait plus the beat audio. Neither emits
 sound of its own. Proven on 16 GB. Not a house default, because a first
 episode should not fetch a third of a disk.
-
-**LTX 2.3** is the honest trap. `ltx23_high_video` runs out of memory on
-8 GB and on 16 GB. It stays in the list because the list is the
-registry, not a recommendation. `ltx23_low_audio_in` can fit 16 GB and
-is still nobody's saved graph.
 
 ---
 

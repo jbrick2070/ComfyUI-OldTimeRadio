@@ -28,7 +28,7 @@ Both phases are intentionally module-local helpers so the cascade
 orchestrator depends on a stable surface even when num2words isn't
 installed (e.g. in CI without the optional dep).
 
-ADR: docs/2026-05-11-multi-turn-polish-adr.md (sprint commit 5 of 14).
+ADR: the 2026-05-11 multi-turn-polish ADR (sprint commit 5 of 14).
 Status: LFC Phase 7 + 8 (2026-05-11).
 """
 from __future__ import annotations

@@ -20,7 +20,7 @@ The full Ledger Freeze Cascade (Phases 1-9) is layered on top of this
 module in subsequent commits. The orchestrator that wires these phases
 together lives in `nodes/OTR_LedgerFreezeCascade.py` (commit 2).
 
-Reference: docs/2026-05-11-multi-turn-polish-adr.md (Ledger Freeze
+Reference: the 2026-05-11 multi-turn-polish ADR (Ledger Freeze
 Cascade ADR).
 
 Schema mapping (ADR §6.16 reality-check vs L3 ledger):

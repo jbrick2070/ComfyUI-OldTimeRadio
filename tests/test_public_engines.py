@@ -29,8 +29,6 @@ _TIER = {
     # grew by one row per lane and the `<vramtier>gb` rows retired as their own
     # lanes closed; the last went on 2026-08-11, so every row below is a
     # low/high id.
-    # Lane 1, 2026-08-11: wan_i2v.
-    "wan22_high_i2v": "wan_i2v",
     # Lane 2, 2026-08-11: the ruled hero cast. The id states audio_in and the
     # aspect because a bare `humo14_high_face` hid which way its sibling
     # renders.
@@ -61,61 +59,10 @@ _TIER = {
     "ltx25_high_video": "ltx25_video",
 }
 
-#: Public rows whose INTERNAL engine is retired -- resolvable, never offerable.
-#:
-#: The row stays in `_PUBLIC_ENGINES` (so `_TIER` still mirrors it exactly and
-#: the bijection tests below are unweakened), but the engine is unregistered, so
-#: it contributes NO menu option. Every menu-shaped assertion in this file skips
-#: these and then checks the tombstone property instead: the id still resolves,
-#: and it cannot be picked.
-#:
-#: `wan22_high_i2v` -> `wan_i2v` joined this set with the 2026-08-26 large-Wan
-#: rip (operator: "rip the large wan we don't need"). The public row is kept
-#: deliberately so a stale saved graph reaches the named RetiredEngineError
-#: rather than the generic "no engine named ..." message.
-_TOMBSTONE_PUBLIC_IDS = frozenset({"wan22_high_i2v"})
-
-#: The rows that still render a live menu option -- what the menu tests iterate.
-_LIVE_TIER = {public: internal for public, internal in _TIER.items()
-              if public not in _TOMBSTONE_PUBLIC_IDS}
-
 
 # --------------------------------------------------------------------------- #
 # resolver
 # --------------------------------------------------------------------------- #
-def test_the_naming_convention_rows_state_the_model_they_load():
-    """A public id is a claim about the model. `wan22_high_i2v` says Wan 2.2
-    because the weight is wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors and
-    the frozen recipe is wan22_14b_i2v_single_pass_v1.
-
-    RULED 2026-08-11: `wan21` was one mistyped version number in the spec that
-    every downstream document inherited; the naming itself was never in doubt.
-    Spec and transplant plan corrected, `wan22_high_i2v` stands, no code moved.
-    The retired string keeps a legacy-alias row so a paste from any stale copy
-    still resolves.
-
-    RETIRED 2026-08-26 (operator: "rip the large wan we don't need"). Both name
-    rows above SURVIVE the rip and that is the whole reason this test still
-    exists: they are what routes a stale saved graph into the named
-    RetiredEngineError instead of the generic "no engine named ..." message.
-    The registry assertion that used to close this test went with the rip --
-    `wan_i2v` has no CAPABILITIES row any more, because the engine is
-    unregistered. What replaces the dead assertion is the property that
-    actually matters now -- the id these rows point at is retired.
-    """
-    assert pub._PUBLIC_ENGINES["wan22_high_i2v"] == "wan_i2v"
-    assert pub._LEGACY_ENGINE_ALIASES["wan21_high_i2v"] == "wan_i2v"
-    assert "wan21_high_i2v" not in pub._PUBLIC_ENGINES, (
-        "two public ids on one internal id collapses _INTERNAL_TO_PUBLIC and "
-        "trips the module-scope bijection assert at IMPORT time")
-    assert "wan_i2v" in pub.RETIRED_ENGINE_IDS
-    assert "wan_i2v" not in vreg.CAPABILITIES, (
-        "the 14B i2v lane was unregistered by the 2026-08-26 rip; a CAPABILITIES "
-        "row reappearing means the engine came back without the retirement "
-        "being lifted")
-
-
-
 def test_public_engines_bijection():
     assert len(pub._PUBLIC_ENGINES) == len(pub._INTERNAL_TO_PUBLIC)
     assert pub._PUBLIC_ENGINES == _TIER
@@ -175,17 +122,9 @@ def test_menu_shows_public_ids_uniquely():
         label = _expected_label(public, internal)
         assert label in combo
         assert combo.count(label) == 1
-    # A TOMBSTONED row is resolvable but never offerable. Asserting its absence
-    # by PREFIX, not by one built label: the label builder needs a registered
-    # engine to derive an aspect suffix from, and a retired lane has none -- so
-    # the check has to be "no option starts with this public id" rather than
-    # "this exact string is missing".
-    for public in _TOMBSTONE_PUBLIC_IDS:
-        assert not any(o.startswith(public) for o in combo), (
-            "%s is retired and must not render as a menu option" % public)
     # the renamed internal ids never leak into the menu: a lane that HAS a
     # public id is offered only under it
-    for public, internal in _LIVE_TIER.items():
+    for public, internal in _TIER.items():
         if internal == public:
             continue
         leaked = [o for o in combo if o.split(" ")[0] == internal]
@@ -196,26 +135,12 @@ def test_menu_shows_public_ids_uniquely():
     assert len(combo) == len(set(combo))               # no duplicates
 
 
-@pytest.mark.parametrize("public,internal", list(_LIVE_TIER.items()))
+@pytest.mark.parametrize("public,internal", list(_TIER.items()))
 def test_exact_menu_option_for_tier(public, internal):
     assert vd.exact_menu_option_for(internal) == _expected_label(
         public, internal)
     # and it round-trips
     assert resolve_engine_id(vd.exact_menu_option_for(internal)) == internal
-
-
-@pytest.mark.parametrize("public", sorted(_TOMBSTONE_PUBLIC_IDS))
-def test_exact_menu_option_for_a_tombstoned_row_fails_loud(public):
-    """A retired lane has no menu option, and asking for one must RAISE.
-
-    `exact_menu_option_for` is what the applier and build_variants call to write
-    the exact string the UI would have saved. A retired lane resolves to zero
-    live options, and the function's 0-or-many guard is what stops a generated
-    profile or variant from being written against an engine that cannot render.
-    """
-    internal = _TIER[public]
-    with pytest.raises(ValueError, match="found 0"):
-        vd.exact_menu_option_for(internal)
 
 
 def test_exact_menu_option_for_non_tier_and_missing():

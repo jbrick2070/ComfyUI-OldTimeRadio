@@ -331,7 +331,7 @@ already promoted). Confidence tags preserved from the sweep.
 - **THE CORPUS NUMBERS, STATED SO THEY RECONCILE** (a QA pass caught the first draft implying 20 + 5 = 21). Three different populations: the LLM proposed a reserved id **21 times and it was accepted 21 times**; **18** of those accepted proposals became a final cast row. Separately, **25 cast rows in total carry a reserved id** = **5 legitimate LEMMY rows** + **20 leaks** onto DON PEDRO, MARCELLUS, BANQUO, FLETCHER CORBEN, STARBUCK, FERDINAND, MOE GORDON, Dr. Alexei Petrov and others. Of the 20 leaks, **18 came through the hybrid path and 2 did not** -- and that 2 is not noise, it is the fingerprint of the THIRD pool below.
 - **ALL 5 LEGITIMATE LEMMY ROWS CAME THROUGH THE POLICY PATH, ZERO THROUGH THE HYBRID PATH** (measured per-row against `meta.voice_cast_decision`). This was the QA pass's open question -- whether reserving would cost Lemmy rows that only ever got his voice by being unfiltered card #1 -- and the answer is no. The fix cannot take his own voice away from him.
 - **THE THREE 08-18 VERIFICATIONS WERE ALL SOUND AND ALL BLIND TO THIS.** The 480 seeded draws went through `assign_voice_for_slot` -- the 4% path. The corpus check was a true observation of a **1.1% leak rate (21/1877) not firing in a small window**, not proof it could not. The operator's *"right amount of lemmy"* is consistent with both. Three green checks on the wrong path still read as green.
-- **A PANEL HAD ALREADY NAMED THIS LAYER ON 2026-08-04 AND IT WAS NOT ACTED ON.** `kibitz-runs/2026-08-04-continuity-ultracode/input_voice-variety.json:174`: *"the hybrid LLM voice-fit ... sits IN FRONT of the deterministic caster ... whose 12-card truncation is a harder variety cap than the tier-of-one ... the plan's 200-episode simulation measures a path production can bypass entirely."* It asked for a test running with the hybrid path ENABLED. That test did not exist until now.
+- **A PANEL HAD ALREADY NAMED THIS LAYER ON 2026-08-04 AND IT WAS NOT ACTED ON.** A 2026-08-04 kibitz review noted: *"the hybrid LLM voice-fit ... sits IN FRONT of the deterministic caster ... whose 12-card truncation is a harder variety cap than the tier-of-one ... the plan's 200-episode simulation measures a path production can bypass entirely."* It asked for a test running with the hybrid path ENABLED. That test did not exist until now.
 - **THE THIRD POOL, FOUND BY THE SONNET QA PASS ON THE FIX ABOVE -- AND IT WAS A BLOCKER.** `gender_agnostic_fallback_ref` (`_otr_voice_bank.py`) had **three** production call sites (`cast_lock.py:938`, `_otr_voice_node_common.py:172` and `:243`) drawing uniformly over the engine's refs with **no reserved filter, and no reject-tier filter either**. It is not a rare branch: canonical gender `other` is **20% of every roll** and the bank carries zero rows for it, so `assign_voice_for_slot` raises and every one of those rows lands here. QA measured Lemmy's clone coming back in **7-9 of 200 draws per engine** -- roughly the odds of any other single voice, because nothing excluded it. That is what the 2 non-hybrid leaks above were. **It was missed twice because it is not a "caster" by name**, yet it draws the reference that both the ledger stamp and the render path use. Now filtered, measured **0/200** after, with 40 distinct voices still reachable.
 - **AND THE HELPER ITSELF WAS HARDENED (QA finding).** `reserved_voice_ref_ids()` caught only `ImportError`, but it now has four callers and two of them promise in their own docstrings to be pure and never raise. A malformed `LEMMY_VOICE_POLICY` (truthy non-dict) would have raised `AttributeError` straight through those promises and out of `cast_lock.py`, turning a cosmetic config error into a dead render. The walk is split into `_reserved_ids_from_policy` and the wrapper now fails soft on any exception -- reserving nothing, which is exactly the pre-reservation behaviour, rather than failing an episode.
 - **FINAL FIX (2026-08-18 night).** `build_voice_cards` no longer offers a reserved id, and `validate_voice_proposal` refuses one even if proposed off-list (a proposal is free text and need not name a shown card; the validator is the last gate before CastLock stamps). Both in `nodes/_otr_voice_bank.py`. The policy path is untouched, so Lemmy's own qualified route still stamps his voice directly. New `tests/test_lemmy_reserved_on_hybrid_path.py` (10 tests) covers both layers with teeth-checks: the card list must not collapse to empty, an ordinary proposal must still validate, and the reserved ids must remain present in the unfiltered bank.
@@ -572,7 +572,7 @@ already promoted). Confidence tags preserved from the sweep.
 - surfaced: scifi_fable2 30w live smoke roll 2, 2026-07-10
 - symptom: TemplateError mid-render on the P3 reroll path
 - root cause: reroll emitted two consecutive user-role messages; chat template requires alternation
-- fix: fold reroll into ONE user message (docs/2026-07-10-fable2-s1b-smoke-hardening.md)
+- fix: fold reroll into ONE user message
 - verify idea: construct a P3 reroll, assert strict role alternation
 - bible-worthy: yes -- chat-template alternation, easy to reintroduce in any lane
 - confidence: HIGH
@@ -1080,7 +1080,7 @@ its name contains `BUG`.
 
 ## PBUG-20260626-01 -- LTX-AV activation spill caused a no-OOM multi-minute crawl
 - promotion: BUG-07.22
-- surfaced: GPU-validated live 30-word all-`ltx_audio_in` headless run,
+- surfaced: GPU-validated live 30-word all-LTX-audio-conditioned headless run,
   2026-06-26; 223 s/iteration spill reduced to steady roughly 11 s/iteration
 - symptom: audio-conditioned video inference avoided OOM but fell into system
   memory spill with near-zero free VRAM and an extreme per-beat slowdown
@@ -1097,7 +1097,7 @@ its name contains `BUG`.
 
 ## PBUG-20260702-02 -- orphaned one-shot environment hook poisoned later headless boots
 - promotion: BUG-12.52
-- surfaced: live all-`ltx_audio_in` probe, 2026-07-02; the report instead showed
+- surfaced: live all-LTX-audio-conditioned probe, 2026-07-02; the report instead showed
   every shot rendered by HuMo from a crashed leg's stale force-engine override
 - symptom: a canonically configured run silently inherited file-based engine
   overrides that were not present in the explicit new-run configuration
@@ -2204,7 +2204,7 @@ out until they independently meet the same production-only admission rule.
 - verify idea: for each curated local row, assert the emitted dropdown label carries exactly one state suffix for a given fixture cache state (materialized weight blob -> `[LOCAL HF]` for gemma / bare id otherwise; config-only OR absent -> `[NOT DOWNLOADED]`; never both); assert `_hf_hub_root()` returns the `HF_HUB_CACHE` path and wins over `HF_HOME/hub`; assert `_snapshot_has_weights` is False for a config-only snapshot and True for one with a weight blob
 - bible-worthy: yes -- generic rule: a model-picker that scans the HF cache must (a) resolve the cache the LOADER uses (honor HF_HUB_CACHE, not just HF_HOME/legacy alias), (b) gate "downloaded" on a materialized weight blob, not a bare snapshot dir, and (c) keep UI state badges mutually exclusive. Hits any custom node that labels a model dropdown from a cache walk
 - operator env note (NOT code-fixable): on this box the ComfyUI process resolves to `~/.cache/huggingface/hub` because it has no HF_* var set; the User-registry `HF_HUB_CACHE=C:\ComfyUI-Models\huggingface` points at the CONFIG-ONLY parent (weights live in `...\huggingface\hub`). For the dropdown to show the real weights, launch ComfyUI with `HF_HOME=C:\ComfyUI-Models\huggingface` (yields `/hub`) or `HF_HUB_CACHE=C:\ComfyUI-Models\huggingface\hub`. The code fix makes the label HONEST for whatever cache the process actually uses
-- follow-up (operator directive 2026-07-16, same day): after seeing the corrected labels the operator observed the download-state STILL depends on each user's HF cache layout ("has to work out of the box for every user regardless of where they store their files"), which no scanner can guarantee. Per that directive the download-state badges were REMOVED entirely: `build_dropdown_choices` now emits the bare repo id / handle with NO `[LOCAL HF]`/`[NOT DOWNLOADED]`/`[LOCAL GGUF]` badge (the dead `_display_label_for_local_row` + `_is_google_gemma_local_row` helpers were ripped). `on_disk` is still tracked internally (recovery hint + auto-download short-circuit) and the HF_HUB_CACHE + weight-completeness fixes are retained; the SUFFIX CONSTANTS + `_strip_label_suffix` stay so a value saved by an older badge-bearing workflow still normalizes. Selection is never gated -- a not-cached model is fetched by `auto_download_if_missing` on first Queue
+- follow-up (operator directive 2026-07-16, same day): after seeing the corrected labels the operator observed the download-state STILL depends on each user's HF cache layout ("has to work out of the box for every user regardless of where they store their files"), which no scanner can guarantee. Per that directive the download-state badges were REMOVED entirely: `build_dropdown_choices` now emits the bare repo id / handle with NO `[LOCAL HF]`/`[NOT DOWNLOADED]` badge (the dead `_display_label_for_local_row` + `_is_google_gemma_local_row` helpers were ripped). `on_disk` is still tracked internally (recovery hint + auto-download short-circuit) and the HF_HUB_CACHE + weight-completeness fixes are retained; the SUFFIX CONSTANTS + `_strip_label_suffix` stay so a value saved by an older badge-bearing workflow still normalizes. Selection is never gated -- a not-cached model is fetched by `auto_download_if_missing` on first Queue
 - **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `build_dropdown_choices` (`nodes/_otr_model_catalog.py`) emits a bare `repo_id` with no badge-suffix logic at all (`aaaf660a` + `0ae59ed4`). There is no code path that can print `[NOT DOWNLOADED]`.
 - previous status: OPEN (badge-label surface removed; underlying cache-resolution/completeness fix stands)
 - status: **CLOSED 2026-08-18 -- FIXED, symptom structurally unreachable**
@@ -2223,17 +2223,17 @@ out until they independently meet the same production-only admission rule.
 - **RESOLUTION (2026-07-17, operator decision "allow longer text"):** after P0 cleared, a live leg (`90f22b15`) failed P3 `string_too_long` on BOTH `premise` (>144) AND scene `description` (>72) -- the -04 recipe IS insufficient for the verbose v4 proof-pressure lane. Operator chose to RAISE the caps rather than clip prose. Raised the non-spoken metadata caps: `premise` 144->240, scene/shot `description` 72->144 (draft+final models + `_p3_text_patch_cap` + the text-patch `replacement_text` schema bound + the receipt). These caps are **load-bearing** (they size the P3 draft to the model's 8192 context+output budget), so the output reservation was resized `1647->1829` and every exact-token guard updated (max-width draft 1418->1576 tokens; envelope re-verified prompt+output=5935<=8192). Full suite 8144 / Bible 17. **LIVE-PROVEN**: leg `c1f3891f` RESULT SUCCESS + obs_publish -- premise+description now fit the raised caps end-to-end (obs asset on disk). NOT promoted to a new PBUG (re-occurrence of -04, resolved by the cap raise, not a novel class).
 
 ## PBUG-20260718-01 -- scifi_fable2_v3 was a runnable=True bank that could never complete a leg (fable2 revision_contract hardcodes rules_id == 'scifi_fable2')
-- surfaced: live cross-bank Sonnet bake-off render window, 2026-07-18, baseline HEAD `60c73618`; the `scifi_fable2_v3` story-only leg logged `RESULT FAIL canonical_runner_exit=1` at t=22s, before any generation, and is model-independent (reproduced under creative=`anthropic/claude-sonnet-4.5`). Full causal record: `docs/2026-07-18-NEWBUG-fable2-v3-rules-id.md`.
+- surfaced: live cross-bank Sonnet bake-off render window, 2026-07-18, baseline HEAD `60c73618`; the `scifi_fable2_v3` story-only leg logged `RESULT FAIL canonical_runner_exit=1` at t=22s, before any generation, and is model-independent (reproduced under creative=`anthropic/claude-sonnet-4.5`).
 - symptom: `!!! [scifi_fable2] pass 'revision_contract' failed: story_rules.rules_id must be 'scifi_fable2', got 'scifi_fable2_v3' (no fallback to legacy_many_pass)` -> `nodes._otr_scifi_fable2.Fable2ScriptError`.
 - root cause: the fable2 lane (`nodes/_otr_scifi_fable2.py:2307`) hardcodes the expected `rules_id` to the literal `"scifi_fable2"`. The 2026-07-17 roster trim (`499386aa`) made every lane own its `story_rules` by EXACT id, so `scifi_fable2_v3`'s rules carry `rules_id = "scifi_fable2_v3"` while its pipeline `fable2_multipass_v3` still routes into `_otr_scifi_fable2` -- which then rejects the v3 id. Net: a `runnable=true` bank that can never finish a leg. (`scifi_fable2` base is unaffected -- rules_id == 'scifi_fable2'.)
-- fix: RETIRED the bank rather than patch the contract (Sonnet-bake-off verdict, `docs/2026-07-18-sonnet-bakeoff-analysis.md` + `docs/2026-07-18-rip-4-banks-plan.md`). The `scifi_fable2_v3` bank row, pack dir, `story_rules`, and its `fable2_multipass_v3` pipeline (removed from BOTH `pipelines.json` and `_RUNNER_BY_PIPELINE`) plus the writer's fable2 target-word gate entry were all deleted in this change, alongside `media_archive_v3` / `scifi_codex_v3` / `scifi_sonnet_v3`. No live route to the defective contract remains.
+- fix: RETIRED the bank rather than patch the contract (Sonnet-bake-off verdict). The `scifi_fable2_v3` bank row, pack dir, `story_rules`, and its `fable2_multipass_v3` pipeline (removed from BOTH `pipelines.json` and `_RUNNER_BY_PIPELINE`) plus the writer's fable2 target-word gate entry were all deleted in this change, alongside `media_archive_v3` / `scifi_codex_v3` / `scifi_sonnet_v3`. No live route to the defective contract remains.
 - verify idea: `scifi_fable2_v3` no longer appears in `_otr_story_routing._ensure_loaded().pipelines`, `banks.json`, or `_RUNNER_BY_PIPELINE`; the source-only retired-id scan over `nodes,tests,workflows` returns zero; full suite + Bug Bible stay green with the bank gone.
 - bible-worthy: no -- resolved by removal, not a reusable code contract. If the fable2 family re-adds a `_v3`, re-open the NEWBUG fix-direction: accept the lane's DECLARED rules_id, never a single literal.
-- status: **CLOSED-BY-RIP** at this commit. NEWBUG doc marked CLOSED-BY-RIP and RETAINED (the only causal record of the live failure -- never deleted).
+- status: **CLOSED-BY-RIP** at this commit.
 
 ## PBUG-20260720-01 -- official Gemma 4 12B HF writer was stranded behind an obsolete architecture/catalog gate
-- surfaced: offline Gemma recovery probe plus canonical headless requalification on the RTX 5080 16 GB box, 2026-07-20. The complete official checkpoint was already under `C:\ComfyUI-Models\huggingface\hub`, but the installed Transformers 5.5.0 did not recognize `model_type=gemma4_unified`; the catalog separately hard-rejected `google/gemma-4-12b-it` and steered users to the unconstrained GGUF row.
-- symptom: the official 12B model could not be selected on OTR's in-process Transformers/HF lane, so the writer could not use that lane's lm-format-enforcer token grammar. The optional GGUF lane instead reached character-zero JSON failures in structured work.
+- surfaced: offline Gemma recovery probe plus canonical headless requalification on the RTX 5080 16 GB box, 2026-07-20. The complete official checkpoint was already under `C:\ComfyUI-Models\huggingface\hub`, but the installed Transformers 5.5.0 did not recognize `model_type=gemma4_unified`; the catalog separately hard-rejected `google/gemma-4-12b-it` with no local alternative offered.
+- symptom: the official 12B model could not be selected on OTR's in-process Transformers/HF lane, so the writer could not use that lane's lm-format-enforcer token grammar.
 - root cause: the catalog tombstone outlived the runtime limitation that prompted it. Correct inference requires native `Gemma4UnifiedForConditionalGeneration` support, not the retired text-tower remap. This machine's HF cache also splits the materialized weights and the newer `chat_template.jinja` across two revisions, while the old resolver assumed the newest snapshot directory was complete.
 - fix: require Transformers >=5.10.4, restore the curated `google/gemma-4-12b-it` row, remove its hard reject, resolve the newest materialized-weight snapshot plus newer compatible local chat-template metadata, and keep tokenizer/config/model loads `local_files_only=True` with no in-loader HTTP fallback. The canonical workflow now selects the row in both writer slots with `cuda` / `sdpa` / `bnb_nf4`, context 8192. Exact result schemas are bound at the local P0-P9 scheduler boundary; P3's authored-text patch keeps its narrower schema.
 - verify idea: in a zero-network process require the official Gemma4Unified class, `is_loaded_in_4bit=True`, coherent prose, and LMFE JSON that decodes and validates. In the real canonical workflow require P0's raw head to begin with `{` and reach semantic validation instead of character-zero parsing.
@@ -2252,7 +2252,7 @@ out until they independently meet the same production-only admission rule.
 - status: **FIXED; LIVE-REQUALIFIED AT P5** by prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f`: P5 produced a complete, schema-valid JSON artifact and entered the ordinary spoken-text post-validator. The later semantic repair exhaustion is not a recurrence of this grammar/compiler bug.
 
 ## Regression watch (2026-07-20 -- NOT a new PBUG) -- Gemma P5 repeated a spoken-hygiene defect after bounded repair
-- prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f` produced a complete constrained P5 artifact but line `l001` contained stage direction, markup, or a role label. The existing Axis-6 route from `docs/2026-07-18-codex-short-leg-convergence.md` correctly selected the spoken-reword repair rule; Gemma repeated the same defect and the lane failed closed after the bounded model repair. This is model non-compliance at an existing semantic gate, not a JSON/LMFE regression and not evidence for a new deterministic code defect. It blocks a full-episode promotion claim, so the handoff records runtime/grammar qualification only.
+- prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f` produced a complete constrained P5 artifact but line `l001` contained stage direction, markup, or a role label. The existing Axis-6 route correctly selected the spoken-reword repair rule; Gemma repeated the same defect and the lane failed closed after the bounded model repair. This is model non-compliance at an existing semantic gate, not a JSON/LMFE regression and not evidence for a new deterministic code defect. It blocks a full-episode promotion claim, so the handoff records runtime/grammar qualification only.
 
 ## PBUG-20260720-03 -- a craft-only spoken-line reject could kill the episode
 - surfaced: canonical Gemma/HF requalification prompt `ee0d4743-11bc-4367-9e19-5422afa2c95f`, 2026-07-20, after P0-P4 had cleared and P5 had produced a complete schema-valid artifact
@@ -2279,7 +2279,7 @@ out until they independently meet the same production-only admission rule.
   limit and the already accepted clean script still completed normally.
 
 ## PBUG-20260720-04 -- alias-blind media consumers dropped the sentinel announcer identity
-- surfaced: the published Fable2 Einstein and Butterfly episodes audited in `docs/2026-07-10-fable2-s2-QA-ANALYSIS-r2.md`. Einstein captions omitted an ANNOUNCER label around the sentinel; Butterfly labeled the intro sentinel but omitted the coda sentinel
+- surfaced: an audit of the published Fable2 Einstein and Butterfly episodes. Einstein captions omitted an ANNOUNCER label around the sentinel; Butterfly labeled the intro sentinel but omitted the coda sentinel
 - symptom: the ledger and rendered episode completed, but a normalized/cast-keyed sentinel could lose its canonical speaker label in captions. Static sibling grounding found that credits could resolve the alias-aware display name yet miss the same row's voice receipt, HuMo could reject the normalized radio face unless `char_id` remained the literal `announcer`, and captions could consume a canonically skipped row instead of filtering it row-locally
 - root cause: downstream media consumers independently rebuilt raw exact-`char_id` maps instead of using the central alias-aware ledger-consumer resolver and canonical skip semantics. ShotLock correctly normalizes the sentinel to a cast identity, but HuMo's later stale guard still tested the pre-normalization literal ID
 - fix: captions now filter canonical skips before ordering, preserve canonical caption text, and resolve speakers through the shared alias-aware cast lookup; credits use that same lookup for both display name and voice; HuMo recognizes the sentinel by role/source-family/portrait identity after ShotLock normalization. No ledger ownership, readiness, seal, hash, node, widget, or canonical-workflow surface changed
@@ -2599,7 +2599,7 @@ out until they independently meet the same production-only admission rule.
   colder technical-slot attempt; two failures keep the best valid script and
   stop without rejudging unchanged input. A full-output marker is captured
   before normalization and enforced by writer-local, model-loader/polish,
-  OpenRouter, Comfy Credits, Google, and GGUF transports, including provider
+  OpenRouter, Comfy Credits, and Google transports, including provider
   output caps. Proven capacity failure is a no-call quality floor. P6/P8 model
   or transport failure is advisory and cannot kill an already valid story.
   Final hashes, authorship receipt, ledger rows, readiness, media consumers,
@@ -3060,86 +3060,6 @@ out until they independently meet the same production-only admission rule.
 - status: **LIVE-ADMITTED / ROOT-FIXED IN WORKTREE; helper regression GREEN;
   six-bank live requalification pending**
 
-## PBUG-20260723-02 -- the 8GB Wan tier's low-VRAM launch contract never reached a production leg
-- surfaced: 2026-07-23 overnight media qualification, matrix leg
-  `wan_8gb__lumina_image__media_archive` (`model_coverage_wan/receipts.json` +
-  `server_wan.log`; staged in `docs/2026-07-23-video-failure-inventory.md`)
-- symptom: terminal `FAIL` at `OTR_VideoRenderBatch` -- `wan_ti2v` received a
-  177-frame request while the cost model afforded 30 frames at the observed
-  free VRAM. No silent resize happened, which is correct; the requested
-  832x480 / 17-frame low-VRAM lane simply never applied to the leg
-- root cause: the 17-frame ceiling existed only in the profile's
-  `launch.env.OTR_WAN_TI2V_MAX_FRAMES`, and `eng_wan_ti2v._floor_length` read
-  that env var as its ONLY channel. A production episode leg is submitted to an
-  ALREADY-BOOTED server, so `launch.env` can never reach it -- any leg not
-  booted through `scripts/otr_headless_canonical.ps1 -Profile otr_8gb_wan`
-  inherited the 177-frame engine max. The profile's other declaration,
-  `render.frame_budget: 17`, maps to `OTR_VideoRenderBatch.frame_count`, which
-  is diagnostic-harness-only ("Ignored in mode=episode" per its own tooltip),
-  so the tier's contract was inert in production on both channels
-- fix: new OPTIONAL profile key `video.max_render_frames` (0/absent =
-  unpinned) travelling the same proven channel the device/dtype policy uses --
-  profile -> `OTR_VideoDirector.max_render_frames` widget (appended LAST,
-  canonical ships 0) -> v2 policy -> ShotLock ledger `video` section ->
-  `render_driver.build_episode_render_policy` -> `MotionEngineBase.prepare` ->
-  `_floor_length`. Env pin still outranks it; every other tier omits the key
-  and is byte-for-byte unchanged. Beat frame targets are untouched: the ceiling
-  caps what the ENGINE renders (then ping-pong-extended to the beat's full
-  audio length), never what the episode plays
-- verify idea: with free VRAM affording ~30 frames at 832x480, a 177-frame beat
-  must raise `MotionBudgetError` UNPINNED and return 17 with the tier ceiling
-  on the ledger; and an unpinned tier must still return 177 (no lane capped by
-  the fix). Covered by `tests/test_remaining_video_contracts.py`
-- UPDATE 2026-08-13: the UNPINNED half of that verify idea no longer holds, and
-  the change is deliberate. `compute_real_frame_budget` now refuses only for a
-  row in `QUALIFIED_COST_ROWS`, which is empty, so the unpinned 177-frame beat
-  RETURNS 177 instead of raising. The cost row that produced the original
-  refusal is the one this repo disqualified in writing, and it had been
-  refusing through this path alone because `_floor_length` never consulted the
-  qualification authority that `render_driver._assert_beat_affordable` always
-  did -- it killed two live 45-word render-gate legs (`fastwan_8gb` at 69
-  frames, `wan_ti2v` at 125) before that was spotted. The tier-ceiling claim --
-  the actual subject of this PBUG -- is untouched and still verified: the test
-  in `tests/test_remaining_video_contracts.py` now QUALIFIES the row so the
-  ceiling still has a refusal to be measured against
-- UPDATE 2026-07-27 (B3): the "then ping-pong-extended to the beat's full audio
-  length" clause above is still exactly right for WAN and is now only HALF the
-  meaning of `video.max_render_frames`. For `ltx_8gb` -- the sole member of
-  `frame_contract.PLANNING_CAP_ENGINES` -- the same ledger key is a coverage
-  PLANNING cap: it narrows the contract `otr_shot_lock._stamp_coverage_plan`
-  partitions against, so the beat is covered by real chained clips of at most
-  that length instead of one short render padded out. WAN is deliberately
-  excluded, because applying it before `partition_beat()` would turn every WAN
-  beat into a pile of 17-frame renders and undo this very fix. Anyone reading
-  this entry as the definition of the key should read
-  `docs/2026-07-27-b3-qa-findings.md` and `frame_contract.effective_frame_contract`
-  alongside it
-- UPDATE 2026-07-27 (B6): SECOND application of this entry's portable rule to
-  the same tier, with the OPPOSITE remedy, because there was no channel to fix.
-  B3 gave the ltx_8gb CEILING a profile -> ledger channel. The tier's RECIPE --
-  T5 device, tiled decode, the sampling knobs, the negative conditioning, the
-  tile geometry -- has no channel at all: the profile schema accepts only
-  `device_policy`, `dtype_policy` and `max_render_frames`, and
-  `otr_8gb_ltx.json`'s `launch.env` is `{}`. So the recipe is now FROZEN IN
-  CODE (`eng_ltx_8gb.LTX8_RECIPE_V1`); those env vars bind only under an
-  explicit `OTR_LTX_8GB_PREQUALIFICATION` consent act, and a run that sets it
-  stamps a `+prequalification` recipe receipt so a measurement artifact is
-  never mistaken for a production one in `meta.render_engines`.
-  A NEW TESTABLE COROLLARY this produced, which the original entry does not
-  state: **a knob that cannot bind must be IGNORED, never FATAL.** The first
-  draft parsed the demoted vars before discarding them, which meant a stale
-  `OTR_LTX_8GB_STEPS=not-a-number` in a long-booted server's environment would
-  raise MALFORMED_CONFIG and kill a leg over a value with no effect on it --
-  the same defect wearing the opposite mask. Presence is named in a warning;
-  nothing outside the consent act is parsed
-- bible-worthy: yes -- the portable rule is that a contract declared only in a
-  process-launch environment cannot bind work submitted to an already-running
-  server; a per-tier constraint has to ride the artifact the run loads. B6 adds
-  the corollary above (ignore, never fail, on a knob that cannot bind) and the
-  receipt rule (a run under a consent act must mark its own artifacts)
-- status: **ROOT-FIXED + suite/contract GREEN; live 8GB requalification leg
-  still owed (no GPU run authorized in this window)**
-
 ## PBUG-20260729-01 -- P5 markup defect hid behind the compile refusal, and the one repair shot died on it
 - surfaced: the live 45-word campaign, leg `ltx_8gb` (2026-07-29 06:46), headless
   canonical run. `P5 failed: ... disposition=primary_ladder_exhausted; last
@@ -3180,8 +3100,8 @@ out until they independently meet the same production-only admission rule.
   `ltx_8gb` must be re-run and reach a video engine**
 
 ## PBUG-20260729-02 -- a degenerate P5 generation burns 24 minutes and bypasses the whole retry ladder
-- surfaced: the live 45-word campaign, leg `ltx_audio_in` (2026-07-29 06:46 ->
-  07:11, 1449s), headless canonical run
+- surfaced: the live 45-word campaign, an LTX-audio-conditioned leg (2026-07-29
+  06:46 -> 07:11, 1449s), headless canonical run
 - symptom: `P5 failed: prose generation exhausted the full remaining
   provider/context capacity (14697 output tokens after a 1687-token prompt);
   the partial artifact is not eligible for a prose or structural reroll`
@@ -3229,7 +3149,7 @@ out until they independently meet the same production-only admission rule.
 - **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `41683fc9` made a capacity failure advance the ladder instead of dying on attempt one of three, and `tests/test_a4_capacity_phase_advances_the_ladder.py` cites this PBUG number in its own docstring as the behaviour it pins.
 - previous status: **OPEN -- diagnosed, not fixed. Live: 2 occurrences in 13 legs
 - status: **CLOSED 2026-08-18 -- FIXED, with a regression test that names this PBUG**
-  (`ltx_audio_in` 1450s, `still_word` 1420s -- both ~24 minutes of GPU time
+  (an LTX-audio-conditioned leg 1450s, `still_word` 1420s -- both ~24 minutes of GPU time
   spent inside a single P5 base call before the refusal).** Both ran to the
   full remaining provider capacity (14697 and 14359 output tokens), which is
   the signature: the model never stops adding lines, and the array's declared
@@ -3335,123 +3255,14 @@ out until they independently meet the same production-only admission rule.
   until the engines are proven, and that call stands until the operator changes
   it. Recorded here so whoever unparks it does not have to re-derive the cost.
 
-## PBUG-20260801-01 -- the gemma row understated its own model by 32x, so the writer could never fit
-- surfaced: the live 45-word campaign, every `otr_g4_*` leg, headless canonical
-  runs. Six engines, zero episodes -- each leg died at `OTR_LedgerScriptWriter`
-  before any video engine was reached.
-- symptom: `GGUF unsloth/gemma-4-12b-it-GGUF cannot fit the complete requested
-  output: requested_output=2800, provider_output_cap=512`, and when the context
-  was raised to compensate, `effective n_ctx 8192 (from policy.gguf_n_ctx) is
-  outside [512, 4096] for this row -- NO clamp`.
-- root cause: TWO placeholder defaults, each below the pipeline's own contract.
-  1. The catalog row declared `context_window=DEFAULT_CONTEXT_WINDOW` (4096)
-     while the GGUF file itself declares `gemma4.context_length = 262144` -- the
-     row understated the model by 32x. P0 needs `_P0_PROMPT_OVERHEAD_TOKENS`
-     2600 + `_P0_BASE_OUTPUT_TOKENS` 2800 = 5400, so P0 was STRUCTURALLY
-     impossible on this row: no setting could satisfy it.
-  2. `DEFAULT_OUTPUT_TOKENS_CAP` was 512 against P0's 2800 request. The other
-     backends never had this -- `_otr_comfy_backend` 8192, `_otr_openrouter_backend`
-     16384. 512 was the outlier, not the rule.
-- fix: row `context_window` 4096 -> 8192 (P0's own `_P0_LOCAL_CONTEXT_CAP`, the
-  value its contract was written against, not a guess), and
-  `DEFAULT_OUTPUT_TOKENS_CAP` 512 -> 4096 (bounded by the window: 8192 - 2600
-  overhead = 5592 usable). Cost checked rather than assumed: KV at 0.7 GB/1k is
-  5.60 GB, plus 6.63 GB of Q4_K_M weights = 12.23 GB, ~2.3 GB under the 14.5 GB
-  tier ceiling. Commits 805123ea + 76c9f565.
-- verified: `fastwan_8gb` 45-word canonical leg, RESULT SUCCESS in 2433 s,
-  published 1920x1080 / 3036 frames / 121.44 s / AAC stereo, coverage 70.68 s
-  audio vs 71.72 s video across 7 clips.
-- **the part worth remembering:** between the first fix and the second, the ONLY
-  thing keeping the writer alive was exporting `GEMMA4_12B_MAX_NEW_TOKENS=3072`
-  at server boot. That is a dead channel of the PBUG-20260723-02 class -- the
-  env binds at BOOT, so the next restart that forgets it silently restores the
-  failure, and the symptom comes back looking like a NEW bug. A live pass that
-  depends on remembering an export is not a fixed bug. The second boot was run
-  deliberately WITHOUT the var to prove the default carries it alone.
-- also worth remembering: two fixes failed before this one because both turned
-  knobs that could not bind -- `n_ctx` when the limit was the output cap, then
-  `n_ctx` past a ceiling the row would not allow. The row was never questioned
-  until the GGUF metadata was read directly. **When two settings in a row fail
-  to move a limit, stop tuning and go read what the artifact itself declares.**
-- bible-worthy: yes -- **a placeholder default that sits below the caller's own
-  contract is a structural refusal, not a configuration problem.** Any registry
-  row describing a model's capacity must be derived from, or checked against,
-  the artifact's declared metadata; a hand-set default silently caps a model at
-  a fraction of what it can do, and no amount of caller-side tuning can reach
-  past it.
-- verify idea: assert every GGUF catalog row's `context_window` is <= the
-  context length its own file declares AND >= what the P0 contract requires, so
-  a row that cannot host the pipeline's own pass fails at test time rather than
-  on live GPU minutes.
-
-## PBUG-20260802-01 -- ltx_video declared 21 legal lengths for an engine that renders exactly one
-- surfaced: the live 45-word campaign, leg `ltx_video` (2026-08-01 23:20, headless
-  canonical run). Died at 11.8 minutes -- AFTER the writer, the cast, the TTS and
-  the music had all been rendered and paid for. No obs asset.
-- symptom: `RenderError: shot shot_music_opening_001 segment 1 rendered 169
-  frame(s) but its plan asked for 89 (a surplus of 80). NO FALLBACK -- the plan's
-  count is what this segment's audio slice was cut against, so assembling a
-  segment of any other length makes the beat drift against its own audio.`
-  Preceded in the same log by the engine's own warning:
-  `[eng_ltx_video] frame ask 89 below the decode floor 169 -- raising`.
-- root cause: the adapter's DECLARATION disagreed with its own RUNTIME.
-  `frame_contract` declared `min_frames=9, max_frames=169, quantum=8` -- 21 legal
-  rungs -- while `_ltx_frame_length` raises every ask below
-  `_LTX_DECODE_FLOOR_DEFAULT` (169) up to it, and `_LTX_MAX_FRAMES_DEFAULT` is
-  ALSO 169. The floor equals the cap, so the adapter emits exactly ONE length and
-  20 of its 21 declared rungs do not exist. The planner believed the declaration,
-  split a beat into 89-frame segments, and the engine could not produce them.
-  The refusal was CORRECT; what it was checking against was wrong.
-- why it read as a regression: `ltx_video` shipped for months in single-clip
-  mode, where nothing ever asked it for a non-169 length. Only coverage planning
-  (2026-07-25) can ask, so only coverage planning could expose it. The operator's
-  "ltx_video always worked, check a week ago" was accurate.
-- fix: declare the truth -- `min_frames=169, max_frames=169`, as LITERALS. Not
-  derived from the constants: a FrameContract is STATIC because stills are minted
-  against it before the render phase, so it must never track a value that can
-  move underneath it (`test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides`
-  rejected a first draft that did exactly that). Commit 53fcebff.
-  Then TWO more channels that could reintroduce it, both found by the kibitz
-  panel (codex gpt-5.6-sol + antigravity), both closed:
-  1. `assert_env_matches_contract` raises `ContractEnvConflict` when
-     `OTR_LTX_MAX_FRAMES` / `OTR_LTX_MIN_DECODE_FRAMES` disagree with the
-     declaration -- wired into BOTH graph builders, since either can resolve a
-     length. Commit 8c5449db.
-  2. `render_canvas = (832, 480)` declared, because the decode floor's own
-     comment ties it to "this canvas". Without a declaration,
-     `OTR_LTX_RENDER_CANVAS` could move the canvas at boot and invalidate the
-     static contract with no code change; `declared_render_canvas` is applied
-     LAST in `build_request_from_shot` precisely so a declaration wins.
-- verified: plan-vs-engine agreement on the PRODUCTION call path (`join_mode_for`,
-  not a forced mode) -- beats 17/89/168/169 take `single`, 170/250/338/442/530
-  take `chain` with 2-4 segments, and every segment satisfies
-  `_ltx_frame_length(render_frames) == render_frames`. Suite 8253 passed.
-  **A live leg has NOT yet re-run -- the fix lands in code the running server
-  loaded hours earlier, so it is proven in arithmetic only until the overnight
-  driver restarts the server and re-runs it.**
-- bible-worthy: yes. **A capability declaration is a promise the runtime must
-  keep, and an OVERSTATED one is worse than none.** An understated contract
-  merely wastes capability; an overstated one converts a plannable component
-  into a GUARANTEED late failure, because the planner commits work against the
-  declaration and only the render discovers the lie. Three channels can break the
-  promise and all three need closing: the declaration itself, an environment
-  override read at runtime, and a second dimension (here canvas) the bound
-  silently depends on.
-- verify condition (automatable, and implemented): feed each adapter's own
-  declared minimum and maximum through its own length resolver and require them
-  to come back unchanged -- `test_a_declared_MINIMUM_is_a_length_the_adapter_can_actually_render`.
-  Currently covers `ltx_video` only, because each adapter resolves length
-  privately; the general version needs the shared `resolve_render_frames`
-  interface both panel lanes converged on.
-
 ## PBUG-20260802-02 -- the writer casts two characters and writes lines for one
 - surfaced: the live 45-word campaign, 2026-08-02. TWO legs, two different
   symptoms, one underlying fault:
-  * `wan_ti2v` (02:35, 2.7 min): `[scifi_fable2] pass 'script' failed after 4
+  * leg A (02:35, 2.7 min): `[scifi_fable2] pass 'script' failed after 4
     attempt(s): markup ladder exhausted`, with `UNKNOWN_SPEAKER` on every line
     of both characters AND `CAST_MEMBER_SILENT: Commander Vance` /
     `CAST_MEMBER_SILENT: Pilot Elara`.
-  * `ltx_video` (02:47, 2.2 min): `OTR_CastLock: freeze cascade stamped
+  * leg B (02:47, 2.2 min): `OTR_CastLock: freeze cascade stamped
     freeze_verdict='needs_full_rerun'`, from
     `[LFC] read-only structural validation failed under content_owned_readonly:
     content_authorship: line proof coverage mismatch: missing=[]
@@ -3498,12 +3309,12 @@ The entry above claims the two legs were "the same fault, which is why this is
 one entry". **That is not established, and the difference changes the fix.**
 Grounded from the ledgers and the server log:
 
-* `wan_ti2v` ran the **`scifi_fable2`** lane. It failed with `UNKNOWN_SPEAKER`
+* Leg A ran the **`scifi_fable2`** lane. It failed with `UNKNOWN_SPEAKER`
   plus `CAST_MEMBER_SILENT` -- and that lane's own gate is what caught it
   (`_otr_scifi_fable2.py:2306`, "speaker set != cast rows", plus the parser
   defect). The gate WORKED. What failed upstream of it was the writer producing
   a play in which a cast member never speaks, and the repair ladder exhausting.
-* `ltx_video` ran the **`scifi_news_pro`** lane, whose ledger meta says in as
+* Leg B ran the **`scifi_news_pro`** lane, whose ledger meta says in as
   many words: `"pack for bank 'scifi_news_pro' declares NO line_composer_system
   seam -- the lane owns its own content loop"`. There is NO equivalent gate on
   that path, so the empty rows travelled all the way to the freeze gate and
@@ -3535,7 +3346,7 @@ symptom.
   lists six live banks -- media_archive, original, scifi_news_pro,
   public_domain, shakespeare, custom_source_bank -- not seven. Whether
   scifi_fable2 was retired, renamed, or merged into scifi_news_pro is NOT
-  re-established here; the original entry's `wan_ti2v` manifestation cannot be
+  re-established here; the original entry's leg-A manifestation cannot be
   re-verified, regressed, or fixed by this change because there is nothing
   left to point it at. Flagged rather than silently implied as covered.
 - root cause, precisely: `nodes/_otr_outline.py`'s `_phase_check` validates
@@ -4094,8 +3905,8 @@ into it than it earned:**
      its own assertion says what that input IS: *"requires init_image -- the
      reference node needs a PORTRAIT"* (`:1156`). It is a talking-FACE engine.
   2. It is EXPLICITLY excluded from the scene-init attach --
-     `_engine_scene_init_required` ends `and _eng_id not in ("ltx_audio_in",
-     "minimax_h3_audio_in")` (`render_driver.py:2245-2249`) -- correctly, since
+     `_engine_scene_init_required` excludes `minimax_h3_audio_in`
+     (`render_driver.py:2245-2249`) -- correctly, since
      a face lane wants a portrait rather than a scene still.
   So the engine needs a portrait, the attach path deliberately withholds the
   scene still, and **a music bookend has no character, so no portrait can
@@ -4196,10 +4007,10 @@ injection by construction.
   music_closing_001 engine still_flat`. The writer, casting and the whole audio
   chain succeeded first (executed list includes nodes 1, 62, 63, 80-83).
 - **REPRODUCED 2026-08-12** on a NORMAL render, which is what the entry below
-  asked for: the `fastwan_8gb` leg of the 45-word every-visual-path sweep died
-  identically -- `still-spine handoff missing materialized scene still for shot
-  shot_music_closing_001 beat music_closing_001 engine fastwan_8gb`. Same beat,
-  same shot id, different engine and different bank. Not lane-specific.
+  asked for: a second engine's leg of the 45-word every-visual-path sweep died
+  identically -- the same `still-spine handoff missing materialized scene
+  still` symptom for shot shot_music_closing_001 beat music_closing_001. Same
+  beat, same shot id, different engine and different bank. Not lane-specific.
 - **ROOT CAUSE, now established, and it is TWO layers.**
 
   **The general fault: the image producer was planning stills from the
@@ -4260,8 +4071,9 @@ injection by construction.
   engines: `still_music_closing_001` now sits beside `still_music_opening_001`.
 - **NOT YET PROVEN ON A LIVE LEG.** A green suite and a regenerated parity
   fixture prove static behaviour, not that the route publishes. The exact
-  canonical `fastwan_8gb` leg must be re-run and its final ledger's closing ids,
-  materialized still paths and published asset recorded before this is closed.
+  canonical leg that reproduced it must be re-run and its final ledger's
+  closing ids, materialized still paths and published asset recorded before
+  this is closed.
 - **OPEN, ADJACENT, FOUND BY THE SAME REVIEW** -- recorded here so they are not
   lost, and NOT fixed in this change:
   - `OTR_ShotLock._same_frozen_episode()` does NOT fail closed. An identity
@@ -4287,14 +4099,14 @@ injection by construction.
     removed in the same candidate, so both reservations are now
     unconditional -- but that is HARDENING, it is still unproven live, and
     it changes nothing about the status above.
-- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical `fastwan_8gb`
-  leg with 60-SECOND opening AND closing cues -- long enough to chunk
+- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical leg
+  with 60-SECOND opening AND closing cues -- long enough to chunk
   (`_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a 60 s cue becomes THREE 20 s
   chunks) -- proving every emitted `music_opening_00N` and
   `music_closing_00N` has a required target, a materialized still, and a
   published asset in `otr/obs/`. The original short cue does not exercise
   the chunked path at all.
-- **The live FastWan reproduction and the root-cause evidence above STAND.**
+- **The live reproduction and the root-cause evidence above STAND.**
   Only the repair/status wording is downgraded.
 - **OPEN, ADJACENT, FOUND BY THE SAME REVIEW** -- recorded here so they are not
   lost, and NOT fixed in this change:
@@ -4316,8 +4128,8 @@ injection by construction.
   independently warned against calling it shipped on a green suite alone,
   and the first version of this entry did exactly that while also
   mis-stating the opening branch.
-- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical `fastwan_8gb`
-  leg with 60-SECOND opening AND closing cues -- long enough to chunk
+- **ACCEPTANCE TEST, agreed by both cross-checks:** a canonical leg
+  with 60-SECOND opening AND closing cues -- long enough to chunk
   (`_MUSIC_MAX_CHUNK_DUR_S = 22.0`, so a 60 s cue becomes THREE 20 s
   chunks) -- proving every emitted `music_opening_00N` and
   `music_closing_00N` has a required target, a materialized still, and a
@@ -4413,7 +4225,7 @@ only visible because the cameo was FORCED and then did not appear.
   `_otr_shared/content_oracle.py:family_for_engine` failed SOFTLY into a bare
   `except: pass` and answered from the `_FAMILY_FALLBACK` table on every call,
   so the live registry was "the source of truth when present" only OFF the
-  runtime. That table stops at 2026-07-05, so `ltx_8gb`, `fastwan_8gb`,
+  runtime. That table stops at 2026-07-05, so `ltx_8gb`,
   `still_word`, every cloud lane and `minimax_h3_video` resolved to family `""`
   in production -- which is not in `MOTION_FAMILIES` -- making
   `motion_required_for_engine` answer False and those lanes silently
@@ -4599,10 +4411,9 @@ only visible because the cameo was FORCED and then did not appear.
     `UNKNOWN_SPEAKER: *Ada` -- shaped exactly like `*SFX`. Pass 1 would have
     told the model to fold or drop a real character's line.
 
-  **Pass 2, after a kibitz consult** (`kibitz-runs/2026-08-12-writer-stage-
-  direction-note/r2/`, Codex `gpt-5.6-sol` + Antigravity; operator rule: one
-  failed fix on the writer, then the panel). Three findings would have shipped
-  past me:
+  **Pass 2, after a kibitz consult** (Codex `gpt-5.6-sol` + Antigravity;
+  operator rule: one failed fix on the writer, then the panel). Three findings
+  would have shipped past me:
   - **`Fable2ParseDefect` is a plain `enum.Enum`, not a `str` enum.** Passing
     typed defects while comparing `defect.code` against string constants would
     be False forever -- the note silently never fires and every stage-direction
@@ -4741,7 +4552,7 @@ only visible because the cameo was FORCED and then did not appear.
 ## PBUG-20260814-01 -- every spoken line ships `speaker: None` because the shared line normalizer drops the field its sibling carries
 
 - artifact: `output/otr/episodes/signal_lost_the_light_of_possibility_20260813_172801/audio/..._ledger.json`
-  -- the accepted, PUBLISHED 2026-08-13 `wan_ti2v` episode. `meta.source_bank = scifi_news`.
+  -- the accepted, PUBLISHED 2026-08-13 episode. `meta.source_bank = scifi_news`.
 - symptom: all 11 spoken rows (`l001`..`l011`) carry `speaker: None`. The two
   music rows carry `speaker: "RADIO"` correctly, and the BEAT rows carry the real
   names -- `b000` Dr. Ada, `b003` Dr. Leo, `b005` MIT Ethics Board. So speaker
@@ -5014,9 +4825,8 @@ only visible because the cameo was FORCED and then did not appear.
 - bible-worthy: yes -- "a model-owned rewrite pass was given authority over a
   field another owner writes deterministically". Generalizes well beyond OTR.
 - **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `e7e10148` wired `PROTECTED_FACT_COMPONENT_FLAG` producer (`OTR_LedgerScriptWriter.py`) to consumer (`_otr_ledger_clean.py`). Live proof from an episode published the same day: `signal_lost_the_16mm_ransom_20260818_145217` line `b016` carries `['news_coda_bridge', 'protected_fact_component']`.
-- previous status: OPEN -- diagnosed, fix specified in
+- previous status: OPEN -- diagnosed, fix specified, not yet landed.
 - status: **CLOSED 2026-08-18 -- FIXED AND FIRING TODAY**
-  `docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`, not yet landed.
 
 ## PBUG-20260815-02 -- `scifi_news` dies at the pre-tail audit on the first row the clean stage repairs
 
@@ -5255,11 +5065,10 @@ only visible because the cameo was FORCED and then did not appear.
   against the standing 100%-local rule to fetch a fact the source already
   states. The gap is plumbing, not knowledge.
 - **TRIAGED AND CLOSED 2026-08-18** (stale-row sweep). `5194ab90` gave all 65/65 `public_domain` units a committed `.provenance.json` (was 16/65), including both units the entry names (`gertrude_governess`, `moby_dick_quarterdeck`). Live ledgers now carry a non-empty `gender_by_name`.
-- previous status: OPEN -- diagnosed, three live instances across three sources. Fix is
+- previous status: OPEN -- diagnosed, three live instances across three
+  sources. Fix is the vendor-time stamper already specified, never built; it
+  is chunk 0.75 / the D4 vendor gate in the current sprint.
 - status: **CLOSED 2026-08-18 -- FIXED AND LIVE-PROVEN**
-  the vendor-time stamper already specified in
-  `docs/2026-08-05-character-gender-ladder-SPEC.md`, never built; it is chunk
-  0.75 / the D4 vendor gate in the current sprint.
 
 ## PBUG-20260815-05 -- the episode title names a DIFFERENT play from the one it adapted
 
@@ -5823,8 +5632,7 @@ EXPECTED result, not a regression signal.
 - surfaced: not a failure report -- an OPERATOR DECISION on measured evidence,
   logged here because the teardown protocol's ledger-discipline item requires a
   rip to leave a causal record rather than a silent absence.
-- evidence: the blind per-bank narrative read
-  (`docs/2026-08-16-blind-bank-narrative-ranking.md`) scored `scifi_news` LAST
+- evidence: a blind per-bank narrative read scored `scifi_news` LAST
   of six at **2.0/10** (worst sample 1/10, "it is not a story"; one leg
   broadcast pipeline metadata as dialogue -- *"final coda, factual report
   backed by P0 facts F01-F06"*), while `scifi_news_pro` scored FIRST at
@@ -5839,8 +5647,7 @@ EXPECTED result, not a regression signal.
   `nodes/_otr_scifi_codex.py` (4,664 lines), so the module, its dedicated
   `_otr_scifi_source_repair.py` helper, the pack dir, the `LANE_SPECS` entry,
   both registry rows and 13 dedicated lane tests went with it. Writer defaults
-  re-point to `scifi_news_pro`. Plan + full surface enumeration:
-  `docs/2026-08-16-scifi-news-RIP-PLAN.md`.
+  re-point to `scifi_news_pro`.
 - **LEDGER GATE PASSED, stated explicitly because it is the one that could have
   blocked this:** every field the lane stamped was inside the
   `meta["scifi_codex"]` namespace with ZERO surviving production readers, or a
@@ -5849,8 +5656,7 @@ EXPECTED result, not a regression signal.
 - **CLOSED-BY-RIP** (these were OPEN against the retired lane and are not
   outstanding work any more): the codex `P5R _call_scene_review` no-shims
   violation; `_canonicalize_script_spoken_text` writing stripped text back into
-  the record; the graduated-extraction span-reader enumeration
-  (`docs/2026-08-15-graduated-extraction-span-reader-enumeration.md`, whose own
+  the record; the graduated-extraction span-reader enumeration (whose own
   scope line read "this work is `scifi_news` only"); the creativity-knob
   no-op on that lane; and the `scifi_news` P0 convergence blocker.
 - **COVERAGE LAPSED, recorded honestly rather than quietly:** `_CodexTailFinalizer`
@@ -5950,8 +5756,7 @@ EXPECTED result, not a regression signal.
 - related, same guardrail, same day: the Lemmy cross-engine r3 panel caught the
   driver planning to move the canonical engine widgets with `--set` for an
   acceptance leg. It cannot be done that way by anyone -- the instrument is a
-  capability profile whose `slot_overrides` reach both nodes through
-  `config/profiles/widget_mapping.json`.
+  capability profile whose `slot_overrides` reach both nodes.
 - fix: NONE APPLIED. The failing harness was left RUNNING deliberately -- it is
   operator-ordered state, it holds no GPU, and killing it was not needed for
   any work this window. What it needs is either the `--profile` lever like its
@@ -6116,8 +5921,8 @@ EXPECTED result, not a regression signal.
   "gated on `OTR_ENABLE_LUMINA=1`". `requires_flag = None` and
   `tests/test_lumina_image_engine.py` deletes that var and still expects the
   engine usable; the real gate is the weights file, and all three lumina files
-  are on disk. The lane was reachable, and it is wired into
-  `config/profiles/otr_soak_*_lumina_image.json` and `otr_sbcov_3`.
+  are on disk. The lane was reachable, and it was actively wired into
+  production configuration at the time.
 - honest limit on the A/B: n=1, one prompt, one seed. It proves the conditioning
   changed MATERIALLY and in the expected direction (the brass microphone reads
   as brass; a hallucinated text-like marking on the mic collar disappears; the
@@ -6137,8 +5942,8 @@ EXPECTED result, not a regression signal.
   `negative_source` arm now reads `none_contributed` and describes COMPOSITION only,
   because the old value asserted engine behaviour at a point where the engine had
   not been resolved (true of `z_image_turbo`, false of `lumina_image`, consulted in
-  neither case). See queue item H-RECEIPT in `GO_FORWARD_PLAN.md` and
-  `kibitz-runs/2026-08-17-item-H-receipt/`. **Residual STILL OPEN: only the lumina
+  neither case). See queue item H-RECEIPT in `GO_FORWARD_PLAN.md`.
+  **Residual STILL OPEN: only the lumina
   hygiene FLOOR itself**, which changes conditioning at cfg 4.0 on a live engine and
   is therefore an operator/recipe decision owing a render, not a driver fix. No new
   PBUG is opened for either half: the mislabel was a static-audit finding and the
@@ -6214,13 +6019,13 @@ EXPECTED result, not a regression signal.
   enumerates FILENAMES; `preflight.required_models` holds two vocabularies --
   filenames (the five ghost_signal profiles, which the gate was validated
   against when it shipped 2026-08-22) and logical/HF-repo ids
-  (`real-esrgan-x2plus`, `wan2.2-ti2v-5b`, `google/gemma-4-E2B-it` -- nine
+  (`real-esrgan-x2plus`, `google/gemma-4-E2B-it` -- nine
   profiles). The gate exact-matched, so the nine could not pass for ANY state
   of the disk. This is why `otr_upscale_ship` sat in the queue as
   "unexercised".
 - fix: `b11a4269` -- a gate may enforce what it can verify and must only
-  REPORT what it cannot. `_is_weight_filename` (closed suffix list; dotted ids
-  like `wan2.2-ti2v-5b` and the `-gguf`-suffixed id are NOT files) splits
+  REPORT what it cannot. `_is_weight_filename` (closed suffix list; a dotted
+  HF-repo-style id is NOT a file) splits
   enforce from report; both upscale profiles now declare the real filename and
   get REAL verification. 18 tests incl. a profile<->engine filename pin.
 - verified: `otr_upscale_ship --dry-run` went from the hard refusal to
@@ -6230,7 +6035,7 @@ EXPECTED result, not a regression signal.
   "absent from an enumeration that could not contain it" as refutation).
 
 ## PBUG-20260823-02 -- the canonical runner reported a healthy render as RESULT TIMEOUT
-- observed: LIVE, 2026-08-23 01:30, the `otr_g4_wan_ti2v` item-F leg. At
+- observed: LIVE, 2026-08-23 01:30, an item-F leg. At
   t=5396s the runner printed `RESULT TIMEOUT` and exited 1 while the server
   reported the prompt RUNNING, the GPU sat at 98%, and the wan clip count
   climbed 21 -> 33 -> 37. The episode finished ~40 minutes later and published
@@ -6568,71 +6373,6 @@ EXPECTED result, not a regression signal.
   recognizing the specific way something broke" is a reusable principle
   beyond this one lane -- but NOT promoted yet, live proof owed.
 
-## PBUG-20260824-05 -- wan_ti2v coverage-planned segments compound color/exposure drift across the chain
-- surfaced: operator flagged a published `otr/obs` episode as "really sloppy",
-  suspecting knobs or the graph, and asked for a byte-level trace against a
-  known-good state. Live artifact:
-  `otr/obs/signal_lost_the_weeping_valve_20260823_001152_silent_procgen_blended_captioned_with_credits_final.mp4`
-  (published 2026-08-23; `otr/episodes/signal_lost_the_weeping_valve_20260823_001152/`
-  still has every pipeline stage on disk: `..._silent.mp4` through
-  `..._final.mp4`, plus the per-beat `clips/` and `stills/`).
-- symptom: beat b001 (`shot_b001_announcer_visual_wan_ti2v.mp4`, 18.44s, the
-  episode's longest clip) opens clean -- frame 1 matches its conditioning
-  still (`still_b001_15cab80d1da7.png`) almost exactly, coherent background
-  extras, a correctly-shaped thin wire antenna -- and by ~9s in, the antenna
-  has morphed into a floating solid rectangular block, background faces have
-  started to melt, and lighting has shifted toward a garish pink/blue wash.
-  By the final frame the shot has blown out almost entirely to white/cyan
-  with a warped, alien-looking background face and dissolved textures. A
-  4.6s beat in the SAME episode (`shot_b003_...`) stays sharp and coherent
-  frame-to-frame with no drift at all. Confirmed present ALREADY in the
-  earliest pipeline artifact (`..._silent.mp4`, pre-blend/pre-caption/
-  pre-credits) -- every later stage (procgen blend, captioning, credits mux)
-  faithfully carries the defect forward unchanged, so none of them are the
-  cause. The conditioning still itself is clean, so the defect is not
-  inherited from the image phase either (contrast with the grid-artifact
-  precedent where the still WAS the culprit) -- it is MINTED by the video
-  render itself.
-- root cause (traced, not yet operator-confirmed): `eng_wan_ti2v.py`'s
-  ping-pong/mirror-extend fallback was deliberately ripped 2026-08-02
-  ("NO MIRRORS... every second of audio gets ORIGINAL video") and replaced
-  with COVERAGE PLANNING -- a beat too long for one VRAM-affordable native
-  render is split into several independently-rendered NATIVE segments
-  (`multi_clip` path, `_planned_length`) instead of being padded. The
-  segment-to-segment handoff (`render_driver.py` ~line 918, "the frame its
-  predecessor ended on", and the `accepts_last_frame` / `asset_refs.last_frame`
-  -> `init_image` overwrite ~lines 1817-1840) feeds each new segment the
-  PREVIOUS segment's ending frame as its own init_image. That frame has to
-  round-trip through the VAE (decode out of the previous segment, re-encode
-  into the next segment's conditioning) at every handoff, and a VAE
-  encode/decode round trip is a well-known source of a small, non-zero
-  color/exposure shift. On an 18.44s beat needing several chained segments,
-  that shift compounds segment over segment -- explaining both why the drift
-  visibly worsens across the clip's OWN duration (more segments have
-  compounded by the tail) and why short, single-segment beats (b003, native
-  in one pass, no handoff at all) show none of it. Not yet directly
-  instrumented (no per-segment frame diff run against this specific episode's
-  render), so this is the traced mechanism, not a proven measurement.
-- fix: **NOT FIXED.** This is a real architecture tradeoff, not a one-line
-  knob flip -- candidate directions (re-anchor/color-match at each segment
-  boundary; cap total chain length and let coverage planning refuse/shorten
-  rather than chain indefinitely; a continuation strategy that does not
-  round-trip the handoff frame through the VAE) each cost something
-  different and need the operator's own call, so nothing was changed
-  tonight. Per the operator's own recipe ruling, this is NOT a prompt/wording
-  problem and must not be chased that way.
-- confidence: HIGH on "coverage-planned multi-segment beats are where this
-  lives, and short single-segment beats do not show it" (multiple beats in
-  the same episode compared directly, silent/pre-blend stage isolated as the
-  origin, conditioning still ruled out). MEDIUM on the exact "VAE round-trip
-  at the last-frame handoff" mechanism -- traced through the code's own
-  comments and control flow, not confirmed with an instrumented render.
-- bible-worthy: plausible -- "a chained/continuation generation strategy
-  needs an explicit anti-drift measure (re-anchoring, color-matching, or a
-  bounded chain length), or errors compound silently and only show up at the
-  tail of long beats" is a reusable principle for any future segment-chaining
-  engine -- but NOT promoted yet, mechanism unconfirmed and no fix landed.
-
 ## PBUG-20260825-04 -- BUG-LOCAL-098 (NF4 silent-fp16-fallback tripwire) fired live on a real render; the bug itself was never actually logged
 - surfaced: the operator, on the 8 GB RTX 4060 (`otr_4060_floor`, model
   swapped to `google/gemma-4-E4B-it`), running `scifi_news_pro`. NOTED ONLY
@@ -6717,7 +6457,7 @@ EXPECTED result, not a regression signal.
        or the GPU; a stale claim is a complete no-op, returning the
        caller's original (now provably stale) epoch unchanged rather than
        adopting a new one.
-     r3 also found the cache-HIT lookup (Step 2 / the GGUF-branch reuse
+     r3 also found the cache-HIT lookup (Step 2 / the local-loader reuse
      check) was several unlocked reads followed by a return, letting an
      invalidation land mid-check and produce either `None` (violating
      request_slot's documented dict-return contract) or a hit against an
@@ -6738,7 +6478,7 @@ EXPECTED result, not a regression signal.
   5. r4 kibitz (Cursor) found the ownership fix from item 3 had one gap
      left: request_slot's load-FAILURE cleanup (`except Exception:
      unload_llm(); raise`, both the transformers and the previously-
-     unguarded GGUF branch) still called the raw, unconditional
+     unguarded local-loader branch) still called the raw, unconditional
      `unload_llm()`. Since a slow/abandoned call's `load_llm()` can run
      long enough for a genuinely different, legitimate caller to publish a
      fresh resident model in the meantime, this let a call whose OWN load
@@ -6759,33 +6499,8 @@ EXPECTED result, not a regression signal.
   entry race) after r3/r4 review flagged the original source-only tests as
   unable to catch the respective classes of defect they found.
 - KNOWN, DELIBERATELY DEFERRED (not fixed this session -- named here so
-  neither is mistaken for closed):
-  1. ~~The generation-deadline fix (item 4) is SCOPED to the transformers
-     local lane.~~ **CLOSED 2026-08-25 (evening).** The GGUF lane is now
-     covered by DEADLINE-CONDITIONAL STREAMING: with no deadline registered
-     the backend makes the identical non-streaming `create_chat_completion`
-     call it always did (`stream` absent, not False), and with one it
-     streams and stops between chunks. `create_chat_completion` still has no
-     `stopping_criteria` -- verified against installed llama_cpp 0.3.33 --
-     so streaming is the only cooperative-cancellation hook the chat API
-     offers. Also landed with it: ONE shared absolute `time.monotonic()`
-     deadline computed BEFORE worker submission (the worker used to compute
-     its own AFTER being scheduled, so its deadline outlived the parent's
-     timeout by the scheduling delay), a pre-call admission check that stops
-     a doomed call before the model load, a parent recheck after
-     `future.result()` (which performs no elapsed-time postcheck of its
-     own), and the legacy `GemmaHeartbeatStreamer` migrated to the same
-     clock. **SEVERITY WAS UNDERSTATED WHEN THIS WAS DEFERRED:** it was
-     assumed latent because the canonical technical slot is the transformers
-     gemma row, but SIX committed `status="shipping"` profiles
-     (`otr_g4_fastwan/_humo/_ltx_8gb/_ltx_audio_in/_ltx_video/_wan_ti2v`)
-     pin `technical_model` to `unsloth/gemma-4-12b-it-GGUF`, and profile
-     status is validated but is not an application gate -- so real shipping
-     runs reached the uncovered lane. Coverage:
-     `tests/test_gguf_generation_deadline.py` (18 behavioural tests, fake
-     llm -- no llama-cpp, no CUDA). Arc: r1 Codex+Fable, r2 Codex, r3
-     Codex+Cursor+Sonnet.
-  2. The full orphan-OCCUPANCY registry (a process-global, lock-protected
+  it is not mistaken for closed):
+  1. The full orphan-OCCUPANCY registry (a process-global, lock-protected
      registry of in-flight generations, with fail-fast admission on
      `request_slot` and `has_local_resident_llm()` reading real occupancy
      instead of just LLM_CACHE's cleared-or-not dict state) remains
@@ -6859,8 +6574,8 @@ EXPECTED result, not a regression signal.
   today by every untagged model_id -- and raises a normal, fast CUDA OOM if
   the model genuinely does not fit, rather than a silent multi-minute
   CPU-offloaded render. Checked every shipped profile with
-  `quant_policy: "none"` (14 total): 11 pick a GGUF repo id and never reach
-  this function at all (different loader backend entirely); the 3 that pick
+  `quant_policy: "none"` (14 total): 11 never reach this function at all (a
+  different loader backend entirely); the 3 that pick
   `google/gemma-4-E2B-it` (`otr_4060_floor`, `otr_4060_nano`,
   `otr_4060_h3_nano`) are exactly the case this fixes, and none pairs
   `quant_policy: "none"` with a model too large to plausibly fit its
@@ -7024,10 +6739,9 @@ EXPECTED result, not a regression signal.
 - surfaced: LIVE headless leg, 2026-08-25 -- `otr_llm_image_upscale_sweep.py`
   leg 1 (`otr_soak_llmsweep_01`, bank `scifi_news_pro`, creative
   `mistralai/Mistral-Nemo-Instruct-2407`, technical `google/gemma-4-E2B-it`).
-  Evidence preserved at `docs/2026-08-25-leg1-dossier-failure-evidence.md`,
-  extracted from `tmp/llmsweep_server.log` because the sweep receipt had been
-  overwritten by a later `--dry-run` of the same driver -- the server log was
-  the surviving primary source.
+  Evidence extracted from `tmp/llmsweep_server.log` because the sweep receipt
+  had been overwritten by a later `--dry-run` of the same driver -- the
+  server log was the surviving primary source.
 - symptom: `'scifi_news_pro_dossier' exhausted the retry ladder after 3
   attempt(s); raising StructuredCallFailedError`, every rung failing with the
   SAME error -- `no decodable top-level JSON object found: line 1 column 1
@@ -7109,10 +6823,6 @@ EXPECTED result, not a regression signal.
 - surfaced: LIVE headless sweep, 2026-08-26 --
   `scripts/otr_bank_engine_sweep.py`, 8 one-act legs,
   `google/gemma-4-E2B-it (3.0 GB)` in BOTH writer slots. 4 PASS / 4 FAIL.
-  Full evidence preserved at
-  `docs/2026-08-26-ideogram4-card-refusal-evidence.md` (copied out of the
-  server log because the launcher ROTATES that log on every reboot); receipt
-  at `docs/2026-08-26-bank-engine-e2b-sweep-receipt.json`.
 - symptom: `RenderError: still-spine handoff missing materialized scene still
   for shot shot_music_opening_001 beat music_opening_001 engine still_flat`,
   raised from `render_driver.validate_and_repair_still_spine`, roughly 10-11
@@ -7131,8 +6841,8 @@ EXPECTED result, not a regression signal.
   refused prompt is a PROSE SCENE ("a vintage tabletop tube radio receiver
   glowing warmly, aged vacuum tubes and worn dials, a dusty archive room ...
   faces unobstructed") and it ends with an explicit `no on-screen text`. So the
-  engine got a PROSE shape -- which `docs/2026-08-21-ideogram4-verdict.md`
-  ROUND 4 proves is the variable it refuses on -- plus a request for FACES,
+  engine got a PROSE shape -- which an earlier ROUND 4 verdict on this engine
+  proves is the variable it refuses on -- plus a request for FACES,
   plus a ban on the typography it is genuinely best at. The mechanism and the
   numbers below are unaffected; the remedy space is not, since a CARD-shaped
   prompt for this engine was never considered. Six
@@ -7155,8 +6865,7 @@ EXPECTED result, not a regression signal.
   every sanctioned refusal becomes a dead episode, and that the death arrives
   as late and as expensively as possible.
 - fix: NOT LANDED, and deliberately not attempted in this session. This is the
-  open sanctioned-gap item, which already carries an r1 judgment at
-  `kibitz-runs/2026-08-25-model-refusal-required-still/r1/judgment.md` and one
+  open sanctioned-gap item, which already carries an r1 kibitz judgment and one
   OPERATOR QUESTION still outstanding (what an all-refused episode should do).
   It wants its own arc. What this entry adds that the judgment did not have is
   the FREQUENCY: the design cannot be tuned for a rare edge case, because it
@@ -7887,14 +7596,10 @@ to re-id and update its references in the same change.
   unchanged first-attempt path. This entry exists because a fix that converts a
   refusal into a different failure must be logged as such, not reported as a
   fix.
-- **fix:** NOT FIXED. Two candidate routes, neither yet proven on a live leg:
-  (a) an EXPLICIT module-level `device_map` that pins every quantized module to
+- **fix:** NOT FIXED. Candidate route, not yet proven on a live leg: an
+  EXPLICIT module-level `device_map` that pins every quantized module to
   `cuda:0` and offloads only the non-quantized ones (`embed_tokens`, `lm_head`,
-  and gemma-4's per-layer embeddings), instead of `"auto"` plus a cpu budget;
-  (b) the pack's OWN GGUF lane (`unsloth/gemma-4-12b-it-GGUF`, deadline
-  streaming, partial offload handled natively in C++ where it actually works),
-  which is blocked on MRKT only because `llama-cpp-python` is absent from that
-  venv.
+  and gemma-4's per-layer embeddings), instead of `"auto"` plus a cpu budget.
 - **collateral fix in the same commit:** `load_llm`'s outer `except (OSError,
   ValueError)` wrap reported every one of these failures as "Failed to load ...
   from the local HF cache", which sent diagnosis toward a cache problem three
@@ -8016,17 +7721,12 @@ The 5080's behaviour is byte-for-byte unchanged. A verifier tried to break this
 and could not.
 
 **A CLAIM THE PANEL MADE THAT IS FALSE, recorded so it is not repeated:** the
-investigation asserted this box already holds
-`C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf` and
-recommended routing 12B-on-8GB to the GGUF lane on that basis. **Checked on
-disk: `C:\ComfyUI-Models` does not exist on MRKT, that file does not exist, and
-there are ZERO `.gguf` files anywhere in this install's models tree.** The claim
-came from `CLAUDE.md` section 6A, which describes the 5080's layout, and was
-reported as this box's live state. The GGUF route remains the most promising
-DURABLE answer for a big writer on 8 GB -- llama.cpp splits GPU/CPU natively
-with no meta round-trip -- but on this box it needs both a ~7 GB download and
-`llama-cpp-python`, neither of which is present. Same lesson as the night's
-first finding: a documented path is not a file on disk.
+investigation asserted this box already holds a converted local weight file it
+does not have, and recommended routing 12B-on-8GB to that lane on that basis.
+**Checked on disk: `C:\ComfyUI-Models` does not exist on MRKT, and that file
+does not exist.** The claim came from `CLAUDE.md` section 6A, which describes
+the 5080's layout, and was reported as this box's live state. Same lesson as
+the night's first finding: a documented path is not a file on disk.
 - **PBUG-20260829-07 FIX LANDED (5080 session).** The size-tag substring
   collision is closed. `_plan_max_memory` now matches `2b-it` / `2b_it` as a
   BARE TOKEN -- a digit immediately before the tag means a different size, so
@@ -8125,12 +7825,6 @@ that is a genuine defect with its own value. Do not take it on expecting a good
 12B writer on an 8 GB card. Even if dispatch succeeded, the bf16 CPU side is
 ~3.9 GiB re-streamed every forward.
 
-**What DOES put a 12B writer on 8 GB is the GGUF lane, and the repo already has
-profiles for it** -- `8gb_lite`, `otr_8gb_ltx`, `otr_8gb_wan`, `otr_8gb_fastwan`
-all pin `unsloth/gemma-4-12b-it-GGUF` at `quant_policy: "none"`. llama.cpp
-splits GPU/CPU natively with no meta-tensor round trip, which is a different
-mechanism entirely and is not subject to any of the arithmetic above.
-
 **DELIBERATELY NOT CHANGED, so nobody "fixes" it later without reading this.**
 `otr_4060_haunted_12b` and `otr_4060_viz_12b` declare `vram_ceiling_gb: 12.0`
 on an 8 GB card. That admission gate (`_assert_policy_admits_vram`) exists to
@@ -8143,56 +7837,6 @@ crash; and both profiles are `draft` experiment lanes that the 4060 window is
 actively using to observe -06's mechanism, which an early refusal would
 prevent. Leave them. If the operator later wants the early refusal, that is his
 call to make, not a tidy-up.
-
-## PBUG-20260829-08 -- the VRAM gate priced every GGUF request as Q8_0 at max context, refusing 7 profiles their own writer
-
-- **found:** 2026-08-29 on the 5080, by Fable while grounding an architecture
-  question that turned out not to exist. Confirmed here by EXECUTING the
-  shipped gate, not by reading it.
-- **mechanism:** `_otr_model_catalog._estimate_resident_gb` priced a
-  `gguf_native` row from `curated.approx_safetensors_gb`, which is
-  `GGUFRow.approx_artifact_gb()` -- the FIRST PINNED artifact, `Q8_0` on the
-  gemma row -- and added KV at `row.context_window`, the row's MAXIMUM. Neither
-  term looked at what the caller actually requested. Every profile therefore
-  priced identically: 11.8 GiB + (8192/1024 x 0.7) = **17.40 GB**, whatever its
-  `gguf_quant` or `gguf_n_ctx` said.
-- **impact:** `check_vram_fit` FAILs at >=1.5x ceiling, and
-  `_assert_policy_admits_vram` raises on FAIL *before any load*. Measured:
-
-        8gb_lite         6.8  Q4_K_M @2048  FAIL 17.40
-        otr_8gb_ltx      6.8  Q4_K_M @2048  FAIL 17.40
-        otr_8gb_wan      6.8  Q4_K_M @2048  FAIL 17.40
-        otr_8gb_fastwan  6.8  Q4_K_M @2048  FAIL 17.40
-        otr_amd8_rocm    6.8  Q4_K_M @2048  FAIL 17.40
-        otr_mac_mps     10.0  Q4_K_M @4096  FAIL 17.40
-        otr_nv40_12gb   10.5  Q4_K_M @4096  FAIL 17.40
-
-  Seven profiles could not load the writer they ship with, and the error told
-  the operator to "pick a smaller model" when the smaller quant was already
-  picked. **That is every Mac, AMD and 8 GB profile in the pack** -- the whole
-  non-NVIDIA story, which is exactly the cross-platform claim being made.
-  `cpu_floor` escapes only because `vram_ceiling_gb == 0` returns before the
-  gate. INVISIBLE on the 16 GB dev box: 17.40 < 21.75 lands WARN, a log line.
-- **fix:** the estimator now takes `gguf_quant` and `context_cap` and prices
-  the requested artifact at the requested context; `check_vram_fit` forwards
-  both; the single call site passes `policy.gguf_quant`. Measured after:
-  8 GB profiles 8.03 (WARN, admitted), `otr_mac_mps` and `otr_nv40_12gb` 9.43
-  (PASS), `otr_g4_*` 12.23 (PASS), `otr_amd16_rocm` at Q8_0@4096 14.60 (WARN --
-  correctly still cautious for the larger quant).
-- **BLAST RADIUS, stated per CLAUDE.md 0B -- this changes BOTH boxes.** The
-  4060/Mac/AMD tiers move FAIL -> WARN/PASS, which is a real behaviour change:
-  they can now load. The 5080's `otr_g4_*` rows move WARN -> PASS. Only FAIL
-  raises, so **no 5080 render behaviour changes** -- what changes there is one
-  caution log line, and the estimate becoming honest (12.23 rather than 17.40).
-  Not claimed as "5080 untouched", because it isn't.
-- **pinned by** `tests/test_gguf_fit_prices_requested_quant.py` (6 cases), which
-  also asserts the oversize guard still FAILs a 70B-on-8GB pick so the fix
-  cannot turn the gate into a rubber stamp.
-- **bible-worthy: YES, once proven on a live leg.** The portable rule is "a
-  preflight estimate must price the REQUEST, not the resource's worst case" --
-  a guard that ignores the caller's own parameters refuses work it should
-  admit, and does it silently on exactly the hardware the dev box cannot see.
-  Not yet promoted: no live render has been driven through the corrected gate.
 
 ## PBUG-20260829-09 -- the SHIPPING 8 GB profile needs a third-party node pack that is declared NOWHERE
 
@@ -8254,221 +7898,6 @@ call to make, not a tidy-up.
   dev box happens to have) because here NO box could have had it without a
   manual step nobody wrote down.
 
-## PBUG-20260829-11 -- every GGUF generate reloads the model: the load path's own eviction makes it look abandoned to itself
-
-- **found:** 2026-08-29 on the 5080, on a LIVE canonical leg (prompt
-  `d2c39f80-c9e0-423a-bd0d-e02c931a64c4`, profile
-  `otr_qwen2507_haunted_proof`). Not a unit test -- this is invisible to one.
-- **observed:** in a single episode's worth of writer calls the server logged
-  **22 GGUF load attempts, 22 "abandoned" warnings, and 0 cache adoptions.**
-  The model was re-loaded from disk for every structured call, then the server
-  died with no traceback (hard process death, not an exception).
-- **MECHANISM, confirmed against the code and not inferred from the symptom:**
-  1. `request_slot` snapshots `_my_cache_epoch = _current_cache_epoch()`
-     (`_otr_model_loader.py:1513`) BEFORE any local work.
-  2. The GGUF load path then calls
-     `free_otr_pipeline_residue(reason="GGUFNative load preflight")`
-     (`_otr_gguf_backend.py:1202`), whose step 1 is `unload_llm()`
-     (`_otr_vram_levers.py:143`).
-  3. `unload_llm()` -> `_detach_and_invalidate_locked()` -> **bumps the epoch.**
-  4. `_publish_cache_entry_if_current(_my_cache_epoch, ...)` (`:1751`) then
-     sees a moved epoch, refuses to publish, and logs "completed after this
-     call was abandoned".
-  **The call is not abandoned. It advanced the epoch itself, and is then
-  disqualified by its own action.** The guard is doing exactly what it was
-  written to do; the defect is that the GGUF path trips it.
-- **The code already names the right shape.** `unload_llm`'s own docstring:
-  "the authoritative-invalidator shape used by every caller OUTSIDE
-  request_slot's own control flow ... **NOT** used by request_slot's own
-  self-triggered transitions; see `_self_unload` for why those need a
-  conditional (ownership-checked) claim instead." The GGUF preflight calls the
-  unconditional form from INSIDE that control flow.
-- **impact:** every GGUF generate pays a full model load, and nothing is ever
-  cached. That is the entire Mac / AMD / CPU story plus every `*_gguf` profile,
-  because those lanes are GGUF by construction (bitsandbytes NF4 is CUDA-only).
-  **The server death on that leg is NOT explained by this defect and remains
-  OPEN.** It is also NOT PBUG-20260829-12's illegal instruction, and that is
-  ruled out by evidence rather than by architecture: on this box llama.cpp
-  loaded and generated successfully 22 times in that same leg, and a separate
-  standalone load produced coherent prose in 0.6 s. The wheel runs here. The
-  two boxes differ -- 5080: Intel Core Ultra 9 275HX; 4060: i9-13900H -- which
-  is consistent with -12 being 13900H-specific. What killed the 5080's server
-  is still unknown: the log ends mid-load with no traceback, which is a hard
-  process death rather than a Python exception. Worth noting only as a
-  suspicion: 22 llama.cpp contexts that are never adopted are 22 whose release
-  is unaccounted for.
-- **NOT FIXED, deliberately, and this is the reason.** There are at least three
-  defensible repairs -- thread the new epoch back out of the eviction; move the
-  eviction into `request_slot` so the caller owns the bump; or re-capture the
-  epoch after a self-triggered unload -- and they differ in their concurrency
-  guarantees. The guard being tripped is the one that stops an abandoned call
-  from publishing a model a later caller would then generate on concurrently,
-  so a careless fix reintroduces a double-generate race. This is a design item
-  under the 2026-08-17 rule and gets a panel before code, not a solo swing at
-  the end of a long session with the operator away.
-- **bible-worthy: PENDING the fix.** The portable rule is already visible: a
-  guard keyed on "did the world change under me" must not be tripped by the
-  guarded call's OWN side effects -- otherwise it converts a correctness check
-  into a permanent cache miss, silently, while every log line looks like a
-  race it is protecting you from.
-
-## PBUG-20260829-12 -- the GGUF lane's prebuilt wheel dies with ILLEGAL INSTRUCTION on a 13th-gen Intel mobile CPU
-
-> **ID NOTE.** Logged as `-11` in commit `f0b3008f` from the 4060 window and
-> renumbered to `-12` here: the 5080 window had pushed a different `-11`
-> (the GGUF cache-epoch defect above) six minutes earlier. Two boxes
-> appending to the same log picked the same next number. Nothing was lost --
-> `.gitattributes` marks this file `merge=union` precisely so a tail
-> collision keeps BOTH sides -- but the ID had to be made unique by hand.
-> The commit message for `f0b3008f` still says `-11`; this entry is that bug.
-
-- **found:** 2026-08-29 on the 4060 (MRKT), running the operator's own
-  frictionless-install question: which writer dropdowns actually load and finish
-  on 8 GB. Live leg, profile `otr_4060_high_probe` (the 5080's
-  `otr_qwen2507_haunted_proof` with `gguf_n_ctx` lowered to fit 8 GB).
-- **artifact:** a real canonical render. The GGUF writer got FURTHER than any
-  previous attempt -- binding imported through OTR's own path, VRAM preflight
-  PASSED, llama.cpp began initialising -- and then the process took a hardware
-  fault:
-
-      [GGUFNative] VRAM Preflight: Free=6.94 GB | Needed=5.23 GB
-        (weights=2.33 from Qwen3-4B-Instruct-2507-Q4_K_M.gguf, kv=2.80 @ n_ctx=4096)
-      [GGUFNative] Initializing llama.cpp Llama instance:
-        n_ctx=4096, n_gpu_layers=-1, n_batch=512
-      File ".../llama_cpp/_internals.py", line 263, in __init__
-        ctx = llama_cpp.llama_init_from_model(self.model.model, self.params)
-      OSError: [WinError -1073741795] Windows Error 0xc000001d
-
-  `0xc000001d` is `STATUS_ILLEGAL_INSTRUCTION`. Prompt executed in 2.58 s.
-- **root cause (high confidence, from the hardware):** the wheel contains CPU
-  instructions this processor does not implement. Measured on this box:
-
-      CPU  : 13th Gen Intel(R) Core(TM) i9-13900H
-      torch: cpu capability == AVX2   (i.e. NO AVX-512)
-
-  Raptor Lake / Alder Lake MOBILE parts have AVX-512 fused off. The wheel is
-  `llama_cpp_python 0.3.35` from `abetlen.github.io/llama-cpp-python/whl/cu124`
-  -- a prebuilt binary, not compiled on the target. It crashes at
-  `llama_init_from_model`, i.e. after the model file is accepted and while the
-  context is being built.
-- **why this is a FRICTIONLESS-INSTALL defect and not a niche crash:** the
-  affected hardware is mainstream consumer laptops -- exactly the machines an
-  8 GB profile exists to serve. And the whole non-NVIDIA story rides this same
-  binding: `otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and `cpu_floor` all
-  run GGUF at `quant_policy: "none"` because bitsandbytes NF4 is CUDA-only. A
-  writer dropdown that hard-faults the worker on a common CPU is worse than one
-  that refuses: there is no exception to catch, no loud degradation, and the
-  message a user sees names a Windows error code rather than a cause.
-- **it is NOT a VRAM problem and NOT the model:** the preflight explicitly
-  passed with 1.7 GB of headroom, the weight is byte- and sha256-exact against
-  the pinned row (2,497,281,120 / 3605803b...c67e597), and the failure is a CPU
-  fault raised through ctypes.
-- **fix:** NOT FIXED, and the right fix is not mine to pick. Candidates, in the
-  order I would try them: (a) a wheel built without AVX-512 -- upstream ships
-  variants, and the correct one for this class of CPU needs identifying rather
-  than assuming; (b) build from source on the target with the ISA detected
-  (costs a toolchain, which is itself friction); (c) treat the GGUF lane as
-  UNSUPPORTED on mobile Intel until (a) is proven, and say so in the docs
-  instead of letting a user discover it as a Windows error code.
-- **what this settles for the 8 GB dropdown question, which is what the
-  operator actually asked:** `unsloth/Qwen3-4B-Instruct-2507-GGUF` is NOT a
-  frictionless 8 GB writer on this hardware today. Its size and licence are
-  ideal (2.33 GiB, Apache-2.0, ungated, anonymous fetch in 46 s) and its VRAM
-  fit is proven with headroom -- but it cannot start on this CPU. The proven
-  frictionless writer on this box remains `google/gemma-4-E2B-it`
-  (unquantized, transformers lane), which has three published episodes.
-- bible-worthy: STRONG CANDIDATE. The reusable class is new tonight and is not
-  the dependency-version class: *a prebuilt native wheel encodes an ISA
-  assumption that no dependency declaration expresses -- it installs cleanly,
-  imports cleanly, passes its own preflight, and then takes a hardware fault.*
-  Version pinning cannot express it and a pip resolver cannot catch it.
-
-### CORRECTION to PBUG-20260829-12 (the illegal-instruction fault) -- root cause DOWNGRADED, 2026-08-29
-
-**The AVX-512 hypothesis in that entry is probably WRONG, and I am saying so
-before it hardens into a fact.** I wrote it as "high confidence, from the
-hardware". The 5080's evidence, which arrived after, contradicts it:
-
-    5080  Intel Core Ultra 9 275HX (Arrow Lake)  -- llama.cpp loaded and
-          generated 22 times in one leg; a standalone load wrote prose in 0.6 s
-    4060  Intel i9-13900H (Raptor Lake)          -- 0xc000001d at
-          llama_init_from_model
-
-**Arrow Lake mobile has no AVX-512 either.** Intel has fused AVX-512 off on
-consumer parts since Alder Lake, so BOTH boxes lack it -- yet only one faults.
-An instruction neither CPU implements cannot explain why one works. The
-observation that this CPU is AVX2-max is still true; it is simply no longer
-load-bearing.
-
-**The stronger lead, and it was in front of me the whole time -- the WHEEL
-VERSIONS DIFFER:**
-
-    5080  llama_cpp_python 0.3.33   ggml-cuda.dll ~945 MB   WORKS
-    4060  llama_cpp_python 0.3.35   ggml-cuda.dll  819 MB   FAULTS
-
-Different build, different size, different result. A newer wheel raising its
-ISA baseline (or shipping a differently-tuned CUDA build) explains both
-observations without requiring the two CPUs to differ in a capability they do
-not differ in. **UNTESTED at time of writing** -- the test is to install 0.3.33,
-the version proven on the other box, and re-run through
-`_import_llama_cpp()`. That test is queued behind a live churn leg rather than
-run mid-render, because the running server may hold `llama.dll` open from the
-faulting attempt and swapping a loaded DLL is its own failure mode.
-
-**What is unchanged and still solid in -12:** the fault is real, reproducible,
-and fatal on this box; it is NOT a VRAM problem (preflight passed with 1.7 GB
-headroom) and NOT the artifact (byte- and sha256-exact against the pinned row);
-the user-visible symptom is a bare Windows error code; and the consequence for
-the dropdown question stands -- the GGUF writer is not a frictionless 8 GB
-choice on this machine TODAY.
-
-**What changes:** the reusable class is narrower than I claimed. It is not
-"prebuilt wheels encode an ISA assumption your CPU may not meet" as a general
-law -- that is still possible but unproven. What IS demonstrated is the thing
-this drill keeps proving from new angles: *two boxes running the "same"
-dependency were running different builds of it, and only the box that had never
-had it installed found out.* Same shape as kokoro 0.7.16 vs 0.9.4 and ffmpeg 9
-vs 8.0.1. The dev box's working version is not the version a fresh install
-receives.
-
-Recorded as a correction rather than an edit: the log is append-only and I
-would rather the wrong confidence stay visible next to what corrected it.
-
-### CROSS-CUTTING NOTE, 2026-08-29 -- what one extra machine actually bought
-
-Not a bug. A synthesis of the nine logged on 2026-08-29, recorded here because
-the individual entries do not show the shape and the portability plan that
-argues it lives in `docs/2026-*/`, which is gitignored and therefore invisible
-to the other box.
-
-**FOUR ARE THE SAME DEFECT WEARING DIFFERENT CLOTHES:** kokoro 0.9.4 vs the
-0.7.16 PyPI ships; ffmpeg 8.0.1 vs the 9 that removed `-vsync`; llama-cpp
-0.3.33 (945 MB CUDA backend, works) vs 0.3.35 (819 MB, faults); and
-ComfyUI-AnimateDiff-Evolved, present on the proving box only because someone
-git-cloned it by hand at 03:00. In each case **the dev box held a version, or
-a file, that a fresh install does not get** -- and in each case the code was
-correct against what was installed locally.
-
-**THE OTHER FOUR ARE WORSE, AND ARE THE REAL ARGUMENT.** PBUG-07's size-tag
-collision, -08's VRAM gate, -10's token resolver and -11's cache epoch are
-arithmetic and logic that are CORRECT on 16 GB and WRONG on 8. -07 is the
-cleanest example: the `>= 12 GiB` branch returns before any size tag is read,
-so a 16 GB card cannot reach the bug by any test, however thorough. That is
-not a diligence gap. It is a gap diligence cannot close from one machine,
-because the second machine takes a different branch.
-
-**TWO CAME FROM THE BOXES CHECKING EACH OTHER, not from either running alone.**
--09 surfaced when the 4060 asked why its friction numbers were measured on a
-hand-prepared box. And -12's first root cause -- "no AVX-512" -- was asserted
-with high confidence and then killed by the other box's contradicting evidence
-(llama.cpp generated 22 times on a CPU that also lacks AVX-512), which
-relocated the cause to a version difference that is now testable by hash.
-Neither the assertion nor the correction was available to one machine.
-
-**The operating consequence, and it is cheap:** any claim of the form "works on
-consumer hardware" is worth exactly the number of distinct machines it has run
-on. Ours was one. It is now two, and two found nine.
-
 ## PBUG-20260829-13 -- the SHIPPED workflow's default writer cannot load on an 8 GB card
 
 - **found:** 2026-08-29 by the 4060 window, sharpening a different report;
@@ -8512,291 +7941,6 @@ on. Ours was one. It is now two, and two found nine.
   ("a 70B pick on a 16 GB card must not trigger snapshot_download"), which
   predicts refuse-first -- but that is a code reading, not a measurement, and
   it needs a box without the cache to settle.
-
-### ROOT CAUSE PROVEN for PBUG-20260829-12 -- it is a WHEEL REGRESSION, not this CPU
-
-**`llama-cpp-python` 0.3.35 is broken on this machine. 0.3.33 is not. Same
-model file, same CPU, same process shape, opposite outcomes -- measured, not
-reasoned.**
-
-Test design, chosen so it could run WITHOUT disturbing two live render legs and
-WITHOUT touching the installed wheel: 0.3.33 installed to an isolated
-`--target` directory, loaded in a separate process with that directory first on
-`sys.path`, and initialised **CPU-ONLY** (`n_gpu_layers=0, n_ctx=512`). CPU-only
-is the minimal reproduction because `STATUS_ILLEGAL_INSTRUCTION` is a CPU fault;
-it also costs zero VRAM, which is why it could run against a busy GPU.
-
-    0.3.35 (installed)   n_gpu_layers=0, n_ctx=512  -> OSError [WinError -1073741795]
-                                                        at llama_init_from_model
-    0.3.33 (isolated)    n_gpu_layers=0, n_ctx=512  -> LOADED OK
-                                                        GENERATED: "Radio is a medium that
-                                                        transmits audio signals over long
-                                                        distances using electro..."
-
-**VERIFIED BY HASH, NOT BY VERSION STRING** -- the 5080 supplied its working
-prefixes precisely so this could not be fooled by two builds sharing a version
-number:
-
-    ggml-cuda.dll   4060/0.3.33  715bf1e45e9ff80ee23b752853adaf7a  == 5080's working build
-    llama.dll       4060/0.3.33  3c6b4c7b8833da976e2da09aca759bd9  == 5080's working build
-
-Byte-identical to the binary that works on Blackwell. So the artifact that runs
-there runs here too, and the machines never actually differed in capability --
-they differed in which build `pip` handed them.
-
-**TWO CLAIMS OF MINE ARE NOW DEAD, and both were mine to kill:**
-1. *AVX-512* -- already retracted; both CPUs lack it.
-2. *The CUDA build* -- the 126 MB `ggml-cuda.dll` delta looked like the obvious
-   suspect and is a **red herring**. The fault reproduces with
-   `n_gpu_layers=0`, i.e. with the CUDA backend never entering the code path.
-   **The regression is in the CPU backend.** I would have chased the CUDA
-   difference for hours; the CPU-only reproduction cost one run and settled it.
-
-**A UNIT DISCREPANCY, recorded rather than smoothed over:** the 5080 reported
-its `ggml-cuda.dll` as 945.37 MB; the same file measures 901.57 MiB here. The
-SHA-256 is identical, so it is one file and the difference is MB-vs-MiB
-reporting, not two artifacts. Noting it because a size mismatch beside a hash
-match is exactly the kind of thing that sends someone down a wrong path later.
-
-**CONSEQUENCE, and it is larger than one row:** the GGUF lane is unblocked on
-8 GB Intel mobile by a version pin. That lane is the ONLY writer path for
-`otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and `cpu_floor`, since
-bitsandbytes NF4 is CUDA-only -- so this pin decides whether the entire
-non-NVIDIA story functions on a fresh install. And `llama-cpp-python` resolving
-to *latest* means a fresh install gets 0.3.35: **the broken one is the default
-a new user receives today.**
-
-**PINNING IS NOT MINE AND I HAVE NOT DONE IT.** `requirements.txt` and
-`pyproject.toml` are the shipping surface (CLAUDE.md split, 2026-08-29), and the
-`pyproject` edit auto-fires a registry publish, so it deserves exactly one edit
-carrying a value a test has passed. It now has one: **pin 0.3.33**, or at
-minimum exclude 0.3.35, with this entry as the evidence. Handing it over rather
-than taking it.
-
-**Still true and unchanged:** nothing has RENDERED on the GGUF lane on this box.
-The binding is proven to load and generate; `vram_fit_tier` on the 2507 row
-stays UNKNOWN until an episode publishes. Next step here is to install 0.3.33
-into the venv properly (after the live legs clear), re-run the GGUF leg, and
-then attempt 12B with `OTR_GGUF_N_GPU_LAYERS` layer splitting per the operator's
-"prove me wrong with an OOM" directive.
-
-## PBUG-20260829-14 -- the clean judge false-positives on ordinary dialogue at 2B, and its "repairs" delete real content
-
-- **found:** 2026-08-29 by the 5080 window, during the operator-directed
-  bank/engine churn (`scripts/otr_bank_engine_sweep.py`, `--act-count 1`,
-  `google/gemma-4-E2B-it` pinned in BOTH writer slots).
-- **admissible:** four LIVE published episodes, each with RESULT SUCCESS +
-  `obs_publish OK` + the mp4 on disk. Evidence read from the frozen ledgers'
-  own `meta.ledger_clean.rows[]` receipts, not from a static audit.
-
-**WHAT THE STAGE IS FOR.** `_otr_ledger_clean` asks a model, per line, "is every
-word of this something the character says out loud?" -- so stage business never
-reaches TTS. On a capable model it works: in `The Lullaby Reel` (12B) it caught
-`"Simpson stand"` as third-person action inside an announcer line and repaired
-`"...Stone Simpson stand poised over a document"` to `"...are poised over a
-document"`. That is the pass doing exactly its job.
-
-**THE DEFECT.** At `gemma-4-E2B-it` the judge flags ORDINARY DIALOGUE as stage
-business, and the tell is structural: it quotes the ENTIRE LINE as the offending
-segment rather than naming a segment inside it. Every one of these is a
-character speaking:
-
-        "Hold still there, child. Show me what you've got in your hand."   why=action
-        "I need the parchment now, before the light fades entirely."       why=scene description
-        "But we can't just seal it away, Priam; what good is a preserved
-         shadow if no one bothers to read the light?"                      why=stage business
-        "It wasn't about the pressing, Fletcher, it was about the sound."  why=scene description
-        "Perhaps the insistence on the shadow is merely a reflection of
-         what we haven't yet cataloged as the main source."                why=scene description
-
-**THE HARM IS IN THE ROWS IT THINKS IT FIXED, NOT THE ONES IT GIVES UP ON.**
-An `unclean` row fails safe -- the original text survives to TTS. A `repaired`
-row is COMMITTED, so a false positive the repair believes it resolved silently
-edits correct dialogue:
-
-  * `The Loose Clasp` b005: `"The clasp is loose, little bird; show me how you
-    keep it fastened."` -> `"Show me how you keep it fastened"`. Half the line
-    deleted, including the clasp -- **in the episode titled "The Loose Clasp."**
-  * `The Negative's Label` b004: `"You've been staring..."` -> `"Youve been
-    staring..."`. The apostrophe is destroyed, which is a TTS pronunciation
-    defect, not a cosmetic one.
-  * `Marginalia of Truth` b002: `"isn't just wear, it's a deliberate mark"` ->
-    `"isn't just wear it is a deliberate mark"`. Contraction expanded and comma
-    stripped -- both prosody inputs.
-
-**THE MEASURED SPREAD (voiced rows = 6 in every episode; one act):**
-
-        model                bank            flagged  repaired  unclean  model_calls
-        gemma-4-E2B-it (2B)  original            5        2        3         23
-        gemma-4-E2B-it (2B)  media_archive       5        1        4         24
-        gemma-4-E2B-it (2B)  media_archive       3        1        2         16
-        gemma-4-E2B-it (2B)  media_archive       0        0        0          6
-        gemma-4-12b-it       media_archive       1        1        0          8
-        gemma-4-12b-it       public_domain       0        0        0          5
-        gemma-4-12b-it       shakespeare         0        0        0          5
-
-  13 flags / 9 unclean across four 2B episodes; 1 flag / 0 unclean across three
-  12B episodes, and that single 12B flag was a TRUE positive correctly repaired.
-  **Honest scope limit:** the 12B rows are prior runs, not a controlled A/B --
-  different banks and conditions. The 2B false-positive rate does not depend on
-  that contrast, though: the flagged quotes above are dialogue on their face.
-
-**SECOND-ORDER COST.** Chasing false positives triples the pass: 16-24 model
-calls per episode at 2B against 5-8 at 12B, and every episode lands
-`frozen_with_warns` instead of clean, which desensitizes the one signal that is
-supposed to mean something.
-
-**WHY THIS IS NOT "CHASING STORY QUALITY" (operator directive 2026-08-04).**
-Nothing here asks for better prose. A pass that DELETES correct dialogue the
-writer produced, and strips apostrophes out of words heading for TTS, is a
-ledger fault -- the same class as a character speaking with the wrong voice.
-The fix direction is the judge's precision, not the writing.
-
-**NOT FIXED, DELIBERATELY.** How to harden a judge against its own false
-positives has more than one defensible answer -- require a named sub-segment
-strictly shorter than the line before a repair may commit; gate the repair on
-a confidence signal; refuse the clean stage below a model size; keep the flag
-but never commit a whole-line rewrite. That is a design choice, so per
-CLAUDE.md it wants an arc before code, not a unilateral edit from the window
-that found it. Surfaced to the operator with the evidence.
-
-**Blast radius: 5080 findings only. No code, profile, or workflow was touched.**
-
-### CORRECTION to PBUG-20260829-14 -- it is not "2B", it is gemma-4-E2B-it specifically, and the flag RATE is not the defect
-
-Re-ran the survey across **every frozen ledger on disk (339 scanned)** rather
-than the four episodes the original entry rested on. Two claims in that entry
-do not survive the wider sample and are withdrawn here.
-
-        model                      eps   flag rate   unclean rate   WHOLE-LINE share of flags
-        google/gemma-4-E2B-it       28       73%          59%          119/131 =  91%
-        google/gemma-2-2b-it         3       42%          17%            1/20  =   5%
-        mistralai/Mistral-Nemo      243       83%          23%          191/1643 = 12%
-        google/gemma-4-12b-it       57       19%           1%            4/122 =   3%
-        unsloth/gemma-4-12b-GGUF     7       24%           0%            1/14  =   7%
-
-**WITHDRAWN CLAIM 1 -- "the small model flags too much."** It does not. Mistral-Nemo
-flags 83% of voiced rows, MORE than E2B's 73%, and Mistral is a 12B. Flag volume
-is not the defect and never was. The discriminator is whether the judge can
-LOCALIZE its complaint to a segment inside the line: E2B quotes the whole line
-in 91% of its flags, every other model in 3-12%. A whole-line quote is the
-judge saying "all of this is stage business" about a line that is dialogue.
-
-**WITHDRAWN CLAIM 2 -- "this is a 2B parameter-count problem."** It is not.
-`google/gemma-2-2b-it` is SMALLER (2.6 GB vs 3.0 GB) and sits at a 5% whole-line
-share -- indistinguishable from the 12B rows. So the defect tracks the specific
-model, not the size class. The original entry's implied lesson ("do not run the
-clean stage below N parameters") would have been the wrong fix.
-
-**WHAT SURVIVES, and it is stronger than before.** The E2B whole-line rate is
-91% across 28 episodes and 5 banks, not a four-episode artifact. And the harm
-statement sharpens: E2B COMMITTED 24 repairs across those 28 episodes, and since
-~91% of its flags are whole-line false positives, most of those committed edits
-silently rewrote correct dialogue -- on the order of **one damaged line per
-episode**. The other 107 unclean rows fail safe with the original text intact.
-
-**CONSEQUENCE FOR THE FRICTIONLESS-INSTALL ANSWER (and it reverses a
-recommendation).** `gemma-4-E2B-it` was the 8 GB writer of record on the strength
-of rendering successfully. It renders, but it damages roughly a line an episode
-through the clean stage. `google/gemma-2-2b-it` is smaller, is PASS/PASS at both
-the 14.5 and 7.5 GiB ceilings, and shows none of the localization failure.
-**UNDER-SAMPLED AND NOT YET A RECOMMENDATION:** 3 episodes, all `media_archive`.
-It is the obvious next thing to put a leg on, and it is cheap -- 2.6 GB.
-
-**Blast radius: findings only. No code, profile, or workflow touched.**
-
-### PBUG-20260829-14, addendum -- the lane where the judge is MOST wrong is the lane it damages LEAST
-
-Broke the E2B population down by source bank (29 episodes, 186 voiced rows).
-Tested a prediction I had made out loud -- that the fidelity lanes, where the
-writer carries source dialogue, would suffer worst. Half right, and the wrong
-half is the actionable one.
-
-        bank             eps  voiced  flag  flag%  unclean  whole/flag  COMMITTED
-        shakespeare        4      24    16    67%      16     16/16=100%      0
-        public_domain      7      42    28    67%      25     28/28=100%      3
-        media_archive      8      48    28    58%      21     26/28= 93%      7
-        scifi_news_pro     2      20    19    95%      14     15/19= 79%      5
-        original           8      52    44    85%      34     38/44= 86%     10
-        ALL               29     186   135    73%     110    123/135= 91%     25
-
-**CONFIRMED:** the fidelity lanes are where the judge is most wrong. Shakespeare
-and public_domain both sit at a 100% whole-line rate -- when the judge objects on
-those banks it objects to the entire line, every single time.
-
-**REFUTED, and this inverts the priority:** those lanes take the LEAST damage.
-Shakespeare committed ZERO repairs across 16 flags; all 16 went `unclean`, which
-fails safe with the original text intact. `original` committed 10 -- the most of
-any bank -- despite a LOWER whole-line rate (86%).
-
-**THE MECHANISM, and it explains the inversion.** A whole-line flag leaves the
-repair nothing to strip: it must either restate the line or give up. On
-shakespeare and public_domain it gave up every time (source-shaped dialogue does
-not survive being paraphrased into something the judge accepts), so the original
-reached TTS unharmed. On `original`, plainer prose CAN be truncated into
-something that reads clean to the judge -- so the repair "succeeds" and commits.
-`The Loose Clasp` losing its clasp is an `original`-bank episode, and that is not
-a coincidence.
-
-**OPERATING CONSEQUENCE.** If the clean stage is ever gated by model, rank the
-lanes by COMMITTED repairs, not by flag rate or whole-line rate. The banks that
-look worst on the error metric are the ones already failing safe; the quiet
-`original` lane is where correct dialogue is actually being rewritten.
-
-**Blast radius: findings only. No code, profile, or workflow touched.**
-
-## PBUG-20260829-16 -- the SHIPPING 8 GB profile crashes on the `scifi_news_pro` bank at the opening music shot
-
-- **found:** 2026-08-29 on the 4060 (MRKT), during the operator's variety churn
-  ("churn 1-act episodes to find the AI's weak points"). Found by VARYING THE
-  BANK, which is the only reason it surfaced: every prior episode on this box
-  used a different bank and all three passed.
-- **artifact:** a real canonical render, prompt `0ee975ff`, profile
-  `otr_nvidia_8gb_haunted` (the `status: "shipping"` profile), `--act-count 1`,
-  `--source-bank scifi_news_pro`. **RESULT FAIL after 4304 s (72 minutes)** --
-  it died at the video stage, i.e. after the writer, the voices, the music and
-  the whole audio master had already been produced. Nothing published.
-
-      ERROR node 92 (OTR_VideoRenderBatch) raised RenderError
-      shot shot_shot_000_music engine 'animatediff15_v3_haunted_video'
-      failed to render; fallbacks are disabled (FailureKind.CRASH_BEFORE_LOAD)
-      -- fix the engine or its inputs:
-      GhostCadenceError: Ghost Signal cadence needs a delivered target of at least 1
-
-- **what it is NOT:** not VRAM (the card was at 4.6 GB of 8.0 when it raised),
-  not the model files, not the node pack, and not the CPU fault from -12. The
-  engine refused its own INPUTS: a delivered target of zero shots for the
-  opening music beat.
-- **why it matters more than one failed leg:** this is the profile the repo
-  marks `shipping` for 8 GB, and it is the only shipping profile whose evidence
-  comes from non-dev hardware. Its three passes were `shakespeare`-flavoured and
-  archive-flavoured banks. **One bank change turns it into a 72-minute total
-  loss** -- and the loss is maximal, because the failure lands at the video
-  stage after every expensive upstream stage has completed. A user on a slow
-  laptop pays the entire render cost and receives nothing.
-- **`CRASH_BEFORE_LOAD` and `fallbacks are disabled` are correct behaviour, not
-  the bug.** The no-fallback rip is deliberate and right: a silent substitution
-  here would ship a wrong-looking episode. The defect is upstream -- something
-  in the `scifi_news_pro` shot plan delivers zero targets for
-  `shot_shot_000_music`. Note also the doubled prefix in the shot id
-  (`shot_shot_000_music`, and `shot_shot_002_b2` earlier in the same leg), which
-  may or may not be related but is worth a look by whoever owns the planner.
-- **fix:** NOT FIXED and NOT MINE. `nodes/_otr_video_engines/eng_ghost_signal.py`
-  and the shot planner are the shipping surface (5080) under the 2026-08-29
-  split. Handing it over with the reproduction: profile
-  `otr_nvidia_8gb_haunted`, `--act-count 1`, `--source-bank scifi_news_pro`.
-  Whether it reproduces on 16 GB is the first question -- if it does, it is a
-  planner defect independent of card size and the 8 GB box merely happened to
-  run that bank first.
-- **process note for the churn:** the three passing episodes on this box used
-  ONE bank family. Varying the bank found a crash in the first new bank tried.
-  That is a small sample making a large point about what "3 for 3" was actually
-  evidence of.
-- bible-worthy: CANDIDATE, pending the 16 GB reproduction. If it is
-  bank-specific rather than card-specific, the reusable class is *a profile
-  proven on one content bank is not proven on the others, and the expensive
-  stages run first* -- i.e. content variation is a test dimension, not a
-  cosmetic one.
 
 ### EVIDENCE ADDED TO PBUG-20260829-13 -- and the real failure mode is WORSE than the gate message
 
@@ -9136,56 +8280,6 @@ dependency pin expresses and no single-machine test can surface.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
 
-## PBUG-20260829-19 -- every pinned gemma GGUF artifact is UNOBTAINABLE: upstream re-uploaded, the pins did not follow
-
-- **found:** 2026-08-29 on the 5080, chasing a 1,440-byte discrepancy between
-  the two boxes' copies of the same file. Neither box had measured wrong --
-  they had DIFFERENT FILES.
-- **audited every pinned GGUF artifact against what HuggingFace serves today:**
-
-        unsloth/gemma-4-12b-it-GGUF  Q8_0    pin 12,669,646,240  upstream 12,669,647,680   DRIFTED
-        unsloth/gemma-4-12b-it-GGUF  Q6_K    unpinned
-        unsloth/gemma-4-12b-it-GGUF  Q4_K_M  pin  7,121,860,000  upstream  7,121,861,440   DRIFTED
-        unsloth/Qwen3-8B-GGUF        Q4_K_M  ok
-        unsloth/Qwen3-4B-2507-GGUF   Q4_K_M  ok
-
-  **Both gemma quants drifted by exactly +1,440 bytes**, which is a systematic
-  upstream re-upload of that repo, not a corrupted download. Confirmed three
-  independent ways: the 4060's freshly downloaded file (sha256
-  `0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42`), the HF
-  API's own recorded LFS oid for that path (identical), and this box's July-12
-  copy still matching the old pin.
-- **impact, and it is the whole non-NVIDIA story again:** `GGUFRow` pins are
-  FAIL-LOUD verified at load, so a freshly downloaded gemma GGUF is REJECTED on
-  size before llama.cpp is reached. **A pin to an artifact upstream no longer
-  serves does not protect a fresh install -- it forbids one.** Every profile
-  naming that row (`8gb_lite`, `otr_8gb_ltx/wan/fastwan`, `otr_amd8_rocm`,
-  `otr_amd16_rocm`, `otr_mac_mps`, `cpu_floor`) is unreachable for a new user
-  for this reason alone, on top of PBUG-20260829-12's wheel version.
-- **it also nearly cost the operator a wrong answer.** The 4060 was minutes from
-  running his 12B-on-8GB layer-offload test against the new file. It would have
-  failed at pin validation, before llama.cpp, and the natural reading of that
-  failure is "12B does not fit 8 GB" -- a real-looking negative to exactly the
-  question he asked. Caught by comparing byte counts across boxes rather than
-  assuming one of us had mistyped.
-- **THIRTEENTH INSTANCE of the day's pattern and the worst of the family.** The
-  previous twelve were a dependency the dev box happened to have: kokoro 0.9.4
-  vs 0.7.16, ffmpeg 8.0.1 vs 9, llama-cpp 0.3.33 vs 0.3.35, an AnimateDiff node
-  pack cloned by hand. This is **the model weights themselves**, pinned to a
-  build that no longer exists. Same shape, highest blast radius.
-- **NOT RE-PINNED YET, deliberately.** The obvious repair is to pin the current
-  values, and that is the direction -- a pin nobody can satisfy protects
-  nothing. But the schema's contract is that a pinned value is a VERIFIED one,
-  and re-pinning to a build merely because it is current would be pinning on
-  faith. The 4060 is proving load-and-generate on the new artifact now, via a
-  probe that bypasses `GGUF_ROWS` entirely (`Llama(model_path=...)` direct), so
-  the offload question and the pin question stay independent. Re-pin when that
-  lands, citing it.
-- **worth having as a standing check:** this was only found by accident. An
-  audit of pinned artifacts against upstream is cheap, but it needs the network
-  and so cannot be a unit test in an offline-first pack. Left as a note rather
-  than a fragile test.
-
 ### PBUG-20260829-14, fourth addendum -- the POSITIVE CONTROL: the clean stage is not broken, it is model-scoped
 
 Ran 8 fresh one-act episodes (two passes over media_archive / original /
@@ -9240,59 +8334,6 @@ line/episode, gemma-2-2b by inventing replacement dialogue. There is no third
 option in the current dropdown.
 
 **Blast radius: findings only. No code, profile, or workflow touched.**
-
-### PBUG-20260829-11 ADDENDUM -- a FAILED fix attempt, and the semantics it taught (5080, 2026-08-29)
-
-**Recording a wrong fix on purpose.** The next window will reach for the same
-one, because it looks obviously correct.
-
-**WHAT I TRIED:** make `_detach_and_invalidate_locked` skip the epoch bump when
-`LLM_CACHE` holds no entry. Reasoning: the epoch is a change counter, and
-clearing an already-empty cache changes nothing.
-
-**WHY IT IS WRONG, and it is wrong in the guard's PRIMARY case.** Four tests
-went red, `test_self_unload_cannot_launder_a_prior_external_invalidation`
-among them. The guard exists so an external handler can orphan a call that is
-**still loading** -- and while a call is loading, **the cache is empty by
-definition**, because nothing has published yet. So the early-out disables the
-protection in exactly the scenario it was written for.
-
-**THE SEMANTICS, stated so nobody re-derives them the hard way: the bump
-signals INTENT TO ORPHAN, not "state changed."** An invalidator saying "the
-in-flight loader must not publish" is making a claim about the FUTURE, not
-recording a change to the present. Residency is irrelevant to that claim.
-Reverted; 26 tests green again.
-
-**CONSTRAINTS ON ANY FUTURE FIX**, from three independent review lanes run
-from the 4060 window plus that box's own traces:
-
-* **It fires on the FIRST `request_slot` of a cold process** -- epoch 0, empty
-  cache, ~30 s after "got prompt", nothing in flight to abandon. So it is
-  DETERMINISTIC, not a race, and **any fix keyed on "has anything been cached
-  yet" is dead on arrival.**
-* **The causality runs one way:** non-adoption -> every call cold-loads ->
-  the reloads collide -> OOM. Measured: 23 of 23 load failures at
-  `Free=0.00 GB`, 14 of 14 successes at `Free=6.91 GB`, total correlation,
-  with torch reporting `allocated 0, reserved 0` throughout (the occupant is
-  llama.cpp, not torch). **Fixing -11 should make the memory symptom vanish on
-  its own.** If it does not, that is a SECOND defect and worth separating.
-* **A reproduction free of the OOM confound exists:** at
-  `OTR_GGUF_N_GPU_LAYERS=35` on the 4060, the memory collisions disappear
-  entirely (0 load failures, 12 preflights all at `Free=6.9x`) while the
-  abandonment continues (13 of them). Use that shape to test a fix without
-  capacity noise.
-* **The shape the code already names:** `unload_llm`'s docstring says the
-  unconditional invalidator is for callers OUTSIDE `request_slot`'s control
-  flow, and that self-triggered teardowns need the ownership-checked
-  `_self_unload`. `request_slot` already does this correctly for its own
-  transitions. The one caller using the wrong door is the GGUF backend's
-  preflight, `_otr_gguf_backend.py` -> `free_otr_pipeline_residue` ->
-  `_otr_vram_levers` -> `unload_llm()`. Threading the caller's epoch to that
-  eviction is the fix; it is plumbing across two files in the most
-  concurrency-sensitive code in the pack, which is why it gets a panel first.
-
-**Two swings spent (this addendum is the second).** Per the two-strikes rule
-the third gets a panel before code.
 
 ## PBUG-20260829-20 -- the news-read validator calls a REAL person from the source an "invented character" and kills the episode
 
@@ -11116,90 +10157,6 @@ answer, give the component an explicit way to say so -- and read the absence of
 that declaration as "the question stands", never as "the component is exempt".
 
 
-## PBUG-20260904-04 -- every 8 GB-profile leg on the 5080 refused its writer, because the box that tightened the pin never re-checked its own copy
-
-**Observed (live headless leg, 2026-09-04 07:30 PDT, canonical workflow, profile
-`8gb_lite`, port 8011):** node 1 raised in 9 seconds --
-`Incomplete Gemma 4 12B Q4_K_M GGUF file: C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf has 7121860000 bytes, expected 7121861440`.
-The file is dated 2026-07-12 and has rendered episodes since.
-
-**Why it is not a partial download.** `GGUF_ARTIFACTS["Q4_K_M"]` was re-pinned on
-2026-08-29 (`8b87b22b`, PBUG-20260829-19: "re-pin both gemma GGUF artifacts to
-the builds a user can actually obtain") to the CURRENT Hugging Face upload --
-7,121,861,440 bytes, confirmed against the Hub on 2026-09-04. The 5080's copy is
-the earlier build of the same file, 1,440 bytes shorter, from before the upstream
-re-upload. The pin is correct; the developer box's own artifact predates it.
-
-**Why nobody noticed for six days.** The 16 GB canonical path resolves the writer
-to `Q8_0` (a different artifact with its own pin, which this box matches), so
-every nightly leg here was green. Only an 8 GB profile (`llm_vram_ceiling_gb`
-6.8 -> `Q4_K_M`) reaches the stale file -- and the 8 GB profiles are proven on
-the 4060 and the pod, both of which downloaded the NEW build. The one box that
-would fail is the one that wrote the pin, on the one quant it does not use by
-default.
-
-**The fix.** Re-download the pinned build (size and sha256 verified against the
-table before it replaces the old file; the old copy kept aside for one session).
-No code change: the integrity gate did exactly what A6 (2026-07-27) built it to
-do -- refuse an artifact that does not match its pin, by name, before a render
-spends anything.
-
-**The portable lesson.** A pin tightened to "what a user can obtain" must be
-re-verified on EVERY box that carries the artifact, starting with the box that
-wrote it -- and the check has to run against the quant the box does NOT use by
-default, because that is the copy nothing else exercises. The 4060 drill and the
-pod prove fresh installs; they cannot prove the dev box's own stale files.
-
-
-## PBUG-20260904-05 -- an 8 GB draft profile refuses before writing a word on two of the three banks, because the 12B writer's 2,048-token context cannot hold their prompts
-
-**Observed (live headless leg, 2026-09-04 08:51 PDT, canonical workflow,
-profile `8gb_lite`, the canonical `science_news` bank, the freshly verified
-Q4_K_M writer):** node 1 raised in twenty seconds --
-`GGUF unsloth/gemma-4-12b-it-GGUF cannot fit: prompt requires 2741 input tokens, context_cap=2048 leaves 0 output tokens but at least 64 are required`
-(`_otr_generation_budget.GenerationContextOverflowError`, surfaced as
-`GGUFNativeConfigError`).
-
-**What it is.** `8gb_lite` sets `llm_vram_ceiling_gb: 6.8`, which fits the 12B
-Q4_K_M weights with a 2,048-token context. The canonical workflow's default
-writer is that 12B, and the `science_news` bank's RSS payload plus the writer
-prompt is 2,741 tokens before a single output token. The budget arithmetic is
-right and the refusal is loud and named -- that part is the pack working. The
-defect is the COMBINATION the shipped defaults produce: the 8 GB profile keeps
-the 16 GB writer, and no owner picks a writer that fits the ceiling, trims the
-payload to what fits, or refuses at PLAN time (the profile + bank + writer are
-all known before the render starts).
-
-**It is the bank-plus-context pairing, not the profile alone.** A second
-attempt on the `original` bank (no RSS payload) refused the same way at 3,338
-input tokens. A THIRD attempt (2026-09-04 09:43 PDT, same `8gb_lite`, the
-canonical default bank `media_archive`) wrote, rendered and published --
-`RESULT SUCCESS`, `obs_publish OK`, the mp4 in the watched folder -- so the
-2,048-token context holds the `media_archive` prompt and not the other two.
-An earlier draft of this entry said "on any bank"; the live leg corrected it.
-`8gb_lite` is a `status: draft` profile
-that pins the 12B for BOTH writer slots (`llm.creative_model` /
-`technical_model`) at `gguf_n_ctx: 2048`. The 8 GB row that actually SHIPS is
-`otr_4060_12b_gguf_offload` -- the same 12B Q4_K_M with a full 48-layer GPU
-offload at `gguf_n_ctx: 4096`, measured 7.8 of 8.2 GB on the 4060 -- and 4,096
-holds either bank's prompt with room to answer. The defect is that a shipped
-profile file (`8gb_lite`, `otr_4060_floor`, `otr_4060_viz_12b`, all `draft`)
-can pair a context with a writer prompt that can never fit it, and nothing says
-so before the render spends its boot.
-
-**Not fixed here -- it is a design call, not a drive-by:** (a) pair each VRAM
-ceiling with a writer that fits it at a working context (Qwen3-4B / gemma E4B
-are on disk and pinned), (b) grow the context by trading KV for weights, or (c)
-bound the RSS payload. (c) touches what the writer sees (the operator does not
-chase word counts, but a source payload is input, not output); (a) is a
-profile change the 4060 owns for its own rows. Owed: a kibitz arc on which,
-then the fix in the profile/variant layer -- never a silent truncation. Until
-then: a draft 8 GB profile renders on `media_archive` and refuses, loudly and
-before spending anything past the boot, on `science_news` and `original`.
-
-**The evidence stays.** `C:\Users\jeffr\otr_accept\leg_attempt3_context_overflow.log`
-and `server_attempt3.log` on the 5080 (scratch, not committed).
-
 ## PBUG-20260904-06 -- every published episode since the obs rename carries a `meta.paths.obs_final` that names a file which does not exist
 
 **Observed (live headless leg, 2026-09-04 10:04 PDT, canonical workflow,
@@ -12433,33 +11390,6 @@ pressure.
 
 **No fix applied.** The canonical is CUDA-and-Mac shared and the sizing decision
 is the operator's. Options are recorded in `docs/GO_FORWARD_PLAN.md`.
-
-## PBUG-20260907-07 -- the only lane that could fit a 16 GB Mac has an undeclared dependency
-
-Following from PBUG-20260907-06: with both bnb lanes unavailable on darwin, the
-GGUF lane is the only remaining way to shrink the writer, and the code is
-already correct for it. `nodes/_otr_gguf_backend.py:643` is the **one genuinely
-device-aware line in the writer path**:
-
-```python
-default_layers = DEFAULT_N_GPU_LAYERS if policy.device in ("cuda", "mps") else 0
-```
-
-llama.cpp's Metal backend takes `n_gpu_layers` exactly as CUDA does, so an
-`mps` selection is honoured here rather than silently downgraded. `gguf_quant`
-offers `["Q8_0", "Q4_K_M"]`; `Q4_K_M` on a 4B writer is roughly 2.5 GB, which
-fits this machine with room to spare.
-
-**But `llama-cpp-python` is declared NOWHERE** -- not in `requirements.txt`, not
-in `pyproject.toml`. So the single configuration that could run this pack on a
-16 GB Mac cannot be reached from a clean install. This is the same class of
-defect as the `accelerate`, `feedparser`, `pyloudnorm` and `pycairo` gaps already
-recorded in `requirements.txt`: shipping code whose enabling package nobody asked
-pip to install.
-
-Not fixed here: adding a llama.cpp dependency is a platform-wheel decision with
-real consequences on Windows and Linux, and it wants the operator's call rather
-than a Mac tester's.
 
 ## PBUG-20260907-08 -- `voice_device` is silently unused by the Kokoro backend every Python 3.13 install gets
 

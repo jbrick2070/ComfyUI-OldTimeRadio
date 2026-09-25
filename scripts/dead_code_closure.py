@@ -52,7 +52,6 @@ ROOT_FILES = ["__init__.py", "prestartup_script.py"]
 #: the commit. Reachability is not the only question. Permission is the other.
 PROTECTIVE_DOCS = [
     "docs/OTR_STANDING_RULINGS.md",
-    "docs/2026-08-22-dead-symbol-inventory.md",
     "docs/PROD_BUG_LOG.md",
     "CLAUDE.md",
 ]

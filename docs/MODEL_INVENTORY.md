@@ -95,97 +95,60 @@ than deleted.
 
 ## Full weight-file list
 
-All 131 weight files (`.safetensors` `.gguf` `.ckpt` `.pth` `.pt` `.bin` `.onnx` `.sft`)
+All 94 weight files (`.safetensors` `.ckpt` `.pth` `.pt` `.bin` `.onnx` `.sft`)
 under the models root, largest first. Paths are relative to `C:\ComfyUI-Models`.
 
 | GB | Used by | File |
 | ---: | --- | --- |
-| 42.98 | OTR | `checkpoints/ltx-2.3-22b-dev.safetensors` |
-| 23.49 | OTR | `diffusion_models/ltx-2.3-22b-distilled-1.1_transformer_only_fp8_scaled.safetensors` |
-| 20.03 | OTR | `diffusion_models/ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors` |
+| 20.03 | OTR | `diffusion_models/LTX25-distilled-DiT-comfy-int8.safetensors` |
 | 19.53 | OTR | `diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors` |
 | 19.53 | OTR | `diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors` |
 | 16.66 | OTR | `diffusion_models/Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors` |
 | 16.06 | OTR | `checkpoints/flux1-dev-fp8.safetensors` |
 | 15.89 | OTR | `diffusion_models/humo_17B_fp8_e4m3fn.safetensors` |
 | 14.61 | OTR | `text_encoders/qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors` |
-| 14.32 | OTR | `text_encoders/gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors` |
-| 13.31 | OTR | `diffusion_models/wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors` |
-| 13.22 | OTR | `unet/distilled-1.1/ltx-2.3-22b-distilled-1.1-Q4_K_M.gguf` |
-| 12.22 | OTR | `unet/ltx-2.3-22b-dev-Q4_K_S.gguf` |
-| 11.86 | OTR | `diffusion_models/Wan2_1-HuMo-17B_Q5_K_M.gguf` |
-| 11.80 | OTR | `LLM/converted/gemma-4-12b-it/gemma-4-12b-it-Q8_0.gguf` |
 | 11.43 | OTR | `text_encoders/mistral_3_small_flux2_fp4_mixed.safetensors` |
-| 10.73 | OTR | `diffusion_models/LTX-2.5-Distilled-Q3_K_M.gguf` |
-| 10.03 | OTR | `unet/ltx-2.3-22b-dev-Q3_K_M.gguf` |
-| 9.90 | OTR | `unet/distilled-1.1/ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf` |
+| 9.88 | OTR | `text_encoders/gemma4-12b-ltx25-comfy-w4a8.safetensors` |
 | 9.57 | OTR | `text_encoders/gemma4_e2b_it_bf16.safetensors` |
 | 9.56 | OTR | `diffusers/stable-diffusion-xl-1.0-inpainting-0.1/unet/diffusion_pytorch_model.safetensors` |
 | 9.12 | OTR | `text_encoders/t5xxl_fp16.safetensors` |
-| 8.86 | OTR | `text_encoders/gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf` |
-| 8.80 | OTR | `text_encoders/gemma_3_12B_it_fp4_mixed.safetensors` |
 | 8.73 | OTR | `checkpoints/ltx-video-2b-v0.9.safetensors` |
-| 8.40 | OTR | `diffusion_models/HuMo-17b-Q3_K_M.gguf` |
 | 7.49 | OTR | `text_encoders/qwen_3_4b.safetensors` |
-| 7.39 | OTR | `unet/distilled-1.1/ltx-2.3-22b-distilled-1.1-Q2_K.gguf` |
-| 7.08 | OTR | `loras/ltxv/ltx2/ltx-2.3-22b-distilled-lora-384.safetensors` |
-| 7.08 | OTR | `loras/ltxv/ltx2/ltx-2.3-22b-distilled-lora-384-1.1.safetensors` |
-| 6.96 | OTR | `LLM/converted/Mistral-Nemo-Instruct-2407/Mistral-Nemo-Instruct-2407-Q4_K_M.gguf` |
-| 6.63 | OTR | `unsloth/gemma-4-12b-it-GGUF/gemma-4-12b-it-Q4_K_M.gguf` |
-| 6.63 | OTR | `LMStudio/unsloth/gemma-4-12b-it-GGUF/gemma-4-12b-it-Q4_K_M.gguf` |
-| 6.63 | OTR | `LLM/converted/gemma-4-12b-it/gemma-4-12b-it-Q4_K_M.gguf` |
 | 6.27 | OTR | `text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors` |
 | 5.91 | OTR | `checkpoints/ltxv-2b-0.9.8-distilled.safetensors` |
 | 5.87 | OTR | `text_encoders/qwen3vl_8b_nvfp4.safetensors` |
 | 5.25 | OTR | `text_encoders/qwen_3_4b_fp8_mixed.safetensors` |
 | 5.11 | OTR | `diffusion_models/ideogram4_unconditional_nvfp4_mixed.safetensors` |
 | 5.11 | OTR | `diffusion_models/ideogram4_nvfp4_mixed.safetensors` |
-| 4.97 | OTR | `LLM/converted/gemma-4-E4B-it/gemma-4-E4B-it-Q4_K_M.gguf` |
 | 4.87 | OTR | `text_encoders/gemma_2_2b_fp16.safetensors` |
 | 4.86 | OTR | `diffusion_models/lumina_2_model_bf16.safetensors` |
 | 4.85 | OTR | `vae/minimax_h3_video_vae_fp16.safetensors` |
 | 4.78 | OTR | `diffusers/stable-diffusion-xl-1.0-inpainting-0.1/unet/diffusion_pytorch_model.fp16.safetensors` |
-| 4.68 | OTR | `LLM/converted/Qwen3-8B/Qwen3-8B-Q4_K_M.gguf` |
 | 4.59 | OTR | `checkpoints/hunyuan3d-dit-v2-mv.safetensors` |
 | 4.52 | OTR | `checkpoints/stable-audio-open-1.0.safetensors` |
 | 4.20 | OTR | `diffusion_models/z_image_turbo_nvfp4.safetensors` |
 | 3.99 | OTR | `controlnet/FLUX.1-dev-ControlNet-Union-Pro-2.0/diffusion_pytorch_model.safetensors` |
-| 3.92 | OTR | `diffusion_models/FastWan2.2-TI2V-5B-q6_k.gguf` |
-| 3.86 | OTR | `text_encoders/umt5-xxl-encoder-Q5_K_M.gguf` |
-| 3.55 | OTR | `diffusion_models/Wan2_2-TI2V-5B-Turbo-Q5_K_M.gguf` |
-| 3.55 | OTR | `diffusion_models/Wan2.2-TI2V-5B-Q5_K_M.gguf` |
 | 3.24 | OTR | `diffusion_models/humo_1.7B_fp16.safetensors` |
-| 3.19 | OTR | `LLM/converted/gemma-4-E2B-it/gemma-4-E2B-it-Q4_K_M.gguf` |
 | 2.97 | OTR | `controlnet/FLUX.1-dev-ControlNet-Depth/diffusion_pytorch_model.safetensors` |
 | 2.88 | OTR | `audio_encoders/whisper_large_v3_fp16.safetensors` |
 | 2.59 | OTR | `diffusers/stable-diffusion-xl-1.0-inpainting-0.1/text_encoder_2/model.safetensors` |
 | 2.55 | OTR | `loras/ltxv/ltx2/ltx_2.3_22b_distilled_1.1_lora_dynamic_fro09_avg_rank_111_bf16.safetensors` |
-| 2.43 | OTR | `diffusion_models/flux-2-klein-4b-Q4_K_M.gguf` |
-| 2.15 | OTR | `text_encoders/text_encoders/ltx-2.3-22b-distilled_embeddings_connectors.safetensors` |
-| 2.15 | OTR | `text_encoders/ltx-2.3-22b-dev_embeddings_connectors.safetensors` |
 | 2.11 | OTR | `checkpoints/stable_audio_3_small_music.safetensors` |
 | 1.99 | OTR | `checkpoints/v1-5-pruned-emaonly-fp16.safetensors` |
 | 1.45 | OTR | `florence2/Florence-2-large/model.safetensors` |
 | 1.37 | OTR | `vae/ltx-2.5-video-vae-bf16.safetensors` |
-| 1.35 | OTR | `vae/vae/ltx-2.3-22b-distilled_video_vae.safetensors` |
-| 1.35 | OTR | `vae/ltx-2.3-22b-dev_video_vae.safetensors` |
-| 1.31 | OTR | `vae/wan2.2_vae.safetensors` |
 | 1.29 | OTR | `diffusers/stable-diffusion-xl-1.0-inpainting-0.1/text_encoder_2/model.fp16.safetensors` |
 | 1.11 | OTR | `text_encoders/t5gemma_b_b_ul2.safetensors` |
 | 1.06 | OTR | `pulid/pulid_flux_v0.9.1.safetensors` |
 | 1.06 | OTR | `pulid/pulid_flux.safetensors` |
 | 0.93 | OTR | `latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors` |
 | 0.93 | OTR | `latent_upscale_models/ltx-2-spatial-upscaler-x2-1.0.safetensors` |
-| 0.93 | OTR | `latent_upscale_models/ltx-2.3-spatial-upscaler-x2-1.1.safetensors` |
 | 0.83 | OTR | `text_encoders/t5-base.safetensors` |
 | 0.73 | OTR | `loras/h3-turbo-larry-v4/minimax_h3_turbo_v4_step600_ema.safetensors` |
 | 0.69 | OTR | `loras/lightx2v_I2V_14B_480p_cfg_step_distill_rank64_bf16.safetensors` |
-| 0.62 | OTR | `loras/Wan2_2_5B_FastWanFullAttn_lora_rank_128_bf16.safetensors` |
 | 0.56 | OTR | `vae/minimax_h3_audio_vae_fp32.safetensors` |
 | 0.46 | OTR | `diffusers/stable-diffusion-xl-1.0-inpainting-0.1/text_encoder/model.safetensors` |
 | 0.34 | OTR | `vae/ltx-2.5-audio-vae-bf16.safetensors` |
-| 0.34 | OTR | `vae/vae/ltx-2.3-22b-distilled_audio_vae.safetensors` |
-| 0.34 | OTR | `vae/ltx-2.3-22b-dev_audio_vae.safetensors` |
 | 0.31 | OTR | `vae/flux2-vae.safetensors` |
 | 0.31 | OTR | `vae/lumina2_ae.safetensors` |
 | 0.31 | OTR | `vae/ae.safetensors` |
@@ -246,18 +209,9 @@ Operator scope, in his words: *"any models outside my models folder can be delet
 good models should be in my models folder, not a cache."* All three tiers below were
 approved, plus HY-WorldMirror ("was a bad experiment").
 
-### Two things that nearly went wrong, and the rule each one leaves behind
+### One thing that nearly went wrong, and the rule it leaves behind
 
-**1. `du` is not evidence of reclaimable space -- check the link count.**
-`gemma-4-12b-it-Q4_K_M.gguf` appears at three paths and `du` reported 6.63 GB at each, which
-reads as 13.3 GB of recoverable duplication. `stat` says otherwise: all three share inode
-`7318349396575578` with `links=3`. They are NTFS hardlinks to one extent. **Deleting the
-mirrors would have freed exactly zero bytes.** Only the fourth copy -- an Ollama-layout blob
-at `blobs\sha256-43fec98c...` with `links=1` and a different inode -- was real, and only that
-one was removed. Before claiming a duplicate is reclaimable, run
-`stat -c '%i links=%h' <path>` on every copy.
-
-**2. An empty directory can mean the loader looks somewhere else on purpose.**
+**An empty directory can mean the loader looks somewhere else on purpose.**
 `C:\ComfyUI-Models\upscale_models\` is empty, which invites the conclusion that the
 RealESRGAN files under `Documents\ComfyUI\models\upscale_models\` are a stray leftover. They
 are not: `eng_spandrel_esrgan.py:151` deliberately walks `here.parents[4]` to that exact
@@ -280,7 +234,7 @@ files would have broken the upscale lane. **They stay where they are.**
 
 | GB | Item | Note |
 | ---: | --- | --- |
-| 6.6 | `blobs\` + `manifests\` | Ollama-layout store. The sha in the blob name matches `GGUF_ARTIFACTS["Q4_K_M"]` exactly, and no live code reads either directory. |
+| 6.6 | `blobs\` + `manifests\` | Ollama-layout store; no live code reads either directory. |
 | 10.0 | HF cache `Comfy-Org--z_image_turbo` | the engine loads `z_image_turbo_nvfp4.safetensors` from `diffusion_models\` via UNETLoader, which reads the flat dir only -- a cache copy cannot serve a render |
 | 10.3 | HF cache `Comfy-Org--Lumina_Image_2.0_Repackaged` | same shape; `lumina_image.py:67` loads from the flat dir |
 | ~7.3 | stale `huggingface\models--*` at the cache root | pre-`HF_HUB_CACHE` layout, not on any read path; every entry except Dia was already duplicated in `hub\` |
@@ -292,14 +246,14 @@ files would have broken the upscale lane. **They stay where they are.**
 | 43.1 | `~\.cache\huggingface\hub\models--mistralai--Mistral-Nemo-Instruct-2407` | a THIRD copy of Mistral-Nemo |
 | 3.0 | `~\.cache\huggingface\hub\models--ResembleAI--chatterbox` | duplicate of the models-root copy |
 | 5.1 | `~\.cache\whisper\` | `large-v3/medium/small/base/tiny.pt` from the `openai-whisper` package. No `import whisper` in ANY pack -- OTR uses `audio_encoders\whisper_large_v3_fp16.safetensors` through `AudioEncoderLoader`. |
-| 14.2 | `Documents\ComfyUI\models\_flux2_dl_scratch\` | held `mistral_3_small_flux2_fp4_mixed.safetensors`, `flux-2-klein-4b-Q4_K_M.gguf`, `flux2-vae.safetensors` -- all three already in the models root at identical byte sizes and separate inodes. The "parked in scratch" anti-pattern CLAUDE.md section 6 warns about. |
+| 14.2 | `Documents\ComfyUI\models\_flux2_dl_scratch\` | held `mistral_3_small_flux2_fp4_mixed.safetensors` and `flux2-vae.safetensors` -- both already in the models root at identical byte sizes and separate inodes. The "parked in scratch" anti-pattern CLAUDE.md section 6 warns about. |
 | 17.5 | `ComfyUI-Installs\...\models\huggingface\` | `.incomplete` blobs from an aborted Mistral-Nemo download |
 
 ### Kept, and why
 
-* **Every Gemma.** `gemma-4-12b-it` (Q8_0 + Q4_K_M), `gemma-4-E4B-it`, `gemma-4-E2B-it`,
-  `gemma-2-2b-it`, `gemma-3-12b-it`, `gemma4-12b-with-proj-ltx-2.5` (both quants),
-  `gemma4_e2b_it_bf16`, `gemma_2_2b_fp16`, `gemma_3_12B_it_fp4_mixed`, `t5gemma_b_b_ul2`.
+* **Every Gemma.** `gemma-4-12b-it`, `gemma-4-E4B-it`, `gemma-4-E2B-it`,
+  `gemma-2-2b-it`, `gemma4-12b-ltx25-comfy-w4a8`,
+  `gemma4_e2b_it_bf16`, `gemma_2_2b_fp16`, `t5gemma_b_b_ul2`.
   OTR uses several Gemmas across the writer, technical and LTX text-encoder slots.
 * **`Dia-1.6B-0626` -- moved, not deleted.** It was the only copy and it sat at the cache
   root where the resolver never looks, so it was unreachable dead weight. Moving it into
@@ -317,7 +271,7 @@ files would have broken the upscale lane. **They stay where they are.**
 `pytest tests/test_model_catalog_scan.py tests/test_model_slot_audit.py
 tests/test_image_gen_preflight_matrix.py tests/test_lane_preflight_matrix.py
 tests/test_tts_voice_preflight_matrix.py` -- **155 passed**. Spot-checked on disk afterward:
-both gemma-4-12b GGUFs, `z_image_turbo_nvfp4`, `lumina_2_model_bf16`, `hunyuan3d-dit-v2-mv`,
+`z_image_turbo_nvfp4`, `lumina_2_model_bf16`, `hunyuan3d-dit-v2-mv`,
 all five Mistral-Nemo shards, the three RealESRGAN upscalers, and Dia in its new `hub\`
 location.
 

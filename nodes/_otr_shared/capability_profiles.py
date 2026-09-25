@@ -1,8 +1,8 @@
 """Capability profiles -- GATE B S0/S1 of the switchable-workflow architecture.
 
-Spec: docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md
-(sections 3 + 5); sequencing: docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md
-section 0 (GATE B).
+Spec: the 2026-06-10 switchable-workflow-architecture decision-and-plan
+(sections 3 + 5); sequencing: the 2026-06-09 3D toolkit plan, section 0
+(GATE B).
 
 S0 -- profile FOUNDATION:
   * the committed row shape (a row of ``config/workflow_matrix.json``) --
@@ -73,7 +73,7 @@ class ProfileError(ValueError):
 
 # ---------------------------------------------------------------------------
 # S0 -- profile shape (schema v2: platform-portability S2, 2026-07-10 --
-# docs/2026-07-09-platform-portability-final.md section 2)
+# per the 2026-07-09 platform-portability final spec, section 2)
 # ---------------------------------------------------------------------------
 _PLATFORMS = ("any", "win", "mac", "linux")
 _DEVICE_BACKENDS = ("cuda", "cpu", "mps")  # ROCm presents as "cuda"
@@ -159,13 +159,13 @@ _VIDEO_KEYS = {
     "device_policy": lambda v: v in _DEVICE_POLICIES,
     "dtype_policy": lambda v: v in _DTYPE_POLICIES,
 }
-#: OPTIONAL video keys (2026-07-24, WAN 8GB launch contract). A tier that does
+#: OPTIONAL video keys (2026-07-24, 8 GB launch contract). A tier that does
 #: not declare one is UNPINNED -- absent behaves exactly as before, so adding a
 #: key here never churns the other profiles.
 #:
 #: ``max_render_frames`` is the tier's ABSOLUTE local-video render-length
 #: ceiling in frames (0 = unpinned = the engine's own max). It is the
-#: profile-carried twin of ``OTR_WAN_TI2V_MAX_FRAMES``: the low-VRAM launch
+#: profile-carried twin of a launch-env render-length pin: the low-VRAM launch
 #: contract has to reach a PRODUCTION episode leg, which is submitted to an
 #: already-booted server and therefore never sees ``launch.env``. Distinct from
 #: ``render.frame_budget``, which is the soak/single harness per-clip frame

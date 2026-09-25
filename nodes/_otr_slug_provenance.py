@@ -102,9 +102,7 @@ def _signal(when: str) -> ProvenanceRecord:
 _UNSET = ProvenanceRecord("", UNVERIFIED, None)
 
 #: The 2026-08-10 direct-Google catalog run. A COMPLETE terminal-page listing of
-#: 52 ids; measurement recorded in
-#: `docs/2026-08-10-MEASUREMENT-google-catalog-slug-provenance.md`. Only a
-#: completed listing may support any verdict, and this one was.
+#: 52 ids. Only a completed listing may support any verdict, and this one was.
 _GOOGLE_RUN = "2026-08-10"
 
 #: The 2026-08-07 OpenRouter sweep. A SIGNAL for the Comfy lane, never authority.

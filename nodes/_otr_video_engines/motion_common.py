@@ -1326,7 +1326,7 @@ class MotionEngineBase:
     #: done"). Audio-only lanes (ltx_av_music) override to False; the pure procedural
     #: floors (visualizer / abstract) declare False too. ltx_video inherits True here,
     #: which is what lets a flux2/flux still drive a silent LTX i2v clip. Plain attr
-    #: (cold-import clean). See docs/2026-06-18-coverage-arch-wiring/.
+    #: (cold-import clean).
     accepts_still = True
 
     #: The ledger-stamped v2 render policy for the CURRENT episode, captured on
@@ -1469,8 +1469,8 @@ class MotionEngineBase:
         is precise: it releases what this engine loaded and leaves everything
         else alone. What is gone is the ban on the bigger hammer when a lane
         genuinely needs the whole card -- which the 16 GB LTX 2.5 decode does
-        (docs/2026-09-22-native-ltx25-16gb/FINDINGS.md: 30.0 s on a free card,
-        unfinished at 412 s with 11 GB occupied)."""
+        (measured 2026-09-22: 30.0 s on a free card, unfinished at 412 s
+        with 11 GB occupied)."""
         for patcher in list((prepared or {}).get("patchers") or []):
             try:
                 detach = getattr(patcher, "detach", None)

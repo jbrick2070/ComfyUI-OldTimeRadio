@@ -176,8 +176,8 @@ thing you can tell me.
 REPORT BACK, per leg: RESULT, minutes, the obs filename, the engine markers in
 it, and the semantic_master_hash the receipt should be recorded against.
 
-DO NOT edit workflows/, nodes/, or config/profiles/ -- the Windows box owns the
-shipping surface. You own docs/MAC_LAB_LOG.md: append your results there,
+DO NOT edit workflows/, nodes/, or config/workflow_matrix.json -- the Windows
+box owns the shipping surface. You own docs/MAC_LAB_LOG.md: append your results there,
 INCLUDING the hash beside each receipt so the next rental can tell what is
 stale, and push that file only.
 ```

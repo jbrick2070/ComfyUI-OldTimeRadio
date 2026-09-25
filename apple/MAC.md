@@ -16,8 +16,8 @@ Each is the canonical with Mac-appropriate dropdowns already saved. The
 canonical itself also runs — it names no vendor and resolves your device at run
 time — but these pick the lanes that have receipts here.
 
-(Each graph is cut from the profile of the same name in `config/profiles/`.
-`otr_mac_mps` is a separate lab profile, not the parent of these graphs.)
+(Each graph is generated from the row of the same name in
+`config/workflow_matrix.json`.)
 
 What runs on a Mac and what does not is the **Mac 16 GB** column in
 [MACHINES.md](MACHINES.md). That table is generated from the same data the code

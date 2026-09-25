@@ -322,75 +322,26 @@ fetch_exact Comfy-Org/Wan_2.2_ComfyUI_Repackaged \
 bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
 ```
 
-### LTX 2.5: one terms click, five exact files
+### LTX 2.5: fetches itself
 
-While signed in, accept the terms at
-<https://huggingface.co/Lightricks/LTX-2.5>. Put the token in the RunPod
-template's `HF_TOKEN` secret before boot. For a running pod, a no-echo fallback
-is:
-
-```bash
-read -rsp 'Hugging Face token: ' OTR_HF_INPUT; echo
-printf '%s' "$OTR_HF_INPUT" | tr -d ' \t\r\n' > /root/.hf_token
-chmod 600 /root/.hf_token
-unset OTR_HF_INPUT
-```
-
-The first provision pass installs and patches the required packs, then names
-the absent manual tier:
+No manual tier. Every LTX 2.5 file -- the mix4x8/int8/nvfp4 DiTs, the w4a8
+text encoder, both VAEs, the x2 upscaler -- is ungated and allowlisted in
+`nodes/_otr_visual_assets.py`, so `OTR_WorkflowValidator` downloads exactly
+what the selected lane needs the first time the graph is queued. No Hugging
+Face token, no terms click, no `fetch_exact` call:
 
 ```bash
-export OTR_PROVISION_PROFILE=otr_ltx25_high_video
+export OTR_PROVISION_PROFILE=otr_16gb_video
 export OTR_WITH_INDEXTTS2=1
 bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
-"$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_provision.py" \
-  --profile otr_ltx25_high_video --list
 ```
 
-Load the token, then use the shared `fetch_exact` helper from the start of this
-section for the exact manifest. A final file is published only after byte-count
-and SHA-256 verification:
+To fetch a lane's files ahead of the first render instead of at queue time:
 
 ```bash
-[ -s /root/.hf_token ] && export HF_TOKEN="$(tr -d ' \t\r\n' < /root/.hf_token)"
-
-fetch_exact realrebelai/LTX-2.5_GGUFs \
-  112436f97aaf99ce13ecb7b7eca7e2f6c128d3ec \
-  LTX-2.5-Distilled-Q3_K_M.gguf \
-  diffusion_models/LTX-2.5-Distilled-Q3_K_M.gguf \
-  11525623808 4286f8de1074c0c4fddfb92f38bd7df9161782b53c1717ebd69f1189c7933265
-
-fetch_exact elix3r/gemma4-12b-with-proj-ltx-2.5-GGUF \
-  085ceddbbac3c0370de7f59ebec8bef4763f04b5 \
-  gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf \
-  text_encoders/gemma4-12b-with-proj-ltx-2.5-Q5_K_M.gguf \
-  9514920864 1d35d4fbfa34cca1513d8e9fdd77c0573778b21ffdcbe4ca9c906f37a8c502f9
-
-fetch_exact Lightricks/LTX-2.5 \
-  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
-  vae/ltx-2.5-video-vae-bf16.safetensors \
-  vae/ltx-2.5-video-vae-bf16.safetensors \
-  1472223346 847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3
-
-fetch_exact Lightricks/LTX-2.5 \
-  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
-  vae/ltx-2.5-audio-vae-bf16.safetensors \
-  vae/ltx-2.5-audio-vae-bf16.safetensors \
-  364866540 c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5
-
-fetch_exact Lightricks/LTX-2.5 \
-  5e6e71018ee1756ed329b697a7b4aedc934dfce9 \
-  latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors \
-  latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors \
-  995778752 eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8
-
-bash "$OTR_REPO_ROOT/scripts/otr_pod_provision.sh"
+"$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_fetch_lane_weights.py" --list
+"$COMFY_PY" "$OTR_REPO_ROOT/scripts/otr_fetch_lane_weights.py" ltx25_native_16gb
 ```
-
-The five files total 23,873,413,310 bytes. The provisioner pins and patches
-ComfyUI-GGUF for Gemma 4 and pins and patches ComfyUI-LTXVideo for Kornia 0.8.3.
-Do not downgrade Kornia, hand-edit those packs, add a VRAM clamp, or shrink the
-canonical 1664x960 output to manufacture a pass.
 
 ### H3: local-only authorization boundary
 
@@ -645,7 +596,7 @@ RunPod billing; after the logs settle, stop the pod in the RunPod console.
 | A pod render ignores today's code fix | The resident ComfyUI loaded `nodes/` at boot, before the `git pull` | Restart ComfyUI after any pull and re-verify `/object_info` shows a nonzero OTR class count |
 | A leg reports FAIL at EXACTLY the timeout you set | The runner's `--timeout` bounds the WATCHER, not the render | The log says so in as many words: `RESULT TIMEOUT ... BUT THE RENDER IS STILL ALIVE: the server reports 1 running`. The episode usually still publishes. This is a MEASUREMENT ("this lane needs more than N minutes here"), not a defect -- do not file it as one. Hit three times on 2026-09-03/04: wan_ti2v at 40 min (1 act) and 120 min (3 acts), fastwan_8gb at 40 min |
 | Two legs render at once and both crawl | A previous leg's PROMPT is still executing server-side | Killing the leg CLIENT never cancelled it. See the atlas row above on `/queue`; check `nvidia-smi` and load average before blaming the lane |
-| A lane fails instantly with `DEPENDENCY_MISSING` on a fresh pod | Provisioning fetched the lane's weights but not its extra tool | `mesh_stage` wants a pinned portable Blender (`OTR_BLENDER_*`); `ltx_video` wants weights the default provision does not pull. Both refuse loudly and correctly -- fetch the dependency or drop the lane from the sweep |
+| A lane fails instantly with `DEPENDENCY_MISSING` on a fresh pod | Provisioning fetched the lane's weights but not its extra tool | `mesh_stage` wants a pinned portable Blender (`OTR_BLENDER_*`); refuses loudly and correctly -- fetch the dependency or drop the lane from the sweep |
 | Every image lane resolves to `z_image_turbo` no matter which profile you pick | Only z_image is on the pod | 
 
 ## 7A. Driving a pod from a second machine (2026-09-03)
@@ -707,8 +658,8 @@ ideogram4_local), `otr_rot_ltx25_video_lumina` (ltx25_high_video + lumina_image)
 
 **Lanes that need their own boot cannot share a sweep.** A profile's `launch.env`
 is a BOOT contract, so these get a separate ComfyUI start and their own group:
-HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`),
-`ltx_audio_in` (`DISABLE_PINNED`, no reserve), and the MiniMax H3 lanes, which
+HuMo (`OTR_HEADLESS_RESERVE_VRAM_GB` + `OTR_HEADLESS_DISABLE_PINNED=1`) and
+the MiniMax H3 lanes, which
 the engine itself refuses on a stock boot.
 
 ## 7B. Running a pod UNATTENDED, and ending it (2026-09-04)

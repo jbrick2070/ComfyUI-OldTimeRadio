@@ -1,6 +1,6 @@
 @echo off
-rem v1.4 capstone headless server launch -- verified recipe (docs/VIDEO_BUILD_HANDOFF.md)
-rem usage: _otr_soak_server_launch.cmd <logfile> [FLOOR | HUMO | LTX | WAN]
+rem v1.4 capstone headless server launch -- verified recipe
+rem usage: _otr_soak_server_launch.cmd <logfile> [FLOOR | HUMO | LTX]
 rem   (default)  heavy engines OFF. Video model selection belongs to the
 rem              workflow dropdown/profile, not an implicit launcher switch.
 rem   FLOOR      heavy engines OFF (same as default). NOTE: the old
@@ -9,8 +9,6 @@ rem              so %2 arrived as "HUMO" and the else-branch enabled HuMo
 rem              (2026-06-10 marathon catch).
 rem   HUMO       explicit legacy HuMo lane for bakeoffs/single-engine probes.
 rem   LTX        Sage-free boot lane: LTX opt-in ON, HuMo OFF (BUG-070)
-rem   WAN        Wan TI2V-5B opt-in ON, HuMo OFF (the 14B i2v lane was
-rem              RETIRED 2026-08-26 -- it never fit the card)
 set HF_HOME=C:\ComfyUI-Models\huggingface
 rem UTF-8 stdio (2026-06-12): a detached cmd inherits the cp1252 console codec,
 rem so ComfyUI's logger crashes the instant OTR prestartup prints an emoji
@@ -101,11 +99,11 @@ rem The canonical wrapper chooses a free local port per leg. Direct/manual
 rem launches keep the historical port as a harmless default.
 if not defined OTR_HEADLESS_PORT set OTR_HEADLESS_PORT=8000
 echo [launch] OTR headless port %OTR_HEADLESS_PORT%
-rem Lane tokens (FLOOR/HUMO/LTX/WAN) are accepted from every harness, but the
+rem Lane tokens (FLOOR/HUMO/LTX) are accepted from every caller, but the
 rem old OTR_ENABLE_* engine exports they used to set were VESTIGIAL and were
 rem removed 2026-08-28: every registered video engine declares
 rem requires_flag=None -- the registry is the menu, and engine selection is
-rem profile-driven. The one live lane payload is WAN's model/recipe exports.
+rem workflow-driven.
 if /i "%2"=="FLOOR" (
   echo [launch] FLOOR leg ^(engine selection is profile/registry-driven^)
 ) else if /i "%2"=="HUMO" (
@@ -123,7 +121,7 @@ rem logs at DEBUG show per-model partial load/unload sizes -- the residency
 rem attribution evidence. Same recipe otherwise.
 set _OTR_VERBOSE=
 if /i "%3"=="DEBUG" set _OTR_VERBOSE=--verbose DEBUG
-rem Optional VRAM clamp (Wan TI2V-5B low-VRAM bakeoff, 2026-06-27): set
+rem Optional VRAM clamp (2026-06-27): set
 rem OTR_HEADLESS_RESERVE_VRAM_GB to reserve that many GB away from model loading,
 rem so a 16GB card simulates an 8GB/6GB card and ComfyUI's allocator forces the
 rem same aggressive offload / sysmem spill a low-VRAM user hits. Default UNSET =

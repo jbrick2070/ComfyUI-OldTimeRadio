@@ -13,7 +13,7 @@ server log, and one of them twice. A campaign leg costs minutes to hours, so a
 lost traceback is a lost leg, not a lost line.
 
 These tests use the REAL payload shape recorded in `tmp/_w45_still_flat.log` and
-`tmp/_w45_wan_ti2v.log`, not an invented one.
+a companion heavy-video leg log, not an invented one.
 """
 from __future__ import annotations
 
@@ -95,7 +95,7 @@ def test_it_keeps_the_frame_that_names_OUR_code(api):
 
 
 def test_a_non_writer_failure_is_described_the_same_way(api):
-    """The wan_ti2v leg died in OTR_CastLock -- a different node, same need."""
+    """A heavy-video leg died in OTR_CastLock -- a different node, same need."""
     messages = [
         ["execution_start", {"prompt_id": "5cc80919"}],
         ["execution_error", {

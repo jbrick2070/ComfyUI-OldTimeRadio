@@ -294,15 +294,15 @@ JUMP plan on a still-consuming lane ever re-mints.
 `evidence` lists every `docs/` receipt the adapter's own source
 cites. **MISSING** means the adapter cites a document that is not
 in this repo -- a safety number nobody can check. This column
-exists because the HuMo 49-frame ceiling cited
-`docs/2026-06-27-humo-bakeoff`, which has never been in the tree,
+exists because the HuMo 49-frame ceiling cited a bakeoff receipt
+that was never in the tree,
 and it read exactly like a measured number until someone looked.
 
 | engine | cap | set by | evidence |
 |---|---|---|---|
 | animatediff15_lightning_video | - | contract max | docs/ADDING_IMAGE_AND_VIDEO_LANES.md |
 | animatediff15_v3_haunted_video | - | contract max | none cited |
-| animatediff15_v3_stillin_lab_video | - | contract max | docs/2026-09-02-animatediff-ledger-experiments, docs/SPEC_haunted_image_to_video.md |
+| animatediff15_v3_stillin_lab_video | - | contract max | docs/SPEC_haunted_image_to_video.md |
 | cloud_kling_avatar | - | contract max | none cited |
 | cloud_ltx25_audio_in | - | contract max | none cited |
 | cloud_ltx25_foley_plus | - | contract max | none cited |
@@ -324,8 +324,8 @@ and it read exactly like a measured number until someone looked.
 | ltx25_native_mime_16gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_native_mime_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_video | - | contract max | docs/PROD_BUG_LOG.md |
-| ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
-| mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
+| ltx_8gb | - | contract max | none cited |
+| mesh_stage | - | contract max | none cited |
 | minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | minimax_h3_video | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | razzle_ltx_8gb | - | contract max | none cited |
@@ -334,9 +334,9 @@ and it read exactly like a measured number until someone looked.
 | still_pan | - | contract max | none cited |
 | still_word | - | contract max | none cited |
 | viz_camera | - | contract max | none cited |
-| viz_green | - | contract max | **MISSING: docs/2026-06-18-coverage-arch-wiring** |
+| viz_green | - | contract max | none cited |
 | viz_mxc_cpu | - | contract max | none cited |
-| viz_mxc_mandala | - | contract max | **MISSING: docs/2026-06-30-viz-rainbow** |
+| viz_mxc_mandala | - | contract max | none cited |
 
 ## Counts
 

@@ -80,7 +80,7 @@ def _led():
                 "music_visual": {"lumina_image": 2}}, "image_revision": 1},
             "render_engines": {
                 "by_role": {"announcer_visual": {"humo": 2},
-                            "music_visual": {"ltx_video": 1},
+                            "music_visual": {"ltx25_video": 1},
                             "character_video": {"wan_i2v": 3}},
                 # DELIBERATELY the PRE-2026-07-28 by_engine shape: no
                 # ``varied``, no ``clip_count``, and the wan_i2v row carrying
@@ -91,7 +91,7 @@ def _led():
                 "by_engine": {
                     "humo": {"family": "audio_driven_face", "recipe": None,
                              "quant": None, "use_lora": False},
-                    "ltx_video": {"family": "text_to_video", "recipe": "ia2v",
+                    "ltx25_video": {"family": "text_to_video", "recipe": "ia2v",
                                   "quant": "q4_K_M", "use_lora": True},
                     "wan_i2v": {"family": "image_to_video"}},
                 "video_revision": 1, "vram_peak_mb": 8245.0},
@@ -951,7 +951,7 @@ def _led_with(recipe):
         eng: {"family": "image_to_video", "recipe": recipe, "quant": "Q8_0",
               "render_canvas": "704x400", "use_lora": True, "varied": [],
               "clip_count": 3}
-        for eng in ("humo", "ltx_video", "wan_i2v")}
+        for eng in ("humo", "ltx25_video", "wan_i2v")}
     return led
 
 

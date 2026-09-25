@@ -199,9 +199,7 @@ _NODE_MODULES = {
     # OTR_VideoPlan) to read meta.visual_plan + meta.voice_assignments +
     # meta.style directly from the L3 ledger stamped by the writer.
     # The deleted Director class + registration + workflow node +
-    # workflow links 17 + 38 all delete in lockstep. See:
-    #   docs/voice-path-cleanbreak-execution-plan.md Sprint 2
-    #   docs/2026-05-12-voice-path-cleanbreak-qa.md §3 + Q3
+    # workflow links 17 + 38 all delete in lockstep.
     #
     # Voice-path-cleanbreak 2026-05-12 (P3): the legacy single-line
     # nodes OTR_BarkTTS / OTR_SFXGenerator / OTR_VoiceRender plus the
@@ -271,7 +269,7 @@ _NODE_MODULES = {
     # validator. Reads the workflow JSON from disk and runs the same
     # validate_workflow_contract check the S16.6 CI test runs. Place
     # as the first node in a workflow to catch contract drift at queue
-    # time. ADR: docs/2026-05-13-S14_2-active-validation-ADR.md.
+    # time.
     "OTR_WorkflowValidator":       (".nodes._otr_workflow_validator", "WorkflowValidator", " Workflow Validator (opt-in, S14.2)"),
     # OTR_HuMoTierLoader -- DELETED in the CW cleanbreak (2026-06-08): it only
     # fed the now-removed OTR_BatchHumoRender; the in-process HuMo adapter
@@ -455,8 +453,7 @@ if _otr_dup is None:
 # examples / workflow / workflows, and the first mount wins. This pack's
 # templates therefore all live in workflows/; an example_workflows/ folder
 # beside it made otr_canonical list in the gallery and 404 on click (2026-09-01
-# ship audit; the trap is spelled out in
-# docs/2026-08-23-workflow-discoverability-PROBLEM.md).
+# ship audit).
 #
 # NAME ONLY WHAT SHIPS. This line used to point a first-time user at
 # `otr_4060_floor`, which the operator's 2026-09-02 ruling removed from the

@@ -1,7 +1,7 @@
 """The regression net `ltx_8gb` never had -- written BEFORE the loader hoist.
 
-All six of its sibling adapters (`ltx_video`, `ltx_av`, `wan_i2v`, `wan_ti2v`,
-`humo`, `mesh_stage`) have graph-shape tests. `ltx_8gb` had NONE: no test in the
+Its sibling adapters (`wan_i2v`, `humo`, `mesh_stage`, among others) have
+graph-shape tests. `ltx_8gb` had NONE: no test in the
 suite built its graph, and no test drove its `render_clip`. A wrong graph shape
 here turned nothing red -- it surfaced on a live GPU render.
 

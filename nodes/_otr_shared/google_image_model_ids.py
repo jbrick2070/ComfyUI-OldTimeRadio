@@ -41,7 +41,7 @@ SELECTOR_TO_MODEL_ID: Mapping[str, str] = {
     # not a broken route -- it is a preview id used where an equivalent stable
     # id exists. Repointing it changes which model renders stills, which is
     # recipe-adjacent and an operator call, so it is recorded here and NOT
-    # changed. See docs/2026-08-09-BUILD-SPEC-slug-provenance-non-video.md.
+    # changed.
     "Nano Banana 2 (Gemini 3.1 Flash Image)": "gemini-3.1-flash-image-preview",
     "Nano Banana 2 Lite": "gemini-3.1-flash-lite-image",
 }

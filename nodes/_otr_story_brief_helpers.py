@@ -191,7 +191,7 @@ def log_story_brief_disposition(meta: Any, consumer_id: str, log: Any) -> str:
 # The CW-1 teardown deleted otr_video_plan.py, the only consumer that appended
 # the brief's era prose + the film style tail to visual prompts -- every
 # post-refactor prompt rendered without them (gap G2/G3, roundtable-hardened
-# fix docs/2026-06-10-brief-downstream-gaps/). These helpers restore that
+# fix). These helpers restore that
 # finishing as ONE shared seam. Pure functions: no logging here (the
 # disposition log keeps its once-per-run contract at the NODE level), no
 # dedupe, no style presets (3-model panel consensus cuts).
@@ -446,9 +446,9 @@ def get_open_subject(role: str, synthetic: bool, meta: Any = None,
     BRIEF-DRIVEN (2026-07-01): the physical radio FORM comes from
     :func:`radio_form_from_meta` (deterministic, no LLM), so a non-1940s brief no
     longer opens on the hardcoded 1940s set. FACELESS by contract -- ONLY HuMo
-    gets a face; this still is what ltx_audio_in / still_pan / still_flat show for
-    the bookends. Pure; never empty. ``meta`` optional (bare -> neutral tube
-    radio form).
+    gets a face; this still is what the audio-in engines / still_pan / still_flat
+    show for the bookends. Pure; never empty. ``meta`` optional (bare -> neutral
+    tube radio form).
 
     Chunk A1: the subject TEMPLATE comes from the resolved ``style`` pack's
     ``open_subjects`` map -- ``synthetic`` -> key "synthetic", role
@@ -495,8 +495,7 @@ STILL_FRAMING_PORTRAIT = ("three-quarter framing, full head and shoulders with "
 #: above. For two months this branch has been ordering unobstructed human faces
 #: into a shot with nobody in it.
 #:
-#: The cost was measured, not theorised: the 2026-08-26 sweep
-#: (docs/2026-08-26-ideogram4-card-refusal-evidence.md, PBUG-20260826-01)
+#: The cost was measured, not theorised: the 2026-08-26 sweep (PBUG-20260826-01)
 #: refused 6 of 8 music-beat stills on ideogram4_local, and the refused prompt
 #: carries this constant verbatim -- a request for faces was one of the three
 #: things handed to the engine worst equipped to take it. The operator's rule:
@@ -517,8 +516,8 @@ STILL_FRAMING_SCENE_BEAT = ("cinematic three-quarter framing, the subject shown 
                             "whole with clear space around it inside frame, "
                             "balanced composition")
 #: Scene-CHARACTER framing (BUG 1, 2026-06-20 operator directive): the LANDSCAPE
-#: still-only character beat (still_flat / still_pan / ltx_video on a character
-#: line). Leads with the CHARACTER (compose_still_prompt subject = appearance) in
+#: still-only character beat (still_flat / still_pan / a video engine on a
+#: character line). Leads with the CHARACTER (compose_still_prompt subject = appearance) in
 #: a WIDE 16:9 environment shot -- a medium shot framing the person inside the
 #: scene, NEVER the vertical portrait (which pillarboxes -> the radio-booth floor
 #: fills the sides) and NEVER the generic radio-set scene subject. Positive-only
@@ -542,7 +541,7 @@ def compose_still_prompt(meta: Any, *, kind: str, role: str = "",
     (``portrait_prompt`` -> ``appearance`` -> ``character_description`` on
     ``char_entry``); ``"scene_character"`` (BUG 1, 2026-06-20) ALSO leads with
     the character description but composes a WIDE 16:9 medium shot (the landscape
-    still-only character beat -- still_flat/still_pan/ltx_video) and DROPS the
+    still-only character beat -- still_flat/still_pan/the video engines) and DROPS the
     radio-booth tail; every other scene kind (``scene_open`` / ``scene_beat``)
     leads with :func:`get_open_subject` (``synthetic`` = kind=="scene_open"
     -- the b000 opening-music beat is the synthetic open). Never returns

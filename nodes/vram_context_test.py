@@ -31,8 +31,8 @@ Workflow placement:
 Output:
 
   - report (STRING): markdown table summarising each probe's VRAM
-    + CPU RAM + generation time. Append to docs/2026-04-29-vram-
-    context-test.md or pipe to a Save Text node.
+    + CPU RAM + generation time. Append to a results log or pipe to
+    a Save Text node.
   - Side effect: appends entries to ledger.meta.vram_test_results[]
     via the existing early-ledger init + Ledger.save() merge.
 """
@@ -332,9 +332,9 @@ class VRAMContextTest:
 
         # Probe each prompt length via the canonical generate surface
         # (Hard rule #5): request_slot + make_generate_fn. Captures three
-        # orthogonal memory numbers per probe (see
-        # docs/2026-04-29-vram-context-test.md for the column
-        # definitions). VRAM nvml is the cap-tuning truth.
+        # orthogonal memory numbers per probe (VRAM nvml, VRAM torch, CPU RAM
+        # -- see the report's column definitions below). VRAM nvml is the
+        # cap-tuning truth.
         gen_fn = _OTRML.make_generate_fn(cache_entry)
         results: list[dict] = []
         for n_target in lengths:

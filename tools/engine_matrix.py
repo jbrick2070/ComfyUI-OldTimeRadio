@@ -152,8 +152,8 @@ REFERENCE_BEAT_FRAMES = 442
 
 #: Matches a docs/ citation inside an adapter's own source, so the evidence
 #: column can say whether the receipt a cap cites is actually IN the repo. This
-#: exists because `eng_humo.py` justified its 49-frame ceiling with
-#: "docs/2026-06-27-humo-bakeoff", a file that is not in the tree -- the load-
+#: exists because `eng_humo.py` once justified its 49-frame ceiling with a
+#: bakeoff receipt that was never in the tree -- the load-
 #: bearing safety number for the heaviest engine cited a receipt nobody could
 #: open, and nothing surfaced that until a human went looking.
 _DOC_CITATION = re.compile(r"docs/[A-Za-z0-9._-]+")
@@ -285,7 +285,7 @@ def _cap_and_evidence(engine, name):
             for ref in _DOC_CITATION.findall(line):
                 # A line that DEBUNKS a missing receipt is not a line that
                 # relies on it. Once the HuMo comment was rewritten to explain
-                # that `docs/2026-06-27-humo-bakeoff` has never existed here,
+                # that its cited bakeoff receipt had never existed here,
                 # the scanner went on reporting that path as MISSING -- turning
                 # a RESOLVED problem into a permanent red mark, which is the
                 # same false-confidence failure this column exists to prevent,
@@ -475,8 +475,8 @@ def render() -> str:
               "`evidence` lists every `docs/` receipt the adapter's own source",
               "cites. **MISSING** means the adapter cites a document that is not",
               "in this repo -- a safety number nobody can check. This column",
-              "exists because the HuMo 49-frame ceiling cited",
-              "`docs/2026-06-27-humo-bakeoff`, which has never been in the tree,",
+              "exists because the HuMo 49-frame ceiling cited a bakeoff receipt",
+              "that was never in the tree,",
               "and it read exactly like a measured number until someone looked.",
               "", "| engine | cap | set by | evidence |", "|---|---|---|---|"]
     for row in data:

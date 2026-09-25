@@ -68,8 +68,8 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   makes 16 Veo calls (8 beats x 2 jump segments), so no Veo lane fits
   Tier 1 as shaped; TTS (10/min), image (100/min) and Lyria (150/min) are
   nowhere near a limit. Tier 2 wants $250 spent over 30 days, and he is
-  not begging for it. **His ruling: Google is a STILLS-ONLY lane** --
-  `config/profiles/google_still_1act.json` (67332dc5): Gemini image for
+  not begging for it. **His ruling: Google is a STILLS-ONLY lane**
+  (67332dc5): Gemini image for
   stills, `still_flat` to composite them (CPU, no models), Google TTS,
   Lyria, Flash / Flash-Lite writers, no Veo. Dry run resolves all 17
   overrides, and the first live leg -- English Hamlet 1.1 -- published
@@ -254,8 +254,7 @@ record of how the scanned lane got here and what it still lacks; none of it
 is a shipping gate and no window opens a new prompt, lane or arc on it (see
 the top entry of [standing rulings](OTR_STANDING_RULINGS.md)). Parked, in
 order of value if it is ever reopened: unbound-speaker emission in
-`speeches_from_span` (the ruling requires it; Grok's detector spec and
-per-cell golden counts are in `docs/2026-09-19-shakespeare-vendoring/`);
+`speeches_from_span` (the ruling requires it);
 the eight Spanish windows (boundaries proven, zero cells vendored because
 of that same emission gap); a per-edition `scan_editions.json` registry;
 the Macpherson furniture floor. What DID ship on the last day: the
@@ -441,8 +440,8 @@ behaviour. Do not reopen it as a feed-selection question.**
 
 ## Parked
 
-[GO_FORWARD_ARCHIVE](GO_FORWARD_ARCHIVE.md) holds the tombstones: unqualified
-installed-family and GGUF opt-in combinations, H3 policy receipts, cfg promotion
+Not tracked further here: unqualified installed-family combinations, H3
+policy receipts, cfg promotion
 comparisons, the AMD scoped pod and platform acceptance, cloud billing opt-in
 routing, operator-parked casting/adaptation ideas, OTR-Lite after v2, the release
 runway, the missing `device_options` test module, regenerating

@@ -148,9 +148,8 @@ def test_pre_halt_no_cuda_error_illegal_address():
 
 
 @pytest.mark.skip(
-    reason="C9 / IMP-33a: real ComfyUI subprocess smoke -- needs "
-    "ComfyUI CI-friendly harness. Tracked in "
-    "docs/2026-05-13-imp33-queue-halt-test-decision.md."
+    reason="C9 / IMP-33a: real ComfyUI subprocess smoke -- needs a "
+    "CI-friendly ComfyUI to run against."
 )
 def test_real_comfyui_queue_halt_subprocess_smoke():
     """Future Option C: spin up real ComfyUI in a subprocess, load

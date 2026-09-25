@@ -533,8 +533,8 @@ setting it later creates a second cache rather than moving the first.
 
 **You do not need a Hugging Face token to run OTR.** Everything the canonical
 selects, and everything the 8 GB and Mac graphs select, is ungated. A token is
-needed only for the handful of gated rows -- `google/gemma-2-2b-it`, the LTX 2.5
-video weights, `stable_audio_music` -- and for those you accept the licence on
+needed only for the handful of gated rows -- `google/gemma-2-2b-it` and
+`stable_audio_music` -- and for those you accept the licence on
 the model's page while signed in, then log in locally once:
 
 ```bash
@@ -615,8 +615,9 @@ backend. Python 3.14 has no Kokoro build yet and is refused. The message names
 the exact pip line. An English episode can use Bark instead, except on a 16 GB
 Mac where Bark is a memory hazard. Non-English rows admit Kokoro only.
 
-**A gated model returns HTTP 401.** The LTX 2.5 weights and `gemma-2-2b-it` need a
-licence click on Hugging Face plus a login; every default weight is ungated.
+**A gated model returns HTTP 401.** `gemma-2-2b-it` and `stable_audio_music` need
+a licence click on Hugging Face plus a login; every default weight is ungated,
+the LTX 2.5 lanes included.
 
 **On a Mac, a 19 GB download starts the moment you queue.** The image dropdowns
 still say `z_image_turbo` while the video lane you picked consumes a still. Set
@@ -726,9 +727,8 @@ off-by-default pieces carry restricted terms:
   lane's motion module publishes no licence grant at all; fine for personal use,
   not cleared for commercial redistribution.
 - `musicgen` and `indextts2` carry non-commercial terms; `bark`'s are unconfirmed.
-- Several heavier video lanes -- `ltx25_*`, the `humo*` family, `mesh_stage`,
-  `wan22_high_fast` -- also declare themselves not commercially clean in their
-  adapters. Read each model's own licence.
+- Several heavier video lanes -- `ltx25_*`, the `humo*` family, `mesh_stage`
+  -- also declare themselves not commercially clean in their adapters. Read each model's own licence.
 - The `shakespeare` bank adapts Folger Digital Texts, which are CC BY-NC.
 
 Review the exact source, engine and weight licences before commercial use. A
@@ -767,7 +767,5 @@ canonical ships:
   space.
 
 [docs/known-failures.md](docs/known-failures.md) explains why the
-expected-failure set is kept empty on purpose, and
-[docs/2026-09-19-ship-regression.md](docs/2026-09-19-ship-regression.md)
-classifies each failing test by name. If one of these reaches you in
-practice, open an issue with the episode's ledger attached.
+expected-failure set is kept empty on purpose. If one of these reaches you
+in practice, open an issue with the episode's ledger attached.

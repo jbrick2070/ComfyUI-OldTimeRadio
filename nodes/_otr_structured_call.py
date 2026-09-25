@@ -725,7 +725,7 @@ def _raw_head(
     raises from INSIDE the generate call -- the in-decode liveness guard does
     exactly this -- never assigns the caller's `last_raw`, so the ladder logged
     `raw head: <empty>` while the halted text sat on the exception all along.
-    That was observed live on a `wan_ti2v` leg: the writer printed the runaway
+    That was observed live on a production leg: the writer printed the runaway
     evidence and the ladder line beside it said empty.
     """
     if not raw and error is not None:

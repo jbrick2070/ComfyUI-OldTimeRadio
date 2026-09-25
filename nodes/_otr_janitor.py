@@ -50,8 +50,8 @@ tmp/    scratch (TEMP/TMP/OTR_GPU_LEASE_DIR). Janitor-swept: stale
         anything you want to keep here.
 state/  per-machine runtime state (news_history.json, node run reports).
 
-Contract: docs/2026-06-11-output-tree-consolidation/OUTPUT_TREE_CONTRACT.md
-(the otr/ top level is EXACTLY episodes/ + obs/).
+Contract (2026-06-11 output-tree consolidation): the otr/ top level is
+EXACTLY episodes/ + obs/.
 """
 
 

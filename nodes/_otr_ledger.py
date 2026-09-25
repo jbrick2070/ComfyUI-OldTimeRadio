@@ -90,8 +90,7 @@ Lineage:
                    to None rather than KeyError.
   l3-2026-05-08 -- ADDITIVE: BUG-126 telemetry + Cast Contract pre-wiring
                    per round-robin synthesis (ChatGPT gpt-5.5 +
-                   Gemini gemini-3.1-pro-preview-customtools, transcripts
-                   at docs/2026-05-08-ledger-schema-additions__*.md).
+                   Gemini gemini-3.1-pro-preview-customtools).
                    New fields:
                      lines[].oom_recovery_count       (int, default 0)
                      lines[].render_method            (str, default "unknown")

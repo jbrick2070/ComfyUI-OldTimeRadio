@@ -303,7 +303,7 @@ def test_every_cloud_backend_installs_the_remote_guard():
 def test_the_ladder_can_still_see_a_halted_completion():
     """The evidence must survive the transport that raised from inside generate().
 
-    Observed live on a wan_ti2v leg: the writer printed 5,201 characters of
+    Observed live on a heavy-video leg: the writer printed 5,201 characters of
     runaway evidence and the ladder line beside it read `raw head: <empty>`.
     The ladder logs the caller's `last_raw`, which a transport raising from
     INSIDE the generate call never assigns -- while the completion sat on the

@@ -71,7 +71,7 @@ local AI radio-drama pipeline on AMD
 > plain PyTorch:
 >
 > * video: a still-motion lane (numpy/PIL, no diffusion video)
-> * images: Z-Image Turbo at bf16 (stock ComfyUI loaders, no fp8/nvfp4/GGUF)
+> * images: Z-Image Turbo at bf16 (stock ComfyUI loaders, no fp8/nvfp4)
 > * voices: Kokoro
 > * music: MusicGen (the 16 GB lab profile swaps in Stable Audio 3)
 > * writer: Qwen3.5-4B through transformers, unquantised -- no bitsandbytes,

@@ -141,11 +141,11 @@ physical memory the model is already in, so there is nowhere to spill to. The OS
 resolves it by killing processes. In practice the whole machine goes down, and
 there is **no traceback afterwards** -- the log simply stops mid-load.
 
-That happened here on 2026-09-08 loading `wan_ti2v` with an fp16 UNET: the log's
-last line is `WAN22 ... loaded completely; 9536.40 MB, full load: True`, and then
-nothing. It happened again on 2026-09-09 when an AnimateDiff beat asked for 160
-latents (section 7): five beats rendered, the sixth rebooted the box, `uptime`
-read 1 minute.
+That happened here on 2026-09-08 loading a large local video lane with an fp16
+UNET: the log's last line reports the model `loaded completely; 9536.40 MB,
+full load: True`, and then nothing. It happened again on 2026-09-09 when an
+AnimateDiff beat asked for 160 latents (section 7): five beats rendered, the
+sixth rebooted the box, `uptime` read 1 minute.
 
 **So do not size a model by trying it.** What stands between you and a reboot:
 
@@ -172,11 +172,11 @@ peak is the larger of (the text encoder alone) and (everything else together),
 because ComfyUI's loader really does run those as two phases. **On unified
 memory every artifact is charged as concurrently resident.** The two-phase
 split is a fiction there: `free_after_use` does not evict on MPS
-(PBUG-20260908-02 -- `wan_ti2v` logged `0 models unloaded.` immediately before
-sampling; `ltx_8gb` never attempted an unload at all). "offload device: cpu" is
-ComfyUI working as designed, and on unified memory host RAM IS the accelerator's
-memory, so the move frees nothing. Charging the sum is the conservative
-direction and it is the measured one.
+(PBUG-20260908-02 -- a large local video lane logged `0 models unloaded.`
+immediately before sampling; `ltx_8gb` never attempted an unload at all).
+"offload device: cpu" is ComfyUI working as designed, and on unified memory
+host RAM IS the accelerator's memory, so the move frees nothing. Charging the
+sum is the conservative direction and it is the measured one.
 
 **The budget it checks against is physical RAM x 1.15, less the 1.5 GiB
 reservation, and that multiplier rests on TWO receipts and nothing else:**
@@ -184,7 +184,7 @@ reservation, and that multiplier rests on TWO receipts and nothing else:**
 | lane | concurrent weights | outcome |
 | --- | --- | --- |
 | `ltx_8gb` | 16.1 GiB | survived, on swap, slowly -- and published episodes |
-| `wan_ti2v` (fp16) | 21.2 GiB | killed the machine |
+| a large local video lane (fp16) | 21.2 GiB | killed the machine |
 
 15.9 GiB of physical RAM sits below both, so a bare-RAM threshold would refuse a
 lane with receipts. 1.15x puts the line at about 18.3 GiB, between the two
@@ -195,8 +195,8 @@ lands, in either direction.
 **Its limits, because a guard you over-trust is worse than none:**
 
 * It reads an engine's weight names by duck-typing two adapter methods. It can
-  read `ltx_8gb`, `wan_ti2v`, `fastwan_8gb`, `humo` and its variants, and
-  `mesh_stage`. **Every other lane is unguarded** -- not blocked, just
+  read `ltx_8gb`, `humo` and its variants, and `mesh_stage`.
+  **Every other lane is unguarded** -- not blocked, just
   unchecked. The Lightning AnimateDiff lane has a guard of its own (below);
   its v3 siblings do not.
   `lumina_image` and `flux_gen1` are on you.
@@ -281,29 +281,18 @@ regression you did not write.**
 
 `MAC_COMPLIANCE_MATRIX.md` carries the per-engine verdict for all 61 engines
 and the reasoning behind each; this section is the shape of the answer, not a
-second copy of it. Four buckets, and they must not blur:
+second copy of it. Three buckets, and they must not blur:
 
 **Really NVIDIA-only (WILL NOT RUN).** `ideogram4_local` and both `minimax_*`
 need `nvfp4` artifacts, and their int8 fallback hits `aten::_int_mm`, which is
-unimplemented on MPS. `ltx_audio_in` fails CLOSED without NVML
-(`eng_ltx_av.py:749-756`) -- a real code gate, not a registry row. None of these
-is a paperwork problem.
+unimplemented on MPS. None of these is a paperwork problem.
 
 **Blocked by size, not by Metal (OOM RISK).** `z_image_turbo` loads fully on
 Metal and dies in the KSampler about 300 MB short of a 20.13 GiB ceiling --
 measured, section 4. `humo` / `humo_14B_169` (26.7 GB fully resident by
-contract), `ltx_video` (the 22B stack), the three `ltx25_*` (~19.6 GB, and an
+contract), the three `ltx25_*` (~19.6 GB, and an
 open MPS black-video defect on top, section 13). A 32 GB Mac would change some
 of these answers; that is a hardware question, not a portability defect.
-
-**Measured fatal here, AND renders wrong.** `wan_ti2v` loaded fully on Metal
-with its fp16 UNET and killed the machine (section 2). Its shipped GGUF set is
-9.37 GB and might fit -- but an open ComfyUI issue reproduces Wan 2.1/2.2
-temporal corruption on this exact macOS/torch generation with GGUF Q8 and fp16
-corrupting identically, so it would fit and still render garbage (section 13).
-Either reason alone is disqualifying. `fastwan_8gb` subclasses it and hoists
-MORE, so it inherits both reasons and is further from fitting, not closer; the
-matrix rates it WILL NOT RUN.
 
 **Never run here.** `lumina_image`, `flux_gen1`, `humo_1.7B`, `humo_1.7B_169`,
 `mesh_stage`, `stable_audio_music`, the sidecar voices (`indextts2`,
@@ -325,14 +314,13 @@ package, which nothing declares, and gated weights -- friction, not failure.
 | `animatediff15_lightning_video` | 2026-09-09, `["cuda"]` -> `["mps","cuda"]` | one published episode |
 | `spandrel_esrgan`, `off` (upscale) | 2026-09-09, `["cuda","cpu"]` -> `["cuda","cpu","mps"]` | RealESRGAN_x2plus 128->256 on `mps` in 0.51 s, **max \|mps - cpu\| = 0.00000** -- bit-exact against the CPU path, which is what makes it evidence; a wrong kernel returns too |
 
-Every row that is still `["cuda"]` after that is either in the first three
+Every row that is still `["cuda"]` after that is either in the first two
 buckets above or has simply never been run here.
 
 ### Names in that list are INTERNAL ids; the dropdown shows public labels
 
-`ltx_8gb` is `ltx098_low_video`, `wan_ti2v` is `wan22_high_video`, `fastwan_8gb`
-is `wan22_high_fast`, `ltx_video` is `ltx23_high_video`, `ltx_audio_in` is
-`ltx23_low_audio_in`, the `minimax_*` pair is `h3_low_video` / `h3_low_audio_in`.
+`ltx_8gb` is `ltx098_low_video`; the `minimax_*` pair is `h3_low_video` /
+`h3_low_audio_in`.
 The mapping is `nodes/_otr_shared/public_engines.py`.
 
 ### History: what this section said until 2026-09-08, and why it was wrong
@@ -363,8 +351,8 @@ this cannot happen again by omission.
 
 Added 2026-09-08 for exactly this reason. **1.99 GB, ungated, one ordinary
 checkpoint** (MODEL + CLIP + VAE in a single file through
-`CheckpointLoaderSimple` -- no split loaders, no separate text encoder, no GGUF
-pack, no licence click).
+`CheckpointLoaderSimple` -- no split loaders, no separate text encoder, no
+licence click).
 
 ```bash
 python -c "
@@ -480,7 +468,7 @@ the 30-second grep test in `ADDING_IMAGE_AND_VIDEO_LANES.md`.
 
 `ltx_8gb` does NOT need the ComfyUI-LTXVideo node pack -- it drives stock
 ComfyUI nodes. Only the three `ltx25_*` lanes need that pack, and they cannot run
-on 16 GB anyway (section 11.2).
+on 16 GB anyway (section 11.1).
 
 ---
 
@@ -657,7 +645,7 @@ file is on disk, and the gate fails with `missing_model` naming
 AnimateDiff-Evolved issue #576 reports producing colored noise (section 13).
 `scripts/otr_provision.py` pins `ANIMATEDIFF_PIN`; call the function directly
 so the `--packs-only` run cannot stall on ComfyUI-LTXVideo's git-lfs
-requirement (section 11.2):
+requirement (section 11.1):
 
 ```bash
 OTR_COMFY_ROOT=/path/to/ComfyUI \
@@ -850,7 +838,7 @@ fraction of it.**
 **The clip length is not yours to set, and that is deliberate.** The lane
 declares `FrameContract(min_frames=1, max_frames=0, quantum=1, ...)` -- a beat
 is ONE timeline even when it spans several internal context windows.
-`PLANNING_CAP_ENGINES` is `("ltx_8gb", "fastwan_8gb", "wan_ti2v")`
+`PLANNING_CAP_ENGINES` is `("ltx_8gb", "razzle_ltx_8gb")`
 (`frame_contract.py:319`) and `effective_frame_contract` returns the contract
 unchanged for anything else. **Adding this lane to that tuple would make it
 WORSE, not shorter:** with `continuity=NONE` the planner joins segments with
@@ -994,9 +982,9 @@ ships ffmpeg 9.0, which removed `-vsync`; the pack probes the binary and uses
 
 Node pack at the pinned commit, weights by hand, and the Comfy Desktop mapping.
 
-### GGUF lanes -- section 11
+### ComfyUI-LTXVideo -- section 11
 
-High friction, and the install is solved.
+The git-lfs trap, and the pack every `ltx25_*` lane needs for its upscaler.
 
 ### Upscale -- nothing manual, and one receipt
 
@@ -1050,7 +1038,7 @@ question.
 | a lane you did not pick starts a huge download at Queue | the image dropdowns still say `z_image_turbo` and the video lane you picked consumes a still | set ALL THREE image dropdowns to `sd15` **before** you queue. The validator provisions the selected image engine, so an unchanged `z_image_turbo` fetches ~20 GB of weights that cannot run here |
 | `[AnimateDiffEvo] ... No motion models found` with the file on disk | Comfy Desktop's generated paths file has no `animatediff_models` category | section 7.3, step 3 |
 | `EngineUnusable ... missing_model -- motion_module=... domain_adapter=...` | the node pack, the module or the adapter is absent -- usually the node pack | section 7.3, steps 1-2 |
-| `vram_fit=WARN@4.3 GB` on a model that is 8.68 GB on disk | `_estimate_resident_gb` halves every non-GGUF model regardless of `quant_policy` | it is lying by 2x; do not read it as headroom (section 12). Open on the punch list |
+| `vram_fit=WARN@4.3 GB` on a model that is 8.68 GB on disk | `_estimate_resident_gb` halves every model's disk size regardless of `quant_policy` | it is lying by 2x; do not read it as headroom (section 12). Open on the punch list |
 | a test passes alone and fails in the full suite, asserting on source text | the installed pack under `custom_nodes/` is a stale COPY of the repo | section 14 |
 | tests fail during a render and pass afterwards | memory pressure, not code | section 2; compare on an idle box |
 
@@ -1121,63 +1109,28 @@ font-resolver design remains in GO_FORWARD row 3.8.
 
 ---
 
-## 11. The GGUF lanes: the install is solved, and it is HIGH FRICTION
+## 11. ComfyUI-LTXVideo: the node pack every LTX lane needs
 
-**Operator's framing, and it is the right one:** GGUF may well work, the install
-method is now known, and that install is high friction. This section is for
-someone with decent coding skills, or an AI coder sitting beside them. If that
-is not you, stop here -- `sd15` + the `still_*` lanes and `ltx_8gb` need none of
-this.
-
-**Be precise about what is proven here: the INSTALL and one STILL, not an
-episode.** The ComfyUI-GGUF pack is verified registered on this machine (six
-still through it (section 4); **no GGUF lane has completed an episode on Apple
-Silicon in this repository.**
-
-**What GGUF buys you on a Mac.** Quantised weights are how the bigger lanes fit
-bf16; `wan_ti2v`'s shipped set is 9.37 GB GGUF against 21.2 GB in fp16, and the
-fp16 route is the one that took this machine down. So on this platform GGUF is
-not an optimisation, it is frequently the only version that can run.
-
-### 11.0 K_M quants do NOT garble on Metal -- SETTLED 2026-09-08
-
-*"K_M quants garble on MPS"*, and city96's ComfyUI-GGUF issue #177 reports GREEN
-OUTPUT from `Q*_K` Flux weights on Metal. A web sweep judged #177 to predate a
-PyTorch MPS integer-operation fix and to be contradicted by later Flux-family
-section 4 is the receipt.
-
-So a K_M quant is not a reason to avoid a lane on this platform. **The habit is
-still worth keeping**: a garbled render exits ZERO, so open the first still or
-clip and look at it before concluding a lane works. That is how this was
-settled, and it is the only way it could have been. `wan_ti2v`'s shipped set is
-also K_M, so this removes one of its two objections; the other -- the open Wan
-temporal-corruption defect (section 13) -- still stands, and it is the
-disqualifying one.
-
-### 11.1 The repo ships the installer -- point it at the right tree
+`scripts/otr_provision.py --packs-only` installs and pins two node packs,
+`ComfyUI-LTXVideo` and `ComfyUI-AnimateDiff-Evolved`:
 
 ```bash
 OTR_COMFY_ROOT=/path/to/ComfyUI \
   <ComfyUI Python> scripts/otr_provision.py --packs-only
 ```
 
-`scripts/otr_provision.py` clones and PINS the three packs (ComfyUI-GGUF at a
-fixed commit plus an in-repo LTX 2.5 patch, ComfyUI-LTXVideo, and
-ComfyUI-AnimateDiff-Evolved) and installs their requirements. You do not need to
-find them yourself, and you should not: the pins matter.
-
 **Two traps in that one command.**
 
 * **`OTR_COMFY_ROOT` is not optional in practice.** Without it the script
   guessed `/Users/<me>/Documents` here and created a `custom_nodes/` folder
-  there, cloning two packs into a directory ComfyUI has never heard of. Nothing
+  there, cloning a pack into a directory ComfyUI has never heard of. Nothing
   warned; the receipt said `PATCHED`. Check the `comfy root :` line it prints
   BEFORE walking away, and delete any stray `custom_nodes/` it made elsewhere.
 * **`--list` does not dry-run for packs.** The flag is documented as "show what
   would be installed, install nothing". Combined with `--packs-only` it clones
   and installs anyway. Treat `--packs-only` as always live.
 
-### 11.2 `git-lfs` -- the step that stops a clean Mac dead
+### 11.1 `git-lfs` -- the step that stops a clean Mac dead
 
 ```
 FAILED  required pack/dependency -- git checkout -q --detach FETCH_HEAD failed
@@ -1196,7 +1149,7 @@ requires ComfyUI-LTXVideo unconditionally, so the provisioner will report
 INCOMPLETE every time until git-lfs exists -- and moving the broken clone aside
 does not settle it, because the next run re-clones and fails again the same way.
 What you get by moving it aside is a ComfyUI that boots cleanly in the meantime,
-not a finished provision. The GGUF pack DOES land before that failure, which is
+not a finished provision.
 
 **And clean up after the failure, because it does not.** A failed checkout
 leaves a directory full of files with NO COMMITS -- `git log` says *"your current
@@ -1208,10 +1161,11 @@ boot, next to lanes that currently work without it. Move it aside:
 mv custom_nodes/ComfyUI-LTXVideo custom_nodes/.disabled/ComfyUI-LTXVideo-unpinned
 ```
 
-`ltx_8gb` does NOT need this pack. Only the three `ltx25_*` lanes need it, and
-they cannot run on 16 GB anyway.
+`ltx_8gb` does NOT need this pack -- it drives stock ComfyUI nodes. The
+`ltx25_*` lanes need it for `LTXVLatentUpsampler` alone; the DiT, text encoder
+and VAE load through stock `UNETLoader`/`CLIPLoader`/`VAELoader`.
 
-### 11.3 Verify the pack actually registered
+### 11.2 Verify the pack actually registered
 
 A cloned pack that failed to install its wheel registers NOTHING, and the
 failure arrives much later as `WrapperNodeMissing` in the middle of a render.
@@ -1220,14 +1174,12 @@ Check at the API instead of at the filesystem:
 ```bash
 curl -s http://127.0.0.1:8188/object_info | python3 -c "
 import json,sys; d=json.load(sys.stdin)
-print([k for k in d if 'GGUF' in k])"
+print('LTXVLatentUpsampler' in d)"
 ```
 
-Six classes is right: `UnetLoaderGGUF`, `CLIPLoaderGGUF`, `DualCLIPLoaderGGUF`,
-`TripleCLIPLoaderGGUF`, `QuadrupleCLIPLoaderGGUF`, `UnetLoaderGGUFAdvanced`.
-An empty list means the `gguf` wheel is missing even though the folder is there.
+`False` means the pack is present on disk but its wheel did not install.
 
-### 11.4 Watch the venv, because this is how a boot gets bricked
+### 11.3 Watch the venv, because this is how a boot gets bricked
 
 Installing a pack's requirements runs `pip` into the SAME environment ComfyUI
 boots from. That is exactly how the `tokenizers` pin bricked this install on
@@ -1240,12 +1192,10 @@ boots from. That is exactly how the `tokenizers` pin bricked this install on
 diff /tmp/venv_before.txt /tmp/venv_after.txt
 ```
 
-A good result is one added line. The ComfyUI-GGUF install here added exactly
-`gguf==0.19.0` and changed nothing else. **If that diff shows an existing
-package being upgraded or downgraded, stop and read it before restarting
-ComfyUI** -- a downgrade of `tokenizers`, `numpy`, `transformers` or `torch` is
-the shape of a bricked boot, and you cannot repair it from the Manager UI
-because the Manager is itself a ComfyUI extension.
+**If that diff shows an existing package being upgraded or downgraded, stop and
+read it before restarting ComfyUI** -- a downgrade of `tokenizers`, `numpy`,
+`transformers` or `torch` is the shape of a bricked boot, and you cannot repair
+it from the Manager UI because the Manager is itself a ComfyUI extension.
 
 ---
 
@@ -1314,9 +1264,8 @@ grep -c "proceeding with caution" <log>      # informational, see below
 ```
 
 **`vram_fit=WARN@4.3 GB` is lying to you by 2x.** `_estimate_resident_gb`
-divides every non-GGUF model's disk size by two
-(`_otr_model_catalog.py:1828, 1898`), i.e. it assumes NF4 regardless of
-`quant_policy`. The Mac profile runs `quant_policy: "none"`, so the true
+divides every model's disk size by two (`_otr_model_catalog.py`), i.e. it
+assumes NF4 regardless of `quant_policy`. The Mac profile runs `quant_policy: "none"`, so the true
 residency is >= 8.68 GB plus KV -- 87% of the 10 GB ceiling, not 43%. The gate
 only refuses at 1.5x the ceiling, so it admits either way; but do not read that
 number as headroom. Still open (punch list B2).
@@ -1396,7 +1345,7 @@ warning, and `mac16-tight` means it fits with nothing else running.
 
 ---
 
-### The Metal writer lane: use GGUF, not bf16
+### The Metal writer lane: bf16 is the only reachable quant
 
 **On Apple Silicon the transformers lane at `llm_quant_policy: none` is the one
 combination that cannot be made to fit, and no dropdown fixes it.** That is
@@ -1410,21 +1359,8 @@ does not:
   14.47 on CUDA, because there is no Metal NF4 kernel. So `none` is the only
   reachable quant, and `none` is exactly the setting that peaks at 14 GB.
 
-**The answer this section used to give is gone, and saying so is the point.**
-It pointed at a GGUF writer row at `gguf_quant: Q4_K_M` -- roughly 2.5 GB for a
-4B writer against 8.7 GB of bf16 safetensors -- and at
-`nodes/_otr_gguf_backend.py`, which was genuinely device-aware (it passed
-`n_gpu_layers` on `mps` exactly as on `cuda`, so llama.cpp's Metal backend took
-it rather than silently falling back to CPU).
-
-**That backend was DELETED on 2026-09-24**, with its two widgets, its provider,
-its lane and its policy fields. The paragraph below already recorded that no row
-had ever been pinned for it, so the lane was unreachable in practice; what
-changed is that it is no longer one pinned artifact away from working. Anyone
-reviving it is rebuilding it, not filling in a blank.
-
-**So the sizing problem stated above stands, and this repo currently documents
-no in-tree answer to it.** That is the honest status, and it is deliberately not
+**This repo currently documents no in-tree smaller-than-bf16 writer for
+Apple Silicon.** That is the honest status, and it is deliberately not
 papered over with a substitute recommendation.
 
 So Apple Silicon wants its own writer lane. **This is stated here and enforced
@@ -1432,19 +1368,10 @@ nowhere** -- operator directive, 2026-09-09: no gated dropdowns and no
 capability matrix in code, only documentation. A guard that refused the bf16
 lane on Metal was written and then removed for exactly that reason.
 
-**IT WAS NEVER SELECTABLE, which is why it could be removed.** `GGUF_ROWS` in
-`nodes/_otr_gguf_backend.py` was an empty tuple from the 2026-09-06 directive
-onward, so no GGUF writer ever appeared in the picker -- there was nothing to
-point a Metal-named row at, and no episode was ever written through it. The
-backend was device-aware and unreached, and on 2026-09-24 it was deleted rather
-than kept standing for a row nobody was going to pin.
-
 **The arithmetic, so you can size it yourself.** Resident runs about **1.61x**
 the bf16 download size -- `14 / 8.68`, the one measurement this repo has
 (PBUG-20260907-06). On a 16 GB machine, minus what macOS and the video stack
-need, a bf16 writer above roughly 7 GB of safetensors has no margin. Q4_K_M on
-a 4B writer is roughly 2.5 GB and is not close to the edge.
-
+need, a bf16 writer above roughly 7 GB of safetensors has no margin.
 ---
 
 ## 13. What the wider world reports, and why we stopped testing by trying
@@ -1467,7 +1394,7 @@ for it.**
 | CogVideoX-2B | anecdote -- one Mac walkthrough, no hardware named | unproven at this size, not in the registry |
 | Wan 2.1 Fun InP 1.3B | anecdote -- an exact M4/16 GB completion EXISTS | **Do not follow it as written:** it required `PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.0`, which REMOVES the MPS allocation ceiling. On a host where OOM reboots the machine, that setting is the opposite of a mitigation |
 | LTX 2.x (`ltx25_*`) | strong NEGATIVE | **Avoid.** ~19.6 GB, and open MPS BF16 attention NaNs produce all-black video |
-| **Wan 2.2 TI2V-5B** (`wan_ti2v`) | strong NEGATIVE | **Dead here**, and not only on memory -- see below |
+| **Wan 2.2 TI2V-5B** | strong NEGATIVE | **Dead here**, and not only on memory -- see below |
 | Stable Video Diffusion, Mochi, HunyuanVideo, FramePack | none found | no qualifying 16 GB Apple Silicon completion reports at all |
 
 ### The three findings that change what you should do
@@ -1475,12 +1402,10 @@ for it.**
 **1. Wan is not merely too big -- it renders WRONG.** An open ComfyUI issue dated
 2026-08-21 reproduces Wan 2.1/2.2 TEMPORAL CORRUPTION on an M4 Pro running
 macOS 26.6 with torch 2.12.1 -- the same software generation as this host -- and
-GGUF Q8 and fp16 corrupt IDENTICALLY. That rules out quantisation as the cause
-and makes it an MPS kernel defect. So the 9.37 GB GGUF set fitting is beside the
-point: it would fit and still produce garbage. `wan_ti2v` and `fastwan_8gb` are
-both off the table on this platform until that lands a fix -- and note this is a
-DIFFERENT reason from the memory one that killed the machine here. Either alone
-is disqualifying.
+quantised and fp16 corrupt IDENTICALLY. That rules out quantisation as the
+cause and makes it an MPS kernel defect: Wan would fit and still produce
+garbage, a different reason from the memory one that killed the machine here.
+Either alone is disqualifying.
 
 **2. LTX 2.5's black-video defect has a published workaround, and it is worth
 knowing even though we cannot run the lane.** ComfyUI issues from 2026-08-22 and
@@ -1521,21 +1446,20 @@ Exporting it in the terminal you run an API client from does nothing at all:
 
 ```bash
 # WRONG -- the client has the value, the renderer does not
-OTR_WAN_TI2V_UNET_NAME=... python scripts/otr_canonical_api_run.py ...
+OTR_LTX_8GB_CKPT=... python scripts/otr_canonical_api_run.py ...
 
 # RIGHT -- restart ComfyUI with it
-OTR_WAN_TI2V_UNET_NAME=... python ComfyUI/main.py ...
+OTR_LTX_8GB_CKPT=... python ComfyUI/main.py ...
 ```
 
 That covers every knob that binds: the loader-name and path overrides
-(`OTR_WAN_TI2V_UNET_NAME`, `OTR_LTX_8GB_CKPT`, `OTR_SD15_*`),
+(`OTR_LTX_8GB_CKPT`, `OTR_SD15_*`),
 `OTR_UNIFIED_MEMORY_HEADROOM_MB`, `OTR_MPS_PYTORCH_ATTENTION`,
 `OTR_GHOST_HOLD_FACTOR`, `OTR_CAPTION_MONO_FONT`. If you changed one and nothing
 changed, you almost certainly set it on the wrong process.
 
-**`ENABLE_FLAG` constants gate nothing.** Some adapters still carry one --
-docstring calls `OTR_ENABLE_WAN_TI2V` a "vestigial opt-in flag". Both adapters
-set `requires_flag = None`, `EngineUsabilityReason.GATED_BY_FLAG` is documented
+**`ENABLE_FLAG` constants gate nothing.** Every registered engine sets
+`requires_flag = None`, `EngineUsabilityReason.GATED_BY_FLAG` is documented
 dead, and `tests/test_registry_is_the_menu_guard.py` asserts that no registered
 engine carries a live flag. If an engine refuses, the reason is in its
 `assert_usable` message, not a missing opt-in.

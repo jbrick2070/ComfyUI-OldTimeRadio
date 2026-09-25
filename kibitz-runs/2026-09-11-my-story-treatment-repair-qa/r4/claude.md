@@ -1,1 +1,0 @@
-You've hit your weekly limit · resets 6am (America/Los_Angeles)

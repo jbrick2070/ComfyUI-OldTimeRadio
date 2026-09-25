@@ -1,8 +1,8 @@
 """The ONE applier -- GATE B S2 of the switchable-workflow architecture.
 
-Spec: docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md
-(sections 4, 5, 6); sequencing: docs/2026-06-09-3d-toolkit/3D_TOOLKIT_PLAN.md
-section 0 (GATE B). This module is the structural kill for the headless
+Spec: the 2026-06-10 switchable-workflow-architecture decision-and-plan
+(sections 4, 5, 6); sequencing: the 2026-06-09 3D toolkit plan, section 0
+(GATE B). This module is the structural kill for the headless
 patch-list drift (the captions/credits/LTX-open bug): ONE applier consumed by
 the generator, the headless scripts and CI -- nobody hand-codes widget patch
 lists again.
@@ -586,7 +586,7 @@ def workflow_to_api_prompt(workflow: dict, schemas: dict) -> dict:
 
 # ---------------------------------------------------------------------------
 # semantic master_hash -- the S5 drift tripwire (generator + validator share
-# THIS normalizer; docs/2026-07-09-platform-portability-final.md section 1)
+# THIS normalizer; per the 2026-07-09 platform-portability final spec, section 1)
 # ---------------------------------------------------------------------------
 def semantic_master_hash(workflow: dict, mapping: Optional[dict] = None,
                          schemas: Optional[dict] = None) -> str:

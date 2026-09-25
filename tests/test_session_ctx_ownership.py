@@ -7,18 +7,18 @@ coverage-planned segment's request is shaped exactly like a single-clip beat's.
 ``MotionEngineBase.prepare`` ACCEPTED it and DROPPED it, returning only
 ``{engine_id, lease, patchers}``.
 
-``eng_wan_ti2v`` and ``eng_humo`` each re-added it LOCALLY and worked. The four
-adapters that did not -- ``ltx_video``, ``ltx_8gb``, ``ltx_av``, ``wan_i2v`` -- saw
-no ``multi_clip``, so ``eng_ltx_video._loop_fill_allowed`` enabled the boomerang on
-a beat whose length a coverage plan had already decided.
+A couple of adapters re-added it LOCALLY on their own and worked (``eng_humo``
+among them). The others did not -- two now-retired LTX adapters, ``ltx_8gb``,
+``wan_i2v`` -- saw no ``multi_clip``, so the affected lane's loop-fill boomerang
+enabled itself on a beat whose length a coverage plan had already decided.
 
 WHY THE SUITE MISSED IT: ``tests/test_ltx_boomerang.py`` builds ``prepared`` by hand,
 so it exercises the very structure the bug destroys. These tests go through the real
 ``prepare`` instead.
 
-TIMELINE, because "it always worked" and "it fails now" are both true: ``ltx_video``
-last delivered episode clips 2026-07-06; the beat session landed 2026-07-25
-(``4fa992e6`` / ``e90dedf1``). It worked BEFORE multi-clip existed.
+TIMELINE, because "it always worked" and "it fails now" are both true: the
+affected lane last delivered episode clips 2026-07-06; the beat session landed
+2026-07-25 (``4fa992e6`` / ``e90dedf1``). It worked BEFORE multi-clip existed.
 """
 
 import inspect

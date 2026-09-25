@@ -1,7 +1,6 @@
 """nodes/_otr_ledger_consistency.py -- deterministic CROSS-STAGE consistency.
 
-story-ledger DRIFT chunk 2 (2026-06-25,
-docs/2026-06-25-story-ledger-integrity/). THE core drift fix: a PURE, offline,
+story-ledger DRIFT chunk 2 (2026-06-25). THE core drift fix: a PURE, offline,
 NO-LLM parity check that asserts every non-optional UPSTREAM field
 (StoryContract / Outline / locked cast) has a populated DOWNSTREAM equivalent in
 the written canon / ledger.

@@ -1,6 +1,6 @@
 """Real host capability facts for adapter-level enforcement (S4).
 
-docs/2026-07-09-platform-portability-final.md section 3: the adapter-level
+Per the 2026-07-09 platform-portability final spec, section 3: the adapter-level
 ``assert_usable(host_caps, profile, ...)`` protocol EXISTED on every video
 and image adapter but received empty dicts (render_driver) or was never
 called at all (image dispatcher) -- the campaign's most consequential

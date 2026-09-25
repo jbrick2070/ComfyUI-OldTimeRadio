@@ -46,7 +46,7 @@ from ._otr_story_brief_helpers import (
     append_visual_safety_clause,
     visual_safety_negative,
 )
-# The banana route (docs/2026-08-06-BUILD-SPEC-banana-route.md): pure,
+# The banana route (2026-08-06 build spec): pure,
 # stdlib-only house-style transform applied at THIS funnel before the prompt
 # content hash, gated by env + the fidelity-bank idiom. Cold-import clean.
 from . import _otr_banana_route as _banana
@@ -1596,7 +1596,7 @@ def dispatch_images(ledger: dict, image_policy: dict, image_prompts: dict, *,
     # stamp, so stamp_portrait must not fail-closed on them (cast stays
     # CastLock's frozen authority; never added to here).
     cast_ids = {str(c.get("char_id") or "") for c in cast if isinstance(c, dict)}
-    # THE BANANA ROUTE (docs/2026-08-06-BUILD-SPEC-banana-route.md). Gate and
+    # THE BANANA ROUTE (2026-08-06 build spec). Gate and
     # variety key are per-EPISODE facts, resolved once: env switch + the
     # fidelity-bank idiom on meta.source_bank; variety keyed on the immutable
     # freeze_timestamp so re-rendering a frozen ledger reproduces the same

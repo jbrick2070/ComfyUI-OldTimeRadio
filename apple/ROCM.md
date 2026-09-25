@@ -23,10 +23,7 @@ workflows/variants/otr_amd_still.json    still image with motion, Kokoro voices,
 
 It is the canonical with AMD-appropriate dropdowns already saved: a
 Qwen3.5-4B writer unquantised, `still_motion` over Z-Image Turbo stills,
-Kokoro, Stable Audio 3. Two older lab profiles, `otr_amd16_rocm` and
-`otr_amd8_rocm`, still load with `--profile` for a 16 GB or 8 GB variant of the
-same idea; neither has run on hardware -- their own files say
-`UNVERIFIED on hardware` in as many words.
+Kokoro, Stable Audio 3. It has not yet run on AMD hardware.
 
 The profile reads `draft`. That field records **promotion**, not proof -- the
 graph has a stranger's published episode behind it and the field has not been
@@ -192,10 +189,8 @@ python custom_nodes/ComfyUI-OldTimeRadio/scripts/otr_canonical_api_run.py \
 ls -la output/otr/obs/
 ```
 
-`--profile otr_amd16_rocm` or `--profile otr_amd8_rocm` in place of
-`--workflow` runs a lab preset instead. **Use `--workflow` or `--profile`, not
-`--machine amd`** -- that shortcut expands to an unaudited in-memory bundle, not
-the graph this page is about.
+**Use `--workflow`, not `--machine amd`** -- that shortcut expands to an
+unaudited in-memory bundle, not the graph this page is about.
 
 Success is an mp4 in `output/otr/obs/`. Win or lose, an issue titled
 `ROCm: <your card>` with the leg log, the ComfyUI terminal, the ledger
@@ -205,11 +200,8 @@ traceback with everything above it, is the whole ask. Send the mp4 too if you
 got one -- we would like to hear it. A failure in the first ninety seconds is a
 result. Send that.
 
-Two traps worth knowing before you spend the evening. **The 8 GB profile is
-tight even on NVIDIA**, so if only one of the two lab profiles works it will be
-the 16 GB one. And **`llama-cpp-python` needs a HIP build** if you want the
-GGUF writer lane -- the AMD profiles do not use it, they pin a transformers
-model, so skip it.
+One trap worth knowing before you spend the evening: **an 8 GB card is tight
+even on NVIDIA**, so a 16 GB Radeon is the better first test.
 
 ---
 

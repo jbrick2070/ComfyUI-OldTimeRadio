@@ -33,7 +33,7 @@ _PUBLIC_ENGINES = {
     # below at IMPORT time -- which, since the director imports this module
     # unguarded, empties most of the ComfyUI node menu rather than failing one
     # lane cleanly.
-    "wan22_high_i2v": "wan_i2v",
+    #
     # Lane 2, 2026-08-11. The id STATES what the lane is, per the operator's
     # 2026-08-10 refinements: audio-conditioned lanes say `audio_in` (HuMo is
     # audio-driven and now says so), and the aspect is in the id rather than
@@ -105,19 +105,6 @@ _LEGACY_ENGINE_ALIASES = {
     "flux_still": "still_pan",
     "still_kenburns": "still_motion",
     "visualizer": "viz_green",
-    # RESOLVED BY THE OPERATOR 2026-08-11: the naming was decided all along and
-    # `wan21` was a single mistyped version number in the spec that everything
-    # downstream inherited. The lane loads a Wan 2.2 weight
-    # (wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors, recipe
-    # wan22_14b_i2v_single_pass_v1), so `wan22_high_i2v` is correct and stands;
-    # the spec and the transplant plan now say so too.
-    #
-    # This row stays anyway, and NOT because the spec needs it -- it does not.
-    # The string briefly existed in a reviewed document, so it survives in this
-    # session's kibitz runs and handoff log, and a person pasting from any of
-    # those should land on the lane rather than on a not-registered error. It is
-    # the cheapest possible way to make a retired typo harmless.
-    "wan21_high_i2v": "wan_i2v",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -135,11 +122,6 @@ _PUBLIC_LABEL = {
     "ltx098_low_video": (
         "LTX 0.9.8 2B - low VRAM (6.8 GiB net at 512x288x161; "
         "the cheapest local video lane, ~22 s a beat)"),
-    # "high" is the measured bucket, not a quality claim: 13.93 GiB warm at
-    # 832x480x33 against a 14.5 GiB gate. The rung is named because only f33
-    # has warm evidence -- the f177 the contract allows is model-legal and not
-    # machine-qualified.
-    "wan22_high_i2v": "Wan 2.2 I2V 14B fp8 - high VRAM (13.9 GiB warm at f33)",
     "humo14_high_audio_in_wide": (
         "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
         "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),
@@ -271,18 +253,6 @@ RETIRED_ENGINE_IDS = frozenset({
     "trellis_talk",
     "triposr",
     "still_parallax",
-    # THE 14B LOCAL WAN i2v LANE, RETIRED 2026-08-26 (operator: "rip the large
-    # wan we don't need"). It did not fit the card and never could: the UNet is
-    # 13.31 GiB and its fp8 text encoder another 6.27, so 19.82 GiB of weights
-    # against a 14.5 GiB target. It only ran by offloading continuously -- a
-    # measured 120-minute TIMEOUT with the render still alive.
-    #
-    # The PUBLIC alias rows in this module (`wan22_high_i2v` and the legacy
-    # `wan21_high_i2v`) deliberately STAY pointing at this id --
-    # they are what routes an old saved graph INTO this named refusal instead
-    # of letting it fall through to the generic "no engine named ..." message,
-    # which reads as a broken install rather than a retirement.
-    "wan_i2v",
     # THE CLOUD PIXVERSE WORD-CARD LANE, RETIRED 2026-09-17 (operator:
     # "WORD_RAZZLE / CLOUD GETS RIPPED"). The adapter was CloudWordRazzleEngine
     # on partner row cloud_pixverse_i2v. Local razzle_ltx_8gb stays; this id

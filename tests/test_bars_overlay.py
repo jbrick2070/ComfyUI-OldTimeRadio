@@ -24,7 +24,7 @@ def _manifest():
     return {
         "fps": 25, "total_target_frames": 20,
         "clips": [
-            {"shot_id": "b001", "engine_id": "ltx_video", "path": "land.mp4",
+            {"shot_id": "b001", "engine_id": "ltx25_video", "path": "land.mp4",
              "exists": True, "target_frame_count": 10, "start_s": None},
             {"shot_id": "b002", "engine_id": "humo", "path": "port.mp4",
              "exists": True, "target_frame_count": 10, "start_s": None},

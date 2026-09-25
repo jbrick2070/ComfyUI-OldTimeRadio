@@ -18,7 +18,7 @@ IDENTITY aliases so an existing ``except`` clause stays true.
 THE ALLOWLIST is the reason this is a boundary rather than a shim. ``argv[0]``
 is normalized (basename, lower-cased, ``.exe`` stripped) and checked against
 the executables this pack actually runs -- measured, not guessed, from an AST
-sweep of all 35 sites (``docs/2026-09-04-registry-findings-collapse/argv0_receipt.txt``).
+sweep of all 35 sites.
 An unlisted binary raises before anything is spawned. Adding one is a
 one-line, reviewed change; that is the point.
 

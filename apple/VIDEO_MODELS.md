@@ -103,36 +103,22 @@ just do not carry the label, which is reserved for the audio-reactive family.
 
 | Dropdown | What it makes | Needs |
 |---|---|---|
-| `ltx098_low_video` | animates the beat's still. The cheapest local video lane, and the only one that downloads itself | automatic, about 16 GB |
-| `ltx23_low_audio_in` | animates the still, conditioned on the beat's audio | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
-| `ltx23_high_video` | the LTX 2.3 22B silent lane | manual weights + ComfyUI-GGUF + ComfyUI-LTXVideo |
-| `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent. 16 GB weights | licence + manual weights |
-| `ltx25_native_foley_16gb` | the same picture, and it **keeps the model's own sound**. 16 GB weights | licence + manual weights |
-| `ltx25_native_foley_24gb` | the same, on the 24 GB+ weights (any modern NVIDIA) | licence + manual weights |
-| `ltx25_native_foley_blackwell` | the same, on Blackwell-only weights | licence + manual weights |
-| `ltx25_native_mime_16gb`, `ltx25_native_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | licence + manual weights |
-| `ltx25_native_audio_in_16gb`, `ltx25_native_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | licence + manual weights |
+| `ltx098_low_video` | animates the beat's still. The cheapest local video lane | automatic, about 16 GB |
+| `ltx25_high_video` | LTX 2.5, two-stage: rendered small, then refined to a large decode. Silent. 16 GB weights | automatic, about 25 GB |
+| `ltx25_native_foley_16gb` | the same picture, and it **keeps the model's own sound**. 16 GB weights | automatic, about 25 GB |
+| `ltx25_native_foley_24gb` | the same, on the 24 GB+ weights (any modern NVIDIA) | automatic, about 33 GB |
+| `ltx25_native_foley_blackwell` | the same, on Blackwell-only weights | automatic, about 24 GB |
+| `ltx25_native_mime_16gb`, `ltx25_native_mime_24gb` | the same picture, and the model's sound **replaces** the episode audio over those beats | automatic, same files as the foley lane of that size |
+| `ltx25_native_audio_in_16gb`, `ltx25_native_audio_in_24gb` | the picture follows the beat's own audio instead of inventing sound | automatic, same files as the foley lane of that size |
 
-Every LTX 2.5 row loads through ComfyUI's own stock loaders -- no extra node
-pack -- and every weight it asks for is ungated, so no Hugging Face token is
-needed.
-
-`ltx098_low_video` is the one lane in this whole page that needs no manual step.
-Pick it and queue, and the weights arrive. It is what the 8 GB and Mac graphs
-ship with.
+Every LTX row downloads its own weights the first time you queue it -- no
+account, no licence click, no Hugging Face token -- and loads through
+ComfyUI's own stock loaders, so there is no extra node pack either. The 16 GB
+LTX 2.5 lanes all share one set of files, so picking a second one costs no new
+download. `ltx098_low_video` is what the 8 GB and Mac graphs ship with.
 
 Read the foley and mime rows twice before picking them -- see **The lanes that
 change the sound**, below.
-
-### Wan
-
-| Dropdown | What it makes | Needs |
-|---|---|---|
-| `wan22_high_video` | animates the beat's still on Wan 2.2 TI2V 5B. The standard Wan lane | manual weights + ComfyUI-GGUF |
-| `wan22_high_fast` | the same motion at the same size for the same memory, roughly 2.7x sooner | manual weights + ComfyUI-GGUF |
-
-`wan22_high_fast` is a throughput option, not a quality one. Neither fits an
-8 GB card.
 
 ### HuMo -- the mouth-moving lanes
 
@@ -220,18 +206,15 @@ On any other graph the same Vidu combo is in the dropdown if you want to spend c
 
 Choosing by hand instead, the short version: **on 8 GB, start at
 `ltx098_low_video`** -- it is what the 8 GB graph ships and the safe local
-diffusion pick. The HuMo lanes, both H3 lanes and `ltx23_low_audio_in` run
-out of memory on 8 GB, and the Wan pair does not fit there either. **On 16 GB the LTX 2.5 lanes,
-both Wan lanes, the HuMo lanes and `h3_low_video` all fit.** On a Mac,
+diffusion pick. The HuMo lanes and both H3 lanes run out of memory on 8 GB.
+**On 16 GB the LTX 2.5 lanes, the HuMo lanes and `h3_low_video` all fit.** On a Mac,
 `ltx098_low_video` and `animatediff15_lightning_video` are the two proven
 diffusion lanes; the still and visualizer lanes work there too, and the rest of
 the local list is CUDA only -- except `humo17_high_audio_in_wide`, which fits
 on paper and is unmeasured on a Mac. On unified memory that is not a free try.
 
-One lane is in the list and fits neither card: **`ltx23_high_video` runs out of
-memory on 8 GB and on 16 GB both.** It is selectable because the menu shows
-every registered engine rather than hiding the ones that do not fit -- being in
-the list is not a recommendation.
+The menu shows every registered engine rather than hiding the ones that do not
+fit your card -- being in the list is not a recommendation.
 
 Exact download sizes, the per-machine grid and the repository each file comes
 from are in [MACHINES.md](MACHINES.md#will-this-engine-run-on-my-machine) and
@@ -269,20 +252,17 @@ writing your own prompts anywhere near these lanes, do the same.
 **The render stops naming a node class you have never heard of.** Two different
 causes look the same on screen, and the error text is what tells them apart:
 
-- **Somebody else's node pack.** **ComfyUI-AnimateDiff-Evolved**
-  for the AnimateDiff lanes, **ComfyUI-GGUF** for the LTX 2.3, LTX 2.5 and
-  Wan lanes, and **ComfyUI-LTXVideo** as well, specifically for the LTX 2.3
-  lanes (`ltx23_low_audio_in`, `ltx23_high_video`). The error names the pack and
-  its URL. Install it into `custom_nodes/`, restart, queue again.
+- **Somebody else's node pack.** **ComfyUI-AnimateDiff-Evolved** for the
+  AnimateDiff lanes. The error names the pack and its URL. Install it into
+  `custom_nodes/`, restart, queue again.
 - **ComfyUI itself.** The LTX 2.5 lanes and the MiniMax H3 lanes use
   node classes that ship inside ComfyUI's own code rather than a separate pack.
-  If your ComfyUI predates them, the error says to update ComfyUI -- and, on
-  rare occasions, that an older ComfyUI-GGUF needs a small patch -- instead of
+  If your ComfyUI predates them, the error says to update ComfyUI instead of
   naming anything to install. Update ComfyUI, restart, queue again.
 
 **The render stops naming a missing file.** The lane needs weights that do not
-fetch themselves. Every lane on this page except `ltx098_low_video` and the
-hosted ones is in that position. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
+fetch themselves. The LTX lanes and the hosted ones fetch their own; the HuMo
+and H3 lanes and a few image engines do not. [MACHINES.md](MACHINES.md#where-do-the-manual-weights-come-from) says which
 repository and which folder. The error names the file and never quietly
 substitutes another one.
 

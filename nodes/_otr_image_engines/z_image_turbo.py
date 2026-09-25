@@ -531,7 +531,7 @@ class ZImageTurboEngine:
         self._classes = classes
         graph = self._build_zimage_graph(params, _wb.Wire)
         try:
-            # free_after_use (the video-engine pattern, eng_wan_ti2v / eng_ltx_8gb):
+            # free_after_use (the video-engine pattern, eng_ltx_8gb):
             # the text encoder is dropped the moment its only consumer has run, so
             # the sampler starts with the encoder OFF the card. Without it an 8 GB
             # card kept the 7.7 GB Qwen3-4B encoder resident and loaded the DiT with

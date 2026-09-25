@@ -345,7 +345,7 @@ def test_segment_carries_bg_still_path():
     assert clip_segs and clip_segs[0]["bg_still_path"] == plate
     # A plain beat with no plate -> empty string (legacy byte-identical).
     m2 = {"fps": FPS, "total_target_frames": N_FRAMES, "clips": [{
-        "order": 0, "shot_id": "b001", "engine_id": "ltx_video",
+        "order": 0, "shot_id": "b001", "engine_id": "ltx25_video",
         "path": "C:/frames", "target_frame_count": N_FRAMES,
         "start_s": None, "exists": True}]}
     segs2, _ = sc.plan_timeline_segments(m2, target_total_frames=N_FRAMES, fps=FPS)

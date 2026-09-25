@@ -942,7 +942,7 @@ def _generate_single_line(text, voice_preset, model, processor, temperature=0.7,
 # WHAT IT MEASURES, and why not the PBUG's first draft. The record proposed
 # "the fraction of one-second windows whose dominant frequency sits in
 # 70-400 Hz". Calibrated on 32 real bark takes across four presets and four
-# deliveries (docs/2026-09-12-bark-output-guard/), that criterion scored
+# deliveries, that criterion scored
 # real speech anywhere from 0.00 to 1.00 -- a voice whose formants carry the
 # whole-second peak (one preset sat at 400-1,500 Hz on every line) reads as
 # "not speech" -- so it would have re-rolled good takes, which on bark costs

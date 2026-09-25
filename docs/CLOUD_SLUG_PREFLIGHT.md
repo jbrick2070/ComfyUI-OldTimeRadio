@@ -35,9 +35,6 @@ the wallet estimate (no LLM call happens).
   Transport fail = refuse (same host as the paid call). A `models/`
   prefix on the posted id is stripped before the compare, same as
   writers -- that is the Comfy-style stale-pin check for Google.
-  Component smoke (catalog only, no generate):
-  `scripts/otr_google_component_smoke.py` writes
-  `docs/2026-09-18-google-component-smoke.txt`.
 
 ## Writer slugs are the posted value
 

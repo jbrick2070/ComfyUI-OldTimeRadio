@@ -100,11 +100,11 @@ pixels cannot disagree without a raise. /32-legal on both axes (46x32, 26x32).
 L13's /64 rule does not reach this lane -- no halved stage, no fixed-x2
 upsampler -- though 1472x832 satisfies it anyway.
 
-`config/profiles/otr_w45_mesh_stage.json` said **832x480**. It now carries
-1472x832 as a DRIFT GUARD, and the variant was regenerated in the same change.
+The lane's own rig said **832x480**; it was moved to 1472x832 as a DRIFT
+GUARD in the same change.
 
 **CORRECTION, traced end to end at the start of lane 11 and folded back here:
-that profile channel is NOT dead, and the corpus wording -- "read by nothing" --
+that canvas channel is NOT dead, and the corpus wording -- "read by nothing" --
 is wrong.** `_otr_workflow_apply.py` flattens `render.canvas_w/h` into the
 node-87 `OTR_VideoDirector` widgets, and `otr_video_director.py` turns those
 widgets into `request["canvas"]`. Measured on this lane's own regenerated
@@ -123,7 +123,7 @@ this engine was enumerated, not just the obvious one -- there is exactly one,
 and the test asserts the enumeration is non-empty so G2.3 cannot go vacuous.
 
 **The "declares NOTHING" differential control moved again**, for the fourth
-time: wan_ti2v -> wan_i2v -> mesh_stage -> **still_pan**. The invariant outlives
+time, now to **still_pan**. The invariant outlives
 every occupant, so the test is edited and never deleted.
 
 ## G3 -- fixed at the shared mechanism, which took four other lanes with it

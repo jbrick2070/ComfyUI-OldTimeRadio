@@ -44,8 +44,7 @@ $KillMarkers = @(
     'otr_soak',
     'otr_sweep',
     '_otr_headless',
-    'run_video_arm_bakeoff',
-    'run_wan_ti2v_bakeoff'
+    'run_video_arm_bakeoff'
 )
 
 function Get-ResetTargets {

@@ -92,7 +92,7 @@ secrets/
 # findings are how every other pack on Comfy-Org/registry-backend's tracker
 # reads too, and a version with ANY finding stays Flagged until an admin
 # batch-approves it -- so after the next publish the move is a manual review
-# request (docs/2026-09-02-registry-manual-review-request.md), not more diffs.
+# request, not more diffs.
 scripts/*
 
 # 2026-09-01 (ship audit finding registry-flag-08): the scripts/ exclusion

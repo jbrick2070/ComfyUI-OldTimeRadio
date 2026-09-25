@@ -76,8 +76,9 @@ def test_assert_usable_passes_with_flag_and_ffmpeg(monkeypatch):
 def test_assert_usable_does_not_gate_audio_ref_pre_render(monkeypatch):
     # audio_ref is NOT gated in assert_usable (the per-beat audio is sliced at
     # render; the template carries an empty audio_ref for music/announcer beats,
-    # like eng_ltx_av). render_clip is the LOUD audio gate. (2026-06-18 soak fix:
-    # the old check aborted shot_b000_music_open before render.)
+    # like the audio-in video lanes). render_clip is the LOUD audio gate.
+    # (2026-06-18 soak fix: the old check aborted shot_b000_music_open before
+    # render.)
     if not sd.find_ffmpeg("ffmpeg"):
         pytest.skip("ffmpeg not on PATH")
     monkeypatch.setenv("OTR_ENABLE_VISUALIZER", "1")

@@ -19,22 +19,22 @@ from nodes import otr_meta_brief_image_prompt as mb
 def test_mesh_fodder_roles_from_video_policy():
     vp = {"video_models": {
         "character_video_model": {"engine_id": "mesh_stage"},
-        "announcer_video_model": {"engine_id": "ltx_video"},
+        "announcer_video_model": {"engine_id": "ltx25_video"},
         "music_video_model": {"engine_id": "mesh_stage"},
     }}
     roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
     # character rides its own slot; music rides its own slot (2026-07-03: no
     # legacy catch-all slot).
     assert roles == {"character_video", "music_visual"}
-    # announcer paired with ltx_video -> NOT fodder.
+    # announcer paired with a non-mesh engine -> NOT fodder.
     assert "announcer_visual" not in roles
 
 
 def test_mesh_fodder_roles_honor_force_engine_map(monkeypatch):
     # OTR_FORCE_ENGINE_MAP=*=mesh_stage forces mesh video at render time; the
     # image phase must ALSO see it and fork fodder, else b000 FamilyInputGaps.
-    vp = {"video_models": {"character_video_model": {"engine_id": "ltx_video"},
-                           "announcer_video_model": {"engine_id": "ltx_video"}}}
+    vp = {"video_models": {"character_video_model": {"engine_id": "ltx25_video"},
+                           "announcer_video_model": {"engine_id": "ltx25_video"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp) == []   # no force -> none
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "*=mesh_stage")
     roles = set(idir.mesh_fodder_roles_from_video_policy(vp))
@@ -43,7 +43,7 @@ def test_mesh_fodder_roles_honor_force_engine_map(monkeypatch):
 
 
 def test_mesh_fodder_roles_empty_when_no_3d():
-    vp = {"video_models": {"character_video_model": {"engine_id": "ltx_video"}}}
+    vp = {"video_models": {"character_video_model": {"engine_id": "ltx25_video"}}}
     assert idir.mesh_fodder_roles_from_video_policy(vp) == []
     # unknown/custom engine is tolerantly NOT-fodder (never raises).
     vp2 = {"video_models": {"character_video_model": {"engine_id": "not_a_real_engine"}}}
@@ -217,8 +217,8 @@ def test_music_visual_fodder_shares_one_id_across_open_and_close():
     # stills are now reserved UNCONDITIONALLY; previously each was suppressed by
     # the mere presence of its own role, so a cue carrying that role under an
     # AUTHORED id (`b005`, `b099` here -- exactly this fixture) killed the
-    # reservation meant to cover the assembler's mirrored id. That is how
-    # `fastwan_8gb` reached video dispatch with no still for
+    # reservation meant to cover the assembler's mirrored id. That is how a
+    # heavy video engine reached dispatch with no still for
     # `music_closing_001`; the opening branch carried the identical defect and
     # was fixed in the same change.
     assert beat_ids == {"b005", "b099",

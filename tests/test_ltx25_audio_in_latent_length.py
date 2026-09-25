@@ -103,10 +103,10 @@ def test_the_supplied_audio_is_frozen_not_regenerated():
     sigma 1.0 where ``sigma * noise + (1 - sigma) * latent_image`` takes
     exactly nothing from the reference.
 
-    The proven ``ltx_audio_in`` lane rides its audio latent under
-    ``SolidMask(0)`` -> ``SetLatentNoiseMask`` for this reason
-    (``eng_ltx_av.py``). Raising ``modality_scale`` cannot recover audio that
-    was already thrown away. Found by a codex review of `bed7556d`.
+    The proven prior audio-in lane rode its audio latent under
+    ``SolidMask(0)`` -> ``SetLatentNoiseMask`` for this reason. Raising
+    ``modality_scale`` cannot recover audio that was already thrown away.
+    Found by a codex review of `bed7556d`.
     """
     assert '"value": 0.0' in _GRAPH_SRC, (
         "the solid mask must be 0.0 -- a 1.0 mask regenerates the reference, "

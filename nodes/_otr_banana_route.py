@@ -8,7 +8,7 @@ the visual-safety clauses stands, and this module must never grow stakes
 rewrites (murder/blood/kill stay untouched: bananas replace the INSTRUMENTS,
 never the stakes).
 
-Contract: docs/2026-08-06-BUILD-SPEC-banana-route.md (the v3 contract -- scoped card shielding).
+Contract: the v3 banana-route spec (2026-08-06) -- scoped card shielding.
 Applied at exactly two funnels -- the still dispatcher
 (otr_image_gen_dispatcher, before the prompt content hash) and the video
 render driver (after _apply_visual_safety_prompt) -- gated by:

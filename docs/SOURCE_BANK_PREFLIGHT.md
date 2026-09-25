@@ -400,8 +400,7 @@ evidence.
 
 Removing a bank is a coder-window change with the same rigor as adding one. A bank lives in
 ~10 wired surfaces, not just `banks.json` -- rediscovering them by hand each time is the failure
-this section prevents. Playbook proven by the `499386aa` roster trim and the 2026-07-18 4-bank rip
-(`docs/2026-07-18-rip-4-banks-plan.md`).
+this section prevents. Playbook proven by the `499386aa` roster trim and the 2026-07-18 4-bank rip.
 
 **CLEAN RIP (operator law).** The removed bank leaves ZERO footprint: no half-rip items, NO
 negative/absence tests (nothing asserts a ripped id is "gone"/"unknown"/"not runnable"), and NO

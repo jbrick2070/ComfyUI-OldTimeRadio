@@ -55,8 +55,8 @@ def _is_audio_in(engine):
     it finishes "GENERATE audio but are not audio-IN lanes: nothing spoken may
     reach them, and the clause forbids voices outright". So an audio-in lane
     must NOT bind the foley formatter and must NOT be in `_JOINT_AV_ENGINES` --
-    `ltx_audio_in` has declined both since 2026-08-27 on purpose, to keep the
-    driver's proven talking register.
+    the audio-in lanes have declined both since 2026-08-27 on purpose, to keep
+    the driver's proven talking register.
 
     An earlier version of the two guards below walked every foley subclass and
     so DEMANDED the wrong thing of these lanes: a test that pins a defect is

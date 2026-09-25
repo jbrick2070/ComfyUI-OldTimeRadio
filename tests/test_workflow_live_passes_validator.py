@@ -59,11 +59,12 @@ def test_production_workflow_visual_structure_pinned():
          composite directly;
       2. the lean visual defaults: node 87 OTR_VideoDirector routes all three
          beat classes to still_flat over z_image_turbo stills. (This bullet
-         used to claim ltx_video and had been WRONG since 2026-07-07, when the
-         lean visualizer defaults landed and only the assertions were updated;
-         corrected 2026-08-15 with the still_flat change so the docstring and
-         the asserts stop disagreeing.) Heavy/video engines remain explicit
-         profile overrides, never saved-workflow defaults;
+         used to claim a heavy video engine and had been WRONG since
+         2026-07-07, when the lean visualizer defaults landed and only the
+         assertions were updated; corrected 2026-08-15 with the still_flat
+         change so the docstring and the asserts stop disagreeing.)
+         Heavy/video engines remain explicit profile overrides, never
+         saved-workflow defaults;
       3. the credits stage: node 12 OTR_SignalLostVideo's procgen feeds the
          composite base (node 84) -- it is the radio FLOOR that fills head,
          gaps and tail so the assembled length equals the master, which is the

@@ -254,10 +254,7 @@ Verified live: the 12B streamed its weights for the first time all night
 transformers' offload machinery -- "Tensor.item() cannot be called on meta
 tensors" -- which is a second, separate defect in the bnb-4bit CPU-offload
 path, handed to the dev box with finding #5. The wrap that mislabeled these
-refusals as cache errors now names the underlying exception. GGUF lane
-checked as the designed alternative (model id -> unsloth/gemma-4-12b-it-GGUF,
-native partial offload): blocked on MRKT because llama-cpp-python is not in
-this venv; installing the CUDA build on Windows is a dev-box decision.
+refusals as cache errors now names the underlying exception.
 
 FINDING #5 CONFIRMED AND PINNED (operator's viz+12B experiment, profile
 `otr_4060_viz_12b`: viz_camera on all four video roles to free the whole
@@ -377,67 +374,9 @@ reproduced here at the corrected budget.
 
 **What this settles:** the tag collision was real and is fixed, but it was
 never what stopped 12B on this card. **12B NF4 does not fit 8 GB by
-arithmetic**, and no budget change reaches that. The remaining routes are the
-explicit-dict device_map (panel Test C: loads, forwards, generates) or the GGUF
-lane -- and per -07's correction, neither the GGUF weights nor
-`llama-cpp-python` exist on this box today. E2B remains the qualified writer
-here.
-
-## Step 11 -- the GGUF route is BLOCKED ON MRKT by a CUDA-major mismatch
-
-Four shipped profiles (`8gb_lite`, `otr_8gb_ltx`, `otr_8gb_wan`,
-`otr_8gb_fastwan`) pin `unsloth/gemma-4-12b-it-GGUF` at `quant_policy: "none"`
--- i.e. the repo already asserts 12B-on-8GB via llama.cpp, which splits GPU/CPU
-natively with no meta-tensor round trip, so none of step 10's arithmetic
-applies. **None of those four has ever been run on this box.** Probed the
-cheapest disqualifying step first, before spending a ~7 GB model download:
-
-- venv python is **3.13.12**. PyPI has NO `llama-cpp-python` wheel for 3.13
-  (`--only-binary=:all:` -> "No matching distribution found").
-- The project's own CUDA wheel index DOES have one: `llama_cpp_python 0.3.35`
-  installs cleanly from `abetlen.github.io/llama-cpp-python/whl/cu124`.
-- **But it cannot load.** `RuntimeError: Failed to load shared library
-  'llama_cpp\lib\llama.dll' ... or one of its dependencies`. Cause identified
-  from the bundled files rather than guessed: the wheel ships a CUDA-**12**
-  build (`ggml-cuda.dll`, 819 MB) and NO CUDA runtime, while this box provides
-  only **`cudart64_13.dll`** (CUDA 13.0, via torch 2.12.1+cu130). Major-version
-  mismatch, not a missing DLL.
-
-**Left the box exactly as found:** the wheel is UNINSTALLED. An importable-but-
-broken `llama_cpp` is worse than an absent one -- any availability probe would
-report the lane usable and then fail at load, which is precisely the
-"documented path is not a working path" class this drill keeps catching.
-
-**The remaining step is an operator decision, not a window's:** supplying a
-CUDA 12 runtime alongside torch's 13 (e.g. `pip install nvidia-cuda-runtime-cu12`
-plus its bin dir on PATH at launch) would likely satisfy it, but it mixes CUDA
-majors inside a process that also loads torch, on the one box with a PROVEN
-shipping render path. Not worth risking that unilaterally for a writer upgrade
-when E2B already ships. **Recorded, not attempted.** The four GGUF profiles
-therefore remain UNVERIFIED on 8 GB hardware -- a real gap in the shipping
-story, and the natural next rung of the proving ground whenever the operator
-wants it.
-
-**CORRECTION TO MY OWN CONCERN, from the 5080's audit:** I flagged that those
-four GGUF profiles might be asserting `shipping` while unrun. They are all
-`draft`. The repo had already declined to make the claim, so there was nothing
-to demote and my worry was unfounded -- recorded because a concern raised in
-this log should be answered in it.
-
-**The audit's real result is worth more than my question was.** Across all 38
-`shipping` profiles: structural validation plus every named visual engine
-resolved against the live registry returns ZERO broken. The tier split:
-
-    vram_ceiling 14.5   ->  37 profiles   (the 5080's tier: the dev box)
-    vram_ceiling  6.8   ->   1 profile    otr_nvidia_8gb_haunted
-
-**Exactly one shipping profile targets hardware that is not the development
-box, and it is the one this box's leg proved.** Every other shipping claim is
-a claim about the machine it was written on. That is not dishonest -- nothing
-overstates itself -- but it is the precise shape of the ship story: the pack is
-broadly proven on a 16 GB 5080 and, as of 2026-08-29, at exactly one point on
-8 GB consumer hardware. What evidence `shipping` ought to REQUIRE is an
-operator question and has been put to him, not decided by either window.
+arithmetic**, and no budget change reaches that. The remaining route is the
+explicit-dict device_map (panel Test C: loads, forwards, generates). E2B
+remains the qualified writer here.
 
 ## OPEN ACTION -- THE REPO IS CURRENT; THE REGISTRY IS NOT. SOMEONE MUST OWN THE PUBLISH.
 
@@ -510,81 +449,6 @@ and are not comparable -- that gap is historical now, not ongoing. The
 
 **Shipping-profile tally on 8 GB hardware: 3 for 3** (haunted_local, then
 `otr_nvidia_8gb_haunted` twice), all publishing, at 55 / 38.7 / 35.4 min.
-
-**Also checked, and my DLL worry was unfounded:** `_import_llama_cpp()`
-(`_otr_gguf_backend.py:939`) wraps preparation and import in `except
-Exception`, not `except ImportError`, so the shared-library RuntimeError I hit
-is caught and converted to a `GGUFNativeConfigError` that already names
-`nvidia-cuda-runtime-cu12`/`nvidia-cublas-cu12`; and
-`validate_gemma_gguf_ready()` ATTEMPTS the import rather than probing for the
-module, so a broken binding reports `binding_available: False`. The uninstall
-was still right -- leave the box as found -- but the availability probe would
-not have lied.
-
-## Step 13 -- CORRECTION: step 11 was WRONG. The GGUF binding WORKS on MRKT.
-
-**Retracting my own finding, because the test that produced it was invalid.**
-Step 11 concluded the GGUF lane was blocked on this box by a CUDA-major
-mismatch. The CAUSE named there (no CUDA 12 runtime present) was real, but the
-EVIDENCE was worthless: I tested with a bare `import llama_cpp`, which BYPASSES
-`_prepare_windows_llama_dll_runtime()` -- the function that adds the DLL
-directories and preloads the CUDA dependencies. A bare import fails even on a
-fully working install. The 5080 hit the identical error the same way and nearly
-declared its own working lane broken, which is how the flaw surfaced.
-
-**Re-tested through OTR's REAL path (`_import_llama_cpp()`), after installing
-the two pip packages the code expects:**
-
-    pip install nvidia-cuda-runtime-cu12 nvidia-cublas-cu12
-    pip install --extra-index-url .../whl/cu124 llama-cpp-python
-
-    [loaded _otr_gguf_backend]
-    _import_llama_cpp() -> <class 'llama_cpp.llama.Llama'>
-    RESULT: GGUF BINDING USABLE
-
-**And the coexistence risk I declined to take is measured safe HERE, not just
-on Blackwell.** Tested in the RISKY order -- llama_cpp resident FIRST, then
-torch:
-
-    torch 2.12.1+cu130 cuda 13.0
-    cuda available after llama_cpp load: True
-    real CUDA matmul after llama_cpp load: OK  (1.5147e+08)
-    device: NVIDIA GeForce RTX 4060 Laptop GPU
-
-So a CUDA-12 runtime (cudart64_12 / cublas64_12, from pip) and torch's CUDA 13
-coexist in one process on Ada as well as Blackwell, and torch keeps driving the
-GPU with llama.cpp resident. Verified BEFORE anything else that the render path
-was unharmed: a clean torch CUDA matmul immediately after install. **No CUDA
-toolkit install was ever required -- it was two pip packages.**
-
-**THE ONLY REMAINING BLOCKER IS THE MODEL FILE -- a path problem plus a
-download:**
-
-    validate_gemma_gguf_ready() -> ok: False,
-      model_path: C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\
-                  gemma-4-12b-it-Q8_0.gguf
-      model_exists: False, expected_size: 12,669,646,240
-
-`C:\ComfyUI-Models` does not exist on MRKT (see the top of this log), so the
-GGUF row resolves to a root this box has never had. It needs
-`OTR_COMFYUI_MODELS_ROOT` pointed at the real tree, plus the weight itself.
-
-**WHY THIS MATTERS BEYOND ONE WRITER:** every non-NVIDIA profile in the repo
-(`otr_mac_mps`, `otr_amd16_rocm`, `otr_amd8_rocm`, `cpu_floor`) runs GGUF at
-`quant_policy: "none"`, because bitsandbytes NF4 is CUDA-only. GGUF is not a
-niche lane -- it is the entire Mac / AMD / CPU story, and its binding is now
-known-good here. Also: GGUF quantizes the embedding table while NF4 leaves it
-bf16, which is precisely the 1.88 GiB that put 12B out of reach in step 10.
-That reopens the writer question on 8 GB entirely.
-
-**Status: binding PROVEN, lane UNPROVEN.** No GGUF weight has been run on this
-box. Which model and which quant is a product decision with quality
-implications, not a bug fix, so it is surfaced rather than taken.
-
-**Blast radius (per CLAUDE.md 0B): 4060 ONLY.** No shared code, no `nodes/`, no
-profile, no workflow JSON was touched -- this is three pip installs in the MRKT
-venv and one log entry. The 5080 is provably untouched because nothing left
-this box's environment.
 
 ## THE FRICTIONLESS-INSTALL ANSWER: LOW and HIGH on 8 GB, every value measured
 
@@ -662,37 +526,6 @@ which is parked with the operator.
                     because this lane never loads the image UNET that triggered
                     PBUG-03.
 
-### HIGH -- the best an 8 GB card can do, still frictionless -- **UNPROVEN**
-
-HIGH's whole premise was a better writer in the same 8 GB. The candidate was
-`unsloth/Qwen3-4B-Instruct-2507-GGUF`: 2.33 GiB against E2B's 9.57 GB on disk,
-Apache-2.0, ungated, anonymous fetch in **46 s**, byte- and sha256-exact against
-the pinned row. Its VRAM fit is **proven with headroom on this card**:
-
-    n_ctx 8192 -> REFUSED  Free 6.94 GB < Needed 8.03 (weights 2.33 + kv 5.70)
-    n_ctx 4096 -> ADMITTED Free 6.94 GB   Needed 5.23 (weights 2.33 + kv 2.80)
-                 then llama.cpp init: n_ctx=4096, n_gpu_layers=-1  (FULL GPU)
-
-Measured `kv_gb_per_1k`: 0.684 @ 4096 and 0.696 @ 8192 -- not perfectly linear,
-so a small fixed term exists; pinned conservatively at 0.70.
-
-**And then it hard-faulted:** `OSError [WinError -1073741795]` =
-`STATUS_ILLEGAL_INSTRUCTION`, at `llama_init_from_model`, 2.58 s in. Not VRAM
-(1.7 GB headroom), not the artifact (hash-exact). **HIGH therefore has no
-proven writer today and I will not ship an unproven one as a default.**
-
-Root cause is NOT settled and my first answer was wrong. I blamed the CPU's
-lack of AVX-512; the 5080 lacks it too and works, so that is dead. The live
-suspect is the WHEEL VERSION -- and the binaries genuinely differ:
-
-    4060  llama_cpp_python 0.3.35  ggml-cuda.dll 819.27 MB  86555e1c0b39d826...  FAULTS
-    5080  llama_cpp_python 0.3.33  ggml-cuda.dll 945.37 MB  715bf1e45e9ff80e...  WORKS
-
-Identical wheel tags (`py3-none-win_amd64`), both from an index, all four DLLs
-different. The decisive test -- install 0.3.33, verify by HASH not version
-string, load through `_import_llama_cpp()` on a fresh process -- is queued
-behind live legs. **Until it resolves, HIGH's writer row is UNPROVEN.**
-
 ### WHAT I REJECTED, and why
 
 | rejected | why, measured |
@@ -703,15 +536,7 @@ behind live legs. **Until it resolves, HIGH's writer row is UNPROVEN.**
 | LTX video lane | never completed an episode on this card, two attempts |
 | `z_image_turbo` stills | survived sampling once under the legacy loader; never completed an episode |
 | `--disable-dynamic-vram` as a default | measured 30% SLOWER and unnecessary on this lane |
-| `n_ctx` 8192 for GGUF | refused on 8 GB by the backend's own physical-free preflight |
 | multi-act episodes | never run here; `--act-count 1` only |
-
-### THE HONEST HEADLINE
-
-**LOW ships today and is proven three times. HIGH does not exist yet** -- not
-because 8 GB cannot host a better writer (the fit is proven with headroom) but
-because the binding that would run it faults on this machine. One version test
-stands between HIGH being real and HIGH being a plan, and it is queued.
 
 ### QUALIFICATION of the LOW writer recommendation -- "it renders" was the only thing I measured
 
@@ -729,7 +554,6 @@ whether it can say WHICH PART of the line it is complaining about:
     google/gemma-2-2b-it           3      42%        17%        1/20  =   5%
     mistralai/Mistral-Nemo       243      83%        23%     191/1643 =  12%
     google/gemma-4-12b-it         57      19%         1%       4/122  =   3%
-    unsloth/gemma-4-12b-it-GGUF    7      24%         0%        1/14  =   7%
 
 E2B quotes the ENTIRE LINE as the offending segment in 91% of its flags; every
 other model does so 3-12% of the time. A whole-line quote is the judge asserting
@@ -847,207 +671,6 @@ The snapshot's own generation_config.json declares
 a transformers a full major line older than what this box runs. Whatever the
 cause, the parser fix stands on its own: accepting a fenced payload is correct
 defensive behaviour regardless of who emits one.
-## Step 14 -- 12B RUNS ON THE 8 GB CARD. Full 48-layer GPU offload, measured.
-
-**Operator's question ("I want to try to get 4-12b on the 4060 to work",
-"prove me wrong with an OOM but don't put an artificial gate") is ANSWERED:
-YES, and with more headroom than anyone predicted.**
-
-Artifact: `gemma-4-12b-it-Q4_K_M.gguf`, 7,121,861,440 bytes, sha256
-`0a270ec9fe6b34f4a0d33992b6135117b484ebc4766ab76b51d4ae8c457e4c42` -- fetched
-anonymously in 228 s, and independently confirmed by the 5080 against the HF
-API's LFS oid as the CURRENT upstream blob. Binding: llama-cpp-python 0.3.33,
-DLL hashes byte-identical to the 5080's working build.
-
-Measured by loading through `Llama(model_path=...)` DIRECTLY -- bypassing
-`GGUF_ROWS` because the pin is stale (PBUG-19) and would have rejected the
-file on size before llama.cpp was ever reached:
-
-    n_gpu_layers  n_ctx   load    generate   VRAM peak / 8188 MiB   result
-        35        2048    4.5 s     3.7 s          6585            PASS
-        48        2048    5.3 s     2.4 s          7841            PASS
-        48        4096    5.3 s     2.8 s          7751            PASS
-
-**ALL 48 LAYERS FIT.** llama.cpp's own line: `load_tensors: offloaded 48/49
-layers to GPU`. The estimate going in was ~35 of 48 at 2048 and ~23 at 4096;
-the truth is the whole model at 4096, which is why the operator's "no
-artificial gate" instruction mattered -- an estimate-based refusal would have
-stopped this at 8192 and never learned that 4096 with full offload is
-comfortable.
-
-**Doubling the context cost essentially nothing** (7841 -> 7751 MiB, i.e. within
-noise and slightly LOWER). That is consistent with gemma-4's hybrid/sliding KV
-cache -- its `generation_config.json` declares
-`"cache_implementation": "hybrid"` -- so KV does not scale linearly with
-n_ctx here the way it does for the Qwen row (0.70 GB per 1k, measured earlier).
-**Do not extrapolate KV cost across model families.**
-
-Generation is coherent 1950s radio narration and FASTER at full offload than at
-35 layers (2.4 s vs 3.7 s), which is the expected sign that the 13 CPU-resident
-layers were the bottleneck.
-
-**Profile shipped: `config/profiles/otr_4060_12b_gguf_offload.json`** --
-Q4_K_M, `gguf_n_ctx` 4096, `quant_policy: "none"`, default
-`n_gpu_layers` (-1 = all). **No `OTR_GGUF_N_GPU_LAYERS` override is
-needed**: the pack's existing default is already the correct setting for this
-card, which is a better outcome than a tuned value because a fresh install gets
-it without knowing anything.
-
-**WHY THIS IS THE PORTABLE ANSWER, not just a 4060 one:** bitsandbytes NF4 is
-CUDA-only, so `otr_mac_mps`, `otr_amd8_rocm`, `otr_amd16_rocm` and
-`cpu_floor` can ONLY run GGUF. This is the same artifact and the same lane
-they use. The operator asked for "preferably the one that AMD and Mac can also
-use" and that is exactly what was tested.
-
-**COST RECORDED, per the operator's own kill order:** the `scifi_news_pro`
-re-run (prompt `40d5b422`) was killed at t=740 s to free the GPU. That
-forfeits the first live test of the PBUG-16 `anchor_line_id` fix; the fix
-itself is unaffected and still needs one leg to confirm.
-
-**STILL UNPROVEN AND NOT CLAIMED:** no EPISODE has been rendered with this
-writer. Load and generate are proven; a full canonical leg is not. The 12B is
-a ~2x slower writer per token than E2B on this card and the render is long, so
-that is the next leg, not a footnote.
-## Step 15 -- the 12B EPISODE FAILED, and it qualifies my own step-14 claim
-
-**Step 14 said "12B RUNS ON THE 8 GB CARD". That is true STANDALONE and NOT
-true inside the pipeline. Recording the distinction because I stated the
-stronger version.**
-
-Leg: prompt `93d53b06`, profile `otr_4060_12b_gguf_offload` exactly as
-committed (ceiling 6.8, Q4_K_M, n_ctx 4096), `--source-bank media_archive`,
-on 219dab79 with the 5080's gate fix.
-
-**THE GATE FIX WORKS -- confirmed live**, and this is the first thing to say
-because it was the blocker I handed over:
-
-    [Selector] proceeding with caution: ctx_cap=UNKNOWN@8192, vram_fit=WARN@9.4 GB
-
-9.4 GB WARN, admitted, exactly as predicted. The old code priced it at 12.2 GB
-and FAILED it. My committed ceiling of 6.8 needed no change.
-
-**THEN THE LOAD FAILED, 27 TIMES:**
-
-    [OTR_LineComposer] generate_fn raised: ValueError:
-      Failed to load model from file: ...\gemma-4-12b-it-Q4_K_M.gguf
-    successful GGUF loads in the whole leg: 0
-    RESULT FAIL at t=640 s, node 80 (OTR_CastLock) raised ValueError
-
-**The file is not the problem** -- the identical path loaded three times in my
-standalone probe minutes earlier. **The difference is what else is resident.**
-The probe ran on an idle card (~500 MiB used). In-pipeline the ComfyUI process
-holds VRAM, and although the backend ran its eviction every time --
-`[GGUFNative] Running pre-load VRAM eviction` then `[VRAMLevers]
-free_otr_pipeline_residue ... OK: unload_llm, _unload_bark, gc.collect,
-soft_empty_cache, cuda.empty_cache` -- the load still failed on all 27
-attempts.
-
-**THE HONEST ARITHMETIC:** the model needs 7,751 MiB of an 8,188 MiB card. That
-leaves ~437 MiB. Torch's caching allocator reserves VRAM it does not return to
-the driver, and ComfyUI's own residents sit in the same process. **A model that
-needs 95% of the card cannot share a process with anything else, no matter how
-well the eviction works.** Standalone success and in-process failure are both
-correct results about different situations.
-
-**WHAT IS PROVEN, precisely:**
-  * gemma-4-12b-it Q4_K_M loads and generates on this 8 GB card in a CLEAN
-    process -- 48/48 layers, 7,751 MiB, three configurations. Unchanged.
-  * The current upstream artifact works (the 5080's re-pin evidence). Unchanged.
-  * The gate fix admits it. Confirmed live.
-  * **It does NOT currently produce an episode**, because the canonical pipeline
-    is one process and the writer wants the whole card.
-
-**WHAT WOULD MAKE IT WORK, not attempted and not mine to choose:** the writer
-would have to run OUT OF PROCESS (a separate llama.cpp process the node talks
-to), or the pipeline would have to fully release the CUDA context before the
-writer loads rather than emptying a cache inside a process that keeps its
-reservations. Both are architecture calls for the shipping surface.
-
-**Still standing for 8 GB TODAY: `gemma-4-E2B-it`** -- four published
-episodes, and the only writer that renders start to finish on this card.
-## Step 16 -- LOW_VRAM did NOT fix it, and I reported "0 failures" too early
-
-**Correcting myself before anything else: I told the operator "zero load
-failures -- your flag worked" at t=100 s. The final count was 27, the same as
-without the flag.** I sampled a counter 100 seconds into a 12-minute leg and
-reported it as an outcome. The flag was real and it did change behaviour, but
-my headline was measured before the thing it claimed to measure had happened.
-
-Leg: prompt `8ea60a1c`, `--disable-dynamic-vram --lowvram` (both required --
-`cli_args.py:170` says `--lowvram` "doesn't do anything if dynamic vram is
-enabled", and `enables_dynamic_vram()` is true by default, so the flag alone
-is a silent no-op). Boot confirmed `Set vram state to: LOW_VRAM`.
-
-**WHAT LOW_VRAM DID FIX:** the FIRST load succeeded, and the 12B actually wrote
-a script --
-
-    [OTR_LedgerScriptWriter] DONE: episode_id=pending_20260829_204814,
-      lines=6, words=59, est_minutes=1
-
-That is the first script ever written by a 12B model on this 8 GB card. It also
-logged the operator's directive working exactly as intended:
-
-    [GGUFNative] VRAM estimate EXCEEDS free: free 6.94 GB < needed 9.53 GB
-      (n_ctx=4096). PROCEEDING ANYWAY -- an OOM is the only authority here.
-
-**WHAT IT DID NOT FIX:** every SUBSEQUENT load. `OTR_LineComposer` reloads the
-writer per line and hit `ValueError: Failed to load model from file` 27 times.
-The unfilled lines left the ledger structurally incomplete, and the freeze
-cascade correctly stamped `needs_full_rerun`, so `OTR_CastLock` refused to
-render:
-
-    ValueError: OTR_CastLock: freeze cascade stamped
-      freeze_verdict='needs_full_rerun' for structural ledger corruption.
-      Refusing to cast/render.
-
-**THE REAL SHAPE OF THE PROBLEM, now that two configurations have shown it:**
-this is not "does the 12B fit" -- it fits, measured three ways at 7,751 MiB.
-It is that **the pipeline loads and unloads the writer repeatedly**, and a
-model needing 95% of the card can only win that race the first time. Once any
-allocation lands between reloads, every later load fails. LOW_VRAM raised the
-success rate from zero loads to one; it cannot make the repeated case work.
-
-**CastLock's refusal is correct behaviour and should not be "fixed".** A ledger
-with unfilled lines must not reach TTS. The defect is upstream of it.
-
-**WHAT WOULD ACTUALLY WORK, unchanged from step 15 and now better evidenced:**
-the writer must persist across calls instead of being reloaded per line, or run
-out of process. Both are architecture calls on the shipping surface. A flag
-cannot reach this.
-
-**8 GB writer answer, unchanged: `gemma-4-E2B-it`,** four published episodes.
-## Step 17 -- PBUG-11 reproduced in 16 SECONDS, in isolation
-
-The operator suggested testing the GGUF lane on its own rather than through a
-whole episode. That was the right call and it produced the cleanest artifact of
-the night. `scripts/repro_pbug11_gguf_cache.py` calls OTR's own
-`request_slot` TWICE for the same GGUF row -- no ComfyUI, no graph, no
-episode, no competing VRAM consumer, one thread:
-
-    CALL 1: OK in 12.30s   epoch 0 -> 1   LLM_CACHE.model_id = None
-    CALL 2: OK in  4.01s   epoch 1 -> 2   LLM_CACHE.model_id = None
-    both:   "[Selector] slot=creative GGUF load ... completed after this call
-             was abandoned (cache epoch advanced) -- NOT adopting"
-
-**The cache is None after two SUCCESSFUL loads.** The epoch increments once per
-call because each load bumps the very counter it then checks itself against.
-Call 2's 4.01 s is a real reload (a cache hit would be milliseconds); it is
-faster than call 1 only because the OS file cache is warm.
-
-**Why this beats another episode as evidence:** every alternative explanation
-is eliminated BY CONSTRUCTION rather than by argument. No second model to
-collide with, no pipeline stage, nothing that can time out, no concurrency, and
-`n_gpu_layers=35` deliberately chosen because it is the known-good setting on
-this card -- so an OOM cannot muddy the result. It also reproduces on the FIRST
-call of a cold process, with an empty cache and epoch 0, which kills any fix
-keyed on "has something been cached yet".
-
-16 seconds and deterministic, against ~40 minutes for a render that could fail
-for six other reasons. Handed to the 5080 so the third fix attempt can be
-verified in seconds instead of by burning a leg.
-
-**Scope, not overstated:** this reproduces the CACHING defect only. The memory
-collision is a separate, downstream consequence and is not exercised here.
 ## Step 18 -- public_domain PASSES: third bank proven on this card
 
 Leg 96b37d22, otr_nvidia_8gb_haunted, --source-bank public_domain,
@@ -1119,8 +742,7 @@ per-episode cost figure.
 
 Open on this box: PBUG-20 (news-read validator rejects real people named in
 the source) is independent of this fix and still kills scifi_news_pro legs at
-the writer. PBUG-11 (GGUF cache epoch) still blocks the 12B in-pipeline;
-repro at `scripts/repro_pbug11_gguf_cache.py`, 16 s, deterministic.
+the writer.
 
 ## Step20 -- 2026-09-05 alpha.24 GUI test fails; workflow ownership moves to MRKT
 
@@ -1156,12 +778,10 @@ tests/pyproject/registry remain5080-owned. Both reviewer CLIs available.
 Optional ComfyUI profile missing in installed older kibitz and repository;
 doctor NOT READY for that missing optional file. Four generic prompts/script
 are intact; running supplied fan-out script unchanged. Driver is Codex, not
-Claude; report actual roster. Plan docs/4060-gemma-canonical-review-plan.md.
+Claude; report actual roster.
 
 Peer substring-match theory is future fragility, not this12B cause: retry line
-is explicit. llama_cpp is isolated to selected nativeGGUF path, not the NF4
-load that failed. It is undeclared and must be checked before proposing GGUF
-as a zero-hand-step alternative; no missing-binding failure was reproduced.
+is explicit; no missing-binding failure was reproduced.
 
 Current step: complete/ground four-round review before any canonical decision.
 No source-code fix, registry publish, process restart or new render undertaken.
@@ -2500,7 +2120,7 @@ Eight relevant shipped files match development exactly. Root independently
 grounded these boundaries, the installed script inventory and obsolete README
 defaults. Generic Manager model-download offerings were NOT inspected.
 
-The whole development provisioner would install GGUF/LTXVideo/AnimateDiff
+The whole development provisioner would install LTXVideo/AnimateDiff
 unconditionally; it was considered and explicitly not invoked. Proposed
 product repair is a shipped GUI weight-only selected-engine asset plan before
 writing, using native-loader roots and all dependencies; keep no-fallback
@@ -3946,8 +3566,7 @@ or per-process peak. Full stop receipt, errors and UI captures remain private.
 Smallest is qualified by the user's ungated/automatic-download requirement:
 installed catalog Gemma2-2B has a lower2.6GB badge but is gated; E2B has a3.0GB
 badge and is the smallest labelled ungated native auto-download choice. These
-badges are estimates, not measured VRAM. The smaller Qwen GGUF artifact requires
-manual placement when absent in the installed backend, so is not substituted.
+badges are estimates, not measured VRAM.
 Normal existing-app launch13:55:01 followed full stop; existing-instance click
 and boot wait are captured. Next trial will verify actual dropdown E2B/E2B,
 one act, batch1 and zero active before one Run. No new model family or packs.
@@ -4092,49 +3711,6 @@ Still open from Step100 and unaffected by this ruling: the required audit file
 `docs/model-license-qwen--qwen3.5-4b.md` does not exist, the Qwen source change
 is uncommitted, and Qwen3.5-4B speed/VRAM/prose/JSON/episode results on this
 8GB card remain NOT TESTED.
-
-### Step 102 — September 6, ~14:45 PDT: operator leaderboard photo; Qwen 3.5 4B confirmed, but it is a GGUF ranking
-
-Operator supplied a photo of a third-party leaderboard headed "SCORED FOR NVIDIA
-RTX4060 — CREATIVE WRITING — 4K CONTEXT", top10 of 30. Transcribed exactly as
-shown; these are the leaderboard's numbers, NOT measurements taken on this box:
-
-1. Qwen3.54B (BEST) — 4.66B, Q6_K, ~56tok/s, GOOD FIT, 53
-2. Phi-4-mini3.8B — Q8_0, 49tok/s, GOOD FIT, 49.2
-3. Qwen3.535B A3B — IQ3_M, 8tok/s, NEEDS RAM OFFLOAD, 44.9
-4. Phi-4-multimodal14B — 5.57B, Q5_K_M, 50tok/s, GOOD FIT, 44.7
-5. Falcon-H1R7B — 7.59B, Q5_K_M, 40tok/s, TIGHT FIT, 43.9
-6. Qwen3.59B — 8.65B, Q4_K_M, 7tok/s, NEEDS (offload), 42.5
-
-The #1 pick AGREES with the row already added in Step100, so the model choice is
-confirmed. The material caveat is the LANE, and it is not a detail:
-
-* Every ranked entry is a GGUF quant (Q6_K, Q8_0, Q5_K_M, IQ3_M). The ~56tok/s
-  figure belongs to Qwen3.54B at Q6_K under llama.cpp.
-* OTR's curated `Qwen/Qwen3.5-4B` row is the TRANSFORMERS lane
-  (`transformers_multimodal_text_only`, ordinary NF4 policy, 8.68GB official
-  safetensors on disk). It is a DIFFERENT quantization and a different runtime,
-  so the leaderboard's tok/s is not a prediction for what this row will do here.
-  Our own throughput number remains NOT MEASURED.
-* OTR does have a native GGUF lane (`gguf_native`, in-process llama-cpp-python,
-  no Ollama/sidecar/port), but read-only inspection confirms it has NO DOWNLOAD
-  PATH: `nodes/_otr_gguf_backend.py` contains no `hf_hub_download` /
-  `snapshot_download` call, and a row resolves only against an existing file at
-  `<models_root>\LLM\converted\<subdir>\<file>.gguf` with a pinned size+sha256.
-  Provisioning goes through `scripts/hf_download_driver.py` — a HAND STEP.
-* Therefore a GGUF Qwen3.5 row would violate BOTH the operator's stated
-  requirement (ungated AND auto-download) and the campaign's zero-hand-steps
-  final gate. The transformers row is the only lane that satisfies them today.
-* Registered GGUF rows for reference, neither of them Qwen3.5:
-  `unsloth/Qwen3-4B-Instruct-2507-GGUF` and `unsloth/Qwen3-8B-GGUF`.
-  Phi-4-mini and Phi-4-multimodal are not in the catalog in any lane.
-
-DISPOSITION: proceed with the transformers `Qwen/Qwen3.5-4B` row as already
-wired, and MEASURE its actual tokens/sec on this card rather than inheriting the
-leaderboard's GGUF figure. If measured NF4 throughput lands far below ~56tok/s,
-that gap is a LANE finding — the correct follow-up would be auto-download support
-for the `gguf_native` lane, which is a source item requiring its own review, not
-a manual file drop.
 
 ### Step 103 — September 6, ~15:00 PDT: Gemma-4-12B slowness diagnosed as forced CPU spill, not a tunable
 
@@ -5442,13 +5018,13 @@ met. The 5080 and preserved source/archive trees were not touched.
 The documented provision preview and check passed. The first provision command
 used the script's fallback root (`D:\`) for node packs and `C:\ComfyUI-Models`
 for weights, which was not the active Desktop install. Re-running packs-only
-with explicit active `OTR_COMFY_ROOT` installed and verified ComfyUI-GGUF,
-ComfyUI-LTXVideo, and ComfyUI-AnimateDiff-Evolved at the pinned revisions in
+with explicit active `OTR_COMFY_ROOT` installed and verified ComfyUI-LTXVideo
+and ComfyUI-AnimateDiff-Evolved at the pinned revisions in
 the active instance. A temporary model-path addendum exposed the provisioned
 haunted weights to the active server; the addendum was removed after the run.
 
 The live machine-row dry run resolved `google/gemma-4-E2B-it`, CUDA,
-`llm_vram_ceiling_gb=6.8`, `gguf_quant=Q4_K_M`, Kokoro, MusicGen, and
+`llm_vram_ceiling_gb=6.8`, Kokoro, MusicGen, and
 `animatediff15_v3_haunted_video`, with `act_count=1`. The API queue completed
 successfully in 40m23s: 6 speech lines, 8 haunted video clips, 1,432 source
 frames at 25 fps, 1080p compositing, SDH captions, credits, and an

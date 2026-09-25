@@ -169,31 +169,16 @@ usable script format at all.
 
 ---
 
-## There is no GGUF writer, and no GGUF widgets
+## Every writer row downloads itself
 
-**This pack ships no GGUF writer.** There is no GGUF entry in either model
-dropdown.
-
-Two widgets, `gguf_n_ctx` and `gguf_quant`, used to sit further down the node
-with nothing to act on. They were REMOVED on 2026-09-24 along with the backend
-behind them, so if you are reading an older copy of this page and hunting for
-them on the node, stop -- they are gone, not hidden. A workflow you saved before
-that date still opens: the pack migrates it by widget name on load, or refuses
-it with a readable message rather than shifting your other values.
-
-This is deliberate and it is not a gap waiting to be filled. A GGUF writer row
-has no automatic download -- the file has to be fetched and placed by hand --
-so the entry would have sat in the picker looking like every other one-click
-choice and then failed for anyone who had not built the lane themselves. The
-models it used to offer were repointed to their ordinary twins, which download
-themselves, and measured faster than the GGUF lane had been anyway.
-
-If you were sent here looking for a way to turn GGUF back on: there is not one,
-and you do not need it.
-
-Video and image GGUF files are a different dropdown and they stay. Foley, mime,
-LTX, and Wan still load their `.gguf` UNets / encoders through those
-lanes. That is not a writer.
+Every local writer in both dropdowns is an ordinary safetensors model that
+downloads itself the first time a slot selects it -- there is no writer that
+has to be fetched and placed by hand. Two older writer widgets were REMOVED on
+2026-09-24 with the retired backend they configured, so if you are reading an
+older copy of this page and hunting for them on the node, stop -- they are
+gone, not hidden. A workflow you saved before that date still opens: the pack
+migrates it by widget name on load, or refuses it with a readable message
+rather than shifting your other values.
 
 ---
 

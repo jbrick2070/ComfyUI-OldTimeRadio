@@ -1,7 +1,7 @@
 """Episode language registry -- the multilingual one-switch.
 
-Plan: ``docs/multilingual-one-switch.md``. Build contract:
-``docs/2026-09-18-multilingual-notebooklm/coder_prompt_all_kokoro_day1.md``.
+Plan: ``docs/multilingual-one-switch.md``. Built per the 2026-09-18
+all-Kokoro day-1 coder prompt.
 
 ONE dropdown, ``episode_language`` on ``OTR_LedgerScriptWriter``, appended
 after ``replay_from``. All eight Kokoro rows are admitted day 1 (operator

@@ -11,7 +11,7 @@ widget / INPUT_TYPES / socket, so it needs no workflow-JSON wiring (PD3 N/A).
 It is inert unless OTR_NAME_MODE=llm_slot_fill (pool mode never builds a plan),
 so pool-mode behavior is byte-identical (C7).
 
-Frozen S0 contract (docs/2026-05-30-cast-system__go-forward-sprint-plan.md):
+Frozen S0 contract (2026-05-30 cast-system sprint plan):
 
     { "char_id": "c02", "gender": "female", "age_band": "middle_adult",
       "voice_preset": "v2/en_speaker_4", "dramatic_role": "skeptical mission doctor" }

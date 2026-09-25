@@ -68,8 +68,7 @@ this box, which is also why its low/high public marker is still provisional**",
 and the corpus told this lane to run a lab-first measurement **before** final
 naming. So the smoke came first and the rename rode on its result.
 
-`ltx_8gb` was an IDENTITY row -- public id == internal id -- like lane 6's
-`fastwan_8gb`, so it needs **no** `_LEGACY_ENGINE_ALIASES` entry on the way
+`ltx_8gb` was an IDENTITY row -- public id == internal id -- so it needs **no** `_LEGACY_ENGINE_ALIASES` entry on the way
 out: a bare internal id already passes through `resolve_engine_id` step 3, and
 adding one would imply an internal rename that never happened. The internal id
 KEEPS `8gb`; only the public surface loses it.
@@ -100,10 +99,8 @@ otherwise would repeat the exact mistake lane 5 retired the `8gb` token for.
 | Artifact | `.../lane08_ltx098_low_video/ltx_8gb_512x288_f161_default_smoke.mp4` |
 | sha256 | `65d0dc199d09d5239bc7874ec3b93bb6173bb5785047b5f20e845fee0ba834bd` |
 
-**The cheapest lane in the roster, by a distance.** Against lane 7's
-`ltx23_low_audio_in` on the same box, same boot, same day: **1.75x cheaper by
-NET** (6,835 vs 11,952 MB) and **13.8x faster per beat** (22.1 s vs 303.8 s).
-`low` is not a hedge on this lane; it is the measurement.
+**The cheapest lane in the roster, by a distance** -- 6,835 MB net and 22.1 s
+a beat. `low` is not a hedge on this lane; it is the measurement.
 
 ## Live menu check, on the running server
 

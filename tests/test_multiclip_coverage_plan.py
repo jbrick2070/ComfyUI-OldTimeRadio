@@ -824,7 +824,8 @@ def test_one_segment_plan_owing_a_trim_needs_the_coverage_executor():
     runs on the coverage path. Routed by segment count, those beats rendered
     their extra frames and kept every one, so the clip outran its own audio.
 
-    Not exotic: `ltx_audio_in` at 442 renders 449, `humo` at 100 renders 101.
+    Not exotic: an audio-conditioned lane at 442 renders 449, `humo` at 100
+    renders 101.
     """
     from nodes._otr_video_engines import coverage_plan as cp
     from nodes._otr_video_engines import frame_contract as fc

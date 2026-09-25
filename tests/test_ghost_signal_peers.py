@@ -6,9 +6,10 @@ compared against each other. The operator retired every non-haunted lane on
 has no second subject and the distinctness tests went with it.
 
 WHAT DID NOT GO IS THE DEFECT CLASS, and it is why this file still exists.
-`eng_fastwan_8gb` records it: a parent whose per-artifact constants are read from
-MODULE SCOPE instead of through ``self`` means a subclass "would have SILENTLY
-rendered with the parent's [weights] and stamped its own receipt on the result".
+A retired sibling engine recorded it: a parent whose per-artifact constants are
+read from MODULE SCOPE instead of through ``self`` means a subclass "would
+have SILENTLY rendered with the parent's [weights] and stamped its own
+receipt on the result".
 The lane that survived is a subclass TWO levels deep --
 ``GhostSignalV3HauntedEngine`` <- ``GhostSignalV3Engine`` <- ``GhostSignalEngine``
 -- which makes it the most exposed lane this repo has ever had to exactly that

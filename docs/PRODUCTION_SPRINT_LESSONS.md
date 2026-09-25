@@ -511,7 +511,7 @@ string.
 
 (2026-07-18: the Sonnet bake-off retired 4 banks; the hard part was rediscovering where a bank is
 wired, not the decision. Runbook: the Teardown protocol in `SOURCE_BANK_PREFLIGHT.md`; proven by the
-`499386aa` roster trim and `docs/2026-07-18-rip-4-banks-plan.md`. 2026-07-31: the runner table left
+`499386aa` roster trim. 2026-07-31: the runner table left
 the writer for `nodes/_otr_lane_specs.py` -- same surface, new address.)
 
 A source bank is not just its `banks.json` row -- it is wired across ~10 surfaces: the row (a

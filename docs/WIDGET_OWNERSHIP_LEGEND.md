@@ -26,7 +26,7 @@ bars remain understandable choices even when production rarely varies them.
 
 Machine and execution policy: your hardware profile (variant) pins these, and
 they move by profile edit, not per-episode. Writer creative/technical model
-and the LLM device/attention/quant/VRAM/context/GGUF policy; voice banks,
+and the LLM device/attention/quant/VRAM/context policy; voice banks,
 cast policy, voice engines/devices, theme engine; video/image role models,
 canvas/FPS, device/dtype, max render frames, upscale and final-resolution
 policy; validator generation stamps. Note the axes: a profile-owned field may

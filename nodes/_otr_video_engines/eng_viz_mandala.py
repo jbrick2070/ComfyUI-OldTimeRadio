@@ -25,10 +25,8 @@ matching pycairo NOT being added to the main requirements, so a box without
 system libcairo never breaks any OTHER engine's install). UTF-8, no BOM,
 ASCII source.
 
-Ported from the operator-approved prototype
-(docs/2026-06-30-viz-rainbow/mandala_proto.py); see
-docs/2026-06-30-viz-rainbow/MANDALA_ENGINE_PLAN.md for the full grounded spec
-(kibitz r1-r4 CONVERGED). Config (env): ``OTR_FFMPEG`` ffmpeg path.
+Ported from the operator-approved prototype; the full grounded spec
+converged over a kibitz r1-r4 arc. Config (env): ``OTR_FFMPEG`` ffmpeg path.
 """
 from __future__ import annotations
 

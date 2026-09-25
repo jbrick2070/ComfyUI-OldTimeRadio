@@ -3,8 +3,9 @@
 HuMo (audio + portrait -> talking-character video) runs IN-PROCESS in the main
 cu130 venv (its wrapper is absent in the pytest sandbox), so every test here
 exercises the COLD path: the adapter is registered + dark + gated, fails closed
-without the flag / install, tolerates SageAttention (unlike ltx_video -- HuMo's
-Sage stance is a GPU-smoke verify item, not a hard CPU gate), the portrait
+without the flag / install, tolerates SageAttention (unlike the Sage-sensitive
+LTX lanes -- HuMo's Sage stance is a GPU-smoke verify item, not a hard CPU
+gate), the portrait
 init_image aspect plan never stretches (480x832 native), the AS-3 lease is taken
 + released, the pure request / clip helpers are deterministic, and NO FALLBACKS
 (2026-07-02 rip): both HuMo tiers declare fallback_engine=None -- a failure
@@ -72,8 +73,9 @@ def test_registry_humo_selectable_no_flag(monkeypatch):
     # `.roles` whitelist, so it still passes announcer_visual/music_visual here
     # -- capability-FIT is necessary but no longer SUFFICIENT for those two
     # roles; render_driver._enforce_radio_is_host is the separate, higher-level
-    # policy gate that redirects any such real dispatch to ltx_audio_in
-    # (2026-06-30 HuMo-improve plan, "the radio is the host").
+    # policy gate that redirects any such real dispatch to the configured
+    # never-HuMo audio-in engine (2026-06-30 HuMo-improve plan, "the radio is
+    # the host").
     monkeypatch.delenv("OTR_ENABLE_HUMO", raising=False)
     for role in ("announcer_visual", "music_visual", "character_video"):
         assert vreg.assert_usable("humo", role) == "humo"
@@ -94,7 +96,7 @@ def test_humo_assert_usable_install_tolerates_sage(monkeypatch):
     eng = vreg.get_engine("humo")
     # No flag gate (registry IS the menu). SageAttention resident + ckpt absent
     # -> MISSING_MODEL (NOT INCOMPATIBLE_PROFILE: HuMo loads in-process and does
-    # not adopt ltx_video's hard BUG-070 Sage abort; its Sage tolerance is a
+    # not adopt the LTX lanes' hard BUG-070 Sage abort; its Sage tolerance is a
     # GPU-smoke verify item).
     monkeypatch.setitem(sys.modules, "sageattention",
                         types.ModuleType("sageattention"))

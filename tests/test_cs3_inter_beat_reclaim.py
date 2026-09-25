@@ -52,10 +52,10 @@ def _inter_beat(reasons):
 
 def test_reclaim_on_engine_change(monkeypatch):
     reasons = _install(monkeypatch)
-    rd.run_episode(_ledger(["humo_1.7B", "ltx_video"]))
+    rd.run_episode(_ledger(["humo_1.7B", "ltx25_video"]))
     inter = _inter_beat(reasons)
     assert len(inter) == 1
-    assert "humo_1.7B->ltx_video" in inter[0]
+    assert "humo_1.7B->ltx25_video" in inter[0]
 
 
 def test_no_reclaim_for_same_engine_run(monkeypatch):
@@ -69,10 +69,10 @@ def test_reclaim_only_at_the_boundaries(monkeypatch):
     # ltx, ltx, humo, humo, wan -> reclaim only at ltx->humo and humo->wan.
     reasons = _install(monkeypatch)
     rd.run_episode(
-        _ledger(["ltx_video", "ltx_video", "humo_1.7B", "humo_1.7B", "wan_i2v"]))
+        _ledger(["ltx25_video", "ltx25_video", "humo_1.7B", "humo_1.7B", "wan_i2v"]))
     inter = _inter_beat(reasons)
     assert len(inter) == 2
-    assert "ltx_video->humo_1.7B" in inter[0]
+    assert "ltx25_video->humo_1.7B" in inter[0]
     assert "humo_1.7B->wan_i2v" in inter[1]
 
 

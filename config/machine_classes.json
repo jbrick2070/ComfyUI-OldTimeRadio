@@ -158,7 +158,7 @@
           "episodes": 11,
           "date": "2026-09-13",
           "scope": "six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29) plus four more on 2026-09-13, one for each 8 GB graph that ships -- otr_8gb_low, otr_8gb_still, otr_8gb_video and otr_8gb_animatediff, every one an act-count-1 episode published to obs on the physical card",
-          "evidence": "docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B; docs/4060_DRILL_LOG.md 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\\output\\otr\\obs\\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)"
+          "evidence": "docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK); docs/4060_DRILL_LOG.md 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\\output\\otr\\obs\\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)"
         }
       ]
     },

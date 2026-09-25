@@ -4,7 +4,7 @@
 A runtime fallback can DEGRADE a consumer to a different family -- e.g. a
 ``character_3d`` (alpha character over a separately-rendered background) shot
 degrades to ``humo`` (an opaque, full-frame face). When that happens the
-separate background-provider group (e.g. an ``ltx_video`` group rendered ONLY to
+separate background-provider group (e.g. a text-to-video group rendered ONLY to
 sit behind the 3D alpha) is ORPHANED: nothing consumes it any more.
 
 AS-2's decision: handle that conditional-skip as a RESOLVER-PRUNE -- physically
@@ -152,7 +152,7 @@ def prune_orphaned_groups(groups: Iterable, pruned_group_ids: Iterable) -> list:
     "Orphaned provider" = a group of ``kind == "provider"`` that, after the
     removals, has no remaining group depending on it. This is the
     ``character_3d -> humo`` background case: prune the degraded consumer group,
-    then the ``ltx_video`` background it fed (nothing else consumes it) drops
+    then the background group it fed (nothing else consumes it) drops
     too. Consumers are NEVER auto-pruned (only the explicitly pruned ones go);
     only dead providers cascade.
 

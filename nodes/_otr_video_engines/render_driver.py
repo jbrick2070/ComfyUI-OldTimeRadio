@@ -246,8 +246,7 @@ BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN = frozenset({
 #: A GATE EVERY ENTRY BELOW INHERITS, found by a test rather than remembered.
 #: Each engine carries two per-engine prompt-style overlay constants describing
 #: what its model wants from a prompt. They are STORED AND DELIBERATELY NOT
-#: WIRED -- a 2026-08-17 decision recorded in
-#: `docs/2026-08-17-per-engine-prompt-style-guide-RESEARCH.md` and enforced by
+#: WIRED -- a 2026-08-17 research decision, enforced by
 #: `tests/test_prompt_style_directives.py`, which fails if the constant names
 #: appear anywhere outside their owning engine modules. Acting on them is a
 #: separate, measured change gated on a fixed-seed A/B, because the still-prompt writer does not know its target
@@ -301,10 +300,12 @@ BOOKEND_SCENE_PROMPT_KNOWN_RED = {
     "cloud_wan_i2v_audio": "cloud text-driven lane. No shipped workflow "
                            "selects it. OWED: the same fix as cloud_wan_i2v, "
                            "before any workflow selects it for a bookend.",
-    "cloud_vidu_q2_pro_fast_720p": "cloud text-driven lane. VERIFIED "
-                                   "2026-09-03: appears in ZERO profiles, "
-                                   "unreachable on a bookend today. OWED: wire "
-                                   "and fix, or retire.",
+    "cloud_vidu_q2_pro_fast_720p": "cloud text-driven lane, and the one the "
+                                   "three otr_cloud_low workflows select for "
+                                   "every visual role, bookends included -- so "
+                                   "this debt is live on shipped workflows. "
+                                   "OWED: an engine-appropriate formatter, "
+                                   "behind the probe A/B above.",
 }
 
 
@@ -3609,7 +3610,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             _stamp_prompt_meta(req, "default", _default_prompt,
                                beat=_beat_id_for_shot(shot))
     # SCENE PROMPTS for text-driven engines (gap-audit fix F2, roundtable-
-    # hardened: docs/2026-06-10-brief-downstream-gaps/). Any ltx_video /
+    # hardened, 2026-06-10). Any ltx_video /
     # wan_i2v shot with NO writer creative prompt gets a prompt grounded in
     # THE EPISODE'S OWN BRIEF -- the source of the old episodes' scenic,
     # varied opens -- finished with the brief's era tail under the LTX char
@@ -3953,7 +3954,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _jav_engine, _beat_id_for_shot(shot),
                 len(_jav_before), len(_jav_after))
     _apply_visual_safety_prompt(req, shot)
-    # THE BANANA ROUTE (docs/2026-08-06-BUILD-SPEC-banana-route.md) -- the
+    # THE BANANA ROUTE (2026-08-06 build spec) -- the
     # PINNED ordering (QA ruling 4): safety hook above -> banana transform ->
     # phrase-safe cap -> assign final text_prompt -> restamp sha8/chars and the
     # receipt WITHOUT logging -> only then the seed derivation below. The gate
@@ -5990,7 +5991,7 @@ def run_episode(ledger, *, oom_shot_id=None,
                             "prompt_chars", "init_source", "init_image",
                             "i2v_still_missing", "video_seed",
                             "visual_style", "prompt_field_source",
-                            # The banana receipt (docs/2026-08-06-BUILD-SPEC-banana-route.md)
+                            # The banana receipt (2026-08-06 build spec)
                             # -- without these the keys never reach the node-92 report.
                             "banana_route", "banana_table_version",
                             "banana_substitutions", "banana_sha256_before",

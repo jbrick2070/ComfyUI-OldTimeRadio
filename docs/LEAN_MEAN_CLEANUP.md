@@ -12,13 +12,10 @@ targets against the then-current committed HEAD.
 `ROADMAP.md` decides when this campaign starts. `docs/GO_FORWARD_PLAN.md` owns
 the work before it and only points here. This file is the sole current authority
 for cleanup scope, order, blast radius, and verification. It intentionally has
-no running changelog; git history and the dated evidence documents are the
-archive.
+no running changelog; git history is the archive.
 
 Supporting evidence:
 
-- `docs/2026-07-25-dormant-3d-rip-brief.md`
-- `docs/2026-07-25-dormant-3d-rip-judgment.md`
 - `docs/ENGINE_MATRIX.md`
 - `docs/PRODUCTION_SPRINT_LESSONS.md`
 
@@ -121,7 +118,7 @@ answer. Protect all of `mesh_stage`, `requires_mesh_fodder`, `directory_clip`,
 | Test path/stubs | **RE-GROUNDED 2026-08-23 -- the premise is FALSE at current HEAD** | Was: remove redundant root inserts. MEASURED: there is NO repo-root conftest.py and NO `pythonpath` key in pyproject.toml, so the 175 per-file `sys.path.insert` calls across the test tree are the LOAD-BEARING import mechanism, not redundancy -- removing any of them breaks collection. The runner-root proof the row demanded cannot be given because no runner root exists. A future chunk may ADD `pythonpath = ["."]` first and then sweep, as its own change with its own suite run. | No universal LLM stub and no global `sys.path` rewrite -- and now also: no insert removal before a runner root EXISTS. |
 | `scripts/` | RE-GROUND PER FILE | Build a current owner/caller/test/operational-value table before each deletion group. | Do not reuse the old bulk kill list; active bakeoff, doctor, render, soak, and recovery tools are protected until proven otherwise. |
 | Tombstone tests | RE-GROUND PER ASSERTION | Consolidate only pure duplicate absence assertions after checking they no longer guard live behavior. | No blanket deletion and no single catch-all file copied from the old plan. |
-| OpenRouter surface | GATED RE-GROUND | Cloud/OpenRouter routes already exist. Build a current coverage matrix only after draft `config/profiles/otr_cloud_lanes.json` is ratified, its matching workflow variant/recipe is emitted, and a current canonical cloud smoke passes. | Do not execute the old file-count diet, mistake a missing emitted variant for a missing cloud boundary, or cut provider behavior before qualification. |
+| OpenRouter surface | GATED RE-GROUND | Cloud/OpenRouter routes already exist. Build a current coverage matrix only after a cloud-lanes matrix row is ratified, its workflow variant/recipe is emitted, and a current canonical cloud smoke passes. | Do not execute the old file-count diet, mistake a missing emitted variant for a missing cloud boundary, or cut provider behavior before qualification. |
 
 ### 2.5 Runtime slop to repair rather than delete
 

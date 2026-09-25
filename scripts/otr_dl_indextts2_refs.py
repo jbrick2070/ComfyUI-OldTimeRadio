@@ -14,7 +14,7 @@ alba-mackenna are CC-BY (attribution), expresso / ears are CC-BY-NC (non-commerc
 NOTE on commercial use: these reference clips are CC0, so the bank stamps
 commercial_clean=true for the REFERENCE. The IndexTTS2 *model* itself is
 non-commercial (bilibili license), so effective commercial cleanliness is a
-separate gate -- see docs/2026-06-05-voice-casting-architecture/pass01_plan.md.
+separate gate (per the 2026-06-05 voice-casting architecture plan).
 
 Usage (ComfyUI venv python):
     python scripts\\otr_dl_indextts2_refs.py --dry-run        # plan only

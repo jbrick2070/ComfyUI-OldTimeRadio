@@ -317,9 +317,9 @@ def test_a_gap_row_cannot_donate_a_vram_peak_it_never_measured():
     """``vram_peak_mb`` rolls up as the WORST clip's peak, so a gap row
     carrying a stale stamp would set the episode's reported cost from work
     that produced no frame."""
-    p = _payload(_delivered("s1", "wan_ti2v", vram_peak_mb=8241),
-                 _gap("s2", "wan_ti2v", vram_peak_mb=16127))
-    assert p["by_engine"]["wan_ti2v"]["vram_peak_mb"] == 8241
+    p = _payload(_delivered("s1", "ltx25_video", vram_peak_mb=8241),
+                 _gap("s2", "ltx25_video", vram_peak_mb=16127))
+    assert p["by_engine"]["ltx25_video"]["vram_peak_mb"] == 8241
 
 
 def test_the_gap_order_is_the_manifest_order_not_a_sorted_one():
@@ -388,17 +388,17 @@ def test_an_unsanctioned_absent_clip_is_NOT_counted_as_a_sanctioned_gap():
     degraded episode -- the exact laundering the 2026-08-28 review panel
     caught in the first draft of this work.
     """
-    payload = _payload(_delivered("s1", "ltx_video"),
-                       _absent_unsanctioned("s2", "ltx_video"))
+    payload = _payload(_delivered("s1", "razzle_ltx_8gb"),
+                       _absent_unsanctioned("s2", "razzle_ltx_8gb"))
     assert payload["sanctioned_gap_count"] == 0
     assert payload["unsanctioned_gap_count"] == 1
     assert payload["unsanctioned_gap_shot_ids"] == ["s2"]
 
 
 def test_the_two_kinds_of_absence_are_counted_apart():
-    payload = _payload(_delivered("s1", "ltx_video"),
-                       _gap("s2", "ltx_video"),
-                       _absent_unsanctioned("s3", "ltx_video"))
+    payload = _payload(_delivered("s1", "razzle_ltx_8gb"),
+                       _gap("s2", "razzle_ltx_8gb"),
+                       _absent_unsanctioned("s3", "razzle_ltx_8gb"))
     assert payload["sanctioned_gap_count"] == 1
     assert payload["sanctioned_gap_shot_ids"] == ["s2"]
     assert payload["unsanctioned_gap_count"] == 1

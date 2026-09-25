@@ -71,7 +71,7 @@ def test_the_attribute_arm_classifies_the_google_lanes(engine_id):
 
 def test_a_local_engine_is_not_cloud():
     assert _RD._is_cloud_video_engine("minimax_h3_video") is False
-    assert _RD._is_cloud_video_engine("ltx_video") is False
+    assert _RD._is_cloud_video_engine("ltx25_video") is False
 
 
 def test_an_unknown_engine_is_not_cloud_and_does_not_raise():

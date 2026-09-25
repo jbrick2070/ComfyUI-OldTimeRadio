@@ -15,8 +15,8 @@ Hierarchy:
 The beat layer was added 2026-04-25 PM (schema bump l1 -> l2) so the
 HuMo clip-fill rule applies per-beat (not per-shot). This guarantees
 no clip's audio window crosses a speaker boundary, which preserves
-identity in Goal 3 daisy-chain mode (see ROADMAP Goal 3 +
-docs/2026-04-25-humo-continuity-brief.md).
+identity in Goal 3 daisy-chain mode (see ROADMAP Goal 3 and the
+2026-04-25 HuMo continuity brief).
 
 L2 scope:
   * Write-only on the producing side (the FULL pipeline).
@@ -986,7 +986,7 @@ class Ledger:
     #
     # Beat = single-speaker continuous turn within a shot. Hierarchy:
     #     Scene > Shot > Beat > Clip
-    # See ROADMAP Goal 3 + docs/2026-04-25-humo-continuity-brief.md.
+    # See ROADMAP Goal 3 and the 2026-04-25 HuMo continuity brief.
     #
     # SCHEMA_VERSION pulled live from _otr_ledger so the two ledger
     # write paths stay in lockstep. Falls back to a hardcoded l3

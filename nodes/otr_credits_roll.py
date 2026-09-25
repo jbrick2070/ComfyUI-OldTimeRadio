@@ -1,6 +1,6 @@
 """OTR_CreditsRoll -- the ONE late viewer-credits surface, rendered as the
-operator's 3-column SIGNAL LOST console (credits enrichment 2026-07-03, redesign
-per docs/2026-07-03-credits-enrichment/CREDITS_OVERLAY_BUILD_PLAN.md).
+operator's 3-column SIGNAL LOST console (credits enrichment 2026-07-03, per
+the credits-overlay build plan).
 
 WIRED 93 -> OTR_CreditsRoll (node 95) -> 85. Renders the COMPLETE viewer credits
 LATE, from post-render truth: the DURABLE production-ledger singleton (S2 stamps)

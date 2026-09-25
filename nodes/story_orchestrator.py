@@ -347,7 +347,7 @@ def _run_with_timeout(fn, timeout_sec, phase_label="LLM"):
 
 # THE BARK PRESET-HEALTH CLUSTER WAS REMOVED 2026-08-28 -- the one C2 item
 # that was NOT ordinary dead code, resolved by verdict after an adversarial
-# review (kibitz-runs/2026-08-28-c2-bark-health/).
+# kibitz review.
 #
 # `_bark_test_presets` / `_bark_health_check` / `_bark_health_check_for_cast`
 # were LIVE until the Director retirement (249bc06c, 2026-05-12) deleted

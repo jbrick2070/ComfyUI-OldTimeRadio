@@ -54,12 +54,12 @@ def test_the_ANNOUNCER_and_the_MUSIC_bookends_owe_the_RADIO():
     structurally redirects away from HuMo, for the same reason."""
     for role in ("announcer_visual", "music_visual"):
         assert mp.mouth_owner_for_beat(
-            engine_id="ltx_audio_in", family="audio_conditioned_video",
+            engine_id="ltx25_native_audio_in_16gb", family="audio_conditioned_video",
             role=role, is_character_face=False) == mp.MOUTH_RADIO
 
 
 def test_a_NON_AUDIO_beat_owes_NO_mouth():
-    """A wan_i2v scene or an ltx_video b-roll animates an image; nothing about
+    """A wan_i2v scene or an image-to-video b-roll animates an image; nothing about
     it is driven by a voice, so the ruling does not reach it. Getting this
     wrong in the other direction would demand lips on every landscape."""
     assert mp.mouth_owner_for_beat(
@@ -84,7 +84,7 @@ def test_the_UNOWNED_case_is_REFUSED_by_name():
     whether that still has lips. Before this chunk it rendered silently."""
     with pytest.raises(mp.MouthPolicyError) as caught:
         mp.mouth_owner_for_beat(
-            engine_id="ltx_audio_in", family="audio_conditioned_video",
+            engine_id="ltx25_native_audio_in_16gb", family="audio_conditioned_video",
             role="background_abstract", is_character_face=False)
     assert "NO FALLBACK" in str(caught.value)
     assert "background_abstract" in str(caught.value)
@@ -135,11 +135,12 @@ def test_a_CLOUD_AUDIO_CONDITIONED_lane_on_a_CHARACTER_beat_is_REFUSED():
 
     ``cloud_seedance_2`` / ``cloud_wan_i2v_audio`` are ``audio_conditioned_video``
     and declare no roles, so an operator CAN aim one at a character beat. When
-    they do, ``_is_character_face_beat`` says False -- only ``ltx_audio_in``
-    counts as a character face outside the HuMo family -- so the beat gets the
-    ambient master mix and a SCENE still: an audio-in engine animating an image
-    with no lips in it. That is precisely r3's unowned case, and it now refuses
-    with the remedy in the message rather than rendering a mouthless take.
+    they do, ``_is_character_face_beat`` says False -- only the engines named
+    in ``_AUDIO_IN_CHARACTER_ENGINES`` count as a character face outside the
+    HuMo family -- so the beat gets the ambient master mix and a SCENE still:
+    an audio-in engine animating an image with no lips in it. That is
+    precisely r3's unowned case, and it now refuses with the remedy in the
+    message rather than rendering a mouthless take.
 
     Recorded here because a refusal nobody wrote down is indistinguishable from
     an oversight the next time somebody reads this file."""
@@ -176,7 +177,8 @@ def test_a_CLOUD_AVATAR_on_a_character_beat_is_FINE():
 
 
 def test_cloud_ltx25_audio_in_on_a_character_beat_is_a_FACE():
-    """Cloud LTX 2.5 A2V joins ``ltx_audio_in``: a character beat owns lips."""
+    """Cloud LTX 2.5 A2V joins the other audio-in character engines: a
+    character beat owns lips."""
     from nodes._otr_video_engines.render_driver import _is_character_face_beat
 
     name = "cloud_ltx25_audio_in"
@@ -235,7 +237,7 @@ def test_THE_SET_SPEAKS_THROUGHOUT_is_a_legal_episode():
     """And it is the DEFAULT look, not a degraded one -- an episode with no
     human face at all passes without comment."""
     assert _faces([
-        _beat("b0", engine_id="ltx_audio_in",
+        _beat("b0", engine_id="ltx25_native_audio_in_16gb",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False),
         _beat("b1", engine_id="wan_i2v", family="image_to_video",
@@ -335,7 +337,7 @@ def test_a_MULTI_CLIP_CABINET_beat_is_NOT_EVEN_REPORTED():
     cut across as many clips as the beat needs, silently. Without this the
     single-take clause would nag about every long announcer beat."""
     faces, long_takes, _demoted = mp.audit_episode_faces([
-        _beat("b0", engine_id="ltx_audio_in",
+        _beat("b0", engine_id="ltx25_native_audio_in_16gb",
               family="audio_conditioned_video", role="announcer_visual",
               char_id="", face=False, multi=True),
     ])
@@ -422,7 +424,7 @@ def test_SHOTLOCK_translates_its_own_rows_and_asks_the_policy():
         {"shot_id": "shot_b1", "engine_id": "humo", "role": "character_video",
          "char_id": "ada",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 33}]}},
-        {"shot_id": "shot_b0", "engine_id": "ltx_audio_in",
+        {"shot_id": "shot_b0", "engine_id": "ltx25_native_audio_in_16gb",
          "role": "announcer_visual", "char_id": "",
          "coverage_plan": {"segments": [{"index": 0, "render_frames": 97}]}},
     ])

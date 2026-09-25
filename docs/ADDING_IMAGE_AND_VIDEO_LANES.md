@@ -175,8 +175,8 @@ your first render whether to mint at 512 and let the still lane handle framing.
 `stabilityai/*` has historically required accepting terms on the Hub. A gated
 repo breaks the auto-install property the pack depends on -- see the engine
 selection criteria in `MAC_LESSONS_LEARNED.md` section 9.
-`Comfy-Org/stable-diffusion-v1-5-archive` (2.13 GB, ordinary checkpoint loader,
-no GGUF pack) is verified ungated.
+`Comfy-Org/stable-diffusion-v1-5-archive` (2.13 GB, ordinary checkpoint loader)
+is verified ungated.
 
 ## Declaring `device_backends` honestly
 

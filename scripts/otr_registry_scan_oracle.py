@@ -7,7 +7,7 @@ lexical string match over the shipped ``node.zip``, and the registry leaks the
 exact matched pattern per finding, so we can replicate it precisely from the
 outside and iterate to zero findings WITHOUT burning version strings.
 
-Calibrated against measured verdicts (docs/2026-09-05-scanner-research/):
+Calibrated against measured verdicts from the 2026-09-05 scanner research:
 * it scans the PACKED archive -- git-tracked minus ``.comfyignore`` -- not the
   repo tree;
 * it is spelling-sensitive: it keys on the literal API text;

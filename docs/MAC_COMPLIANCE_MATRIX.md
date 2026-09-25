@@ -19,37 +19,33 @@ The sections below run in that order -- the two that can cost you a machine firs
 
 **Gated or manual weights are friction, not failure** -- recorded so you know what a first run costs, never as a mark against the lane.
 
-**Engine names here are internal ids; the `OTR_VideoDirector` dropdown shows a public label for some of them.** `ltx_8gb` is `ltx098_low_video`, `wan_ti2v` is `wan22_high_video`, `fastwan_8gb` is `wan22_high_fast`, `ltx_video` is `ltx23_high_video`, `ltx_audio_in` is `ltx23_low_audio_in`, `minimax_h3_video` / `minimax_h3_audio_in` are `h3_low_video` / `h3_low_audio_in`, `humo` / `humo_14B_169` are `humo14_high_audio_in_portrait` / `humo14_high_audio_in_wide`, `humo_1.7B` / `humo_1.7B_169` are `humo17_high_audio_in_portrait` / `humo17_high_audio_in_wide`, and `ltx25_video` / `ltx25_foley_plus` / `ltx25_mime` are `ltx25_high_video` / `ltx25_high_foley_plus` / `ltx25_high_mime`. Every other engine appears under its own name. The mapping is `nodes/_otr_shared/public_engines.py`.
+**Engine names here are internal ids; the `OTR_VideoDirector` dropdown shows a public label for some of them.** `ltx_8gb` is `ltx098_low_video`, `minimax_h3_video` / `minimax_h3_audio_in` are `h3_low_video` / `h3_low_audio_in`, `humo` / `humo_14B_169` are `humo14_high_audio_in_portrait` / `humo14_high_audio_in_wide`, `humo_1.7B` / `humo_1.7B_169` are `humo17_high_audio_in_portrait` / `humo17_high_audio_in_wide`, and `ltx25_video` / `ltx25_foley_plus` / `ltx25_mime` are `ltx25_high_video` / `ltx25_high_foley_plus` / `ltx25_high_mime`. Every other engine appears under its own name. The mapping is `nodes/_otr_shared/public_engines.py`.
 
 ## Summary
 
 | verdict | count |
 |---|---|
-| WILL NOT RUN | **5** |
-| OOM RISK @16GB | **14** |
+| WILL NOT RUN | **3** |
+| OOM RISK @16GB | **12** |
 | PROVEN | **15** |
 | LIKELY | **27** |
-| | **61 total** |
+| | **57 total** |
 
-## WILL NOT RUN (5)
+## WILL NOT RUN (3)
 
 | engine | ns | weights | ~GB | why |
 |---|---|---|---|---|
 | `ideogram4_local` | image | manual | 17.3 | It is the one local image row that declares needs_fp4_te True and requires_vendor "nvidia", and every escape from fp4 is also closed on Metal: int8_convrot would hit the same unimplemented aten::_int_mm that killed z_image's int8 build. |
-| `fastwan_8gb` | video | manual | 10.0 | **[OVERTURNED from OOM RISK @16GB]** A subclass of wan_ti2v that hoists MORE (it adds the rank-128 DMD LoRA to the session nodes) than the incumbent that already rebooted this machine. The ~21.8 GB peak the first pass quoted did not survive the re-check: the shipped set is 10.03 GB on disk (`docs/2026-08-01-fastwan-8gb-MODEL-MANIFEST.md`), which is why the size column here reads 10.0, and why size is not what decides this row. The re-check's own deciding-fact text is cut off in this file (see the overturned list); the platform fact the repo does record is the open Wan 2.1/2.2 MPS temporal-corruption defect (`docs/MAC_PORTABILITY_GUIDE.md` section 11), which reproduces on this macOS/torch generation with GGUF Q8 and fp16 alike -- a set that fits still renders garbage. |
-| `ltx_audio_in` | video | manual | 15.2 | assert_usable hard-refuses when NVML is unavailable -- a real code gate, not a registry row -- and NVML is an NVIDIA-only library, so this lane fails closed on every Mac regardless of memory. |
 | `minimax_h3_audio_in` | video | manual | 42.5 | The REF2VA sibling shares the same NVFP4 encoder and int8-convrot DiT class, adds the audio VAE for reference encoding, and totals 42.5 GB -- so both the fp4/int8 Metal blocker and the size wall apply unchanged. |
 | `minimax_h3_video` | video | manual | 41.9 | It conditions on an NVFP4-AWQ Qwen3-VL encoder and an int8-convrot DiT -- Metal executes neither fp4 nor int8 matmul (the measured z_image_turbo int8 build died on `aten::_int_mm` not implemented for MPS) -- and the three artifacts total ~41.9 GB on top of that. |
 
-**Blockers, verbatim** (the four engines the first pass put here; `fastwan_8gb` arrived through the re-check and has no verbatim string):
+**Blockers, verbatim**:
 
 * `ideogram4_local` -- nvfp4 (fp4) text encoder + dual-expert diffusion; the non-fp4 ladders are int8 (aten::_int_mm missing on MPS) or ~27 GB of fp8 — no Metal-viable precision exists
-* `ltx_audio_in` -- Hard NVML/pynvml gate in assert_usable (requires_vendor "nvidia") -- unavailable on Apple Silicon; the LTX-2.3 22B stack would also not fit 16 GB.
 * `minimax_h3_audio_in` -- NVFP4-AWQ text encoder (needs_fp4_te True) plus an int8-convrot DiT; MPS has no fp4 path and no aten::_int_mm.
 * `minimax_h3_video` -- NVFP4-AWQ text encoder (needs_fp4_te True) plus an int8-convrot DiT; MPS has no fp4 path and no aten::_int_mm.
-* `fastwan_8gb` -- not verbatim: moved here by the adversarial pass. See its row above and the overturned list; the repo-recorded blocker is the Wan MPS temporal-corruption defect in `docs/MAC_PORTABILITY_GUIDE.md` section 11.
 
-## OOM RISK @16GB (14)
+## OOM RISK @16GB (12)
 
 | engine | ns | weights | ~GB | why |
 |---|---|---|---|---|
@@ -64,8 +60,6 @@ The sections below run in that order -- the two that can cost you a machine firs
 | `ltx25_foley_plus` | video | manual | 19.6 | Registry-identical to ltx25_video -- the same five artifacts and the same graph, differing only in a two-node audio decode after the DiT is reclaimed -- so it carries the same ~19.6 GB residency and the same MPS black-video defect. |
 | `ltx25_mime` | video | manual | 19.6 | The third LTX 2.5 sibling on the same graph and the same five artifacts -- the only difference is what happens to the model's audio after the render -- so ~19.6 GB of weights against an ~11.8 GiB Metal ceiling, plus the same all-black MPS BF16 attention defect. |
 | `ltx25_video` | video | manual | 19.6 | A 10.73 GB LTX 2.5 DiT plus an 8.86 GB Gemma-4 12B encoder is ~19.6 GB, and the adapter's CPU-pinning of that encoder buys nothing on unified memory where 'cpu' is the same physical RAM; on top of that, MPS BF16 attention NaNs are reported to produce all-black LTX 2.5 output on this platform (`docs/MAC_PORTABILITY_GUIDE.md` section 11). |
-| `ltx_video` | video | manual | 14.8 | The LTX-2.3 22B stack: a 10.03 GB Q3_K_M GGUF plus an 8.80 GB Gemma-3 encoder, a 42.98 GB projection checkpoint and a 7.08 GB LoRA, with a measured per-clip peak of ~14.8 GB on a 16 GB CUDA card -- past the ~11.8 GiB Metal working-set ceiling. |
-| `wan_ti2v` | video | manual | 10.6 | It is the one lane MEASURED fatal here: it loaded fully on Metal ('WAN22 ... loaded completely; 9536.40 MB, full load: True') and then took the whole machine down, and the pack's unified-memory guard now refuses it at 10.6 GiB of weights against a 10.3 GiB accelerator budget. The Wan MPS temporal-corruption defect (`docs/MAC_PORTABILITY_GUIDE.md` section 11) applies to this lane as well. |
 | `bark` | audio | auto, ungated | 4.2 | **SUPERSEDED 2026-09-09 -- MOVED TO OOM RISK.** The earlier reading (40.8 s for 4.6 s, flatness 0.070) is real and was too short to find the problem. Run end to end it drives the process to an **18.0 GB phys_footprint on a 16 GB machine** at **11.7x realtime**, and strands **10.85 GB** that a second explicit torch.mps.empty_cache() will not return. Its live tensors never exceed 4.18 GB -- the cost is the MPS allocator ratcheting across an autoregressive loop (PBUG-20260909-03). |
 
 ## PROVEN (15)
@@ -105,7 +99,7 @@ The sections below run in that order -- the two that can cost you a machine firs
 | `cloud_seedream_2` | image | none | - | Cloud partner row with no weights and no accelerator use; mps is already declared and practical_without_gpu is True, and assert_usable only requires Pillow and an OK cloud_seedream_2 pin row — credentials, not Metal, are the gate. |
 | `google_image` | image | none | - | Direct Gemini BYO-key adapter that never invokes a local model — module scope imports no torch/PIL/SDK and assert_usable does nothing but resolve_api_key(), so the sole failure mode on an M4 is a missing Google API key, not Metal. |
 | `ideo` | image | none | - | The cloud Ideogram v4 scene-still row (node_key cloud_ideogram_v4) — not to be confused with local ideogram4_local: no weights, no fp4, mps declared, practical_without_gpu True, gated only by credentials and its partner pin row. |
-| `lumina_image` | image | manual | 10.4 | No Metal blocker exists anywhere in it — bf16 native flow model through stock UNETLoader/CLIPLoader(lumina2)/VAELoader, no fp8, no fp4, no GGUF pack, no sidecar, no device check in assert_usable — and its ~10.4 GB of concurrent artifacts sit under the ~11.8 GiB Metal ceiling. |
+| `lumina_image` | image | manual | 10.4 | No Metal blocker exists anywhere in it — bf16 native flow model through stock UNETLoader/CLIPLoader(lumina2)/VAELoader, no fp8, no fp4, no sidecar, no device check in assert_usable — and its ~10.4 GB of concurrent artifacts sit under the ~11.8 GiB Metal ceiling. |
 | `spandrel_esrgan` | upscale | manual, ungated | 0.1 | No Metal blocker exists (needs_fp8_te/needs_fp4_te both False, requires_sidecar False, required_toolchain None, plain ESRGAN/RRDBNet convs through spandrel) and the checkpoint is only 67 MB. At audit time `_resolve.resolve_device` rejected `"mps"` by name; since 2026-09-09 it accepts it, on a receipt taken on this M4 -- RealESRGAN_x2plus via spandrel 0.4.2, 128x128 -> 256x256 on `torch.device("mps")` in 0.51 s, bit-exact against the CPU path (max abs(mps - cpu) = 0.00000) -- and both upscale rows now declare mps. Still LIKELY rather than PROVEN because no episode has run its upscale stage on this Mac: the receipt is a forward pass, not a render. |
 | `cloud_kling_avatar` | video | none | - | The render happens provider-side with zero local weights; assert_usable checks only ffmpeg/ffprobe and the partner pin row, so what it measures is a Comfy Cloud credential, not Apple Silicon (it does need an image engine for its init still). |
 | `cloud_seedance_2` | video | none | - | Provider-side render, no local weights and no device gate in assert_usable; the only requirement beyond ffmpeg/ffprobe is a Comfy API key on the queue (signed-in Comfy session, or OTR_COMFY_API_KEY on the headless submitter) plus an init_image from a working image engine. |
@@ -120,11 +114,10 @@ The sections below run in that order -- the two that can cost you a machine firs
 
 ## What the adversarial pass overturned
 
-Five verdicts did not survive being attacked. Each is a case where the first reading was plausible and wrong, which is the whole reason the pass exists.
+Four verdicts did not survive being attacked. Each is a case where the first reading was plausible and wrong, which is the whole reason the pass exists.
 
 * **`chatterbox`**: WILL NOT RUN -> **LIKELY**. The blocker is packaging + an unproven registry row, not hardware, and the claim's own note concedes it ("the blocker is packaging, not Metal"). Three specific refutations. (1) THE cu128 PIN IS FALSE FOR CHATTERBOX. scripts/_otr_chatterbox_install.ps1:21 has the cu128 line COMMENTED OUT; the live step is `pip install chatterbox-tts soundfile` (line 15), vendor-neutral. *[the rest of this refutation was cut off when the file was generated]*
 * **`dia`**: WILL NOT RUN -> **LIKELY**. The blocker is a missing install, not an unconditional Metal blocker, and the device half of the claimed reason is factually wrong. (1) The cu128 pin lives in scripts/_otr_dia_install.ps1:21, a PowerShell script that also hardcodes C:\Users\jeffr\Documents\ComfyUI\dia at line 6 and therefore cannot execute on macOS at all - so it is the absence of a mac installer, not a runtime pin. *[the rest of this refutation was cut off when the file was generated]*
-* **`fastwan_8gb`**: OOM RISK @16GB -> **WILL NOT RUN**. The size half of the claim is wrong and the deciding fact is the wrong one. (1) The ~21.8 GB peak is ungrounded: docs/2026-08-01-fastwan-8gb-MODEL-MANIFEST.md:17-22 pins the shipped files in bytes -- UNET Q5_K_M 3,810,603,360 + LoRA 660,874,456 + umt5 Q5_K_M encoder 4,145,878,880 + wan2.2 VAE 1,409,400,960 = 10.03 GB on disk, and 5.88 GB peak-concurrent under the pack's own floor rule (`docs/MAC_PORTABILITY_GUIDE.md` section 2). *[the rest of this refutation was cut off when the file was generated]*
 * **`humo_1.7B_169`**: OOM RISK @16GB -> **LIKELY**. REFUTED on the deciding fact. The 12.6 GB half is fine — HuMo really is fully-resident-by-contract (motion_common.py:702-723 names HuMo explicitly as the engine that does NOT evict; eng_humo.py:604-608 "HuMo renders FULLY RESIDENT by contract (BUG-265)"), and on unified memory motion_common.py:895-897 charges every artifact, so the sum is real, not guessed. *[the rest of this refutation was cut off when the file was generated]*
 * **`indextts2`**: WILL NOT RUN -> **OOM RISK @16GB**. Both claimed blockers fail. (1) The cu128 pin is refuted by the very file cited: scripts/_otr_indextts2_install.ps1:4-6 states the stack is "python 3.10 + torch 2.8 -- cu128 on Windows/Linux, Metal-capable default wheels on Mac, selected automatically by the repo's [tool.uv.sources]"; the "+cu128" at :40-42 is explicitly scoped to "this box" (the Windows reference machine), and lines 116-120 already carry a `bin/python` fallback for the Mac venv layout. *[the rest of this refutation was cut off when the file was generated]*
 
@@ -183,7 +176,7 @@ One agent per namespace read the CAPABILITIES table and each adapter module for 
 The generator truncated every reason cell at a fixed width, so the tables above were hand-corrected on 2026-09-09. Nothing changed a verdict or a count. What changed:
 
 * Every cut-off cell was completed only where the missing words were unambiguous from the row itself or from a fact recorded elsewhere in this repo (guide section, PROD_BUG_LOG entry, code line), and otherwise ended at its last complete clause. The five overturn paragraphs are marked where their text was cut off; the reasoning in them is the adversarial agent's, not reconstructed.
-* `fastwan_8gb`: the row repeated the ~21.8 GB size claim its own refutation had rejected. It now carries the manifest figure (10.03 GB on disk) and names the platform fact the repo records for both Wan lanes. `indextts2`: the row repeated the cu128 claim its refutation had rejected; it now states what survived (size and a PowerShell installer). Both keep the verdict the audit gave them.
+* `indextts2`: the row repeated the cu128 claim its refutation had rejected; it now states what survived (size and a PowerShell installer). It keeps the verdict the audit gave it.
 * `spandrel_esrgan`: the resolver it cited as rejecting `mps` accepts it since 2026-09-09 on a bit-exact receipt; the row says so and stays LIKELY because no episode has exercised the upscale stage on this Mac.
 * The cloud section said nine cloud rows sit in LIKELY; there are nineteen, and six (not all) of the eight cloud video lanes share `_CloudVideoBase`.
 * Added the internal-id to dropdown-label mapping under "How to read a verdict", and put the legend in the order the sections use.

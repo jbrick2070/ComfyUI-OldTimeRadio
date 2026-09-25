@@ -50,7 +50,8 @@ class MouthPolicyError(ValueError):
 
 #: The families whose engines are DRIVEN BY AUDIO and therefore owe a mouth.
 #: ``audio_driven_face`` is HuMo and the cloud avatars; ``audio_conditioned_video``
-#: is the LTX-2.3 audio-in lane. Chosen by FAMILY rather than by engine id so a
+#: is the audio-in lane (LTX 2.5, H3, and the cloud audio-in engines). Chosen by
+#: FAMILY rather than by engine id so a
 #: new adapter in either family inherits the ruling instead of slipping past a
 #: list nobody remembered to edit.
 #:

@@ -31,8 +31,7 @@ explicitly when they know they're about to write -- because read-only
 consumers (e.g. ledger auto-discover) shouldn't accidentally create
 empty dirs as a side effect.
 
-OUTPUT TREE CONTRACT (operator law 2026-06-11; OH-1 -- see
-docs/2026-06-11-output-tree-consolidation/OUTPUT_TREE_CONTRACT.md):
+OUTPUT TREE CONTRACT (operator law 2026-06-11; OH-1):
 ``<output>/otr/`` contains EXACTLY two top-level entries:
 
   * ``episodes/<episode_id>/...`` -- the asset of record for everything
@@ -187,8 +186,8 @@ def comfy_output_dir() -> Path:
 def comfy_models_dir() -> Path:
     """Return the ComfyUI models root.
 
-    Used by visual backends (FLUX anchor, PuLID portrait, future
-    LTX/Wan2.1) to find pre-quantized weights without hardcoding
+    Used by visual backends (FLUX anchor, PuLID portrait, the video
+    engines) to find pre-quantized weights without hardcoding
     Jeffrey's personal path. Resolution order:
 
       1. ``OTR_MODELS_DIR`` env var (explicit override; cloud / 8GB

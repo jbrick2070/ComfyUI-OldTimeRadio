@@ -46,9 +46,8 @@ specifically to manage this.
 | engine | declares | test | why |
 | --- | --- | --- | --- |
 | **`ltx_8gb` (LTX 0.9.8)** | cuda | flip the declaration, run one shot | **Highest value.** Its adapter contains NO NVIDIA-specific code (no nvenc/nvml/triton/flash_attn/torch.cuda), drives stock ComfyUI nodes, and pins its T5 to CPU. The `[cuda]` row looks untested rather than measured |
-| `fastwan_8gb` | cuda | after LTX | 8 GB-class |
 | `animatediff15_v3_haunted_video` | cuda | after LTX | 8 GB-class, proven on the 4060 |
-| `ltx25_*`, `wan_ti2v`, `humo`, `mesh_stage`, `minimax_*` | cuda | LOW priority | large models; 16 GB unified is already the wall for a 4B writer |
+| `ltx25_*`, `humo`, `mesh_stage`, `minimax_*` | cuda | LOW priority | large models; 16 GB unified is already the wall for a 4B writer |
 
 ## Tier 3 -- sidecar TTS (expensive, least likely to pay)
 

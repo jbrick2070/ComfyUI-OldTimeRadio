@@ -140,8 +140,7 @@ structured JSON the model was trained on.
 That is a **reliability and product-fit** question, not a licensing one, and it
 sits against a hard operator directive (`CLAUDE.md`: no content guardrails on
 generated episodes) on a pipeline that adapts Macbeth and King Lear. It is being
-decided on its own merits in
-`docs/2026-08-21-ideogram4-local-still-engine/driver_anchor.md` (question D8).
+decided on its own merits.
 It is flagged here only so that a future reader does not mistake the licence
 sign-off for a sign-off on that question.
 

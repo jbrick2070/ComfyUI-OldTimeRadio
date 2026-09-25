@@ -53,8 +53,8 @@ except ImportError:  # pragma: no cover -- flat test imports
 _LOG = logging.getLogger("OTR.video.ghost_signal")
 
 # --------------------------------------------------------------------------- #
-# The frozen recipe. Every value here is pinned by the R3 contract in
-# docs/2026-08-22-GHOST-SIGNAL-CODING-PLAN.md section 4.3 and by tests.
+# The frozen recipe. Every value here is pinned by the R3 contract
+# (2026-08-22 Ghost Signal coding plan, section 4.3) and by tests.
 # --------------------------------------------------------------------------- #
 
 #: The recipe receipt string threaded into the manifest. The version lives IN
@@ -296,8 +296,8 @@ NODE_LORA = "lora"
 #: The SEVEN unique class ids the eight instances resolve to (the repeated text
 #: class is resolved once). ONE NAME PER ALIAS -- never alternative spellings.
 #: A miss stops the build; it does not activate runtime probing or a fallback
-#: node. Every one of these was confirmed live in the Phase-0 capture at
-#: docs/2026-08-22-ghost-signal-object-info.json.
+#: node. Every one of these was confirmed live in the 2026-08-22 Phase-0
+#: object_info capture.
 GHOST_NODE_CANDIDATES = {
     "checkpoint": ("CheckpointLoaderSimple",),
     "text_encode": ("CLIPTextEncode",),
@@ -1050,8 +1050,8 @@ class GhostSignalEngine(_MC.MotionEngineBase):
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
                 "%s missing required ComfyUI node class(es): %s -- Ghost Signal "
                 "needs the canonical Kosinkadink ComfyUI-AnimateDiff-Evolved "
-                "installed (see docs/2026-08-22-ghost-signal-dependency-lock"
-                ".json for the pinned commit) and a server restart"
+                "installed (pinned to the recorded 2026-08-22 commit) and a "
+                "server restart"
                 % (self.name, ", ".join(absent)), kind="video")
         return self.name
 

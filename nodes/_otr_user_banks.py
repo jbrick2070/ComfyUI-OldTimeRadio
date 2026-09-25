@@ -1,8 +1,7 @@
 """Client-authored source-bank bundles -- discovery, integrity, quarantine.
 
-Independent source banks v1 (plan of record:
-docs/2026-07-24-independent-source-banks-v1-plan.md; requirements contract:
-docs/EXTENDING_OTR.md). A client adds a 7th+ bank EQUAL to the shipped six by
+Independent source banks v1 (plan of record 2026-07-24; requirements
+contract: docs/EXTENDING_OTR.md). A client adds a 7th+ bank EQUAL to the shipped six by
 dropping a self-contained bundle under `user_packs/source_banks/<bank_id>/`
 and activating it with `otr_check bank <path> --activate`.
 

@@ -11,13 +11,13 @@ document narrates those checks and is never a substitute for running them -
 the `vram-recipe-lab/PREFLIGHT.md` rule.
 
 Every gate below exists because a real lane failed it (2026-08-09/10 audits:
-16 defects across 18 lanes; receipts in the lab repo and kibitz-runs/).
+16 defects across 18 lanes; receipts in the lab repo).
 
 ## Gate 1 -- Weights resolve
 
 - G1.1 Every declared weight resolves via `folder_paths` or a documented env
   pin; no bare `os.path.exists` on a hardcoded default.
-  *Origin: wan_i2v shipped dead - default path absent on this box.*
+  *Origin: a lane shipped dead - its default weight path was absent on this box.*
 - G1.2 A missing weight produces a NAMED `EngineUnusable` from
   `assert_usable`, never a swallowed import.
   *Origin: registry imports swallow exceptions; a lane can vanish silently.*
@@ -26,10 +26,10 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   recipe receipts, quant tokens -- must be a CLASS attribute a sibling lane can
   override, never a module-level constant read from inside a method. Two
   separate failures of this one class, and the second cost a live leg:
-  * `eng_fastwan_8gb` records the first. Its parent's recipe accessors read
-    module-level constants, so "a subclass declaring its own recipe would have
-    SILENTLY rendered with `wan_ti2v`'s and stamped a FastWan receipt on the
-    result" -- wrong pixels under a confident label.
+  * The first: a parent's recipe accessors read module-level constants, so a
+    subclass declaring its own recipe would have SILENTLY rendered with the
+    parent's and stamped its own receipt on the result -- wrong pixels under a
+    confident label.
   * The Ghost v3 peer hit the second on 2026-08-22. The module NAME had been
     moved to a class attribute; the BYTE FLOOR beside it had not. v3's official
     module is 1,673,262,583 bytes -- 144 MB smaller than the golden lane's
@@ -118,7 +118,7 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   per_recurring_subject / per_bookend_role), `aspect` (the dimensions --
   wide / portrait / inherit_engine), `required` (always / never / conditional),
   `framing_geometry` and `style_tail_policy`. That declaration must match what
-  the lane's renderer ACTUALLY consumes: `wan_ti2v` declares portrait `never`
+  the lane's renderer ACTUALLY consumes: `ltx_8gb` declares portrait `never`
   and is family `image_to_video`, so `render_driver` overrides its init with the
   per-beat scene still; `humo` declares portrait `always` and is
   `audio_driven_face`, so it keeps `init_image = portrait` and drives a mouth
@@ -216,7 +216,8 @@ Every gate below exists because a real lane failed it (2026-08-09/10 audits:
   master-freeze/stills were already paid for.*
 - G6.3 Module-scope env reads go through the guarded numeric parser; a
   malformed env var must not delete the lane from the registry.
-  *Origin: OTR_LTX_AV_RESERVE_VRAM_GB deleted ltx_audio_in, silently.*
+  *Origin: a malformed reserve-VRAM env var deleted an audio-in lane from the
+  registry, silently.*
 
 ## Gate 7 -- Public surface
 

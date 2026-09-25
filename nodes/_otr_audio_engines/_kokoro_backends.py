@@ -12,7 +12,7 @@ per_line interface, and only the synthesis call differs:
   VERBATIM (one ``KPipeline(text, voice=..., speed=..., split_pattern=r"\\n+")``
   call over the full line). The RTX 5080's 3.12 venv keeps selecting it and its
   output is byte-identical to the pre-change engine; that is proven by sha256,
-  not asserted (docs/2026-09-02-kokoro-onnx/5080_torch_baseline_sha256.json).
+  not asserted (a 5080 torch-baseline sha256 receipt from 2026-09-02).
 * ``OnnxKokoroBackend`` -- CPU by design: an 82M model runs six times faster than
   realtime on CPU, the 8 GB tier's GPU is owed to the video engine, and
   onnxruntime-gpu would drag CUDA DLL matching into a voice. The CastLock ledger's

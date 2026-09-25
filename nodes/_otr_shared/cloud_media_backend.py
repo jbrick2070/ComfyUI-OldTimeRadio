@@ -1,8 +1,7 @@
 """Cloud media control plane -- S0 of the cloud engine lanes.
 
-Build doc: docs/2026-07-02-cloud-engines/roundtable/pass04_plan.md
-(4-round roundtable, converged 2026-07-02, operator amendment: audio
-reactivity DEFAULT-ON for all video roles).
+Build plan (4-round roundtable, converged 2026-07-02, operator amendment:
+audio reactivity DEFAULT-ON for all video roles).
 
 This module is the ONE allowed process singleton for cloud media state
 (a lock-guarded session table). "No module globals" in the plan means:

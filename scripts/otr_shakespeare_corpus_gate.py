@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 """Open every vendored-translation lead and verdict it. Nothing else.
 
-Operator ruling 2026-09-18 and `docs/2026-09-18-fidelity-lane-translation/
-shakespeare_corpus_spec_v2.yaml`: *"nothing enters the pipeline on the strength
+Operator ruling 2026-09-18 and `apple/SHAKESPEARE_CORPUS_SPEC.yaml`: *"nothing enters the pipeline on the strength
 of this document"*. v1 scored 28 cells READY without opening the pages, so this
 script exists to replace claims with measurements before anyone vendors a line.
 
@@ -257,7 +256,8 @@ def main(argv: "list[str] | None" = None) -> int:
                     help="ignore the cache and re-download")
     ap.add_argument("--cache", default=os.path.join(_REPO, "tmp", "corpus_cache"))
     ap.add_argument("--report", default=os.path.join(
-        _REPO, "docs", "2026-09-18-fidelity-lane-translation", "gate_report.json"))
+        _REPO, "config", "source_banks", "shakespeare", "translations",
+        "gate_report.json"))
     args = ap.parse_args(argv)
 
     leads = load_leads(args.leads)

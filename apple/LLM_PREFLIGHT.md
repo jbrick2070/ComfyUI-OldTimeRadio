@@ -8,9 +8,8 @@ slot if you have a key. The picker is open. Nothing here locks you to Qwen.
 
 **What this pack ships:** Qwen 3.5 4B as one transformers dropdown row.
 NVIDIA bakes NF4; Mac and CPU load full. The 16 GB NVIDIA graphs still
-ship `google/gemma-4-12b-it`. There is no GGUF writer in the shipped catalog
-(`GGUF_ROWS` is empty on purpose: a transformers twin already exists). Video
-engines may still load a GGUF UNet; that is a different dropdown.
+ship `google/gemma-4-12b-it`. Every row is a safetensors model that downloads
+itself.
 
 This page is the add-your-own checklist. The models that already ship, and
 how to read their badges, are [WRITERS.md](WRITERS.md). The short binding
@@ -129,13 +128,12 @@ weights.
 `license_audit_status` on anything the canonical graph binds must be
 `mit_equivalent`.
 
-### Do not add a GGUF writer
+### A writer must ship safetensors weights
 
-The writer GGUF identity is gone from the catalog, the COMBO,
-`validate_model_id`, auto-download, and `request_slot`. Restoring
-`GGUF_ROWS` does not put one back. If you only have a GGUF on disk and no
-Hugging Face snapshot, cache a CausalLM or pick what is already in the
-list. Video-engine GGUF UNets are a different dropdown.
+The writer loads safetensors through transformers, and auto-download refuses
+an uncurated repo that carries none before fetching anything. If what you have
+on disk is some other weight format, cache a CausalLM snapshot instead or pick
+what is already in the list.
 
 ### If it becomes a shipped default
 

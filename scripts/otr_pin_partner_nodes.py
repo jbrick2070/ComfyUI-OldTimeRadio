@@ -300,7 +300,7 @@ def check_against_yaml() -> int:
 # synthetic schemas -- importing the comfy core inside pytest corrupts teardown
 # (same reason --check runs as a subprocess).
 # ---------------------------------------------------------------------------
-AUDIT_OUT_DIR = REPO_ROOT / "docs" / "2026-07-03-word-razzle"
+AUDIT_OUT_DIR = REPO_ROOT / "tmp" / "partner_pin_audit"  # working output, not tracked
 
 _STRING_TOKENS = {"STRING"}
 _IMAGE_TOKENS = {"IMAGE"}

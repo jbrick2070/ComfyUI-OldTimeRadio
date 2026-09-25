@@ -109,7 +109,7 @@ depends on this.
 ## A lesson INHERITED, not rediscovered
 
 L1 said to check the lane's weight resolution before writing code. HuMo had the
-identical defect wan_i2v died of: both `_ckpt_path` implementations stopped at
+identical defect an earlier lane died of: both `_ckpt_path` implementations stopped at
 `<comfy_root>/models/diffusion_models`, so off the ComfyUI runtime a correctly
 installed HuMo read as MISSING. Two copies of the chain were also two places to
 fix it, so there is now one resolver, `_resolve_unet`, shared by all four tiers.

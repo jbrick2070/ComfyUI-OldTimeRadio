@@ -1,6 +1,6 @@
 # Lane build lessons -- the ledger every lane reads before it writes code
 
-Companion to `2026-08-09-TRANSPLANT-PLAN-per-lane.md` (the per-lane loop) and
+Companion to the per-lane transplant plan (2026-08-09) and
 `VIDEO_LANE_PREFLIGHT.md` (the gates). This file is the MECHANISM that makes
 one-lane-at-a-time pay for itself: after every lane closes, what actually bit
 gets written here as a CHECK SOMEONE CAN RUN, and the next lane starts by
@@ -40,13 +40,11 @@ operator never installed under that name.
 `os.path.exists(<hardcoded default>)`. `folder_paths` is ComfyUI's resolver and
 knows every configured model root and category; a hardcoded default knows one.
 
-**Origin:** `wan_i2v` shipped dead. `_ckpt_path()` defaulted to
-`<comfy_root>/models/checkpoints/wan2.2-i2v.safetensors` and `_installed()` was
-a bare `os.path.exists` that never consulted `folder_paths`
-(`eng_wan_i2v.py:245-250`) -- while the installed weight on this box is
-`C:\ComfyUI-Models\diffusion_models\wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`:
-different name, different category. The sibling `eng_wan_ti2v.py:331-339` had
-the fallback all along.
+**Origin:** a now-retired local video lane shipped dead. Its weight-existence
+check defaulted to a hardcoded path and was a bare `os.path.exists` that never
+consulted `folder_paths` -- while the installed weight on this box lived under
+a different name, in a different category. A sibling engine in the same
+family had the fallback all along.
 
 **Runnable check:** preflight gate G1. Every local GPU lane declaring
 `model_requirements` must reference `folder_paths` in its weight-resolution
@@ -109,9 +107,10 @@ duration-preserving ffmpeg resample for free (`cloud_media_canonical.py:387-388`
 A local 24 fps model must convert in numpy immediately before the encoder.
 
 **Second half of the same lesson:** a contract that overstates costs GPU work
-silently. `ltx_video` declares `min_frames == max_frames == 169`, so a 50-frame
-beat renders 169 and trims 119 -- ~3.4x the work, untracked, and the 169 floor
-was measured at 1472x832 rather than the 832x480 the lane now declares.
+silently. A now-retired lane declared `min_frames == max_frames == 169`, so a
+50-frame beat rendered 169 and trimmed 119 -- ~3.4x the work, untracked, and
+the 169 floor had been measured at a canvas different from the one the lane
+later declared.
 
 **Third half:** a discrete menu derived from prose drifts. The H3 grid was
 drafted 107-345 from a problem statement's rounded "4-15 s"; the installed node
@@ -148,9 +147,8 @@ only re-hashes a stored fixture -- it proves the fixture is self-consistent,
 never that this render was silent.
 
 **Origin:** `eng_humo.py:900-902, :983-997` return no `vram_peak_mb`/`recipe`/
-`quant`/`render_canvas`; the WAN lanes already fixed this at
-`eng_wan_ti2v.py:1171-1194`. And no adapter probed its own emitted clip until
-the V-1 self-probe was made a gate.
+`quant`/`render_canvas`; other lanes had already fixed this. And no adapter
+probed its own emitted clip until the V-1 self-probe was made a gate.
 
 **Corollary that is its own rule:** ripping an LLM pass or a stamp is allowed;
 leaving a ledger field with no owner is not. Before removing anything that
@@ -283,74 +281,11 @@ still gets a line saying so.
 
 <!-- LANE LOG BEGINS -->
 
-## Lane 1 -- `wan22_high_i2v` (`wan_i2v`), closed 2026-08-11
-
-Three things bit. Two were the seed lessons doing their job; the third was new
-and is now L8.
-
-**What bit (1): the wrong default was only HALF the L1 defect.** The audit
-named `_installed()`'s bare `os.path.exists` as the killer, and it was -- but
-fixing only that still left the lane dead off the ComfyUI runtime, because the
-`folder_paths` fallback's last resort was `<comfy_root>/models/<category>` and
-this box keeps its weights in `C:\ComfyUI-Models`. Inside a live server
-`folder_paths` reads `extra_model_paths.yaml` and finds them; in the CPU suite,
-in the preflight matrix, in any tool that asks "is this lane installed?", the
-import fails and the answer was a confident, wrong NO.
-
-**Root cause:** two different questions were being answered by one probe --
-"where would the LOADER find this?" (folder_paths, live) and "is this weight on
-this box?" (any configured root, always). The second had no answer off the
-runtime.
-
-**Runnable check:** does the lane resolve its weight with NO environment
-variables set at all? Not "does it resolve on my machine", where a leftover
-`OTR_*_CKPT` export in the shell can make a dead lane look alive -- that is
-exactly what masked this: `wan_ti2v` read as installed only because an env pin
-happened to be exported, so the two WAN lanes looked different for a reason
-that had nothing to do with their code.
-
-**Fix:** `wan_shared.configured_models_root()` -- one spelling of "where this
-box keeps its models", the same override chain `_otr_models_root._models_root`
-already used -- probed LAST in `_resolve_model_file_by_token`. Additive by
-construction: every earlier probe still wins, so it can only turn a false
-negative into the truth. It fixed all three WAN lanes at once, which is why it
-belongs in shared code and why the sibling lanes got non-regression coverage in
-the same chunk without being marked green.
-
-**Twin assertion:** `tests/test_wan_i2v.py::test_a_models_root_override_is_honoured`
-(behavioural, against a staged temp root) and
-`::test_weight_resolution_does_not_stop_at_one_hardcoded_location`.
-
-**What bit (2): a declaration moves a control that other tests lean on.**
-Declaring `render_canvas` on wan_i2v broke two tests in
-`tests/test_ltx_8gb_canonical_canvas.py` that used this lane as their
-"declares NOTHING" differential control, plus the `ENGINE_MATRIX.md` drift
-gate. All three were CORRECT failures -- the suite noticing that the world
-changed. The control has now moved twice (wan_ti2v 2026-08-02, wan_i2v
-2026-08-11) and is on `mesh_stage`.
-
-**Runnable check:** before declaring a canvas, grep the test tree for the
-lane's id used as a NEGATIVE control (`declared_render_canvas(x) is None`,
-"takes the landscape default", "declares nothing"). Move the control to a lane
-that still declares nothing and say in the test WHY it moved -- the invariant
-outlives every occupant, so the test is edited, never deleted.
-
-**What bit (3):** see L8 below -- the naming table said 2.1 and the weight says
-2.2.
-
-**What did NOT bite, worth recording:** the module-scope bijection assert
-(L5's blast radius) never fired, because the rename ADDED a public row for a
-lane that had none rather than adding a second row for a lane that already had
-one. The live menu was checked on the running server after the change -- 27
-options, `wan22_high_i2v (16:9)` present -- rather than only in the CPU suite,
-since an empty ComfyUI menu is precisely the failure a CPU suite cannot see.
-
----
-
 ## Lane 2 -- `humo14_high_audio_in_wide` (`humo_14B_169`), closed 2026-08-11
 
 **THE LEDGER PAID FOR ITSELF ON THE FIRST TRY.** L1 says to check weight
-resolution before writing code. HuMo had the identical defect wan_i2v died of --
+resolution before writing code. HuMo had the identical class of defect an
+earlier, since-retired lane died of --
 both `_ckpt_path` implementations stopped at
 `<comfy_root>/models/diffusion_models`, so off the ComfyUI runtime a correctly
 installed HuMo read as MISSING. Found by reading the ledger, not by a failed
@@ -428,37 +363,26 @@ value in workflow graphs, so correcting it later costs an alias forever.
 version number is exactly the kind of detail that survives a review because it
 looks like a typo rather than a claim.
 
-**Origin (lane 1):** the transplant spec's naming table prints
-`wan21_high_i2v` for this lane. The lane is Wan **2.2**: the installed weight is
-`wan2.2_i2v_low_noise_14B_fp8_scaled.safetensors`, the frozen recipe id is
-`wan22_14b_i2v_single_pass_v1`, and `registry.CAPABILITIES` carries a dated
-comment recording that this row was corrected FROM a stale `wan2.1` label TO
-`wan2.2-i2v` once already. The same mislabel came back through a doc.
+**Origin:** a transplant spec's naming table printed a stale version number for
+a lane's public id, mismatched against the installed weight's own basename and
+frozen recipe id. The same mislabel came back through a doc.
 
-**What was done, and why it is not a spec override:** the live menu id states
-`wan22_high_i2v`, and the spec's `wan21_high_i2v` was registered as a LEGACY
-ALIAS -- so it resolved rather than being a dead end, and neither spelling ever
-stopped working. Flagged for the operator rather than silently chosen, and not
-a spec edit.
-
-**OUTCOME, 2026-08-11: ruled `wan22_high_i2v`, and the diagnosis was better
-than the lesson's.** The operator's answer was that the naming had been decided
-all along -- `wan21` was ONE mistyped version number in the spec, and every
-downstream document inherited it. So the failure mode is narrower and more
-worrying than "claims go stale": a single typo at the source of a reviewed
-corpus propagates silently through every review round, because reviewers check
-consistency WITH the spec rather than the spec against the artifact. Seven
-review passes did not catch it; reading the weight filename did. The check
-below is unchanged and is exactly the one that works -- assert the version
-token against the lane's own weight basename and recipe id, never against
-another document.
+**OUTCOME: the diagnosis was better than the lesson's.** The naming had been
+decided all along -- the stale label was ONE mistyped version number in the
+spec, and every downstream document inherited it. So the failure mode is
+narrower and more worrying than "claims go stale": a single typo at the source
+of a reviewed corpus propagates silently through every review round, because
+reviewers check consistency WITH the spec rather than the spec against the
+artifact. Seven review passes did not catch it; reading the weight filename
+did. The check below is unchanged and is exactly the one that works -- assert
+the version token against the lane's own weight basename and recipe id, never
+against another document.
 
 **Runnable check:** for every public id, assert the version token against the
 lane's own weight basename and recipe id.
 
 **Twin assertion:**
-`tests/test_public_engines.py::test_the_naming_convention_rows_state_the_model_they_load`
-and `tests/test_wan_i2v.py::test_the_lane_is_named_wan_2_2_because_that_is_what_it_loads`.
+`tests/test_public_engines.py::test_the_naming_convention_rows_state_the_model_they_load`.
 
 ## Lane 3 -- `humo17_high_audio_in_portrait` + `humo17_high_audio_in_wide`, closed 2026-08-11
 
@@ -500,51 +424,6 @@ wrote no new resolution code at all.
 
 ---
 
-## L10 -- A correct test can become a bug's bodyguard without anyone touching it
-
-**Check:** when this lane depends on a number pinned in a profile, a variant or
-a test, ask what OTHER module would have to change for that number to stop
-being true -- and assert against the SOURCE OF TRUTH rather than the literal.
-
-**Symptom:** the fix looks like the regression. Three green tests fail the
-moment the real defect is corrected, and the suite argues -- confidently, in
-triplicate -- for the broken behaviour.
-
-**Root cause:** a pin written as a correct low-VRAM launch contract goes stale
-by REMOTE action. `config/profiles/otr_8gb_wan.json` pinned
-`video.max_render_frames: 17` and its env twin `OTR_WAN_TI2V_MAX_FRAMES: "17"`;
-both were right until 2026-08-02, when `wan_ti2v` was added to
-`frame_contract.PLANNING_CAP_ENGINES` and the adapter-side compensation that
-made a render cap harmless was ripped the same day. From that moment the pin
-narrowed the PLANNER instead of the render, so every beat on that profile
-became a chain of 0.68-second segments -- while the adapter's own comment still
-claimed WAN was "deliberately excluded from PLANNING_CAP_ENGINES". The comment
-described protection that had already been deleted.
-
-**Origin (lane 5):** `test_otr_8gb_wan_profile_pins_low_vram_contract`,
-`test_applied_8gb_variant_pins_17_and_other_tiers_stay_unpinned` and
-`test_the_wan_8gb_variant_still_carries_its_real_17_frame_ceiling` all asserted
-17 as correct.
-
-**Runnable check:** a test that pins a tunable number asserts it against the
-profile or the declaration it comes from, never against a literal copy. Then
-the number can move without any test lying in either direction.
-
-**Twin assertion:** two of the three now read the profile. The third keeps its
-literal deliberately, because its whole job is to pin the SHIPPED variant, and
-that one is named so the next reader knows the difference.
-
-**Second half, same lane, different mechanism:** `workflows/variants/*.env.json`
-is **not** generated by `scripts/build_variants.py` -- only four exist and they
-are kept BY HAND. Regenerating a variant rewrites the graph and the launch
-recipe and silently leaves the env recipe behind, still carrying the old number
-and a `master_hash` for a graph that no longer exists. Guards now exist
-(`test_the_hand_kept_env_recipe_cannot_drift_from_its_profile`,
-`test_the_hand_kept_env_recipe_carries_the_LIVE_master_hash`), so the next
-mover is told rather than finding out in a leg.
-
----
-
 ## Lane 4 -- `humo14_high_audio_in_portrait` (`humo`), closed 2026-08-11
 
 The 2026-06-09 keystone, and the tier that closed the family: four tiers, four
@@ -573,9 +452,8 @@ family closed there is no HuMo tier left to hold it. `test_boot_contracts.py`
 stopped parking the invariant on whichever tier had not been done yet and now
 asserts the SCOPING RULE directly -- strip the declaration, the overrides go
 back to winning. `test_ltx_8gb_canonical_canvas.py`'s list simply lost its
-third occupant; `mesh_stage`, `ltx_audio_in`, `still_pan` and `viz_mxc_cpu`
-remain, and each leaves when its own packet runs. (Lane 7 takes `ltx_audio_in`
-out of that list -- read this paragraph before you do.)
+third occupant; `mesh_stage`, `still_pan` and `viz_mxc_cpu`
+remain, and each leaves when its own packet runs.
 
 **Cold absolute peaks, the family in a readable order** (all COLD, device
 total, ~1,890 MB idle baseline included -- state the surface, per L7):
@@ -592,64 +470,6 @@ family** -- the single most useful thing these legs say to any admission work.
 
 ---
 
-## Lane 5 -- `wan22_high_video` (`wan_ti2v`), closed 2026-08-11
-
-The lane that carried a LIVE production bug shipping since 2026-08-02, and the
-first naming MOVE. Both are written up as L10 above and in the lane receipt;
-what belongs here is the third thing.
-
-**What bit: the first MOVE, and why it could not be an ADD.** `wan_8gb` did not
-stay as a second public row -- it moved into `_LEGACY_ENGINE_ALIASES`. Two
-public ids on one internal id collapses `_INTERNAL_TO_PUBLIC` and trips the
-module-scope bijection assert at IMPORT time; because the director imports that
-module unguarded, the blast radius is most of OTR vanishing from the ComfyUI
-node menu rather than one lane failing cleanly (L5's wider shape, now proved on
-a real rename).
-
-**Runnable check:** after any rename, verify on the RUNNING server that the old
-id, the old id with its aspect suffix, the new id and the bare internal id all
-resolve, that the old id appears in NO menu option, and that the menu row count
-is unchanged. A CPU suite cannot see an empty ComfyUI menu.
-
-**What was deliberately NOT done, and is not an omission:** the cost row stays
-DISQUALIFIED per standing default Q3. `QUALIFIED_COST_ROWS` is empty and the
-manifest says "admission NOT enforced" for this lane, in words.
-
----
-
-## Lane 6 -- `wan22_high_fast` (`fastwan_8gb`), closed 2026-08-11
-
-**The healthiest lane in the audit: 7/7 green before the packet started and 7/7
-after.** Canvas declared and tested, ceiling pinned at a measured rung, LoRA
-absence already failing preflight closed, seed trap already pinned. Nothing was
-broken, so nothing was fixed. A lane that sails through is evidence the ledger
-is working, and it is recorded as such.
-
-**The one wrinkle worth a check: an IDENTITY public row needs no alias on the
-way out.** `fastwan_8gb`'s public id WAS its internal id, so unlike `wan_8gb` it
-required no `_LEGACY_ENGINE_ALIASES` entry -- a bare internal id already passes
-through `resolve_engine_id` step 3. Adding one would have been harmless but
-misleading, implying a rename that never happened at the internal level.
-
-**Runnable check:** before writing an alias row for a renamed lane, ask whether
-the OLD public id and the internal id are the same string. If they are, the
-alias is noise.
-
-**The throughput claim, proved live rather than quoted:** same boot, same still,
-same canvas, same rung as lane 5 -- 81 frames at 832x480 in **70.5 s** against
-`wan_ti2v`'s **171.2 s**, 2.43x. That is one cold pair, not a benchmark; the
-label's "~2.7x" comes from the lab and the label sells throughput and only
-throughput, with a test forbidding the words "better", "hq" and "high quality"
-in it.
-
-**An unrelated flake, recorded so the next window does not chase it:**
-`tests/test_feed_fetch_seam.py::TestBoundedRequest::test_a_redirect_into_the_private_network_is_refused`
-failed once during this lane's suite run and passes in isolation. It coincided
-with the Wi-Fi DNS drop that also killed a `git push` -- a network-dependent
-test caught in a network outage, not a code defect.
-
----
-
 ## L11 -- A derived canvas is a canvas, and the grid applies to it
 
 **Check:** does this lane compute any INTERMEDIATE resolution from the render
@@ -661,16 +481,16 @@ and derive the constraint on the FULL canvas from it.
 gate, the render succeeds, and an illegal intermediate rides underneath it. The
 suite can even PIN the illegal value as correct.
 
-**Root cause:** `assert_ltx_dims` was called on the full canvas at two sites and
-never on the derived one. Nothing in the codebase knew the derived value
-existed except the graph builder that computed it.
+**Root cause:** the LTX dims legality assert was called on the full canvas at
+two sites and never on the derived one. Nothing in the codebase knew the
+derived value existed except the graph builder that computed it.
 
-**Origin (lane 7):** `_build_graph_ia2v` halves the canvas for its stage-A
-motion pass (`base_w, base_h = width // 2, height // 2`). At the lane's live
-832x480 that is 416x240, and `240 % 32 == 16`. Three things asserted it was
-fine: the driver comment said "base 416x240 (all /32)",
-`tests/test_ltx_av_ia2v_canonical.py` pinned 416 and 240 as expected, and the
-full-canvas gate passed because 832x480 IS /32.
+**Origin:** a two-stage LTX graph halved the canvas for its stage-A motion
+pass (`base_w, base_h = width // 2, height // 2`). At a live 832x480 that is
+416x240, and `240 % 32 == 16`. Three things asserted it was fine: the driver
+comment said "base 416x240 (all /32)", the lane's own canonical test pinned
+416 and 240 as expected, and the full-canvas gate passed because 832x480 IS
+/32.
 
 **The arithmetic worth keeping, because it generalises:** stage B feeds that
 latent to `LTXVLatentUpsampler`, whose installed schema
@@ -690,10 +510,9 @@ Only 1024x576 is both /64 and exact 16:9.
 any `width`/`height` arithmetic, then assert the result against the model's
 spatial multiple at the point it is computed -- not at the caller.
 
-**Twin assertion:** `eng_ltx_av._build_graph_ia2v` now calls
-`_AVD.assert_ltx_dims(base_w, base_h, length)` on the derived latent, and
-`tests/test_ltx_av_ia2v_canonical.py::test_two_stage_topology` pins the legal
-512x288 with the reasoning in the test.
+**Twin assertion:** the two-stage graph builder now asserts LTX dims legality
+on the derived latent as well as the full canvas, with a canonical test
+pinning the legal 512x288 and the reasoning in the test.
 
 ---
 

@@ -12,7 +12,7 @@ OTR_SilentComposite's directory-clip read path (Track-3, 80ce175).
 LICENSE (E-7 gate): Hunyuan3D-2mv ships under the **Tencent Hunyuan
 community license** (threshold + territory clauses) -- ``commercial_clean``
 stays False and the engine stays SELECTABLE-NOT-DEFAULT until the operator-
-visible license record lands (docs/2026-06-11-comfy-native-3d-options/).
+visible license record lands.
 TripoSR (MIT) is the recorded license-hedge mesher; swapping meshers only
 changes the E-1 slot (the cache key carries mesher id/version).
 

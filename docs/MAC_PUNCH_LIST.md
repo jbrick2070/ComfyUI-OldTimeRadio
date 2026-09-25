@@ -14,7 +14,7 @@ closed and how, and what was deliberately left.
 **The operator accepted the final font replay and closed Mac testing.** The
 centered title and credits were explicitly signed off. Canonical replay
 published the ninth Mac video in 147.28 seconds with the current font fixes;
-the renderer is stopped. Receipt: `2026-09-10-mac-final/README.md`.
+the renderer is stopped.
 
 The new Lightning attempt failed during VAE decode with a Metal out-of-memory
 error, even though its 100 latents were below the measured 136-latent anchor.
@@ -34,7 +34,7 @@ a completed backup. The handoff receipt records that status separately.
 | A1 AnimateDiff to `otr/obs/` | **DONE** 2026-09-09 | `lightning_mac_proof_2_20260909_100958__arch__adlt__none__...mp4` on disk; 23 beats, 2,736 frames, 02:32:34 |
 | A2 `flux2_klein` to an episode | **OPEN** | one clean still, no episode; no `fkln` slug in `otr/obs/` |
 | B1 `spandrel_esrgan` rejects `"mps"` | **DONE, pending review** (uncommitted at time of writing) | bit-exact receipt, `tests/test_upscale_mps_receipt.py` |
-| B2 `_estimate_resident_gb` halves non-GGUF models | **OPEN** | `_otr_model_catalog.py:1898` still `/ 2.0` |
+| B2 `_estimate_resident_gb` halves every model regardless of quant policy | **OPEN** | `_otr_model_catalog.py:1898` still `/ 2.0` |
 | B3 `stable_audio_music` needs undeclared `stable-audio-tools` | **OPEN** | not in `requirements.txt` or `pyproject.toml` |
 | C1 5080 proof of the writer-unload fix | **OPEN -- needs the other machine** | no CUDA receipt in the log |
 | E1 panel reasoning copied into `docs/` | DONE | guide section 7.5 |
@@ -104,7 +104,7 @@ wrong Metal path (sub-quadratic attention). The change is in the working tree
 uncommitted at the time of writing; no episode has rendered through the upscale
 stage on a Mac yet.
 
-**B2. `_estimate_resident_gb` halves every non-GGUF model -- OPEN.**
+**B2. `_estimate_resident_gb` halves every model regardless of quant policy -- OPEN.**
 `nodes/_otr_model_catalog.py:1898` still divides by 2.0 regardless of
 `quant_policy`. That is why the Selector logs `vram_fit=WARN@4.3 GB` for a
 model that is 8.68 GB on disk and unquantized here -- 87% of the ceiling
@@ -151,7 +151,7 @@ bonus, and on CUDA the win is ~25-40 s per avoided reload rather than survival.
 * **PBUG-20260908-05** -- the attention forcing on MPS costs ~1.15x end to end,
   not the ~14x first claimed. The forcing stays; no scoped fix is worth doing.
 * **The engines nobody has run here** -- `humo_1.7B`, `humo_1.7B_169`,
-  `lumina_image`, `flux_gen1`, `mesh_stage`, `ltx_video`, the three `ltx25_*`,
+  `lumina_image`, `flux_gen1`, `mesh_stage`, the three `ltx25_*`,
   both `minimax_*`, and the rest of the matrix's LIKELY and OOM RISK rows.
 
   **EVERY "UNSAFE AT 16 GB" JUDGEMENT ON THOSE IS A SIZE ESTIMATE, NOT A
@@ -181,10 +181,10 @@ bonus, and on CUDA the win is ~25-40 s per avoided reload rather than survival.
 
 ## E. Loose ends with a deadline
 
-**E1. The panel reasoning lives only on this Mac -- DONE.** `kibitz-runs/` is
-gitignored, so the r1 synthesis that established why the AnimateDiff clip cannot
-be capped would have disappeared when the rental ends. The durable part is guide
-section 7.5.
+**E1. The panel reasoning lives only on this Mac -- DONE.** The kibitz panel's
+output directory is gitignored, so the r1 synthesis that established why the
+AnimateDiff clip cannot be capped would have disappeared when the rental ends.
+The durable part is guide section 7.5.
 
 **E2. A six-commit codex review never returned** after two hours. Dropped;
 cursor and Sonnet covered that range and their corrections are already folded

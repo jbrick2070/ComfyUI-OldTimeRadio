@@ -11,9 +11,9 @@ the S1 audit test proves the invariant
 ``registry.CAPABILITIES.keys() == all_engine_names() == valid-plan owners``.
 S2 wires the plan into the seven consumers atomically.
 
-Spec of record:
-``docs/2026-07-25-still-plans-locked-build-spec.md`` (locked @ ``84328aa1``),
-section 5 (schema) and section 6 (declaration and audit).
+Spec of record: the 2026-07-25 still-plans locked build spec
+(locked @ ``84328aa1``), section 5 (schema) and section 6 (declaration and
+audit).
 
 Two doctrine points from the spec that shape this module:
 
@@ -113,11 +113,11 @@ VALID_ASPECTS = frozenset((
 #: ``when_ltx_i2v_enabled`` WAS REMOVED 2026-08-28 and must not come back. It
 #: was an ad-hoc token invented for exactly one engine, gating on the
 #: ``OTR_ENABLE_LTX_I2V`` env flag, and at mint time it already behaved
-#: identically to ``always`` -- nothing branched on it. ltx_video now declares
-#: ``required="always"`` like every sibling, and the flag is retired under the
-#: operator ruling "no switches nor flags, all video models request and ingest
-#: stills". A closed enum with a dead member invites a future declaration
-#: nothing honours.
+#: identically to ``always`` -- nothing branched on it. That engine now
+#: declares ``required="always"`` like every sibling, and the flag is retired
+#: under the operator ruling "no switches nor flags, all video models request
+#: and ingest stills". A closed enum with a dead member invites a future
+#: declaration nothing honours.
 REQUIRED_ALWAYS = "always"
 REQUIRED_NEVER = "never"
 REQUIRED_WHEN_ENGINE_TALKING = "when_engine_talking"

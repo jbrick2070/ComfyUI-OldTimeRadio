@@ -174,11 +174,8 @@ partner stack, a Mac device policy.
 **The source of truth is one file: `config/workflow_matrix.json`.** Each row is
 one workflow. Edit that file. Do not hand-edit anything in
 `workflows/variants/` -- those JSON files and their `.launch.md` recipes are
-generated, and the next rebuild silently undoes you. Do not add a
-`config/experiments/<id>.json` for something you intend to ship -- the matrix
-is consulted first. That folder is the lab rigs (`otr_soak_*` and friends)
-that `--profile` loads on the canonical runner. A new shipping graph is a
-matrix row only.
+generated, and the next rebuild silently undoes you. A new shipping graph is a
+matrix row only -- there is no second place a workflow can be defined.
 
 This wants the git clone. `scripts/` is not in a registry install.
 
@@ -265,8 +262,7 @@ Set `"ships"` false (or delete the row), **and delete** the matching files in
 `workflows/variants/` (the `.json` and `.launch.md` that `--all` emitted for
 that id). Leaving the files is not enough to fail `--check`: a row that still
 exists -- even with `"ships"` false -- is what `load_profile` reads, so the
-leftover graph regenerates cleanly. If you delete the row, also delete any
-`config/experiments/<id>.json` or the same pass falls through to that file.
+leftover graph regenerates cleanly.
 
 ### The proof
 
@@ -283,8 +279,7 @@ This is not an engine. There is no `@register` and no adapter file.
 Gemma, use a cloud slot. That is not the same as what the pack ships.
 
 **What the pack ships:** Qwen 3.5 as one transformers dropdown row
-(NVIDIA NF4, Mac / CPU full). There is no GGUF writer row; a transformers
-twin already exists.
+(NVIDIA NF4, Mac / CPU full).
 
 The full checklist -- on-machine cache path, catalog row, the gates -- is
 [LLM_PREFLIGHT.md](LLM_PREFLIGHT.md). Which models already ship, and how to

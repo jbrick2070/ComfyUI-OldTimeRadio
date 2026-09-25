@@ -105,7 +105,7 @@ def test_leaves_everything_else_byte_identical(raw):
 # --------------------------------------------------------------------------- #
 # SHAPE 4 -- the whole-line wrapper (2026-08-03, live)
 #
-# The 30-word sweep lost `ltx_audio_in` and `viz_mxc_cpu` in the writer to a
+# The 30-word sweep lost an audio-in lane and `viz_mxc_cpu` in the writer to a
 # model that wrapped its structure end to end: `**SCENE 5: The vault**`,
 # `**TITLE: ...**`, `**MUSIC**`, `**CODA**`. Shapes 1-3 all miss it -- the body
 # opens with a space after the colon and the label does not end with the marker

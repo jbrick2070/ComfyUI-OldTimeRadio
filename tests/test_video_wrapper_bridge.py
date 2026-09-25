@@ -1,6 +1,6 @@
 """CPU tests for the shared in-process wrapper bridge (A-ship forward mechanics).
 
-The in-process motion forwards (humo / ltx_video / wan_i2v) and the radio floor
+The in-process motion forwards (humo / ltx_8gb / wan_i2v) and the radio floor
 all run through nodes/_otr_video_engines/wrapper_bridge: node-class resolution,
 the generic declarative graph executor, the 4n+1 quantizer, IMAGE->uint8, and the
 silent bt709 / yuv420p ffmpeg encode. Every mechanic is proven here on the CPU box

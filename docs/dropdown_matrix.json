@@ -148,14 +148,6 @@
       },
       "size_gb": 6.0
     },
-    "fastwan_8gb": {
-      "memory": {
-        "mac16": "no",
-        "nv16": "fits",
-        "nv8": "oom"
-      },
-      "size_gb": 10.0
-    },
     "flux_gen1": {
       "memory": {
         "mac16": "oom",
@@ -287,22 +279,6 @@
         "nv8": "proven"
       },
       "size_gb": 9.1
-    },
-    "ltx_audio_in": {
-      "memory": {
-        "mac16": "no",
-        "nv16": "fits",
-        "nv8": "oom"
-      },
-      "size_gb": 15.2
-    },
-    "ltx_video": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "oom",
-        "nv8": "oom"
-      },
-      "size_gb": 14.8
     },
     "lumina_image": {
       "memory": {
@@ -469,14 +445,6 @@
         "nv8": "fits"
       },
       "size_gb": null
-    },
-    "wan_ti2v": {
-      "memory": {
-        "mac16": "oom",
-        "nv16": "proven",
-        "nv8": "no"
-      },
-      "size_gb": 10.6
     },
     "z_image_turbo": {
       "memory": {

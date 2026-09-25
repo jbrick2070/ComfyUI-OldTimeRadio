@@ -72,9 +72,9 @@ _RETIRED_IDS = frozenset({
     "still_parallax",
     # The 14B local Wan i2v lane, RETIRED 2026-08-26 (operator: "rip the large
     # wan we don't need"). 19.82 GiB of weights against a 14.5 GiB target -- it
-    # only ever ran by offloading continuously. NOT the same lane as the 5B
-    # `wan_ti2v`, which is live and stays live; the ids are one letter apart and
-    # that is the whole hazard.
+    # only ever ran by offloading continuously. NOT the same lane as the
+    # smaller 5B ti2v lane (a separate engine, since removed on its own
+    # terms); the ids were one letter apart and that was the whole hazard.
     "wan_i2v",
     # Cloud Pixverse word-card lane, RETIRED 2026-09-17. Adapter deleted;
     # local razzle_ltx_8gb stays. The id must remain unregistered and

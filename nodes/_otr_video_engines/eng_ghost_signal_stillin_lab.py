@@ -1,8 +1,7 @@
 """``animatediff15_v3_stillin_lab_video`` -- the haunted v3 lane started from a STILL.
 
-THE STILL-IN LAB PEER (campaign item 2, 2026-09-02; design arc in
-``docs/2026-09-02-animatediff-ledger-experiments/still-in-peer/driver_anchor.md``,
-sections 10 + 12 are the contract this file implements). A NEW engine id beside
+THE STILL-IN LAB PEER (campaign item 2, 2026-09-02; the design arc's
+driver anchor, sections 10 + 12, is the contract this file implements). A NEW engine id beside
 the shipping ``animatediff15_v3_haunted_video``, subclassing it and touching
 nothing in it. Same recipe (v3 motion module + adapter, 20 / 8.0 / euler /
 normal, 512x288 hold-2, the static 16/4 pyramid, the live negative), one change:

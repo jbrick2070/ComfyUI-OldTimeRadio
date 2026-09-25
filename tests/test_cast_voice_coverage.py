@@ -80,7 +80,7 @@ def test_STAGE_DIRECTION_ONLY_is_not_a_voice():
 
 
 def test_the_REAL_failing_production_ledger_is_refused_BY_NAME():
-    """The live artifact that cost the ltx_video leg, replayed through the gate.
+    """The live artifact that cost a video leg, replayed through the gate.
 
     Its five c03 rows carry `tts_skip_reason='empty_spoken_text_at_ledger_cleanup'`
     -- the cleanup already emptied them -- so the gate must fail it and must

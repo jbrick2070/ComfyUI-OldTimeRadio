@@ -584,8 +584,7 @@ CAPABILITIES = {
     #
     # NO COST ROW EXISTS FOR THIS LANE. The operator declined a measurement
     # campaign, so it is recorded admission-unenforced in the evidence manifest
-    # and makes no VRAM-fit claim -- see docs/2026-08-22-ghost-signal-
-    # dependency-lock.json.
+    # and makes no VRAM-fit claim.
     "animatediff15_v3_haunted_video": {
         "required_toolchain": None, "requires_sidecar": False,
         # MPS NOT CLAIMED (2026-09-08). The adapter itself has zero

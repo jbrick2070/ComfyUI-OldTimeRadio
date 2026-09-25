@@ -46,7 +46,7 @@ honest -- the same reasoning `google_veo_video` records for its own endpoints.
 
 ### 2. The mouth policy, which fails at PLAN time when it is not extended
 
-`render_driver._is_character_face_beat` tested `engine_id == "ltx_audio_in"` by
+`render_driver._is_character_face_beat` tested a single engine id by
 EQUALITY. It is now a membership test over `_AUDIO_IN_CHARACTER_ENGINES`.
 
 **Registering this family without that change does not degrade anything -- it
@@ -66,8 +66,8 @@ motion-EXEMPT -- trading a loud plan-time refusal for a silent quality hole.
 **This one was WRONG in the first draft, and the post-coding QA caught it.**
 
 `_engine_scene_init_required` overwrites `init_image` with the beat's wide scene
-still for any non-face engine that declares `init_image`. `ltx_audio_in` is
-excluded from it by name; this lane was not. On a lane whose `init_image` IS the
+still for any non-face engine that declares `init_image`. The one earlier
+audio-in lane was excluded from it by name; this lane was not. On a lane whose `init_image` IS the
 reference the model lip-syncs -- presented to the tokenizer as `<Picture 1>`,
 with the lane's own prompt saying "a medium close shot of `<Picture 1>` speaking
 directly to camera" -- that does not fail. It renders the wrong identity,
@@ -75,8 +75,7 @@ silently, on every beat. Both audio-in lanes are excluded now.
 
 **The comment I wrote was false about the code beneath it, and the test I wrote
 to prove it was LEXICAL, so it passed anyway.** The draft claimed this lane
-"does NOT take the scene-still spine"; in fact it does, exactly like
-`ltx_audio_in`, because `_still_spine_requires_scene` returns True for the whole
+"does NOT take the scene-still spine"; in fact it does, because `_still_spine_requires_scene` returns True for the whole
 `audio_conditioned_video` family. That is fine -- the SPINE decides which stills
 get MINTED and a per-beat scene still is worth having. The two questions are now
 separate assertions so they cannot be confused again: the spine one asserts

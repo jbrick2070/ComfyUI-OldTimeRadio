@@ -1,7 +1,6 @@
 # Extending OTR -- add your own source bank
 
-**Status:** requirements contract of record (2026-07-24). Companion plan:
-`docs/2026-07-24-independent-source-banks-v1-plan.md`. Deep reference:
+**Status:** requirements contract of record (2026-07-24). Deep reference:
 `docs/SOURCE_BANK_GUIDE.md` (the shipped-bank playbook this doc builds on).
 Every field name below is grounded against the live code; re-verify pins at
 build time.

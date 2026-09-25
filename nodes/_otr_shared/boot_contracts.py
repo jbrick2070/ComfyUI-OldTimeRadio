@@ -1,6 +1,6 @@
 """NAMED BOOT CONTRACTS -- what a lane needs the SERVER to have been started with.
 
-Spec S8 (`docs/2026-08-09-SPEC-lab-findings-into-otr.md`). Some lanes only fit
+Spec S8 (2026-08-09, folding the lab findings into OTR). Some lanes only fit
 under the 14.5 GiB gate if the server was launched with particular allocator
 flags. HuMo 14B measures 14.98 GiB unclamped and 13.06 GiB under a reserve-VRAM
 clamp with pinned memory disabled -- same graph, same weights, 1.9 GiB apart.

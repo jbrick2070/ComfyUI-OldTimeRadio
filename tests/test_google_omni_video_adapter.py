@@ -300,7 +300,7 @@ def test_google_omni_video_has_no_partner_or_local_engine_call_path():
         "invoke_partner_node",
         "cloud_media_invoke",
         "eng_cloud_video",
-        "eng_ltx_video",
+        "eng_ltx_8gb",
         "eng_wan_i2v",
         "eng_humo",
     }

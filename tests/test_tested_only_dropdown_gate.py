@@ -53,11 +53,11 @@ def test_formerly_hidden_engines_are_now_selectable():
     # `wan_i2v` was the other exemplar here until the 2026-08-26 large-Wan rip
     # (operator: "rip the large wan we don't need") unregistered it: 19.82 GiB
     # of weights against a 14.5 GiB target. It moves to the NEGATIVE side of
-    # this test with still_parallax rather than being retargeted at the 5B
-    # `wan_ti2v` -- that is a different model with a different contract, and
-    # asserting it here would only re-state coverage the 5B already has in
-    # test_video_combo_is_the_full_registry_plus_sentinel above. `still_motion`
-    # carries the original point on its own: registry IS the menu.
+    # this test with still_parallax rather than being retargeted at another
+    # local video lane -- that would be a different model with a different
+    # contract, and asserting it here would only re-state coverage that lane
+    # already has in test_video_combo_is_the_full_registry_plus_sentinel above.
+    # `still_motion` carries the original point on its own: registry IS the menu.
     video = {vd._engine_id_from_pick(c) for c in vd._video_model_combo()}
     assert {"still_motion"} <= video
     assert "still_parallax" not in video

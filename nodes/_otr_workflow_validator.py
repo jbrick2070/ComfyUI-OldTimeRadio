@@ -1,6 +1,6 @@
 """OTR_WorkflowValidator -- opt-in execution-time contract validator.
 
-Per ADR docs/2026-05-13-S14_2-active-validation-ADR.md (Option B,
+Per the 2026-05-13 S14_2 active-validation ADR (Option B,
 locked in S24/C12; implementation in S26 Sprint 3).
 
 Placed as the first node in a workflow JSON, this validator reads the

@@ -878,7 +878,7 @@ LEMMY_VOICE_POLICY = {
                     "source": "self-generated Google TTS output (voice Algenib), "
                               "used as a clone reference for LOCAL engines",
                     "terms_snapshot_ref":
-                        "docs/2026-08-10-G0-RIGHTS-DECISION-CARD-lemmy.md",
+                        "apple/RIGHTS_DECISION_LEMMY_VOICE.md",
                     "terms_snapshot_date": "2026-08-10",
                     "scope": "clone reference for local engines; tier left "
                              "UNDETERMINED -- it governs what Google may do with "

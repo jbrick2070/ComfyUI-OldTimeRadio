@@ -127,7 +127,7 @@ server for a reason that was about an import.
 
 * `content_oracle.family_for_engine` -- the WORST, because it failed SOFTLY into
   a bare `except: pass` and answered from `_FAMILY_FALLBACK` on every call. That
-  table stops at 2026-07-05, so `ltx_8gb`, `fastwan_8gb`, `still_word`, every
+  table stops at 2026-07-05, so `ltx_8gb`, `still_word`, every
   cloud lane and this one all resolved to family `""` in production -- which is
   not in `MOTION_FAMILIES`, so `motion_required_for_engine` answered False and
   those lanes were **silently motion-EXEMPT**. A frozen clip from any of them
@@ -193,7 +193,7 @@ module and it is lane 20's. Two public ids on one internal id collapses
 `_INTERNAL_TO_PUBLIC` and trips its module-scope bijection assert at IMPORT time,
 which empties most of the ComfyUI menu rather than failing one lane cleanly (L5).
 
-**The mouth policy is UNTOUCHED.** `render_driver`'s `"ltx_audio_in"` equality
+**The mouth policy is UNTOUCHED.** `render_driver`'s single-engine equality
 test becomes a membership test in LANE 20, with the registration it exists for.
 Doing it here would wire a policy to an engine that is not registered yet.
 

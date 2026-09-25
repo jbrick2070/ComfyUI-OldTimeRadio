@@ -20,7 +20,7 @@ from nodes import otr_credits_roll as cr  # noqa: E402
 
 def _manifest_with_recipe():
     return {
-        "engine_histogram": {"ltx_audio_in": 1, "still_pan": 1},
+        "engine_histogram": {"ltx25_native_audio_in_16gb": 1, "still_pan": 1},
         "video_revision": 3,
         # `exists: True` is REQUIRED on every row here, and was not until
         # 2026-08-26. These fixtures predate the sanctioned-gap work: the
@@ -32,7 +32,7 @@ def _manifest_with_recipe():
         # so explicitly. A fixture that means "this beat produced no clip"
         # should set `exists: False` and expect no delivered credit.
         "clips": [
-            {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx_audio_in",
+            {"shot_id": "s1", "role": "music_visual", "engine_id": "ltx25_native_audio_in_16gb",
              "recipe": "distilled_native", "quant": "Q2_K", "use_lora": False,
              "render_canvas": "512x288", "vram_peak_mb": 13900, "exists": True},
             {"shot_id": "s2", "role": "announcer_visual", "engine_id": "still_pan",
@@ -43,16 +43,16 @@ def _manifest_with_recipe():
 
 def test_payload_preserves_existing_keys():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
-    assert payload["histogram"] == {"ltx_audio_in": 1, "still_pan": 1}
+    assert payload["histogram"] == {"ltx25_native_audio_in_16gb": 1, "still_pan": 1}
     assert payload["video_revision"] == 3
     assert payload["vram_peak_mb"] == 13900
-    assert payload["by_role"]["music_visual"] == {"ltx_audio_in": 1}
+    assert payload["by_role"]["music_visual"] == {"ltx25_native_audio_in_16gb": 1}
 
 
 def test_payload_per_clip_recipe_receipt():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
     pc = {p["shot_id"]: p for p in payload["per_clip"]}
-    assert pc["s1"]["delivered_engine"] == "ltx_audio_in"
+    assert pc["s1"]["delivered_engine"] == "ltx25_native_audio_in_16gb"
     assert pc["s1"]["recipe"] == "distilled_native"
     assert pc["s1"]["quant"] == "Q2_K"
     assert pc["s1"]["use_lora"] is False
@@ -64,7 +64,7 @@ def test_payload_per_clip_recipe_receipt():
 
 def test_payload_by_engine_rollup():
     payload = _build_render_engines_payload(_manifest_with_recipe(), 13900)
-    assert payload["by_engine"]["ltx_audio_in"]["quant"] == "Q2_K"
+    assert payload["by_engine"]["ltx25_native_audio_in_16gb"]["quant"] == "Q2_K"
     assert payload["by_engine"]["still_pan"]["recipe"] is None
 
 
@@ -88,9 +88,9 @@ def test_build_clip_manifest_threads_recipe_receipt(tmp_path):
     result = {
         "ledger": {"video": {"shots": [
             {"shot_id": "s1", "role": "music_visual",
-             "target_frame_count": 100, "engine_id": "ltx_audio_in"}]},
+             "target_frame_count": 100, "engine_id": "ltx25_native_audio_in_16gb"}]},
             "lines": []},
-        "clips": {"s1": {"type": "video", "path": str(_c1), "engine_id": "ltx_audio_in",
+        "clips": {"s1": {"type": "video", "path": str(_c1), "engine_id": "ltx25_native_audio_in_16gb",
                          "frame_count": 100, "recipe": "sharp_lora",
                          "quant": "Q3_K_M", "use_lora": True,
                          "render_canvas": "512x288", "vram_peak_mb": 15500}},
@@ -132,11 +132,11 @@ def _payload(*clips):
 def test_by_engine_no_longer_lets_the_first_clip_speak_for_the_rest():
     """THE DEFECT, as its own test: two clips, one engine, two recipes."""
     p = _payload(
-        _clip("s1", "ltx_audio_in", recipe="RECIPE_LTX8_I2V_v2"),
-        _clip("s2", "ltx_audio_in",
+        _clip("s1", "ltx25_native_audio_in_16gb", recipe="RECIPE_LTX8_I2V_v2"),
+        _clip("s2", "ltx25_native_audio_in_16gb",
               recipe="RECIPE_LTX8_I2V_v2+prequalification[tiled_vae=off]"),
     )
-    row = p["by_engine"]["ltx_audio_in"]
+    row = p["by_engine"]["ltx25_native_audio_in_16gb"]
     assert row["recipe"] != "RECIPE_LTX8_I2V_v2"          # the OLD behaviour
     assert row["recipe"] is None
     assert row["varied"] == ["recipe"]
@@ -171,10 +171,10 @@ def test_by_engine_render_canvas_is_the_case_reachable_at_head():
 
 
 def test_by_engine_peak_is_the_worst_clip_not_the_first_or_the_last():
-    p = _payload(_clip("s1", "wan_ti2v", vram_peak_mb=8241),
-                 _clip("s2", "wan_ti2v", vram_peak_mb=16127),
-                 _clip("s3", "wan_ti2v", vram_peak_mb=11062))
-    row = p["by_engine"]["wan_ti2v"]
+    p = _payload(_clip("s1", "ltx25_video", vram_peak_mb=8241),
+                 _clip("s2", "ltx25_video", vram_peak_mb=16127),
+                 _clip("s3", "ltx25_video", vram_peak_mb=11062))
+    row = p["by_engine"]["ltx25_video"]
     assert row["vram_peak_mb"] == 16127
     assert isinstance(row["vram_peak_mb"], int)   # returned exactly as stamped
     assert row["varied"] == []                    # a measurement, not identity
@@ -203,13 +203,13 @@ def test_a_nan_peak_cannot_swallow_a_real_measurement():
     boundary, not a live bug. Both orders must give the real number."""
     nan = float("nan")
     assert _payload(
-        _clip("s1", "wan_ti2v", vram_peak_mb=nan),
-        _clip("s2", "wan_ti2v", vram_peak_mb=20000),
-    )["by_engine"]["wan_ti2v"]["vram_peak_mb"] == 20000
+        _clip("s1", "ltx25_video", vram_peak_mb=nan),
+        _clip("s2", "ltx25_video", vram_peak_mb=20000),
+    )["by_engine"]["ltx25_video"]["vram_peak_mb"] == 20000
     assert _payload(
-        _clip("s1", "wan_ti2v", vram_peak_mb=20000),
-        _clip("s2", "wan_ti2v", vram_peak_mb=nan),
-    )["by_engine"]["wan_ti2v"]["vram_peak_mb"] == 20000
+        _clip("s1", "ltx25_video", vram_peak_mb=20000),
+        _clip("s2", "ltx25_video", vram_peak_mb=nan),
+    )["by_engine"]["ltx25_video"]["vram_peak_mb"] == 20000
 
 
 def test_a_uniform_engine_reports_varied_empty_and_every_field_intact():
@@ -230,9 +230,9 @@ def test_unstamped_and_false_are_a_disagreement_not_a_match():
     """A clip that never stamped use_lora and a clip that stamped False are
     two different statements; collapsing them reports a LoRA decision the
     first clip never made."""
-    p = _payload(_clip("s1", "ltx_video"),
-                 _clip("s2", "ltx_video", use_lora=False))
-    assert p["by_engine"]["ltx_video"]["varied"] == ["use_lora"]
+    p = _payload(_clip("s1", "ltx25_video"),
+                 _clip("s2", "ltx25_video", use_lora=False))
+    assert p["by_engine"]["ltx25_video"]["varied"] == ["use_lora"]
 
 
 def test_varied_lists_fields_in_the_receipts_own_order():
@@ -257,9 +257,9 @@ def test_three_distinct_values_on_one_field_is_still_one_varied_entry():
 def test_a_varied_family_is_named_in_the_payload_not_only_on_the_card():
     """The other four identity fields each get a payload-level assertion;
     family was reachable only through the credits reader."""
-    p = _payload(_clip("s1", "ltx_video", family="text_to_video"),
-                 _clip("s2", "ltx_video", family="image_to_video"))
-    row = p["by_engine"]["ltx_video"]
+    p = _payload(_clip("s1", "ltx25_video", family="text_to_video"),
+                 _clip("s2", "ltx25_video", family="image_to_video"))
+    row = p["by_engine"]["ltx25_video"]
     assert row["family"] is None and row["varied"] == ["family"]
 
 
@@ -324,20 +324,20 @@ def test_a_uniform_lora_decision_still_prints_lora():
 
 
 def test_the_family_slot_says_mixed_rather_than_going_blank():
-    ren = _payload(_clip("s1", "ltx_video", family="text_to_video"),
-                   _clip("s2", "ltx_video", family="image_to_video"))
-    assert cr._video_role_rows(ren) == [("music_visual", "ltx_video", "mixed")]
+    ren = _payload(_clip("s1", "ltx25_video", family="text_to_video"),
+                   _clip("s2", "ltx25_video", family="image_to_video"))
+    assert cr._video_role_rows(ren) == [("music_visual", "ltx25_video", "mixed")]
     # ...and the recipe line does NOT repeat it -- family has its own slot.
-    assert "family" not in cr._recipe_suffix(ren, "ltx_video")
+    assert "family" not in cr._recipe_suffix(ren, "ltx25_video")
 
 
 def test_a_uniform_family_still_pretty_prints():
     """CONTROL -- passes under the pre-2026-07-28 code too, on purpose: the
     "mixed" branch must not have eaten the _FAMILY_PRETTY mapping."""
-    ren = _payload(_clip("s1", "ltx_video", family="text_to_video"),
-                   _clip("s2", "ltx_video", family="text_to_video"))
+    ren = _payload(_clip("s1", "ltx25_video", family="text_to_video"),
+                   _clip("s2", "ltx25_video", family="text_to_video"))
     assert cr._video_role_rows(ren) == [
-        ("music_visual", "ltx_video", "text-to-video")]
+        ("music_visual", "ltx25_video", "text-to-video")]
 
 
 def test_a_pre_rollup_ledger_reads_exactly_as_before():
@@ -346,13 +346,13 @@ def test_a_pre_rollup_ledger_reads_exactly_as_before():
     emit this shape, so the only way to pin the compatibility is to write the
     old shape out. It is a fixture for the READERS, not for the roll-up. Same
     shape as tests/test_credits_roll_spec.py's ``_led()``."""
-    legacy = {"by_role": {"music_visual": {"ltx_video": 1}},
-              "by_engine": {"ltx_video": {"family": "text_to_video",
+    legacy = {"by_role": {"music_visual": {"ltx25_video": 1}},
+              "by_engine": {"ltx25_video": {"family": "text_to_video",
                                           "recipe": "ia2v", "quant": "q4_K_M",
                                           "use_lora": True}}}
-    assert cr._recipe_suffix(legacy, "ltx_video") == "ia2v · q4_K_M · lora"
+    assert cr._recipe_suffix(legacy, "ltx25_video") == "ia2v · q4_K_M · lora"
     assert cr._video_role_rows(legacy) == [
-        ("music_visual", "ltx_video", "text-to-video")]
+        ("music_visual", "ltx25_video", "text-to-video")]
 
 
 def test_the_whole_chain_carries_a_second_clip_on_one_engine(tmp_path):

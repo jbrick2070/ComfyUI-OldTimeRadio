@@ -447,7 +447,7 @@ class TestProperties:
 
 
 # ---------------------------------------------------------------------------
-# The ROLE PARENTHETICAL, from the live wan_ti2v leg (2026-08-02)
+# The ROLE PARENTHETICAL, from a live heavy-video leg (2026-08-02)
 # ---------------------------------------------------------------------------
 
 def test_a_speaker_restated_with_its_ROLE_still_resolves_to_the_cast():

@@ -73,7 +73,7 @@ SAGE_SENSITIVE = frozenset({
 #: Method names that resolve a lane's PRIMARY weight. G1 reads these, not the
 #: whole module: a module can mention `folder_paths` in an unrelated helper
 #: while its checkpoint resolver is still a bare hardcoded path -- which is
-#: exactly how wan_ti2v shipped dead (lesson L1).
+#: exactly how a heavy-video lane once shipped dead (lesson L1).
 WEIGHT_RESOLVER_METHODS = (
     "_installed", "_ckpt_path", "_weight_paths", "_unet_path",
     "_primary_weight_path", "_model_paths",
@@ -206,8 +206,9 @@ EXPECTED_RED: dict = {
     # the render died mid-beat after the checkpoint was paid for -- there is now
     # a node gate in `assert_usable`, ordered before weight resolution, reading
     # the ACTIVE candidate set and collecting every miss. And lesson L1, the
-    # wan_ti2v killer: `_ckpt_path` walked a hardcoded models/checkpoints plus an
-    # HF_HOME sibling and never consulted `folder_paths`, so a checkpoint
+    # hardcoded-checkpoint killer: `_ckpt_path` walked a hardcoded
+    # models/checkpoints plus an HF_HOME sibling and never consulted
+    # `folder_paths`, so a checkpoint
     # registered through extra_model_paths.yaml was invisible on the runtime and
     # one installed under this box's real models root was invisible off it. It
     # now probes the env pin, `folder_paths`, the historical dirs, then lane 1's
@@ -471,8 +472,8 @@ def gate_g1_weights(name, eng):
               + _defining_module_source(eng, "_weight_paths")):
         bad.append(
             "its weight resolver never reaches folder_paths: it resolves a "
-            "hardcoded default directly, which is the wan_ti2v killer "
-            "(lesson L1)")
+            "hardcoded default directly, which is the hardcoded-checkpoint "
+            "killer (lesson L1)")
     au = _method_source(eng, "assert_usable")
     if not au.strip():
         bad.append("declares no assert_usable, so a missing weight cannot "

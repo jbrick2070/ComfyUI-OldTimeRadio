@@ -97,8 +97,7 @@ cross-engine Lemmy work. Where a gate has no twin assertion, it says why.
   gender-balance policy lives there too. This cost real investigation time
   on 2026-08-24 chasing "does Bark already have an announcer pool" before
   the comment was read closely.
-  **SHIPPED 2026-08-24** (full 4-round kibitz arc, see
-  `kibitz-runs/2026-08-24-bark-announcer/`): Bark now declares BOTH roles
+  **SHIPPED 2026-08-24** (full 4-round kibitz arc): Bark now declares BOTH roles
   (`roles = ("char_voice", "announcer_voice")`,
   `nodes/_otr_audio_engines/eng_bark.py`), backed by a real
   `announcer_bark_v1` profile (`config/audio_engine_profiles.yaml`). It does

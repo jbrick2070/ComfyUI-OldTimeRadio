@@ -62,5 +62,5 @@ the family closed there is no HuMo tier left to hold it, so
 not been done yet and asserts the SCOPING RULE directly -- strip the
 declaration, the overrides go back to winning. A control with no occupant left
 gets rewritten, not deleted. `test_ltx_8gb_canonical_canvas.py`'s list simply
-lost its third occupant; `mesh_stage`, `ltx_audio_in`, `still_pan` and
+lost its third occupant; `mesh_stage`, `still_pan` and
 `viz_mxc_cpu` remain, and each will leave when its own packet runs.

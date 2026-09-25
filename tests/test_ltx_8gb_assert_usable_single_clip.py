@@ -253,10 +253,10 @@ def test_SageAttention_is_refused_BEFORE_any_weight_is_resolved(eng, monkeypatch
     """BUG-070, on the exact family it was written for.
 
     int8-PV SageAttention process-ABORTS LTX-Video with no traceback, so an
-    engine that cannot tolerate it must refuse before the first forward. Both
-    siblings (`eng_ltx_video`, `eng_ltx_av`) called `assert_sage_not_patched`;
-    this 0.9.8 lane had no Sage gate of any kind, so the failure mode here was a
-    dead process rather than a named refusal.
+    engine that cannot tolerate it must refuse before the first forward. Its
+    Sage-sensitive siblings (`eng_ltx25`, `eng_minimax_h3`) called
+    `assert_sage_not_patched`; this 0.9.8 lane had no Sage gate of any kind,
+    so the failure mode here was a dead process rather than a named refusal.
 
     Ordered FIRST on purpose: a refusal that costs nothing beats one that costs
     a checkpoint load. Proved by making weight resolution explode -- if the Sage

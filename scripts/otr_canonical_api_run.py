@@ -280,18 +280,32 @@ def _assert_profile_models_present(profile_name, schemas, offline=False) -> list
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
     from nodes._otr_shared.capability_profiles import ProfileError, load_profile
-    from nodes._otr_visual_assets import MANIFEST as _SELF_FETCHED
+    from nodes._otr_shared.public_engines import resolve_engine_id
+    from nodes._otr_visual_assets import VisualAssetError, planned_downloads
     try:
         profile = load_profile(profile_name)
     except ProfileError:
         return []                  # "none", or no such row: nothing declared
     required = ((profile.get("preflight") or {}).get("required_models") or [])
-    # A FILE THE PACK FETCHES FOR ITSELF IS NOT A REFUSAL. The validator's
-    # queue-time preflight downloads every allowlisted weight a selected lane
-    # needs -- before the writer runs, so the failure this gate exists to
-    # prevent cannot happen for them -- and refusing here because such a file
-    # is not on disk YET would block exactly the download that fixes it.
-    self_fetched = {name for (_category, name) in _SELF_FETCHED}
+    # A FILE THE PACK FETCHES FOR THIS ROW IS NOT A REFUSAL. The validator's
+    # queue-time preflight downloads the allowlisted weights the row's own
+    # engines ask for -- before the writer runs, so the failure this gate
+    # exists to prevent cannot happen for them -- and refusing here because
+    # such a file is not on disk YET would block exactly the download that
+    # fixes it. The skip is computed from THIS row's engines through the same
+    # adapters the preflight asks; a file that merely appears somewhere in the
+    # allowlist is still checked, because another lane fetching it proves
+    # nothing about this one (found by review 2026-09-25: an engine-blind skip
+    # let the AnimateDiff rows through with their checkpoint unchecked).
+    # A selection the preflight would refuse skips nothing.
+    selected = set((profile.get("role_overrides") or {}).values())
+    slots = profile.get("slot_overrides") or {}
+    selected.update(slots.get(k) for k in ("video_render_engine", "music_engine"))
+    try:
+        self_fetched = {name for (_category, name) in planned_downloads(
+            {resolve_engine_id(str(e)) for e in selected if e})}
+    except VisualAssetError:
+        self_fetched = set()
     required = [n for n in required if os.path.basename(str(n)) not in self_fetched]
     if not required:
         return []

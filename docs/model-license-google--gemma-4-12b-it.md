@@ -36,8 +36,7 @@ Gemma 4 12B announcement (2026-06-03):
   allocated / 7.29 GiB peak on the 16 GB RTX 5080 and produces coherent prose.
 - Structured SciFi passes bind their exact Pydantic schema to
   lm-format-enforcer's `prefix_allowed_tokens_fn`, making invalid JSON tokens
-  unsampleable on this lane. The independent GGUF row remains available but is
-  not the canonical selection.
+  unsampleable on this lane.
 - `prompt_profile = modern`. Eligible for the creative slot AND the
   technical slot. Apache 2.0 satisfies the Sprint D / D3 creative-binding gate.
 

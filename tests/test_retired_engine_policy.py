@@ -94,7 +94,7 @@ def test_the_error_contract_is_pinned(engine_id):
 
 
 def test_non_retired_ids_pass_through_untouched():
-    for ok in ("", "humo", "ltx_video", "google_veo_video",
+    for ok in ("", "humo", "ltx25_video", "google_veo_video",
                "cloud_vidu_q2_pro_fast_720p", "unknown_engine"):
         check_retired_engine(ok)                # must not raise
 

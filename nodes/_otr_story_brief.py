@@ -19,7 +19,7 @@ Design references:
 - Sprint C: L-6 fail-loud pattern, L-8 8-key meta delta,
   E-17 scoped try/except, E-18 repair temp clamp, E-21 technical_fn-
   only signature, R-06 CRITICAL prefix, R-01 single-load cache profile.
-- `docs/2026-05-12-story-brief-v2-design-refinements.md` (post-C0b):
+- The 2026-05-12 story-brief v2 design refinements (post-C0b):
   section 2 input builder, section 3.1 strict JSON, section 3.2 LLM
   settings, section 3.3 no-period rule, section 3.4 validation gate,
   section 3.5 repair pass, section 4 8-key storage schema, section 4.1

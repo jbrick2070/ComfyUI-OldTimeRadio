@@ -158,11 +158,11 @@ _HUMO_MAX_FRAMES = 177         # last empirically verified ceiling at 480x832 fp
 # THE 14B CAP, UNIFIED ACROSS ORIENTATIONS (2026-08-02).
 #
 # WHAT IT USED TO SAY, and why it is gone: "the 14B fp8 tier rides ~15.9 GB at
-# 832x480 ... 49 (4n+1) is the bakeoff-proven safe length
-# (docs/2026-06-27-humo-bakeoff)". Two things were wrong with that.
+# 832x480 ... 49 (4n+1) is the bakeoff-proven safe length" (citing a bakeoff
+# receipt). Two things were wrong with that.
 #
-#   1. THE CITED RECEIPT IS NOT IN THIS REPO. `docs/2026-06-27-humo-bakeoff`
-#      has never existed here -- only the scripts that would have produced it.
+#   1. THE CITED RECEIPT IS NOT IN THIS REPO. That bakeoff receipt has never
+#      existed here -- only the scripts that would have produced it.
 #      A number nobody can check gated the heaviest engine, and it asserted
 #      15.9 GB against a 14.5 GB working ceiling, which is a breach on its face.
 #   2. IT APPLIED TO ONE ORIENTATION ONLY. The same checkpoint ran uncapped to
@@ -999,9 +999,9 @@ class HuMoEngine(_MC.MotionEngineBase):
         # OTR_BatchHumoRender does.)
         # PEAK TELEMETRY (2026-08-02). HuMo was the ONLY heavy lane with no
         # ``VramPeakProbe``, which is why its frame ceilings have never been
-        # checkable: the 49-frame landscape cap asserts ~15.9 GB and cites
-        # `docs/2026-06-27-humo-bakeoff`, a file that is not in this repo, and
-        # nothing this engine ever ran could confirm or refute it. Every other
+        # checkable: the 49-frame landscape cap asserts ~15.9 GB citing a
+        # bakeoff receipt that is not in this repo, and nothing this engine
+        # ever ran could confirm or refute it. Every other
         # heavy engine reports its render-window peak, and `ltx_audio_in`'s 79
         # logged samples are what finally settled ITS frame question -- from
         # data already on disk. Telemetry only, no enforcement (the admission

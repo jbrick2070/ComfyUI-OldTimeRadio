@@ -59,9 +59,8 @@ _CKPT_PREFERENCE = ("stable_audio_3_small_music_base.safetensors",
 #: where the base file had been fetched by hand. The fall-through now names
 #: the base file, and `tests/test_music_prompts_are_musical.py` pins that
 #: this name is one `_otr_visual_assets.MANIFEST` is allowed to download.
-#: The medium checkpoint was benched against this one the same day
-#: (docs/2026-09-12-music-model-bench/): 9.22 GB, unproven on 8 GB, and the
-#: operator's ear decides it -- it is not a default.
+#: The medium checkpoint was benched against this one the same day: 9.22 GB,
+#: unproven on 8 GB, and the operator's ear decides it -- it is not a default.
 _FETCH_DEFAULT = _CKPT_PREFERENCE[0]
 #: A base checkpoint can be steered, so it gets real guidance: 4.0 measured
 #: clean across a 1.0-6.0 sweep with the healthiest peak (-2.2 dBFS). A
@@ -432,9 +431,8 @@ class StableAudio3Engine:
                             # WHICH MODEL MADE THIS CUE. The family ships
                             # small and medium checkpoints, each in a base
                             # and a post-trained form, and they render the
-                            # same prompt differently (measured 2026-09-12,
-                            # docs/2026-09-12-music-model-bench/); a receipt
-                            # that does not say which one played cannot
+                            # same prompt differently (measured 2026-09-12);
+                            # a receipt that does not say which one played cannot
                             # answer the operator's question about the
                             # music, and the A/B harness refuses to measure
                             # an arm it cannot attribute.

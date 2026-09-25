@@ -68,7 +68,7 @@ ever stops reaching this lane -- so a future declaration cannot be added without
 something saying what it costs.
 
 **And it dissolved a blocker rather than fighting it.** The draft's G2.3 row was
-held red by `config/profiles/otr_sbcov_4.json`, an UNTRACKED file this window
+held red by an UNTRACKED local rig file this window
 must not edit or adopt. Documenting the channel inert makes G2.3 skip the
 profile comparison entirely, so the row is green on its own merits and the
 untracked file is irrelevant to it.

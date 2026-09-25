@@ -134,7 +134,7 @@ the assertion instead of being skipped. `mesh_stage` is the one entry.
 
 **2. A misleading RUNTIME LOG, not just a comment.** `render_driver` warned, on
 every missing scene still, that *"a cheap family (still_pan/still_flat)
-synthesizes its dark floor; a still-REQUIRED engine (still_word/ltx_audio_in)
+synthesizes its dark floor; a still-REQUIRED engine (still_word)
 fails LOUD"*. Wrong since lane 15 and emitted to the operator at exactly the
 moment they are debugging a missing still -- the reader most likely to be
 misled, and against the "clean logs" rule. It now says all four still families

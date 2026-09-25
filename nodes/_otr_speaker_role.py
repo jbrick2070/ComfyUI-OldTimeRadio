@@ -5,7 +5,7 @@ _otr_speaker_role.py
 Speaker-role taxonomy for the v2.0-alpha architecture.
 
 **Routing contract (locked 2026-05-01 after BUG-LOCAL-129; sfx role RIPPED
-2026-07-01 -- see docs/2026-07-01-rip-sfx-broll/BUILD_PLAN.md):**
+2026-07-01):**
 
 Every line in ``ledger.lines[]`` carries a ``speaker_role``. Routing:
 
@@ -31,8 +31,7 @@ will not animate non-face references. Passing the radio still as
 HuMo's ``ref_image`` for announcer/music produced two unrelated
 generic faces (l001 + l021 of the 2026-05-01_110019 run) instead of
 the radio itself. HuMo is for speaking faces only; everything else
-goes through the deterministic radio-console editorial path. See
-``docs/2026-05-01-humo-radio-architecture__*.md`` for transcripts.
+goes through the deterministic radio-console editorial path.
 
 This module is pure stdlib -- no torch, no comfy imports -- so it's
 safe to load from tests, scripts, and any node without adding

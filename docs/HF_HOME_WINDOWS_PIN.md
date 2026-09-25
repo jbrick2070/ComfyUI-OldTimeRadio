@@ -10,7 +10,6 @@ must be one cache, short enough to materialise, chosen before
 
 Decided 2026-09-23. r1 panel: Codex gpt-6-astra, Antigravity Gemini 3.8
 Flash (High), Claude sonnet. Cursor driver; Cursor CLI excluded.
-Working notes (gitignored): `docs/2026-09-23-hf-home-windows-pin/`.
 
 ## Decision
 
@@ -73,7 +72,7 @@ When `HF_HOME` is not already in the process environment, prestartup
 | C (`\\?\` in our fetch) | writer/TTS/transformers still use pointer_path |
 | D (shorter Lumina) | next long repo repeats the cliff |
 | E (always `C:\ComfyUI-Models`) | mkdir `C:\` is UAC for a stranger |
-| Cut F step 4's models-root join | splits the 4060: Lumina in `~/.cache`, GGUFs in `C:\ComfyUI-Models` |
+| Cut F step 4's models-root join | splits the 4060: Lumina in `~/.cache`, the other weights in `C:\ComfyUI-Models` |
 
 ## Proof after the code lands
 

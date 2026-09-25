@@ -57,12 +57,6 @@ _ALLOWED_FILES = {
     # list -- they're the CI gate for the clean-break invariant.
     "tests/test_lfc_wiring_smoke_script.py",
     "scripts/lfc_wiring_smoke.py",
-    "docs/2026-05-11-multi-turn-polish-adr.md",
-    "docs/2026-05-11-multi-turn-polish-problem-statement.md",
-    "docs/2026-05-11-lfc-go-forward-qa.md",
-    "docs/2026-05-11-lfc-wiring-qa-roundrobin.md",
-    "docs/2026-05-11-multi-turn-polish-qa-handoff.md",
-    "docs/2026-05-12-lfc-clean-break.md",
     "docs/BUG_LOG.md",
 }
 

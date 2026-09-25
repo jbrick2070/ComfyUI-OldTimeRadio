@@ -1,6 +1,6 @@
 """LLMRuntimePolicy -- the S1 explicit LLM runtime policy (platform matrix).
 
-docs/2026-07-09-platform-portability-final.md section 3: a FROZEN policy
+Per the 2026-07-09 platform-portability final spec, section 3: a FROZEN policy
 object built from the writer's widgets in ``_resolve_inputs`` and threaded
 ``_SlotScheduler -> request_slot(slot, id, policy) -> backend.load(...,
 policy)``. NO legacy/auto sentinel anywhere: every field default EQUALS

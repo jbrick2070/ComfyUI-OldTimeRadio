@@ -28,8 +28,7 @@ THE JOIN IS beat_id -> beats[].scene_id, NOT lines[].scene_id (fixed
 carried real scene_id data on their BEATS -- scifi_news writes it there -- and
 this check passed all 55 anyway, because no writer has ever put scene_id on a
 LINE row. ``lines[]`` carries ``beat_id``; ``beats[]`` carries ``scene_id``;
-that is the only join the schema has. See
-``docs/2026-08-28-scene-coherence-vacuity/CODING_PLAN.md``.
+that is the only join the schema has.
 """
 from __future__ import annotations
 

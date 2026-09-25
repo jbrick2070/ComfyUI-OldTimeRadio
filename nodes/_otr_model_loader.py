@@ -459,7 +459,7 @@ def _require_transformers_model_support(
 
 
 # ---------------------------------------------------------------------------
-# S0 portability helpers (docs/2026-07-09-platform-portability-final.md)
+# S0 portability helpers (2026-07-09 platform-portability sprint)
 # ---------------------------------------------------------------------------
 
 
@@ -1033,8 +1033,7 @@ def load_llm(
         # CUDA 13 surfaces cudaErrorUnknown on the post-eviction call
         # when async kernel completions from the prior generation are
         # still in flight while empty_cache() touches their memory.
-        # Triple-confirmed by 2026-04-30 round-robin. See
-        # docs/2026-04-30-spine-cuda-crash/.
+        # Triple-confirmed by 2026-04-30 round-robin.
         if torch.cuda.is_available():
             try:
                 torch.cuda.synchronize()

@@ -405,7 +405,7 @@ def test_a_stem_from_a_lane_with_no_gains_is_a_refusal(tmp_path):
     bed = _stem(tmp_path, "bed.wav", 10, 0.5, channels=1)
     with pytest.raises(fs.FoleyStemError) as exc:
         fs.mix_foley_under_master(
-            master, RATE, [_row(bed, 0.0, 10, engine="wan_ti2v")], fps=FPS)
+            master, RATE, [_row(bed, 0.0, 10, engine="ltx_8gb")], fps=FPS)
     assert "not an audio-keeping lane" in str(exc.value)
 
 

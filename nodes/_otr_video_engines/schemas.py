@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 #: The video families (the ``character_3d`` token was RETIRED with its family
 #: 2026-08-23, lean-mean order 4 -- zero live declarers; ``audio_conditioned_video``
-#: is the LTX-AV lane for audio-reactive scene motion / music).
+#: is the audio-in lane for audio-reactive scene motion / music).
 FAMILIES: tuple = (
     "audio_driven_face",
     "lipsync_overlay",
@@ -60,7 +60,7 @@ FAMILY_REQUIRED_INPUTS: dict = {
     "static_image_gen": (),   # special-cased: text_prompt OR init_image
     "static_motion": (),
     "abstract": (),
-    # LTX-AV music/scene lane: audio-reactive motion from a text prompt + the
+    # Audio-in music/scene lane: audio-reactive motion from a text prompt + the
     # per-beat slice of the frozen master (no portrait needed -- that is the
     # talk lane, which reuses audio_driven_face).
     "audio_conditioned_video": ("text_prompt", "audio_ref"),

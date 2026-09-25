@@ -82,9 +82,8 @@ class ContractEnvConflict(RuntimeError):
     whether an env var may lower a declared CEILING at all -- is deliberately
     NOT answered here: several of those vars are documented operator knobs for
     VRAM-constrained boxes (the WAN 8GB launch contract depends on one), so
-    refusing them outright would break a real production path. The fork is
-    written up in ``docs/2026-07-26-chunk-7b-window-prompt.md`` under OPEN
-    DECISION and is the operator's to settle.
+    refusing them outright would break a real production path. The fork was
+    written up as an OPEN DECISION (2026-07-26) and is the operator's to settle.
     """
 
 

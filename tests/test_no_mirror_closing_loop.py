@@ -53,7 +53,7 @@ def _manifest(window=None, *, total=300, fps=25):
     manifest = {
         "fps": fps,
         "total_target_frames": total,
-        "clips": [{"shot_id": "shot_b001", "engine_id": "wan_ti2v",
+        "clips": [{"shot_id": "shot_b001", "engine_id": "ltx25_video",
                    "path": "body.mp4", "exists": True,
                    "frame_count": 200, "target_frame_count": 200,
                    "start_s": 0.0}],

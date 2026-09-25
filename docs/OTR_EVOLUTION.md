@@ -314,9 +314,8 @@ June also:
   writers" (`550679d7`, 2026-06-23). The operator's phrasing on a sister flip the next
   day became a rule: *"if it makes a better story it's the default, not a lever to
   find"* (`57279156`).
-* Ran honest bake-offs: HuMo 14B vs 1.7B (`2646688d FINAL VERDICT -- 14B fp8 wins
-  100%`), LTX-AV GGUF quants (13 legs, a winner, and a Codex catch of "a real decode-spec
-  contradiction").
+* Ran an honest bake-off: HuMo 14B vs 1.7B (`2646688d FINAL VERDICT -- 14B fp8 wins
+  100%`).
 * Wrote the first version of THE LAW's ancestor: `c8f0156c ... NO-FALLBACKS hard-fail
   directive + rip-out-all-fallbacks production cleanbreak sprint` (2026-06-29), and
   `c6ca5d88 C2: remove requires_flag GATE (registry IS the menu)`.
@@ -427,8 +426,7 @@ next beat's speech` (`4cc76806`); `wan_i2v renders a whole beat from ONE UNET lo
 instead of one per segment` (`3e89d6b2`). From here to the end of the log the subject
 line is written for the reader who will not open the diff.
 
-July also built the GGUF writer registry and promoted Qwen3-8B after a live bake-off
-(`f58ed6e6`), shipped a 100-style radio-grammar catalog, and on the 31st specified a
+July also shipped a 100-style radio-grammar catalog, and on the 31st specified a
 "four-arm clamped video bench" whose kibitz r1 "caught two errors of mine"
 (`04ae4f0c`).
 
@@ -632,9 +630,8 @@ progress`, `Log 4060 cast lock and one-act outline progress`, `Log 4060 slot con
 and dialogue composition milestone` -- dozens of commits that are a live log of one
 episode rendering on the 8 GB machine, checkpointed to the repo so the other machine
 could follow. It ends with `fbd28432 Record the first complete 4060 episode: Qwen one-
-act publishes in 32:34` and two rulings the drill earned: `f5f6fcac Remove every VRAM
-cap: fit on GPU or fail loudly, never crawl` and `9087708d Retire the GGUF writer
-rows; repoint every profile to an auto-downloading twin`. The 4060 had been given
+act publishes in 32:34` and a ruling the drill earned: `f5f6fcac Remove every VRAM
+cap: fit on GPU or fail loudly, never crawl`. The 4060 had been given
 ownership of the workflow files the day before (`f727a5c4`).
 
 **The Mac.** 2026-09-07, `87ea8491 First Mac hardware run: MPS answered, and 16 GB is

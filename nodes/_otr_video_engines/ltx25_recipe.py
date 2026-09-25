@@ -7,7 +7,7 @@ the numbers have a single home. Nothing here imports torch or touches the GPU.
 PROVENANCE. `~/.gemini/antigravity/brain/588e.../ltx_2_5_final_qa_and_output_
 review.md` (2026-08-19), the lab's "Final QA & Output Review", with its
 predecessor `otr_ltx_2_5_integration_handoff.md`. Reviewed against
-`docs/VIDEO_LANE_PREFLIGHT.md` in `kibitz-runs/2026-08-19-ltx25-integration/`.
+`docs/VIDEO_LANE_PREFLIGHT.md` during the 2026-08-19 LTX 2.5 integration review.
 
 **THE LAB'S NUMBERS ARE LAB NUMBERS.** `CLAUDE.md` section 0A is explicit that a
 bench result "may never be worded as qualification" for OTR and must be

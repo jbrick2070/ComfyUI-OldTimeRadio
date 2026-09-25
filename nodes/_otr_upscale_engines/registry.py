@@ -177,9 +177,8 @@ CAPABILITIES = {
     # `RealESRGAN_x2plus.pth` (matching eng_spandrel_esrgan._model_filename),
     # NOT the id below.
     #
-    # DO NOT "reconcile" these by copying one into the other. The fastwan lane
-    # has a test (tests/test_fastwan_8gb.py::test_profile_preflight_requires_
-    # the_lora) that asserts `set(CAPABILITIES[...]["model_requirements"]) <=
+    # DO NOT "reconcile" these by copying one into the other. Another engine's
+    # test once asserted `set(CAPABILITIES[...]["model_requirements"]) <=
     # set(required)` -- extending that pattern to this engine would fail on
     # purpose-built difference, not on a defect. That is the trap this comment
     # exists to disarm; it was flagged in QA on 2026-08-23 before it bit.

@@ -172,7 +172,7 @@ def test_local_ltx_and_kokoro_make_no_query():
         seen.append(wallet)
         raise AssertionError("local graph must not query a wallet")
 
-    prompt = _prompt(_director("ltx_video"), {
+    prompt = _prompt(_director("ltx25_video"), {
         "class_type": "OTR_CastLock",
         "inputs": {
             "char_voice_engine": "kokoro",

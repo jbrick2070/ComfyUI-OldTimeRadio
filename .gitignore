@@ -15,7 +15,6 @@ temp/
 models/
 *.bin
 *.safetensors
-*.gguf
 
 # OS files
 .DS_Store
@@ -199,7 +198,6 @@ outputs_scratch_*/
 docs/*_tmp.txt
 # Untracked sprint QA-dump leftover that is OneDrive-locked on disk (removed
 # from git in the docs prune; ignore so it stays out of `git status`).
-docs/2026-05-13-S28-new-forbidden-hits.txt
 
 # --- 2026-06-01 OpenRouter catalog cache ---
 # MOVED 2026-09-11. The cache now lives OUTSIDE the repo, under the user's own

@@ -1,9 +1,9 @@
 """The image producer must read the POST-AUDIO ledger, not the pre-audio one.
 
-FOUND BY A LIVE LEG. `fastwan_8gb`, 45-word sweep, 2026-08-12:
+FOUND BY A LIVE LEG. A heavy video engine, 45-word sweep, 2026-08-12:
 
     RenderError: still-spine handoff missing materialized scene still
-    for shot shot_music_closing_001 beat music_closing_001 engine fastwan_8gb
+    for shot shot_music_closing_001 beat music_closing_001
 
 THE MECHANISM, and my first diagnosis was WRONG. I read it as a still that was
 planned and then failed to materialize. An independent audit refuted that: the
@@ -30,9 +30,9 @@ exercise the helpers directly and nothing pinned the graph. The defect lived in
 the wiring, so the guard has to live there too -- otherwise link 255 can be
 reverted and the suite stays green while every scene-still engine breaks again.
 
-Eight of thirteen heavy engines require a scene still (`fastwan_8gb`, `ltx_8gb`,
-`ltx_audio_in`, `wan_i2v`, `wan_ti2v`, `mesh_stage`, `minimax_h3_video`,
-`minimax_h3_audio_in`), so this is most of the video roster.
+Most heavy engines require a scene still (`ltx_8gb`, `wan_i2v`, `mesh_stage`,
+`minimax_h3_video`, `minimax_h3_audio_in`, among others), so this is most of
+the video roster.
 """
 from __future__ import annotations
 

@@ -767,7 +767,7 @@ def _graded(clip, plan, *, shot_id="shot_b001"):
 
 
 def _chain_plan(count=3, render_frames=81):
-    """The shipped wan_ti2v shape: N native renders, one duplicated head frame
+    """A shipped multi-clip shape: N native renders, one duplicated head frame
     dropped at every seam after the first."""
     segments = [{"index": i, "render_frames": render_frames,
                  "drop_head": (1 if i else 0), "trim_tail": 0}

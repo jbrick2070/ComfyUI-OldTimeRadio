@@ -5,7 +5,7 @@ The 8GB-tier LTX sibling. It animates a still into motion on the OFFICIAL LTX-Vi
 NOT the LTX-2.3 22B stack (`eng_ltx_video` / `eng_ltx_av`) and NOT the forbidden
 original `ltx-video-2b-v0.9.safetensors`. It is its own adapter/recipe: the 0.9.8
 graph was captured from a LIVE `/object_info` + a functional in-process smoke on the
-5080 (2026-07-20; see docs/2026-07-20-OTR-video-tiers/ltx_8gb_discovery.md).
+5080 (2026-07-20).
 
 The 0.9.8 all-in-one checkpoint carries MODEL + the video VAE **embedded** (no
 separate VAE fetch); it has **no text encoder**, so the T5 is the shared
@@ -319,7 +319,7 @@ _RECIPE_ENV_KEYS = {
 }
 
 #: Per-knob bounds for the tiled-decode geometry, from the LIVE ``/object_info``
-#: capture of 2026-07-20 (docs/2026-07-20-OTR-video-tiers/ltx_8gb_discovery.json):
+#: capture of 2026-07-20:
 #: ``VAEDecodeTiled`` declares tile_size min 64, overlap min 0, temporal_size
 #: min 8, temporal_overlap min 4. A value under the NODE'S OWN floor is a render
 #: that dies inside ComfyUI, so it is refused here like every other knob rather

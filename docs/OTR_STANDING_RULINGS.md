@@ -40,7 +40,7 @@ bottom, people really care."** Both done in `c0b6aeff`.
   declaration reached the registry only with this version.
 * **"Warts and all" means the suite is red on purpose and the failing SET is
   explained.** Baseline: 33 nodeids in a worktree at `cc62b2c1`; set-diffed, not
-  counted (`docs/2026-09-19-ship-regression.md`, correction section on top).
+  counted (ruling 2026-09-19, correction section on top).
   New since baseline: one environmental disk-space precheck. Fixed since: the
   B7 sweep, the installed-pack check, the replay test, the HF-offline stub, the
   Lemmy preset. Shipping as known failures: the cloud-lane fixtures, the
@@ -349,28 +349,17 @@ Veo at 1080p or 4K. Do not add a third upscale engine. ESRGAN stays the
 opt-in model. After the render is done, Basic is the cheap generate;
 Standard is the Lanczos 1920x1080 episode. See `apple/UPSCALERS.md`.
 
-## 2026-09-17 -- story and music are closed; public graphs go non-GGUF; test wave last
+## 2026-09-17 -- story and music are closed; test wave last
 
 Operator: *"DUMP THAT IM FINE WITH THE STORY AS IS MUSIC AS IT IS ITS GREAT
-WE FIXED IT"*; *"GGUFS DONT AUTO INSTALL SO I AM TRYING A FULL NON GGUF
-STAGE"*; looking for non-GGUF LTX 2.5 as a foley/mime substitute;
+WE FIXED IT"*; looking for LTX 2.5 as a foley/mime substitute;
 *"TEST WAVE AFTER CODING"*.
 
 * Do not reopen story-quality, writer-model, or music prompt-craft. The
   scripts and the music path are accepted. Tempo/groove/lottery rows are
   archive, not work.
-* Public / shipping graphs stay off GGUF. GGUF does not auto-install (pack
-  + files). Lab recipes that exist to exercise a GGUF lane may keep it.
 * The four-machine test wave stays after sections 1 and 2 are empty. Do not
   freeze a wave head to settle a coding row.
-* Official non-GGUF LTX 2.5 exists (`Lightricks/LTX-2.5` safetensors,
-  native Comfy T2V/I2V/FLF2V with synced audio). This 5080 box already
-  has the INT8 pack on disk. **It does not fit 16 GB:** official INT8
-  DiT is 20.027 GiB on disk, official NVFP4 DiT is 17.433 GiB, card is
-  15.92 GiB. Local `ltx25_*` stays on the Q3 GGUF DiT (lab peak 14.48
-  GiB with CPU TE). The public hole is `otr_16gb_video` /
-  `otr_16gb_foley` / `otr_16gb_mime`. Cloud deluxe already ships
-  `cloud_ltx25_foley_plus`.
 * THE CPU GRAPH IS RETIRED (2026-09-23). `otr_cpu_low` wrote through
   Comfy Credits -- Sonnet 5 + Luna, never local Qwen -- so it was a cloud
   tier wearing a CPU label, and it paid that writer only to render
@@ -486,17 +475,11 @@ tree rather than trusting an `obs_publish OK`. A third `obs` under
   receipts in `vram-recipe-lab/template_sweep/2026-08-21-grounded/` (migrating
   to baseline-models): 11 exact byte-hashed references, 2 qualified stand-ins,
   17 no-reference-by-design, 0 errors. Deltas are overwhelmingly documented
-  VRAM discipline (GGUF loaders, tiling, CPU pins; the 2.3 lanes run a
+  VRAM discipline (tiling, CPU pins; the 2.3 lanes run a
   FULL-PRECISION text encoder where the template ships fp8). **Live quality
-  candidates, in order: (1) wan_ti2v `uni_pc`/20 vs our `euler`/30 -- free,
-  pre-authorized by the ROI ruling the moment the static diff surfaced it;
-  (2) ltx25 stage-1 anchor 0.7 vs our 1.0 -- the one hero-lane knob never
+  candidate: ltx25 stage-1 anchor 0.7 vs our 1.0 -- the one hero-lane knob never
   tested (not among the six eliminated, all of which were grid-scored while the
-  grid rode in on the stills); (3) ltx_video LoRA strength 0.5 vs 0.7.**
-  Download-gated, operator authorization list only: the official 1.1 dynamic
-  rank-111 LoRA -- **NO LONGER GATED: downloaded on operator authorization
-  2026-08-21 (2.74 GB, byte-verified), tested in lane 5, closed NO WIN** --
-  alongside the still-frozen wan high-noise expert.
+  grid rode in on the stills).**
 * **baseline-models IS THE CLEAN HOME** (operator: it *"becomes our new
   diffomatic with the principle Codex taught us"*). The grounded differ and its
   receipts move there; the corpus's remaining fix is byte-true refetch with
@@ -556,57 +539,6 @@ server, per scope discipline); reviewer multiplication on integration (the
 more only on a blocker or disagreement). Ultracode changes HOW MANY EYES look
 at pixels and at a claimed win; it changes nothing else about the method.
 
-**Lane order (ALL THREE CLOSED NO WIN -- kept only so the contrast sets stay
-quotable; do not re-run them):** (1) `wan_ti2v` sampling recipe -- contrast set exactly
-{KSampler.sampler_name uni_pc-vs-euler, KSampler.steps 20-vs-30,
-ModelSamplingSD3.shift 8-vs-5}, bundled as a SCREEN, decompose only on a win;
-(2) `ltx25` stage-1 anchor 0.7-vs-1.0; (3) `ltx_video` LoRA strength
-0.5-vs-0.7. Download-gated (operator authorization only): official 1.1
-dynamic rank-111 LoRA **(DONE -- fetched and closed NO WIN in lane 5)**; wan
-high-noise expert (still frozen, and ruled out by the operator's 16 GB rule:
-14 GB of weights handing off to another 14 GB expert will not fit).
-
-**LANE 1 IS CLOSED: NO WIN. The shipped `wan_ti2v` recipe stands and nothing
-was queued as an OTR item** (2026-08-21 midday, `basline-models` `23c77a5`,
-verdict `basline-models/verdicts/lane1_wan_ti2v.md`). It is not a bare tie --
-two measurements on known ground truth put the official recipe BEHIND: temporal
-stability worse in 7 of 8 cells (+11% to +60% mean frame-to-frame change), and
-the test card's neutral grey wedge drifting to channel spread 11.50 against
-ours at 2.42. The one unanimous panel call for official was refuted 3/3 and the
-refutation was re-derived by the driver: the edge advantage is CONTRAST (raw
-ratio 1.222 at f097, 0.980 after identical autocontrast), and that cell is the
-one where the arms stopped rendering the same scene (NCC 0.627 vs 0.89-0.999
-elsewhere).
-
-**FOUR THINGS FROM LANE 1 THAT BIND THE REST OF THE PROGRAMME:**
-* **ONE EASY FIXTURE CANNOT CLOSE A LANE.** The officer close-up tied on every
-  seat; the operator called it before any judging and the panel confirmed it.
-  Every lane carries hard content AND the authored **test card**
-  (`staging/lane1_wan_ti2v/make_testcard.py`: colour bars, 16-step grey wedge,
-  shape rows, gratings 16px-3px, Sloan eye-chart rows, both polarities, drawn at
-  the exact render canvas so the latent resize is a no-op). Countable beats
-  impressionistic.
-* **THE A/A NULL IS NOW MANDATORY, ONCE PER LANE** (`tools/run_aa_control.py`).
-  The pipeline is bit-exact -- an identical graph reproduces all 97 frames by
-  sha256 -- and the panel returns TIE on identical pixels. That is the noise
-  floor every margin is read against.
-* **ADMIT A CELL ONLY IF THE ARMS STILL RENDER THE SAME SCENE.** Arm-to-arm NCC
-  at the final frame under ~0.90 means "which is better" is the wrong question.
-  Across lane 1's cells, correlation between arm similarity and decided votes
-  was -0.821: the panel ties when renders look alike and picks a winner when
-  they diverge.
-* **TONE FEEDS THE COUNTS.** Judges told to ignore contrast cannot. Contrast-match
-  before judging, or ask a tonal question outright.
-
-**WHAT LANE 1 DID NOT SCREEN, so it is not re-derived as new:** the fleet diff
-lists nine official-vs-ours differences; lane 1 screened the three sampler
-parameters and held the rest at ours in BOTH arms -- fp16 vs Q5_K_M GGUF
-weights, fp8-scaled vs GGUF text encoder, untiled vs tiled VAE decode, and the
-reference 1280x704 x 121 @ 24fps canvas. Each is its own candidate lane; the
-precision deltas are the interesting ones. Note also that `shift 8` was tested
-at an operating point it was not authored for (the engine documents 5.0 as the
-5B value), which bounds the null without rescuing it.
-
 **A PRODUCTION HAZARD FOUND IN PASSING, NOT FIXED (out of scope that window):**
 `copy.deepcopy` silently corrupts `wrapper_bridge.Wire`. It is a 2-tuple
 subclass taking two constructor arguments, so it inherits
@@ -618,15 +550,6 @@ time. **It is LATENT, not live: the only `deepcopy` in `_otr_video_engines` is
 currently exposed. It is a trap for the next person who copies a graph rather
 than a bug to chase now. Re-verify that grep before fixing; it is production
 code and wants the design test.
-
-**THE LANE 1 TAIL IS ALSO CLOSED (2026-08-21 afternoon, workbench `18fe7e6`):**
-the temporal metric is now a standard receipt field (`tools/temporal_stats.py`,
-wired into `render_arms.py`, all 16 legs backfilled), and the shift transplant
-objection is dead -- the refcanvas retest (crowd at 1280x704 x 121, both arms)
-shows the scene divergence disappearing (NCC 0.9698 vs 0.6269), detail tying
-exactly (0.995 raw and normalized), and official STILL marginally less stable
-with a faint hallucinated streak in its final frame. NO WIN holds at both
-operating points; no bound remains on the null.
 
 **LANE 2 IS CLOSED: NO WIN. The shipped ltx25 anchor 1.0 stands** (2026-08-21
 evening, `basline-models` `dc63ab0`, verdict `verdicts/lane2_ltx25.md`).
@@ -644,93 +567,15 @@ fixture, 4 legs on the existing harness.
 **WHAT LANE 2 ADDED TO THE METHOD (all pushed):** the r1 kibitz (Codex +
 Antigravity, scoped r1, reported as such) resolved the arm shape -- ONE
 constant drives BOTH anchors, so an i2v-only arm is not shippable -- and
-caught the runtime CPU-pin blocker, closed by the registered
-`CLIPLoaderGGUFCPU` as a documented shared ADAPT in both arms. Bible `12.122`
-promoted (301 entries, suite green): an in-process graph authoring form is not
-the HTTP prompt form -- V3 dynamic inputs dot-flatten, runtime class swaps
-re-declare, local classes fail closed. `tools/dynamic_input_census.py` sweeps
-this BEFORE a lane renders; it already flagged that **lane 3's `ltx_video` is
-unbuildable over the API** (local `_SigmasFromValues` class; the ADAPT path is
-the registered `ManualSigmas`, exactly as ltx25 uses). The completeness critic
-then caught a false receipt line in the lane 2 verdict itself (a lane-1
-permutation count pasted into lane 2); corrected in place, `seat_plan` now
-hashes lane+fixture+seed+seat, and the panel prompts are archived beside
-PANEL.json so its numbers can be re-derived.
-
-**LANE 3 IS CLOSED: NO WIN. The shipped `_LTX_DISTILLED_LORA_STRENGTH = 0.70`
-stands** (2026-08-21 afternoon, workbench `68ce4c5`, verdict
-`verdicts/lane3_ltx_video.md`). Panel dead heat (9 half / 8 ours / 1 TIE, no
-fixture decisive; "clear" margins pointed in OPPOSITE directions within the
-same cells -- on a t2v lane the arms compose different scenes from one seed,
-so seat margins are substantially scene luck, anticipated in the pre-declared
-matrix). A/A null 97/97 byte-identical, overlay check ran before the panel,
-the ManualSigmas ADAPT worked first try off the census flag.
-
-**THE LANE 3 COMPLETENESS CRITIC HAS NOW RUN (2026-08-21), AND IT CORRECTED
-THIS ENTRY. Every item below was re-verified by the driver against the real
-files before being folded into `verdicts/lane3_ltx_video.md`:**
-* The panel margin count was **10 clear**, not 9 (9 was the half-column total
-  pasted into the margin sentence).
-* The 0.5 arm does move less in 6 of 6 cells, but the range is **-6.4% to
-  -37.9%, median -26.3%** -- NOT the "25-38% on every cell" this entry used to
-  claim. March at seed 20260821 is only -6.4%.
-* **The "ours plays its instruments" read is WITHDRAWN.** Two of three seats at
-  march/seed42 record the opposite: half delivers the prompt's five brass
-  players while ours decays to 3-4 with deformations. Only the half-dressed
-  figure at f097 survives. NO WIN still stands, but on the BURDEN OF PROOF --
-  the candidate showed no material gain -- not on ours being visibly better.
-* **New bound, and it is the material one: the knob was screened on the
-  TEXT-ONLY path while `OTR_ENABLE_LTX_I2V` defaults to `"1"`**
-  (`eng_ltx_video.py:931`). Production conditions on an image by default, so
-  the null is bounded to t2v and the i2v question is a genuinely open NEW lane.
-* Arm-to-arm NCC, never computed during the lane, is **0.14-0.74 across all six
-  cells** -- every one under lane 1's ~0.90 admission line. That CONFIRMS the
-  scene-luck reasoning and explains why 9-8 carries no signal.
-* `seat1_full` and `seat2_full` were **byte-identical image sets** in all six
-  cells, and disagreed in 3 of 6. That is the judge noise floor, measured free.
-* Read order landed **14 candidate-first / 4 ours-first**; `seat_plan` has no
-  balance constraint, so lane 2's defect moved from seat1 to seats 2 and 3.
-* `PANEL_META.json` / `PANEL_PROMPTS` were **not archived** for lane 3, so its
-  judge model and questions are permanently unrecorded. Enforce in the harness.
-Bound unchanged: same-file-only (rank-111 LoRA stays download-gated).
-
-**FIVE LANES ARE NOW CLOSED, ALL NO WIN, EVERY SHIPPED RECIPE CONFIRMED WITH
-RECEIPTS** (2026-08-21). Lanes 1-3 as recorded above; then:
-
-**LANE 4 -- `wan_ti2v` TEXT ENCODER PRECISION: NO WIN** (workbench
-`e545404`..`2388fb5`). Our Q5_K_M umt5 against the fp8-scaled file the official
-template names; both were already on disk. **This was the first lane aimed at a
-COMPROMISE rather than a deliberate quality choice** -- the GGUF encoder exists
-for the 16 GB ceiling and its cost had never been measured. 8 legs, no OOM at
-14.4 GB. The decisive instrument was NOT the panel: `tools/encoder_delta.py`
-loads both encoders on CPU and compares the conditioning tensors directly.
-**They are NOT output-equivalent** -- cosine 0.9904-0.9959 but relative RMS
-0.355-1.041 -- yet the rendered video lands within ~1% on three of four cells.
-The input moves materially and the output barely does. On the test card both
-arms reproduce the SAME failure modes in the same places, including the same
-`TI2V`->`TIZV` corruption and the same artifact.
-**`testcard_motion` FAILED as a motion fixture:** prompted camera drift over a
-flat graphic still produces 0.0 px translation in both arms at both seeds
-(`tools/drift_stats.py`). It survives only as a STATIC acuity card.
-
-**LANE 5 -- THE OFFICIAL `ltx_video` PAIRING ON THE i2v PATH: NO WIN**
-(workbench `d90d747`, verdict `verdicts/lane5_ltx_i2v_official.md`). Closes
-BOTH bounds lane 3 left open: staged through `_build_graph_i2v` (the path
-production defaults to), against the official rank-111 dynamic LoRA at 0.5
-(2.74 GB, downloaded on operator authorization, byte-verified). Bundled screen,
-declared as such. **The pre-declared NCC admission gate rejected all four cells
-(0.40-0.69 against a 0.90 floor), so NO PANEL WAS RUN** -- and the A/A null
-(97/97 byte-identical, NCC exactly 1.000000) proves that gate measures the arms
-rather than engine noise. What decided it was the operator's eye: *"they all
-look good"*, *"the differences are minute."*
-
-**THE OPERATOR EYE SEAT WAS FINALLY EXERCISED** (`verdicts/OPERATOR_EYE.md`).
-24 blind pairs in one 93-second reel: **15 SAME, 5 decided, 4 skipped**, and no
-lane drew a consistent preference across both its seeds. It overturned nothing
--- and on lane 3 march/seed42 it independently landed on the same side as two
-blinded seats, confirming the driver's withdrawn strip read was wrong at BOTH
-seeds. He then returned to a SKIPPED segment and pointed out an **orphan drum
-in the SHIPPED arm**, verified at native pixels.
+caught the runtime CPU-pin blocker, closed by a documented shared ADAPT in
+both arms. Bible `12.122` promoted (301 entries, suite green): an in-process
+graph authoring form is not the HTTP prompt form -- V3 dynamic inputs
+dot-flatten, runtime class swaps re-declare, local classes fail closed.
+`tools/dynamic_input_census.py` sweeps this BEFORE a lane renders. The
+completeness critic then caught a false receipt line in the lane 2 verdict
+itself; corrected in place, `seat_plan` now hashes lane+fixture+seed+seat, and
+the panel prompts are archived beside PANEL.json so its numbers can be
+re-derived.
 
 **STILL-CANVAS REVIEW (workbench `ae441eb`) -- NOT ADOPTED, NOT REJECTED.**
 Production stills are already minted ABOVE every video canvas (1472x832
@@ -763,9 +608,7 @@ workbench HEAD; the handoff log stops at `ae441eb`). Two parts:
   to multiples of 16, so 1920x1080 becomes 1920x1072; `z_image_turbo` renders
   exactly 1920x1080.
 * **IDEOGRAM 4 IS NOW CLOSED: NO. Downloaded on operator authorization, tested
-  live, rejected before any code** (2026-08-21; verdict
-  `docs/2026-08-21-ideogram4-verdict.md`, tracked receipt
-  `docs/2026-08-21-ideogram4-probe-receipt.json`). The tested Macbeth card
+  live, rejected before any code** (ruling 2026-08-21). The tested Macbeth card
   prompt repeatably produced a model-rendered "Image blocked by safety filter"
   card at two seeds, with no supported runtime disable control found -- and the
   refusal presents as a normal `SUCCESS` with a valid non-black PNG, so a
@@ -795,51 +638,13 @@ workbench HEAD; the handoff log stops at `ae441eb`). Two parts:
   engine is a design change and would owe a full arc before code, not a Sonnet
   QA pass.
 
-**LANE 6 IS CLOSED: NO WIN on its matrix -- BUT IT FOUND FLICKER, AND THAT NEEDS
-THE OPERATOR** (2026-08-21, workbench `f71b24e`, verdict
-`verdicts/lane6_wan_tiled_decode.md`). `wan_ti2v` tiled-vs-untiled VAE decode,
-8/8 legs, purity gate clean, shipped recipe untouched.
-* **No tile seam.** The classic tiling artifact is absent -- highest lattice
-  concentration 1.093 against a declared 1.15 threshold, arms 98% identical
-  spatially. That was the pre-declared win condition, so on the matrix this is
-  a NO WIN and `VAEDecodeTiled` stands.
-* **THE UNANTICIPATED FINDING: the TILED arm churns 4.3x and 4.9x more at the
-  median on the test card, at both seeds** (2.83 vs 0.66; 2.83 vs 0.58), on a
-  fixture whose prompt demands a rigid static card -- so that change is
-  flicker. p95 and max are close between arms, so it is the BASELINE that
-  differs, not a few events. On real crowd content the gap collapses to
-  1.2-1.4x. Frozen-clip ruled out: both arms travel the same frame-1-to-97
-  distance within 6%, i.e. same trajectory, smoother path.
-* **NOT cashed as a win, deliberately.** Promoting a temporal result after
-  declaring a seam matrix would be the goalpost move lane 5 refused. It earns a
-  follow-up lane with a temporal matrix declared up front.
-* **What is still missing is the whole cost side:** decode time was confounded
-  by ComfyUI caching the shared latent (the `ours` leg paid for sampling, so the
-  180s-vs-18s split is NOT "untiled is 9x faster"), and no per-arm VRAM peak was
-  measured. Tiling exists for VRAM; nobody has priced removing it.
-* **This is a QUALITY finding, which is the one class the "recipes are not on
-  the table" directive does not cover** -- that directive exempts VRAM and speed
-  findings. So it is the operator's call, and he needs the cost half first.
-
 **LANE 7 IS STAGED AND RENDERING** (workbench `8922eba`): the `ltx25` MOTION
 fixture lane 2 said it owed, same anchor contrast (1.0 vs 0.7, both leaves),
 two i2v fixtures that demand traversal and head rotation, purity gate clean.
 **A motion gate is declared before rendering and fails closed on the lane's own
-premise** -- lane 4's `testcard_motion` produced 0.0 px translation in both arms,
-so if neither arm moves here the cell is NOT judged and the verdict is "the
-fixture failed", not "soft ties on motion".
-
-**THE PROGRAMME'S NEXT STEP IS A DECISION, NOT A RENDER.** Per the standing ROI
-ruling ("if no rendered candidate wins materially, stop the program and retain
-the corpus"), the nulls are that condition. Remaining candidate: the
-full-precision wan UNET (~10 GB, coin-flip on fit, the LARGEST untested 16 GB
-compromise). **The operator's 16 GB rule governs downloads: "if the model can
-run under 16gb that's fine we download."**
-
-**A BOUND THAT MUST BE WRITTEN INTO ANY CLOSING STATEMENT:** five lanes tested
-KNOBS. The single biggest 16 GB COMPROMISE -- the Q5_K_M UNET -- was never
-challenged, because the official full-precision counterpart is not on disk.
-Five nulls must NOT be read as "the compromises are validated."
+premise** -- a prior static test card produced 0.0 px translation on a prompted
+camera drift, so if neither arm moves here the cell is NOT judged and the
+verdict is "the fixture failed", not "soft ties on motion".
 
 **Bible now 302 entries (`8b194d3`), 22/26/3.** `12.123` promoted 2026-08-21 evening: a harness that hardcodes one graph builder measures the path production does not use (lane 3 screened text-only for twelve live legs while `OTR_ENABLE_LTX_I2V` defaults on). `12.122` and `12.121` promoted this
 morning: an uncontrolled second variable voids every arm of a visual A/B (the
@@ -864,8 +669,7 @@ confident about goes to the panel BEFORE you write code. Ground every panel
 claim against the real Windows files and discard what does not survive.
 
 **THE ARC FOR THIS SPRINT ALREADY RAN (2026-08-15) -- do not re-run it.** Four
-rounds, 14 external reviews, output =
-`docs/2026-08-15-BUILD-CONTRACT-bugfix-sprint.md`. Provenance, stated precisely
+rounds, 14 external reviews (the 2026-08-15 build contract). Provenance, stated precisely
 because a partial campaign may never be reported as a full arc: Codex covered
 all four rounds; **Antigravity covered r1 ONLY** and was quota-held
 (`RESOURCE_EXHAUSTED` 429) through r2-r4, recovering only afterwards; the cloud
@@ -929,7 +733,7 @@ supersedes the 2026-08-21 block):** suite **12141 passed / 134 skipped /
 silent) at the order-6 head, never derived. Bible **22 / 26 / 3** (re-run at
 wrap-up, Bible repo synced to origin/main). `build_variants.py --check`
 **54 variants / 2 failures -- and BOTH failures are the DEFERRED
-`otr_ghost_signal_v3` drift** (`docs/2026-08-22-variant-drift-DEFERRED.md`);
+`otr_ghost_signal_v3` drift** (deferred 2026-08-22);
 any third failure is NEW. Canonical validator **23 nodes / 57 links**; the
 saved canonical Git blob remains `c27dff3690030e78d88c3a2607a9ac54fd3935d9`,
 byte-identical through the whole campaign. **The PACK ROSTER baseline moved:
@@ -1172,7 +976,7 @@ fix, and it is why the deterministic option was offered and NOT chosen -- it
 cannot reach b002, whose dialogue names no listed object at all, and b002 is the
 beat he actually complained about.
 
-Design record: `kibitz-runs/2026-09-03-prompt-v3-half-b/` (5080-local).
+Design record: the 2026-09-03 prompt v3 half-b kibitz round (5080-local).
 
 **THE PROMPT FORMULA, IN HIS OWN WORDS (same ruling, 2026-09-03):**
 
@@ -1329,7 +1133,7 @@ either of them; it does not merge the two files into one.
 ## AN ALL-REFUSED EPISODE STILL PUBLISHES (operator ruling 2026-08-27 -- hard)
 
 **THE QUESTION, and it was asked because a panel refused to answer it for him.**
-The r1 judgment at `kibitz-runs/2026-08-25-model-refusal-required-still/r1/`
+The r1 judgment (2026-08-25 model-refusal-required-still kibitz round)
 found that node 92's success check is `clip_count > 0`
 (`otr_video_render_batch.py:556-563`), so an episode in which EVERY required
 still was sanctioned-gapped would report FAILURE even though every individual
@@ -1386,11 +1190,8 @@ already-pruned models went with it. Precedent: the same operation on 2026-05-23
 pruned two community WARN-tier 12B rows.
 
 **THE OLLAMA HALF HAD ZERO TARGETS, and that is worth recording so nobody
-re-hunts it.** Nothing in OTR uses Ollama. The GGUF lane is IN-PROCESS
-llama-cpp-python -- `nodes/_otr_gguf_backend.py` (DELETED 2026-09-24 with the
-writer GGUF lane; quoted as the record of what it said while it existed, not as
-a file to go read) stated it opens no port and
-does not call Ollama. There is no daemon, no sidecar, no HTTP hop to remove.
+re-hunts it.** Nothing in OTR uses Ollama. There is no daemon, no sidecar, no
+HTTP hop to remove.
 
 **DO NOT READ A >16 GB DISK SIZE AS "DOES NOT FIT".** `approx_safetensors_gb`
 is the DOWNLOAD size, not the VRAM resident size -- the field's own comment
@@ -1796,7 +1597,7 @@ Two changes serve that, and neither is a gate:
    Foreign frames arriving from a dice roll are melding by another route.
 
 **`public_domain_plays` is DEFERRED TO v2.1**
-(`docs/2026-08-03-public-domain-plays-PLAN.md`, research complete, nothing built).
+(research complete 2026-08-03, nothing built).
 That avoids a third bank row, which is never one line: it would force a pack
 directory, a registered fetcher, an executable pipeline, family-policy coverage and
 updates to exact-roster contract tests.
@@ -1927,11 +1728,6 @@ one costs more than the length does.**
   proof and rip all shipped (`429b73aa`).
 * **PBUG-20260817-07 (stage directions in captions): WILL-NOT-FIX**, operator
   ruling.
-* **TRAP -- public `ltx_video` prompt guidance CONTRADICTS an operator
-  directive.** The guides say camera-move-first; he directed subject-first, and
-  rewriting the registers the wrong way cost 40% of the motion at a fixed seed.
-  **Do not adopt it.** The sibling Wan lane proves no global prompt rule works --
-  each engine's `PROMPT_STYLE_NOTES` is the authority.
 * **Disguise plots are a legitimate gender-scan hit:** ROSALIND-as-Ganymede and
   VIOLA-as-Cesario keep female voices by operator ruling. Read that list, do not
   total it.
@@ -2023,7 +1819,7 @@ place.
 **So there is nothing queued here, and the module must NOT be deleted.** That
 inverted test is the tripwire that makes a re-armed content filter fail loudly;
 removing the module removes the guard. Reasoning and the wider dead-symbol
-sweep: `docs/2026-08-22-dead-symbol-inventory.md`.
+sweep were recorded 2026-08-22.
 
 ## Standing operator directives (hard)
 
@@ -2102,7 +1898,7 @@ box as the repo, and two of CLAUDE.md's assumptions do not hold:
   nv50 re-soak -- the two open portability remainders; release QA validation time, not
   coding.
 - **SFX: RETIRED and RIPPED (operator ruling 2026-08-06, "rip out SFX 100%";
-  executed `9eb6ede1` per `docs/2026-08-06-BUILD-SPEC-rip-sfx.md`).** The five
+  executed `9eb6ede1`).** The five
   bed engines are deregistered and barred via `RETIRED_ENGINE_IDS`, the bed
   compiler and mux mix branch are deleted, and
   `tests/test_rip_sfx_bed_guard.py` trips on any surface creeping back.
@@ -2144,8 +1940,7 @@ here because each has been re-proposed at least once:
 * **The 20 fabricated-fixture `public_domain` episodes and the fixture itself** --
   operator ruling 2026-08-04: dropped and deleted, **never raise again**.
 * **v4 improvement campaign banks #2-#5** -- PARKED, superseded by the keep-6
-  rename + THE LAW. Revive only by operator decision
-  (`docs/2026-07-17-v4-campaign/final.md`).
+  rename + THE LAW. Revive only by operator decision.
 * **LEAN-MEAN** -- scheduled in `ROADMAP.md`; executable scope and order live in
   `docs/LEAN_MEAN_CLEANUP.md`, not this file.
 
@@ -2158,15 +1953,7 @@ here because each has been re-proposed at least once:
 - `docs/PRODUCTION_SPRINT_LESSONS.md` (incl. lesson 11 pointer-not-proof; 24 lost-anchor; 25 bank-teardown)
 - `docs/SOURCE_BANK_PREFLIGHT.md` -- add-a-bank gate + the Teardown protocol
 - `docs/PROD_BUG_LOG.md` (promotion is tracked in the Bible repo's `otr_coverage_index.yaml`)
-- `docs/2026-08-04-POSTMORTEM-still-unmaterialized-320w.md` / `docs/2026-08-04-D1-SHIPPED-still-skip-evidence.md`
-- `docs/2026-08-03-fidelity-pass-ownership.md` (the ownership table the verbatim executor is gated on)
-- `docs/2026-08-03-script-parse-repair-CODE-READY.md` (writer scaffolding repair increments 1-5)
-- `docs/2026-08-03-public-domain-plays-PLAN.md` (v2.1, researched, nothing built)
-- `docs/2026-07-31-four-arm-clamped-video-bench-SPEC.md` (the isolated-bench carve-out)
-- `docs/2026-07-24-independent-source-banks-v1-plan.md` / `docs/EXTENDING_OTR.md`
-- `docs/2026-07-12-randomizer-rolls-r2-coding-plan.md` / `docs/2026-07-12-dynamic-story-visual-scope.md`
-- `docs/2026-07-11-announcer-framing-defect.md` (PARKED) / `docs/2026-07-11-timeline-cue-ledger.md`
-- `docs/2026-07-17-model-bakeoff-scoreboard.md` (writer-model verdict)
+- `docs/EXTENDING_OTR.md`
 - `workflows/otr_canonical.json` (the workflow source of truth)
 
 
@@ -2207,7 +1994,7 @@ closed story-quality directive and of the fidelity lanes' invents-nothing rule
 at the TEXT level.
 
 This closes the second half of section 7 of
-`docs/2026-08-06-PROBLEM-STATEMENT-banana-route.md` (committed `9c686886`).
+the 2026-08-06 banana-route problem statement (committed `9c686886`).
 
 **THE DEFAULT AND THE REACH ARE ALSO RULED NOW (2026-08-06, `ec9da848`) --
 that question is CLOSED, do not reopen it.** Global default **ON**, with
@@ -2217,7 +2004,7 @@ force-on override. **NO node widget and NO `workflows/otr_canonical.json`
 change.** So `Is this a dagger which I see before me` stays a dagger on the
 fidelity lanes unless the operator flips the override. Two env switches
 (`OTR_BANANA_STILLS`, `OTR_BANANA_VIDEO`), one per funnel. The whole contract is
-`docs/2026-08-06-BUILD-SPEC-banana-route.md` at `ec9da848`; SHIPPED -- see
+the 2026-08-06 banana-route build spec at `ec9da848`; SHIPPED -- see
 section 0-QUATER above (`bc8a1bde`).
 
 ### 2. Operator calls nobody can make for you
@@ -2267,12 +2054,9 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
 
 ## KNOWN OPEN -- do not rediscover these
 
-* The VRAM admission guard covers coverage-executed beats only; the single-clip path
-  returns via `render_shot()` first, and `ltx_audio_in` is not in
-  `PLANNING_CAP_ENGINES` -- so the hottest-peaking engine is unguarded.
 * `FRAME_COST_MODEL` is keyed by engine NAME while recipe/quant/LoRA/reserve are
   env-configurable; a measured row needs a calibration IDENTITY.
-* Four adapters still cite missing receipts (`ltx_audio_in`, `mesh_stage`, `viz_green`,
+* Three adapters still cite missing receipts (`mesh_stage`, `viz_green`,
   `viz_mxc_mandala`).
 * The HuMo lip-sync onset fix is SPECIFIED but unbuilt, blocked on M1 classification
   (`BUG_BIBLE.yaml:2343`: audio leads the lips by 100-200 ms with the face static for
@@ -2292,15 +2076,14 @@ full `r2 -> r3 -> r4` gate defined in `docs/LEAN_MEAN_CLEANUP.md`.
 * `humo_1.7B` and `ltx_8gb` are marked CUDA-only with no fp8, no fp4 and no stated
   reason. Unexamined, not proven.
 * M2's raw rows sit in swept `tmp/` with no pinned digest or config manifest.
-* `docs/2026-08-02-IDEA-hardware-compatibility-matrix.md` -- captured, not scoped.
+* A hardware-compatibility matrix idea (captured 2026-08-02, not scoped).
   Includes the Mac research: Metal has no `Float8_e4m3fn`, ComfyUI+MPS video is
   impractical (82 min for a 2-second clip), Draw Things and MLX are ~100x faster and DO
-  support LTX-2.3 with joint audio, and the `viz_*`/`still_*` lanes need no GPU at all.
+  support joint-audio video generation, and the `viz_*`/`still_*` lanes need no GPU at all.
 * Writer scaffolding repair increments 1-5 -- the spec needs its r3 CORRECTION
   before any code (NEXT CODING QUEUE item 3; the "code-ready" title is stale);
   the reuse detector to the panel; section 0A carve-out ruling before M2 numbers
-  move caps; Wan 2.2 I2V checkpoint download + `wan_i2v` re-run; the
-  `OTR_CastLock` freeze cascade (`wan_ti2v`).
+  move caps.
 
 **Standing traps and recorded limits moved here from `docs/GO_FORWARD_PLAN.md` on
 2026-09-02 (carried knowledge; no scheduled work):**
@@ -2617,21 +2400,6 @@ the same day: *"kokoro onnx is our new go-to."*
 * This closes the 2026-09-01 ship-audit blocker about the indextts2 default without
   shipping WAVs, and it makes the Python 3.12 / 3.13 split irrelevant to voices.
 
-## IMAGE ENGINE DEFAULTS BY MACHINE CLASS (operator ruling 2026-09-01)
-
-Operator: *"Klein 4B Q4 GGUF can be the default for Mac / AMD and 30/40/50 series low VRAM
-JSON."*
-
-* The low-VRAM saved dropdown set (Mac, AMD, and NVIDIA cards below the 16 GB class) uses
-  `flux2_klein` with the Q4 GGUF DiT for every image slot. Z-Image-Turbo remains the 16 GB
-  NVIDIA default. The canonical workflow keeps Z-Image; the variants carry the class default.
-* ComfyUI-GGUF is therefore a documented prerequisite of the low-VRAM set, alongside LTX 2.5.
-* The machine matrix marks a class PROVEN on Klein only after a measured render on that
-  class (Batch R7 Leg C for 8 GB NVIDIA; Apple Silicon and ROCm each need their own). Until
-  then the row reads "ruled default, unmeasured".
-* APPLIED 2026-09-01: all 19 8 GB / 12 GB / AMD profiles carry `flux2_klein` in every image
-  slot; `config/machine_classes.json` says so for the 8gb, 12gb and amd classes.
-
 ## Z-IMAGE-TURBO RUNS AT cfg 1.0 (operator ruling 2026-09-01, on a same-seed A/B)
 
 Operator, choosing among the four A/B frames: *"I like the last one because it's the
@@ -2647,8 +2415,8 @@ the 16 GB default "work, be less friction and fit VRAM for our 8 GB and 16 GB de
   tail in the positive prompt carries the filmic look.
 * Z-Image-Turbo stays the 16 GB NVIDIA default. Weight follows the card through the existing
   compute-capability ranking: nvfp4 on Blackwell, bf16 on Ampere/Ada.
-* Receipts: `docs/2026-09-01-16GB-IMAGE-ENGINE-PROBLEM-STATEMENT.md` and
-  `docs/ship-audit-2026-09-01/image-jury/zab_{nvfp4,bf16}_cfg{2.0,1.0}.png`. One seed and
+* Receipts: the 2026-09-01 16 GB image-engine problem statement and its
+  same-seed A/B jury stills. One seed and
   one prompt; the three-prompt eyeball on real episode stills is the promotion step.
 
 ## MAC AND AMD SHIP IMAGES ONLY (operator ruling 2026-09-01)
@@ -2660,7 +2428,7 @@ the 16 GB default "work, be less friction and fit VRAM for our 8 GB and 16 GB de
 > registry rows carry `mps` accordingly. The second clause -- "it stays on
 > `google_image` until a local image engine declares `mps`" -- is also spent:
 > `sd15` declares `["cuda","cpu","mps"]` and minted the stills in FOUR published
-> Mac episodes, and `config/profiles/otr_mac_mps.json` has used it throughout.
+> Mac episodes, and the Mac profile has used it throughout.
 >
 > **STILL STANDING FOR AMD**, and untouched: nothing in this repo has ever run
 > on AMD hardware, and `docs/DROPDOWN_MATRIX.md` records AMD at 0 of 68 cells.
@@ -2673,11 +2441,11 @@ fine only giving them images if that's the case."*
 
 * The Mac and AMD saved dropdown sets carry NO video-diffusion engine. Their video roles
   use the still and procedural lanes (`still_*`, `viz_*`) driven by the image engine ruled
-  for the low tier (Klein 4B Q4 GGUF). Nothing in the video registry declares `mps`, and
+  for the low tier. Nothing in the video registry declares `mps`, and
   ROCm has no measured render; that is the fact behind the ruling, and it stands until a
   video engine publishes an episode on one of those machines.
 * APPLIED 2026-09-01: `config/machine_classes.json` amd `video` is `still_motion` (it had
-  advertised `wan_ti2v`, unproven there), both AMD profiles run `still_motion` for the
+  advertised a video-diffusion engine, unproven there), both AMD profiles run `still_motion` for the
   character lane and the procedural viz lanes for announcer and music, and the matrix reads
   it. The mac profile was already images-only (`still_motion`, `draft`); it stays on
   `google_image` until a local image engine declares `mps` in the registry.
@@ -2699,7 +2467,7 @@ three of the four had not been. They are the authority now; the plan keeps a poi
   and `git log` `d3cca496`..`5cd4dcc8`). AMENDED 2026-08-29 by the operator for the
   loudness fix: golden-shaped foley prose IS allowed in the joint-AV prompt; dialogue,
   identity and voice words stay banned.
-* From the archived GGUF generation-deadline row (CLOSED 2026-08-25), the reusable
+* From an archived generation-deadline row (CLOSED 2026-08-25), the reusable
   lesson: **"A reachability question answered against the default path only is not
   answered."**
 

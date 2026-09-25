@@ -276,7 +276,7 @@
     },
     {
       "id": "otr_16gb_foley",
-      "display_name": "16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_native_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s. See docs/2026-09-22-native-ltx25-16gb/FINDINGS.md.",
+      "display_name": "16 GB NVIDIA -- video that generates its own sound, mixed under the voices. Lane ltx25_native_foley_16gb (mix4x8-13.8GB) through the stock UNETLoader/CLIPLoader; every weight is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. MEASURED on an RTX 5080 Laptop 2026-09-23: one 97-frame 1664x960 clip with foley in 205.3 s.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -863,7 +863,7 @@
           "ltx-2.5-video-vae-bf16.safetensors",
           "ltx-2.5-audio-vae-bf16.safetensors",
           "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-          "stable_audio_3_small_music.safetensors",
+          "stable_audio_3_small_music_base.safetensors",
           "t5gemma_b_b_ul2.safetensors"
         ]
       }
@@ -907,7 +907,7 @@
           "ltx-2.5-video-vae-bf16.safetensors",
           "ltx-2.5-audio-vae-bf16.safetensors",
           "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-          "stable_audio_3_small_music.safetensors",
+          "stable_audio_3_small_music_base.safetensors",
           "t5gemma_b_b_ul2.safetensors"
         ]
       }
@@ -951,7 +951,7 @@
           "ltx-2.5-video-vae-bf16.safetensors",
           "ltx-2.5-audio-vae-bf16.safetensors",
           "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
-          "stable_audio_3_small_music.safetensors",
+          "stable_audio_3_small_music_base.safetensors",
           "t5gemma_b_b_ul2.safetensors"
         ]
       }

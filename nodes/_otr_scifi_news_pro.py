@@ -1644,8 +1644,7 @@ def _extract_complete_source_dossier(
 #: object. gemma-4-E2B-it failed ALL THREE ladder rungs on a live leg with the
 #: same error each time -- "no decodable top-level JSON object found" -- after
 #: stopping at 503 tokens of a 700-token budget, i.e. it believed it had
-#: finished while the object was still unclosed. Evidence:
-#: docs/2026-08-25-leg1-dossier-failure-evidence.md.
+#: finished while the object was still unclosed.
 #:
 #: WHY NOT GRAMMAR-CONSTRAINED DECODING, which was the obvious fix and was
 #: REJECTED at r1: under a grammar the legal minimum for DossierLLM is one fact

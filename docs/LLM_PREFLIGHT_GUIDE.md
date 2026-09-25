@@ -8,6 +8,3 @@ add-your-own pages:
 `docs/` is stripped from a Manager install. `apple/` ships. The seven gates,
 the field contract, and the split between "a user can pick anything" and
 "what this pack ships" are there.
-
-Do not restore a GGUF writer path here. Writer GGUF ids are rejected in
-the catalog. Video-engine GGUF is a different dropdown.

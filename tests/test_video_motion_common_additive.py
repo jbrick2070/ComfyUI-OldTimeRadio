@@ -30,10 +30,10 @@ def test_sageattention_patched_detects_module_and_env_override():
 def test_assert_sage_not_patched_raises_when_patched_else_returns():
     with pytest.raises(erb.EngineUnusable) as exc:
         mc.assert_sage_not_patched(
-            "ltx_video", "text_to_video", modules={"sageattention": 1})
+            "ltx25_video", "text_to_video", modules={"sageattention": 1})
     assert exc.value.reason is erb.EngineUsabilityReason.INCOMPATIBLE_PROFILE
     assert mc.assert_sage_not_patched(
-        "ltx_video", "text_to_video", modules={}, env={}) == "ltx_video"
+        "ltx25_video", "text_to_video", modules={}, env={}) == "ltx25_video"
 
 
 def test_resolve_isolation_escalates_optional_when_sage_resident():

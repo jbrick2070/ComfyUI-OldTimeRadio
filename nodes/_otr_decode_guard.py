@@ -25,9 +25,8 @@ back. That is what a runaway actually is, and it is:
 * **tokenizer-independent** -- nothing is decoded, so isolated-token decoding
   compositionality, byte-fallback pieces and escape handling stop being risks.
 
-WHAT THIS IS, EXACTLY -- framing corrected by a blind frontier panel 2026-08-13
-(`docs/2026-08-13-blind-runaway-detection/`), which was given the three
-specimens and NO description of this module, and independently landed on a
+WHAT THIS IS, EXACTLY -- framing corrected by a blind frontier panel 2026-08-13,
+which was given the three specimens and NO description of this module, and independently landed on a
 StoppingCriteria with a ~2,000-token per-string bound. Two of its corrections
 change what this file may claim about itself:
 

@@ -50,7 +50,7 @@ fields from V4's excluded list (`news_briefs_halt_reason`, `ledger_scrub`,
 `story_spine_status`, `vram_at_cascade_entry_gb`, `post_upscale_blend`,
 `freeze_capability_receipt`, `slot_drama_contracts_audit`,
 `exchange_prepass_audit`, `post_assembly_key_terms`) -- unique receipts,
-KEEP; historical docs and `kibitz-runs/` are records, never callers, and
+KEEP; historical docs are records, never callers, and
 are never edited to "fix" references to deleted files.
 
 ## V5 TARGETS -- where the remaining bodies are likely buried

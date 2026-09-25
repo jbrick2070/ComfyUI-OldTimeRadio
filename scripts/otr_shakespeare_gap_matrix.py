@@ -21,8 +21,7 @@ import os
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 LEADS = os.path.join(REPO, "config", "source_banks", "shakespeare",
                      "translations", "leads.json")
-OUT = os.path.join(REPO, "docs", "2026-09-18-fidelity-lane-translation",
-                   "GAP_MATRIX.md")
+OUT = os.path.join(REPO, "apple", "SHAKESPEARE_GAP_MATRIX.md")
 
 # The 14 target scenes, exactly as the matrix has always named them.
 TARGETS = [

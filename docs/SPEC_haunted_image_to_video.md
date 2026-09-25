@@ -206,8 +206,8 @@ specified — run the disqualifying probe first.** I accept that.
 
 2. **"Six engines already declare image_to_video" was wrong.** It is **12
    declarations across 8 files** — I counted files with `grep -l` and reported
-   them as engines. `eng_wan_ti2v.py` and three separate engines inside
-   `eng_cloud_video.py` were missed.
+   them as engines. Three separate engines inside `eng_cloud_video.py`
+   were among those missed.
 
 3. **File attribution in section 3 is loose.** The live haunted lane is
    `GhostSignalV3HauntedEngine` in `eng_ghost_signal_official.py:120`. The
@@ -276,7 +276,7 @@ Repeating one still latent across the window gives the motion module's temporal
 attention identical cross-frame keys and queries, which suppresses motion
 trajectory while leaving high-frequency texture free to boil. SD1.5 AnimateDiff
 has **no image-conditioning channel** without SparseCtrl or IP-Adapter, unlike
-Wan/LTX which condition through DiT patches.
+LTX, which conditions through DiT patches.
 
 **This is reasoning, not measurement, and I am recording it as such.** But it
 predicts exactly the failure the probe is designed to detect, which is a good
@@ -377,10 +377,9 @@ Verified present in the repo and enforced by tests:
 
 ### 11.5 Factual corrections to earlier sections
 
-* **12 effective `image_to_video` engines, not six.** Verified against the live
-  registry: `cloud_vidu_q2_pro_fast_720p`, `cloud_wan_i2v`, `fastwan_8gb`,
-  `ltx25_foley_plus`, `ltx25_mime`, `ltx25_video`, `ltx_8gb`, `ltx_video`,
-  `mesh_stage`, `minimax_h3_video`, `wan_ti2v`, `word_razzle`.
+* **12 effective `image_to_video` engines, not six**, verified against the
+  live registry at the time -- the cloud lanes, the LTX lanes, `mesh_stage`
+  and `minimax_h3_video` among them.
 * **The golden and clean-v3 Ghost lanes are not selectable siblings.** They are
   unregistered/tombstoned bases kept as inheritance references.
   `animatediff15_v3_haunted_video` is the one surviving AnimateDiff lane.

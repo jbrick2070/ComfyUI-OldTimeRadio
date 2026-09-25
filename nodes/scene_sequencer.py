@@ -635,7 +635,7 @@ def _master_loudness(waveform, ceiling_dbfs: float = -1.0, makeup_db=None,
 # left UNCHANGED (makeup 4.0), and the target sits at ~ the level peak-norm
 # already produced, so overall loudness is preserved -- only the per-line
 # balance evens out. CPU/numpy-only, deterministic. Roundtable-converged
-# 2026-06-22 + operator "bake it in" (docs/2026-06-22-loudness-normalization).
+# 2026-06-22 + operator "bake it in".
 # ---------------------------------------------------------------------------
 
 _LOUDNORM_PREFLIGHT_LOGGED = False
