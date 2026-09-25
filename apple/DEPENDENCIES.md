@@ -30,7 +30,7 @@ python3 -c "import folder_paths,os;print(os.path.dirname(folder_paths.__file__))
 
 ## 0. ComfyUI itself has a minimum version
 
-Some lanes resolve node classes that live in ComfyUI CORE, not in any node pack, so an older ComfyUI fails them no matter what you install. The failure arrives at RENDER time as WrapperNodeMissing, typically seventeen minutes in, after the script, cast, voices and stills are already done -- it looks nothing like a version problem.
+Some lanes resolve node classes that live in ComfyUI CORE, not in any node pack, so an older ComfyUI fails them no matter what you install. Since 2026-09-25 the queue-time gate checks every selected engine's node classes BEFORE any download, so the refusal comes in seconds and says "Update ComfyUI: these are built-in ComfyUI nodes that this version does not have" (until then it arrived at render time as WrapperNodeMissing, typically seventeen minutes in, and looked nothing like a version problem).
 
 | lane | needs | why |
 |---|---|---|
@@ -109,12 +109,12 @@ Each pins torch/transformers versions that would brick ComfyUI's own venv, so th
 
 ## 3b. Other custom node packs
 
-OTR resolves these node CLASSES by name at render time, so a missing pack does not fail at startup -- it fails deep inside an episode, after the script, cast, voices and stills are already done. A video lane once died seventeen minutes in with WrapperNodeMissing for exactly this reason.
+OTR resolves these node CLASSES by name. Since 2026-09-25 the queue-time gate checks them before any download, so a missing pack refuses the graph in seconds with the install instruction first ("Install ComfyUI-AnimateDiff-Evolved (Kosinkadink) from ComfyUI Manager, then restart ComfyUI"). Before that it failed deep inside an episode, after the script, cast, voices and stills were done -- a video lane died eighteen minutes in with WrapperNodeMissing on a fresh install for exactly this reason (PBUG-20260925-02).
 
 | pack | who needs it | what breaks without it |
 |---|---|---|
 | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |
-| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `ltx25` | the advanced LTXV nodes (ImgToVideoInplace, LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, EmptyLatentAudio, ModalityGuidance). ComfyUI core ships only Conditioning/Scheduler/ImgToVideo -- enough for `ltx_8gb`, not for `ltx25`. |
+| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `ltx_8gb` (the 0.9.x lane), per [patches/README.md](../patches/README.md) and its kornia pad patch | NOT `ltx25`: every class the LTX 2.5 lanes ask for (ImgToVideoInplace, LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, EmptyLatentAudio, ModalityGuidance) is ComfyUI core since v0.32.0 (section 0). Measured 2026-09-25 from the live server's `/object_info` `python_module`: `comfy_extras.nodes_lt*`, not the pack. And the pack's own registry (75 node ids) contains NONE of the classes any OTR engine asks for, while no OTR module imports its Python -- so on a current ComfyUI it is a dependency of nothing shipped. The 4060's B4 leg on a wiped box without it is the live confirmation; after that the provisioner stops cloning and patching it (plan row 0b). |
 
 `scripts/otr_provision.py` clones all three. If you install by hand, clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node classes are registered at startup.
 

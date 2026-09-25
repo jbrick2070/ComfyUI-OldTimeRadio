@@ -168,16 +168,18 @@ writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
 the pin still governs Bark, MusicGen, the visual assets and the provisioner,
 and the 162-character tail it sizes for was always the visual one.
 
-### 0b. Name the node pack for every engine in the queue-time gate (from the 02758478 reviews)
+### 0b. Retire the ComfyUI-LTXVideo dependency (measured 2026-09-25; lands after B4)
 
-`_otr_visual_assets._refuse_missing_node_packs` (`02758478`) leads with an
-install instruction only for Ghost Signal (`NODE_PACK_HINT`); HuMo, LTX 2.5,
-MiniMax H3 and mesh get the generic "install the node pack that provides
-these classes". `wrapper_bridge._PACK_FOR_PREFIX` / `_pack_hint()` already
-map a class-name prefix to its pack and URL (`ADE_`, `VHS_`) -- extend that
-table for the other engines' wrapper prefixes and have the gate read
-`_pack_hint(absent)` instead of a per-engine constant. One verifiable answer;
-no arc.
+`scripts/otr_provision.py` clones ComfyUI-LTXVideo at a pinned commit and
+applies `patches/ComfyUI-LTXVideo-kornia-pad.patch`; DEPENDENCIES.md 3b and
+README's node-pack paragraph name it for `ltx_8gb` / `ltx098_low_video`.
+Measured: every class the LTX 2.5 and LTX 8 GB engines ask for is ComfyUI
+core (`comfy_extras.nodes_lt*`, live `/object_info`), the pack's own registry
+(75 ids) holds none of them, and no OTR module imports its Python. It is a
+dependency of nothing shipped. Wait for the 4060's B4 (`otr_8gb_video` on a
+wiped box with no such pack) to publish; then rip the clone, the patch, its
+provisioner checks and tests, and the two doc mentions in one change. If B4
+fails for want of the pack, this row flips to "document why".
 
 ## 3. TEST
 
@@ -192,7 +194,12 @@ so A3 and the Ghost Half B measurement A4 stay OWED on the 16 GB row -- one
 leg then FAILED on the missing AnimateDiff-Evolved pack (PBUG-20260925-02,
 fixed `02758478`); the operator is wiping the 4060 for a fresh start, so the
 sequence there is: install, queue `otr_8gb_animatediff` WITHOUT the pack and
-log the t=0 refusal (the live verify), install the pack, B3, B4. Part C: the
+log the t=0 refusal (the live verify), install the pack, B3, B4. Measured
+2026-09-25 from the live server's `/object_info` `python_module`: AnimateDiff-
+Evolved is the ONLY third-party node pack any shipped engine needs; every
+class LTX 2.5, LTX 8 GB, HuMo, MiniMax H3 and the mesh stage ask for is
+ComfyUI core, so a missing one of those means an old ComfyUI, and the gate
+now says "Update ComfyUI" for them. Part C: the
 suite has run at every push today (12 inherited reds); the Bug Bible
 regression against the pack has not.
 

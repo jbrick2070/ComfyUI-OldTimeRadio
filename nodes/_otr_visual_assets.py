@@ -1028,9 +1028,28 @@ def _refuse_missing_node_packs(engines):
             except Exception:  # noqa: BLE001 -- collect EVERY miss before raising
                 absent.append("/".join(names))
         if absent:
-            hint = getattr(eng, "NODE_PACK_HINT", None) or (
-                "Install the ComfyUI node pack that provides these classes "
-                "from ComfyUI Manager, then restart ComfyUI")
+            # THE FIX FIRST, AND THE RIGHT ONE. Measured 2026-09-25 from the
+            # live server's /object_info `python_module`: every class any
+            # shipped engine asks for is ComfyUI CORE (`nodes`, `comfy_extras`)
+            # except AnimateDiff-Evolved's ADE_* pair. So a missing class is
+            # a pack to install only when a known pack provides it
+            # (`wrapper_bridge._PACK_FOR_PREFIX`); otherwise it is a ComfyUI
+            # too old to have the node, and "install a pack" would send the
+            # user hunting for something that does not exist.
+            hint = getattr(eng, "NODE_PACK_HINT", None)
+            if not hint:
+                packs = {}
+                for entry in absent:
+                    for candidate in entry.split("/"):
+                        for prefix, pack, _url in getattr(_wb, "_PACK_FOR_PREFIX", ()):
+                            if candidate.startswith(prefix):
+                                packs[pack] = True
+                if packs:
+                    hint = ("Install %s from ComfyUI Manager, then restart ComfyUI"
+                            % " and ".join(sorted(packs)))
+                else:
+                    hint = ("Update ComfyUI: these are built-in ComfyUI nodes that "
+                            "this version does not have")
             problems.append("%s -- the video engine '%s' needs node classes "
                             "that are not registered on this server: %s"
                             % (hint, name, ", ".join(absent)))

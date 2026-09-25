@@ -90,6 +90,22 @@ def test_no_registry_at_all_is_nothing_to_check(monkeypatch):
     VA._refuse_missing_node_packs({GHOST})
 
 
+def test_a_missing_core_class_says_update_comfyui_not_install_a_pack(monkeypatch):
+    """Measured 2026-09-25: every class the LTX 2.5, LTX 8 GB, HuMo, MiniMax H3
+    and mesh engines ask for is ComfyUI core. A missing one means an old
+    ComfyUI, and the message must say so rather than name a pack that does
+    not exist."""
+    engine = "ltx25_video"
+    names = sorted({n for ns in VREG.get_engine(engine)._node_candidates().values() for n in ns})
+    assert "LTXVDualCFGGuider" in names
+    _install(monkeypatch, *[n for n in names if n != "LTXVDualCFGGuider"])
+    with pytest.raises(VA.VisualAssetError) as err:
+        VA._refuse_missing_node_packs({engine})
+    text = str(err.value)
+    assert text.startswith("Update ComfyUI"), text
+    assert "LTXVDualCFGGuider" in text and "Install" not in text.split("--")[0]
+
+
 def test_the_gate_runs_before_any_download():
     src = inspect.getsource(VA.ensure_prompt_visual_assets)
     call = src.index('_refuse_missing_node_packs(plan["engines"])')
