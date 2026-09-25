@@ -1,9 +1,10 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the EIGHTEEN allowlisted
+No model imports or network at module import. Only the TWENTY-TWO allowlisted
 files below can be fetched (three z_image_turbo, two ltx_8gb, three
 stable_audio_3, one sd15, two lumina_image -- the Flux ae VAE is already the
-z_image row -- and seven for the native LTX 2.5 lanes).
+z_image row -- seven for the native LTX 2.5 lanes, and four for the
+AnimateDiff lanes, whose SD 1.5 checkpoint is the sd15 row).
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
 their existing adapter checks with explicit uncovered logs.
@@ -115,6 +116,24 @@ _SOURCES = (
      "ltx-2.5-audio-vae-bf16.safetensors"),                   #    364,866,540 B
     ("latent_upscale_models", "yuvraj108c/LTX-2.5",
      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),  # 995,778,752 B
+    # THE ANIMATEDIFF LANES, added 2026-09-25 for the same reason as every row
+    # above: a new user presses Run and the weights arrive. The SD 1.5
+    # checkpoint was already the sd15 row; these are the rest of what
+    # `_weight_tokens()` names. Until now only `scripts/otr_fetch_lane_weights.py`
+    # fetched them, and .comfyignore strips scripts/ from the published
+    # bundle, so both AnimateDiff graphs refused on a fresh install. All three
+    # repos are ungated (Hub API gated:false, 2026-09-25): guoyww Apache-2.0,
+    # ByteDance CreativeML Open RAIL-M, stabilityai MIT. The Lightning file is
+    # one of four step-count variants of identical size; the pinned commit's
+    # LFS SHA-256 is taken for THIS filename, so the 8-step file is the one
+    # verified. `animatediff_models` is registered by ComfyUI-AnimateDiff-
+    # Evolved, which these lanes need to run at all.
+    ("animatediff_models", "guoyww/animatediff", "v3_sd15_mm.ckpt"),  # 1,673,262,583 B
+    ("loras", "guoyww/animatediff", "v3_sd15_adapter.ckpt"),          #   102,134,097 B
+    ("animatediff_models", "ByteDance/AnimateDiff-Lightning",
+     "animatediff_lightning_8step_comfyui.safetensors"),              #   908,929,664 B
+    ("vae", "stabilityai/sd-vae-ft-mse-original",
+     "vae-ft-mse-840000-ema-pruned.safetensors"),                     #   334,641,190 B
 )
 #: Windows MAX_PATH is 260 including the terminating NUL, so 259 is what a
 #: path may actually occupy. Named here because _scrub_transfer_error reports
@@ -136,21 +155,17 @@ _LTX25_WEIGHT_ENGINES = frozenset({
     "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
     "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb",
 })
-_COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
-                     | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES)
-#: The registered AnimateDiff lanes load SD 1.5 INSIDE their own graph (a
-#: CheckpointLoaderSimple on ``GHOST_CHECKPOINT_NAME``), not through an image
-#: slot -- they declare ``accepts_still = False``, so the image-slot pass never
-#: asks for it, and until 2026-09-25 nothing fetched it for them. Only that
-#: checkpoint is allowlisted: their motion module and adapter are not, the
-#: engine's own ``assert_usable`` still checks those, and so these lanes stay
-#: OUT of ``_COVERED`` (which the dropdown matrix reads as "fetches everything").
-_ANIMATEDIFF_CHECKPOINT_ENGINES = frozenset({
+#: Every registered AnimateDiff lane. They load SD 1.5 INSIDE their own graph,
+#: not through an image slot (``accepts_still = False``), so each lane is asked
+#: for its own files through ``_weight_tokens()``.
+_ANIMATEDIFF_WEIGHT_ENGINES = frozenset({
     "animatediff15_lightning_video",
     "animatediff15_v3_haunted_video",
     "animatediff15_v3_stillin_lab_video",
 })
-_REQUESTED = _COVERED | _ANIMATEDIFF_CHECKPOINT_ENGINES
+_COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
+                     | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES
+                     | _ANIMATEDIFF_WEIGHT_ENGINES)
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -419,11 +434,7 @@ def plan_prompt(prompt, unique_id, *, resolve_video, freeze_video,
         picked = _literal(node.get("inputs") or {}, "engine")
         if picked and not picked.startswith("+ Add Custom"):
             result["engines"].add(picked)
-    for engine in sorted(result["engines"] & _ANIMATEDIFF_CHECKPOINT_ENGINES):
-        result["skipped"].append("%s: only its SD 1.5 checkpoint downloads automatically; "
-                                 "the motion module and adapter remain adapter-checked"
-                                 % engine)
-    for engine in sorted(result["engines"] - _REQUESTED):
+    for engine in sorted(result["engines"] - _COVERED):
         result["skipped"].append("%s: automatic visual-weight coverage unavailable; "
                                  "existing adapter checks remain" % engine)
     return result
@@ -478,7 +489,12 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
             if token != loader_token or spec is None:
                 raise VisualAssetError("selected weight %s/%s is missing and has no "
                                        "allowlisted download; no substitution" % (category, token))
-            roots = folder_paths.get_folder_paths(category)
+            try:
+                roots = folder_paths.get_folder_paths(category)
+            except KeyError:
+                # `animatediff_models` exists only once the AnimateDiff-Evolved
+                # pack has registered it.
+                roots = None
             if not roots:
                 raise VisualAssetError("no native model folder registered for " + category)
             # Do not hide a stale symlink or directory by downloading elsewhere.
@@ -571,13 +587,19 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
-    if engines & _ANIMATEDIFF_CHECKPOINT_ENGINES:
-        # The token the lane's own graph hands CheckpointLoaderSimple. When an
-        # sd15 image slot is also selected it names the same default file, and
-        # `add` requests it once.
-        if animatediff is None:
+    selected_animatediff = sorted(engines & _ANIMATEDIFF_WEIGHT_ENGINES)
+    if selected_animatediff:
+        # ASK EACH LANE: `_weight_tokens()` names the files its own
+        # assert_usable checks. When an sd15 image slot is also selected it
+        # names the same checkpoint, and `add` requests it once.
+        if not animatediff:
             raise VisualAssetError("AnimateDiff adapter resolution is unavailable")
-        add(animatediff.GHOST_CHECKPOINT_CATEGORY, animatediff.GHOST_CHECKPOINT_NAME)
+        for eid in selected_animatediff:
+            lane = animatediff.get(eid)
+            if lane is None:
+                raise VisualAssetError("AnimateDiff adapter for %s is unavailable" % eid)
+            for category, token in lane._weight_tokens():
+                add(category, token)
     selected_ltx25 = sorted(engines & _LTX25_WEIGHT_ENGINES)
     if selected_ltx25:
         # ASK EACH LANE, same rule as every branch above: `_dit_name()` and its
@@ -870,17 +892,16 @@ def _load_adapters(engines):
     if "lumina_image" in engines:
         from ._otr_image_engines import lumina_image
         adapters["lumina"] = lumina_image
-    if engines & _ANIMATEDIFF_CHECKPOINT_ENGINES:
-        from ._otr_video_engines import eng_ghost_signal
-        adapters["animatediff"] = eng_ghost_signal
-    if engines & _LTX25_WEIGHT_ENGINES:
-        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
-        from ._otr_video_engines import registry as _vreg
-        ltx25 = {}
-        for eid in engines & _LTX25_WEIGHT_ENGINES:
-            engine = _vreg.get_engine(eid)
-            ltx25[eid] = engine() if isinstance(engine, type) else engine
-        adapters["ltx25"] = ltx25
+    for key, family in (("animatediff", _ANIMATEDIFF_WEIGHT_ENGINES),
+                        ("ltx25", _LTX25_WEIGHT_ENGINES)):
+        if engines & family:
+            from . import _otr_video_engines  # noqa: F401 -- registers built-ins
+            from ._otr_video_engines import registry as _vreg
+            lanes = {}
+            for eid in engines & family:
+                engine = _vreg.get_engine(eid)
+                lanes[eid] = engine() if isinstance(engine, type) else engine
+            adapters[key] = lanes
     return adapters
 
 
@@ -906,11 +927,11 @@ def planned_downloads(engines, env=None):
 
     The same adapters and the same :func:`native_requests` the validator runs,
     so the answer cannot drift from the download it describes; no disk is
-    read and nothing is fetched. An engine outside ``_REQUESTED`` contributes
+    read and nothing is fetched. An engine outside ``_COVERED`` contributes
     nothing, and a selection the preflight would refuse raises
     :class:`VisualAssetError` exactly as it would at queue time.
     """
-    engines = {str(e) for e in engines if e} & _REQUESTED
+    engines = {str(e) for e in engines if e} & _COVERED
     if not engines:
         return set()
     adapters = _load_adapters(engines)
@@ -964,7 +985,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                        role_video_slots=role_video_slots)
     for note in plan["skipped"]:
         log.warning("[OTR.assets] %s", note)
-    engines = plan["engines"] & _REQUESTED
+    engines = plan["engines"] & _COVERED
     if not engines:
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths

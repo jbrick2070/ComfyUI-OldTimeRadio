@@ -47,9 +47,9 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
-| `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
-| `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
+| `animatediff15_lightning_video` | **auto** | 3.1 GiB | fits | fits | **proven** | ? | not offered |
+| `animatediff15_v3_haunted_video` | **auto** | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
+| `animatediff15_v3_stillin_lab_video` | **auto** | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |

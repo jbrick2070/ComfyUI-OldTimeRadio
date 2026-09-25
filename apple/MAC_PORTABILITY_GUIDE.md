@@ -659,7 +659,10 @@ m.ensure_animatediff_pack('/path/to/ComfyUI')"
 This pack ships no `requirements.txt`, so it adds NOTHING to the venv -- the
 safest install in the whole document.
 
-**2. The weights, by hand.**
+**2. The weights download themselves.** Since 2026-09-25 the canonical graph
+fetches every file below at queue time, before the writer runs, into the first
+folder ComfyUI registers for its category. The table and the command are for
+pre-staging on a slow or metered link; nothing else needs them.
 
 | file | size | source | destination | needed by |
 | --- | --- | --- | --- | --- |

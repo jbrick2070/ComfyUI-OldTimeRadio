@@ -11,8 +11,11 @@ the AnimateDiff lane, which loads it inside its own graph. The row passed the
 video beat.
 
 Two fixes, both pinned here: the AnimateDiff lanes now ask the preflight for
-their checkpoint, and the gate's skip set is computed from the row's own
+every file they load, and the gate's skip set is computed from the row's own
 engines through the same adapters the preflight asks.
+
+THE GOAL, pinned last: a new user presses Run and the weights arrive, so on a
+server that holds nothing no shipping row is refused.
 """
 from __future__ import annotations
 
@@ -56,21 +59,24 @@ def test_the_animatediff_set_is_every_registered_animatediff_lane():
         cls = engine if isinstance(engine, type) else type(engine)
         if issubclass(cls, GhostSignalEngine):
             registered.add(eid)
-    assert registered == set(VA._ANIMATEDIFF_CHECKPOINT_ENGINES)
+    assert registered == set(VA._ANIMATEDIFF_WEIGHT_ENGINES)
 
 
-@pytest.mark.parametrize("engine", sorted(VA._ANIMATEDIFF_CHECKPOINT_ENGINES))
-def test_each_animatediff_lane_downloads_its_own_checkpoint(engine):
-    from nodes._otr_video_engines import eng_ghost_signal as gs  # noqa: PLC0415
-    assert (gs.GHOST_CHECKPOINT_CATEGORY, gs.GHOST_CHECKPOINT_NAME) in (
-        VA.planned_downloads({engine}))
-    assert (gs.GHOST_CHECKPOINT_CATEGORY, gs.GHOST_CHECKPOINT_NAME) in VA.MANIFEST
+@pytest.mark.parametrize("engine", sorted(VA._ANIMATEDIFF_WEIGHT_ENGINES))
+def test_each_animatediff_lane_downloads_every_file_it_loads(engine):
+    """The files the lane declares it needs are exactly the files the
+    preflight fetches for it, and every one is allowlisted."""
+    from nodes._otr_video_engines import registry as vreg  # noqa: PLC0415
+    planned = VA.planned_downloads({engine})
+    assert {name for _c, name in planned} == set(
+        vreg.CAPABILITIES[engine]["model_requirements"])
+    assert planned <= set(VA.MANIFEST)
 
 
-def test_the_animatediff_lanes_stay_out_of_full_coverage():
-    """Their motion module and adapter are not allowlisted, so the dropdown
-    matrix must not read them as fetching everything."""
-    assert not (VA._ANIMATEDIFF_CHECKPOINT_ENGINES & VA._COVERED)
+def test_the_animatediff_lanes_are_fully_covered():
+    """Every file is allowlisted, so the dropdown matrix reads them as
+    fetching everything."""
+    assert VA._ANIMATEDIFF_WEIGHT_ENGINES <= VA._COVERED
 
 
 def test_an_allowlisted_file_no_selected_engine_fetches_is_still_checked(monkeypatch):
@@ -139,3 +145,19 @@ def test_one_engine_that_cannot_plan_does_not_empty_the_skip_list(monkeypatch):
         "preflight": {"required_models": [_SD15]},
     }
     assert _gate(monkeypatch, profile) == []
+
+
+def test_no_shipping_row_is_refused_on_an_empty_server(monkeypatch):
+    """A fresh install holds no weights; every shipping row must still pass
+    the gate, because everything it declares downloads at queue time."""
+    runner = _runner()
+    monkeypatch.setattr(runner, "_server_visible_model_names", lambda _s: set())
+    refused = {}
+    for rid in cp.known_profile_ids():
+        if cp.load_profile(rid).get("status") != "shipping":
+            continue
+        try:
+            runner._assert_profile_models_present(rid, {})
+        except SystemExit as exc:
+            refused[rid] = str(exc)
+    assert not refused, refused

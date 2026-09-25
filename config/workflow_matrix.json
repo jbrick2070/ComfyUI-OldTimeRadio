@@ -123,8 +123,8 @@
       },
       "preflight": {
         "required_models": [
-          "ltxv-2b-0.9.8-distilled",
-          "t5xxl_fp16"
+          "ltxv-2b-0.9.8-distilled.safetensors",
+          "t5xxl_fp16.safetensors"
         ]
       }
     },
@@ -158,7 +158,6 @@
       },
       "preflight": {
         "required_models": [
-          "google/gemma-4-E2B-it",
           "v1-5-pruned-emaonly-fp16.safetensors",
           "v3_sd15_mm.ckpt",
           "v3_sd15_adapter.ckpt"
@@ -374,7 +373,6 @@
       },
       "preflight": {
         "required_models": [
-          "google/gemma-4-12b-it",
           "v1-5-pruned-emaonly-fp16.safetensors",
           "v3_sd15_mm.ckpt",
           "v3_sd15_adapter.ckpt"

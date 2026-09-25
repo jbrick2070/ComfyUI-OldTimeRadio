@@ -913,8 +913,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         `wan_i2v` killer (lesson L1), and this name is the established one for
         exactly that reason -- it is the same question `wan_shared` asks.
 
-        Returns ``None`` when absent everywhere. The offline invariant means NO
-        runtime fetch: a missing file is fail-closed, never downloaded.
+        Returns ``None`` when absent everywhere. The engine never fetches: the
+        queue-time preflight (``_otr_visual_assets``) downloads the files named
+        by ``_weight_tokens`` before the writer runs, and a file still missing
+        here is fail-closed.
         """
         try:
             import folder_paths  # type: ignore
@@ -963,6 +965,17 @@ class GhostSignalEngine(_MC.MotionEngineBase):
             return None
         return self._resolve_model_file_by_token(
             (GHOST_VAE_CATEGORY,), self.vae_name)
+
+    def _weight_tokens(self):
+        """``(category, token)`` for every file this lane loads -- the files
+        ``assert_usable`` checks -- read off the lane without touching disk."""
+        tokens = [(GHOST_CHECKPOINT_CATEGORY, GHOST_CHECKPOINT_NAME),
+                  (GHOST_MOTION_CATEGORY, self.motion_module_name)]
+        if self.lora_name:
+            tokens.append((GHOST_LORA_CATEGORY, self.lora_name))
+        if self.vae_name:
+            tokens.append((GHOST_VAE_CATEGORY, self.vae_name))
+        return tokens
 
     def _installed(self):
         """A PREDICATE -- it answers, it never raises."""
