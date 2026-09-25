@@ -464,12 +464,14 @@ if _otr_dup is None:
 # otr_canonical.json. Its otr_canonical.jpg gallery thumbnail was deleted
 # 2026-09-11 (operator call): the still was an 8/22-era frame grab, three
 # weeks older than the graph it advertised. The template still lists and
-# opens; only the card image is gone. otr_story_only.json
-# and the workflows/variants/ tree were deleted 2026-09-07 while the canonical
-# is being proven on Apple Silicon, so the gallery serves ONE template and this
-# line names one. `otr_4060_floor` remains a valid PROFILE id for
-# provisioning and the headless runner; it was never a gallery template after
-# 09-02. If a template is added or dropped, this line changes in the same edit.
+# opens; only the card image is gone. otr_story_only.json was deleted
+# 2026-09-07, and the gallery lists only the directory level
+# (`*/workflows/*.json`), so the machine variants under workflows/variants/
+# ship as files to drag in but never appear there: the gallery serves ONE
+# template and this line names one. `otr_4060_floor` is gone altogether:
+# every machine configuration is a row in config/workflow_matrix.json since
+# 2026-09-24, and there is no row by that name. If a template is added or
+# dropped, this line changes in the same edit.
 # The banner used to end with "per the README's 'Pick the graph' table".
 # That table does not exist -- grep README.md for the phrase and it is not
 # there -- so every boot pointed every user at nothing, and the advice

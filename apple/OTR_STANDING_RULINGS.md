@@ -19,8 +19,9 @@ reworded or dropped -- the 2026-08-16 audit's warning still governs: *"roughly a
 third of these sections are standing operator rulings phrased as 'do not
 re-open', and losing one costs more than the length does."*
 
-Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
-to resume.
+Closed receipts used to be a third file, `docs/GO_FORWARD_ARCHIVE.md`. It went
+with the docs/ folder on 2026-09-24 (`git show a0ff6c8c~1:docs/GO_FORWARD_ARCHIVE.md`
+is its last version); closed rows now leave the plan for `apple/HANDOFF_LOG.md`.
 
 ## 2026-09-25 -- ASSET CLEANUP IS THE SECOND SANCTIONED AUTO-DELETE, CHOSEN PER RUN
 
