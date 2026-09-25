@@ -118,7 +118,7 @@ def _expected_label(public, internal):
 
 def test_menu_shows_public_ids_uniquely():
     combo = vd._video_model_combo()
-    for public, internal in _LIVE_TIER.items():
+    for public, internal in _TIER.items():
         label = _expected_label(public, internal)
         assert label in combo
         assert combo.count(label) == 1

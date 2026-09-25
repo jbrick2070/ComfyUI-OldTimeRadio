@@ -42,19 +42,20 @@ RETIRED = sorted(RETIRED_ENGINE_IDS)
 # The contract itself: type, fields, message -- ONE spelling, pinned
 # ---------------------------------------------------------------------------
 
-def test_the_retired_set_is_exactly_the_seventeen_known_ids():
+def test_the_retired_set_is_exactly_the_sixteen_known_ids():
     # Five from the 2026-08-06 SFX-bed rip, five from the 2026-08-23 dormant-3D
     # retirement (lean-mean order 4), five from the 2026-08-23 Ghost narrowing
-    # (operator: "delete any animatediff that are not haunted"), one from
-    # the 2026-08-26 large-Wan rip (operator: "rip the large wan we don't
-    # need") -- the 14B `wan_i2v` lane, whose 19.82 GiB of weights never fit
-    # the 14.5 GiB target and only ran by offloading continuously -- and one
-    # from the 2026-09-17 cloud Pixverse rip (operator: "WORD_RAZZLE / CLOUD
+    # (operator: "delete any animatediff that are not haunted"), and one from
+    # the 2026-09-17 cloud Pixverse rip (operator: "WORD_RAZZLE / CLOUD
     # GETS RIPPED"). Local `razzle_ltx_8gb` stays.
+    # The 14B `wan_i2v` lane (2026-08-26, "rip the large wan we don't need")
+    # LEFT this set on the 2026-09-25 clean rip of local Wan: a saved graph
+    # naming it now gets the ordinary unregistered-engine refusal, the same
+    # one every other removed lane gets, rather than a named tombstone.
     # EXACT on purpose: the set is append-only, and an id appearing here that no
     # ruling added -- or one vanishing -- must fail the suite, not drift. When a
     # retirement lands, the COUNT in this test's NAME moves with the set; a
-    # guard whose name says sixteen while it asserts seventeen has stopped being
+    # guard whose name says fifteen while it asserts sixteen has stopped being
     # a guard and started being a comment.
     assert RETIRED_ENGINE_IDS == frozenset({
         "animatediff15_video",
@@ -72,11 +73,10 @@ def test_the_retired_set_is_exactly_the_seventeen_known_ids():
         "trellis_talk",
         "triposr",
         "still_parallax",
-        "wan_i2v",
         "word_razzle",
     })
     assert isinstance(RETIRED_ENGINE_IDS, frozenset)
-    assert len(RETIRED_ENGINE_IDS) == 17, (
+    assert len(RETIRED_ENGINE_IDS) == 16, (
         "the count in this test's name is part of the guard -- rename it in "
         "the same edit that grows the set")
 

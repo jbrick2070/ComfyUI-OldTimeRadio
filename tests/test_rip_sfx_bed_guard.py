@@ -47,9 +47,9 @@ _REPO = pathlib.Path(__file__).resolve().parent.parent
 #: The retired engine ids, restated here INDEPENDENTLY of public_engines so a
 #: weakened RETIRED_ENGINE_IDS cannot weaken this guard. Five from the
 #: 2026-08-06 SFX-bed rip; five more from the 2026-08-23 dormant-3D retirement
-#: (lean-mean order 4); five from the 2026-08-23 Ghost narrowing; and the 14B
-#: `wan_i2v` lane from the 2026-08-26 large-Wan rip. Growing this set is
-#: deliberate and append-only, exactly like the production set it mirrors.
+#: (lean-mean order 4); five from the 2026-08-23 Ghost narrowing; and one from
+#: the 2026-09-17 cloud Pixverse rip. Growing this set is deliberate and
+#: append-only, exactly like the production set it mirrors.
 _RETIRED_IDS = frozenset({
     # The Ghost narrowing, 2026-08-23 ("delete any animatediff that are not
     # haunted"). Listed here because this guard asserts the WHOLE retired set is
@@ -70,12 +70,6 @@ _RETIRED_IDS = frozenset({
     "trellis_talk",
     "triposr",
     "still_parallax",
-    # The 14B local Wan i2v lane, RETIRED 2026-08-26 (operator: "rip the large
-    # wan we don't need"). 19.82 GiB of weights against a 14.5 GiB target -- it
-    # only ever ran by offloading continuously. NOT the same lane as the
-    # smaller 5B ti2v lane (a separate engine, since removed on its own
-    # terms); the ids were one letter apart and that was the whole hazard.
-    "wan_i2v",
     # Cloud Pixverse word-card lane, RETIRED 2026-09-17. Adapter deleted;
     # local razzle_ltx_8gb stays. The id must remain unregistered and
     # unaliased so a stale graph fails as RetiredEngineError.
@@ -142,13 +136,14 @@ def test_the_retired_ids_are_not_registered_or_aliased():
     engine -- but a name may deliberately point AT one as a tombstone.
 
     The property this guard actually protects is "a stale selection must never
-    silently work". Until 2026-08-26 that was enforced with a blunt rule: no
-    table value may be a retired id at all. The large-Wan rip made that rule
-    false on purpose. `wan22_high_i2v` and the legacy `wan21_high_i2v` KEEP
-    pointing at the retired `wan_i2v` so an old saved graph lands on the named
+    silently work". The blunt rule -- no table value may ever be a retired id --
+    was relaxed on 2026-08-26 so a public/legacy row COULD point at a retired
+    id on purpose: an old saved graph then lands on the named
     ``RetiredEngineError`` -- "this engine is retired" -- instead of falling
     through to the generic "no engine named ..." message, which reads to a user
-    as a broken install rather than a retirement.
+    as a broken install rather than a retirement. No live row exercises that
+    shape today; the loop below still holds it to the contract if one ever
+    does.
 
     So the value side is checked for the real thing rather than for absence: a
     row that resolves to a retired id must resolve to THAT id (never sideways
