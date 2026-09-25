@@ -303,6 +303,19 @@ model's card recommendation beside our four presets; decide whether
 `balanced` should mean "the maker's default for THIS model" (a per-model
 map in the catalog) with the other three as offsets from it. His ear
 decides whether any change ships.
+DIRECTION (operator, same day: "open to removing it and just having
+baseline ... cloud models change all the time, can we have a null
+temperature -- is that more future proof?"): YES, "model default" as the
+shipped default. MEASURED from the local generation_config.json files:
+Gemma 4 12B ships temp 1.0 / top_p 0.95 / top_k 64 (our balanced runs it
+cooler); Qwen3 8B ships 0.6 / 0.95 / top_k 20 (our balanced runs it much
+hotter); Mistral-Nemo ships NO sampling defaults. So: local models use
+their own generation_config; cloud slots send no temperature (the provider
+applies the model's default); a model that ships nothing (Nemo) falls back
+to today's balanced -- never greedy, which would flatten dialogue. The dial
+either goes, or becomes tighter / model default / looser as offsets from
+the model's own baseline. Mind `compose_line`'s +0.1 per retry, which needs
+a base number. Seed is separate and untouched.
 
 ## 3. TEST
 
