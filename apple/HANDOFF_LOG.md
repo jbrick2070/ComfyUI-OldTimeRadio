@@ -1,3 +1,41 @@
+## 2026-09-25 -- HEAD d167f0ab +branch claude/practical-hamilton-ftvd2j -- CODE + PLAN (AnimateDiff auto-download, required_models, test wave)
+
+Did (cloud window, no hardware touched; the 5080 chain was not reached):
+  AnimateDiff weights now download at queue time. `_SOURCES` in
+  `nodes/_otr_visual_assets.py` gained v3_sd15_mm.ckpt and
+  v3_sd15_adapter.ckpt (guoyww/animatediff, Apache-2.0),
+  animatediff_lightning_8step_comfyui.safetensors (ByteDance, OpenRAIL-M) and
+  vae-ft-mse-840000-ema-pruned.safetensors (stabilityai, MIT) -- all ungated
+  on the Hub API. Each lane names its own files through the new
+  `GhostSignalEngine._weight_tokens()`; the three lanes joined `_COVERED`, so
+  the dropdown matrix reads them "auto". Measured before the change: with an
+  empty server the runner gate refused otr_8gb_animatediff and
+  otr_16gb_animatediff over the motion module and adapter, and every other
+  shipping row passed. After: no shipping row is refused
+  (`test_no_shipping_row_is_refused_on_an_empty_server`).
+  `preflight.required_models` now accepts weight FILENAMES only (schema in
+  `capability_profiles.py`). Removed the writer repo ids from both
+  AnimateDiff rows (the 8 GB row named gemma-4-E2B-it; its writer is
+  Qwen3.5-4B) and replaced otr_8gb_video's logical ids with
+  ltxv-2b-0.9.8-distilled.safetensors and t5xxl_fp16.safetensors. The
+  runner's report-only branch for ids is gone. Variant JSONs unchanged; three
+  launch recipes regenerated.
+  Plan cleaned: dead links fixed, the Google row cut to its fork, the
+  resolved word-counter row removed (WORD_RE is already Unicode), Shakespeare
+  moved to Parked with a git pointer. Row 0 and 0a specs restored as
+  apple/ROUTE_DELETION_PLAN.md and apple/HF_HOME_WINDOWS_PIN.md and
+  re-grounded. The wave is apple/TEST_WAVE.md.
+  Registry, read 2026-09-25: 2.3.3 Active, 2.3.2 Active; 2.3.0, 2.3.1, 2.1.5,
+  2.1.6 Flagged.
+Suite (Linux sandbox, not the Windows venv): scoped set 1,631 passed; two
+  red, both already red on d167f0ab before this change --
+  test_lane_preflight_matrix.py::test_g2_canvas_truth and
+  ::test_g4_admission_honesty. Full suite result is on the PR. Bug Bible not
+  run.
+Next: 5080 -- TEST_WAVE Part A once the chain ends. 4060 -- Part B on a head
+  that carries this branch. Then Part C. Code rows 0 and 0a stay open.
+Models: Sonnet QA on the pushed diff (see the PR).
+
 ## 2026-09-25 -- HEAD 9b9e0766 +handoff (main) -- RENDER (16 GB 1-act rotation, registry 2.3.3)
 
 Did: Stills descriptions now say z_image_turbo. Lumina is not a default in any
