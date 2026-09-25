@@ -467,6 +467,16 @@
             "name": "episode_language"
           },
           "link": null
+        },
+        {
+          "localized_name": "asset_cleanup",
+          "name": "asset_cleanup",
+          "shape": 7,
+          "type": "COMBO",
+          "widget": {
+            "name": "asset_cleanup"
+          },
+          "link": null
         }
       ],
       "outputs": [
@@ -556,7 +566,8 @@
         true,
         true,
         "",
-        "English"
+        "English",
+        "off (keep everything)"
       ],
       "color": "#1B2940",
       "bgcolor": "#3B3D42"

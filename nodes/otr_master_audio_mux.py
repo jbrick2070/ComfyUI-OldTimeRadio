@@ -1690,6 +1690,85 @@ class OTRMasterAudioMux:
         except Exception as exc:  # noqa: BLE001 -- best-effort, never blocks the mux
             return f"terminal path stamp failed: {type(exc).__name__}: {exc}"
 
+    def _asset_cleanup(self, silent_video_path: str, final: str,
+                       obs_copy: "str | None", intent) -> "tuple[str | None, bool]":
+        """ASSET CLEANUP AFTER PUBLISH (row 0b, 2026-09-25).
+
+        Carries out the writer's `asset_cleanup` choice on THIS run's episode
+        folder. Returns ``(report_line, final_removed)``; the line is None for
+        `off`, which says nothing. Refusals and skipped files are report lines,
+        never raises -- the episode is already published. The caller re-raises
+        a cancel before it catches anything else.
+
+        Every fact the planner needs is gathered here and judged there
+        (``_otr_asset_cleanup.plan_asset_cleanup``):
+
+        * the folder comes ONLY from the in-flight singleton for this stem, the
+          same identity check the output path and the publication decision use;
+        * the ledger is RE-READ from disk, after the terminal stamp, for the
+          mode, the run token and ``meta.obs_final_path``;
+        * the wired delivery intent must bind to that ledger -- the comparison
+          ``_assert_delivery_binding`` makes for a required delivery, reused
+          here without the raise. That token is what makes the ledger
+          singleton's mtime fallback harmless: a ledger it wandered to from
+          another run cannot carry this run's token.
+        """
+        try:
+            from . import _otr_asset_cleanup as _AC
+            from . import _otr_ledger as _OTRL
+        except ImportError:  # pragma: no cover -- flat (sys.path) test import
+            import _otr_asset_cleanup as _AC  # type: ignore
+            import _otr_ledger as _OTRL  # type: ignore
+        stem = _episode_stem(silent_video_path)
+        ledger_path, episode_dir = _inflight_episode_for_stem(stem)
+        led = _terminal_ledger(stem)
+        meta = (led.get("meta") if isinstance(led, dict) else None) or {}
+        mode, note = _AC.mode_from_meta(meta)
+        if note:
+            log.warning("[OTR_MasterAudioMux] %s", note)
+        if mode == "off":
+            return None, False
+        if not isinstance(intent, dict):
+            return ("asset_cleanup %s: refused -- the script_json wire carries "
+                    "no delivery intent, so this run cannot be bound to its "
+                    "folder; nothing was deleted" % mode), False
+        try:
+            _assert_delivery_binding(intent, stem)
+        except DeliveryContractError as exc:
+            return ("asset_cleanup %s: refused -- %s; nothing was deleted"
+                    % (mode, exc)), False
+        live_intent = meta.get("delivery_intent")
+        delete, keep, refusal = _AC.plan_asset_cleanup(
+            episode_dir, mode,
+            episodes_root=_episodes_root(),
+            obs_copy=obs_copy,
+            video_paths=(silent_video_path, final),
+            obs_dir=_obs_dir(),
+            wire_token=intent.get("delivery_token"),
+            ledger_token=(live_intent.get("delivery_token")
+                          if isinstance(live_intent, dict) else None),
+            ledger_obs_path=meta.get("obs_final_path"),
+        )
+        if refusal:
+            return ("asset_cleanup %s: refused -- %s; nothing was deleted"
+                    % (mode, refusal)), False
+
+        def _write_receipt(receipt: dict) -> bool:
+            # Never creates a ledger: after `full` the file is gone and the
+            # answer is simply False.
+            if ledger_path is None or not os.path.isfile(ledger_path):
+                return False
+            current = _OTRL.load_ledger_safe(ledger_path)
+            if not isinstance(current, dict):
+                return False
+            current.setdefault("meta", {})["asset_cleanup_receipt"] = receipt
+            return bool(_OTRL.save_ledger_safe(ledger_path, current))
+
+        line = _AC.execute_asset_cleanup(
+            mode, episode_dir, delete, keep,
+            write_receipt=_write_receipt, obs_copy=str(obs_copy or ""))
+        return line, not os.path.exists(final)
+
     @classmethod
     def IS_CHANGED(cls, **kwargs):
         """Cache key: the manifest, the EPISODE, and its publication verdict.
@@ -1939,8 +2018,9 @@ class OTRMasterAudioMux:
                 report.append("delivery OK -- required publication verified "
                               "on disk and on the ledger")
             # OH-3 (output-tree contract 2026-06-11): post-publish janitor
-            # pass over episodes/_shared/tmp -- the ONE sanctioned
-            # auto-delete; fully fail-soft (PD1, never blocks the mux).
+            # pass over episodes/_shared/tmp -- fully fail-soft (PD1, never
+            # blocks the mux). One of the two sanctioned auto-deletes; the
+            # other is the asset cleanup below.
             try:
                 from ._otr_janitor import sweep_shared_tmp
                 _jrep = sweep_shared_tmp()
@@ -1952,6 +2032,32 @@ class OTRMasterAudioMux:
             except Exception as _jexc:  # noqa: BLE001 -- PD1
                 log.info("[OTR_MasterAudioMux] janitor sweep skipped: %s",
                          _jexc)
+            # THE PREVIEW BEFORE THE CLEANUP. Its poster frame is extracted
+            # from the archival `final`, which `partial` and `full` delete.
+            ui = _canvas_preview(final, obs_copy)
+            # ASSET CLEANUP AFTER PUBLISH (row 0b) -- THE LAST STEP, after the
+            # publish, the ledger stamp, the required-delivery gate and the
+            # janitor. The episode is already delivered, so nothing here may
+            # fail it: a cancel is re-raised FIRST (`_Interrupted` is a
+            # RuntimeError, and a bare `except Exception` would swallow it),
+            # and everything else is a report line.
+            final_removed = False
+            try:
+                _cleanup_line, final_removed = self._asset_cleanup(
+                    silent_video_path, final, obs_copy, _intent)
+                if _cleanup_line:
+                    report.append(_cleanup_line)
+            except _Interrupted:
+                raise
+            except Exception as _cexc:  # noqa: BLE001 -- the episode is published
+                report.append("asset_cleanup skipped: %s: %s"
+                              % (type(_cexc).__name__, _cexc))
+            if final_removed:
+                # Never print a removed archival path as if it were there: the
+                # published copy is the surviving deliverable.
+                ui.setdefault("text", []).append(
+                    "archival copy removed by asset_cleanup; the published "
+                    "copy above is the deliverable")
         except _Interrupted:
             raise
         except (ValueError, OSError) as exc:
@@ -1982,10 +2088,13 @@ class OTRMasterAudioMux:
         for line in report:
             log.info("[OTR_MasterAudioMux] %s", line)
         # The canvas gets a frame and the path. `otr_video_render_batch` already
-        # returns this shape; ComfyUI unwraps "result" and draws "ui".
-        return {"ui": _canvas_preview(final, obs_copy),
-                "result": (final,
-                           "OTR_MasterAudioMux OK -> " + final + "\n"
+        # returns this shape; ComfyUI unwraps "result" and draws "ui". When the
+        # asset cleanup removed the archival final, the output names the
+        # published copy -- the file that still exists.
+        delivered = obs_copy if (final_removed and obs_copy) else final
+        return {"ui": ui,
+                "result": (delivered,
+                           "OTR_MasterAudioMux OK -> " + delivered + "\n"
                            + "\n".join(report))}
 
 

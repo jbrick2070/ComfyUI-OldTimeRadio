@@ -79,6 +79,9 @@ _EXPECTED_INPUT_ORDER = [
     # (BUG-LOCAL-097). A trailing widget is nearly free; a mid-list one would
     # have cost the re-index everywhere.
     "episode_language",
+    # ASSET CLEANUP AFTER PUBLISH (row 0b, 2026-09-25), appended the same way:
+    # after episode_language, before the socket, so it is the trailing value.
+    "asset_cleanup",
     "gate_in",                      # SOCKET -- no widgets_values slot
 ]
 
@@ -136,8 +139,8 @@ def test_widget_order_appends_slots_at_end():
     # The socket, called out separately because it is the one entry here that
     # is NOT a widget and does NOT consume a saved value slot.
     widgets = [n for n in order if n != "gate_in"]
-    assert len(widgets) == 35, (
-        "the writer should declare 35 widgets plus the gate_in socket; got %d"
+    assert len(widgets) == 36, (
+        "the writer should declare 36 widgets plus the gate_in socket; got %d"
         % len(widgets))
 
 

@@ -81,11 +81,12 @@ def test_source_ref_slot_pinned_after_source_bank():
     # so it closes the declared vector now -- not `story_author`, which the
     # reorder moved up next to `source_ref` (see the chain above).
     assert order[-1] == "gate_in"
-    # A COUNT, not a position -- this one is a literal on purpose. 36 declared
-    # inputs carry a 35-wide saved vector because gate_in is a forceInput
+    # A COUNT, not a position -- this one is a literal on purpose. 37 declared
+    # inputs carry a 36-wide saved vector because gate_in is a forceInput
     # socket and consumes no widgets_values slot (asserted just below).
-    # 36 since 2026-09-24, when the two retired quant widgets came out.
-    assert len(order) == 36
+    # 36 since 2026-09-24, when the two retired quant widgets came out; 37
+    # since 2026-09-25, when `asset_cleanup` was appended as the trailing one.
+    assert len(order) == 37
 
     source_ref_type, meta = spec["optional"]["source_ref"]
     assert source_ref_type == "STRING"
@@ -146,12 +147,13 @@ def test_patch_widget_by_name_lands_on_source_ref():
     )
     node1 = next(n for n in workflow["nodes"] if n["id"] == 1)
 
-    # A COUNT, not a position: the writer's saved vector has been 35 wide
-    # since 2026-09-24, when the two retired quant widgets came out with the
-    # backend they configured. Patching must not change the width -- a patch
+    # A COUNT, not a position: the writer's saved vector was 35 wide from
+    # 2026-09-24, when the two retired quant widgets came out with the
+    # backend they configured, and is 36 since 2026-09-25, when
+    # `asset_cleanup` was appended. Patching must not change the width -- a patch
     # that grew or shrank the vector would be corrupting every later widget in
     # the graph.
-    assert len(node1["widgets_values"]) == 35
+    assert len(node1["widgets_values"]) == 36
 
     # Neighbour checks. They exist to prove the patch landed on source_ref
     # ALONE and left the widgets on either side of it holding canonical's own

@@ -706,10 +706,18 @@ class TestWriterB2aSurface:
         # identity. A captured pre-removal graph is replayed through the
         # frontend boundary in tests/test_workflow_schema_boundary.py and must
         # land on exactly the values this file pins.
-        assert len(wv) == 35, (
-            f"writer widgets_values length drift: {len(wv)} (expected 35 "
-            f"after the 2026-09-24 removal of the two writer-backend quant "
-            f"widgets; every earlier count is recorded in the history above)"
+        #
+        # 2026-09-25: `asset_cleanup` (row 0b) was APPENDED as the trailing
+        # widget, taking the vector 35 -> 36. Declared after
+        # `episode_language` and before the `gate_in` forceInput, so it lands
+        # last and no earlier index and no link dst_slot moved. It ships off.
+        assert len(wv) == 36, (
+            f"writer widgets_values length drift: {len(wv)} (expected 36 "
+            f"after the 2026-09-25 append of asset_cleanup; every earlier "
+            f"count is recorded in the history above)"
+        )
+        assert wv[slot('asset_cleanup')] == "off (keep everything)", (
+            f"asset_cleanup must ship off; got {wv[slot('asset_cleanup')]!r}"
         )
         # The one-switch ships English -- not Off, and never a language the
         # first-run listener did not ask for.

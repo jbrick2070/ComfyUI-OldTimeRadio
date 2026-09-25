@@ -22,6 +22,36 @@ re-open', and losing one costs more than the length does."*
 Closed receipts are a third file, `docs/GO_FORWARD_ARCHIVE.md`, which is not read
 to resume.
 
+## 2026-09-25 -- ASSET CLEANUP IS THE SECOND SANCTIONED AUTO-DELETE, CHOSEN PER RUN
+
+Operator: bring the space-saver back, three settings, on the first node where
+the choices are made, default off. `OTR_LedgerScriptWriter.asset_cleanup` offers
+`off (keep everything)`, `partial (keep only the text files)` and `full (keep
+only the published video)`; the writer stamps the first word on
+`meta.asset_cleanup` and `OTR_MasterAudioMux` carries it out as its LAST step
+(`nodes/_otr_asset_cleanup.py`). The janitor's scratch sweep is the other
+sanctioned auto-delete; nothing else in the pack deletes episode assets.
+
+**What may not be reopened, and why each one is load-bearing.** The previous
+space-saver wiped the WRONG episode on its first day (BUG-LOCAL-014, commit
+`d2c2df81`) because it found its ledger by an mtime walk, and that walker is
+still the singleton's last-resort fallback. So:
+- the folder comes ONLY from the in-flight singleton for this video stem, and
+  the ledger found for it must carry the delivery token on this run's
+  `script_json` wire -- a wire with no token cleans nothing;
+- a BLOCKED episode is never cleaned: the archival final is its only copy;
+- the published copy must exist, be non-empty, sit OUTSIDE the folder, and be
+  what the RE-READ ledger records as `meta.obs_final_path`;
+- `partial` is a DELETE list by extension; an unknown extension is KEPT;
+- a linked folder inside the episode is a refusal; nothing is followed;
+- failure is a report line, never a raise -- except a cancel, re-raised first;
+- `asset_cleanup` is run-volatile on a replay: a replay never inherits its
+  source's choice to delete.
+
+**The cost, said out loud:** a `partial` or `full` episode cannot be frozen
+into a replay bundle afterwards. Freeze first, or run it off. The harness and
+the 5-minute rule read `otr/obs` and the leg log, never the episode folder.
+
 ## 2026-09-24 -- THE PORTABLE-BANK "NOT DIAGNOSED" NOTE IS NOW EXPLAINED AND FIXED
 
 The 2026-09-20 entry below (and the README's "Known failures" section, and

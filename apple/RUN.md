@@ -67,6 +67,7 @@ show, all on the **OTR_LedgerScriptWriter** node unless noted.
 | `visual_style` | How it looks — ships on *roll*, which picks any of them. |
 | `creativity` | `balanced` by default. |
 | `episode_language` | One switch for writing, Kokoro casting, caption labels/wrapping/fonts, and audience-facing credits. See [MULTILINGUAL.md](MULTILINGUAL.md). |
+| `asset_cleanup` | What to delete from the episode's working folder once it is published. Ships **off**. See [Saving disk space](#saving-disk-space). |
 
 **There is no ONE seed for the episode.** The two director nodes each carry
 a `seed_mode` and a `request_seed` widget for their own lane, but there is no
@@ -85,6 +86,28 @@ Set `episode_language` on **OTR_LedgerScriptWriter**. Keep the voice engines
 on **Kokoro**. The admitted rows, the voice pools, and how Shakespeare and
 Public Domain perform in another language are in
 [MULTILINGUAL.md](MULTILINGUAL.md).
+
+## Saving disk space
+
+An episode's working folder in `otr/episodes/<episode>/` holds every stem,
+still and clip the run made, and it adds up fast. `asset_cleanup` on
+**OTR_LedgerScriptWriter** tidies it once the episode is published:
+
+- **off (keep everything)** -- the default. Nothing is deleted.
+- **partial (keep only the text files)** -- the sound and the pictures go
+  (video, audio, images); the ledger, the canon, the treatment, the manifests,
+  the captions and the QA reports stay.
+- **full (keep only the published video)** -- the whole episode folder goes.
+
+All three leave `otr/obs/` alone. Nothing is deleted unless the published copy
+is on disk there, and an episode whose publication was withheld is never
+cleaned, because its working folder holds the only copy. A file Windows has
+open is skipped and named in the log, never forced.
+
+**The one thing you give up:** a `partial` or `full` episode can no longer be
+frozen into a replay bundle, because the freeze needs the master WAV and the
+stills. Freeze it first, or run it `off`. The ledger records what was removed
+under `asset_cleanup_receipt`.
 
 ## Writing your own story
 

@@ -10,12 +10,13 @@ REPO = Path(__file__).resolve().parents[1]
 
 #: The writer's saved control count, measured against the canonical graph on
 #: 2026-09-24 after two writer controls were removed with their backend
-#: (see e5ff488b). This is a COUNT, not a
+#: (see e5ff488b), and 36 since 2026-09-25 when `asset_cleanup` was appended
+#: as the trailing control. This is a COUNT, not a
 #: position -- it is the one number in this module that is allowed to be a
 #: literal, and it changes only when a control is genuinely added or dropped.
 #: Every VALUE below is found by widget NAME, so nothing here needs
 #: renumbering when the writer's controls are reordered.
-WRITER_WIDGET_COUNT = 35
+WRITER_WIDGET_COUNT = 36
 
 
 def load_graph(path):

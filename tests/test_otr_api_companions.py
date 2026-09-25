@@ -231,6 +231,12 @@ def _writer_schemas_s5() -> dict:
          "Hindi", "Japanese", "Mandarin"],
         {"default": "English"},
     )
+    # ASSET CLEANUP AFTER PUBLISH (row 0b, 2026-09-25): the trailing widget now.
+    required["asset_cleanup"] = (
+        ["off (keep everything)", "partial (keep only the text files)",
+         "full (keep only the published video)"],
+        {"default": "off (keep everything)"},
+    )
     return schemas
 
 
@@ -556,7 +562,9 @@ def test_round_trip_canonical_node1_inputs_correct():
     # retired writer backend they configured, via the same three-part
     # migration -- descriptor, saved value, and link 279's dst_slot, which
     # moved 31 -> 30 with the gate_in socket.
-    assert len(dump) == 35, f"node 1 widgets_values length drift: {len(dump)}"
+    # 36 since 2026-09-25: `asset_cleanup` (row 0b) appended as the trailing
+    # widget, after episode_language and before the gate_in socket.
+    assert len(dump) == 36, f"node 1 widgets_values length drift: {len(dump)}"
     # creative/technical shifted 3/4 -> 2/3 when slot 1 was removed.
     expected_creative = dump[2]
     expected_technical = dump[3]

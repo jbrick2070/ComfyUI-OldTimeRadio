@@ -1,11 +1,15 @@
-"""OH-3 janitor -- the ONE sanctioned auto-delete (output-tree contract,
-operator law 2026-06-11).
+"""OH-3 janitor -- one of the TWO sanctioned auto-deletes (output-tree
+contract, operator law 2026-06-11).
 
 Sweeps STALE entries under ``episodes/_shared/tmp`` ONLY (the scratch tier
 the launchers point TEMP/TMP/OTR_GPU_LEASE_DIR at). Everything else in the
-output tree is operator-gated: episode assets are never auto-deleted, the
-OH-4 migration prints a dry-run table and STOPS for an explicit yes, and
-the pending-dir sweep (BUG-LOCAL-290) keeps its own narrow contract.
+output tree is operator-gated: episode assets are deleted only when the
+operator CHOSE it for that run -- the writer's ``asset_cleanup`` (default
+off, 2026-09-25), carried out by ``OTR_MasterAudioMux`` on that run's own
+folder after the publish is proven (``_otr_asset_cleanup``), which is the
+second sanctioned auto-delete. The OH-4 migration prints a dry-run table
+and STOPS for an explicit yes, and the pending-dir sweep (BUG-LOCAL-290)
+keeps its own narrow contract.
 
 Rules (the OUTPUT_TREE_CONTRACT OH-3 ticket, verbatim):
 
@@ -107,7 +111,7 @@ def sweep_shared_tmp(max_age_seconds: float | None = None,
                      dry_run: bool = False) -> TmpSweepReport:
     """Delete stale top-level entries under ``episodes/_shared/tmp``.
 
-    The ONE sanctioned auto-delete. Age = newest mtime inside the entry;
+    The scratch-folder auto-delete. Age = newest mtime inside the entry;
     younger-than-threshold entries are skipped (an in-flight render's
     scratch stays). Locked/undeletable entries are SKIPPED loud. Returns
     a :class:`TmpSweepReport`; never raises."""

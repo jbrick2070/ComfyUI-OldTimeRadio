@@ -183,6 +183,9 @@ from . import _otr_story_input as _otr_story_input
 # choices are built in INPUT_TYPES -- a broken registry must fail at load, the
 # same no-fallback law `source_bank` follows.
 from . import _otr_episode_languages as _EPLANG
+# ASSET CLEANUP AFTER PUBLISH (row 0b, 2026-09-25). The choice is made here and
+# stamped on the ledger; the terminal mux carries it out. Stdlib only.
+from . import _otr_asset_cleanup as _ASSET_CLEANUP
 from . import _otr_word_delivery as _OTRWD
 # MODULE SCOPE ON PURPOSE (item F, 2026-08-17). This module was previously
 # imported ONLY inside the `provenance_normalize` branch below, which is true
@@ -2940,6 +2943,20 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                         ),
                     },
                 ),
+                # ASSET CLEANUP AFTER PUBLISH (row 0b, 2026-09-25). APPENDED
+                # after episode_language and before the gate_in socket, which
+                # holds no saved slot, so this is the trailing value
+                # (widgets_values[35]) and no earlier index or link dst_slot
+                # moves (BUG-LOCAL-097). Default off. The ledger stamp is the
+                # FIRST WORD of the label, so the labels can be reworded later
+                # without touching a stamp.
+                "asset_cleanup": (
+                    list(_ASSET_CLEANUP.LABELS),
+                    {
+                        "default": _ASSET_CLEANUP.DEFAULT_LABEL,
+                        "tooltip": _ASSET_CLEANUP.TOOLTIP,
+                    },
+                ),
                 # MY STORY (2026-09-10). The four fields a person fills in to
                 # tell their own story, APPENDED after replay_from so every
                 # earlier saved value keeps its index (BUG-LOCAL-097). All
@@ -3093,6 +3110,9 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # on, today's behaviour byte for byte. The canvas default is the
         # explicit "English" label, which resolves to the same row.
         episode_language="",
+        # ASSET CLEANUP AFTER PUBLISH (row 0b), the trailing widget. "" is the
+        # legacy-missing state of a graph saved before it existed, and is off.
+        asset_cleanup="",
         # MY STORY (2026-09-10), appended after replay_from in widget order.
         story_characters="",
         story_plot="",
@@ -3133,6 +3153,10 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
         # ------------------------------------------------------------------ #
         _language = _EPLANG.resolve_label(episode_language)
         _language_row = _language.row
+        # THE ASSET-CLEANUP CHOICE, resolved here for the same reason: an
+        # unknown value fails at zero cost, and the replay branch below
+        # returns from run() and still has to stamp it.
+        _cleanup_slug = _ASSET_CLEANUP.slug_from_label(asset_cleanup)
         _story_raw = _otr_story_input.capture_raw(
             idea=custom_premise, characters=story_characters,
             plot=story_plot, setting=story_setting, author=story_author,
@@ -3214,6 +3238,15 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
                     _replay_language.row_drift["recorded_row_revision"],
                     _replay_language.row_drift["current_row_revision"],
                 )
+            # ASSET CLEANUP ON A REPLAY. A per-run housekeeping choice, not
+            # story content: the import already dropped the source's copy
+            # (`_REPLAY_RUN_VOLATILE_META`), so this run's widget is the only
+            # thing that can put one back. Stamped and saved BEFORE the wire is
+            # built, so the mux reads the same answer off the disk. Off stamps
+            # nothing.
+            if _cleanup_slug != "off":
+                meta["asset_cleanup"] = _cleanup_slug
+                led.save()
             script_json = json.dumps(data, ensure_ascii=True, separators=(",", ":"))
             script_text = "\n".join(
                 "%s: %s" % (str(r.get("speaker") or "").upper(), str(r.get("text") or ""))
@@ -3633,6 +3666,12 @@ class OTR_LedgerScriptWriter(WriterTailMixin):
             "draft_digest": (_story_bundle.digest if _story_bundle else ""),
             "delivery_token": uuid.uuid4().hex,
         }
+        # ASSET CLEANUP AFTER PUBLISH (row 0b), beside the delivery intent
+        # whose token binds it: the mux cleans only the folder whose ledger
+        # carries this run's token. Off stamps nothing -- an absent key is
+        # off, the `episode_language` convention.
+        if _cleanup_slug != "off":
+            meta["asset_cleanup"] = _cleanup_slug
         if _story_draft is not None:
             meta["story_draft"] = _story_draft.to_meta()
         # Randomizer receipt (2026-07-31). Written ONLY when the bank

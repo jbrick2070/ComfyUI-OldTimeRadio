@@ -556,9 +556,13 @@ REPLAY_MANIFEST_SCHEMA = "otr_replay_bundle_v1"
 #: `render_engines`, `render_trace`, `render_trace_version`, `phase_ms`,
 #: `audio_motion_profile`, `paths` -- were all rebuilt by the replay, and
 #: `video_readiness` is a freeze-cascade diagnostic that nothing requires.)
+#:
+#: `asset_cleanup` (row 0b, 2026-09-25) is a per-run housekeeping choice, not
+#: story content: the writer's replay branch re-stamps it from THIS run's
+#: widget, so a replay never inherits its source's choice to delete things.
 _REPLAY_RUN_VOLATILE_META = (
     "render_engines", "render_trace", "render_trace_version", "phase_ms",
-    "video_readiness", "audio_motion_profile", "paths",
+    "video_readiness", "audio_motion_profile", "paths", "asset_cleanup",
 )
 
 

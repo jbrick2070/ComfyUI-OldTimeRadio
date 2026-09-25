@@ -33,11 +33,14 @@ FIDELITY_BANKS = ("shakespeare", "public_domain")
 
 def test_the_widget_is_declared_after_replay_from_and_before_gate_in():
     """BUG-LOCAL-097: gate_in is a forceInput socket and holds no saved slot,
-    so declaring episode_language between them makes it the TRAILING value."""
+    so a widget declared just before it is the TRAILING value. That was
+    episode_language until 2026-09-25, when asset_cleanup (row 0b) was
+    appended after it the same way."""
     spec = W.INPUT_TYPES()
     order = list(spec["required"].keys()) + list(spec["optional"].keys())
     assert order.index("replay_from") + 1 == order.index("episode_language")
-    assert order.index("episode_language") + 1 == order.index("gate_in")
+    assert order.index("episode_language") + 1 == order.index("asset_cleanup")
+    assert order.index("asset_cleanup") + 1 == order.index("gate_in")
     assert order[-1] == "gate_in"
 
 
