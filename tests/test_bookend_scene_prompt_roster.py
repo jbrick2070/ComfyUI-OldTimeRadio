@@ -13,10 +13,10 @@ stamped.
 
 **That set was an inline literal and it went stale three times.** The last
 occurrence reached a published episode: `whispers_in_the_park` (2026-09-03,
-`otr/obs/`) rendered on `wan_ti2v` and four of its eight beats shipped that seed,
-which the operator reported as "basically no movement". The set still carried
-`wan_i2v` -- retired that same week and no longer registered, so the entry could
-never match -- while its live replacement was absent.
+`otr/obs/`) rendered on a lane missing from the set and four of its eight beats
+shipped that seed, which the operator reported as "basically no movement". The
+set still carried a lane retired that same week and no longer registered, so the
+entry could never match -- while its live replacement was absent.
 
 A name is cheap to add and free to forget. These tests are what make forgetting
 fail.
@@ -37,10 +37,9 @@ def _registered():
 #: checked only `BOOKEND_SCENE_PROMPT_ENGINES`, and review promptly found two
 #: tombstoned ids sitting in `SELF_COMPOSED` -- the same dead-id defect this
 #: file was written to stop, reproduced inside its own fix and invisible to its
-#: own test. A gate that guards one of five doors guards nothing.
+#: own test. A gate that guards one door of several guards nothing.
 _ALL_SETS = (
     ("BOOKEND_SCENE_PROMPT_ENGINES", "BOOKEND_SCENE_PROMPT_ENGINES"),
-    ("BOOKEND_SCENE_PROMPT_BOUNDED", "BOOKEND_SCENE_PROMPT_BOUNDED"),
     ("BOOKEND_SCENE_PROMPT_SELF_COMPOSED", "BOOKEND_SCENE_PROMPT_SELF_COMPOSED"),
     ("BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN", "BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN"),
     ("BOOKEND_SCENE_PROMPT_KNOWN_RED", "BOOKEND_SCENE_PROMPT_KNOWN_RED"),
@@ -51,10 +50,10 @@ _ALL_SETS = (
 def test_every_member_of_every_set_is_a_real_registered_engine(label, attr):
     """A dead id is a silent no-op that reads as coverage.
 
-    `wan_i2v` sat in the prompt tuple for a week after being retired: it matched
-    no shot, and its presence made the set LOOK like it covered the Wan family.
-    Two more (`animatediff15_video`, `animatediff15_v3_video`, tombstoned
-    2026-08-23) made it into the first draft of the replacement.
+    A retired lane sat in the prompt tuple for a week after being retired: it
+    matched no shot, and its presence made the set LOOK like it covered that
+    family. Two more (tombstoned 2026-08-23) made it into the first draft of the
+    replacement.
     """
     unknown = sorted(e for e in getattr(rd, attr) if e not in _registered())
     assert not unknown, (
@@ -88,10 +87,9 @@ def test_no_live_engine_falls_through_silently():
     scene prompt, is a Google provider or strict-text-only engine (both handled
     by their own branches of the same condition), is known-red with a stated
     debt, or does not take a text prompt at all. Anything else is an engine
-    nobody decided about, which is how `wan_ti2v` shipped bland for a week.
+    nobody decided about, which is how a lane shipped bland for a week.
     """
     accounted = (set(rd.BOOKEND_SCENE_PROMPT_ENGINES)
-                 | set(rd.BOOKEND_SCENE_PROMPT_BOUNDED)
                  | set(rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED)
                  | set(rd.BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN)
                  | set(rd.BOOKEND_SCENE_PROMPT_KNOWN_RED)
@@ -111,51 +109,16 @@ def test_no_live_engine_falls_through_silently():
         % "\n  ".join(unaccounted))
 
 
-def test_the_engine_that_shipped_the_bland_episode_is_accounted_for():
-    """The regression, named, and now PAID. `wan_ti2v` rendered
-    `whispers_in_the_park` and put all four bookends on the static seed.
-
-    It is still deliberately NOT in BOOKEND_SCENE_PROMPT_ENGINES: that branch
-    emits an LTX-shaped five-clause register (framing constraint, three subject
-    motions, a camera move) and wan's own directive asks for "one subject, one
-    action, one speed. Do not restate the set" at cfg 5.0, the highest guidance
-    in the stack. What KNOWN_RED said it was OWED instead -- an engine-shaped
-    formatter emitting one subject/action/speed -- is `bounded_motion_register`,
-    and BOOKEND_SCENE_PROMPT_BOUNDED is where it is now paid (2026-09-03).
-
-    The debt therefore must NOT still be sitting in KNOWN_RED: a standing
-    "PROVEN DEFECT / OWED" note over a fixed defect reads as coverage exactly
-    the way a dead engine id does, which is the failure this whole file exists
-    to stop.
-    """
-    assert "wan_i2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_BOUNDED, (
-        "wan_ti2v must receive the COMPACTED register -- that is the debt "
-        "PBUG-20260903-06 left owed and 2026-09-03 paid")
-    assert "fastwan_8gb" in rd.BOOKEND_SCENE_PROMPT_BOUNDED, (
-        "fastwan_8gb inherits wan_ti2v's directive and its fix")
-    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED, (
-        "the debt is paid; leaving the OWED note standing reads as coverage")
-
-
 @pytest.mark.parametrize("engine_id", sorted(rd.BOOKEND_SCENE_PROMPT_ENGINES))
 def test_each_prompt_owning_engine_is_selectable_and_registered(engine_id):
     assert engine_id in _registered(), engine_id
     assert vreg.get_engine(engine_id) is not None, engine_id
 
 
-def test_the_five_sets_are_disjoint():
-    """An engine in two sets is an engine nobody decided about, twice.
-
-    BOUNDED joined on 2026-09-03. It is a genuinely separate decision from
-    ENGINES -- both receive a scene prompt, but of different SHAPES -- so an
-    engine in both would be handed the five-clause LTX register and the
-    one-action compaction of it, and only the last write would survive.
-    """
+def test_the_four_sets_are_disjoint():
+    """An engine in two sets is an engine nobody decided about, twice."""
     sets = {
         "ENGINES": set(rd.BOOKEND_SCENE_PROMPT_ENGINES),
-        "BOUNDED": set(rd.BOOKEND_SCENE_PROMPT_BOUNDED),
         "SELF_COMPOSED": set(rd.BOOKEND_SCENE_PROMPT_SELF_COMPOSED),
         "NOT_TEXT_DRIVEN": set(rd.BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN),
         "KNOWN_RED": set(rd.BOOKEND_SCENE_PROMPT_KNOWN_RED),

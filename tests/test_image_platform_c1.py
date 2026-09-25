@@ -588,16 +588,17 @@ def test_dispatch_appends_visual_safety_to_image_requests(
     assert led["images"]["images"][0]["prompt_hash"] == calls["last"]["prompt_hash"]
 
 
-def test_dispatch_renders_forced_ltx_announcer_radio_face(
+def test_dispatch_renders_forced_talking_announcer_radio_face(
         clean_image_registry, tmp_path, monkeypatch):
     """Regression for the missing ledger row:
-    OTR_FORCE_ENGINE_MAP can turn the saved announcer slot into talking
-    ltx_audio_in, so the dispatcher must render/stamp the MetaBrief radio-face
-    object instead of skipping it as an unused viz still."""
+    OTR_FORCE_ENGINE_MAP can turn the saved announcer slot into a talking
+    (lip-syncing) engine, so the dispatcher must render/stamp the MetaBrief
+    radio-face object instead of skipping it as an unused viz still."""
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
+                       "announcer_visual=cloud_kling_avatar")
     ledger = {"episode_id": "ep_radio_face", "cast": []}
     policy = {
         "policy_version": 2,
@@ -673,14 +674,14 @@ def test_dispatch_skips_stills_for_all_visualizer_episode(clean_image_registry, 
 
 
 def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_registry, tmp_path):
-    # character video = wan_ti2v (consumes init_image) -> the still IS generated.
+    # character video = ltx_8gb (consumes init_image) -> the still IS generated.
     clean_image_registry._registry.clear()
     ireg.register(_img_stub(name="flux_gen1"))
-    ledger = {"episode_id": "ep_wan", "cast": [{"char_id": "c1", "name": "BABA"}]}
+    ledger = {"episode_id": "ep_ltx", "cast": [{"char_id": "c1", "name": "BABA"}]}
     policy = {
         "policy_version": 2,
         "image_models": {"character_image_model": {"engine_id": "flux_gen1"}},
-        "video_models": _complete_video_models(character="wan_ti2v"),
+        "video_models": _complete_video_models(character="ltx_8gb"),
         "seed": {"request_seed": 0}, "granularity": {}}
     prompts = _payload(_pobj("c1", "a spacer, station", "ph1"))
     lockdir = tmp_path / "lease.lockdir"
@@ -690,7 +691,7 @@ def test_dispatch_still_made_when_video_engine_needs_init_image(clean_image_regi
         return _np_pixels(60)
     disp.dispatch_images(ledger, policy, prompts, gen_fn=gen_fn,
                          output_dir=str(tmp_path), lockdir=lockdir)
-    assert calls["n"] == 1                          # wan_ti2v needs the still
+    assert calls["n"] == 1                          # ltx_8gb needs the still
 
 
 def test_dispatcher_cache_and_cregenerate_invalidates(clean_image_registry, tmp_path):

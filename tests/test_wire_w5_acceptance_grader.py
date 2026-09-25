@@ -20,9 +20,7 @@ Three refusals are as load-bearing as the checks, and each has a test:
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import sys
 
 import pytest
@@ -106,11 +104,11 @@ def _manifest(rows):
 # ---------------------------------------------------------------------------
 
 def test_a_CLEAN_episode_produces_NO_findings():
-    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx_audio_in"),
+    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb"),
                       _shot("shot_b1", "character_video", "humo")],
-                     {"announcer_visual": "ltx_audio_in",
+                     {"announcer_visual": "ltx25_native_audio_in_16gb",
                       "character_video": "humo"})
-    manifest = _manifest([_row("shot_b0", "ltx_audio_in"),
+    manifest = _manifest([_row("shot_b0", "ltx25_native_audio_in_16gb"),
                           _row("shot_b1", "humo")])
     assert acc.grade_episode(ledger, manifest) == []
 
@@ -118,11 +116,11 @@ def test_a_CLEAN_episode_produces_NO_findings():
 def test_a_SHOT_REWRITTEN_after_the_freeze_is_caught():
     """The case a per-role check alone cannot see: the frozen map still says
     what it always said, and the shot row no longer agrees with it."""
-    ledger = _ledger([_shot("shot_b1", "character_video", "wan_i2v")],
+    ledger = _ledger([_shot("shot_b1", "character_video", "ltx25_video")],
                      {"character_video": "humo"})
     findings = acc.grade_frozen_route(ledger)
     assert [f["rule"] for f in findings] == [acc.RULE_FROZEN_ROUTE]
-    assert "humo" in findings[0]["detail"] and "wan_i2v" in findings[0]["detail"]
+    assert "humo" in findings[0]["detail"] and "ltx25_video" in findings[0]["detail"]
 
 
 def test_a_ROLE_MISSING_from_the_frozen_map_is_a_FINDING_not_a_pass():
@@ -163,13 +161,13 @@ def test_TWO_SHOTS_EXCHANGING_ENGINES_is_caught_and_the_HISTOGRAM_cannot():
     """r4's own argument for cutting histograms, run as an experiment rather
     than asserted: swap two shots' engines and every aggregate total is
     IDENTICAL, while the per-shot grader reports both."""
-    frozen = {"announcer_visual": "ltx_audio_in", "character_video": "humo"}
-    shots = [_shot("shot_b0", "announcer_visual", "ltx_audio_in"),
+    frozen = {"announcer_visual": "ltx25_native_audio_in_16gb", "character_video": "humo"}
+    shots = [_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb"),
              _shot("shot_b1", "character_video", "humo")]
-    honest = _manifest([_row("shot_b0", "ltx_audio_in"),
+    honest = _manifest([_row("shot_b0", "ltx25_native_audio_in_16gb"),
                         _row("shot_b1", "humo")])
     swapped = _manifest([_row("shot_b0", "humo"),
-                         _row("shot_b1", "ltx_audio_in")])
+                         _row("shot_b1", "ltx25_native_audio_in_16gb")])
     assert honest["engine_histogram"] == swapped["engine_histogram"], (
         "the premise of this test is that the totals cannot tell them apart")
     assert acc.grade_episode(_ledger(shots, frozen), honest) == []
@@ -192,9 +190,9 @@ def test_a_PLANNED_beat_with_NO_CLIP_is_its_OWN_named_finding():
 def test_a_beat_that_RENDERS_NOTHING_owes_nothing():
     """CONTROL. A zero-frame row is not a missing clip; demanding one would
     make every non-rendering beat a finding."""
-    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx_audio_in",
+    ledger = _ledger([_shot("shot_b0", "announcer_visual", "ltx25_native_audio_in_16gb",
                             frames=0)],
-                     {"announcer_visual": "ltx_audio_in"})
+                     {"announcer_visual": "ltx25_native_audio_in_16gb"})
     assert acc.grade_delivered(ledger, _manifest([])) == []
 
 
@@ -216,10 +214,10 @@ def test_a_PING_PONGED_clip_on_a_MULTI_CLIP_beat_is_REJECTED():
 
     So this asserts through ``grade_episode``: the clip is still rejected,
     exactly once, and the rule that owns it is named."""
-    ledger = _ledger([_shot("shot_b1", "character_video", "wan_ti2v",
+    ledger = _ledger([_shot("shot_b1", "character_video", "ltx_8gb",
                             segments=3)],
-                     {"character_video": "wan_ti2v"})
-    manifest = _manifest([_row("shot_b1", "wan_ti2v",
+                     {"character_video": "ltx_8gb"})
+    manifest = _manifest([_row("shot_b1", "ltx_8gb",
                                extension_mode="ping_pong", native=17)])
     findings = acc.grade_episode(ledger, manifest)
     rules = [f["rule"] for f in findings]
@@ -251,10 +249,11 @@ def test_a_SINGLE_CLIP_beat_is_OUT_OF_SCOPE_for_the_honesty_rule_but_NOT_for_the
     and fills the beat with a mirror (PBUG-20260723-02). If this went red the
     grader would be failing production's majority path."
 
-    That sentence is no longer true in either half. ``eng_wan_ti2v``'s
-    adapter-side ping-pong was DELETED under the operator's no-mirror ruling, so
-    padding is not production's majority path -- it is not any path. And the
-    ruling is flat: *"there is no mirror or ping pong unless for credits."*
+    That sentence is no longer true in either half. The WAN adapter's
+    ping-pong was DELETED under the operator's no-mirror ruling, and the tier
+    with it, so padding is not production's majority path -- it is not any
+    path. And the ruling is flat: *"there is no mirror or ping pong unless for
+    credits."*
 
     What survives is a SCOPE fact, not a permission: ``grade_multiclip_honesty``
     still ignores a one-segment plan, because its question is whether a
@@ -262,10 +261,10 @@ def test_a_SINGLE_CLIP_beat_is_OUT_OF_SCOPE_for_the_honesty_rule_but_NOT_for_the
     the flat ban was unenforced on exactly the beats a single padded render
     produces -- and ``RULE_NO_MIRROR`` is what closed it. Both halves are pinned
     here so the scope fact can never again be mistaken for a licence."""
-    ledger = _ledger([_shot("shot_b1", "character_video", "wan_ti2v",
+    ledger = _ledger([_shot("shot_b1", "character_video", "ltx_8gb",
                             segments=1)],
-                     {"character_video": "wan_ti2v"})
-    manifest = _manifest([_row("shot_b1", "wan_ti2v",
+                     {"character_video": "ltx_8gb"})
+    manifest = _manifest([_row("shot_b1", "ltx_8gb",
                                extension_mode="ping_pong", native=17)])
     # The honesty rule does not ask about this beat...
     assert acc.grade_multiclip_honesty(ledger, manifest) == []
@@ -277,10 +276,10 @@ def test_a_SINGLE_CLIP_beat_is_OUT_OF_SCOPE_for_the_honesty_rule_but_NOT_for_the
 def test_a_CLIP_claiming_NO_EXTENSION_must_have_RENDERED_every_frame():
     """The other half of the receipt: a lane can declare "none" and still hand
     back fewer real frames than it emitted."""
-    ledger = _ledger([_shot("shot_b1", "character_video", "wan_ti2v",
+    ledger = _ledger([_shot("shot_b1", "character_video", "ltx_8gb",
                             segments=2)],
-                     {"character_video": "wan_ti2v"})
-    manifest = _manifest([_row("shot_b1", "wan_ti2v", frames=50, native=33)])
+                     {"character_video": "ltx_8gb"})
+    manifest = _manifest([_row("shot_b1", "ltx_8gb", frames=50, native=33)])
     findings = acc.grade_multiclip_honesty(ledger, manifest)
     assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
     assert "only 33" in findings[0]["detail"]
@@ -291,10 +290,10 @@ def test_a_CLIP_claiming_NO_EXTENSION_must_have_RENDERED_every_frame():
 # ---------------------------------------------------------------------------
 
 def _chain_shot(shot_id, *, segment_frames=81, count=3):
-    """A real ``wan_ti2v`` chain: N native renders, one duplicated head frame
+    """A real ``ltx_8gb`` chain: N native renders, one duplicated head frame
     dropped at every seam after the first."""
     return {"shot_id": shot_id, "role": "character_video",
-            "engine_id": "wan_ti2v",
+            "engine_id": "ltx_8gb",
             "target_frame_count": count * segment_frames - (count - 1),
             "coverage_plan": {"join_mode": "chain", "segments": [
                 {"index": i, "render_frames": segment_frames,
@@ -316,7 +315,7 @@ def _chain_row(shot_id, *, segment_frames=81, count=3, natives=None):
         max(0, min(s["native_frame_count"],
                    s["render_frames"] - s["trim_tail"]) - s["drop_head"])
         for s in segments)
-    return {"shot_id": shot_id, "engine_id": "wan_ti2v", "exists": True,
+    return {"shot_id": shot_id, "engine_id": "ltx_8gb", "exists": True,
             "frame_count": count * segment_frames - (count - 1),
             "extension_mode": "none",
             "native_frame_count": sum(s["native_frame_count"] for s in segments),
@@ -338,7 +337,7 @@ def test_an_HONEST_CHAINED_beat_that_renders_MORE_than_it_delivers_is_ACCEPTED()
     assert row["native_frame_count"] == 243, "the WORK"
     assert row["delivered_native_frame_count"] == 241, "the OUTPUT"
     assert row["frame_count"] == 241
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     assert acc.grade_multiclip_honesty(ledger, _manifest([row])) == []
 
 
@@ -357,7 +356,7 @@ def test_PADDING_that_SURVIVES_the_seam_is_still_REJECTED():
     real frames of its 81 delivers 21 frames that came from nowhere."""
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1", natives=[81, 60, 81])
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
     assert "only 220" in findings[0]["detail"], findings[0]["detail"]
@@ -368,12 +367,12 @@ def test_PADDING_the_TRIM_removes_entirely_does_NOT_condemn_the_beat():
     rendered 40 real frames and had its last 41 trimmed away delivers only real
     frames, whatever happened inside the render."""
     shot = {"shot_id": "shot_b1", "role": "character_video",
-            "engine_id": "wan_ti2v", "target_frame_count": 121,
+            "engine_id": "ltx_8gb", "target_frame_count": 121,
             "coverage_plan": {"join_mode": "chain", "segments": [
                 {"index": 0, "render_frames": 81, "drop_head": 0, "trim_tail": 0},
                 {"index": 1, "render_frames": 81, "drop_head": 1,
                  "trim_tail": 40}]}}
-    row = {"shot_id": "shot_b1", "engine_id": "wan_ti2v", "exists": True,
+    row = {"shot_id": "shot_b1", "engine_id": "ltx_8gb", "exists": True,
            "frame_count": 121, "extension_mode": "none",
            "native_frame_count": 122, "delivered_native_frame_count": 121,
            "segments": [
@@ -383,7 +382,7 @@ def test_PADDING_the_TRIM_removes_entirely_does_NOT_condemn_the_beat():
                {"segment_id": "b1_seg01", "segment_index": 1,
                 "render_frames": 81, "drop_head": 1, "trim_tail": 40,
                 "native_frame_count": 41, "extension_mode": "none"}]}
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     assert acc.grade_multiclip_honesty(ledger, _manifest([row])) == []
 
 
@@ -398,7 +397,7 @@ def test_a_MISSING_native_count_is_a_FINDING_not_a_PASS():
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1")
     row["segments"][1]["native_frame_count"] = None
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
     assert "missing or impossible" in findings[0]["detail"]
@@ -411,7 +410,7 @@ def test_a_beat_with_NO_per_segment_receipt_is_a_FINDING():
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1")
     row["segments"] = None
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert "carries no per-segment receipt" in findings[0]["detail"]
 
@@ -428,7 +427,7 @@ def test_a_beat_whose_OWN_COUNT_disagrees_with_its_SEGMENTS_is_a_FINDING(
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1")
     row[field] = value
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert "do not support what it declares" in findings[0]["detail"]
     assert field in findings[0]["detail"], findings[0]["detail"]
@@ -452,7 +451,7 @@ def test_TWO_COORDINATED_LIES_cannot_launder_a_padded_beat():
     assert row["delivered_native_frame_count"] == 220
     # Now forge the length so the receipt is internally consistent at 220.
     row["frame_count"] = 220
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert [f["rule"] for f in findings] == [acc.RULE_MULTICLIP_HONESTY]
     assert "the plan it was cut against covers 241" in findings[0]["detail"], \
@@ -481,7 +480,7 @@ def test_a_projection_that_CONTRADICTS_the_frozen_plan_is_a_FINDING():
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1")
     row["segments"][2]["render_frames"] = 49
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert "the frozen plan says 81" in findings[0]["detail"], \
         findings[0]["detail"]
@@ -493,7 +492,7 @@ def test_a_NATIVE_count_ABOVE_the_segments_own_length_is_IMPOSSIBLE():
     launder a broken receipt into a pass."""
     shot = _chain_shot("shot_b1")
     row = _chain_row("shot_b1", natives=[81, 999, 81])
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     findings = acc.grade_multiclip_honesty(ledger, _manifest([row]))
     assert "missing or impossible" in findings[0]["detail"]
 
@@ -504,7 +503,7 @@ def test_DUPLICATE_segment_ids_and_indices_are_FINDINGS():
     dup_id["segments"][1]["segment_id"] = dup_id["segments"][0]["segment_id"]
     dup_index = _chain_row("shot_b1")
     dup_index["segments"][1]["segment_index"] = 0
-    ledger = _ledger([shot], {"character_video": "wan_ti2v"})
+    ledger = _ledger([shot], {"character_video": "ltx_8gb"})
     assert "twice" in acc.grade_multiclip_honesty(
         ledger, _manifest([dup_id]))[0]["detail"]
     assert "missing or repeated" in acc.grade_multiclip_honesty(
@@ -515,8 +514,7 @@ def test_DUPLICATE_segment_ids_and_indices_are_FINDINGS():
 def test_an_UNREADABLE_receipt_is_a_FINDING_and_NEVER_a_TRACEBACK(bad):
     """A grader that dies on a malformed receipt has not graded the episode.
     Both operands used to be coerced with a bare ``int()``, so a manifest
-    carrying "not-a-number" raised straight out of the grader -- past a durable
-    script that guards only document LOADING.
+    carrying "not-a-number" raised straight out of the grader as a traceback.
 
     ``True`` is in this list on purpose: ``bool`` is an ``int`` subclass, so it
     coerced to 1 and produced "of which only True were rendered" -- a nonsense
@@ -527,7 +525,7 @@ def test_an_UNREADABLE_receipt_is_a_FINDING_and_NEVER_a_TRACEBACK(bad):
         row = _chain_row("shot_b1")
         row[field] = bad
         findings = acc.grade_multiclip_honesty(
-            _ledger([shot], {"character_video": "wan_ti2v"}), _manifest([row]))
+            _ledger([shot], {"character_video": "ltx_8gb"}), _manifest([row]))
         assert findings, "%s=%r must be reported, not ignored" % (field, bad)
         assert all(f["rule"] == acc.RULE_MULTICLIP_HONESTY for f in findings)
 
@@ -540,8 +538,7 @@ def test_grade_DELIVERED_never_raises_on_an_unreadable_target_count(bad):
     could raise out of the grader -- and every site in this module was moved on
     to it EXCEPT the two in ``grade_delivered``, which kept a bare ``int()``.
     A ledger stamping an unreadable ``target_frame_count`` therefore raised
-    straight past ``grade_episode`` and past the durable script's documented
-    0/1/2 exit contract, as an uncaught traceback.
+    straight past ``grade_episode`` as an uncaught traceback.
 
     An unreadable PLAN and a missing CLIP are different failures, and this rule
     owns only the second -- so a shot that cannot say what it wanted is skipped,
@@ -607,7 +604,7 @@ def test_the_MANIFEST_carries_the_receipts_the_grader_reads():
     """
     from nodes._otr_video_engines import render_driver as rd
     beat_clip = {
-        "path": "", "type": "video", "frame_count": 241, "engine_id": "wan_ti2v",
+        "path": "", "type": "video", "frame_count": 241, "engine_id": "ltx_8gb",
         "native_frame_count": 243, "delivered_native_frame_count": 241,
         "extension_mode": "none",
         "segments": [{"segment_id": "b001_seg00", "beat_id": "b001",
@@ -619,7 +616,7 @@ def test_the_MANIFEST_carries_the_receipts_the_grader_reads():
     }
     result = {"ledger": {"video": {"shots": [
         {"shot_id": "shot_b1", "role": "character_video",
-         "engine_id": "wan_ti2v", "target_frame_count": 241}]}},
+         "engine_id": "ltx_8gb", "target_frame_count": 241}]}},
         "clips": {"shot_b1": beat_clip}}
     row = rd.build_clip_manifest(result)["clips"][0]
 
@@ -651,125 +648,3 @@ def test_a_SINGLE_RENDER_beat_carries_NO_delivered_native_count():
     row = rd.build_clip_manifest(result)["clips"][0]
     assert row["delivered_native_frame_count"] is None
     assert row["segments"] is None
-
-
-# ---------------------------------------------------------------------------
-# The durable script -- "a grader nobody can run is an unowned ruling"
-# ---------------------------------------------------------------------------
-
-def _write(tmp_path, name, doc):
-    path = tmp_path / name
-    path.write_text(json.dumps(doc), encoding="utf-8")
-    return str(path)
-
-
-def _run_script(ledger_path, manifest_path, *extra):
-    script = os.path.join(_REPO, "scripts", "grade_episode.py")
-    return subprocess.run(
-        [sys.executable, script, "--ledger", ledger_path,
-         "--manifest", manifest_path] + list(extra),
-        capture_output=True, text=True)
-
-
-def test_the_SCRIPT_exits_ZERO_on_a_clean_episode(tmp_path):
-    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
-                     {"character_video": "humo"})
-    manifest = _manifest([_row("shot_b1", "humo")])
-    out = _run_script(_write(tmp_path, "l.json", ledger),
-                      _write(tmp_path, "m.json", manifest))
-    assert out.returncode == 0, out.stderr
-    assert "ACCEPTED" in out.stdout
-
-
-def test_the_SCRIPT_exits_ONE_and_NAMES_the_shot(tmp_path):
-    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
-                     {"character_video": "humo"})
-    manifest = _manifest([_row("shot_b1", "still_pan")])
-    out = _run_script(_write(tmp_path, "l.json", ledger),
-                      _write(tmp_path, "m.json", manifest))
-    assert out.returncode == 1
-    assert "shot_b1" in out.stdout and "still_pan" in out.stdout
-
-
-def test_the_SCRIPT_exits_TWO_on_an_UNREADABLE_document(tmp_path):
-    """A document that cannot be read is not an accepted episode and it is not
-    a rejected one either -- conflating "unreadable" with "clean" is how a
-    grader reports success on a run it never saw."""
-    bad = tmp_path / "broken.json"
-    bad.write_text("{not json", encoding="utf-8")
-    out = _run_script(str(bad), str(bad))
-    assert out.returncode == 2
-    assert "cannot read" in out.stderr
-
-
-def test_the_SCRIPT_grades_the_WRAPPER_the_render_batch_actually_writes(tmp_path):
-    """THE VACUOUS PASS (2026-08-06). ``OTR_VideoRenderBatch`` retains its
-    ledger as ``{"ledger": {...}, "master_audio_path": "..."}``, and this script
-    handed that WRAPPER straight to a grader that looks for ``video.shots`` at
-    the ROOT. Pointed at the real retained artifact it printed
-
-        ACCEPTED: 0 shot(s) delivered the route this episode froze.
-
-    and exited 0 -- success reported on an episode it never graded. Even a
-    perfectly repaired honesty rule would never have fired."""
-    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
-                     {"character_video": "humo"})
-    wrapped = {"ledger": ledger, "master_audio_path": "master.wav"}
-    manifest = _manifest([_row("shot_b1", "still_pan")])
-    out = _run_script(_write(tmp_path, "wrapped.json", wrapped),
-                      _write(tmp_path, "m.json", manifest))
-    assert out.returncode == 1, out.stdout + out.stderr
-    assert "shot_b1" in out.stdout and "still_pan" in out.stdout
-
-
-def test_the_SCRIPT_grades_a_WRAPPED_and_a_DIRECT_ledger_IDENTICALLY(tmp_path):
-    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
-                     {"character_video": "humo"})
-    manifest = _write(tmp_path, "m.json", _manifest([_row("shot_b1", "humo")]))
-    direct = _run_script(_write(tmp_path, "d.json", ledger), manifest, "--json")
-    wrapped = _run_script(
-        _write(tmp_path, "w.json", {"ledger": ledger, "master_audio_path": ""}),
-        manifest, "--json")
-    assert direct.returncode == wrapped.returncode == 0
-    assert direct.stdout == wrapped.stdout
-
-
-@pytest.mark.parametrize("root", ["[1, 2, 3]", '"a string"', "7", "null"])
-def test_the_SCRIPT_exits_TWO_on_a_document_of_the_WRONG_SHAPE(tmp_path, root):
-    """PARSEABLE IS NOT READABLE. ``json.load`` happily returns a list, a
-    string or a number for a file whose root is not an object, and every reader
-    downstream assumes a mapping -- so a document of the wrong shape used to
-    crash with an AttributeError instead of exiting 2, which is the exact
-    verdict this script promises for a document it cannot read."""
-    bad = tmp_path / "bad.json"
-    bad.write_text(root, encoding="utf-8")
-    good = _write(tmp_path, "m.json", _manifest([]))
-    for ledger_path, manifest_path in ((str(bad), good), (good, str(bad))):
-        out = _run_script(ledger_path, manifest_path)
-        assert out.returncode == 2, out.stdout + out.stderr
-        assert "not a JSON object" in out.stderr
-        assert "Traceback" not in out.stderr
-
-
-def test_the_SCRIPT_exits_TWO_on_a_ledger_with_NO_SHOTS(tmp_path):
-    """Every rule is per-shot, so an empty shot list makes all of them
-    VACUOUSLY true. "Could not grade" belongs with the other document failures
-    at exit 2 -- this script already knew unreadable is not clean, and empty had
-    to learn the same lesson."""
-    out = _run_script(_write(tmp_path, "l.json", _ledger([], {})),
-                      _write(tmp_path, "m.json", _manifest([])))
-    assert out.returncode == 2
-    assert "nothing to grade" in out.stderr
-    assert "ACCEPTED" not in out.stdout
-
-
-def test_the_SCRIPT_can_emit_JSON_for_a_receipt(tmp_path):
-    ledger = _ledger([_shot("shot_b1", "character_video", "humo")],
-                     {"character_video": "humo"})
-    manifest = _manifest([_row("shot_b1", "still_pan")])
-    out = _run_script(_write(tmp_path, "l.json", ledger),
-                      _write(tmp_path, "m.json", manifest), "--json")
-    assert out.returncode == 1
-    parsed = json.loads(out.stdout)
-    assert parsed[0]["rule"] == acc.RULE_DELIVERED_ENGINE
-    assert parsed[0]["shot_id"] == "shot_b1"

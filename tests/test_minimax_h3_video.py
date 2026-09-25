@@ -22,7 +22,6 @@ from __future__ import annotations
 
 import ast
 import inspect
-import json
 import os
 
 import pytest
@@ -40,8 +39,6 @@ from nodes._otr_video_engines.registry import EngineUnusable
 
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROFILE_PATH = os.path.join(
-    REPO_ROOT, "config", "profiles", "otr_h3_low_video.json")
 
 #: The boot contract this lane requires, as a profile fragment. Every test that
 #: needs preflight to get PAST the boot gate uses this, so a test can never pass
@@ -57,11 +54,6 @@ H3_SERVER_STATE = {"available": True, "reserve_vram_gb": 12.0,
 @pytest.fixture()
 def engine():
     return vreg.get_engine("minimax_h3_video")
-
-
-def _profile():
-    with open(PROFILE_PATH, "r", encoding="utf-8") as fh:
-        return json.load(fh)
 
 
 # ---------------------------------------------------------------------------
@@ -223,14 +215,6 @@ def test_the_lane_DECLARES_its_canvas_864x480(engine):
     w, h = engine.render_canvas
     # Every H3 node takes width/height at step=32 and the latent is H/16 x W/16.
     assert w % 32 == 0 and h % 32 == 0
-
-
-def test_the_profile_carries_the_same_canvas_as_the_declaration(engine):
-    """The declaration is applied LAST and overrules the profile, so a profile
-    saying something else is a config an operator reads and is misled by."""
-    render = _profile()["render"]
-    assert (render["canvas_w"], render["canvas_h"]) == engine.render_canvas
-    assert render["fps"] == engine.target_fps
 
 
 def test_the_contract_publishes_canvas_frames_at_the_canvas_rate(engine):
@@ -430,17 +414,11 @@ def test_the_h3_contract_carries_the_MEASURED_reserve_clamp():
     assert spec["sage_attention"] is False
 
 
-def test_the_reserve_clamp_REACHES_the_launcher_and_the_profile_carries_it():
+def test_the_reserve_clamp_REACHES_the_launcher():
     """A boot pin that no launcher turns into argv clamps nothing (lesson L6)."""
     env = bc.launch_env_for("h3")
     assert env["OTR_HEADLESS_RESERVE_VRAM_GB"] == "12"
     assert env["OTR_HEADLESS_DISABLE_PINNED"] == "1"
-    launch = _profile()["launch"]
-    assert launch["boot_contract"] == "h3"
-    assert launch["sage_attention"] is False
-    # The profile's env must BE the contract's env -- not a hand-typed echo of
-    # it that can drift the next time the contract moves.
-    assert launch["env"] == env
 
 
 def test_the_solo_smoke_path_leaves_multi_contract_h3_for_live_resolution():

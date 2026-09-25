@@ -88,7 +88,7 @@ class NullableVramConsumerTests(unittest.TestCase):
         cls.host = cls.load("_otr_shared.host_caps")
         cls.batch = cls.load("otr_video_render_batch")
         cls.credits = cls.load("otr_credits_roll")
-        cls.av = cls.load("_otr_video_engines.eng_ltx_av")
+        cls.av = cls.load("_otr_video_engines.eng_ltx25")
         if cls.boundary.blocked:
             raise AssertionError("Blocked imports: " + repr(cls.boundary.blocked))
 
@@ -235,7 +235,7 @@ class NullableVramConsumerTests(unittest.TestCase):
         self.post_read.assert_not_called()
 
     def test_adapter_raw_to_clip_preserves_optional_measurement(self):
-        engine = self.av.LtxAudioInEngine()
+        engine = self.av.Ltx25NativeAudioIn16gbEngine()
         for value in (None, 0, 12345):
             with self.subTest(value=value):
                 raw = {"out_path": "clip.mp4", "frame_count": 10,

@@ -5,19 +5,20 @@ Spec: docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md
 3D_TOOLKIT_PLAN.md section 0.
 
 Covers:
-  * S0 shape validator: the 3 committed tiers load + validate; unknown keys,
-    missing keys and bad enums are rejected fail-closed.
+  * S0 shape validator: every `config/workflow_matrix.json` row loads +
+    validates; unknown keys, missing keys and bad enums are rejected
+    fail-closed.
   * S0 mapping: loads + validates; raw node ids banned; companion-trap widget
     names (`seed`/`noise_seed`) banned; every managed target is a REAL widget
     on a REAL node type (verified against INPUT_TYPES); managed node types are
     unique in the master graph.
   * S0 profile separation: the lean canonical workflow is allowed to differ
-    from the heavier 16gb_full profile; profile application is explicit.
+    from the heavier otr_16gb_low row; profile application is explicit.
   * S1 declarations: every registered engine has a CAPABILITIES row and vice
     versa, in all three namespaces; rows validate.
   * S1 enable-set: derived availability with reason codes; every profile
-    override is in enabled(P) for its namespace (cross-validation), for all
-    three tiers; the two-heavy-roles regression (NO static co-residency
+    override is in enabled(P) for its namespace (cross-validation), for every
+    matrix row; the two-heavy-roles regression (NO static co-residency
     rejection).
 
 UTF-8, no BOM, ASCII-only source.
@@ -34,15 +35,28 @@ from nodes._otr_shared import capability_profiles as cp
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
-TIERS = ("16gb_full", "8gb_lite", "cpu_floor")
-GOOGLE_MEDIA_PROFILES = (
-    "google_veo_media",
-    "google_omni_media",
-    "google_veo_all",
-    "google_omni_all",
-    "google_veo_low_1act",
-    "google_veo_low_3act",
-)
+#: Every workflow the pack runs -- the matrix is the only source `load_profile` reads.
+MATRIX_IDS = cp.known_profile_ids()
+#: The rows the host-shape tests stand on. Named, not picked by position, so a
+#: matrix reorder never silently moves a test onto a different kind of machine.
+NV16 = "otr_16gb_low"       # 16 GB NVIDIA, sidecars allowed
+NV8 = "otr_8gb_still"       # 8 GB NVIDIA, sidecars off
+CPU_ROW = "otr_cloud_low"   # the cloud rows are the cpu-backend documents
+
+
+def _a_row_stating(section, key=None):
+    """A deep copy of the first matrix row that states `section` (and `key`).
+
+    The rows are delta documents -- each states only what it changes -- so no
+    single row carries every section. A test that edits one section takes a real
+    row that has it rather than inventing a document.
+    """
+    for rid in MATRIX_IDS:
+        prof = cp.load_profile(rid)
+        if section in prof and (key is None or key in prof[section]):
+            return copy.deepcopy(prof)
+    wanted = f"{section}.{key}" if key else section
+    raise AssertionError(f"no workflow_matrix.json row states {wanted!r}")
 
 
 # ---------------------------------------------------------------------------
@@ -51,8 +65,7 @@ GOOGLE_MEDIA_PROFILES = (
 def _video_registry():
     from nodes._otr_video_engines import registry as vreg
     from nodes._otr_video_engines import (  # noqa: F401  (register adapters)
-        cheap_families, eng_humo,
-        eng_ltx_video, eng_wan_ti2v,
+        cheap_families, eng_humo, eng_ltx25,
     )
     return vreg
 
@@ -85,14 +98,8 @@ def _declarations_by_registry():
 # ---------------------------------------------------------------------------
 # S0 -- profile shape
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("tier", TIERS)
-def test_committed_tier_loads_and_validates(tier):
-    profile = cp.load_profile(tier)
-    assert profile["id"] == tier
-
-
-@pytest.mark.parametrize("profile_id", GOOGLE_MEDIA_PROFILES)
-def test_google_media_profile_loads_and_validates(profile_id):
+@pytest.mark.parametrize("profile_id", MATRIX_IDS)
+def test_every_matrix_row_loads_and_validates(profile_id):
     profile = cp.load_profile(profile_id)
     assert profile["id"] == profile_id
 
@@ -100,10 +107,21 @@ def test_google_media_profile_loads_and_validates(profile_id):
 # ---------------------------------------------------------------------------
 # S2 -- schema v2 sections (platform-portability, 2026-07-10)
 # ---------------------------------------------------------------------------
-@pytest.mark.parametrize("profile_id", TIERS + GOOGLE_MEDIA_PROFILES + ("otr_cloud_lanes",))
-def test_v2_sections_present_on_every_committed_profile(profile_id):
+#: The sections every row must carry: each one that holds a KEY INDICATOR (the
+#: matrix states those on every row, even where they equal the canonical), plus
+#: `launch` and `preflight`, which default from the matrix's own block because the
+#: canonical holds nothing for them. `image` and `render` are not in the set: a row
+#: omits them to follow the canonical, which the delta relaxation made legal.
+_ROW_SECTIONS = tuple(sorted(
+    {k.split(".")[0] for k in cp.load_matrix()["key_indicators"]}
+    | {"launch", "preflight"}))
+
+
+@pytest.mark.parametrize("profile_id", MATRIX_IDS)
+def test_v2_sections_present_on_every_matrix_row(profile_id):
     prof = cp.load_profile(profile_id)
-    for section in ("llm", "video", "image", "audio", "render", "preflight"):
+    assert {"llm", "video", "audio", "preflight"} <= set(_ROW_SECTIONS)
+    for section in _ROW_SECTIONS:
         assert isinstance(prof[section], dict), section
     assert prof["gpu_vendor"] in ("nvidia", "amd", "apple", "none")
     assert isinstance(prof["launch"]["env"], dict)
@@ -122,14 +140,14 @@ def test_v2_sections_present_on_every_committed_profile(profile_id):
     ("preflight", "required_keys", [1], "preflight.required_keys"),
 ])
 def test_v2_bad_section_values_rejected(section, key, value, match):
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad = _a_row_stating(section)
     bad[section][key] = value
     with pytest.raises(cp.ProfileError, match=match):
         cp.validate_profile_shape(bad)
 
 
 def test_v2_unknown_llm_key_rejected():
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad = copy.deepcopy(cp.load_profile(NV16))
     bad["llm"]["surprise_lane"] = "x"
     with pytest.raises(cp.ProfileError, match="unknown llm key"):
         cp.validate_profile_shape(bad)
@@ -153,9 +171,10 @@ def test_an_absent_section_is_legal(section):
 
     Parametrized across every section because the relaxation edited a table.
     Asserting on `render` alone would have passed while `llm` was still
-    all-or-nothing, which is precisely what happened mid-change.
+    all-or-nothing, which is precisely what happened mid-change. Each case
+    takes the section out of a real matrix row that states it.
     """
-    doc = copy.deepcopy(cp.load_profile("16gb_full"))
+    doc = _a_row_stating(section)
     del doc[section]
     assert cp.validate_profile_shape(doc) is doc
 
@@ -172,7 +191,7 @@ def test_a_section_may_state_one_key_and_omit_the_rest(section, key):
     per-section one, which is a different code path and the one the llm
     section failed.
     """
-    full = cp.load_profile("16gb_full")
+    full = _a_row_stating(section, key)
     doc = _probe(**{section: {key: full[section][key]}})
     assert cp.validate_profile_shape(doc) is doc
 
@@ -194,21 +213,18 @@ def test_a_typo_inside_a_partial_section_is_still_fatal(section):
 
 def test_v2_llm_section_matches_runtime_policy_enums():
     """ONE enum truth: the llm section validates by CONSTRUCTING an
-    LLMRuntimePolicy, so profile enums can never drift from runtime."""
+    LLMRuntimePolicy, so profile enums can never drift from runtime.
+
+    Built from exactly the runtime keys the cloud row states, which is what
+    the validator itself does -- an unstated key takes the dataclass default."""
     from nodes._otr_shared.llm_policy import LLMRuntimePolicy
 
-    prof = cp.load_profile("cpu_floor")
-    pol = LLMRuntimePolicy(
-        device=prof["llm"]["device"],
-        attn_impl=prof["llm"]["attn_impl"],
-        quant_policy=prof["llm"]["quant_policy"],
-        vram_ceiling_gb=prof["llm"]["vram_ceiling_gb"],
-        lane_allowlist=tuple(prof["llm"]["lane_allowlist"]),
-    )
+    prof = cp.load_profile(CPU_ROW)
+    stated = {k: prof["llm"][k] for k in cp._LLM_RUNTIME_KEYS if k in prof["llm"]}
+    pol = LLMRuntimePolicy(**stated)
     assert pol.device == "cpu"
     assert pol.vram_ceiling_gb == 0
-    assert "transformers" not in pol.lane_allowlist
-    assert "comfy_credits" in pol.lane_allowlist
+    assert pol.quant_policy == "none"
     assert prof["llm"]["creative_model"] == "comfy:slot-a"
     assert prof["llm"]["technical_model"] == "comfy:slot-b"
     assert prof["llm"]["comfy_slot_a_model"] == "anthropic/claude-sonnet-5"
@@ -249,22 +265,19 @@ def test_v2_every_registry_row_validates():
 
 
 def test_v2_vendor_pins_gate_amd_hosts():
-    """dia / indextts2 / chatterbox (cu128 sidecars) and ltx_audio_in
-    (NVML gate) are vendor-locked nvidia: an AMD cuda profile must see
-    REASON_REQUIRES_VENDOR, an nvidia one REASON_OK-or-sidecar-gated."""
-    amd = copy.deepcopy(cp.load_profile("16gb_full"))
+    """dia / indextts2 / chatterbox (cu128 sidecars) are vendor-locked
+    nvidia: an AMD cuda profile must see REASON_REQUIRES_VENDOR, an nvidia
+    one REASON_OK-or-sidecar-gated."""
+    amd = copy.deepcopy(cp.load_profile(NV16))
     amd["gpu_vendor"] = "amd"
     decls = _declarations_by_registry()
     audio_avail = cp.availability(amd, decls["audio"])
     for eng in ("dia", "indextts2", "chatterbox"):
         assert audio_avail[eng] == cp.REASON_REQUIRES_VENDOR, eng
-    video_avail = cp.availability(amd, decls["video"])
-    assert video_avail["ltx_audio_in"] == cp.REASON_REQUIRES_VENDOR
 
-    nv = cp.load_profile("16gb_full")
+    nv = cp.load_profile(NV16)
     nv_audio = cp.availability(nv, decls["audio"])
     assert nv_audio["indextts2"] == cp.REASON_OK
-    assert cp.availability(nv, decls["video"])["ltx_audio_in"] == cp.REASON_OK
 
 
 def test_v2_bark_excluded_from_cpu_but_fine_on_cuda():
@@ -272,21 +285,21 @@ def test_v2_bark_excluded_from_cpu_but_fine_on_cuda():
     _generate_single_line stopped hardcoding CUDA (it now asks the loaded
     model for its real device -- see nodes/_otr_bark_lib.py and
     tests/test_platform_s0_guards.py::test_bark_registry_row_admits_cpu_but_stays_impractical_there).
-    cpu_floor still excludes it -- a ~1B-parameter three-stage autoregressive
-    stack is not a PRACTICAL cpu_floor choice even though it now runs there
-    -- so the exclusion reason moved from REASON_REQUIRES_CUDA (cuda was
-    genuinely the only backend) to REASON_IMPRACTICAL_ON_CPU (cpu works, it
-    is just not the tier's job to offer it)."""
+    A cpu-backend document still excludes it -- a ~1B-parameter three-stage
+    autoregressive stack is not a PRACTICAL cpu choice even though it now
+    runs there -- so the exclusion reason moved from REASON_REQUIRES_CUDA
+    (cuda was genuinely the only backend) to REASON_IMPRACTICAL_ON_CPU (cpu
+    works, it is just not a cpu host's job to offer it)."""
     decls = _declarations_by_registry()["audio"]
-    floor = cp.load_profile("cpu_floor")
+    floor = cp.load_profile(CPU_ROW)
     assert cp.availability(floor, decls)["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
-    nv = cp.load_profile("16gb_full")
+    nv = cp.load_profile(NV16)
     assert cp.availability(nv, decls)["bark"] == cp.REASON_OK
 
 
 def test_v2_stable_audio_3_lists_mps_but_not_cpu():
-    """The mac_mps tier ships stable_audio_3 as its music engine (Comfy
-    core owns its device layer); the cpu floor keeps musicgen."""
+    """The otr_mac16_* rows ship stable_audio_3 as their music engine (Comfy
+    core owns its device layer); musicgen stays the cpu-capable one."""
     decls = _declarations_by_registry()["audio"]
     row = decls["stable_audio_3"]
     assert "mps" in row["device_backends"]
@@ -326,7 +339,7 @@ def _probe(**extra):
 
 
 def test_unknown_top_level_key_rejected():
-    profile = cp.load_profile("16gb_full")
+    profile = cp.load_profile(NV16)
     bad = copy.deepcopy(profile)
     bad["surprise_knob"] = 1
     with pytest.raises(cp.ProfileError, match="unknown top-level key"):
@@ -337,7 +350,7 @@ def test_unknown_top_level_key_rejected():
                                  "toolchains", "allow_sidecars"])
 def test_a_required_key_cannot_be_omitted(key):
     """The complete required set, one key per case so a failure names it."""
-    doc = copy.deepcopy(cp.load_profile("16gb_full"))
+    doc = copy.deepcopy(cp.load_profile(NV16))
     del doc[key]
     with pytest.raises(cp.ProfileError, match="missing required key"):
         cp.validate_profile_shape(doc)
@@ -386,7 +399,7 @@ def test_availability_refuses_an_incomplete_profile_rather_than_raising_keyerror
     ("gpu_vendor", "apple"),
 ])
 def test_v2_enum_values_accepted(key, value):
-    prof = copy.deepcopy(cp.load_profile("16gb_full"))
+    prof = copy.deepcopy(cp.load_profile(NV16))
     prof[key] = value
     assert cp.validate_profile_shape(prof) is prof
 
@@ -398,22 +411,22 @@ def test_v2_enum_values_accepted(key, value):
     ("gpu_vendor", "intel", "gpu_vendor"),
 ])
 def test_bad_enum_values_rejected(key, value, match):
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad = copy.deepcopy(cp.load_profile(NV16))
     bad[key] = value
     with pytest.raises(cp.ProfileError, match=match):
         cp.validate_profile_shape(bad)
 
 
 def test_unknown_seed_policy_key_rejected():
-    bad = copy.deepcopy(cp.load_profile("16gb_full"))
+    bad = _a_row_stating("seed_policy")
     bad["seed_policy"]["seed"] = 7  # the companion-trap name does not belong here
     with pytest.raises(cp.ProfileError, match="seed_policy"):
         cp.validate_profile_shape(bad)
 
 
 def test_id_filename_agreement_enforced(tmp_path):
-    profile = copy.deepcopy(cp.load_profile("16gb_full"))
-    profile["id"] = "16gb_full"
+    profile = copy.deepcopy(cp.load_profile(NV16))
+    assert profile["id"] == NV16
     p = tmp_path / "wrong_name.json"
     p.write_text(json.dumps(profile), encoding="utf-8")
     with pytest.raises(cp.ProfileError, match="filename and id"):
@@ -421,7 +434,7 @@ def test_id_filename_agreement_enforced(tmp_path):
 
 
 def test_unknown_profile_id_names_known_profiles():
-    with pytest.raises(cp.ProfileError, match="16gb_full"):
+    with pytest.raises(cp.ProfileError, match=NV16):
         cp.load_profile("no_such_tier")
 
 
@@ -464,22 +477,22 @@ def test_managed_node_types_unique_in_master():
 
 
 def test_16gb_profile_is_separate_from_lean_canonical_values():
-    """The saved workflow is the quick 30-word canonical. 16gb_full remains a
-    named heavier profile and must not be assumed to equal the saved canvas."""
+    """The saved workflow is the quick 30-word canonical. otr_16gb_low is a
+    named heavier row and must not be assumed to equal the saved canvas."""
     mapping = cp.load_widget_mapping()
-    profile = cp.load_profile("16gb_full")
+    profile = cp.load_profile(NV16)
     wf = json.loads(MASTER.read_text(encoding="utf-8"))
     nodes_by_type = {n["type"]: n for n in wf["nodes"]}
 
     # Widget slot layout per node type, from the REAL saved arrays. We use the
     # probe-verified slot orders (these are pinned independently in
-    # tests/test_workflow_apply.py against INPUT_TYPES).
+    # tests/test_workflow_apply.py against INPUT_TYPES). A matrix row is a
+    # delta, so only the sections and keys it states are compared.
     flat = {}
-    for section in ("role_overrides", "slot_overrides", "features"):
-        for k, v in profile[section].items():
+    for section in ("role_overrides", "slot_overrides", "features", "seed_policy"):
+        for k, v in profile.get(section, {}).items():
             flat[f"{section}.{k}"] = v
-    flat["seed_policy.request_seed"] = profile["seed_policy"]["request_seed"]
-    flat["seed_policy.seed_mode"] = profile["seed_policy"]["seed_mode"]
+    assert flat, "otr_16gb_low states no widget-mapped value at all"
 
     from nodes._otr_workflow_apply import build_offline_schemas, serialized_slot_names
     schemas = build_offline_schemas()
@@ -492,7 +505,7 @@ def test_16gb_profile_is_separate_from_lean_canonical_values():
             idx = slots.index(widget)
             if node["widgets_values"][idx] != value:
                 differences.append((dotted, node_type, widget))
-    assert differences, "16gb_full unexpectedly matches the lean canonical"
+    assert differences, "otr_16gb_low unexpectedly matches the lean canonical"
 
 
 # ---------------------------------------------------------------------------
@@ -554,43 +567,36 @@ def test_availability_reason_codes():
                     "practical_without_gpu": True, "sidecar_conditional": False,
                     "model_requirements": []},
     }
-    lite = cp.load_profile("8gb_lite")
+    lite = cp.load_profile(NV8)
     avail = cp.availability(lite, decls)
     assert avail["gpu_heavy"] == cp.REASON_OK          # no VRAM cap -> fits
     assert avail["side"] == cp.REASON_SIDECARS_DISABLED
     assert avail["compiled"] == cp.REASON_MISSING_TOOLCHAIN
     assert avail["procgen"] == cp.REASON_OK
 
-    floor = cp.load_profile("cpu_floor")
+    floor = cp.load_profile(CPU_ROW)
     avail = cp.availability(floor, decls)
     assert avail["gpu_heavy"] == cp.REASON_REQUIRES_CUDA
     assert avail["procgen"] == cp.REASON_OK
 
 
-@pytest.mark.parametrize("tier", TIERS)
-def test_cross_validation_green_for_committed_tiers(tier):
-    profile = cp.load_profile(tier)
-    mapping = cp.load_widget_mapping()
-    cp.cross_validate_profile(profile, mapping, _declarations_by_registry())
-
-
-@pytest.mark.parametrize("profile_id", GOOGLE_MEDIA_PROFILES)
-def test_cross_validation_green_for_google_media_profiles(profile_id):
+@pytest.mark.parametrize("profile_id", MATRIX_IDS)
+def test_cross_validation_green_for_every_matrix_row(profile_id):
     profile = cp.load_profile(profile_id)
     mapping = cp.load_widget_mapping()
     cp.cross_validate_profile(profile, mapping, _declarations_by_registry())
 
 
 def test_cross_validation_rejects_disabled_engine():
-    profile = copy.deepcopy(cp.load_profile("cpu_floor"))
-    profile["role_overrides"]["character_visual"] = "humo"  # GPU-only on a CPU floor
+    profile = copy.deepcopy(cp.load_profile(CPU_ROW))
+    profile["role_overrides"]["character_visual"] = "humo"  # GPU-only on a cpu host
     with pytest.raises(cp.ProfileError, match="requires_cuda"):
         cp.cross_validate_profile(profile, cp.load_widget_mapping(), _declarations_by_registry())
 
 
 def test_cross_validation_rejects_typoed_override_key():
-    profile = copy.deepcopy(cp.load_profile("16gb_full"))
-    profile["role_overrides"]["announcer_visualz"] = "ltx_video"
+    profile = copy.deepcopy(cp.load_profile(NV16))
+    profile["role_overrides"]["announcer_visualz"] = "ltx25_video"
     with pytest.raises(cp.ProfileError, match="no widget-mapping entry"):
         cp.cross_validate_profile(profile, cp.load_widget_mapping(), _declarations_by_registry())
 
@@ -627,8 +633,8 @@ def test_two_heavy_roles_still_validate():
     """Regression pinned by the spec: per-engine fit ONLY -- a profile with two
     heavy roles yields a valid enable-set (single-heavy residency is
     wrapper_bridge's RUNTIME invariant, never a static profile rejection)."""
-    profile = cp.load_profile("16gb_full")
-    # S6 ratification (2026-07-10): the nv50 profile is REGENERATED from
+    profile = cp.load_profile(NV16)
+    # S6 ratification (2026-07-10): the 16 GB row is REGENERATED from
     # canonical (viz lanes + z_image_turbo) -- the old humo/flux pins moved
     # out. This test's subject is the two-heavy STATIC rule, so it forces
     # heavy roles onto a copy below regardless of the committed defaults.
@@ -641,6 +647,6 @@ def test_two_heavy_roles_still_validate():
     profile["role_overrides"]["music_visual"] = "humo"                   # force heavy
     decls = _declarations_by_registry()
     enabled = cp.enabled_engines(profile, decls["video"])
-    assert "ltx_audio_in" in enabled and "humo" in enabled
+    assert "ltx25_native_audio_in_16gb" in enabled and "humo" in enabled
     assert "humo_1.7B" in enabled       # legacy selectable engine stays registered
     cp.cross_validate_profile(profile, cp.load_widget_mapping(), decls)

@@ -5,7 +5,7 @@ Chunk C0 of the engine image-contract block (plan:
 
 Why this file exists: the 2026-07-23 qualification produced three still-spine
 failures (`still_word` refusing the opening beat, `mesh_stage` with no fodder
-for the opening object, `ltx_video` handed an empty init_image), and the
+for the opening object, an LTX lane handed an empty init_image), and the
 standing theory was that the image phase never enumerated what those engines
 demanded. These pins prove that theory FALSE at HEAD -- the producer already
 requires the opening-beat target for every still-consuming engine, and the
@@ -79,9 +79,10 @@ def _required_target_ids(engine_id):
     return required
 
 
-#: Engines whose live 2026-07-23 leg died on a missing still-spine input, plus
-#: the two qualified scene-still consumers, as a regression cohort.
-_SCENE_STILL_ENGINES = ("still_word", "ltx_video", "wan_ti2v", "humo")
+#: `still_word` (whose live 2026-07-23 leg died on a missing still-spine input),
+#: the two live LTX lanes that carry the same init-image contract, and HuMo, as
+#: a regression cohort.
+_SCENE_STILL_ENGINES = ("still_word", "ltx25_video", "ltx_8gb", "humo")
 
 
 @pytest.mark.parametrize("engine_id", _SCENE_STILL_ENGINES)
@@ -146,7 +147,7 @@ def test_humo_portrait_and_wide_siblings_keep_their_declared_aspects():
         "humo_1.7B": "portrait",
         "humo_1.7B_169": "wide",
         "humo_14B_169": "wide",
-        "wan_ti2v": "wide",
+        "ltx_8gb": "wide",
         "mesh_stage": "wide",
     }
     for engine_id, aspect in expected.items():
@@ -158,7 +159,7 @@ def test_talking_capability_is_read_through_the_hook_not_truthiness():
     """Golden nugget (S4b 2026-07-02 + proof8): which lane needs LIPS decides
     whether stills are minted face-forward.
 
-    `ltx_audio_in` exposes ``wants_talking_prompt`` as a bound METHOD, so a
+    `cloud_kling_avatar` exposes ``wants_talking_prompt`` as a bound METHOD, so a
     bare ``getattr(...)`` truthiness test reports True for ANY engine that
     defines it, inverting lips/no-lips. The director calls the hook instead.
     This pins the call semantics so a refactor cannot regress to truthiness.
@@ -166,7 +167,8 @@ def test_talking_capability_is_read_through_the_hook_not_truthiness():
     from nodes._otr_video_engines import registry as vreg
     from nodes.otr_video_director import OTRVideoDirector
 
-    hook = getattr(vreg.get_engine("ltx_audio_in"), "wants_talking_prompt", None)
+    hook = getattr(vreg.get_engine("cloud_kling_avatar"), "wants_talking_prompt",
+                   None)
     assert callable(hook), "the talking capability is a hook, not a flag"
 
     resolved = OTRVideoDirector._role_talking({

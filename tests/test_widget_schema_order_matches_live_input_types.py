@@ -142,7 +142,8 @@ def test_the_graphs_and_the_registry_both_actually_loaded():
     """
     assert len(GRAPHS) >= 17, "expected the 17 shipped graphs, found %d: %r" % (
         len(GRAPHS), [p.name for p in GRAPHS])
-    assert len(NODE_CLASS_MAPPINGS) >= 25, (
+    # The pack declares 24 nodes (`node_list.json`).
+    assert len(NODE_CLASS_MAPPINGS) >= 24, (
         "the node registry resolved %d classes -- if it is empty or short, the "
         "comparisons below silently skip and this file proves nothing"
         % len(NODE_CLASS_MAPPINGS))

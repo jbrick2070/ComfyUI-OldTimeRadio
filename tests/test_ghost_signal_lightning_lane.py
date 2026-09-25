@@ -387,14 +387,14 @@ def test_but_it_IS_in_the_no_still_set():
 
 
 def test_the_profile_plans_the_lightning_bundle_and_no_image_weights():
-    """The end-to-end statement both memberships exist to produce."""
-    import json
-    import pathlib
+    """The end-to-end statement both memberships exist to produce.
+
+    The Mac row that ships this lane names `sd15` stills, which have no
+    provisioner lane at all -- so planning them would raise, not just add a
+    download."""
     m = _provision_module()
-    repo = pathlib.Path(__file__).resolve().parent.parent
-    prof = json.loads((repo / "config" / "profiles" /
-                       ("otr_w45_%s.json" % ENGINE_ID)).read_text(
-                           encoding="utf-8"))
+    prof = m.load_profile("otr_mac16_animatediff")
+    assert prof["slot_overrides"]["video_render_engine"] == ENGINE_ID
     plan = m.profile_lanes(prof)
     assert plan["automatic"] == ["lightning", "stable_audio_3"], plan
     assert not any("z_image" in lane for lane in plan["automatic"])
@@ -403,13 +403,10 @@ def test_the_profile_plans_the_lightning_bundle_and_no_image_weights():
 
 def test_the_haunted_lane_still_plans_exactly_what_it_did():
     """CLAUDE.md 0B in one assertion: the sibling is provably unchanged."""
-    import json
-    import pathlib
     m = _provision_module()
-    repo = pathlib.Path(__file__).resolve().parent.parent
-    prof = json.loads((repo / "config" / "profiles" /
-                       "otr_w45_animatediff15_v3_haunted_video.json").read_text(
-                           encoding="utf-8"))
+    prof = m.load_profile("otr_8gb_animatediff")
+    assert prof["slot_overrides"]["video_render_engine"] == (
+        "animatediff15_v3_haunted_video")
     assert m.profile_lanes(prof)["automatic"] == ["haunted", "stable_audio_3"]
 
 

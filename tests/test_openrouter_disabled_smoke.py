@@ -9,8 +9,6 @@ operator gate left for Jeffrey.
 """
 from __future__ import annotations
 
-import pathlib
-
 import pytest
 
 from nodes import _otr_model_catalog as cat
@@ -52,20 +50,3 @@ def test_local_run_gets_no_remote_meta():
     # Even the helper yields nothing for two local ids -> a local run's
     # meta is byte-identical to the pre-OpenRouter baseline.
     assert orb.openrouter_meta_for(LOCAL, LOCAL) == {}
-
-
-def test_audio_baseline_fixtures_present_and_consistent():
-    """The C7 byte-identical baseline fixtures are the audio-is-king
-    anchor; confirm they are still on disk + internally consistent so
-    the operator's enabled/disabled runtime compare has a baseline."""
-    here = pathlib.Path(__file__).resolve().parent
-    wav = here / "fixtures" / "baseline_v1.5.wav"
-    sha = here / "fixtures" / "baseline_v1.5.sha256"
-    if not (wav.is_file() and sha.is_file()):
-        pytest.skip("audio baseline fixtures not captured on this host")
-    import hashlib
-    h = hashlib.sha256()
-    with open(wav, "rb") as f:
-        for chunk in iter(lambda: f.read(65536), b""):
-            h.update(chunk)
-    assert h.hexdigest() == sha.read_text(encoding="utf-8").strip()

@@ -184,14 +184,14 @@ def test_detect_host_shape_and_vendor_consistency():
 
 
 # --------------------------------------------------------------------------
-# bark registry ruling + cpu_floor runnability
+# bark registry ruling + cpu-row runnability
 # --------------------------------------------------------------------------
 
 def test_bark_registry_row_admits_cpu_but_stays_impractical_there():
     """2026-08-25: _generate_single_line no longer hardcodes CUDA (it asks
     the loaded model for its real device), so a CPU-loaded bark generates
     correctly instead of crashing on the first line -- "cpu" belongs in
-    device_backends now. It still is not a PRACTICAL cpu_floor choice: bark
+    device_backends now. It still is not a PRACTICAL cpu-host choice: bark
     is a ~1B-parameter three-stage autoregressive stack, so
     practical_without_gpu stays False and the profile-fit reason below must
     become REASON_IMPRACTICAL_ON_CPU rather than REASON_REQUIRES_CUDA.
@@ -213,42 +213,41 @@ def test_bark_registry_row_admits_cpu_but_stays_impractical_there():
     assert areg.CAPABILITIES["bark"]["practical_without_gpu"] is False
 
 
-def test_cpu_floor_profile_is_runnable_on_cpu():
-    """The committed cpu_floor profile must select only engines whose
-    declarations admit the cpu backend, and the bark_legacy voice bank goes
-    with bark. bark itself stays excluded from cpu_floor -- CUDA is no
-    longer REQUIRED (device_backends includes "cpu"), but running a
-    three-stage autoregressive TTS stack on CPU is not PRACTICAL, so the
-    exclusion reason changes from REASON_REQUIRES_CUDA to
-    REASON_IMPRACTICAL_ON_CPU rather than disappearing."""
+def test_every_cpu_row_is_runnable_on_cpu():
+    """Every cpu-backend matrix row (the cloud rows -- no CPU-backend local
+    workflow ships) must select only engines whose declarations admit the cpu
+    backend. bark itself stays excluded there -- CUDA is no longer REQUIRED
+    (device_backends includes "cpu"), but running a three-stage
+    autoregressive TTS stack on CPU is not PRACTICAL, so the exclusion reason
+    changes from REASON_REQUIRES_CUDA to REASON_IMPRACTICAL_ON_CPU rather than
+    disappearing."""
     from nodes._otr_audio_engines import registry as areg
+    from nodes._otr_image_engines import registry as ireg_caps
     from nodes._otr_shared import capability_profiles as cp
 
-    prof = cp.load_profile("cpu_floor")
-    avail = cp.availability(prof, areg.CAPABILITIES)
-    assert avail["bark"] == cp.REASON_IMPRACTICAL_ON_CPU
-    for slot in ("announcer_voice_engine", "music_engine"):
-        eng = prof["slot_overrides"][slot]
-        assert avail.get(eng) == cp.REASON_OK, (slot, eng)
-    assert prof["slot_overrides"]["announcer_voice_engine"] == "kokoro"
-    # Banks follow engine. CastLock has no voice_bank widget; kokoro
-    # derives kokoro_builtin. A leftover "default" pin is the
-    # VoiceCastingError tests/test_profile_bank_matches_char_engine.py
-    # used to catch.
-    assert "voice_bank" not in prof["slot_overrides"]
-    char_eng = str(prof["slot_overrides"].get("char_voice_engine") or "kokoro")
-    assert char_eng == "kokoro"
-    assert avail.get(char_eng) == cp.REASON_OK
-    # Post-ship audit (2026-07-10): the IMAGE roles must be overridden too
-    # -- inheriting canonical's cuda-only z_image_turbo shipped a GPU
-    # engine on the no-GPU tier. Every image override must fit cpu.
-    from nodes._otr_image_engines import registry as ireg_caps
-
-    img_avail = cp.availability(prof, ireg_caps.CAPABILITIES)
-    for slot in ("announcer_image", "music_image", "character_image"):
-        eng = prof["role_overrides"].get(slot)
-        assert eng, f"cpu_floor must override {slot} (canonical is cuda-only)"
-        assert img_avail.get(eng) == cp.REASON_OK, (slot, eng)
+    cpu_rows = [rid for rid in cp.known_profile_ids()
+                if cp.load_profile(rid)["device_backend"] == "cpu"]
+    assert cpu_rows, "no cpu-backend row in workflow_matrix.json to check"
+    for rid in cpu_rows:
+        prof = cp.load_profile(rid)
+        avail = cp.availability(prof, areg.CAPABILITIES)
+        assert avail["bark"] == cp.REASON_IMPRACTICAL_ON_CPU, rid
+        for slot in ("announcer_voice_engine", "char_voice_engine",
+                     "music_engine"):
+            eng = prof["slot_overrides"][slot]
+            assert avail.get(eng) == cp.REASON_OK, (rid, slot, eng)
+        # Banks follow engine. CastLock has no voice_bank widget; a leftover
+        # "default" pin is the VoiceCastingError
+        # tests/test_profile_bank_matches_char_engine.py used to catch.
+        assert "voice_bank" not in prof["slot_overrides"], rid
+        # Post-ship audit (2026-07-10): the IMAGE roles must be overridden too
+        # -- inheriting canonical's cuda-only z_image_turbo shipped a GPU
+        # engine on the no-GPU tier. Every image override must fit cpu.
+        img_avail = cp.availability(prof, ireg_caps.CAPABILITIES)
+        for slot in ("announcer_image", "music_image", "character_image"):
+            eng = prof["role_overrides"].get(slot)
+            assert eng, f"{rid} must override {slot} (canonical is cuda-only)"
+            assert img_avail.get(eng) == cp.REASON_OK, (rid, slot, eng)
 
 
 # --------------------------------------------------------------------------
@@ -386,16 +385,6 @@ def test_humo_fetch_lane_fetches_engine_default_unet():
     assert re.fullmatch(r"[0-9a-f]{40}", unet.revision)
     assert unet.expected_bytes == 17_892_294_098
     assert re.fullmatch(r"[0-9a-f]{64}", unet.expected_sha256)
-
-
-def test_retired_humo_script_points_at_the_executable_lane():
-    from pathlib import Path
-
-    script = (Path(__file__).resolve().parents[1] / "scripts"
-              / "download_humo_models.ps1")
-    text = script.read_text(encoding="utf-8")
-    assert "scripts/otr_fetch_lane_weights.py humo" in text
-    assert "manual recipe" not in text.lower()
 
 
 def test_humo_registry_labels_name_the_kijai_artifact_family():

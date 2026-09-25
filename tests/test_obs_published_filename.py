@@ -65,7 +65,7 @@ _FULL = {
              "creative_writing_model": "Qwen/Qwen3.5-4B",
              "music_engine": "musicgen",
              "image_engines": {"by_role": {"character_video": {"z_image_turbo": 4}}}},
-    "video": {"shots": [{"engine_id": "wan_ti2v"} for _ in range(8)]},
+    "video": {"shots": [{"engine_id": "ltx25_video"} for _ in range(8)]},
 }
 
 
@@ -101,10 +101,10 @@ def test_the_name_carries_every_choice_as_a_short_code(monkeypatch):
     """
     _install(monkeypatch, _FULL)
     got = mux._obs_basename(ARCHIVAL)
-    for field in ("cart", "wti2", "zimg", "idx2", "pubd", "q354b", "mgen"):
+    for field in ("cart", "l25v", "zimg", "idx2", "pubd", "q354b", "mgen"):
         assert field in got, (field, got)
     # and the spelled-out forms are GONE -- that is the point of the change
-    for spelled in ("cartoon", "wan_ti2v", "z_image_turbo", "indextts2",
+    for spelled in ("cartoon", "ltx25_video", "z_image_turbo", "indextts2",
                     "public_domain", "musicgen"):
         assert spelled not in got, (spelled, got)
 
@@ -125,13 +125,13 @@ def test_episode_leads_and_style_follows(monkeypatch):
     _install(monkeypatch, _FULL)
     got = mux._obs_basename(ARCHIVAL)
     assert got.startswith("arms_at_the_ready_20260903_092133__")
-    assert got.index("cart") < got.index("wti2") < got.index("zimg")
-    assert got.index("wti2") < got.index("pubd")
+    assert got.index("cart") < got.index("l25v") < got.index("zimg")
+    assert got.index("l25v") < got.index("pubd")
 
 
 def test_the_final_marker_survives(monkeypatch):
-    """`scripts/otr_pod_obs_bridge.py` keys on `_final` to recognise a published
-    episode -- dropping it would make published work invisible to the bridge."""
+    """Readers key on `_final` to recognise a published episode -- dropping it
+    would make published work invisible to them."""
     _install(monkeypatch, _FULL)
     assert mux._obs_basename(ARCHIVAL).endswith("_final.mp4")
 
@@ -379,7 +379,7 @@ class _GlossLedger:
             # working code, and nearly sent the fix into the wrong place.
             meta["episode_language"] = language
         self.payload = {"meta": meta,
-                        "video": {"shots": [{"engine_id": "wan_ti2v"}]}}
+                        "video": {"shots": [{"engine_id": "ltx25_video"}]}}
 
     def in_flight_ledger_path(self):
         return "in-memory"

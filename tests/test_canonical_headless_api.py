@@ -13,7 +13,6 @@ import io
 import json
 import os
 import pathlib
-import re
 import subprocess
 import sys
 
@@ -116,14 +115,14 @@ def test_cloud_profile_dry_run_builds_prompt_from_canonical(tmp_path):
     rc, out = _run_main([
         "--offline-schemas",
         "--dry-run",
-        "--profile", "otr_cloud_lanes",
+        "--profile", "otr_cloud_low",
         "--source-bank", "scifi_news_pro",
         "--dump-prompt", str(dump),
     ])
     assert rc == 0
     assert "workflows\\otr_canonical.json" in out or \
         "workflows/otr_canonical.json" in out
-    assert "profile=otr_cloud_lanes" in out
+    assert "profile=otr_cloud_low" in out
     prompt = json.loads(dump.read_text(encoding="utf-8"))
     writer = _node(prompt, "OTR_LedgerScriptWriter")
     director = _node(prompt, "OTR_VideoDirector")
@@ -185,7 +184,7 @@ def test_runner_rejects_machine_and_profile_as_competing_selectors():
         canonical.main([
             "--offline-schemas", "--dry-run",
             "--machine", "8gb",
-            "--profile", "otr_4060_floor",
+            "--profile", "otr_8gb_animatediff",
         ])
 
     assert exc.value.code == 2
@@ -226,59 +225,18 @@ def test_visual_style_override_does_not_patch_story_fields(tmp_path):
     assert writer["inputs"]["custom_premise"] == ""
 
 
-def test_google_veo_media_profile_dry_run_builds_prompt(tmp_path):
-    dump = tmp_path / "prompt.json"
-    rc, out = _run_main([
-        "--offline-schemas",
-        "--dry-run",
-        "--profile", "google_veo_media",
-        "--source-bank", "media_archive",
-        "--dump-prompt", str(dump),
-    ])
-    assert rc == 0
-    assert "profile=google_veo_media" in out
-    prompt = json.loads(dump.read_text(encoding="utf-8"))
-    director = _node(prompt, "OTR_VideoDirector")
-    veo = _video_pick("google_veo_video")
-    assert director["inputs"]["announcer_video_model"] == veo
-    assert director["inputs"]["music_video_model"] == veo
-    assert director["inputs"]["character_video_model"] == veo
-    assert director["inputs"]["announcer_image_model"] == "google_image"
-    assert director["inputs"]["music_image_model"] == "google_image"
-    assert director["inputs"]["character_image_model"] == "google_image"
-
-
-def test_google_omni_media_profile_dry_run_builds_prompt(tmp_path):
-    dump = tmp_path / "prompt.json"
-    rc, out = _run_main([
-        "--offline-schemas",
-        "--dry-run",
-        "--profile", "google_omni_media",
-        "--source-bank", "media_archive",
-        "--dump-prompt", str(dump),
-    ])
-    assert rc == 0
-    assert "profile=google_omni_media" in out
-    prompt = json.loads(dump.read_text(encoding="utf-8"))
-    director = _node(prompt, "OTR_VideoDirector")
-    omni = _video_pick("google_omni_video")
-    assert director["inputs"]["announcer_video_model"] == omni
-    assert director["inputs"]["music_video_model"] == omni
-    assert director["inputs"]["character_video_model"] == omni
-    assert director["inputs"]["announcer_image_model"] == "google_image"
-    assert director["inputs"]["music_image_model"] == "google_image"
-    assert director["inputs"]["character_image_model"] == "google_image"
-
-
 @pytest.mark.parametrize(
-    "profile_id,video_engine",
+    "profile_id,video_engine,image_engine",
     [
-        ("google_veo_all", "google_veo_video"),
-        ("google_omni_all", "google_omni_video"),
+        ("otr_cloud_low", "cloud_vidu_q2_pro_fast_720p",
+         "cloud_luma_photon_flash"),
+        ("otr_cloud_deluxe_3act", "cloud_ltx25_foley_plus", "cloud_flux_pro"),
     ],
 )
-def test_google_all_profile_dry_run_builds_prompt(
-        tmp_path, monkeypatch, profile_id, video_engine):
+def test_cloud_row_dry_run_binds_every_slot_it_sets(
+        tmp_path, monkeypatch, profile_id, video_engine, image_engine):
+    """Every engine a cloud row selects reaches the prompt, and the explicit
+    writer flags still win over the row's own writer slots."""
     monkeypatch.setenv("GEMINI_API_KEY", "test-google-api-key")
     dump = tmp_path / "prompt.json"
     rc, out = _run_main([
@@ -306,19 +264,19 @@ def test_google_all_profile_dry_run_builds_prompt(
     assert writer["inputs"]["technical_model"] == "google_api:slot-b"
     assert writer["inputs"]["google_api_slot_a_model"] == "gemini-flash-latest"
     assert writer["inputs"]["google_api_slot_b_model"] == "gemini-flash-lite-latest"
-    assert cast["inputs"]["char_voice_engine"] == "google_tts"
-    assert cast["inputs"]["announcer_voice_engine"] == "google_tts"
+    assert cast["inputs"]["char_voice_engine"] == "cloud_elevenlabs"
+    assert cast["inputs"]["announcer_voice_engine"] == "cloud_elevenlabs"
     assert "engine" not in char_voice["inputs"]
     assert "engine" not in announcer_voice["inputs"]
     assert "voice_bank" not in cast["inputs"]
-    assert music["inputs"]["engine"] == "google_lyria"
+    assert music["inputs"]["engine"] == "sonilo"
     video_label = _video_pick(video_engine)
     assert director["inputs"]["announcer_video_model"] == video_label
     assert director["inputs"]["music_video_model"] == video_label
     assert director["inputs"]["character_video_model"] == video_label
-    assert director["inputs"]["announcer_image_model"] == "google_image"
-    assert director["inputs"]["music_image_model"] == "google_image"
-    assert director["inputs"]["character_image_model"] == "google_image"
+    assert director["inputs"]["announcer_image_model"] == image_engine
+    assert director["inputs"]["music_image_model"] == image_engine
+    assert director["inputs"]["character_image_model"] == image_engine
     assert render["inputs"]["engine"] == video_engine
 
 
@@ -430,39 +388,6 @@ def test_retired_full_workflow_harnesses_are_not_tracked():
     assert present == []
 
 
-def test_headless_wrapper_clears_stale_extra_env_hook_before_boot():
-    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    assert "_marathon_extra_env.cmd" in src
-    assert "removing stale extra-env hook" in src
-    assert "Remove-Item -LiteralPath $StaleExtraEnv -Force" in src
-
-
-def test_headless_wrapper_applies_profile_launch_env_before_boot():
-    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    assert "config\\profiles\\{0}.json" in src
-    assert "ProfileObject.launch.env" in src
-    assert "Set-Item -Path (\"Env:{0}\" -f $name)" in src
-    assert "profile launch env" in src
-    assert "-NoBoot server cannot satisfy profile" in src
-
-
-def test_headless_wrapper_does_not_assign_reserved_pid_variable():
-    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    assert "foreach ($pid " not in src
-    assert "$proc.ProcessId" in src
-
-
-def test_headless_wrapper_uses_positive_ownership_and_free_port_selection():
-    src = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    assert "for ($i = 0; $i -lt 10; $i++)" in src
-    assert "if (-not $remaining) { return }" in src
-    assert "Test-OtrHeadlessServerCommand" in src
-    assert "Test-OtrCanonicalRunnerCommand" in src
-    assert "Resolve-OtrHeadlessPort" in src
-    assert "[int]$Port = 0" in src
-    assert "Get-NetTCPConnection -LocalPort 8000" not in src
-
-
 def test_canonical_runner_emits_poll_heartbeats(tmp_path, monkeypatch):
     dump = tmp_path / "prompt.json"
     monkeypatch.setattr(canonical, "build_api_prompt", lambda _args: ({}, []))
@@ -511,48 +436,6 @@ def test_poll_history_zero_timeout_waits_for_terminal_result(monkeypatch):
     assert error == ""
 
 
-@pytest.mark.skipif(os.name != "nt", reason="PowerShell selector module is Windows-only")
-def test_headless_process_selectors_never_claim_the_interactive_gui():
-    module = SCRIPTS / "otr_headless_process.psm1"
-
-    def selected(function_name: str, command_line: str) -> bool:
-        env = os.environ.copy()
-        env["OTR_TEST_COMMAND_LINE"] = command_line
-        module_text = str(module).replace("'", "''")
-        script = (
-            "$ErrorActionPreference='Stop'; "
-            f"Import-Module -Name '{module_text}' -Force; "
-            f"if ({function_name} -CommandLine $env:OTR_TEST_COMMAND_LINE) "
-            "{ 'true' } else { 'false' }"
-        )
-        completed = subprocess.run(
-            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-            check=False, capture_output=True, text=True, env=env, timeout=15,
-        )
-        assert completed.returncode == 0, completed.stderr
-        return completed.stdout.strip().splitlines()[-1] == "true"
-
-    headless = (
-        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8123 "
-        r"--extra-model-paths-config C:\OTR\_otr_headless_model_paths.yaml"
-    )
-    gui = (
-        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8001 "
-        r"--extra-model-paths-config C:\ComfyUI\shared_model_paths.yaml"
-    )
-    assert selected("Test-OtrHeadlessServerCommand", headless)
-    assert not selected("Test-OtrHeadlessServerCommand", gui)
-    assert not selected(
-        "Test-OtrHeadlessServerCommand",
-        r"C:\Python\python.exe C:\ComfyUI\main.py --port 8123",
-    )
-    assert selected(
-        "Test-OtrCanonicalRunnerCommand",
-        r"C:\Python\python.exe C:\OTR\scripts\otr_canonical_api_run.py --act-count 3",
-    )
-    assert not selected("Test-OtrCanonicalRunnerCommand", gui)
-
-
 @pytest.mark.skipif(os.name != "nt", reason="watchdog is a PowerShell harness")
 def test_watchdog_recognizes_canonical_terminal_result(tmp_path):
     leg_log = tmp_path / "leg.log"
@@ -571,71 +454,3 @@ def test_watchdog_recognizes_canonical_terminal_result(tmp_path):
     assert completed.returncode == 0, completed.stdout + completed.stderr
     assert "DONE" in completed.stdout
     assert "DONE" in (tmp_path / "leg.log.watchdog").read_text(encoding="ascii")
-
-
-class _StopParsing(Exception):
-    """Raised to seize the runner's real parser before it consumes argv."""
-
-
-def _runner_option_strings() -> set[str]:
-    """Every long flag `otr_canonical_api_run.main` actually accepts.
-
-    The parser is seized from the LIVE `main()` rather than re-derived from
-    the source text, so a flag that moves, is renamed, or is deleted is caught
-    by construction. Only `parse_args` is patched -- swapping the
-    `ArgumentParser` CLASS recurses, because argparse's own `__init__`
-    resolves the class through the same module global.
-    """
-    import argparse
-
-    captured: list[argparse.ArgumentParser] = []
-    original = argparse.ArgumentParser.parse_args
-
-    def _seize(self, *args, **kwargs):  # noqa: ANN001, ANN002, ANN003
-        captured.append(self)
-        raise _StopParsing
-
-    argparse.ArgumentParser.parse_args = _seize  # type: ignore[method-assign]
-    try:
-        with contextlib.suppress(_StopParsing):
-            canonical.main([])
-    finally:
-        argparse.ArgumentParser.parse_args = original  # type: ignore[method-assign]
-
-    assert captured, "the runner never built its parser"
-    options: set[str] = set()
-    for action in captured[0]._actions:  # noqa: SLF001 -- no public accessor exists
-        options.update(opt for opt in action.option_strings if opt.startswith("--"))
-    return options
-
-
-def test_headless_wrapper_only_forwards_flags_the_runner_accepts():
-    """The wrapper and the runner must agree on the CLI, or nothing runs.
-
-    2026-08-15: they did not. `--words` was deleted from the runner on
-    2026-08-14 with the `target_words` widget, and this wrapper kept sending
-    it -- so the ONE sanctioned headless entrypoint died in argparse (exit 2)
-    before it ever reached the API, on every single invocation. The failure
-    was invisible because no test read the wrapper's argument list and the
-    runner's parser at the same time. This one does.
-    """
-    wrapper = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    start = wrapper.index("$argsList = @(")
-    tail = wrapper[start:wrapper.index("& $Python @argsList", start)]
-    forwarded = set(re.findall(r'"(--[a-z0-9-]+)"', tail))
-
-    assert forwarded, "no forwarded flags found; the wrapper's arg block moved"
-    unknown = forwarded - _runner_option_strings()
-    assert not unknown, (
-        f"otr_headless_canonical.ps1 forwards {sorted(unknown)}, which "
-        f"otr_canonical_api_run.py does not accept -- the wrapper would exit 2 "
-        f"before submitting anything"
-    )
-
-
-def test_headless_wrapper_no_longer_carries_a_word_count_knob():
-    """Length is an observation. `-Words` is not a knob that came back."""
-    wrapper = (SCRIPTS / "otr_headless_canonical.ps1").read_text(encoding="utf-8")
-    param_block = wrapper[wrapper.index("param("):wrapper.index(")", wrapper.index("param("))]
-    assert "$Words" not in param_block
-    assert "$Acts" in param_block

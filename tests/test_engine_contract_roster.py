@@ -22,15 +22,6 @@ import pytest
 import nodes._otr_video_engines  # noqa: F401  -- populate the registry
 from nodes._otr_video_engines import frame_contract as fc
 from nodes._otr_video_engines import registry as vreg
-from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine as _LV
-
-#: ltx_video's canvas, READ FROM THE DECLARATION rather than repeated as a
-#: literal. It moved 832x480 -> 1024x576 by operator ruling on 2026-08-11: the
-#: HQ two-stage path halves for stage A and upsamples with a fixed-x2 node, so
-#: both axes must be /64 or the stage-A latent is not /32-legal. Two sites in
-#: this file pinned the old number, and a literal would have made the ruling
-#: look like a regression in both at once (lesson L10).
-_LV_CANVAS = tuple(_LV.render_canvas)
 
 
 def _engines():
@@ -154,24 +145,14 @@ def test_a_declared_native_fps_matches_the_engines_own_target_fps(name, eng):
 def test_the_local_ladders_match_their_adapters_named_constants():
     from nodes._otr_video_engines import eng_humo as _humo
     from nodes._otr_video_engines import eng_ltx_8gb as _l8
-    from nodes._otr_video_engines import eng_ltx_av as _lav
-    from nodes._otr_video_engines import eng_ltx_video as _lv
-    from nodes._otr_video_engines import eng_wan_ti2v as _wt
-    # The `wan_i2v` line -- Wan 2.2 **14B** I2V, pinned against that adapter's
-    # own `_WAN_MIN_FRAMES` / `_WAN_MAX_FRAMES` -- went with that engine's
-    # retirement on 2026-08-26 (it never fit the box's 14.5 GiB envelope).
-    # Nothing is orphaned by the removal: those two constants were ITS module's
-    # and left with it. Deliberately NOT retargeted at `wan_ti2v` below -- the
-    # 5B TI2V is a DIFFERENT checkpoint with its own `_TI2V_*` ladder, and this
-    # test's entire job is to pin each adapter to the constants IT declares.
-    # Pointing a 14B assertion at the 5B is how this file would go green while
-    # asserting a number no engine holds.
+    # This test's entire job is to pin each adapter to the constants IT
+    # declares; a lane that leaves takes its line with it rather than being
+    # retargeted at a sibling with a different ladder.
 
     def bounds(engine_name):
         c = fc.frame_contract_for(vreg.get_engine(engine_name))
         return (c.min_frames, c.max_frames)
 
-    assert bounds("wan_ti2v") == (_wt._TI2V_MIN_FRAMES, _wt._TI2V_MAX_FRAMES)
     # `humo` is the 14B PORTRAIT route, so its ceiling is the shared 14B cap --
     # not `_HUMO_MAX_FRAMES`, which is the ladder the lighter 1.7B tiers keep.
     assert bounds("humo") == (_humo._HUMO_MIN_FRAMES,
@@ -179,50 +160,6 @@ def test_the_local_ladders_match_their_adapters_named_constants():
     assert bounds("humo_1.7B") == (_humo._HUMO_MIN_FRAMES,
                                    _humo._HUMO_MAX_FRAMES)
     assert bounds("ltx_8gb") == (_l8._LTX8_MIN_FRAMES, 161)
-    # ltx_video's minimum is its DECODE FLOOR, not the ladder's first rung
-    # (2026-08-01). The declaration is a LITERAL in the engine on purpose -- a
-    # FrameContract is static because stills are minted against it before the
-    # render phase -- so THIS assertion is the thing that keeps the literal and
-    # the runtime constant from drifting apart. Asserted against the constants
-    # rather than against numbers, which is this test's whole job.
-    #
-    # The pair was (169, 169) until lane 9 (2026-08-11): the decode floor was a
-    # constraint measured at 1472x832, the lane swept the ladder at the declared
-    # 1024x576, and f9/f49/f97/f121/f137 all decode clean -- so the floor moved
-    # to the bottom of the ladder and `min_frames=9, quantum=8` became the
-    # honest 8n+1 declaration again. Written as constants here so the next
-    # measurement moves one number in the engine, not two in two files.
-    assert bounds("ltx_video") == (_lv._LTX_DECODE_FLOOR_DEFAULT,
-                                   _lv._LTX_MAX_FRAMES_DEFAULT)
-    assert bounds("ltx_audio_in") == (_lav._LTX_AV_MIN_FRAMES, 497)
-
-
-def test_an_env_override_may_not_silently_move_a_declared_ceiling():
-    """The rule the declarations were written to enforce.
-
-    Three ceilings in this tree are env-overridable -- ``OTR_LTX_MAX_FRAMES``,
-    ``OTR_LTX_8GB_MAX_FRAMES``, ``OTR_LTX_AV_MAX_FRAMES``. A FrameContract is
-    STATIC by design, because stills are minted against it before the render
-    phase begins: a partition computed from mutable state is a partition the
-    image phase could not have planned for. So the contract carries the
-    LITERAL, and the environment disagreeing with it must become a refusal
-    rather than a quiet re-plan.
-
-    This test pins the ONE unavoidable case -- ``_LTX_AV_MAX_FRAMES`` is
-    resolved at import, so with the env unset it must equal the declared
-    literal. If a box needs a different ceiling, the declaration moves and the
-    stills follow; the environment does not get to move it alone.
-    """
-    from nodes._otr_video_engines import eng_ltx_av as _lav
-    import os
-
-    if os.environ.get("OTR_LTX_AV_MAX_FRAMES"):
-        pytest.skip("box sets OTR_LTX_AV_MAX_FRAMES; the refusal is 7b's")
-    declared = fc.frame_contract_for(vreg.get_engine("ltx_audio_in")).max_frames
-    assert _lav._LTX_AV_MAX_FRAMES == declared, (
-        "ltx_audio_in declares max_frames=%d but its module constant resolved "
-        "to %d -- the environment moved a ceiling the image phase already "
-        "planned against" % (declared, _lav._LTX_AV_MAX_FRAMES))
 
 
 def test_the_google_menus_are_counted_at_the_CANVAS_rate_not_the_providers():
@@ -333,14 +270,9 @@ def test_a_negative_native_fps_is_rejected():
     assert fc.FrameContract(native_fps=25).native_fps == 25
 
 
-def test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides():
-    """Two of the three at-risk env vars had no check at all.
-
-    ``test_an_env_override_may_not_silently_move_a_declared_ceiling`` covers
-    ``OTR_LTX_AV_MAX_FRAMES`` because that one resolves at IMPORT, so a
-    mismatch is visible as a constant. The other two -- ``OTR_LTX_MAX_FRAMES``
-    and ``OTR_LTX_8GB_MAX_FRAMES`` -- are read at RENDER time, so nothing at
-    import can see them and there was nothing to compare.
+def test_the_LTX_ceiling_does_not_silently_follow_its_env_override():
+    """``OTR_LTX_8GB_MAX_FRAMES`` is read at RENDER time, so nothing at import
+    can see it and there is nothing to compare.
 
     What CAN be pinned, and is what actually matters: the declared ceiling is a
     LITERAL and is NOT the env-overridable ``*_DEFAULT`` constant. If someone
@@ -349,16 +281,12 @@ def test_the_LTX_ceilings_do_not_silently_follow_their_env_overrides():
     can move underneath it.
     """
     from nodes._otr_video_engines import eng_ltx_8gb as _l8
-    from nodes._otr_video_engines import eng_ltx_video as _lv
 
-    assert fc.frame_contract_for(vreg.get_engine("ltx_video")).max_frames == 169
     assert fc.frame_contract_for(vreg.get_engine("ltx_8gb")).max_frames == 161
     # They happen to be equal today -- that is the point. Equality is fine;
     # IDENTITY with the mutable default would mean the contract had been rewired
     # to follow it.
-    assert _lv._LTX_MAX_FRAMES_DEFAULT == 169
     assert _l8._LTX8_MAX_FRAMES_DEFAULT == 161
-    assert "_LTX_MAX_FRAMES_DEFAULT" not in _contract_source("eng_ltx_video.py")
     assert "_LTX8_MAX_FRAMES_DEFAULT" not in _contract_source("eng_ltx_8gb.py")
 
 
@@ -373,216 +301,3 @@ def _contract_source(filename):
                       text, re.S)
     assert match, "no frame_contract declaration found in %s" % filename
     return match.group(1)
-
-
-def test_a_declared_MINIMUM_is_a_length_the_adapter_can_actually_render():
-    """The defect that killed the 2026-08-01 ltx_video leg, as a tripwire.
-
-    A contract exists so the planner never asks for a length the adapter cannot
-    deliver. ``ltx_video`` declared ``min_frames=9`` while ``_ltx_frame_length``
-    raised every ask below its decode floor up to 169, so the planner split a
-    beat into 89-frame segments the engine could not produce:
-
-        shot shot_music_opening_001 segment 1 rendered 169 frame(s) but its
-        plan asked for 89 (a surplus of 80). NO FALLBACK
-
-    An overstated contract is worse than no contract -- it turns a plannable
-    engine into a guaranteed LATE failure, after the writer and the audio have
-    already been paid for. So: feed each adapter's own declared minimum through
-    its own length resolver, and the resolver must hand it straight back.
-    """
-    from nodes._otr_video_engines import eng_ltx_video as _lv
-
-    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
-    resolved = _lv._ltx_frame_length(contract.min_frames, 25)
-    assert resolved == contract.min_frames, (
-        "ltx_video declares min_frames=%d but _ltx_frame_length turns that ask "
-        "into %d, so every planned segment at the declared minimum renders the "
-        "wrong length and render_beat_coverage refuses the beat."
-        % (contract.min_frames, resolved))
-    # And the same at the ceiling, which is where the cap could lie instead.
-    assert _lv._ltx_frame_length(contract.max_frames, 25) == contract.max_frames
-
-
-def test_the_ltx_video_declaration_still_matches_its_runtime_decode_floor():
-    """EQUALITY, never identity -- the literal is deliberate.
-
-    The declaration must not READ ``_LTX_DECODE_FLOOR_DEFAULT`` (a FrameContract
-    is static because stills are minted against it before the render phase), but
-    it must still AGREE with it. This is the check that makes the drift visible
-    instead of silent, which is the whole reason the literal is allowed to be a
-    literal.
-    """
-    from nodes._otr_video_engines import eng_ltx_video as _lv
-
-    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
-    assert contract.min_frames == _lv._LTX_DECODE_FLOOR_DEFAULT
-    assert "_LTX_DECODE_FLOOR_DEFAULT" not in _contract_source("eng_ltx_video.py")
-
-
-# ---------------------------------------------------------------------------
-# kibitz r2 (2026-08-01), codex gpt-5.6-sol + antigravity, both lanes converging
-# with the driver anchor: a contract that the ENVIRONMENT can move is not a
-# contract. The doctrine is already this repo's, on eng_ltx_8gb line 531 --
-# ltx_video simply never enforced it.
-# ---------------------------------------------------------------------------
-
-def test_ltx_video_REFUSES_when_the_env_moves_what_the_contract_froze():
-    """The back door the 2026-08-01 contract fix would otherwise leave open.
-
-    ``_ltx_frame_length`` reads OTR_LTX_MAX_FRAMES and OTR_LTX_MIN_DECODE_FRAMES
-    at RENDER time. The planner has already partitioned the beat against the
-    STATIC declaration, so obeying the env would reproduce the exact failure the
-    declaration was corrected to prevent:
-        segment 1 rendered 169 frame(s) but its plan asked for 89
-    """
-    import os
-
-    from nodes._otr_video_engines import eng_ltx_video as _lv
-
-    contract = fc.frame_contract_for(vreg.get_engine("ltx_video"))
-    saved = {k: os.environ.get(k)
-             for k in ("OTR_LTX_MAX_FRAMES", "OTR_LTX_MIN_DECODE_FRAMES")}
-    try:
-        for k in saved:
-            os.environ.pop(k, None)
-        # Clean environment agrees with the declaration -> no refusal.
-        _lv.assert_env_matches_contract(contract)
-
-        os.environ["OTR_LTX_MAX_FRAMES"] = str(int(contract.max_frames) + 80)
-        with pytest.raises(fc.ContractEnvConflict):
-            _lv.assert_env_matches_contract(contract)
-        os.environ.pop("OTR_LTX_MAX_FRAMES")
-
-        # A disagreeing value that is also IN RANGE. This read
-        # `min_frames - 72`, which was 97 while the floor was 169 and became
-        # -63 when lane 9 moved the floor to 9 -- and `_env_int` clamps a
-        # below-range value back up to `_LTX_MIN_FRAMES`, so the "disagreement"
-        # agreed and the refusal correctly did not fire. Moving UP keeps the
-        # value inside the parser's range at any floor, so the test exercises
-        # the refusal instead of the clamp (lesson L12: a contract-bearing var
-        # must be judged on what it really resolves to).
-        os.environ["OTR_LTX_MIN_DECODE_FRAMES"] = str(int(contract.min_frames) + 40)
-        with pytest.raises(fc.ContractEnvConflict):
-            _lv.assert_env_matches_contract(contract)
-    finally:
-        for k, v in saved.items():
-            if v is None:
-                os.environ.pop(k, None)
-            else:
-                os.environ[k] = v
-
-
-def test_the_refusal_is_wired_into_the_render_path_not_merely_defined():
-    """A guard nothing calls is not a guard.
-
-    ltx_video has TWO graph builders (the i2v branch and the base branch) and
-    both resolve their length through ``_ltx_frame_length``, so both must check
-    first -- a check on only one path leaves the other silently obeying the env.
-    """
-    from pathlib import Path
-
-    text = (Path(__file__).resolve().parents[1] / "nodes" / "_otr_video_engines"
-            / "eng_ltx_video.py").read_text(encoding="utf-8")
-    assert text.count("assert_env_matches_contract(") >= 3, (
-        "expected the definition plus a call on BOTH render paths; found %d "
-        "occurrence(s)" % text.count("assert_env_matches_contract("))
-
-
-def test_every_ltx_video_profile_renders_at_the_canvas_the_engine_declares():
-    """The mechanism by which the frozen 169 could become a SECOND lie.
-
-    The decode floor is canvas-dependent, so a profile that moves ltx_video's
-    canvas can invalidate the static frame contract without touching a line of
-    engine code. Every shipped profile renders 832x480 and the live leg
-    confirmed it; this pins that so a canvas change fails HERE rather than as a
-    plan-vs-render surplus 12 minutes into a leg.
-
-    NOTE the name is deliberately "the canvas the engine DECLARES", not "the
-    canvas the floor was measured at" -- those are DIFFERENT canvases and an
-    earlier version of this test conflated them. The 169 floor was measured at
-    1472x832; 832x480 is where production renders. See the contract comment on
-    LtxVideoEngine.
-    """
-    import json
-    from pathlib import Path
-
-    root = Path(__file__).resolve().parents[1] / "config" / "profiles"
-    checked = 0
-    for path in sorted(root.glob("*.json")):
-        raw = path.read_text(encoding="utf-8")
-        if '"ltx_video"' not in raw:
-            continue
-        render = (json.loads(raw).get("render") or {})
-        w, h = render.get("canvas_w"), render.get("canvas_h")
-        if w is None or h is None:
-            continue
-        checked += 1
-        assert (int(w), int(h)) == _LV_CANVAS, (
-            "%s renders ltx_video at %sx%s, but the adapter declares %sx%s "
-            "and its frame contract describes what it produces THERE. The "
-            "decode floor is canvas-dependent, so re-measure the decode band "
-            "at the new canvas before moving this."
-            % (path.name, w, h, _LV_CANVAS[0], _LV_CANVAS[1]))
-    assert checked >= 3, "expected to check the shipped ltx_video profiles"
-
-
-def test_ltx_video_DECLARES_its_render_canvas_so_the_env_cannot_move_it():
-    """kibitz r3: the profile-only pin from r2 was not enough.
-
-    The canvas also arrives through OTR_LTX_RENDER_CANVAS, read at render time
-    in build_request_from_shot. A test over shipped profiles cannot see a
-    variable set at BOOT, so the static 169 contract stayed invalidatable by an
-    export. ``declared_render_canvas`` is applied LAST in the chain on purpose
-    ("nothing can clobber this and this clobbers nothing", B5 2026-07-27), so
-    declaring it is what actually closes the channel.
-    """
-    import os
-
-    from nodes._otr_video_engines import render_driver as rd
-
-    saved = os.environ.get("OTR_LTX_RENDER_CANVAS")
-    try:
-        # Hostile: the DELIVERABLE canvas the composite scales up to, which
-        # this engine's own note says "re-noises into mush". (It IS where the
-        # 169 floor was measured -- but it is not where production renders,
-        # and the declaration is what the contract was written against.)
-        os.environ["OTR_LTX_RENDER_CANVAS"] = "1472x832"
-        assert rd.declared_render_canvas("ltx_video") == _LV_CANVAS, (
-            "the declaration must not follow OTR_LTX_RENDER_CANVAS -- it is the "
-            "channel the declaration exists to overrule")
-    finally:
-        if saved is None:
-            os.environ.pop("OTR_LTX_RENDER_CANVAS", None)
-        else:
-            os.environ["OTR_LTX_RENDER_CANVAS"] = saved
-
-
-def test_the_declared_canvas_and_the_shipped_profiles_AGREE():
-    """Two channels naming one canvas must not be allowed to disagree.
-
-    ltx_8gb already has this guard (tests/test_ltx_8gb_canonical_canvas.py);
-    ltx_video now has a declaration, so it needs the same one.
-    """
-    import json
-    from pathlib import Path
-
-    from nodes._otr_video_engines import render_driver as rd
-
-    declared = rd.declared_render_canvas("ltx_video")
-    assert declared is not None
-    root = Path(__file__).resolve().parents[1] / "config" / "profiles"
-    checked = 0
-    for path in sorted(root.glob("*.json")):
-        raw = path.read_text(encoding="utf-8")
-        if '"ltx_video"' not in raw:
-            continue
-        render = (json.loads(raw).get("render") or {})
-        w, h = render.get("canvas_w"), render.get("canvas_h")
-        if w is None or h is None:
-            continue
-        checked += 1
-        assert (int(w), int(h)) == declared, (
-            "%s renders ltx_video at %sx%s but the adapter declares %s"
-            % (path.name, w, h, declared))
-    assert checked >= 3

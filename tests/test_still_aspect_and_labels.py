@@ -3,7 +3,7 @@ tier suffix added 2026-06-30, HuMo-improve plan item 5).
 
 Operator directive: every registered video/3D engine must declare an EXPLICIT
 ``render_aspect`` in {portrait, wide} so the director mints a matching init still
-(``ltx_video`` previously declared none -> silently defaulted portrait -> the wide
+(an LTX lane once declared none -> silently defaulted portrait -> the wide
 render decapitated heads), and the per-role dropdown must show an aspect-DERIVED
 label (``humo (portrait)`` vs ``humo_1.7B_169 (16:9)``) while the SAVED value stays
 the bare engine id (back-compat with old saved graphs). The label now ALSO
@@ -56,12 +56,6 @@ def test_portrait_vs_wide_partition_matches_operator_rule():
         )
 
 
-def test_ltx_video_is_wide_the_bug_fix():
-    # The reported root cause: ltx_video declared no render_aspect -> portrait
-    # default -> 832x1216 portrait stills the 16:9 render decapitated.
-    assert _engine("ltx_video").render_aspect == "wide"
-
-
 # (lean-mean order 4, 2026-08-23) test_mesh_portrait_3d_engines_are_portrait
 # was here. It imported the three eng_character_3d SOURCE classes directly to
 # pin requires_mesh_portrait + portrait aspect on adapters that had been
@@ -84,7 +78,7 @@ def _resolved(announcer, music, character):
 
 def test_role_aspects_ltx_and_169_humos_are_wide():
     aspects = vd.OTRVideoDirector._role_aspects(
-        _resolved("ltx_video", "humo_1.7B_169", "humo_14B_169"))
+        _resolved("ltx25_video", "humo_1.7B_169", "humo_14B_169"))
     assert aspects["announcer_visual"] == "wide"
     assert aspects["music_visual"] == "wide"
     assert aspects["character_video"] == "wide"
@@ -121,16 +115,11 @@ def test_label_suffix_is_aspect_derived():
     assert vd._label_for("humo_1.7B") == (
         "humo17_high_audio_in_portrait (portrait)")
     assert vd._label_for("humo_1.7B_169") == "humo17_high_audio_in_wide (16:9)"
-    # video-tiers (2026-07-20): the four PUBLIC-aliased tier engines show their
+    # video-tiers (2026-07-20): the PUBLIC-aliased tier engines show their
     # public menu id (aspect suffix still derived from the internal engine).
-    assert vd._label_for("ltx_video") == "ltx23_high_video (16:9)"
-    # ltx_audio_in took its low/high name in lane 7 and ltx_video took its own
-    # in lane 9 (both 2026-08-11), which retired the last `<vramtier>gb` token
-    # in the public table. The mixed spellings this comment used to describe
-    # were the one-lane-at-a-time rollout being visible mid-flight; the rollout
-    # has now reached every renamed lane.
-    assert vd._label_for("ltx_audio_in") == "ltx23_low_audio_in (16:9)"
-    assert vd._label_for("wan_ti2v") == "wan22_high_video (16:9)"
+    assert vd._label_for("ltx25_video") == "ltx25_high_video (16:9)"
+    assert vd._label_for("minimax_h3_audio_in") == "h3_low_audio_in (16:9)"
+    assert vd._label_for("minimax_h3_video") == "h3_low_video (16:9)"
     # ltx_8gb took its low/high name in lane 8 (2026-08-11). It was the last
     # IDENTITY row in the public table -- public id == internal id -- so this
     # line used to read the same string twice and looked like it was asserting
@@ -147,7 +136,7 @@ def test_label_descriptor_suffix_is_family_derived():
         assert vd._descriptor_suffix(name) == " (audio-reactive, no scene image)"
         assert vd._label_for(name).endswith(" (audio-reactive, no scene image)")
     # a non-abstract / still-consuming engine gets NO descriptor
-    for name in ("humo", "ltx_video", "still_flat", "wan_i2v"):
+    for name in ("humo", "ltx25_video", "still_flat", "ltx_8gb"):
         assert vd._descriptor_suffix(name) == ""
     # unknown engine -> '' (never raises)
     assert vd._descriptor_suffix("not_a_real_engine") == ""
@@ -168,7 +157,7 @@ def test_label_round_trips_to_bare_id():
 def test_bare_legacy_value_still_resolves():
     # Old saved graphs store the bare id -> must pass through unchanged.
     assert vd._engine_id_from_pick("humo") == "humo"
-    assert vd._engine_id_from_pick("ltx_audio_in") == "ltx_audio_in"
+    assert vd._engine_id_from_pick("ltx_8gb") == "ltx_8gb"
 
 
 def test_renamed_engine_legacy_alias_resolves():
@@ -200,7 +189,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
     BARE engine id, and aspects follow the engine's render_aspect."""
     import json
     out = vd.OTRVideoDirector().direct(
-        announcer_video_model="ltx_video (16:9)",
+        announcer_video_model="ltx25_high_video (16:9)",
         music_video_model="humo_1.7B_169 (16:9)",
         character_video_model="humo_1.7B (portrait)",
         announcer_image_model="flux_gen1",
@@ -209,7 +198,7 @@ def test_direct_parses_labelled_pick_to_bare_engine_id():
         fps=25, canvas_w=832, canvas_h=480,
     )
     policy = json.loads(out[0])
-    assert policy["video_models"]["announcer_video_model"]["engine_id"] == "ltx_video"
+    assert policy["video_models"]["announcer_video_model"]["engine_id"] == "ltx25_video"
     assert policy["video_models"]["music_video_model"]["engine_id"] == "humo_1.7B_169"
     assert policy["video_models"]["character_video_model"]["engine_id"] == "humo_1.7B"
     assert policy["aspects"]["announcer_visual"] == "wide"

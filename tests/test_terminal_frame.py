@@ -563,10 +563,10 @@ def test_every_adapter_that_writes_a_clip_proves_its_COLOUR_CONTRACT():
     contract -- at itself, or inside the encoder it calls.
 
     Derived from the SOURCE, not from a hand-kept list. The bug report named
-    two adapters (eng_humo, eng_ltx_av) and listed eng_ltx_video among those
-    that already probed; sweeping every encoder found eng_ltx_video did NOT, on
-    either of its two recipe paths, and that eng_still_parallax was missing
-    from the report altogether. A later widening caught cheap_families.py,
+    two adapters (eng_humo and an LTX audio-in lane since removed) and listed a
+    third LTX adapter among those that already probed; sweeping every encoder
+    found that adapter did NOT, on either of its two recipe paths, and that
+    eng_still_parallax was missing from the report altogether. A later widening caught cheap_families.py,
     which is not named eng_* and builds its mp4 from an ffmpeg arg list. This
     version stops asking HOW the clip was written at all -- it asks who reaches
     an ffmpeg encode, by any spelling."""
@@ -594,7 +594,7 @@ def test_every_adapter_that_writes_a_clip_proves_its_COLOUR_CONTRACT():
     # adapter through the first, and cheap_families by building the argv
     # itself and handing it to a generic runner.
     for expected in ("eng_viz_camera.py", "eng_visualizer.py",
-                     "eng_ltx_video.py", "cheap_families.py"):
+                     "eng_ltx_8gb.py", "cheap_families.py"):
         assert expected in billed, (
             "%s writes a clip and the roster no longer bills it for the "
             "colour contract -- the gate has gone blind again, not clean"

@@ -585,11 +585,10 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     `BOOKEND_SCENE_PROMPT_ENGINES`, so the old substring assertion started
     failing on a change that was strictly an improvement.
 
-    And the substring it pinned was
-    `'"ltx_video", "ltx25_video", "wan_i2v", "ltx_audio_in"'` -- which means
-    this guard was holding the `wan_i2v` staleness IN PLACE: a test asserting
-    the literal presence of a retired engine id. Membership says what was
-    actually meant and cannot rot the same way.
+    And the substring it pinned named a retired engine id, which means this
+    guard was holding that staleness IN PLACE: a test asserting the literal
+    presence of a dead id. Membership says what was actually meant and cannot
+    rot the same way.
     """
     from nodes._otr_video_engines import render_driver as rd
 
@@ -612,17 +611,6 @@ def test_ghost_is_not_added_to_the_ltx_tuple():
     # branch at all and shipped build_request's hardcoded radio-studio default.
     for joint_av in ("ltx25_native_foley_16gb", "ltx25_native_mime_16gb"):
         assert joint_av in rd.BOOKEND_SCENE_PROMPT_ENGINES, joint_av
-
-    # The retired id is GONE. `wan_ti2v` is still deliberately NOT here: this
-    # branch emits an LTX-shaped five-clause register, and wan's own directive
-    # asks for one subject/action/speed at cfg 5.0. What it was OWED in
-    # KNOWN_RED -- an engine-shaped formatter emitting exactly that -- was paid
-    # on 2026-09-03 as BOOKEND_SCENE_PROMPT_BOUNDED, so the debt entry is gone
-    # and membership moved rather than disappearing (PBUG-20260903-06).
-    assert "wan_i2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_ENGINES
-    assert "wan_ti2v" in rd.BOOKEND_SCENE_PROMPT_BOUNDED
-    assert "wan_ti2v" not in rd.BOOKEND_SCENE_PROMPT_KNOWN_RED
 
 
 def test_an_all_ghost_policy_spends_no_writer_llm_call():

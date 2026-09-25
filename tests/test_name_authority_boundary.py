@@ -717,7 +717,6 @@ def test_no_source_file_carries_a_stray_control_character():
     targets = [
         _REPO_ROOT / "nodes" / "_otr_name_authority.py",
         _REPO_ROOT / "nodes" / "_otr_casting.py",
-        _REPO_ROOT / "scripts" / "audit_wrong_person_census.py",
         Path(__file__),
     ]
     forbidden = {"\x00", "\x07", "\x08", "\x0b", "\x0c", "\x1b"}

@@ -234,10 +234,10 @@ def test_the_render_batch_engine_becomes_a_safe_filename_token():
         "reduced to a token first")
 
 
-def test_a_profile_id_names_a_file_not_a_path():
+def test_a_profile_id_names_a_workflow_not_a_path():
     from nodes._otr_shared import capability_profiles as cp
     for bad in ("../../../etc/hosts", r"..\..\x", "a/b", "a\\b"):
-        with pytest.raises(cp.ProfileError, match="names a file"):
+        with pytest.raises(cp.ProfileError, match="names a workflow, not a path"):
             cp.load_profile(bad)
 
 

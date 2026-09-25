@@ -73,12 +73,19 @@ def _fresh_registry():
     vs._clear_caches()
 
 
+#: The live LTX audio-in lane: on the LTX bookend scene branch for radio beats
+#: and an audio-in character lane on character beats.
+_AUDIO_IN_LANE = "ltx25_native_audio_in_16gb"
+
+#: The minted scene still for the synthetic music-open beat. The audio-in lane
+#: conditions on it and refuses to render without one (no portrait fallback).
+_OPEN_STILLS = {"images": [
+    {"object_id": "still_b000_music_open", "beat_id": "b000_music_open",
+     "kind": "scene_open", "path": "X:/img/still_b000_music_open.png"}]}
+
+
 @pytest.fixture()
-def _single_pass_recipe(monkeypatch):
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+def _bookend_env(monkeypatch):
     monkeypatch.delenv("OTR_LTX_OPEN_MOTION_KEY", raising=False)
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
 
@@ -190,10 +197,10 @@ class TestSurfaceDeltas:
 
     @pytest.mark.parametrize("style_id", _NON_DEFAULT_IDS)
     def test_motion_registers_delta_through_real_builder(
-            self, _single_pass_recipe, style_id):
+            self, _bookend_env, style_id):
         def _shot():
             return {"shot_id": "shot_b000_music_open", "beat_id": "b000",
-                    "engine_id": "ltx_audio_in", "role": "music_visual",
+                    "engine_id": _AUDIO_IN_LANE, "role": "music_visual",
                     "family": "audio_conditioned_video",
                     "target_frame_count": 25, "source_line_ids": [],
                     "char_id": "", "creative": {}}
@@ -203,7 +210,7 @@ class TestSurfaceDeltas:
                     "video": {"video_revision": 1, "shots": []},
                     "lines": [{"line_id": "b000", "char_id": "",
                                "start_s": 0.0, "dur_s": 2.0}],
-                    "images": {"images": []}}
+                    "images": _OPEN_STILLS}
 
         styled = rd.build_request_from_shot(_shot(),
                                             _led(_meta_for(style_id)))
@@ -212,7 +219,7 @@ class TestSurfaceDeltas:
         assert styled["text_prompt"] != default["text_prompt"]
         s = vs.resolve_visual_style(style_id)
         assert styled["text_prompt"].lower().startswith(
-            rd._compact_style_talking_cue(s).lower())
+            vs.compact_style_cue(s).lower())
         motion_body = s.motion_registers["music_open"]
         if "." in motion_body:
             motion_body = motion_body.split(".", 1)[1].strip()
@@ -244,9 +251,9 @@ class TestVideoArtCondensedCue:
             meta, "village square")
         assert "video-art feedback environment" in plate
 
-    def test_video_art_cue_hits_video_motion_prompt(self, _single_pass_recipe):
+    def test_video_art_cue_hits_video_motion_prompt(self, _bookend_env):
         shot = {"shot_id": "shot_b000_music_open", "beat_id": "b000",
-                "engine_id": "ltx_audio_in", "role": "music_visual",
+                "engine_id": _AUDIO_IN_LANE, "role": "music_visual",
                 "family": "audio_conditioned_video",
                 "target_frame_count": 25, "source_line_ids": [],
                 "char_id": "", "creative": {}}
@@ -254,7 +261,7 @@ class TestVideoArtCondensedCue:
                "video": {"video_revision": 1, "shots": []},
                "lines": [{"line_id": "b000", "char_id": "",
                           "start_s": 0.0, "dur_s": 2.0}],
-               "images": {"images": []}}
+               "images": _OPEN_STILLS}
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith("video-art feedback style.")
@@ -310,9 +317,9 @@ class TestRecursiveFractalExplicitStyleCue:
         assert cue not in sibling_cues.values()
 
     def test_recursive_fractal_style_cue_hits_video_motion_prompt(
-            self, _single_pass_recipe):
+            self, _bookend_env):
         shot = {"shot_id": "shot_b000_music_open", "beat_id": "b000",
-                "engine_id": "ltx_audio_in", "role": "music_visual",
+                "engine_id": _AUDIO_IN_LANE, "role": "music_visual",
                 "family": "audio_conditioned_video",
                 "target_frame_count": 25, "source_line_ids": [],
                 "char_id": "", "creative": {}}
@@ -320,7 +327,7 @@ class TestRecursiveFractalExplicitStyleCue:
                "video": {"video_revision": 1, "shots": []},
                "lines": [{"line_id": "b000", "char_id": "",
                           "start_s": 0.0, "dur_s": 2.0}],
-               "images": {"images": []}}
+               "images": _OPEN_STILLS}
 
         req = rd.build_request_from_shot(shot, led)
         assert req["text_prompt"].startswith(
@@ -330,9 +337,9 @@ class TestRecursiveFractalExplicitStyleCue:
         assert req["observability"]["visual_style"] == "recur_frac"
 
     def test_recursive_fractal_style_cue_hits_character_m4_video_prompt(
-            self, _single_pass_recipe):
+            self, _bookend_env):
         shot = {"shot_id": "shot_b002", "beat_id": "b002",
-                "engine_id": "ltx_audio_in", "role": "character_video",
+                "engine_id": _AUDIO_IN_LANE, "role": "character_video",
                 "family": "audio_conditioned_video",
                 "target_frame_count": 25, "source_line_ids": ["b002"],
                 "char_id": "c01",
@@ -354,9 +361,9 @@ class TestRecursiveFractalExplicitStyleCue:
         assert req["observability"]["visual_style"] == "recur_frac"
 
     def test_recursive_fractal_style_cue_hits_character_fallback_prompt(
-            self, _single_pass_recipe):
+            self, _bookend_env):
         shot = {"shot_id": "shot_b002", "beat_id": "b002",
-                "engine_id": "ltx_audio_in", "role": "character_video",
+                "engine_id": _AUDIO_IN_LANE, "role": "character_video",
                 "family": "audio_conditioned_video",
                 "target_frame_count": 25, "source_line_ids": ["b002"],
                 "char_id": "c01", "creative": {}}
@@ -375,9 +382,9 @@ class TestRecursiveFractalExplicitStyleCue:
         assert req["observability"]["prompt_source"] == "default_character"
 
     def test_recursive_fractal_style_cue_hits_brief_video_prompt(
-            self, _single_pass_recipe):
+            self, _bookend_env):
         shot = {"shot_id": "shot_b010", "beat_id": "b010",
-                "engine_id": "ltx_video", "role": "background_video",
+                "engine_id": "ltx25_video", "role": "background_video",
                 "family": "image_to_video", "target_frame_count": 25,
                 "source_line_ids": ["b010"], "char_id": "",
                 "creative": {}}

@@ -1,6 +1,7 @@
 """The explicit H3 lane is complete, pinned, and never auto-selected."""
 from __future__ import annotations
 
+import copy
 import hashlib
 import importlib.util
 import pathlib
@@ -29,6 +30,20 @@ def _fetcher():
 def _provisioner():
     return _load(ROOT / "scripts" / "otr_provision.py",
                  "_otr_h3_provision_tests")
+
+
+def _h3_profile(provision, row_id, video):
+    """A matrix row with every video selection moved onto an H3 lane.
+
+    No shipped row selects H3 -- it is operator-local by design -- so the
+    profile is built from a real row rather than read from one.
+    """
+    profile = copy.deepcopy(provision.load_profile(row_id))
+    profile["id"] = "%s_%s" % (row_id, video)
+    profile["slot_overrides"]["video_render_engine"] = video
+    for key in ("announcer_visual", "music_visual", "character_visual"):
+        profile["role_overrides"][key] = video
+    return profile
 
 
 def test_h3_lane_has_exact_five_file_receipt():
@@ -101,60 +116,30 @@ def test_h3_fetcher_is_the_union_of_both_engine_recipes(monkeypatch):
     assert "minimax_h3_ref2va_pruned_int8_convrot.safetensors" in fetched
 
 
-def test_every_h3_profile_stays_operator_only():
+@pytest.mark.parametrize("row_id, video, image_lane", [
+    ("otr_8gb_video", "h3_low_video", "z_image_int8"),
+    ("otr_16gb_video", "h3_low_audio_in", "z_image"),
+])
+def test_every_h3_profile_stays_operator_only(row_id, video, image_lane):
     provision = _provisioner()
-    profiles = []
-    for path in sorted((ROOT / "config" / "profiles").glob("*.json")):
-        if path.stem == "widget_mapping":
-            continue
-        profile = provision.load_profile(path.stem)
-        roles = profile.get("role_overrides") or {}
-        slots = profile.get("slot_overrides") or {}
-        selected = str(slots.get("video_render_engine") or
-                       roles.get("character_visual") or "")
-        if provision._PUBLIC_VIDEO_IDS.get(selected, selected) in provision._H3_ENGINES:
-            profiles.append(profile)
+    profile = _h3_profile(provision, row_id, video)
 
-    assert profiles, "no H3 profiles found"
-    for profile in profiles:
-        images = {
-            profile["role_overrides"].get(name)
-            for name in ("announcer_image", "music_image", "character_image")
-        }
-        if images == {"lumina_image"}:
-            with pytest.raises(provision.ProvisionFailure,
-                               match="unrecognized image engine"):
-                provision.profile_lanes(profile)
-            continue
-
-        expected_automatic = []
-        expected_manual = ["h3_operator_only"]
-        if images == {"z_image_turbo"}:
-            expected_automatic.append(
-                "z_image_int8"
-                if float(profile["llm"]["vram_ceiling_gb"]) <= 8.0
-                else "z_image"
-            )
-        else:
-            pytest.fail("H3 profile has an unowned image route: %r" % images)
-        if profile["slot_overrides"].get("music_engine") == "stable_audio_3":
-            expected_automatic.append("stable_audio_3")
-        routes = provision.profile_lanes(profile)
-        assert routes == {
-            "automatic": expected_automatic,
-            "manual": expected_manual,
-        }
-        assert "minimax_h3" not in routes["automatic"]
+    routes = provision.profile_lanes(profile)
+    assert routes == {
+        "automatic": [image_lane, "stable_audio_3"],
+        "manual": ["h3_operator_only"],
+    }
+    assert "minimax_h3" not in routes["automatic"]
 
 
-def test_operator_tier_prints_the_exact_explicit_command():
+def test_operator_download_prints_the_exact_explicit_command():
     provision = _provisioner()
-    detail = provision.OPERATOR_ONLY_TIERS["h3_operator_only"]
+    detail = provision.OPERATOR_ONLY_DOWNLOADS["h3_operator_only"]
     assert "python scripts/otr_fetch_lane_weights.py minimax_h3" in detail
     assert "auto-selected" in detail
 
 
-def test_operator_tier_becomes_present_only_after_exact_explicit_fetch(
+def test_operator_download_becomes_present_only_after_exact_explicit_fetch(
         tmp_path, monkeypatch):
     provision = _provisioner()
     payload = b"receipt-bearing operator-only H3 fixture"
@@ -177,12 +162,12 @@ def test_operator_tier_becomes_present_only_after_exact_explicit_fetch(
     part = pathlib.Path(str(final) + ".part")
     part.write_bytes(payload)
 
-    assert provision.verify_manual_tier(
+    assert provision.verify_manual_download(
         str(tmp_path), "h3_operator_only") is False
     assert not final.exists()
 
     part.replace(final)
-    assert provision.verify_manual_tier(
+    assert provision.verify_manual_download(
         str(tmp_path), "h3_operator_only") is True
 
 
@@ -206,15 +191,17 @@ def test_main_fetches_h3_profile_dependencies_then_verifies_operator_lane(
         provision, "fetch_lane_weights", lambda lanes: fetched.append(list(lanes)))
     monkeypatch.setattr(provision, "warm_profile_writer_models", lambda _profile: None)
 
-    def verify(_root, tier_id):
-        verified.append(tier_id)
+    def verify(_root, download_id):
+        verified.append(download_id)
         return True
 
-    monkeypatch.setattr(provision, "verify_manual_tier", verify)
+    monkeypatch.setattr(provision, "verify_manual_download", verify)
+    h3 = _h3_profile(provision, "otr_8gb_video", "h3_low_video")
+    monkeypatch.setattr(provision, "load_profile", lambda _profile_id: h3)
 
-    rc = provision.main(["--profile", "otr_4060_h3_nano"])
+    rc = provision.main(["--profile", h3["id"]])
 
     assert rc == 0
-    assert fetched == [["z_image_int8"]]
+    assert fetched == [["z_image_int8", "stable_audio_3"]]
     assert verified == ["h3_operator_only"]
     assert all("minimax_h3" not in lanes for lanes in fetched)

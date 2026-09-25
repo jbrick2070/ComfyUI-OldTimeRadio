@@ -1,6 +1,6 @@
 """The per-engine prompt-style overlays -- STORED, NOT WIRED (queue item C).
 
-Ten engines each carry two constants, per the schema decided 2026-08-17 in
+Five engines each carry two constants, per the schema decided 2026-08-17 in
 `docs/2026-08-17-per-engine-prompt-style-guide-RESEARCH.md`:
 
   * `PROMPT_STYLE_DIRECTIVE` -- 240 chars HARD. The only half that may ever
@@ -8,18 +8,17 @@ Ten engines each carry two constants, per the schema decided 2026-08-17 in
   * `PROMPT_STYLE_NOTES`     -- uncapped, humans only, never injected.
 
 Nothing in the repo reads either one yet; acting on them is a separate, measured
-change gated on `scripts/otr_talking_radio_probe_eval.py` at a fixed seed. These
-tests therefore pin the CONTRACT, not behaviour -- the cap, the completeness, and
-the two prohibitions that stop a future window shipping a known defect one layer
-up.
+change gated on a probe before/after at a fixed seed. These tests therefore pin
+the CONTRACT, not behaviour -- the cap, the completeness, and the two
+prohibitions that stop a future window shipping a known defect one layer up.
 
-WHY THIS READS BY AST AND NEVER IMPORTS AN ENGINE. `scripts/otr_style_traceroute.py`
-established the pattern: it pulls each engine's negative without importing the
-module so the tool keeps its "loads no model, spends no GPU" promise. The same
-applies here, and it also keeps the test honest about engines whose module scope
-reaches for optional runtime deps. One contract difference: the traceroute returns
-"" on a read failure because it REPORTS and must never fail a build. A test has
-the opposite duty, so every reader here raises instead.
+WHY THIS READS BY AST AND NEVER IMPORTS AN ENGINE. The style traceroute tool
+(since retired) established the pattern: it pulled each engine's negative without
+importing the module so the tool kept its "loads no model, spends no GPU"
+promise. The same applies here, and it also keeps the test honest about engines
+whose module scope reaches for optional runtime deps. One contract difference: a
+reporting tool returns "" on a read failure because it must never fail a build.
+A test has the opposite duty, so every reader here raises instead.
 """
 import ast
 import pathlib
@@ -36,29 +35,21 @@ _REPO = pathlib.Path(__file__).resolve().parents[1]
 #: fixtures and ships disabled. Bounded and validated works; open-ended does not.
 _HARD_CAP = 240
 
-#: The ten owning modules, engine slug -> path. `ltx_8gb` is deliberately ABSENT:
-#: the RESEARCH doc treats "ltx_video / ltx_8gb" as ONE block, so the LTX family
-#: pair lives on `eng_ltx_video` and the 8GB tier carries a pointer, not a copy.
+#: The five owning modules, engine slug -> path.
 _OWNERS = {
     "z_image_turbo": "nodes/_otr_image_engines/z_image_turbo.py",
     "flux_gen1": "nodes/_otr_image_engines/flux_gen1.py",
     "lumina_image": "nodes/_otr_image_engines/lumina_image.py",
-    "ltx_video": "nodes/_otr_video_engines/eng_ltx_video.py",
-    "ltx_av": "nodes/_otr_video_engines/eng_ltx_av.py",
-    # `wan_i2v` left this map when the local 14B was retired (2026-08-26). Its
-    # directive was never shared -- `eng_wan_ti2v` carries its own, written
-    # against Wan 2.2's subject-first captions, so the 5B row below is the whole
-    # Wan family now and nothing was orphaned by the removal.
-    "wan_ti2v": "nodes/_otr_video_engines/eng_wan_ti2v.py",
-    "fastwan_8gb": "nodes/_otr_video_engines/eng_fastwan_8gb.py",
     "humo": "nodes/_otr_video_engines/eng_humo.py",
     "minimax_h3": "nodes/_otr_video_engines/eng_minimax_h3.py",
     # Additional directives may land here from operator drafts; keep the map
     # pointing at real files only.
 }
 
-#: The sibling that must NOT grow its own copy of the LTX family pair.
-_LTX_POINTER_ONLY = "nodes/_otr_video_engines/eng_ltx_8gb.py"
+#: A module that names the constants in PROSE only (a comment about where an
+#: overlay lives) and defines no pair of its own. The not-wired scan below is a
+#: plain text search, so it must not read a comment as a reader.
+_PROSE_ONLY_MENTIONS = ("nodes/_otr_video_engines/eng_ltx_8gb.py",)
 
 #: A directive may STATE that a negative is inert or absent -- that is a phrasing
 #: fact a writer needs, and `minimax_h3` legitimately opens with it. It may never
@@ -80,7 +71,7 @@ _LTX_POINTER_ONLY = "nodes/_otr_video_engines/eng_ltx_8gb.py"
 #: has-no-effect hedge is also present. Ways to say "this channel is inert" are a
 #: CLOSED set; ways to say "author one" are not.
 #:
-#: Deliberately narrow to stay free of false positives. Four real directives say
+#: Deliberately narrow to stay free of false positives. A real directive says
 #: "exclusions have no effect", so the avoidance list matches "to exclude" and
 #: never the bare stem "exclu"; and it does NOT match a bare "avoid", because
 #: "avoid tag lists" is a legitimate PHRASING rule about how to write, not an
@@ -183,7 +174,7 @@ def _module_constants(rel_path):
 
 @pytest.fixture(scope="module")
 def overlays():
-    """slug -> (directive, notes) for all ten owners."""
+    """slug -> (directive, notes) for every owner."""
     out = {}
     for slug, rel_path in _OWNERS.items():
         consts = _module_constants(rel_path)
@@ -280,7 +271,7 @@ def test_notes_carry_a_provenance_stamp(overlays, slug):
 
 
 def test_directives_are_all_distinct(overlays):
-    """Ten engines, ten answers. Identical text means someone pasted rather than
+    """One engine, one answer. Identical text means someone pasted rather than
     derived -- the configurations genuinely differ (cfg 1.0 through 5.0, live
     negatives and absent ones, LLM encoders and T5)."""
     seen = {}
@@ -288,32 +279,6 @@ def test_directives_are_all_distinct(overlays):
         if directive in seen:
             pytest.fail("%s and %s share a directive verbatim" % (seen[directive], slug))
         seen[directive] = slug
-
-
-def test_ltx_8gb_carries_a_pointer_not_a_copy():
-    """One authority for the LTX family.
-
-    D-BIS finding 2 is the standing example of what two copies become: the same
-    7-term negative boilerplate exists in four copies and two silently diverged
-    with no recorded reason. A deliberate DEPARTURE for the 8GB tier is allowed
-    later -- it just has to be a real pair with a recorded reason, which is what
-    makes it a departure rather than a drift. Until then, no copy.
-    """
-    consts = _module_constants(_LTX_POINTER_ONLY)
-    assert "PROMPT_STYLE_DIRECTIVE" not in consts, (
-        "eng_ltx_8gb defines its own PROMPT_STYLE_DIRECTIVE. The LTX family pair "
-        "lives on eng_ltx_video; a byte-identical copy here is the duplicate-drift "
-        "shape D-BIS finding 2 already flags. If this IS a deliberate departure, "
-        "add it to _OWNERS with the reason recorded in its notes.")
-    assert "PROMPT_STYLE_NOTES" not in consts, (
-        "eng_ltx_8gb defines its own PROMPT_STYLE_NOTES -- see above.")
-    body = (_REPO / _LTX_POINTER_ONLY).read_text(encoding="utf-8")
-    # Loosened deliberately: requiring the exact dotted string made a purely
-    # cosmetic reword or an aliased import fail a test whose real invariant --
-    # no second copy -- the two checks above already prove.
-    assert "eng_ltx_video" in body and "PROMPT_STYLE_DIRECTIVE" in body, (
-        "eng_ltx_8gb must name where its overlay actually lives, or a reader "
-        "concludes the engine was simply missed.")
 
 
 def test_the_overlays_are_not_wired_anywhere():
@@ -331,7 +296,7 @@ def test_the_overlays_are_not_wired_anywhere():
     directive before that is settled targets an engine the writer cannot see.
     """
     owners = {(_REPO / p).resolve() for p in _OWNERS.values()}
-    owners.add((_REPO / _LTX_POINTER_ONLY).resolve())
+    owners.update((_REPO / p).resolve() for p in _PROSE_ONLY_MENTIONS)
     skip = {".git", ".claude", "__pycache__", "tests", "node_modules",
             "kibitz-runs", "kibitz", "otr", "output", "docs", "site-packages"}
     offenders = []
@@ -350,8 +315,7 @@ def test_the_overlays_are_not_wired_anywhere():
                                  % (path.relative_to(_REPO).as_posix(), name))
     assert not offenders, (
         "the overlays are STORED, NOT WIRED. Acting on them is a separate, "
-        "measured change -- a before/after on "
-        "scripts/otr_talking_radio_probe_eval.py at a fixed seed -- and the "
+        "measured change -- a probe before/after at a fixed seed -- and the "
         "engine-binding question (queue item D) is still BLOCKED. New readers "
         "found:\n  %s" % "\n  ".join(offenders))
 
@@ -360,8 +324,8 @@ def test_the_owner_map_still_points_at_real_files():
     """The map cannot rot silently.
 
     SCOPE, stated plainly because this test's first name ("no engine module was
-    missed") promised a completeness it does not deliver: it checks the TEN the
-    RESEARCH doc enumerated and cannot discover an engine nobody listed.
+    missed") promised a completeness it does not deliver: it checks the owners
+    listed above and cannot discover an engine nobody listed.
 
     A Sonnet QA pass found registered local image engines outside the
     RESEARCH doc's original ten. `hidream_i1` and `sd35_large` were
@@ -375,7 +339,7 @@ def test_the_owner_map_still_points_at_real_files():
         assert (_REPO / rel_path).is_file(), (
             "%s: %s no longer exists -- the overlay moved or the engine was "
             "renamed, and this map is now lying" % (slug, rel_path))
-    assert len(_OWNERS) == 9, (
+    assert len(_OWNERS) == 5, (
         "this map has %d. Update this count in the same commit when an owner "
         "row is added or removed -- this assertion firing is the guard working, "
         "not a bug." % len(_OWNERS))

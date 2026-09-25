@@ -652,11 +652,11 @@ def test_video_render_batch_mode_combo_offers_episode():
 # operator experiment knob: the all-LTX / forced-engine episodes)
 # --------------------------------------------------------------------------- #
 def test_parse_engine_override_grammar():
-    m = rd.parse_engine_override("*=ltx_video")
-    assert m == {"*": "ltx_video"}
+    m = rd.parse_engine_override("*=ltx25_video")
+    assert m == {"*": "ltx25_video"}
     m = rd.parse_engine_override(
-        "character_video=humo, retired_role_a=ltx_video")
-    assert m == {"character_video": "humo", "retired_role_a": "ltx_video"}
+        "character_video=humo, retired_role_a=ltx25_video")
+    assert m == {"character_video": "humo", "retired_role_a": "ltx25_video"}
     with pytest.raises(ValueError):
         rd.parse_engine_override("character_video")          # no '='
     with pytest.raises(ValueError):
@@ -666,11 +666,10 @@ def test_parse_engine_override_grammar():
 def test_apply_engine_override_rewrites_by_role(monkeypatch):
     led = _two_shot_ledger()
     led["video"]["shots"][0]["role"] = "character_video"
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx25_video")
     out = rd.apply_engine_override(led)
-    assert out["video"]["shots"][0]["engine_id"] == "ltx_video"
-    # image_to_video since 2026-08-28 -- the family override stamps what the
-    # engine class now declares.
+    assert out["video"]["shots"][0]["engine_id"] == "ltx25_video"
+    # The family override stamps what the engine class declares.
     assert out["video"]["shots"][0]["family"] == "image_to_video"
     # the other role is untouched
     assert out["video"]["shots"][1]["engine_id"] == "stub_fail"
@@ -710,10 +709,10 @@ def test_resolve_final_shot_engines_runs_both_mutations(monkeypatch):
     """The route lock resolves force map AND radio-host redirect in one pass."""
     led = _two_shot_ledger()
     led["video"]["shots"][0]["role"] = "character_video"
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx25_video")
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     out = rd.resolve_final_shot_engines(led)
-    assert out["video"]["shots"][0]["engine_id"] == "ltx_video"
+    assert out["video"]["shots"][0]["engine_id"] == "ltx25_video"
 
 
 def test_resolve_final_shot_engines_redirects_humo_bookend(monkeypatch):
@@ -902,7 +901,7 @@ def test_family_changing_failure_is_loud_no_prune(stub_registry):
     led = rd.build_full_ledger({
         "video_revision": 1, "fps": 25,
         "execution_groups": [
-            {"group_id": "grp_bg", "kind": "provider", "engine_id": "ltx_video",
+            {"group_id": "grp_bg", "kind": "provider", "engine_id": "ltx25_video",
              "profile_id": "", "depends_on": [],
              "produces_base_for": ["grp_char"]},
             {"group_id": "grp_char", "kind": "consumer",
@@ -995,7 +994,7 @@ def test_content_floor_is_gated_to_cloud_engines():
     assert rd._cloud_floor_reason(
         "shot_b040", errors, {"engine_id": "humo"}) == ""
     assert rd._cloud_floor_reason(
-        "shot_b040", errors, {"engine_id": "ltx_video"}) == ""
+        "shot_b040", errors, {"engine_id": "ltx25_video"}) == ""
 
 
 def test_report_cloud_floors_escalates_when_failures_look_systemic(caplog):

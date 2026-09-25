@@ -18,6 +18,7 @@ CPU-safe: no CUDA, no model loads, no renders.
 
 from __future__ import annotations
 
+import copy
 import json
 import pathlib
 
@@ -34,7 +35,10 @@ LANE = "humo_14B_169"
 PUBLIC = "humo14_high_audio_in_wide"
 DECLARED_CANVAS = (832, 480)
 REPO = pathlib.Path(__file__).resolve().parents[1]
-PROFILE_ID = "otr_w45_humo_14b_169"
+#: A shipping matrix row the tests below borrow a complete, validated profile
+#: shape from. No matrix row selects a HuMo tier, so the hero cast is layered
+#: on in code rather than read from a saved rig.
+BASE_ROW = "otr_16gb_video"
 
 
 @pytest.fixture()
@@ -43,8 +47,21 @@ def engine():
 
 
 @pytest.fixture()
-def profile():
-    return load_profile(PROFILE_ID)
+def profile(tmp_path):
+    """The hero tier's cast on the HuMo diet, built from a live matrix row and
+    read back through ``load_profile`` so the shape validator still runs."""
+    prof = copy.deepcopy(load_profile(BASE_ROW))
+    prof["id"] = "humo_hero_cast"
+    for role in ("announcer_visual", "music_visual", "character_visual"):
+        prof["role_overrides"][role] = LANE
+    prof["render"] = dict(prof.get("render") or {},
+                          canvas_w=DECLARED_CANVAS[0], canvas_h=DECLARED_CANVAS[1])
+    prof["launch"]["env"] = {"OTR_HEADLESS_RESERVE_VRAM_GB": "2.921",
+                             "OTR_HEADLESS_DISABLE_PINNED": "1"}
+    prof["launch"]["boot_contract"] = bc.HUMO_DIET
+    (tmp_path / "humo_hero_cast.json").write_text(
+        json.dumps(prof), encoding="utf-8")
+    return load_profile("humo_hero_cast", profile_dir=str(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -84,7 +101,7 @@ def test_cpu_contract_is_identified_from_the_running_server(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "contract", [bc.HUMO_DIET, bc.H3, bc.H3_8GB_LAB, bc.LTX_AV_DIET])
+    "contract", [bc.HUMO_DIET, bc.H3, bc.H3_8GB_LAB])
 def test_gpu_diet_contracts_reject_a_conflicting_cpu_only_boot(contract):
     state = {
         "available": True,
@@ -169,22 +186,12 @@ def test_the_launcher_turns_both_diet_knobs_into_argv():
     assert "%_OTR_RESERVE%" in assembly and "%_OTR_PINNED%" in assembly
 
 
-def test_the_hero_profile_carries_the_contract_in_the_live_channel(profile):
-    assert bc.contract_for_profile(profile) == bc.HUMO_DIET
-    assert profile["launch"]["env"] == bc.launch_env_for(bc.HUMO_DIET)
-    assert not profile["launch"]["extra_args"], (
-        "extra_args is documentation-only; anything load-bearing placed there "
-        "is silently ignored at boot")
-
-
 def test_every_shipped_profile_still_validates_with_the_new_optional_key():
     """`boot_contract` is OPTIONAL because the launch key set is
     closed-validated: a required key would have broken all ~20 profiles at
     once."""
-    # widget_mapping.json shares the directory but is a WIDGET MAP, not a
-    # profile -- load_profile refuses it by design.
-    ids = sorted(p.stem for p in (REPO / "config" / "experiments").glob("*.json")
-                 if p.stem != "widget_mapping")
+    from nodes._otr_shared.capability_profiles import known_profile_ids
+    ids = sorted(known_profile_ids())
     assert len(ids) >= 20
     for pid in ids:
         prof = load_profile(pid)
@@ -197,7 +204,7 @@ def test_a_malformed_boot_contract_value_is_refused_by_the_schema():
     """An OPTIONAL key still gets VALIDATED when present. A typo'd value
     silently doing nothing is the drift class the closed validator kills."""
     from nodes._otr_shared import capability_profiles as cp
-    prof = load_profile(PROFILE_ID)
+    prof = load_profile(BASE_ROW)
     prof["launch"]["boot_contract"] = 17
     with pytest.raises(ProfileError) as exc:
         cp.validate_profile_shape(prof, source="synthetic")
@@ -308,7 +315,7 @@ def test_sage_is_checked_only_when_the_contract_names_it():
 def test_an_engine_that_declares_nothing_keeps_legacy_boots_not_cpu():
     """Legacy tuning remains compatible; a device change is never implied."""
     assert set(bc.compatible_contracts_for_engine(
-        vreg.get_engine("wan_ti2v"))) == set(bc.BOOT_CONTRACTS) - {bc.CPU}
+        vreg.get_engine("ltx_8gb"))) == set(bc.BOOT_CONTRACTS) - {bc.CPU}
 
 
 def test_the_hero_tier_keeps_default_because_it_has_shipped_under_it(engine):
@@ -398,11 +405,6 @@ def test_the_override_refusal_is_SCOPED_to_tiers_that_declare(monkeypatch):
     assert engine._native_dims() == (640, 384)
 
 
-def test_the_profile_canvas_agrees_with_the_declaration(profile):
-    render = profile["render"]
-    assert (int(render["canvas_w"]), int(render["canvas_h"])) == DECLARED_CANVAS
-
-
 @pytest.mark.parametrize("tier", ["humo", "humo_1.7B", "humo_1.7B_169",
                                   "humo_14B_169"])
 def test_every_humo_tier_can_now_produce_its_manifest_row(tier):
@@ -485,14 +487,6 @@ def test_the_1p7b_pair_declares_its_canvas(tier, canvas):
     assert canvas[0] % 32 == 0 and canvas[1] % 32 == 0
 
 
-def test_the_portrait_profile_stopped_claiming_landscape():
-    """`otr_w45_humo_1_7b.json` said 832x480 on the tier whose whole identity
-    is the pillarbox talking head. The declaration is what renders, so the
-    profile was lying to whoever read it."""
-    prof = load_profile("otr_w45_humo_1_7b")
-    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (480, 832)
-
-
 @pytest.mark.parametrize("tier", ["humo_1.7B", "humo_1.7B_169"])
 def test_the_longbeat_tier_keeps_BOTH_boot_contracts(tier):
     """It is the auto-downgrade target -- the floor a heavy episode falls to --
@@ -543,15 +537,6 @@ def test_the_last_humo_tier_declares_its_canvas():
     engine = vreg.get_engine("humo")
     assert tuple(engine.render_canvas) == (480, 832)
     assert rd.declared_render_canvas("humo") == (480, 832)
-
-
-@pytest.mark.parametrize("pid", ["otr_w45_humo", "otr_g4_humo"])
-def test_both_humo_profiles_stopped_claiming_landscape(pid):
-    """BOTH of this tier's profiles said 832x480 on the pillarbox lane. The
-    w45 one was found by G2.3; the g4 one only surfaced because the gate reads
-    EVERY profile that selects the engine, not just the one being edited."""
-    prof = load_profile(pid)
-    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (480, 832)
 
 
 def test_every_humo_tier_now_declares_a_canvas_and_a_contract():

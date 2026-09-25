@@ -28,8 +28,8 @@ from nodes._otr_shared import retry_taxonomy as rt
 from nodes._otr_video_engines import registry as vreg
 # Register every engine so the no-fallback declarations can be checked.
 from nodes._otr_video_engines import eng_humo            # noqa: F401
-from nodes._otr_video_engines import eng_ltx_video       # noqa: F401
-from nodes._otr_video_engines import eng_wan_ti2v        # noqa: F401
+from nodes._otr_video_engines import eng_ltx25           # noqa: F401
+from nodes._otr_video_engines import eng_ltx_8gb         # noqa: F401
 from nodes._otr_video_engines import cheap_families      # noqa: F401
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent

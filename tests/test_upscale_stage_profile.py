@@ -2,25 +2,31 @@
 
 Asserts:
 * `upscale_stage` is an OPTIONAL top-level section; a profile that omits it
-  passes validation (operator-dirty `otr_g4_wan_ti2v.json` is the load-bearing
-  case per section-10 no-touch).
+  passes validation (every `config/workflow_matrix.json` row that states none
+  is the load-bearing case).
 * A profile that names an UNKNOWN engine fails cross_validate_profile with
   an accumulated `ProfileError` (not a raw ImportError).
 * A profile that specifies `engine` but omits `device` is legal (Sonnet 5
   MF-3: device is in _SECTION_OPTIONAL_KEYS).
+
+No matrix row carries an upscale stage, so the documents that do are a real
+row (`BASE_ROW`) with the section added, written into `tmp_path` where the
+case needs `load_profile` itself.
 """
 from __future__ import annotations
 
+import copy
 import json
-import tempfile
-from pathlib import Path
 
 import pytest
 
 from nodes._otr_shared.capability_profiles import (
-    PROFILE_DIR, ProfileError, load_profile, load_widget_mapping,
-    cross_validate_profile, validate_profile_shape,
+    ProfileError, known_profile_ids, load_profile, load_widget_mapping,
+    cross_validate_profile,
 )
+
+#: A cuda row, so a `cuda:0` upscale device is the natural pairing.
+BASE_ROW = "otr_16gb_low"
 
 
 def _decls():
@@ -31,38 +37,46 @@ def _decls():
     return {"audio": A, "video": V, "image": I, "upscale": U}
 
 
-def test_ship_profile_loads_and_cross_validates():
-    p = load_profile("otr_upscale_ship")
+def _row_with_upscale(new_id, upscale_stage):
+    src = copy.deepcopy(load_profile(BASE_ROW))
+    src["id"] = new_id
+    src["upscale_stage"] = upscale_stage
+    return src
+
+
+def test_a_full_upscale_stage_loads_and_cross_validates(tmp_path):
+    src = _row_with_upscale("otr_upscale_full_test",
+                            {"engine": "spandrel_esrgan", "device": "cuda:0"})
+    (tmp_path / "otr_upscale_full_test.json").write_text(
+        json.dumps(src), encoding="utf-8")
+    p = load_profile("otr_upscale_full_test", profile_dir=str(tmp_path))
     assert p["upscale_stage"]["engine"] == "spandrel_esrgan"
     assert p["upscale_stage"]["device"] == "cuda:0"
     cross_validate_profile(p, load_widget_mapping(), _decls())
 
 
 def test_profile_without_upscale_stage_still_loads():
-    """Every shipping profile that predates queue item 8 has no
-    upscale_stage section; they must all keep loading."""
-    p = load_profile("otr_g4_wan_ti2v")
-    assert "upscale_stage" not in p
+    """A row that states no upscale_stage section must keep loading."""
+    without = [rid for rid in known_profile_ids()
+               if "upscale_stage" not in load_profile(rid)]
+    assert without, "every matrix row states an upscale_stage -- nothing to prove"
 
 
-def test_partial_upscale_stage_engine_only_is_legal():
+def test_partial_upscale_stage_engine_only_is_legal(tmp_path):
     """Sonnet 5 MF-3: `device` is optional; a profile writing just
     {"engine": "spandrel_esrgan"} must pass validation."""
-    src = json.loads(Path(PROFILE_DIR, "otr_w45_wan_ti2v.json").read_text(encoding="utf-8"))
-    src["id"] = "otr_upscale_partial_test"
+    src = _row_with_upscale("otr_upscale_partial_test",
+                            {"engine": "spandrel_esrgan"})
     src["display_name"] = "test only"
-    src["upscale_stage"] = {"engine": "spandrel_esrgan"}
-    with tempfile.TemporaryDirectory() as td:
-        tp = Path(td) / "otr_upscale_partial_test.json"
-        tp.write_text(json.dumps(src), encoding="utf-8")
-        loaded = load_profile("otr_upscale_partial_test", profile_dir=td)
-        assert loaded["upscale_stage"] == {"engine": "spandrel_esrgan"}
+    (tmp_path / "otr_upscale_partial_test.json").write_text(
+        json.dumps(src), encoding="utf-8")
+    loaded = load_profile("otr_upscale_partial_test", profile_dir=str(tmp_path))
+    assert loaded["upscale_stage"] == {"engine": "spandrel_esrgan"}
 
 
 def test_unknown_engine_raises_profile_error():
-    src = json.loads(Path(PROFILE_DIR, "otr_w45_wan_ti2v.json").read_text(encoding="utf-8"))
-    src["id"] = "otr_upscale_bad"
-    src["upscale_stage"] = {"engine": "not_a_real_engine", "device": "cpu"}
+    src = _row_with_upscale("otr_upscale_bad",
+                            {"engine": "not_a_real_engine", "device": "cpu"})
     with pytest.raises(ProfileError) as excinfo:
         cross_validate_profile(src, load_widget_mapping(), _decls())
     assert "upscale_stage.engine" in str(excinfo.value)
@@ -70,9 +84,8 @@ def test_unknown_engine_raises_profile_error():
 
 
 def test_retired_engine_raises_profile_error():
-    src = json.loads(Path(PROFILE_DIR, "otr_w45_wan_ti2v.json").read_text(encoding="utf-8"))
-    src["id"] = "otr_upscale_retired_test"
-    src["upscale_stage"] = {"engine": "some_retired_id", "device": "cpu"}
+    src = _row_with_upscale("otr_upscale_retired_test",
+                            {"engine": "some_retired_id", "device": "cpu"})
     # Monkeypatch the retired frozenset for this test.
     from nodes._otr_upscale_engines import registry as reg
     orig = reg.RETIRED_UPSCALE_ENGINE_IDS
@@ -88,7 +101,7 @@ def test_retired_engine_raises_profile_error():
 def test_widget_mapping_upscale_registry_is_valid():
     """The `upscale_stage.engine` widget-mapping entry uses `registry:
     "upscale"` -- adding a new registry token requires updating
-    `_REGISTRY_NAMES` at capability_profiles.py:314. Validate the mapping
+    `_REGISTRY_NAMES` in capability_profiles.py. Validate the mapping
     parses cleanly under the extended validator."""
     m = load_widget_mapping()
     entry = m["managed"].get("upscale_stage.engine")

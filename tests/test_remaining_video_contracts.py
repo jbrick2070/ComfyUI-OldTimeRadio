@@ -13,43 +13,17 @@ from nodes._otr_shared import capability_profiles as cp
 REPO = Path(__file__).resolve().parents[1]
 
 
-def test_otr_8gb_wan_profile_pins_low_vram_contract():
-    profile = cp.load_profile("otr_8gb_wan")
-    assert profile["render"]["canvas_w"] == 832
-    assert profile["render"]["canvas_h"] == 480
-    # frame_budget is the SOAK per-clip frame count and is a different knob
-    # from the planner ceiling -- it stays 17, untouched.
-    assert profile["render"]["frame_budget"] == 17
-    assert profile["launch"]["env"] == {
-        "OTR_VIDEO_LANDSCAPE_CANVAS": "832x480",
-        "OTR_WAN_TI2V_MAX_FRAMES": "81",
-    }
-
-    # The graph is derived, not read: otr_8gb_wan left the shipping set on
-    # 2026-09-13, so workflows/variants/ no longer carries it. The launch
-    # env is asserted on the profile above, which is where the generated
-    # launch recipe reads it from; the hand-kept `.env.json` twin this once
-    # compared against was never tracked.
-    import sys
-    sys.path.insert(0, str(REPO / "scripts"))
-    import build_variants as bv
-    variant, _rel, _recipe = bv.build_variant("otr_8gb_wan")
-    render_batch = next(
-        node for node in variant["nodes"]
-        if node.get("type") == "OTR_VideoRenderBatch")
-    assert render_batch["widgets_values"][3] == 17    # frame_budget
-
-
 # ---------------------------------------------------------------------------
-# WAN 8GB low-VRAM LAUNCH CONTRACT (2026-07-24)
+# THE PROFILE-CARRIED RENDER CEILING (2026-07-24)
 #
-# The 2026-07-23 live failure (wan_8gb__lumina_image__media_archive): the engine
-# received a 177-frame request while the cost model afforded 30 at the observed
-# free VRAM, and died -- correctly, with no silent resize. The 17-frame ceiling
+# Born of the 2026-07-23 live failure (wan_8gb__lumina_image__media_archive): the
+# engine received a 177-frame request while the cost model afforded 30 at the
+# observed free VRAM, and died -- correctly, with no silent resize. The ceiling
 # existed only in the profile's `launch.env`, which a PRODUCTION episode leg can
-# never see: the leg is submitted to an already-booted server. These pins hold
-# the ceiling on its new channel, profile -> director widget -> ledger -> engine,
-# and hold every other tier UNPINNED so no qualified lane changes behaviour.
+# never see: the leg is submitted to an already-booted server. The tier that
+# needed it is retired; the channel it built -- profile -> director widget ->
+# ledger -> engine -- is what these pins hold, together with every shipped tier
+# staying UNPINNED so no qualified lane changes behaviour.
 # ---------------------------------------------------------------------------
 
 
@@ -62,21 +36,36 @@ def _node_of(graph, node_type):
     return next(n for n in graph["nodes"] if n.get("type") == node_type)
 
 
-def test_wan_8gb_profile_declares_the_render_ceiling():
-    profile = cp.load_profile("otr_8gb_wan")
-    # 81 since lane 5 (2026-08-11). The 17 became a planner-narrowing live
-    # bug the day wan_ti2v joined PLANNING_CAP_ENGINES.
-    assert profile["video"]["max_render_frames"] == 81
-    # The ceiling is NOT render.frame_budget: that is the soak/single harness
-    # per-clip count (every 16GB tier declares 25 and must not be capped to
-    # it), which is why the two numbers stopped agreeing and that is FINE.
-    assert profile["render"]["frame_budget"] == 17
-    assert "max_render_frames" not in cp.load_profile("16gb_full")["video"]
-    assert "max_render_frames" not in cp.load_profile("otr_16gb_ltx_video")["video"]
+#: The 8 GB video row: `ltx_8gb` is a PLANNING_CAP_ENGINES lane, so a ceiling on
+#: this row is the case the channel exists for. No matrix row pins one today,
+#: so a pinned document is this row with the key added.
+PINNED_BASE = "otr_8gb_video"
+PINNED_CEILING = 81
+
+
+def _pinned_variant(tmp_path, monkeypatch):
+    """Emit `PINNED_BASE` with a render ceiling, through the real generator."""
+    import copy
+    import sys
+    sys.path.insert(0, str(REPO / "scripts"))
+    import build_variants as bv
+
+    doc = copy.deepcopy(cp.load_profile(PINNED_BASE))
+    doc["id"] = "otr_8gb_ceiling_probe"
+    doc["video"]["max_render_frames"] = PINNED_CEILING
+    (tmp_path / "otr_8gb_ceiling_probe.json").write_text(
+        json.dumps(doc), encoding="utf-8")
+    monkeypatch.setattr(
+        bv, "load_profile",
+        lambda pid: cp.load_profile(pid, profile_dir=str(tmp_path)))
+    graph, _rel, _recipe = bv.build_variant("otr_8gb_ceiling_probe")
+    return graph
 
 
 def test_max_render_frames_is_optional_but_range_checked():
-    profile = cp.load_profile("otr_8gb_wan")
+    profile = cp.load_profile(PINNED_BASE)
+    profile["video"]["max_render_frames"] = PINNED_CEILING
+    assert cp.validate_profile_shape(profile, source="<pinned>")  # legal
     del profile["video"]["max_render_frames"]
     assert cp.validate_profile_shape(profile, source="<absent>")  # legal
     for bad in (999, -1, "17", True):
@@ -111,45 +100,31 @@ def test_canonical_director_ships_the_ceiling_unpinned():
     assert widgets[12] == 0
 
 
-def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned():
-    """81, not 17 (lane 5, 2026-08-11). The 17 was a real low-VRAM launch
-    contract when it was written, and it became a LIVE BUG on 2026-08-02
-    without anyone touching it: `wan_ti2v` joined
-    `frame_contract.PLANNING_CAP_ENGINES` and the adapter-side ping-pong
-    that made a render cap harmless was ripped the same day. From that
-    moment the pin narrowed the PLANNER, so every beat on this profile
-    became a chain of 0.68-second segments -- the exact "pile of
-    17-frame renders" the adapter's own comment warned about.
+def test_applied_8gb_variant_pins_its_ceiling_and_other_tiers_stay_unpinned(
+        tmp_path, monkeypatch):
+    """A ceiling a profile states lands in the director's LAST widget slot,
+    and the shipped tiers carry none.
 
-    81 = 4*20+1, on the shared ladder, and the value its sibling WAN and
-    FastWan profiles already carry. NOT re-measured on real 8 GB
-    hardware -- see the lane 5 receipt; if it does not fit there the
-    answer is a MEASURED ceiling, not a return to a number that breaks
-    the planner.
+    The value that motivated this (81, lane 5, 2026-08-11) sat on a retired
+    Wan tier; what stays true is the mechanism, so the pinned graph is the
+    8 GB video row emitted with a ceiling added. A shipped tier reading
+    anything but 0 here would narrow the planner on a lane nobody measured
+    that way.
     """
-    def _director_ceiling(stem):
-        path = REPO / "workflows" / "variants" / f"{stem}.json"
-        if path.is_file():
-            graph = json.loads(path.read_text(encoding="utf-8"))
-        else:
-            # otr_8gb_wan left the shipping set on 2026-09-13 (WAN is `no`
-            # on an 8 GB card in docs/dropdown_matrix.json), so its graph is
-            # derived here rather than read: build_variant is pure, and the
-            # profile id is the stem for every otr_* profile.
-            import sys
-            sys.path.insert(0, str(REPO / "scripts"))
-            import build_variants as bv
-            graph, _rel, _recipe = bv.build_variant(stem)
+    def _director_ceiling(graph):
         # max_render_frames is the LAST widget slot -- 12 since seed_mode/
         # request_seed left the list on 2026-09-13 (was 14 with them).
         return _node_of(graph, "OTR_VideoDirector")["widgets_values"][12]
 
-    assert _director_ceiling("otr_8gb_wan") == 81
+    assert _director_ceiling(_pinned_variant(tmp_path, monkeypatch)) \
+        == PINNED_CEILING
     # The 2026-09-13 curation renamed the shipping set; these are the tiers
     # that exist now and legitimately carry no planner ceiling.
     for stem in ("otr_16gb_low", "otr_16gb_video", "otr_8gb_low",
                  "otr_8gb_still"):
-        assert _director_ceiling(stem) == 0, stem
+        path = REPO / "workflows" / "variants" / f"{stem}.json"
+        graph = json.loads(path.read_text(encoding="utf-8"))
+        assert _director_ceiling(graph) == 0, stem
 
 
 def test_director_and_shot_lock_carry_the_ceiling_onto_the_ledger():
@@ -211,59 +186,6 @@ def test_prepare_captures_the_episode_ceiling():
         mc._GR.release(prepared["lease"])
 
 
-def test_wan_ti2v_renders_the_8gb_contract_instead_of_failing_closed(monkeypatch):
-    """The live 2026-07-23 leg, reproduced: a 177-frame beat at 832x480 with
-    only ~30 frames affordable. UNPINNED it raises (correct -- no silent
-    resize); with the tier ceiling on the ledger it renders 17 real frames,
-    which the render then ping-pong-extends to the beat's full length.
-
-    The row is QUALIFIED here (2026-08-13). This test's subject is the TIER
-    CEILING, and the ceiling is only interesting against a budget that would
-    otherwise refuse -- so the refusal has to be reachable for the contrast to
-    mean anything. In production no row is qualified and the unpinned call
-    returns 177 instead of raising; that is pinned in test_wan_ti2v.py, not
-    here, because it is a different claim.
-    """
-    from nodes._otr_video_engines import motion_common as mc
-    from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
-
-    monkeypatch.delenv("OTR_WAN_TI2V_MAX_FRAMES", raising=False)
-    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
-    monkeypatch.setattr(mc, "free_vram_mb", lambda: 10365.0)   # affords ~30
-    engine = WanTi2vEngine()
-
-    with pytest.raises(mc.MotionBudgetError):
-        engine._floor_length(177, 832, 480)
-
-    engine._active_profile = {"policy_version": 2, "max_render_frames": 17}
-    assert engine._floor_length(177, 832, 480) == 17
-    # The ceiling caps the RENDER, never the beat: a short beat is unaffected.
-    assert engine._floor_length(17, 832, 480) == 17
-
-
-def test_wan_ti2v_ceiling_precedence_and_no_change_when_unpinned(monkeypatch):
-    from nodes._otr_video_engines import motion_common as mc
-    from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
-
-    monkeypatch.setattr(mc, "free_vram_mb", lambda: 40000.0)   # affords 177+
-    engine = WanTi2vEngine()
-
-    # Unpinned tier (every shipped profile but the 8GB Wan one): unchanged.
-    monkeypatch.delenv("OTR_WAN_TI2V_MAX_FRAMES", raising=False)
-    engine._active_profile = {"policy_version": 2, "max_render_frames": 0}
-    assert engine._floor_length(177, 832, 480) == 177
-
-    # An explicit operator env pin outranks the profile-carried ceiling.
-    engine._active_profile = {"policy_version": 2, "max_render_frames": 17}
-    monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "49")
-    assert engine._floor_length(177, 832, 480) == 49
-
-    # A malformed pin/stamp falls back to the engine max -- never a crash.
-    monkeypatch.setenv("OTR_WAN_TI2V_MAX_FRAMES", "not-an-int")
-    engine._active_profile = {"max_render_frames": "nonsense"}
-    assert engine._floor_length(177, 832, 480) == 177
-
-
 def test_the_hand_kept_env_recipe_cannot_drift_from_its_profile():
     """`workflows/variants/*.env.json` is NOT generated by
     `scripts/build_variants.py` -- only four of them exist and they are kept by
@@ -281,7 +203,7 @@ def test_the_hand_kept_env_recipe_cannot_drift_from_its_profile():
         profile = cp.load_profile(stem)
         for key, value in (profile["launch"].get("env") or {}).items():
             assert recipe["env"].get(key) == value, (
-                "%s carries %s=%r while config/profiles/%s.json says %r -- two "
+                "%s carries %s=%r while matrix row %s says %r -- two "
                 "files describing one launch must not disagree"
                 % (env_path.name, key, recipe["env"].get(key), stem, value))
 

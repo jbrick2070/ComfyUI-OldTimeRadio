@@ -85,9 +85,9 @@ EXPECTED_CLEANUP_STATUS = {
 
 # The child program runs the real registered freeze node against a fresh,
 # valid ledger with the loader's acquisition entry points poisoned. It imports
-# the pack exactly the way the fresh canonical audio check does (package
-# loader in scripts/otr_canonical_audio_check.py), so the poisoned module is
-# THAT package's loader, never a stock ``nodes`` module on sys.path.
+# the pack the way ComfyUI does -- as a package from its ``__init__.py`` -- so
+# the poisoned module is THAT package's loader, never a stock ``nodes`` module
+# on sys.path.
 _FRESH_FREEZE_CHILD = r'''
 import hashlib
 import importlib
@@ -111,11 +111,14 @@ def require(condition, message):
         raise AssertionError(message)
 
 
+# ComfyUI's real folder_paths is used, not the suite's collection-time stub.
+sys.path.insert(0, str(root.parents[1]))
+package_name = root.name.replace("-", "_")
 spec = importlib.util.spec_from_file_location(
-    "otr_canonical_audio_check", root / "scripts" / "otr_canonical_audio_check.py")
-check = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(check)
-package = check.load_package()
+    package_name, root / "__init__.py", submodule_search_locations=[str(root)])
+package = importlib.util.module_from_spec(spec)
+sys.modules[package_name] = package
+spec.loader.exec_module(package)
 namespace = package.__name__ + ".nodes."
 pl = importlib.import_module(namespace + "production_ledger")
 loader = importlib.import_module(namespace + "_otr_model_loader")

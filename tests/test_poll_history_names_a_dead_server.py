@@ -21,8 +21,7 @@ author believed:
   * after a restart /history answers {} -- so does a normal render -- and the
     only discriminator is an empty /queue, checked and then re-checked against
     history once, because a render can complete between the two GETs;
-  * the strike count is printed by the runner or it exists nowhere;
-  * the bank gate maps the new failure to HARNESS, not DOWNSTREAM.
+  * the strike count is printed by the runner or it exists nowhere.
 
 No sockets: `requests.get` and `queue_snapshot` are replaced, `time.sleep` is
 a no-op.
@@ -244,17 +243,6 @@ class TheContractsAroundIt(_Base):
         self.assertIn("unreachable_strikes", src,
                       "a count nobody prints exists nowhere a person can read it")
         self.assertIn("unreachable_limit", src)
-
-    def test_the_bank_gate_calls_a_gone_server_harness_not_downstream(self):
-        import otr_writer_bank_gate as gate
-        log = ("[canonical-api] RESULT FAIL prompt_id=x\n"
-               f"{otr_api.SERVER_GONE_MARKER}: the ComfyUI server at http://h "
-               "stopped answering -- 12 consecutive refused connections\n")
-        self.assertEqual(gate.classify_failure(log), "HARNESS")
-        # and the spelling is pinned in both files
-        gate_src = (Path(__file__).resolve().parents[1] / "scripts"
-                    / "otr_writer_bank_gate.py").read_text(encoding="utf-8")
-        self.assertIn('"%s"' % otr_api.SERVER_GONE_MARKER, gate_src)
 
 
 if __name__ == "__main__":

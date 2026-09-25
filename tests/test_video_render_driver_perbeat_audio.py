@@ -174,13 +174,14 @@ class TestSliceMasterAudio:
 
 
 # --------------------------------------------------------------------------- #
-# 2026-06-22: ambient-audio (ltx_audio_in / viz_green) no-timing music-beat gap
+# 2026-06-22: ambient-audio (audio-in lanes / viz_green) no-timing music-beat gap
 # --------------------------------------------------------------------------- #
 class TestAmbientAudioMusicBeatGap:
     def test_uses_ambient_master_audio_scope(self, monkeypatch):
         monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-        # ltx_audio_in's family + the viz_green engine = ambient master lanes.
-        assert rd._uses_ambient_master_audio("ltx_audio_in", "audio_conditioned_video") is True
+        # The audio-in family + the viz_green engine = ambient master lanes.
+        assert rd._uses_ambient_master_audio(
+            "ltx25_native_audio_in_16gb", "audio_conditioned_video") is True
         assert rd._uses_ambient_master_audio("viz_green", "abstract") is True
         # HuMo / talk (audio_driven_face) is EXCLUDED -- it needs the OWN voice,
         # never a master-mix slice (would lip-sync to the wrong audio).
@@ -193,7 +194,7 @@ class TestAmbientAudioMusicBeatGap:
         assert rd._uses_ambient_master_audio(
             "cloud_kling_avatar", "audio_driven_face",
             role="character_video") is False
-        assert rd._uses_ambient_master_audio("ltx_video", "text_to_video") is False
+        assert rd._uses_ambient_master_audio("ltx25_video", "image_to_video") is False
 
     def test_cumulative_beat_start_sums_preceding(self):
         ledger = {"video": {"fps": 25, "shots": [
@@ -259,7 +260,7 @@ class TestAmbientAudioMusicBeatGap:
 
         with mock.patch.object(rd, "_slice_master_audio", side_effect=_fake_slice):
             req = rd.build_request_from_shot(shot, ledger, master_audio_path=str(master))
-        # audio_ref satisfied (would otherwise FamilyInputGap-crash ltx_audio_in):
+        # audio_ref satisfied (would otherwise FamilyInputGap-crash an audio-in lane):
         # build_request puts it at the top-level req["audio_ref"], and
         # _present_request_tokens then reports "audio_ref" -> the family gate passes.
         assert (req.get("audio_ref") or {}).get("path") == slice_path
@@ -312,18 +313,19 @@ class TestAmbientAudioMusicBeatGap:
 # nodes._otr_speaker_role.is_never_humo_role into real render_driver dispatch.
 # --------------------------------------------------------------------------- #
 class TestRadioIsHostGuard:
-    def test_music_and_announcer_humo_picks_redirect_to_ltx_audio_in(self):
+    def test_music_and_announcer_humo_picks_redirect_to_the_audio_in_lane(self):
         for role, engine_id in (("music_visual", "humo"),
                                 ("announcer_visual", "humo_1.7B")):
             shot = {"shot_id": "s", "beat_id": "b", "role": role,
                     "engine_id": engine_id, "family": "audio_driven_face"}
             rd._enforce_radio_is_host(shot)
-            assert shot["engine_id"] == "ltx_audio_in", (role, engine_id)
+            assert shot["engine_id"] == "ltx25_native_audio_in_16gb", (
+                role, engine_id)
             assert shot["family"] == "audio_conditioned_video", (role, engine_id)
 
     def test_cloud_audio_driven_face_bookend_is_untouched(self):
         # Kling Avatar is a Partner/cloud audio_driven_face engine. The old HuMo
-        # default guard must not silently rewrite it to local ltx_audio_in.
+        # default guard must not silently rewrite it to the local audio-in lane.
         shot = {"shot_id": "s", "beat_id": "b", "role": "announcer_visual",
                 "engine_id": "cloud_kling_avatar", "family": "audio_driven_face"}
         rd._enforce_radio_is_host(shot)
@@ -342,13 +344,13 @@ class TestRadioIsHostGuard:
     def test_mixed_video_section_reclaims_before_local_engine(self):
         section = {"shots": [
             {"engine_id": "cloud_seedance_2"},
-            {"engine_id": "ltx_audio_in"},
+            {"engine_id": "ltx25_native_audio_in_16gb"},
         ]}
         assert rd._section_has_local_video_engine(section) is True
         assert rd._should_reclaim_between_engines(
-            "cloud_seedance_2", "ltx_audio_in") is True
+            "cloud_seedance_2", "ltx25_native_audio_in_16gb") is True
         assert rd._should_reclaim_between_engines(
-            "ltx_audio_in", "cloud_seedance_2") is False
+            "ltx25_native_audio_in_16gb", "cloud_seedance_2") is False
 
     def test_character_video_humo_is_untouched(self):
         # character_video is the ONLY role HuMo may still serve (real dialogue
@@ -361,7 +363,7 @@ class TestRadioIsHostGuard:
 
     def test_non_humo_bookend_engine_is_untouched(self):
         # A non-audio_driven_face engine on a bookend role is already fine (the
-        # operator picked viz_green / ltx_audio_in themselves) -- no-op.
+        # operator picked viz_green / an audio-in lane themselves) -- no-op.
         shot = {"shot_id": "s", "beat_id": "b", "role": "music_visual",
                 "engine_id": "viz_green", "family": "abstract"}
         rd._enforce_radio_is_host(shot)
@@ -391,12 +393,13 @@ class TestRadioIsHostGuard:
     def test_build_request_from_shot_applies_guard_before_engine_keyed_logic(self):
         """End-to-end: build_request_from_shot (the REAL episode path) applies
         the redirect BEFORE any engine-keyed branch runs, so a HuMo-picked
-        bookend is already ltx_audio_in by the time init_image/canvas/audio are
-        resolved -- proving the guard is WIRED IN, not just defined. Since S4c
-        the redirected TALKING bookend then fails LOUD on the missing
-        radio-face still (this bare ledger mints none) -- which itself proves
-        the ordering: the engine-keyed face check only runs because the
-        redirect already stamped ltx_audio_in."""
+        bookend is already the audio-in lane by the time init_image/canvas/audio
+        are resolved -- proving the guard is WIRED IN, not just defined. The
+        redirected bookend then fails LOUD on the missing scene still (this
+        bare ledger mints none) -- which itself proves the ordering: HuMo's
+        audio_driven_face family is excluded from the scene-init requirement,
+        so that check only runs because the redirect already stamped the
+        audio-in lane."""
         import pytest
         ledger = {
             "video": {"fps": 25, "shots": [
@@ -408,9 +411,10 @@ class TestRadioIsHostGuard:
                 "engine_id": "humo", "family": "audio_driven_face",
                 "target_frame_count": 50, "source_line_ids": ["b000"],
                 "creative": {}}
-        with pytest.raises(rd.RenderError, match="radio-face"):
+        with pytest.raises(rd.DeferredImageGapError,
+                           match="ltx25_native_audio_in_16gb.*NO scene still"):
             rd.build_request_from_shot(shot, ledger)
-        assert shot["engine_id"] == "ltx_audio_in"
+        assert shot["engine_id"] == "ltx25_native_audio_in_16gb"
         assert shot["family"] == "audio_conditioned_video"
 
 

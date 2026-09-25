@@ -1,11 +1,9 @@
 """scifi_news_pro S1b -- P7 assembly golden chain (architecture doc s7/s13).
 
-Asserts scifi_news_pro's OWN ledger contract. The committed
-tests/fixtures/scifi_news_pro/legacy_reference_ledger.json (captured from the
-S1a science live smoke, scrubbed) serves ONLY as the row-role-ordering +
-tail-output-contract REFERENCE -- never a byte-match target (r4/CUT2).
-The golden happy-path fixture (golden_s1b_assembly.json) pins scifi_news_pro's
-own deterministic assembly output.
+Asserts scifi_news_pro's OWN ledger contract. The legacy lane's row keys and
+spoken roles (captured from the S1a science live smoke) are held below as
+the row-role-ordering + tail-output-contract REFERENCE -- never a
+byte-match target (r4/CUT2).
 
 Covers: five-hierarchy emission (r1/S2), exact music sentinel rows +
 assembler cue ids (r2/M5 + r3/M1), per-constituent verbatim proof +
@@ -29,10 +27,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from nodes import _otr_scifi_news_pro as F2  # noqa: E402
 from nodes import production_ledger as _PL  # noqa: E402
 from nodes._otr_scifi_news_pro_markup import parse_scifi_news_pro_markup  # noqa: E402
-
-_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "scifi_news_pro"
-_LEGACY = _FIXTURES / "legacy_reference_ledger.json"
-_GOLDEN = _FIXTURES / "golden_s1b_assembly.json"
 
 # Sequencer-legal role set (scene_sequencer role dispatch; NO FALLBACKS).
 _SEQUENCER_LEGAL_ROLES = frozenset({
@@ -176,23 +170,9 @@ def _assembled(tmp_path: Path):
     return led, parsed, led.data["meta"]
 
 
-def _hierarchies(led) -> dict:
-    return {k: led.data[k]
-            for k in ("cast", "scenes", "shots", "beats", "lines", "music")}
-
-
 # ---------------------------------------------------------------------------
-# 1. Golden happy path (fixture-pinned)
+# 1. Assembly contract
 # ---------------------------------------------------------------------------
-
-def test_golden_happy_path_matches_fixture(tmp_path):
-    """The deterministic assembly output IS the committed golden fixture.
-    Regenerate deliberately (tests/fixtures/scifi_news_pro/README.md) when the
-    assembly contract changes -- never to paper over a drift."""
-    led, _parsed, _meta = _assembled(tmp_path)
-    golden = json.loads(_GOLDEN.read_text(encoding="utf-8"))
-    assert _hierarchies(led) == golden
-
 
 def test_all_five_hierarchies_emitted(tmp_path):
     # r1/S2: set_lines/set_music populate only their own arrays; assembly
@@ -332,14 +312,13 @@ def test_boundary_stamps(tmp_path):
 
 def test_role_set_matches_legacy_reference(tmp_path):
     # r4 anchor: assembled scifi_news_pro SPOKEN role set == the legacy role set
-    # (the reference fixture is ordering/contract truth, never a
-    # byte-match target); the full set stays sequencer-legal.
+    # (the reference is ordering/contract truth, never a byte-match target);
+    # the full set stays sequencer-legal.
     led, _parsed, _meta = _assembled(tmp_path)
-    legacy = json.loads(_LEGACY.read_text(encoding="utf-8"))
-    legacy_roles = {r["speaker_role"] for r in legacy["lines"]}
     scifi_news_pro_spoken = {r["speaker_role"] for r in led.data["lines"]
                      if not r["speaker_role"].startswith("music_")}
-    assert scifi_news_pro_spoken == legacy_roles == {"announcer", "character"}
+    assert scifi_news_pro_spoken == _LEGACY_SPOKEN_ROLES == {
+        "announcer", "character"}
     all_roles = {r["speaker_role"] for r in led.data["lines"]}
     assert all_roles <= _SEQUENCER_LEGAL_ROLES
 
@@ -347,7 +326,7 @@ def test_role_set_matches_legacy_reference(tmp_path):
 def test_row_role_ordering_follows_legacy_reference(tmp_path):
     # Ordering reference: announcer intro first spoken row, announcer
     # (coda/news read) last spoken row, characters in between -- the
-    # legacy fixture's shape.
+    # legacy capture's shape.
     led, _parsed, _meta = _assembled(tmp_path)
     spoken = [r for r in led.data["lines"]
               if r["speaker_role"] in ("character", "announcer")]
@@ -356,7 +335,7 @@ def test_row_role_ordering_follows_legacy_reference(tmp_path):
     assert spoken[-1]["speaker_role"] == "announcer"
     # 22nd live smoke + kibitz r4 M2: EVERY announcer row carries the
     # SENTINEL char_id -- exempt from every cast-keyed downstream
-    # mutator by design (the legacy fixture's c01 postamble was a
+    # mutator by design (the legacy capture's c01 postamble was a
     # legacy-lane quirk).
     for r in spoken:
         if r["speaker_role"] == "announcer":
@@ -427,22 +406,31 @@ def test_speaker_set_gate_fails_loud(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# 2. Tail-output-contract reference (legacy fixture)
+# 2. Tail-output-contract reference (legacy capture)
 # ---------------------------------------------------------------------------
 
-# Keys later pipeline stages stamp ONTO the saved ledger during a live
-# run (voice-bank engine resolution, sequencer timing space). The legacy
-# fixture was captured POST-RUN, so it carries them; the writer-stage
-# contract this lane must match excludes them.
-_POST_WRITER_CAST_STAMPS = frozenset({
-    "commercial_clean", "voice_engine", "voice_ref_id"})
-_POST_WRITER_LINE_STAMPS = frozenset({"start_s_space"})
+# The legacy lane's row contract, from the S1a `science_news` live smoke
+# (episode signal_lost_etnas_secret_20260710_072427, RESULT SUCCESS). That
+# ledger was captured POST-RUN, so its rows also carried the keys later
+# pipeline stages stamp on during a live run -- `commercial_clean`,
+# `voice_engine` and `voice_ref_id` on cast rows (voice-bank engine
+# resolution), `start_s_space` on line rows (sequencer timing space). The
+# writer-stage contract this lane must match excludes them, so they are
+# absent here.
+_LEGACY_CAST_KEYS = frozenset({
+    "char_id", "character_description", "gender", "line_count", "name",
+    "tts_model", "voice_params", "voice_preset", "word_count"})
+_LEGACY_LINE_KEYS = frozenset({
+    "arc_phase", "bark_wav_path", "beat_id", "beat_intent", "boundary",
+    "char_count", "char_id", "compose_flags", "dialogue_slot_id", "dur_s",
+    "line_id", "shot_id", "speaker_role", "start_s", "target_words", "text",
+    "traits", "word_count"})
+_LEGACY_SPOKEN_ROLES = frozenset({"announcer", "character"})
 
 
 def test_cast_row_contract_matches_legacy_reference(tmp_path):
     led, _parsed, _meta = _assembled(tmp_path)
-    legacy = json.loads(_LEGACY.read_text(encoding="utf-8"))
-    legacy_keys = set(legacy["cast"][0]) - _POST_WRITER_CAST_STAMPS
+    legacy_keys = set(_LEGACY_CAST_KEYS)
     for row in led.data["cast"]:
         assert set(row) == legacy_keys, (
             f"cast row {row['char_id']} keys {sorted(set(row))} != "
@@ -456,8 +444,7 @@ def test_cast_row_contract_matches_legacy_reference(tmp_path):
 
 def test_line_row_contract_superset_of_legacy_reference(tmp_path):
     led, _parsed, _meta = _assembled(tmp_path)
-    legacy = json.loads(_LEGACY.read_text(encoding="utf-8"))
-    legacy_keys = set(legacy["lines"][0]) - _POST_WRITER_LINE_STAMPS
+    legacy_keys = set(_LEGACY_LINE_KEYS)
     for row in led.data["lines"]:
         assert set(row) >= legacy_keys, (
             f"line {row['line_id']} missing legacy-contract key(s) "

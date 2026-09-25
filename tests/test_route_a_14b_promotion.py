@@ -63,8 +63,8 @@ def test_engine_id_for_role_no_fallback():
 
 
 def test_engine_id_for_role_accepts_bare_string_values():
-    vm = {"character_video_model": "wan_ti2v"}
-    assert rs.engine_id_for_role(vm, "character_video") == "wan_ti2v"
+    vm = {"character_video_model": "ltx_8gb"}
+    assert rs.engine_id_for_role(vm, "character_video") == "ltx_8gb"
 
 
 def test_video_slot_roles_has_three_per_role_slots():
@@ -153,8 +153,8 @@ def test_the_frame_cap_follows_the_MODEL_not_the_orientation():
 # --------------------------------------------------------------------------- #
 def _direct_policy():
     pol_json, = vd.OTRVideoDirector().direct(
-        announcer_video_model="ltx_audio_in (16:9)",
-        music_video_model="ltx_audio_in (16:9)",
+        announcer_video_model="ltx25_native_audio_in_16gb (16:9)",
+        music_video_model="ltx25_native_audio_in_16gb (16:9)",
         announcer_image_model="flux_gen1",
         music_image_model="flux_gen1",
         character_image_model="flux_gen1",

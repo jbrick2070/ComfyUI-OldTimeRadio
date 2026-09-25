@@ -112,15 +112,14 @@ def test_the_operators_own_example_is_the_shipped_arithmetic():
 def test_a_heavy_local_lane_renders_its_own_minimum_rather_than_holding():
     """The same sentence on the lane it actually costs GPU time: HuMo's floor
     is 33 frames (1.3 s at 25 fps), and a 1 s beat pays for all 33."""
-    # Each lane pays ITS OWN floor -- humo 33, wan_ti2v 17. Hardcoding one
-    # number was only ever right because the two lanes this once listed
-    # (humo + the retired 14B wan_i2v) happened to share 33; asserting the
-    # engine's declared minimum is what the test name actually claims.
-    # Only a lane whose floor EXCEEDS the beat can demonstrate "pays for all
-    # 33" -- wan_ti2v's floor is 17, under this 25-frame beat, so it renders 25
-    # and proves nothing here. It was only ever valid alongside humo because
-    # the retired 14B wan_i2v also floored at 33.
-    billed = [(n, int(_contract(n).min_frames)) for n in ("humo", "wan_ti2v")]
+    # Each lane pays ITS OWN floor. Hardcoding one number is only right while
+    # the listed lanes happen to share it; asserting the engine's declared
+    # minimum is what the test name actually claims. Only a lane whose floor
+    # EXCEEDS the beat can demonstrate "pays for all of it" -- a lane flooring
+    # under this 25-frame beat renders 25 and proves nothing, which is what
+    # the filter below keeps honest.
+    billed = [(n, int(_contract(n).min_frames))
+              for n in ("humo", "humo_14B_169")]
     over = [(n, f) for n, f in billed if f > SHORT_BEAT]
     assert over, (
         "no lane in the roster floors above a %d-frame beat -- this gate has "
@@ -156,5 +155,5 @@ def test_the_roster_is_not_empty_and_this_gate_is_not_vacuous():
         "trim gate above is close to vacuous" % len(with_minimum))
     # Named anchors the trim gate exists for -- these must always carry a
     # minimum or a discrete menu:
-    for anchor in ("humo", "ltx_video", "wan_ti2v", "razzle_ltx_8gb"):
+    for anchor in ("humo", "ltx25_video", "ltx_8gb", "razzle_ltx_8gb"):
         assert anchor in with_minimum, anchor

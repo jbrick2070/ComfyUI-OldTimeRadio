@@ -20,8 +20,6 @@ CPU-safe: no CUDA, no server, no weights, no render.
 from __future__ import annotations
 
 import inspect
-import json
-import os
 
 import pytest
 
@@ -34,10 +32,6 @@ from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_video_engines import wrapper_bridge as wb
 
-
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROFILE_PATH = os.path.join(
-    REPO_ROOT, "config", "profiles", "otr_h3_low_audio_in.json")
 
 LANE = "minimax_h3_audio_in"
 SIBLING = "minimax_h3_video"
@@ -212,10 +206,19 @@ def test_a_character_beat_on_this_lane_is_a_character_FACE():
     assert rd._is_character_face_beat(shot) is True
 
 
-def test_the_incumbent_audio_in_lane_still_answers_the_same():
-    """A membership test must not change the lane it replaced."""
+#: The other audio-in lanes that share the character-face membership.
+SIBLING_AUDIO_IN_LANES = (
+    "cloud_ltx25_audio_in",
+    "ltx25_native_audio_in_16gb",
+    "ltx25_native_audio_in_24gb",
+)
+
+
+@pytest.mark.parametrize("sibling_lane", SIBLING_AUDIO_IN_LANES)
+def test_the_sibling_audio_in_lanes_still_answer_the_same(sibling_lane):
+    """A membership test must not change the lanes it sits beside."""
     assert rd._is_character_face_beat(
-        {"engine_id": "ltx_audio_in", "role": "character_video"}) is True
+        {"engine_id": sibling_lane, "role": "character_video"}) is True
 
 
 def test_without_the_membership_extension_the_beat_would_FAIL_AT_PLAN_TIME():
@@ -243,8 +246,8 @@ def test_the_family_is_an_EXISTING_motion_family_not_a_new_one(engine):
     MOTION_FAMILIES and make its frozen clips motion-EXEMPT."""
 
     assert engine.family == "audio_conditioned_video"
-    # The four families whose clips must show temporal motion -- the set the
-    # w45 campaign's held-frame invariant checks (scripts/otr_w45_campaign.py).
+    # The four families whose clips must show temporal motion -- the set a
+    # held-frame invariant check holds to.
     assert engine.family in {"audio_driven_face", "audio_conditioned_video",
                              "image_to_video", "text_to_video"}
 
@@ -253,44 +256,45 @@ def test_the_scene_still_never_OVERWRITES_the_reference_this_lane_lip_syncs():
     """THE DEFECT THE FIRST DRAFT OF THIS TEST MISSED, and how it missed it.
 
     `_engine_scene_init_required` overwrites `init_image` with the beat's wide
-    scene still for any non-face engine that declares `init_image`.
-    `ltx_audio_in` is excluded from it by name; this lane was not. On a lane
-    whose `init_image` IS the reference the model lip-syncs -- presented to the
-    tokenizer as `<Picture 1>` -- that does not fail, it renders the wrong
-    identity silently on every beat.
+    scene still for any non-face engine that declares `init_image`. The first
+    draft of this lane was not excluded from it. On a lane whose `init_image`
+    IS the reference the model lip-syncs -- presented to the tokenizer as
+    `<Picture 1>` -- that does not fail, it renders the wrong identity
+    silently on every beat.
 
     The first draft asserted this with `inspect.getsource` string surgery and
-    passed while the behaviour was wrong. It is now a BEHAVIOURAL check: both
-    audio-in lanes must be excluded, and a lane that legitimately wants the
-    scene still must still get it.
+    passed while the behaviour was wrong. It is now a BEHAVIOURAL check: this
+    lane must be excluded, and a lane that legitimately wants the scene still
+    must still get it.
     """
     def scene_init_required(engine_id, family):
         """The branch's own condition, evaluated the way the driver does."""
         return (
             "init_image" in rd._required_inputs_for_engine(engine_id, family)
             and family != "audio_driven_face"  # (character_3d token retired 2026-08-23)
-            and engine_id not in ("ltx_audio_in", "minimax_h3_audio_in"))
+            and engine_id != "minimax_h3_audio_in")
 
-    # Neither audio-in lane may have its reference overwritten ...
+    # This lane may not have its reference overwritten ...
     assert scene_init_required(LANE, "audio_conditioned_video") is False
-    assert scene_init_required("ltx_audio_in", "audio_conditioned_video") is False
-    # ... and the exclusion must be exactly those two, read off the SOURCE of
+    # ... and the exclusion must be exactly this one, read off the SOURCE of
     # the real branch so this cannot drift from the driver silently.
     src = inspect.getsource(rd.build_request_from_shot)
-    assert '_eng_id not in ("ltx_audio_in", "minimax_h3_audio_in")' in src
+    assert 'and _eng_id != "minimax_h3_audio_in"' in src
 
 
-def test_this_lane_DOES_take_the_scene_still_SPINE_like_its_incumbent(engine):
+def test_this_lane_DOES_take_the_scene_still_SPINE_like_its_siblings(engine):
     """Stated correctly, because the first draft stated it backwards.
 
     The SPINE decides which stills get MINTED, and this lane takes it exactly
-    like `ltx_audio_in` -- a per-beat scene still is useful to have. What must
-    not happen is that still replacing the portrait, which is the assertion
-    above. Kept as a pair so the two questions cannot be confused again.
+    like the other audio-in lanes -- a per-beat scene still is useful to have.
+    What must not happen is that still replacing the portrait, which is the
+    assertion above. Kept as a pair so the two questions cannot be confused
+    again.
     """
-    assert rd._still_spine_requires_scene(
-        {"engine_id": "ltx_audio_in"}, "ltx_audio_in",
-        "audio_conditioned_video") is True
+    for sibling_lane in SIBLING_AUDIO_IN_LANES:
+        assert rd._still_spine_requires_scene(
+            {"engine_id": sibling_lane}, sibling_lane,
+            "audio_conditioned_video") is True, sibling_lane
     assert rd._still_spine_requires_scene(
         {"engine_id": LANE}, LANE, "audio_conditioned_video") is True
 
@@ -343,16 +347,6 @@ def test_the_two_public_ids_map_to_two_SEPARATE_internal_engines():
     assert pub.resolve_engine_id("h3_low_audio_in") == LANE
     assert pub.resolve_engine_id("h3_low_video") == SIBLING
     assert len(pub._PUBLIC_ENGINES) == len(pub._INTERNAL_TO_PUBLIC)
-
-
-def test_the_profile_carries_seed_43_and_the_h3_boot():
-    with open(PROFILE_PATH, "r", encoding="utf-8") as fh:
-        prof = json.load(fh)
-    assert prof["seed_policy"]["request_seed"] == 43
-    assert prof["launch"]["boot_contract"] == "h3"
-    assert prof["launch"]["sage_attention"] is False
-    assert (prof["render"]["canvas_w"], prof["render"]["canvas_h"]) == (864, 480)
-    assert prof["slot_overrides"]["video_render_engine"] == "h3_low_audio_in"
 
 
 def test_the_seed_comes_from_the_REQUEST_and_is_never_pinned_in_the_adapter(

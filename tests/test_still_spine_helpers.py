@@ -361,7 +361,7 @@ class TestSceneStillObjects:
         assert close["role"] == "music_visual"
 
     def test_a_close_cue_under_ANOTHER_id_still_earns_the_reservation(self):
-        """THE LIVE BUG, inverted (2026-08-12, `fastwan_8gb`).
+        """THE LIVE BUG, inverted (2026-08-12).
 
         This test used to assert the OPPOSITE -- that an existing `music_close`
         line under any id suppressed the `music_closing_001` reservation -- and
@@ -746,17 +746,15 @@ class TestDispatcherStillSpine:
 
         # static_motion + image_to_video -> scene still
         #
-        # The image_to_video leg named the 14B `wan_i2v` until it RETIRED
-        # 2026-08-26; it is the live 5B `wan_ti2v` now. The engine id is
-        # LOAD-BEARING here even though the shot dict also carries a "family"
-        # key: `build_request_from_shot` derives the family from the ENGINE
-        # (`engine_family`, which reads ENGINE_FAMILY then the live registry),
-        # so a retired id resolves to the "abstract" default, misses
-        # _SCENE_INIT_FAMILIES entirely, and quietly returns the portrait init
-        # instead. `wan_ti2v` declares family="image_to_video" and does not
+        # The engine id is LOAD-BEARING here even though the shot dict also
+        # carries a "family" key: `build_request_from_shot` derives the family
+        # from the ENGINE (`engine_family`, which reads ENGINE_FAMILY then the
+        # live registry), so a retired id resolves to the "abstract" default,
+        # misses _SCENE_INIT_FAMILIES entirely, and quietly returns the portrait
+        # init instead. `ltx_8gb` declares family="image_to_video" and does not
         # require mesh fodder, so this leg proves exactly what it always did.
         for eng, fam in (("still_motion", "static_motion"),
-                         ("wan_ti2v", "image_to_video")):
+                         ("ltx_8gb", "image_to_video")):
             req = rd.build_request_from_shot(shot(eng, fam), ledger)
             assert req["observability"]["init_source"] == "scene_still", eng
             assert req["observability"]["init_image"] == still.name
@@ -766,13 +764,12 @@ class TestDispatcherStillSpine:
             shot("humo", "audio_driven_face"), ledger)
         assert req["observability"]["init_source"] == "portrait"
         assert req["asset_refs"]["init_image"] == str(portrait)
-        # ltx_video takes the scene still, ALWAYS. The portrait-fallback half
-        # of this assertion is gone with OTR_ENABLE_LTX_I2V (retired
-        # 2026-08-28): the lane declares family = "image_to_video", so it
-        # routes through the SHARED _SCENE_INIT_FAMILIES path like every
-        # sibling and there is no switch that could send it to a portrait.
+        # The LTX 2.5 lane takes the scene still, ALWAYS: it declares family =
+        # "image_to_video", so it routes through the SHARED
+        # _SCENE_INIT_FAMILIES path like every sibling and there is no switch
+        # that could send it to a portrait.
         req = rd.build_request_from_shot(
-            shot("ltx_video", "image_to_video"), ledger)
+            shot("ltx25_video", "image_to_video"), ledger)
         assert req["observability"]["init_source"] == "scene_still"
 
         # NO-FALLBACK (2026-07-03): a scene-init family with a MISSING scene still
@@ -794,7 +791,7 @@ class TestDispatcherStillSpine:
             {"object_id": "c01", "kind": "portrait", "char_id": "c01",
              "path": str(portrait)}]}
         with pytest.raises(rd.DeferredImageGapError, match="NO scene still") as caught:
-            rd.build_request_from_shot(shot("wan_ti2v", "image_to_video"), ledger2)
+            rd.build_request_from_shot(shot("ltx_8gb", "image_to_video"), ledger2)
         assert isinstance(caught.value, rd.RenderError)
 
     def test_mesh_fodder_routing_skips_scene_still(self, tmp_path):
@@ -868,22 +865,17 @@ class TestDispatcherStillSpine:
         assert eng.uses_still is True
         assert eng._still_path(req) == str(still)
 
-    def test_st5_wan_ti2v_reads_driver_built_request(self, tmp_path):
-        """ST-5/W6 pin: the same driver-built request feeds the Wan adapter's
-        `_init_image_ref` -- init = the beat's scene still.
+    def test_st5_ltx_8gb_reads_driver_built_request(self, tmp_path):
+        """ST-5/W6 pin: the same driver-built request feeds the shared
+        `wan_shared.WanInitImageMixin._init_image_ref` -- init = the beat's
+        scene still.
 
-        This pinned the 14B `wan_i2v` until that engine RETIRED 2026-08-26.
-        It is the 5B `wan_ti2v` now, and NOTHING about the seam changed:
-        `_init_image_ref` is not the 14B's method at all, it lives on
-        `wan_shared.WanInitImageMixin` and both adapters inherit the identical
-        implementation, so the surviving lane holds this property literally
-        rather than by analogy (verified against the live registry, not
-        assumed). The old docstring's `OTR_ENABLE_WAN_I2V` opt-in went with the
-        14B: this adapter declares `requires_flag = None` -- the registry IS
-        the menu -- so no flag claim is made here any more.
+        `_init_image_ref` lives on the mixin, not on any one adapter, and
+        `ltx_8gb` inherits the identical implementation, so this lane holds
+        the property literally rather than by analogy.
         """
         from nodes._otr_video_engines import render_driver as rd
-        from nodes._otr_video_engines.eng_wan_ti2v import WanTi2vEngine
+        from nodes._otr_video_engines.eng_ltx_8gb import Ltx8gbEngine
         still = tmp_path / "still_b002_xyz.png"
         still.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
         ledger = {
@@ -893,35 +885,34 @@ class TestDispatcherStillSpine:
                 {"object_id": "still_b002", "kind": "scene_beat",
                  "beat_id": "b002", "path": str(still)}]},
         }
-        shot = {"shot_id": "shot_b002", "engine_id": "wan_ti2v",
+        shot = {"shot_id": "shot_b002", "engine_id": "ltx_8gb",
                 "family": "image_to_video", "target_frame_count": 25,
                 "source_line_ids": ["b002"], "char_id": "", "creative": {}}
         req = rd.build_request_from_shot(shot, ledger)
-        eng = WanTi2vEngine() if isinstance(WanTi2vEngine, type) else WanTi2vEngine
+        eng = Ltx8gbEngine()
         assert eng._init_image_ref(req) == str(still)
         assert req["observability"]["init_source"] == "scene_still"
 
     def test_st4_manifest_rows_gain_init_source(self):
         from nodes._otr_video_engines import render_driver as rd
-        # The engine id is a pure LABEL the manifest builder copies through --
-        # it read "wan_i2v" until that engine retired 2026-08-26, and moved to
-        # the live 5B so no dead name survives in the fixture.
+        # The engine id is a pure LABEL the manifest builder copies through;
+        # it names a live lane so no dead name survives in the fixture.
         result = {
             "ledger": {
                 "video": {"video_revision": 1, "fps": 25,
                           "canonical_canvas": {"w": 1472, "h": 832},
                           "shots": [{"shot_id": "shot_b001",
                                      "source_line_ids": ["b001"],
-                                     "engine_id": "wan_ti2v",
+                                     "engine_id": "ltx_8gb",
                                      "target_frame_count": 25,
                                      "char_id": "c01", "start_s": 0.0}]},
                 "lines": [{"line_id": "b001", "start_s": 0.0}],
                 "images": {"images": []},
             },
-            "clips": {"shot_b001": {"path": "", "engine_id": "wan_ti2v",
+            "clips": {"shot_b001": {"path": "", "engine_id": "ltx_8gb",
                                     "frame_count": 0}},
             "trace": [{"shot_id": "shot_b001", "attempts": 1,
-                       "final_engine": "wan_ti2v",
+                       "final_engine": "ltx_8gb",
                        "init_source": "scene_still",
                        "init_image": "still_b001_abc.png"}],
         }

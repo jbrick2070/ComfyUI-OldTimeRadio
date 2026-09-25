@@ -30,7 +30,7 @@ def test_humo_row_names_the_14b_lane_and_keeps_1_7b_manual():
     row = next(line for line in rendered.splitlines()
                if line.startswith("| `humo` |"))
     assert "14B: `otr_fetch_lane_weights.py humo`" in row
-    assert "1.7B: [exact manual tier](RUNPOD_INSTALL.md)" in row
+    assert "1.7B: [exact manual download](RUNPOD_INSTALL.md)" in row
 
 
 def test_bundle_and_unresolved_names_never_become_fake_commands():
@@ -59,10 +59,13 @@ def test_profile_usage_counts_resolve_public_video_ids_to_internal_owners():
     index = _load("scripts/otr_asset_index.py", "_otr_asset_index_alias_test")
     profiles = index.collect_profiles()
 
-    assert "otr_runpod_starter" in profiles["wan_ti2v"]
-    # 9 since 2026-09-13: a 12 GB WAN row was built and cut the same night.
-    assert len(profiles["wan_ti2v"]) == 9
-    assert "wan22_high_video" not in profiles
+    # otr_16gb_video saves the public id `ltx25_high_video`.
+    assert profiles["ltx25_video"] == ["otr_16gb_video"]
+    assert "ltx25_high_video" not in profiles
+    # otr_8gb_video names the internal id; otr_mac16_video saves the public
+    # `ltx098_low_video`. Both are counted against the one owner.
+    assert profiles["ltx_8gb"] == ["otr_8gb_video", "otr_mac16_video"]
+    assert "ltx098_low_video" not in profiles
 
 
 def test_committed_asset_index_has_no_generator_drift():

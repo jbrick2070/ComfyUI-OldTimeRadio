@@ -13,17 +13,14 @@ Pins:
      silent `or ...["announcer"]` fallback is RETIRED (a stub style with a
      missing console key raises KeyError, never remaps); the
      OTR_LTX_OPEN_MOTION_KEY retarget works off the STATIC key set.
-   2. NO-LEAK (r3): the probe-locked _IA2V_TALKING_PROMPT_ANNOUNCER is a
-      VERBATIM Python constant -- pack motion registers never reach an
-      explicitly audio-driven radio bookend, even from a hostile pack.
-  3. LOOK SPLITS: object anchors / plate scaffold compose geometry + pack
+  2. LOOK SPLITS: object anchors / plate scaffold compose geometry + pack
      look byte-identically; the emblem template formats {base} at the real
      fallback; music_visual keeps radio_form_from_meta.
-  4. PROVENANCE: visual_style + prompt_field_source stamped ADDITIVELY on
+  3. PROVENANCE: visual_style + prompt_field_source stamped ADDITIVELY on
      the 4 scene-family image objects + the motion-lane request
      observability; prompt text + sha stamps unchanged; the trace-copy
      allowlist carries the new keys.
-  5. AST guards: zero production Loads of the retired motion fixture; the
+  4. AST guards: zero production Loads of the retired motion fixture; the
      A2 look fixtures read only in their designated lanes.
 """
 from __future__ import annotations
@@ -64,26 +61,28 @@ def _fresh_registry():
 
 
 @pytest.fixture()
-def _single_pass_recipe(monkeypatch):
-    # single-pass ltx recipe: no talking register, no radio-face requirement
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+def _bookend_env(monkeypatch):
     monkeypatch.delenv("OTR_LTX_OPEN_MOTION_KEY", raising=False)
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
 
 
 def _led(meta):
+    # The audio-in lane conditions on the beat's minted scene still and
+    # refuses to render without one, so both beat ids the shots below resolve
+    # to (the synthetic music open and the shared b000 line) carry one.
     return {"meta": meta,
             "video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b000", "char_id": "",
                        "start_s": 0.0, "dur_s": 2.0}],
-            "images": {"images": []}}
+            "images": {"images": [
+                {"object_id": "still_%s" % bid, "beat_id": bid,
+                 "kind": "scene_open", "path": "X:/img/still_%s.png" % bid}
+                for bid in ("b000", "b000_music_open")]}}
 
 
 def _shot(sid="shot_b000_music_open", role="music_visual", sids=None):
-    return {"shot_id": sid, "beat_id": "b000", "engine_id": "ltx_audio_in",
+    return {"shot_id": sid, "beat_id": "b000",
+            "engine_id": "ltx25_native_audio_in_16gb",
             "role": role, "family": "audio_conditioned_video",
             "target_frame_count": 25, "source_line_ids": list(sids or []),
             "char_id": "", "creative": {}}
@@ -110,7 +109,7 @@ class TestMotionRegisters:
         ("shot_b005_close", "music_visual", ["b000"], "music_close"),
         ("shot_b006", "music_visual", ["b000"], "music_inter"),
     ])
-    def test_sci_fi_byte_identical(self, _single_pass_recipe, sid, role,
+    def test_sci_fi_byte_identical(self, _bookend_env, sid, role,
                                    sids, key):
         req = rd.build_request_from_shot(_shot(sid, role, sids),
                                          _led(dict(_META_BRIEF)))
@@ -119,7 +118,7 @@ class TestMotionRegisters:
                 == "motion_registers:%s" % key)
         assert req["observability"]["visual_style"] == "sci_fi_radio"
 
-    def test_pack_value_is_what_renders(self, _single_pass_recipe,
+    def test_pack_value_is_what_renders(self, _bookend_env,
                                         tmp_path, monkeypatch):
         # a leaktest pack with a DIFFERENT music_open register changes the
         # rendered prompt -- proof the pack VALUE (not the fixture) renders.
@@ -145,7 +144,7 @@ class TestMotionRegisters:
         assert "Paper radio unfolds." in req["text_prompt"]
         assert req["observability"]["visual_style"] == "leaktest"
 
-    def test_missing_console_key_raises_never_remaps(self, _single_pass_recipe,
+    def test_missing_console_key_raises_never_remaps(self, _bookend_env,
                                                      monkeypatch):
         # r2 codex S3: the silent `or ...["announcer"]` fallback is retired.
         class _Stub:
@@ -155,7 +154,7 @@ class TestMotionRegisters:
         with pytest.raises(KeyError):
             rd.build_request_from_shot(_shot(), _led(dict(_META_BRIEF)))
 
-    def test_env_retarget_uses_static_key_set(self, _single_pass_recipe,
+    def test_env_retarget_uses_static_key_set(self, _bookend_env,
                                               monkeypatch):
         monkeypatch.setenv("OTR_LTX_OPEN_MOTION_KEY", "music_inter")
         req = rd.build_request_from_shot(_shot(), _led(dict(_META_BRIEF)))
@@ -164,65 +163,14 @@ class TestMotionRegisters:
         req2 = rd.build_request_from_shot(_shot(), _led(dict(_META_BRIEF)))
         assert req2["text_prompt"] == _expected_motion("music_inter")
 
-    def test_unknown_style_fails_the_shot_loud(self, _single_pass_recipe):
+    def test_unknown_style_fails_the_shot_loud(self, _bookend_env):
         with pytest.raises(vs.UnknownVisualStyleError):
             rd.build_request_from_shot(
                 _shot(), _led({"visual_style": "no_such_style"}))
 
 
 # ---------------------------------------------------------------------------
-# 2. NO-LEAK: the probe-locked talking prompt outranks every pack
-# ---------------------------------------------------------------------------
-class TestTalkingNoLeak:
-    def test_pack_radio_motion_never_leaks_into_talking(
-            self, _single_pass_recipe, tmp_path, monkeypatch):
-        raw = json.loads((_STYLES_DIR / "sci_fi_radio.json")
-                         .read_text(encoding="utf-8"))
-        scratch = tmp_path / "visual_styles"
-        scratch.mkdir()
-        hostile = dict(raw)
-        hostile["motion_registers"] = dict(raw["motion_registers"])
-        hostile["motion_registers"]["announcer"] = (
-            "HOSTILE PACK MOTION that must never reach the lip-sync lane.")
-        (scratch / "sci_fi_radio.json").write_text(json.dumps(hostile),
-                                                   encoding="utf-8")
-        monkeypatch.setattr(vs, "_VISUAL_STYLES_ROOT", scratch)
-        vs._clear_caches()
-        # force the talking register active (engine-owned probe stubbed)
-        monkeypatch.setattr(rd, "_ia2v_talking_register_active",
-                            lambda eng: True)
-        shot = _shot(sid="shot_b004", role="announcer_visual", sids=["b000"])
-        led = _led(dict(_META_BRIEF))
-        # the talking lane REQUIRES the wide radio-face still in the ledger
-        face = tmp_path / "radio_face.png"
-        face.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
-        led["images"]["images"].append(
-            {"object_id": "still_announcer_visual_radio_face_169",
-             "kind": "portrait", "path": str(face)})
-        req = rd.build_request_from_shot(shot, led)
-        assert req["text_prompt"] == rd._IA2V_TALKING_PROMPT_ANNOUNCER
-        assert "HOSTILE" not in req["text_prompt"]
-        assert (req["observability"]["prompt_field_source"]
-                == "python:ia2v_talking")
-        # Explicitly audio-driven music uses the same radio-with-lips contract;
-        # its hostile pack motion must not leak either.
-        led2 = _led(dict(_META_BRIEF))
-        led2["images"]["images"].append(
-            {"object_id": "still_music_visual_radio_face_169",
-             "kind": "portrait", "path": str(face)})
-        req2 = rd.build_request_from_shot(_shot(), led2)
-        assert req2["text_prompt"] == rd._IA2V_TALKING_PROMPT_ANNOUNCER
-        assert "HOSTILE" not in req2["text_prompt"]
-
-    def test_talking_constants_stay_python(self):
-        # P8: verbatim constants; packs have no field for them.
-        assert not hasattr(vs.resolve_visual_style("sci_fi_radio"),
-                           "ia2v_talking_prompt")
-        assert "talking to the viewer" in rd._IA2V_TALKING_PROMPT_ANNOUNCER
-
-
-# ---------------------------------------------------------------------------
-# 3. Look splits + emblem (byte-identity)
+# 2. Look splits + emblem (byte-identity)
 # ---------------------------------------------------------------------------
 class TestLookSplits:
     def test_object_anchor_fixtures_compose(self):
@@ -299,7 +247,7 @@ class TestLookSplits:
 
 
 # ---------------------------------------------------------------------------
-# 4. Provenance on the derived image objects
+# 3. Provenance on the derived image objects
 # ---------------------------------------------------------------------------
 class TestImageObjectProvenance:
     def _payload(self, **kw):
@@ -357,7 +305,7 @@ class TestImageObjectProvenance:
 
 
 # ---------------------------------------------------------------------------
-# 5. AST guards + trace allowlist
+# 4. AST guards + trace allowlist
 # ---------------------------------------------------------------------------
 _RD = _NODES / "_otr_video_engines" / "render_driver.py"
 _IMGP = _NODES / "otr_meta_brief_image_prompt.py"

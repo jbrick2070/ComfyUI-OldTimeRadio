@@ -7,8 +7,9 @@ THE DEFECT THIS GUARDS (2026-07-27). ``OTR_VideoDirector`` gained an optional
 ``inputs`` array, which stopped at ``dtype_policy``. The value sat there
 unbound.
 
-Why that mattered rather than being cosmetic: the WAN 8GB launch contract
-routes its render-length ceiling profile -> director widget -> ledger
+Why that mattered rather than being cosmetic: a profile's render-length
+ceiling (first carried by the since-retired WAN 8GB tier) routes
+profile -> director widget -> ledger
 ``video.max_render_frames`` -> ``build_episode_render_policy`` -> ``prepare`` ->
 ``motion_common.profile_max_render_frames()``. With no input descriptor the
 first hop is dead, so the entire profile-carried ceiling channel was
@@ -84,7 +85,7 @@ def test_node_87_carries_max_render_frames_specifically():
 
     The parametrized test above would also pass if someone 'fixed' the count by
     DELETING the trailing widget value instead of adding the descriptor. That
-    would silently remove the 8GB tier's ceiling control, so the name is pinned
+    would silently remove every tier's ceiling control, so the name is pinned
     here separately from the count.
     """
     node = next(n for n in _canonical()["nodes"] if n.get("id") == 87)
@@ -92,7 +93,7 @@ def test_node_87_carries_max_render_frames_specifically():
     names = [i.get("name") for i in _widget_inputs(node)]
     assert "max_render_frames" in names, (
         "node 87 lost its max_render_frames input descriptor -- the "
-        "profile-carried render-length ceiling (the WAN 8GB launch contract) "
+        "profile-carried render-length ceiling "
         "has no path from the director widget to the ledger. Descriptors: %r"
         % (names,))
     assert names[-1] == "max_render_frames", (
@@ -136,12 +137,11 @@ def test_the_descriptor_matches_what_the_node_class_declares():
 # panel asked whether the variants carried the same node -- they did, all
 # eleven of them, including the two 8GB tiers this ceiling exists FOR.
 #
-# The worst instance was ``variants/otr_8gb_wan.json``: its orphan trailing
-# widget value was not the harmless 0 default but a REAL **17**, matching
-# ``config/profiles/otr_8gb_wan.json`` -- the only shipped profile that pins
-# ``max_render_frames`` at all. So the WAN 8GB launch contract's ceiling had
-# been deliberately configured and silently ignored, because the value had no
-# descriptor to arrive through. That is the precise failure
+# The worst instance was the 8GB WAN graph (a tier since retired): its orphan
+# trailing widget value was not the harmless 0 default but a REAL **17** -- the
+# only shipped profile that pinned ``max_render_frames`` at all. So that tier's
+# ceiling had been deliberately configured and silently ignored, because the
+# value had no descriptor to arrive through. That is the precise failure
 # ``test_floor_max_override_is_an_absolute_hard_cap`` was written after: an 8GB
 # leg inheriting the 177-frame engine max and dying in the cost model.
 #
@@ -215,37 +215,40 @@ def test_every_variant_director_carries_max_render_frames(wf_path):
             % (wf_path.name, names))
 
 
-def test_the_wan_8gb_variant_still_carries_a_REAL_frame_ceiling():
+def test_a_pinned_frame_ceiling_reaches_the_variant_by_name(tmp_path,
+                                                            monkeypatch):
     """The value, not just the descriptor.
 
     If this ever reads 0, someone "fixed" a parity failure by deleting the
-    value instead of wiring it, and the 8GB WAN tier has silently lost its
-    cap. The NUMBER moved 17 -> 81 in lane 5 (2026-08-11) because the 17
-    had become a planner-narrowing live bug; what this test guards is that
-    a ceiling REACHES the variant at all, so it asserts against the profile
-    rather than against a literal that will move again.
+    value instead of wiring it, and a pinned tier has silently lost its cap.
+    No matrix row pins a ceiling today (the WAN 8GB tier that did is
+    retired), so the pinned document is the 8 GB video row -- `ltx_8gb` is a
+    planner-capped lane -- with the key added, emitted through the real
+    generator. The slot is found BY NAME through the node's descriptors.
     """
-    # otr_8gb_wan left the shipping set on 2026-09-13 (WAN is `no` on an
-    # 8 GB card in docs/dropdown_matrix.json), so its graph is no longer
-    # written to workflows/variants/. The ceiling wiring it guards is the
-    # same code path every shipped graph takes, so derive the graph in
-    # memory -- build_variant is pure -- and assert on that.
+    import copy
     import sys
     sys.path.insert(0, str(REPO_ROOT / "scripts"))
     import build_variants as bv
     from nodes._otr_shared import capability_profiles as _cp
-    expected = _cp.load_profile("otr_8gb_wan")["video"]["max_render_frames"]
-    assert expected and expected > 17, (
-        "the 8GB WAN ceiling must be a real, planner-legal value")
-    data, _variant_rel, _recipe = bv.build_variant("otr_8gb_wan")
+
+    expected = 81
+    doc = copy.deepcopy(_cp.load_profile("otr_8gb_video"))
+    doc["id"] = "otr_8gb_ceiling_probe"
+    doc["video"]["max_render_frames"] = expected
+    (tmp_path / "otr_8gb_ceiling_probe.json").write_text(
+        json.dumps(doc), encoding="utf-8")
+    monkeypatch.setattr(
+        bv, "load_profile",
+        lambda pid: _cp.load_profile(pid, profile_dir=str(tmp_path)))
+    data, _variant_rel, _recipe = bv.build_variant("otr_8gb_ceiling_probe")
     node = next(n for n in data["nodes"]
                 if str(n.get("type") or "") == "OTR_VideoDirector")
     names = [i.get("name") for i in _widget_inputs(node)]
     idx = names.index("max_render_frames")
     assert node["widgets_values"][idx] == expected, (
-        "the otr_8gb_wan graph should pin max_render_frames=%r to match "
-        "config/profiles/otr_8gb_wan.json; got %r"
-        % (expected, node["widgets_values"][idx]))
+        "the pinned graph should carry max_render_frames=%r from its "
+        "profile; got %r" % (expected, node["widgets_values"][idx]))
 
 @pytest.mark.parametrize(
     "wf_path",

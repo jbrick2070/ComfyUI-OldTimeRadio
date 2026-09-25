@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 import json
 import subprocess
 import sys
@@ -14,15 +15,55 @@ from nodes import _otr_public_domain_sources as pd
 from nodes import _otr_source_payload as osp
 
 REPO = Path(__file__).resolve().parents[1]
-# A DEDICATED FIXTURE, NOT THE LIVE MANIFEST (2026-08-04). These tests pin a
+# A DEDICATED SAMPLE, NOT THE LIVE MANIFEST (2026-08-04). These tests pin a
 # manifest's exact contents -- ids, labels, word budgets -- which is the right
 # thing to pin for FORMAT tests and the wrong thing to couple to production
 # data. While the bank shipped one book the two were indistinguishable; the
 # moment the library grew to 28 works, eight of these broke for no reason but
 # the shelf being fuller. The live library is asserted separately, on its own
-# terms, in tests/test_public_domain_library_roll.py.
-SAMPLE_MANIFEST = (
-    REPO / "tests" / "fixtures" / "public_domain_bank" / "manifest.json"
+# terms, in tests/test_public_domain_library_roll.py. The sample is built here
+# and written to `tmp_path` when a test needs it on disk.
+SAMPLE_MANIFEST = {
+    "schema_version": "v1",
+    "sources": [
+        {
+            "source_id": "gutenberg-time-machine-sample",
+            "title": "The Time Machine",
+            "author": "H. G. Wells",
+            "year": "1895",
+            "license_status": "public_domain_us",
+            "license_url": "https://www.gutenberg.org/policy/license.html",
+            "source_url": "https://www.gutenberg.org/ebooks/35",
+            "source_label": "Project Gutenberg",
+            "adapter_type": "project_gutenberg_text",
+            "search_tags": ["science fiction", "time travel", "machine"],
+            "recommended_word_budget": 300,
+            "cast_hints": ["traveler", "skeptical witness"],
+            "units": [
+                {
+                    "unit_id": "arrival",
+                    "label": "The impossible arrival",
+                    "synopsis": (
+                        "A shaken traveler returns with a strange machine and "
+                        "forces skeptical witnesses to confront an impossible "
+                        "journey."
+                    ),
+                    "text_path": "sources/time_machine__arrival.txt",
+                }
+            ],
+        }
+    ],
+}
+#: The unit's text, wrapped in the Gutenberg markers the loader must strip.
+SAMPLE_TEXT = (
+    "*** START OF THE PROJECT GUTENBERG EBOOK THE TIME MACHINE ***\n"
+    "III.\n The Time Traveller Returns\n\n\n"
+    "I think that at that time none of us quite believed in the Time\n"
+    "Machine. The fact is, the Time Traveller was one of those men who are\n"
+    "too clever to be believed: you never felt that you saw all round him;\n"
+    "you always suspected some subtle reserve, some ingenuity in ambush,\n"
+    "behind his lucid frankness.\n"
+    "*** END OF THE PROJECT GUTENBERG EBOOK THE TIME MACHINE ***\n"
 )
 MODULE_PATH = REPO / "nodes" / "_otr_public_domain_sources.py"
 
@@ -42,12 +83,24 @@ def _production_story_routing_root(monkeypatch):
     routing._clear_caches()
 
 
+@pytest.fixture
+def sample_manifest_path(tmp_path):
+    """The sample bank on disk: the manifest plus its one unit text."""
+    root = tmp_path / "public_domain_bank"
+    (root / "sources").mkdir(parents=True)
+    (root / "sources" / "time_machine__arrival.txt").write_text(
+        SAMPLE_TEXT, encoding="utf-8")
+    path = root / "manifest.json"
+    path.write_text(json.dumps(SAMPLE_MANIFEST, indent=2), encoding="utf-8")
+    return path
+
+
 def _manifest():
-    return pd.load_public_domain_manifest(SAMPLE_MANIFEST)
+    return pd.validate_public_domain_manifest(copy.deepcopy(SAMPLE_MANIFEST))
 
 
-def test_sample_manifest_validates():
-    manifest = _manifest()
+def test_sample_manifest_validates(sample_manifest_path):
+    manifest = pd.load_public_domain_manifest(sample_manifest_path)
     assert manifest["schema_version"] == "v1"
     source = manifest["sources"][0]
     assert source["license_status"] == "public_domain_us"
@@ -135,8 +188,9 @@ def test_sidecars_are_separate_from_payload():
     assert "source_meta" not in payload
 
 
-def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
-    """Fixed-mode selection against the fixture bank.
+def test_fetch_public_domain_source_uses_default_ref_and_sidecars(
+        sample_manifest_path):
+    """Fixed-mode selection against the sample bank.
 
     This used to run the LIVE bank with a blank ref and assert The Time
     Machine, which held only because that bank had one book and no selector.
@@ -147,7 +201,7 @@ def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
 
     bank = SimpleNamespace(
         source_bank_id="public_domain",
-        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+        defaults={"manifest_path": str(sample_manifest_path),
                   "selection_mode": "fixed",
                   "source_ref": "gutenberg-time-machine-sample:arrival"},
     )
@@ -169,14 +223,14 @@ def test_fetch_public_domain_source_uses_default_ref_and_sidecars():
     assert rights["license_status"] == "public_domain_us"
 
 
-def test_fetch_public_domain_source_honors_explicit_ref():
+def test_fetch_public_domain_source_honors_explicit_ref(sample_manifest_path):
     """An explicit ref pins, and it OUTRANKS the bank's selection mode --
     which is the property that matters now the default mode is random."""
     from types import SimpleNamespace
 
     bank = SimpleNamespace(
         source_bank_id="public_domain",
-        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+        defaults={"manifest_path": str(sample_manifest_path),
                   "selection_mode": "random"},
     )
     result = pd.fetch_public_domain_source(
@@ -186,7 +240,8 @@ def test_fetch_public_domain_source_honors_explicit_ref():
     assert result.source_meta["source_ref"] == "gutenberg-time-machine-sample:arrival"
 
 
-def test_fetch_public_domain_source_missing_defaults_fail_loud():
+def test_fetch_public_domain_source_missing_defaults_fail_loud(
+        sample_manifest_path):
     from types import SimpleNamespace
 
     bank = SimpleNamespace(source_bank_id="public_domain_story", defaults={})
@@ -198,7 +253,7 @@ def test_fetch_public_domain_source_missing_defaults_fail_loud():
     # the library; that path is covered in test_public_domain_library_roll.py.)
     bank = SimpleNamespace(
         source_bank_id="public_domain_story",
-        defaults={"manifest_path": str(SAMPLE_MANIFEST),
+        defaults={"manifest_path": str(sample_manifest_path),
                   "selection_mode": "fixed"},
     )
     with pytest.raises(pd.PublicDomainSourceRefError, match="source_ref"):

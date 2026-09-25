@@ -198,12 +198,17 @@ def _host(has_cuda=True, vram_mb=16384, platform="win", has_mps=False,
     # section 1). The real _detect_host() always returns both keys; a stub
     # missing them made host.get("vendor") resolve to None, which is
     # "not in ('none', 'nvidia')" -- a false-positive vendor mismatch
-    # against the 16gb_full fixture profile (gpu_vendor="nvidia"). NEW
-    # shape adds both keys with defaults matching that fixture's cuda/
-    # nvidia profile so the pre-existing has_cuda=False call sites are
-    # unaffected (they short-circuit before the vendor check runs).
+    # against the NV16 matrix row (gpu_vendor="nvidia"). NEW shape adds
+    # both keys with defaults matching that row's cuda/nvidia host so the
+    # pre-existing has_cuda=False call sites are unaffected (they
+    # short-circuit before the vendor check runs).
     return {"has_cuda": has_cuda, "vram_mb": vram_mb, "platform": platform,
             "has_mps": has_mps, "vendor": vendor}
+
+
+#: A real `config/workflow_matrix.json` row: platform any, cuda, nvidia. The
+#: stamp tests need a profile that LOADS, or the host-reality checks are skipped.
+NV16 = "otr_16gb_low"
 
 
 class TestStampAssertion:
@@ -249,18 +254,30 @@ class TestStampAssertion:
         monkeypatch.delenv("OTR_SNAPSHOT_HASH", raising=False)
         node = WorkflowValidator()
         (msg,) = node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                               profile_id="16gb_full", master_hash="")
+                               profile_id=NV16, master_hash="")
         assert "stamp OK" in msg
-        assert os.environ["OTR_ACTIVE_PROFILE"] == "16gb_full"
+        assert os.environ["OTR_ACTIVE_PROFILE"] == NV16
         assert len(os.environ["OTR_SNAPSHOT_HASH"]) == 64
 
-    def test_no_cuda_aborts_suggesting_cpu_floor(self, monkeypatch):
+    def test_no_cuda_aborts_suggesting_a_real_tier(self, monkeypatch):
+        """The abort names a suggested tier, and that tier has to be one a user
+        can open: a matrix row, or the canonical itself (which resolves its
+        device at run time and is the proven CPU-only path)."""
+        import re
+
+        from nodes._otr_shared import capability_profiles as cp
+
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
                             staticmethod(lambda: _host(has_cuda=False)))
         node = WorkflowValidator()
-        with pytest.raises(ValueError, match="cpu_floor"):
+        with pytest.raises(ValueError, match="requires CUDA") as excinfo:
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                          profile_id="16gb_full")
+                          profile_id=NV16)
+        suggested = re.findall(r"suggested tier: (\S+)", str(excinfo.value))
+        assert suggested, str(excinfo.value)
+        real = set(cp.known_profile_ids()) | {"otr_canonical"}
+        assert set(suggested) <= real, (
+            "the abort suggests a tier nobody can open: %r" % suggested)
 
     def test_validate_anyway_false_never_skips_the_assertion(self, monkeypatch):
         monkeypatch.setattr(WorkflowValidator, "_detect_host",
@@ -268,7 +285,7 @@ class TestStampAssertion:
         node = WorkflowValidator()
         with pytest.raises(ValueError, match="validate_anyway never skips"):
             node.validate(str(_DEFAULT_WORKFLOW_PATH), False, False,
-                          profile_id="16gb_full")
+                          profile_id=NV16)
 
     def test_an_unknown_profile_id_WARNS_AND_LETS_THE_WORKFLOW_RUN(
             self, monkeypatch, caplog):
@@ -313,13 +330,13 @@ class TestStampAssertion:
         node = WorkflowValidator()
         with pytest.raises(ValueError, match="validate_anyway never skips"):
             node.validate(str(_DEFAULT_WORKFLOW_PATH), True, False,
-                          profile_id="16gb_full")
+                          profile_id=NV16)
 
     def test_is_changed_varies_on_stamp(self):
         a = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,
                                          True)
         b = WorkflowValidator.IS_CHANGED(str(_DEFAULT_WORKFLOW_PATH), True,
-                                         True, profile_id="16gb_full")
+                                         True, profile_id=NV16)
         assert a != b
 
     def test_gate_wired_63_to_87_and_image_lane_downstream(self):

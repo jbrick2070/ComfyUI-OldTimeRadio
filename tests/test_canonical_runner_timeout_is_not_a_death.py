@@ -1,15 +1,15 @@
 """A poll TIMEOUT is about the watcher, not about the render.
 
-FOUND LIVE, 2026-08-23, running item F's `otr_g4_wan_ti2v` leg. The canonical
-runner printed
+FOUND LIVE, 2026-08-23, running item F's 16 GB Wan leg (a video lane since
+retired). The canonical runner printed
 
     [canonical-api] RESULT TIMEOUT prompt_id=60d23b04-...
 
 and exited 1 at t=5396s. The render was fine. The server reported one prompt
-RUNNING, the GPU sat at 98%, and the wan clip count went on climbing from 21 to
+RUNNING, the GPU sat at 98%, and the clip count went on climbing from 21 to
 33 while the runner was declaring failure. `--timeout` defaults to 5400s and a
-full wan_ti2v episode on the 16 GB box takes longer than that, so this is the
-NORMAL outcome for the slowest shipped lane -- not an exception.
+full episode on the slowest video lane can take longer than that, so this is
+the NORMAL outcome for that lane -- not an exception.
 
 The defect was never the timeout itself; `--timeout 0` is documented as the
 operator mode for long lanes. The defect is that ONE message covered two
@@ -45,7 +45,7 @@ def _runner():
 def test_a_busy_queue_means_the_render_survived(running, pending):
     assert _runner().classify_timeout(running, pending) == "still_running", (
         "a TIMEOUT with work still on the queue must NOT read as a dead "
-        "render -- that misreading is what gets a healthy 90-minute wan leg "
+        "render -- that misreading is what gets a healthy 90-minute video leg "
         "killed and restarted.")
 
 

@@ -24,7 +24,7 @@ from nodes._otr_video_engines.schemas import ShotRow
 # The non-haunted lanes retired 2026-08-23; the survivor inherits this
 # composer unchanged.
 GHOST = "animatediff15_v3_haunted_video"
-NON_GHOST = "ltx_video"
+NON_GHOST = "ltx25_video"
 
 POLICY = {
     "video_models": {"announcer_visual": GHOST, "music_visual": GHOST,

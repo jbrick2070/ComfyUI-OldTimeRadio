@@ -37,7 +37,7 @@ def test_matrix_and_readme_are_in_sync_with_the_profiles():
         pytest.skip(r.stdout.strip() or "registry unavailable in this interpreter")
     assert r.returncode == 0, (
         "docs/MACHINE_MATRIX.md or README's generated block no longer matches "
-        "config/profiles/. Regenerate with:\n"
+        "config/workflow_matrix.json. Regenerate with:\n"
         "    python scripts/otr_machine_matrix.py\n\n" + r.stdout + r.stderr)
 
 
@@ -98,7 +98,8 @@ def test_experimental_profile_tiers_include_the_middle_vram_band():
     text = M.render()
     middle = text.index("## 10-15 GB")
     high = text.index("## 16 GB+")
-    assert middle < text.index("`otr_nv40_12gb`") < high
+    # The Mac rows declare a 10 GB writer ceiling.
+    assert middle < text.index("`otr_mac16_low`") < high
 
 
 def test_experimental_shipping_status_is_separate_from_install_ownership():
@@ -106,25 +107,24 @@ def test_experimental_shipping_status_is_separate_from_install_ownership():
     import otr_machine_matrix as M          # noqa: E402
 
     profiles = {row["id"]: row for row in M.load_profiles()}
+    # Shipping rows whose selections the provisioner has no lane for: the Mac
+    # still/video rows pin `sd15` stills, the low cloud rows a hosted video
+    # route no provisioning set covers.
     missing = {
-        "otr_g4_fastwan",
-        "otr_g4_ltx_audio_in",
-        "otr_g4_ltx_video",
-        "otr_w45_fastwan",
-        "otr_w45_ltx_audio_in",
-        "otr_w45_ltx_video",
-        "otr_w45_mesh_stage",
+        "otr_mac16_still",
+        "otr_mac16_video",
+        "otr_cloud_low",
+        "otr_cloud_low_1act",
+        "otr_cloud_low_5act",
     }
     assert all(profiles[pid]["status"] == "shipping" for pid in missing)
     assert all(profiles[pid]["install_recipe"] == "missing exact owner"
                for pid in missing)
-    # "complete; Python <=3.13", not bare "complete" (2026-09-24). This row sets
-    # no voice engine, so it INHERITS the canonical's kokoro and genuinely needs
-    # Python <=3.13. The old expectation held only because the generator read
-    # profile FILES, where an absent key did not exist -- it was pinning the
-    # generator's blindness rather than the profile's truth.
-    assert profiles["otr_4060_floor"]["install_recipe"].startswith("complete")
-    assert "missing exact owner" not in profiles["otr_4060_floor"]["install_recipe"]
+    # "complete; Python <=3.13", not bare "complete" (2026-09-24). This row
+    # selects kokoro, which genuinely needs Python <=3.13; the recipe column
+    # has to say so rather than read as an unconditional install.
+    assert profiles["otr_8gb_low"]["install_recipe"].startswith("complete")
+    assert "missing exact owner" not in profiles["otr_8gb_low"]["install_recipe"]
 
     text = M.render()
     assert "| confidence | install recipe |" in text

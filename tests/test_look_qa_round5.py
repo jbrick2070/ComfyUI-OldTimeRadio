@@ -1,7 +1,7 @@
 """Look-QA round 5 (2026-06-10): the acceptance-eyeball fixes, CPU-only.
 
-Covers F1 (LTX frame cap), F2 (per-beat brief prompts + prompt observability +
-diversity status), F3 (talking-head person anchor, guard-before-anchor), F4
+Covers F2 (per-beat brief prompts + prompt observability + diversity
+status), F3 (talking-head person anchor, guard-before-anchor), F4
 (writer self-vocative attribution repair -- the b004 shape), F5 (char_id join
 hardening + manifest positioned-mode fallback). Plan + panel record:
 docs/2026-06-10-look-qa-round5/.
@@ -16,7 +16,6 @@ import pytest
 _REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, _REPO)
 sys.path.insert(0, os.path.join(_REPO, "nodes"))
-from nodes._otr_video_engines import eng_ltx_video as _ltx          # noqa: E402
 from nodes._otr_video_engines import render_driver as _rd           # noqa: E402
 from nodes import otr_shot_lock as _sl                               # noqa: E402
 
@@ -42,100 +41,6 @@ def _prompt_only_lanes_get_a_still(monkeypatch, tmp_path):
 
     monkeypatch.setattr(_rdrv, "_still_index",
                         lambda _ledger: _AnyBeatHasAStill())
-
-
-# --------------------------------------------------------------------------- #
-# F1 -- the LTX frame cap (pure helper)
-# --------------------------------------------------------------------------- #
-
-class TestLtxFrameCap:
-    def test_over_cap_ask_caps_to_default(self, monkeypatch):
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        # the 2026-06-10 mud open: a 238-frame ask for the 9.5s gap. Default
-        # cap = 169, the live-DECODE-PROVEN length on this wrapper stack (121
-        # trips the wrapper VAEDecode tensor mismatch -- ticking_lab catch).
-        assert _ltx._ltx_frame_length(238, 24) == 169
-        assert _ltx._LTX_MAX_FRAMES_DEFAULT == 169
-
-    def test_short_ask_raised_to_decode_floor(self, monkeypatch):
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        monkeypatch.setenv("OTR_LTX_MIN_DECODE_FRAMES", "169")
-        # The r5b live catch: b004's 137f ask hit the wrapper VAEDecode tensor
-        # mismatch, so an ask below the floor is raised into the tiled band.
-        #
-        # THE FLOOR IS NOW SET EXPLICITLY, because the SHIPPED default stopped
-        # being 169 (lane 9, 2026-08-11: the band is open at the declared
-        # 1024x576). The mechanism this test owns -- "an ask below the ACTIVE
-        # floor comes back AT the floor" -- is unchanged and still worth
-        # pinning, so the floor it needs is now stated rather than inherited.
-        assert _ltx._ltx_frame_length(137, 24) == 169
-        assert _ltx._ltx_frame_length(50, 24) == 169
-
-    def test_at_the_SHIPPED_floor_a_short_ask_renders_its_own_length(
-            self, monkeypatch):
-        """The other side of the same mechanism, and the lane 9 behaviour.
-
-        With the decode band open at the declared canvas the floor is the
-        bottom of the ladder, so a short ask is NOT raised -- it renders itself,
-        snapped to 8n+1. This is what stopped a 2 s beat rendering 169 frames
-        and discarding 119 of them.
-        """
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
-        assert _ltx._LTX_DECODE_FLOOR_DEFAULT == _ltx._LTX_MIN_FRAMES
-        assert _ltx._ltx_frame_length(137, 24) == 137     # already 8n+1
-        assert _ltx._ltx_frame_length(50, 24) == 49       # snapped DOWN to 8n+1
-        assert _ltx._ltx_frame_length(9, 24) == 9         # the ladder's bottom
-
-    def test_decode_floor_env_override(self, monkeypatch):
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        monkeypatch.setenv("OTR_LTX_MIN_DECODE_FRAMES", "49")
-        assert _ltx._ltx_frame_length(50, 24) == 49      # 8n+1 snap, low floor
-
-    def test_cap_env_override_respected(self, monkeypatch):
-        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "57")
-        assert _ltx._ltx_frame_length(238, 24) == 57     # 57 = 8*7+1
-
-    def test_non_8n1_cap_snaps_down_below_cap(self, monkeypatch):
-        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "120")
-        out = _ltx._ltx_frame_length(238, 24)
-        assert out == 113 and out <= 120 and (out - 1) % 8 == 0
-
-    def test_invalid_env_falls_to_default(self, monkeypatch):
-        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "not-a-number")
-        assert _ltx._ltx_frame_length(238, 24) == 169
-
-    def test_below_floor_env_clamps(self, monkeypatch):
-        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "2")
-        out = _ltx._ltx_frame_length(238, 24)
-        assert out == _ltx._LTX_MIN_FRAMES
-
-    def test_zero_ask_uses_fallback_then_floor(self, monkeypatch):
-        monkeypatch.delenv("OTR_LTX_MAX_FRAMES", raising=False)
-        # A zero ask falls back to the supplied fallback, and the ACTIVE floor
-        # then applies to that. With the floor high the fallback rises to it;
-        # at the shipped floor it simply snaps to 8n+1. Both directions asserted
-        # so the test proves the fallback is CONSULTED rather than proving one
-        # floor's arithmetic (lane 9 moved the shipped floor to 9).
-        monkeypatch.setenv("OTR_LTX_MIN_DECODE_FRAMES", "169")
-        assert _ltx._ltx_frame_length(0, 24) == 169
-        monkeypatch.delenv("OTR_LTX_MIN_DECODE_FRAMES", raising=False)
-        assert _ltx._ltx_frame_length(0, 24) == 17     # fallback 24 -> 8n+1
-
-
-    def test_cap_below_floor_wins(self, monkeypatch):
-        monkeypatch.setenv("OTR_LTX_MAX_FRAMES", "57")
-        # The floor is SET here rather than inherited from the default. This
-        # test's invariant is "an operator cap BELOW the decode floor wins", and
-        # that requires a floor above the cap to mean anything at all. It rode
-        # the old 169 default until lane 9 moved it to 9, at which point the cap
-        # was no longer below the floor and the test was asserting nothing --
-        # it went red for the right reason. State the floor, keep the invariant.
-        monkeypatch.setenv("OTR_LTX_MIN_DECODE_FRAMES", "169")
-        # effective floor = min(169, 57) = 57, so a 30f ask rises only to 57,
-        # never past the operator's ceiling
-        assert _ltx._ltx_frame_length(30, 24) == 57
-        assert _ltx._ltx_frame_length(238, 24) == 57
 
 
 # --------------------------------------------------------------------------- #
@@ -166,7 +71,7 @@ def _scene_ledger(lines_extra=None):
     }
 
 
-def _shot(shot_id, role, engine="ltx_video", source_line_ids=None, **kw):
+def _shot(shot_id, role, engine="ltx25_video", source_line_ids=None, **kw):
     base = {"shot_id": shot_id, "role": role, "engine_id": engine,
             "group_id": f"grp_{role}",
             "source_line_ids": (source_line_ids
@@ -527,11 +432,11 @@ class TestManifestPositionedFallback:
                       "shots": [
                           {"shot_id": "shot_b000_music_open",
                            "source_line_ids": [], "start_s": 0.0,
-                           "dur_s": 9.5, "engine_id": "ltx_video",
+                           "dur_s": 9.5, "engine_id": "ltx25_video",
                            "target_frame_count": 238, "char_id": ""},
                           {"shot_id": "shot_b001",
                            "source_line_ids": ["b001"],
-                           "engine_id": "ltx_video",
+                           "engine_id": "ltx25_video",
                            "target_frame_count": 175, "char_id": "c01"},
                       ]},
             "lines": [{"line_id": "b001", "char_id": "announcer",

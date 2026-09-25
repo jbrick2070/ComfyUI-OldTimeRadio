@@ -876,28 +876,36 @@ def test_a_long_stage_direction_is_stripped_like_a_short_one():
     assert dialogue in vendor.strip_direction_parentheticals("<p>x " + dialogue + " y</p>")
 
 
+#: Real snippets from it.wikisource.org Rusconi act pages.
+_RUSCONI_SPEAKER_MARKUP = (
+    "<p><i>Orl</i>. Restate qui appesi, miei versi.</p>\n"
+    "<p><i>Ber</i>. Chi \u00e8 l\u00e0?</p>\n"
+    "<p>(<i>escono Gloc. ed Edm</i>.)</p>\n"
+    "<p><i>Vil</i>. Immenso errore, signora: "
+    "<i>cucullus non facit monachum</i>.</p>\n"
+    "<p><i>Mal</i>. <i>M. O. A. I.</i> governa i miei destini?</p>\n"
+    '<p><span style="letter-spacing: 0px"><i>Entra</i> '
+    '<span style="font-variant:small-caps">Orlando</span> '
+    "<i>con un foglio</i>.</span></p>\n"
+)
+
+
 def test_rusconi_headed_markup_claims_speakers_not_italic_prose():
     """The Rusconi rule reads real paragraph-head labels off fetched markup.
 
-    The fixture is copied from the Italian Wikisource pages named by the held
+    The markup is copied from the Italian Wikisource pages named by the held
     leads.  The same page uses italics for entrances and for words spoken by a
     character, so a loose ``<i>... </i>.`` match must not cast those strings.
     """
     import importlib.util
-    # Load the vendor module independently; the fixture path is only the data
-    # source, not an importable Python file.
     spec = importlib.util.spec_from_file_location(
         "_otr_vendor_shakespeare_rusconi_vendor",
         os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
                      "scripts", "otr_vendor_shakespeare.py"))
     vendor = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(vendor)
-    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                           "fixtures", "rusconi_speaker_markup.html"),
-              encoding="utf-8") as handle:
-        markup = handle.read()
 
-    out = vendor.to_text(markup)
+    out = vendor.to_text(_RUSCONI_SPEAKER_MARKUP)
     text = vendor.canonicalise_labels(vendor.normalise_labels(out))
     labels = [line.split(":", 1)[0]
               for line in text.splitlines() if ":" in line]

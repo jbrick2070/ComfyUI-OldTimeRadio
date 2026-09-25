@@ -15,8 +15,8 @@ import pytest
 
 from nodes._otr_video_engines import cheap_families  # noqa: F401 (register)
 from nodes._otr_video_engines import eng_humo         # noqa: F401 (register humo)
-from nodes._otr_video_engines import eng_ltx_video      # noqa: F401 (register)
-from nodes._otr_video_engines import eng_wan_ti2v       # noqa: F401 (register)
+from nodes._otr_video_engines import eng_ltx25          # noqa: F401 (register)
+from nodes._otr_video_engines import eng_ltx_8gb        # noqa: F401 (register)
 from nodes._otr_video_engines import registry as vreg
 from nodes._otr_video_engines import render_driver as rd
 from nodes._otr_shared import retry_taxonomy as rt
@@ -112,25 +112,20 @@ def test_assert_soak_ok_rejects_violations(mutate):
 
 
 def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch, tmp_path):
-    """ltx_video renders at the canvas it DECLARES while still_pan keeps the
+    """ltx25_video renders at the canvas it DECLARES while still_pan keeps the
     full 1472x832 landscape canvas.
 
-    The declaration moved 832x480 -> 1024x576 by operator ruling on 2026-08-11
-    (lane 9): the HQ two-stage path halves the canvas and upsamples with a
-    fixed-x2 node, so both axes must be /64 or stage A is an illegal latent --
-    832x480 fails on height. Asserted against the DECLARATION rather than a
-    literal, so the number can move again without this test lying (lesson L10).
+    Asserted against the DECLARATION rather than a literal, so the number can
+    move without this test lying (lesson L10).
 
-    still_pan stays env-overridable. ltx_video STOPPED being so on 2026-08-02:
-    it declares a render_canvas, which wins, because its frame contract is a
-    single canvas-dependent length that an env-moved canvas would invalidate.
+    still_pan stays env-overridable through OTR_VIDEO_LANDSCAPE_CANVAS. The
+    LTX lane is NOT: it declares a render_canvas, which is applied last and
+    wins, because its frame contract is canvas-dependent and an env-moved
+    canvas would invalidate it with no code change and no warning.
     """
-    monkeypatch.delenv("OTR_LTX_RENDER_CANVAS", raising=False)
     monkeypatch.delenv("OTR_VIDEO_LANDSCAPE_CANVAS", raising=False)
-    # This test isolates canvas selection. The text-only opt-out is retired
-    # (2026-08-28) -- the lane requires a still, always -- so the fixture
-    # SUPPLIES one rather than dodging the requirement. The required-still
-    # contract keeps its own regression in test_video_motion.
+    # This test isolates canvas selection. The lane requires a still, always,
+    # so the fixture SUPPLIES one rather than dodging the requirement.
     still = tmp_path / "scene_b001.png"
     still.write_bytes(bytes((0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)))
     ledger = {"video": {"video_revision": 1, "shots": []},
@@ -145,32 +140,27 @@ def test_ltx_renders_its_DECLARED_canvas_others_keep_landscape(monkeypatch, tmp_
                 "target_frame_count": 169, "source_line_ids": ["b001"],
                 "char_id": "", "creative": {}}
 
-    from nodes._otr_video_engines.eng_ltx_video import LtxVideoEngine
-    declared = tuple(LtxVideoEngine.render_canvas)
-    req_ltx = rd.build_request_from_shot(shot("ltx_video", "image_to_video"),
+    from nodes._otr_video_engines.eng_ltx25 import Ltx25VideoEngine
+    declared = tuple(Ltx25VideoEngine.render_canvas)
+    assert declared != (1472, 832), (
+        "the declared canvas must differ from the landscape default or this "
+        "test cannot tell the two apart")
+    req_ltx = rd.build_request_from_shot(shot("ltx25_video", "image_to_video"),
                                          ledger)
     assert (req_ltx["canvas"]["w"], req_ltx["canvas"]["h"]) == declared
     req_flux = rd.build_request_from_shot(shot("still_pan", "static_image_gen"),
                                           ledger)
     assert (req_flux["canvas"]["w"], req_flux["canvas"]["h"]) == (1472, 832)
-    # ltx_video's canvas STOPPED being env-overridable on 2026-08-02, and that
-    # is the fix rather than a regression. Its frame contract is now the single
-    # length 169. That bound is CANVAS-DEPENDENT, so an env-moved canvas would
-    # invalidate a STATIC contract the beat was already partitioned against,
-    # with no code change and no warning.
-    # A declared render canvas wins (it is applied last, by design), and the
-    # engine REFUSES at render time rather than quietly handing back a canvas
-    # the operator did not ask for. still_pan, which declares nothing, keeps its
-    # env branch untouched -- see the assertion above.
-    monkeypatch.setenv("OTR_LTX_RENDER_CANVAS", "768x432")
-    req2 = rd.build_request_from_shot(shot("ltx_video", "text_to_video"), ledger)
+    # A declared render canvas wins (it is applied last, by design). still_pan,
+    # which declares nothing, follows the env lever.
+    monkeypatch.setenv("OTR_VIDEO_LANDSCAPE_CANVAS", "768x432")
+    req2 = rd.build_request_from_shot(shot("ltx25_video", "image_to_video"),
+                                      ledger)
     assert (req2["canvas"]["w"], req2["canvas"]["h"]) == declared, (
-        "a declared render canvas must beat OTR_LTX_RENDER_CANVAS")
-
-    from nodes._otr_video_engines import eng_ltx_video as _lv
-    from nodes._otr_video_engines import frame_contract as _fc
-    with pytest.raises(_fc.ContractEnvConflict):
-        _lv.assert_env_matches_contract(_lv.LtxVideoEngine.frame_contract)
+        "a declared render canvas must beat OTR_VIDEO_LANDSCAPE_CANVAS")
+    req_flux2 = rd.build_request_from_shot(
+        shot("still_pan", "static_image_gen"), ledger)
+    assert (req_flux2["canvas"]["w"], req_flux2["canvas"]["h"]) == (768, 432)
 
 
 def test_still_flat_character_beat_uses_landscape_scene_still_not_portrait():

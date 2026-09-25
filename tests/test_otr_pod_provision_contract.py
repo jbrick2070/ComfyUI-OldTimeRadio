@@ -37,7 +37,6 @@ def test_pod_script_has_one_pack_and_weight_owner():
     # concern, not a source of code.
     assert 'git clone -q -b main "$OTR_REPO_URL" "$OTR_ROOT"' in text
     assert "otr_fetch_lane_weights.py \"$L\"" not in text
-    assert "ComfyUI-GGUF.git" not in text
     assert "ComfyUI-LTXVideo.git" not in text
     assert "OTR_COMFY_CORE_PIN" in text
     assert "OTR_COMFY_ROOT" in text
@@ -211,19 +210,6 @@ def test_pod_default_uses_machine_matrix_and_profiles_are_explicit_overrides():
     assert 'PROVISION_ARGS=(--machine "$MACHINE")' in text
     assert 'PROVISION_ARGS=(--profile "$PROFILE")' in text
     assert 'SELECTOR="machine:$MACHINE"' in text
-    assert 'PROFILE="otr_runpod_starter"' not in text
     assert '[ -n "${VRAM_MIB:-}" ]' in text
     assert '[ "$VRAM_MIB" -lt 8000 ]' in text
     assert "below the supported 8 GB machine floor" in text
-
-
-def test_legacy_cloud_scripts_cannot_bypass_the_owner():
-    setup = (REPO / "scripts" / "setup_cloud.sh").read_text(encoding="utf-8")
-    download = (REPO / "scripts" / "download_models.sh").read_text(encoding="utf-8")
-
-    assert "otr_pod_provision.sh" in setup
-    assert "ComfyUI-GGUF" not in setup
-    assert "ComfyUI-LTXVideo" not in setup
-    assert "huggingface-cli download" not in download
-    assert "otr_fetch_lane_weights.py --list" in download
-    assert "exit 2" in download

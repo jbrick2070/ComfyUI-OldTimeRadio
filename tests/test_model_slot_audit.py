@@ -148,7 +148,7 @@ def test_retired_and_unknown_engines_fail_loud():
     assert excinfo.value.reason is audio_engines.EngineUsabilityReason.INCOMPATIBLE_PROFILE
 
 
-def test_requested_local_smoke_candidate_contracts_are_inspected(monkeypatch):
+def test_requested_local_smoke_candidate_contracts_are_inspected():
     """Pre-live-smoke contract check for the operator's 2026-07-09 queue."""
     chatterbox = audio_engines.get_engine("chatterbox")
     assert chatterbox.roles == ("char_voice", "announcer_voice")
@@ -163,18 +163,6 @@ def test_requested_local_smoke_candidate_contracts_are_inspected(monkeypatch):
     assert dia.requires_voice_ref is True
     assert dia.missing_ref_fallback is None
     assert dia.sample_rate == 44100
-
-    for env in ("OTR_WAN_TI2V_SAMPLER", "OTR_WAN_TI2V_SCHEDULER"):
-        monkeypatch.delenv(env, raising=False)
-    wan_ti2v = video_registry.get_engine("wan_ti2v")
-    assert wan_ti2v.family == "image_to_video"
-    assert wan_ti2v.required_inputs == ("init_image",)
-    assert wan_ti2v.default_roles == ()
-    assert wan_ti2v.commercial_clean is True
-    assert wan_ti2v._node_candidates()["latent"] == ("Wan22ImageToVideoLatent",)
-    assert wan_ti2v._loader_names()["clip"] == "umt5-xxl-encoder-Q5_K_M.gguf"
-    assert wan_ti2v._loader_names()["vae"] == "wan2.2_vae.safetensors"
-    assert wan_ti2v._resolve_render_config()["sampler"] == "euler"
 
 
 def test_requested_cloud_smoke_candidate_contracts_are_inspected():

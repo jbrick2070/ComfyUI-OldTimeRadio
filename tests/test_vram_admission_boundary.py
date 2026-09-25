@@ -1,8 +1,8 @@
 """The ONE admission boundary for a coverage-planned beat.
 
 ``_planned_length`` never consults the VRAM predictor by design, so once
-``wan_ti2v`` / ``fastwan_8gb`` / ``ltx_8gb`` became planning-capped, the only
-ENFORCING guard was bypassed on the path doing most of the rendering. These
+``ltx_8gb`` and its siblings became planning-capped, the only ENFORCING guard
+was bypassed on the path doing most of the rendering. These
 tests pin the replacement, including the half that is easy to get wrong: an
 engine with no MEASURED cost row must be reported as unenforced rather than
 judged against a borrowed row, because a guard that refuses and admits with
@@ -40,44 +40,46 @@ def test_engine_without_a_cost_row_is_reported_unenforced(monkeypatch):
 
 
 def test_a_PRESENT_but_disqualified_row_may_not_refuse(monkeypatch):
-    """`wan_ti2v` HAS a row. It may still not refuse anything.
+    """A lane that HAS a row may still not refuse anything.
 
     This is the regression that shipped for about an hour: the guard gated on
-    "is there a row?", and `wan_ti2v` has one -- `(7000.0, 185.0)`, the row this
-    repo has disqualified in writing after it refused a real production leg
-    ("affordable 24 frames (free=13481 MB)") on an engine that had already
+    "is there a row?", and a 5B video lane had one -- `(7000.0, 185.0)`, the
+    seed this repo disqualified in writing after it refused a real production
+    leg ("affordable 24 frames (free=13481 MB)") on an engine that had already
     shipped an episode.
 
-    At every realistic free-VRAM level that row refuses EVERY segment length the
-    coverage planner produces for this engine, including 93 frames at 14,500 MB
-    free -- so gating on existence re-armed, at a brand new call site, the exact
+    That lane is gone and the table is empty, so the row is SEEDED here onto a
+    live coverage-planned engine: the property is the gate's, not the lane's.
+    At every realistic free-VRAM level that seed refuses EVERY segment length
+    the coverage planner produces, including 93 frames at 14,500 MB free -- so
+    gating on existence would re-arm, at a brand new call site, the exact
     refusal `_planned_length` had already stopped issuing. The question a
     refusal must answer is "may this row refuse?", not "does one exist?".
     """
     monkeypatch.setattr(mc, "free_vram_mb", lambda: 14500.0)
-    assert "wan_ti2v" in mc.FRAME_COST_MODEL, "fixture assumes the row is present"
-    assert not mc.cost_row_may_refuse("wan_ti2v"), "present is not qualified"
+    monkeypatch.setitem(mc.FRAME_COST_MODEL, "ltx_8gb", mc._DEFAULT_FRAME_COST)
+    assert "ltx_8gb" in mc.FRAME_COST_MODEL, "fixture assumes the row is present"
+    assert not mc.cost_row_may_refuse("ltx_8gb"), "present is not qualified"
 
-    # The planner's real output for a 442-frame wan_ti2v beat.
-    record = rd._assert_beat_affordable({"engine_id": "wan_ti2v"},
+    # A planner-shaped output for a long beat.
+    record = rd._assert_beat_affordable({"engine_id": "ltx_8gb"},
                                         _prebuilt([177, 177, 93]))
     assert record["enforced"] is False, (
         "the disqualified row must not enforce -- every one of these lengths "
         "would be refused by it")
     assert "disqualified" in record["reason"]
 
-    # And the STATIC path no longer refuses them either (2026-08-13).
+    # And the STATIC path does not refuse them either (2026-08-13).
     #
     # This assertion used to run the other way: it proved the row "really would
     # have refused", because until the render gate caught it,
     # `compute_real_frame_budget` priced frames without asking
     # `cost_row_may_refuse` at all. So the disqualified row was inert at THIS
-    # boundary and live one call away, through `eng_wan_ti2v._floor_length` --
-    # and that is the path that killed the `fastwan_8gb` and `wan_ti2v` legs.
-    # One row, one authority, both call sites.
+    # boundary and live one call away -- and that is the path that killed two
+    # live render-gate legs. One row, one authority, both call sites.
     for frames in (93, 177):
         assert mc.assert_frame_affordable(
-            14500.0, frames, 832, 480, "wan_ti2v") == frames
+            14500.0, frames, 832, 480, "ltx_8gb") == frames
 
 
 def test_no_row_is_qualified_today_and_that_is_deliberate():
@@ -92,15 +94,19 @@ def test_no_row_is_qualified_today_and_that_is_deliberate():
 
 @pytest.fixture
 def qualified(monkeypatch):
-    """Qualify `wan_ti2v`'s row so the ENFORCEMENT machinery can be tested.
+    """Seed and qualify a row for `ltx_8gb` so the ENFORCEMENT machinery can be
+    tested.
 
     No row is qualified in production today and that is deliberate (see
-    ``test_no_row_is_qualified_today_and_that_is_deliberate``). These tests are
-    about whether the boundary refuses correctly WHEN a row is trusted, which is
-    a separate question from whether any row is trusted yet.
+    ``test_no_row_is_qualified_today_and_that_is_deliberate``), and the table
+    itself is empty. These tests are about whether the boundary refuses
+    correctly WHEN a row is trusted, which is a separate question from whether
+    any row is trusted yet -- and qualification needs a row to qualify.
     """
-    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"wan_ti2v"}))
-    return "wan_ti2v"
+    monkeypatch.setitem(mc.FRAME_COST_MODEL, "ltx_8gb", mc._DEFAULT_FRAME_COST)
+    monkeypatch.setattr(mc, "QUALIFIED_COST_ROWS", frozenset({"ltx_8gb"}))
+    assert mc.cost_row_may_refuse("ltx_8gb")
+    return "ltx_8gb"
 
 
 def test_unaffordable_planned_segment_proceeds_and_is_reported(
@@ -148,5 +154,5 @@ def test_affordable_beat_records_every_segment(monkeypatch, qualified):
 
 
 def test_no_segments_is_not_an_enforced_pass():
-    record = rd._assert_beat_affordable({"engine_id": "wan_ti2v"}, [])
+    record = rd._assert_beat_affordable({"engine_id": "ltx_8gb"}, [])
     assert record["enforced"] is False

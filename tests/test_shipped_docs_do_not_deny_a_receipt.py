@@ -11,6 +11,8 @@ days saying the opposite of `README.md`'s own headline:
     apple/WRITERS.md               "nobody has published an episode from AMD yet"
     README.md                      "AMD has no receipts yet"
     config/profiles/...json        a display_name PRINTED INTO EVERY RUN'S LOG
+                                   (those files are rows of
+                                    config/workflow_matrix.json now)
     scripts/otr_dropdown_matrix.py "Nothing in this repo has an AMD receipt"
     scripts/otr_tier_matrix.py     "AMD ROCm (experimental -- no receipts)"
                                    (that generator was retired 2026-09-24; the
@@ -65,13 +67,6 @@ CLASS_WORDS = {
 
 #: Sentences that trip the rule and are TRUE. Keep the reason with the text.
 ALLOWED = (
-    # ROCm's own scope note: the two LAB profiles (`otr_amd16_rocm`,
-    # `otr_amd8_rocm`) genuinely have not run -- only `otr_amd_still` has.
-    # Keeping them distinct is the proven/measured discipline, not an
-    # oversight. The sentence names the tier it scopes, on a line that also
-    # carries the class word, which is exactly the shape this rule cannot
-    # tell from a denial.
-    "neither has run on hardware and their own files say so",
     # The writer table's Llama row. "Nobody has published an episode with it
     # yet" is about that MODEL and is true; the machine words on the line are
     # the model's own fit tags (`mac16 nv8 nv16 nv24`), not a claim about the

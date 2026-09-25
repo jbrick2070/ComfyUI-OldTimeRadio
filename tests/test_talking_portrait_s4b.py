@@ -1,5 +1,5 @@
-"""S4b/S4c (2026-07-02): face-forward portrait mint for the ia2v talking
-lane + radio-face default-on for its bookends.
+"""S4b/S4c (2026-07-02): face-forward portrait mint for a lip-syncing
+(talking) lane + radio-face default-on for its bookends.
 
 Proof8 root cause: S4 routed character inits to the PORTRAIT, but the
 brief-styled portrait mint produced dark profile/wide compositions (mouth
@@ -51,28 +51,27 @@ def test_talking_roles_policy_malformed_is_empty():
 def test_video_director_role_talking_map():
     from nodes.otr_video_director import OTRVideoDirector
     resolved = {
-        "announcer_video_model": {"engine_id": "ltx_audio_in"},
-        "music_video_model": {"engine_id": "ltx_audio_in"},
-        "character_video_model": {"engine_id": "ltx_audio_in"},
+        "announcer_video_model": {"engine_id": "cloud_kling_avatar"},
+        "music_video_model": {"engine_id": "cloud_kling_avatar"},
+        "character_video_model": {"engine_id": "cloud_kling_avatar"},
     }
     talk = OTRVideoDirector._role_talking(resolved)
     assert set(talk) == {"announcer_visual", "music_visual",
                           "character_video"}
-    # default env (dev unet) -> ia2v register -> talking engine
+    # the engine's own wants_talking_prompt() hook says it lip-syncs
     assert talk["announcer_visual"] is True
     assert talk["music_visual"] is True
     assert talk["character_video"] is True
 
 
-def test_video_director_role_talking_false_on_single_pass(monkeypatch):
+def test_video_director_role_talking_false_on_a_non_lipsync_lane():
+    # An audio-in lane conditions the picture on the waveform but declares no
+    # talking hook, so its portraits keep the ordinary styling.
     from nodes.otr_video_director import OTRVideoDirector
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     resolved = {
-        "announcer_video_model": {"engine_id": "ltx_audio_in"},
-        "music_video_model": {"engine_id": "ltx_audio_in"},
-        "character_video_model": {"engine_id": "ltx_audio_in"},
+        "announcer_video_model": {"engine_id": "ltx25_native_audio_in_16gb"},
+        "music_video_model": {"engine_id": "ltx25_native_audio_in_16gb"},
+        "character_video_model": {"engine_id": "ltx25_native_audio_in_16gb"},
     }
     talk = OTRVideoDirector._role_talking(resolved)
     assert talk["character_video"] is False

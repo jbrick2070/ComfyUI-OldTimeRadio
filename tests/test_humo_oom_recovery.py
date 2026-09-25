@@ -10,9 +10,6 @@ BUG-LOCAL-126 alarm-plumbing unit tests. Verifies:
     re-raise).
   - `HumoSoakCapReached` exception carries `lines_completed` and
     `cap` attributes.
-  - The audit script's FAIL_PATTERNS includes the
-    `Fatal Python error: Aborted` signal so a soak watcher can
-    surface BUG-126 hard aborts.
 
 Pure-stdlib + targeted import. No torch required to run -- the
 module-load helpers are best-effort and degrade cleanly.
@@ -204,27 +201,3 @@ def test_hard_reset_does_not_raise_after_runtime_error(monkeypatch):
     if mod is None or not hasattr(mod, "_hard_reset_cuda_context"):
         pytest.skip("batch_humo_render didn't load in test venv")
     mod._hard_reset_cuda_context()  # must not raise
-
-
-# ---------- audit script FAIL_PATTERNS includes Aborted signal ----
-
-
-def test_audit_fail_patterns_includes_fatal_python_error():
-    """BUG-LOCAL-126 watcher / auditor must surface the C-level abort
-    signal so an incomplete soak isn't reported as PASS."""
-    src = _REPO_ROOT / "scripts" / "audit_otr_full_run.py"
-    body = src.read_text(encoding="utf-8")
-    assert "Fatal Python error: Aborted" in body, (
-        "audit_otr_full_run.py must include 'Fatal Python error: Aborted' "
-        "in FAIL_PATTERNS to catch BUG-126 C-level CUDA aborts"
-    )
-    # Stronger: load the FAIL_PATTERNS object and assert by membership.
-    spec = importlib.util.spec_from_file_location(
-        "audit_otr_full_run_for_test", src,
-    )
-    assert spec is not None and spec.loader is not None
-    audit_mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(audit_mod)
-    patterns = audit_mod.FAIL_PATTERNS
-    string_patterns = [p for p in patterns if isinstance(p, str)]
-    assert "Fatal Python error: Aborted" in string_patterns

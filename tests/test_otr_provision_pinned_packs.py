@@ -10,7 +10,6 @@ import pytest
 
 REPO = Path(__file__).resolve().parents[1]
 SCRIPT = REPO / "scripts" / "otr_provision.py"
-FIXTURE_LOADER = REPO / "tests" / "fixtures" / "comfyui_gguf_6ea2651" / "loader.py"
 
 
 def _load_provision():
@@ -58,15 +57,15 @@ def test_runpod_manual_recipes_carry_every_authoritative_manifest():
     playbook = (REPO / "docs" / "RUNPOD_INSTALL.md").read_text(
         encoding="utf-8"
     )
-    assert set(provision.MANUAL_TIERS) == {
+    assert set(provision.MANUAL_DOWNLOADS) == {
         "humo_1_7b",
     }
-    for tier_id, artifacts in provision.MANUAL_TIERS.items():
-        assert artifacts, f"manual tier {tier_id} has no artifacts"
+    for download_id, artifacts in provision.MANUAL_DOWNLOADS.items():
+        assert artifacts, f"manual download {download_id} has no artifacts"
         for artifact in artifacts:
             for field in ("repo", "revision", "path", "destination", "sha256"):
                 assert artifact[field] in playbook, (
-                    f"{tier_id} manual recipe is missing {field}="
+                    f"{download_id} manual recipe is missing {field}="
                     f"{artifact[field]!r}"
                 )
             assert str(artifact["bytes"]) in playbook
@@ -89,92 +88,6 @@ def test_legacy_runpod_docs_are_redirect_only(name):
     assert "```" not in redirect
     assert not any(line.startswith("    ") for line in redirect.splitlines())
     assert len(redirect) < 1000
-
-
-@pytest.mark.parametrize("line_ending", [b"\n", b"\r\n"])
-def test_gguf_patch_applies_to_exact_normalized_preimage(tmp_path, monkeypatch, line_ending):
-    provision = _load_provision()
-    comfy = _comfy(tmp_path)
-    dest = comfy / "custom_nodes" / provision.GGUF_PACK_NAME
-    clean = FIXTURE_LOADER.read_bytes().replace(b"\n", line_ending)
-    pin = _make_repo(dest, {"loader.py": clean, "requirements.txt": b"gguf\n"})
-    installed = []
-    monkeypatch.setattr(provision, "GGUF_PIN", pin)
-    monkeypatch.setattr(
-        provision,
-        "install_pack_requirements",
-        lambda name, root, required=False: installed.append((name, required)),
-    )
-
-    provision.ensure_gguf_pack(str(comfy))
-
-    assert provision._normalized_sha256(str(dest / "loader.py")) == provision.GGUF_PATCHED_SHA256
-    assert provision._git_changed_paths(str(dest)) == ["loader.py"]
-    assert provision._git_untracked_paths(str(dest)) == []
-    assert installed == [(provision.GGUF_PACK_NAME, True)]
-
-
-def test_gguf_already_patched_is_idempotent(tmp_path, monkeypatch):
-    provision = _load_provision()
-    comfy = _comfy(tmp_path)
-    dest = comfy / "custom_nodes" / provision.GGUF_PACK_NAME
-    pin = _make_repo(
-        dest,
-        {"loader.py": FIXTURE_LOADER.read_bytes(), "requirements.txt": b"gguf\n"},
-    )
-    monkeypatch.setattr(provision, "GGUF_PIN", pin)
-    monkeypatch.setattr(provision, "install_pack_requirements", lambda *args, **kwargs: None)
-
-    provision.ensure_gguf_pack(str(comfy))
-    first = (dest / "loader.py").read_bytes()
-    provision.ensure_gguf_pack(str(comfy))
-
-    assert (dest / "loader.py").read_bytes() == first
-    assert provision._git_changed_paths(str(dest)) == ["loader.py"]
-
-
-def test_manager_install_accepts_only_exact_patched_loader(tmp_path, monkeypatch):
-    provision = _load_provision()
-    comfy = _comfy(tmp_path)
-    source = comfy / "custom_nodes" / provision.GGUF_PACK_NAME
-    pin = _make_repo(
-        source,
-        {"loader.py": FIXTURE_LOADER.read_bytes(), "requirements.txt": b"gguf\n"},
-    )
-    monkeypatch.setattr(provision, "GGUF_PIN", pin)
-    monkeypatch.setattr(provision, "install_pack_requirements", lambda *args, **kwargs: None)
-    provision.ensure_gguf_pack(str(comfy))
-
-    manager_comfy = _comfy(tmp_path / "manager")
-    manager_pack = manager_comfy / "custom_nodes" / provision.GGUF_PACK_NAME
-    manager_pack.mkdir()
-    (manager_pack / "loader.py").write_bytes((source / "loader.py").read_bytes())
-    (manager_pack / "requirements.txt").write_text("gguf\n", encoding="utf-8")
-    provision.ensure_gguf_pack(str(manager_comfy))
-
-    (manager_pack / "loader.py").write_bytes(FIXTURE_LOADER.read_bytes())
-    with pytest.raises(provision.ProvisionFailure, match="clean base"):
-        provision.ensure_gguf_pack(str(manager_comfy))
-
-
-def test_gguf_refuses_wrong_commit_and_dirty_drift(tmp_path, monkeypatch):
-    provision = _load_provision()
-    comfy = _comfy(tmp_path)
-    dest = comfy / "custom_nodes" / provision.GGUF_PACK_NAME
-    pin = _make_repo(
-        dest,
-        {"loader.py": FIXTURE_LOADER.read_bytes(), "requirements.txt": b"gguf\n"},
-    )
-    monkeypatch.setattr(provision, "install_pack_requirements", lambda *args, **kwargs: None)
-
-    monkeypatch.setattr(provision, "GGUF_PIN", "0" * 40)
-    with pytest.raises(provision.ProvisionFailure, match="required"):
-        provision.ensure_gguf_pack(str(comfy))
-
-    monkeypatch.setattr(provision, "GGUF_PIN", pin)
-    (dest / "requirements.txt").write_text("changed\n", encoding="utf-8")
-    with pytest.raises(provision.ProvisionFailure, match="dirty checkout"):
-        provision.ensure_gguf_pack(str(comfy))
 
 
 def _ltxvideo_pyramid_fixture() -> bytes:

@@ -66,8 +66,8 @@ def _policy(character_engine, *, effective=None):
     policy = {
         "policy_version": 2,
         "video_models": {
-            "announcer_video_model": {"engine_id": "ltx_video"},
-            "music_video_model": {"engine_id": "ltx_video"},
+            "announcer_video_model": {"engine_id": "ltx25_video"},
+            "music_video_model": {"engine_id": "ltx25_video"},
             "character_video_model": {"engine_id": character_engine},
         },
     }
@@ -1132,21 +1132,26 @@ def test_a_silent_ltx25_character_beat_is_not_told_to_hold_still(
     assert "the subject in real motion" in prompt
 
 
-@pytest.mark.parametrize("spelling", ["ltx_audio_in", "ltx23_low_audio_in",
-                                      "ltx23_16gb_audio_in"])
-def test_an_audio_in_lane_keeps_its_framing_under_any_spelling(spelling):
+@pytest.mark.parametrize("spelling, internal", [
+    ("ltx25_native_audio_in_16gb", "ltx25_native_audio_in_16gb"),
+    ("ltx25_native_audio_in_16gb (16:9)", "ltx25_native_audio_in_16gb"),
+    ("h3_low_audio_in", "minimax_h3_audio_in"),
+])
+def test_an_audio_in_lane_keeps_its_framing_under_any_spelling(spelling,
+                                                               internal):
     """THE LIP-SYNC PROTECTION MUST NOT DEPEND ON HOW THE ID IS SPELLED.
 
-    `engine_family` is keyed on INTERNAL ids, so a shot row carrying the
-    public (`ltx23_low_audio_in`) or legacy (`ltx23_16gb_audio_in`) spelling
-    classified as `abstract` -- and once the LTX character append started
-    keying the steadying clause on family, an audio-in lane misread that way
-    would silently lose the framing that keeps its mouth in shot. Found by
-    review before it reached a render; the id is resolved before classifying.
+    `engine_family` is keyed on INTERNAL ids, so a shot row carrying a menu
+    spelling (`ltx25_native_audio_in_16gb (16:9)`) or a public id
+    (`h3_low_audio_in`) classified as `abstract` -- and once the LTX character
+    append started keying the steadying clause on family, an audio-in lane
+    misread that way would silently lose the framing that keeps its mouth in
+    shot. Found by review before it reached a render; the id is resolved
+    before classifying.
     """
     from nodes._otr_video_engines.render_driver import engine_family
     from nodes._otr_shared.public_engines import resolve_engine_id
-    assert resolve_engine_id(spelling) == "ltx_audio_in"
+    assert resolve_engine_id(spelling) == internal
     assert engine_family(resolve_engine_id(spelling), "") == \
         "audio_conditioned_video"
 

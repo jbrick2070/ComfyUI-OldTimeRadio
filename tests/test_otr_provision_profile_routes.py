@@ -1,8 +1,8 @@
 """Provisioning plans every selected profile route without hidden fallback."""
 from __future__ import annotations
 
+import copy
 import importlib.util
-import json
 from pathlib import Path
 
 import pytest
@@ -35,46 +35,48 @@ def test_no_weight_video_routes_are_registered_and_asset_free():
         assert registry.CAPABILITIES[engine_id]["model_requirements"] == []
 
 
-def test_google_omni_all_profile_skips_remote_video_download():
-    """A remaining remote-video profile must not mint a local video fetch lane."""
+def _with_every_visual(profile: dict, video: str) -> dict:
+    """A copy of one matrix row with every video selection moved to `video`."""
+    swapped = copy.deepcopy(profile)
+    swapped["slot_overrides"]["video_render_engine"] = video
+    for key in ("announcer_visual", "music_visual", "character_visual"):
+        swapped["role_overrides"][key] = video
+    return swapped
+
+
+def test_remote_video_profile_skips_remote_video_download():
+    """A remote-video profile must not mint a local video fetch lane."""
     provision = _provisioner()
-    lanes = provision.profile_lanes("google_omni_all")
-    assert "google_omni_video" not in lanes["automatic"]
-    assert "google_omni_video" not in lanes["manual"]
+    lanes = provision.profile_lanes("otr_cloud_deluxe_audio_in_3act")
+    assert "cloud_ltx25_audio_in" not in lanes["automatic"]
+    assert "cloud_ltx25_audio_in" not in lanes["manual"]
 
 
 def test_razzle_ltx_8gb_profile_uses_the_ltx_8gb_weight_lane():
     provision = _provisioner()
+    ltx_8gb = provision.load_profile("otr_8gb_video")
+    razzle = _with_every_visual(ltx_8gb, "razzle_ltx_8gb")
 
-    assert provision.profile_lanes("otr_w45_razzle_ltx_8gb") == (
-        provision.profile_lanes("otr_w45_ltx_8gb"))
-    assert "ltx_8gb" in provision.profile_lanes("otr_w45_razzle_ltx_8gb")[
-        "automatic"]
+    assert provision.profile_lanes(razzle) == provision.profile_lanes(ltx_8gb)
+    assert "ltx_8gb" in provision.profile_lanes(razzle)["automatic"]
 
 
 def test_amd_profiles_plan_their_exact_image_and_music_dependencies():
-    """AMD installs with NOTHING extra -- no manual tier, no third-party pack.
+    """AMD installs with NOTHING extra -- no manual download, no third-party pack.
 
-    This assertion was stale from 2026-09-06 to 2026-09-12. Commit b1f372a9
-    moved both AMD profiles off `flux2_klein` (which needs the third-party
-    ComfyUI-GGUF pack and a hand-fetched 11 GB tier) and onto `z_image_turbo`,
-    which comes out of OTR's own fetch manifest -- that was the whole point of
-    the commit, "Make the AMD tiers installable with nothing extra". The test
-    kept asserting the pre-change plan, so it failed for six days while the
-    code was right. It now states the shipped truth: both plans are fully
-    automatic and both manual lists are EMPTY.
+    Commit b1f372a9 moved AMD off `flux2_klein` (which needed a third-party
+    pack and a hand-fetched 11 GB download) and onto `z_image_turbo`, which
+    comes out of OTR's own fetch manifest -- "Make the AMD tiers installable
+    with nothing extra". The shipped AMD row keeps that promise: its plan is
+    fully automatic and its manual list is EMPTY.
 
-    The two differ only in VRAM ceiling (and therefore z_image vs z_image_int8);
-    both select `musicgen` (HF cache on first use, so no music lane).
+    Its 6.8 GB ceiling selects `z_image_int8`, and its `stable_audio_3` music
+    is the one audio engine with a fetcher lane of its own.
     """
     provision = _provisioner()
 
-    assert provision.profile_lanes("otr_amd16_rocm") == {
-        "automatic": ["z_image"],
-        "manual": [],
-    }
-    assert provision.profile_lanes("otr_amd8_rocm") == {
-        "automatic": ["z_image_int8"],
+    assert provision.profile_lanes("otr_amd_still") == {
+        "automatic": ["z_image_int8", "stable_audio_3"],
         "manual": [],
     }
 
@@ -85,45 +87,17 @@ def test_amd_machine_selector_has_a_complete_dry_run_plan(capsys):
     assert provision.main(["--machine", "amd", "--list"]) == 0
     output = capsys.readouterr().out
     assert "automatic    : z_image_int8" in output or "automatic    : z_image" in output
-    assert "manual tiers : none" in output
+    assert "manual       : none" in output
     assert "flux2_klein" not in output
     assert "unrecognized video engine" not in output
-
-
-def test_w45_profiles_without_complete_install_owners_are_explicit():
-    """The pod roster may exclude these; it may never discover them silently."""
-    provision = _provisioner()
-    failures = {}
-    for path in sorted((ROOT / "config" / "profiles").glob("otr_w45_*.json")):
-        try:
-            provision.profile_lanes(path.stem)
-        except provision.ProvisionFailure as exc:
-            failures[path.stem] = str(exc)
-
-    assert set(failures) == {
-        "otr_w45_fastwan",
-        "otr_w45_ltx_audio_in",
-        "otr_w45_ltx_video",
-        "otr_w45_mesh_stage",
-    }
-    assert all("unrecognized video engine" in reason
-               for reason in failures.values())
-
-
-def test_default_pod_roster_is_filtered_through_the_provision_plan_owner():
-    runtime = (ROOT / "scripts" / "otr_pod_runtime.sh").read_text(
-        encoding="utf-8")
-
-    assert '"$OTR_REPO_ROOT/scripts/otr_provision.py"' in runtime
-    assert '--profile "$profile" --check-plan' in runtime
-    assert "excluding profile without a complete provision plan" in runtime
-    assert "has no complete provision plan" in runtime
 
 
 def test_kokoro_profiles_fail_early_on_python_313_but_bark_does_not():
     provision = _provisioner()
     kokoro = provision.load_machine_profile("8gb")
-    bark = provision.load_profile("otr_4060_floor")
+    bark = copy.deepcopy(provision.load_profile("otr_8gb_animatediff"))
+    bark["slot_overrides"]["char_voice_engine"] = "bark"
+    bark["slot_overrides"]["announcer_voice_engine"] = "bark"
 
     # 2026-09-02: 3.13 runs kokoro through kokoro-onnx; only 3.14+ is flagged.
     assert provision.profile_python_issue(kokoro, (3, 13)) == ""
@@ -144,18 +118,29 @@ def test_machine_readable_plan_check_rejects_kokoro_on_python_314(
     assert "MISSING" in rejected
     assert "no backend packaged for Python 3.14" in rejected
 
+    # A row with no Kokoro voice at all (hosted voices) is ready on 3.14.
     assert provision.main([
-        "--profile", "otr_4060_floor", "--check-plan"
+        "--profile", "otr_cloud_deluxe_3act", "--check-plan"
     ]) == 0
     ready = capsys.readouterr().out
-    assert "READY: complete provision plan for otr_4060_floor" in ready
+    assert "READY: complete provision plan for otr_cloud_deluxe_3act" in ready
 
 
-def test_procedural_4060_floor_does_not_require_an_uninvoked_image_lane():
+@pytest.mark.parametrize(
+    "profile_id", ["otr_8gb_low", "otr_16gb_low", "otr_mac16_low"])
+def test_procedural_low_rows_do_not_require_an_uninvoked_image_lane(
+        profile_id):
+    """Every visual is a procedural visualizer, which consumes no still.
+
+    The rows still name an image engine per role; none may be planned. The
+    Mac row names `sd15`, which has no provisioner lane at all -- planning it
+    would raise, so this also proves the image selection is skipped rather
+    than merely routed to nothing.
+    """
     provision = _provisioner()
 
-    assert provision.profile_lanes("otr_4060_floor") == {
-        "automatic": [],
+    assert provision.profile_lanes(profile_id) == {
+        "automatic": ["stable_audio_3"],
         "manual": [],
     }
 
@@ -172,28 +157,27 @@ def test_haunted_machine_paths_do_not_require_unconsumed_klein_weights(
         }
 
 
-def test_mixed_role_plan_includes_every_video_and_rejects_unowned_images():
+@pytest.mark.parametrize("missing_image", ["lumina_image", "flux_gen1"])
+def test_mixed_role_plan_includes_every_video_and_rejects_unowned_images(
+        missing_image):
     provision = _provisioner()
+    # One role moves off its procedural visualizer onto a still-consuming
+    # video and pins an image engine that has no provisioner lane.
+    mixed = copy.deepcopy(provision.load_profile("otr_16gb_low"))
+    mixed["id"] = "mixed_role_%s" % missing_image
+    mixed["role_overrides"]["character_visual"] = "still_motion"
+    mixed["role_overrides"]["character_image"] = missing_image
 
-    # sbcov_5 pins wan + lumina_image; lumina has no provisioner lane.
     with pytest.raises(
             provision.ProvisionFailure,
-            match="unrecognized image engine"):
-        provision.profile_lanes("otr_sbcov_5")
-    for profile_id, missing_image in (
-        ("otr_soak_llmsweep_01", "flux_gen1"),
-        ("otr_soak_llmsweep_02", "flux_gen1"),
-    ):
-        with pytest.raises(
-                provision.ProvisionFailure,
-                match="unrecognized image engine %r" % missing_image):
-            provision.profile_lanes(profile_id)
+            match="unrecognized image engine %r" % missing_image):
+        provision.profile_lanes(mixed)
 
 
 def test_remote_profiles_need_no_local_video_or_image_weights():
     provision = _provisioner()
 
-    assert provision.profile_lanes("google_veo_media") == {
+    assert provision.profile_lanes("otr_cloud_deluxe_3act") == {
         "automatic": [],
         "manual": [],
     }
@@ -203,18 +187,13 @@ def test_profile_selector_rejects_path_traversal():
     provision = _provisioner()
 
     with pytest.raises(provision.ProvisionFailure, match="invalid profile id"):
-        provision.load_profile("../otr_4060_floor")
+        provision.load_profile("../otr_8gb_animatediff")
 
 
-def test_profile_selector_rejects_filename_id_drift(tmp_path, monkeypatch):
+def test_profile_selector_rejects_an_id_that_is_not_a_matrix_row():
     provision = _provisioner()
-    profiles = tmp_path / "config" / "profiles"
-    profiles.mkdir(parents=True)
-    (profiles / "requested.json").write_text(
-        json.dumps({"id": "different"}), encoding="utf-8"
-    )
-    monkeypatch.setattr(provision, "_REPO", str(tmp_path))
 
     with pytest.raises(
-            provision.ProvisionFailure, match="profile filename/id drift"):
+            provision.ProvisionFailure,
+            match="'requested' is not a row of config/workflow_matrix.json"):
         provision.load_profile("requested")

@@ -5,7 +5,7 @@ was "the image phase has not run yet" (defer) or "this beat is broken" (fail)
 by SUBSTRING-MATCHING the exception message against four needles. The LTX-I2V
 gap says "LTX-I2V requires a minted scene still for beat %s; the image phase
 produced no usable path", which matches none of them -- so ShotLock re-raised,
-plan-build died, and `ltx_video` came back NO_RENDER in the 2026-07-28
+plan-build died, and an LTX lane came back NO_RENDER in the 2026-07-28
 engine-coverage campaign. An engine was off the air because of prose.
 
 Deferrability is a property of the RAISE SITE, so the raise site declares it.
@@ -105,32 +105,26 @@ def _raise_roster():
     return out
 
 
-#: The five CAST-TIME image gaps. Matched by a distinctive phrase from each
+#: The CAST-TIME image gaps. Matched by a distinctive phrase from each
 #: message rather than by line number, because line numbers rot and this file
-#: has already had every cite in it move at least once.
+#: has already had every cite in it move at least once. Every image_to_video
+#: lane surfaces its cast-time gap through the SHARED scene-init raise -- the
+#: "has NO scene still" needle. Deferral itself is by TYPE, so a lane needs no
+#: private wording to be protected.
 DEFERRABLE = (
     "has NO scene still",                              # scene-init family
-    "IA2V TALKING register:",                          # missing cast portrait
-    "(MetaBrief mints it when the engine lip-syncs)",  # missing radio face
-    # "LTX-I2V requires a minted scene still" was REMOVED 2026-08-28: its
-    # raise site went with OTR_ENABLE_LTX_I2V. ltx_video declares
-    # family="image_to_video" now, so its cast-time gap surfaces through
-    # the SHARED scene-init raise -- the "has NO scene still" needle
-    # above, which this table already covers. Deferral itself is by
-    # TYPE, so the lane lost no protection, only a private wording.
     "OTR_ENABLE_HUMO_HOSTS is ON but no radio_host_portrait",
 )
 
 #: Must stay TERMINAL. The first three are POST-image still-spine validation:
 #: reaching them means image generation actually ran and FAILED, so deferring
-#: would defer to nobody. The last two are wrong-STYLE/ASPECT -- the still
-#: exists, it is simply the wrong shape, which no later phase will fix.
+#: would defer to nobody. The last is wrong-STYLE -- the still exists, it is
+#: simply the wrong kind of face, which no later phase will fix.
 TERMINAL = (
     "still-spine handoff missing materialized scene still",
     "still-spine handoff missing materialized jump-segment",
     "still-spine handoff missing materialized portrait",
     "RADIO FACE LOGIC:",
-    "radio-face still %r is %dx%d (NOT wide)",
 )
 
 
@@ -158,10 +152,9 @@ def test_post_image_and_wrong_shape_failures_stay_terminal(phrase):
 
 
 def test_the_deferrable_and_terminal_sets_do_not_overlap():
-    """The two ltx_audio_in bookend raises sit four lines apart and open with
-    the SAME sentence -- one is a missing still (deferrable), one is a still of
-    the wrong aspect (terminal). A phrase that matched both would let this
-    file pass while asserting nothing, so the disjointness is checked."""
+    """A missing still (deferrable) and a still of the wrong kind (terminal)
+    can be worded almost identically. A phrase that matched both would let
+    this file pass while asserting nothing, so the disjointness is checked."""
     roster = _raise_roster()
     defer = {line for exc, msg, line in roster
              if any(p in msg for p in DEFERRABLE)}
@@ -190,7 +183,7 @@ def _ledger():
 
 def _policy():
     return {"policy_version": 2,
-            "video_models": {"character_video_model": {"engine_id": "wan_i2v"}}}
+            "video_models": {"character_video_model": {"engine_id": "ltx_8gb"}}}
 
 
 def _preflight(monkeypatch, raiser):
@@ -204,7 +197,7 @@ def _preflight(monkeypatch, raiser):
 
     monkeypatch.setattr(rd, "build_request_from_shot", _boom)
     return sl._assert_family_inputs_satisfiable_cast_time(
-        "wan_i2v", _beat(), _ledger(), _policy())
+        "ltx_8gb", _beat(), _ledger(), _policy())
 
 
 def test_a_declared_cast_time_gap_is_DEFERRED_not_raised(monkeypatch, caplog):
@@ -252,7 +245,7 @@ def test_an_unexpected_exception_PROPAGATES_it_is_no_longer_swallowed(monkeypatc
 def test_the_ltx_i2v_wording_is_what_the_OLD_needles_missed():
     """The live defect, pinned as arithmetic rather than as a story.
 
-    `ltx_video` came back NO_RENDER because ShotLock's four substring needles
+    An LTX lane came back NO_RENDER because ShotLock's four substring needles
     did not cover the LTX-I2V gap's prose. Deleting the needles fixed it; this
     records WHY, so nobody reintroduces message-matching thinking the needle
     list was merely incomplete. It was not incomplete -- it was the wrong

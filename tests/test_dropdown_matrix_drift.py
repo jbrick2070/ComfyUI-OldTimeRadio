@@ -148,9 +148,23 @@ def test_the_two_questions_stay_separate():
 
 
 def test_machine_columns_name_real_shipped_profiles():
-    """Every column is reproducible -- a reader can run that exact profile."""
-    for machine in _generator().MACHINES:
-        path = os.path.join(_REPO, "config/experiments/%s.json" % machine["profile"])
-        assert os.path.exists(path), (
-            "column %r names profile %r, which does not exist"
+    """Every column is reproducible -- a reader can open that exact graph.
+
+    A column names a row of `config/workflow_matrix.json`, and the doc's
+    "reproduce with" cell points at the variant that row emits, so both have
+    to exist.
+    """
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    from nodes._otr_shared.capability_profiles import known_profile_ids
+
+    M = _generator()
+    rows = known_profile_ids()
+    for machine in M.MACHINES:
+        assert machine["profile"] in rows, (
+            "column %r names profile %r, which is not a workflow_matrix row"
             % (machine["label"], machine["profile"]))
+        variant = os.path.join(_REPO, M._variant_for(machine["profile"]))
+        assert os.path.exists(variant), (
+            "column %r reproduces with %r, which does not exist"
+            % (machine["label"], variant))

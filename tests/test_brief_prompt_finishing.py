@@ -143,7 +143,7 @@ def test_scene_open_motion_and_budget(monkeypatch):
         ]},
     }
     shot = {"shot_id": "shot_b001", "source_line_ids": ["b001"],
-            "role": "announcer_visual", "engine_id": "ltx_video",
+            "role": "announcer_visual", "engine_id": "ltx25_video",
             "group_id": "grp_announcer_visual", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
@@ -229,7 +229,7 @@ def test_ltx_scene_prompt_uses_still_profile_tail(monkeypatch):
     still_tail = sbh.get_era_tail(meta, profile="still")
     ledger = {"meta": meta, "lines": []}
     shot = {"shot_id": "shot_b009", "source_line_ids": [],
-            "role": "retired_role_a", "engine_id": "ltx_video",
+            "role": "retired_role_a", "engine_id": "ltx25_video",
             "group_id": "grp_retired_role_a", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)
@@ -273,25 +273,19 @@ def test_humo_character_beat_preserves_authored_m4_visual_vocabulary():
 
 def test_humo_announcer_beat_keeps_radio_styling(monkeypatch):
     # NOTE 2026-06-30: _enforce_radio_is_host redirects this fixture's
-    # engine_id="humo" pick to "ltx_audio_in" before any prompt logic runs (an
-    # announcer_visual beat can no longer stay on a HuMo-family engine -- "the
-    # radio is the host"). The M4-verbatim-prompt handling below is IDENTICAL
-    # on either engine for this exempt (announcer, gear-not-scrubbed) case, so
-    # the assertions are unchanged; only the reason they hold has shifted.
-    # NOTE 2026-07-02 (lips-dont-talk): under ia2v_canonical the TALKING
-    # register now OUTRANKS M4 on announcer bookends -- this M4-verbatim
-    # contract belongs to the SINGLE-PASS recipes, so pin one (the ia2v
-    # behavior is locked in test_ltx_av_ia2v_canonical.py).
+    # engine_id="humo" pick to the local LTX audio-in lane before any prompt
+    # logic runs (an announcer_visual beat can no longer stay on a HuMo-family
+    # engine -- "the radio is the host"). The M4-verbatim-prompt handling below
+    # is IDENTICAL on either engine for this exempt (announcer,
+    # gear-not-scrubbed) case, so the assertions are unchanged; only the reason
+    # they hold has shifted.
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     creative = {"text_prompt": ("vintage radio announcer at a chrome "
                                 "microphone, ON AIR sign"), "source": "llm"}
     shot = _face_shot("announcer_visual", creative)
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx_audio_in"           # redirected off HuMo
+    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirected off HuMo
     assert "microphone" in req["text_prompt"].lower()   # exempt BY DESIGN
     assert req["observability"]["prompt_source"] == "shared_video_prompting_engine"
 
@@ -310,37 +304,30 @@ def test_announcer_beat_missing_creative_redirects_off_humo_to_radio_console(
         monkeypatch):
     """2026-06-30 HuMo-improve plan (reversing Route-A 2026-06-28, "the radio
     is the host"): render_driver._enforce_radio_is_host now redirects an
-    announcer_visual pick of a HuMo-family engine to ltx_audio_in BEFORE any
-    prompt logic runs (this fixture's ``_face_shot`` still requests
-    engine_id="humo" -- the point is that the driver no longer honors it for
-    this role). A beat with no M4 creative prompt therefore no longer falls to
-    the old hardcoded "1940s radio studio" HuMo default: it flows through the
-    pre-existing role-driven LTX motion-prompt path (_ltx_motion_role_key),
-    producing an animated RADIO-CONSOLE prompt -- never a human face.
-
-    2026-07-02 (lips-dont-talk): the console-motion contract belongs to the
-    SINGLE-PASS recipes; under ia2v_canonical this announcer bookend swaps to
-    the TALKING register (locked in test_ltx_av_ia2v_canonical.py)."""
+    announcer_visual pick of a HuMo-family engine to the local LTX audio-in
+    lane BEFORE any prompt logic runs (this fixture's ``_face_shot`` still
+    requests engine_id="humo" -- the point is that the driver no longer honors
+    it for this role). A beat with no M4 creative prompt therefore no longer
+    falls to the old hardcoded "1940s radio studio" HuMo default: it flows
+    through the role-driven LTX motion-prompt path, producing an animated
+    RADIO-CONSOLE prompt -- never a human face."""
     from nodes._otr_video_engines import render_driver as rd
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     shot = _face_shot("announcer_visual", {})
     req = rd.build_request_from_shot(shot, _FACE_LEDGER)
-    assert shot["engine_id"] == "ltx_audio_in"              # redirected off HuMo
+    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirected off HuMo
     assert req["observability"]["prompt_source"] == "motion_role"
     assert "console" in req["text_prompt"].lower()
 
 
 def test_retired_role_a_on_ltx_no_longer_generic(monkeypatch):
-    """GPT#8: a no-creative retired_role_a shot on ltx_video gets the brief
+    """GPT#8: a no-creative retired_role_a shot on an LTX lane gets the brief
     core, not the generic '1940s radio studio' default."""
     from nodes._otr_video_engines import render_driver as rd
     monkeypatch.delenv("OTR_LTX_RADIO_PROMPT", raising=False)
     ledger = {"meta": _OK_META, "lines": []}
     shot = {"shot_id": "shot_b009", "source_line_ids": [],
-            "role": "retired_role_a", "engine_id": "ltx_video",
+            "role": "retired_role_a", "engine_id": "ltx25_video",
             "group_id": "grp_retired_role_a", "target_frame_count": 50,
             "creative": {}}
     req = rd.build_request_from_shot(shot, ledger)

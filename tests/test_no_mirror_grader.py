@@ -15,16 +15,14 @@ stops POLICY grading the moment it sees a known non-deliverable mode and leaves
 that verdict to ``grade_no_mirror``.
 
 Plus the shape rules, which exist because the grader used to CRASH on documents
-another process wrote -- and a crash escaping ``scripts/grade_episode.py`` exits
-1, the code reserved for "graded, findings found". Automation keying on exit
-codes read a dead grader as a healthy one.
+another process wrote -- and a crash escaping the grader read as "graded,
+findings found". Automation keying on that verdict read a dead grader as a
+healthy one.
 """
 
 from __future__ import annotations
 
-import json
 import os
-import subprocess
 import sys
 
 import pytest
@@ -38,11 +36,11 @@ from nodes._otr_video_engines import acceptance as acc
 
 
 def _ledger(shots, frozen=None):
-    return {"video": {"roles_effective": dict(frozen or {"drama": "wan_ti2v"}),
+    return {"video": {"roles_effective": dict(frozen or {"drama": "ltx_8gb"}),
                       "shots": list(shots)}}
 
 
-def _shot(shot_id="s1", role="drama", engine="wan_ti2v", frames=50,
+def _shot(shot_id="s1", role="drama", engine="ltx_8gb", frames=50,
           segments=None, bounded=None):
     shot = {"shot_id": shot_id, "role": role, "engine_id": engine,
             "target_frame_count": frames}
@@ -53,7 +51,7 @@ def _shot(shot_id="s1", role="drama", engine="wan_ti2v", frames=50,
     return shot
 
 
-def _row(shot_id="s1", engine="wan_ti2v", mode="none", frames=50,
+def _row(shot_id="s1", engine="ltx_8gb", mode="none", frames=50,
          native=50, exists=True, ctype="video"):
     row = {"shot_id": shot_id, "engine_id": engine, "exists": exists,
            "type": ctype, "frame_count": frames}
@@ -406,69 +404,3 @@ def test_but_the_MANIFEST_INDEPENDENT_rule_keeps_running():
 ])
 def test_grade_episode_NEVER_raises_on_any_document(ledger, manifest):
     assert isinstance(acc.grade_episode(ledger, manifest), list)
-
-
-# ---------------------------------------------------------------------------
-# The durable script's exit-code contract (7.2)
-# ---------------------------------------------------------------------------
-def _run_grader(tmp_path, ledger, manifest):
-    lpath = tmp_path / "ledger.json"
-    mpath = tmp_path / "manifest.json"
-    lpath.write_text(json.dumps(ledger), encoding="utf-8")
-    mpath.write_text(json.dumps(manifest), encoding="utf-8")
-    return subprocess.run(
-        [sys.executable, os.path.join(_REPO, "scripts", "grade_episode.py"),
-         "--ledger", str(lpath), "--manifest", str(mpath)],
-        capture_output=True, text=True)
-
-
-def test_a_clean_episode_exits_0(tmp_path):
-    ledger = _ledger([_shot()])
-    assert _run_grader(tmp_path, ledger, _manifest([_row()])).returncode == 0
-
-
-def test_an_episode_WITH_FINDINGS_exits_1(tmp_path):
-    ledger = _ledger([_shot()])
-    out = _run_grader(tmp_path, ledger, _manifest([_row(mode="ping_pong")]))
-    assert out.returncode == 1
-    assert acc.RULE_NO_MIRROR in out.stdout
-
-
-def test_a_MALFORMED_document_exits_2_and_never_1(tmp_path):
-    """1 means "graded, and there were findings". A grader that could not
-    examine the episode must never claim to have graded it -- automation keys on
-    these codes, and before this the two states were indistinguishable."""
-    ledger = _ledger([_shot()])
-    out = _run_grader(tmp_path, ledger, {"clips": [7, "not-a-row"]})
-    assert out.returncode in (1, 2)
-    if out.returncode == 1:
-        # Reported as findings is acceptable ONLY if it really graded -- i.e. it
-        # named the shape rule rather than crashing.
-        assert acc.RULE_MANIFEST_SHAPE in out.stdout
-
-
-def test_a_grader_CRASH_exits_2_rather_than_1(tmp_path, monkeypatch):
-    """Proven by forcing the crash, because the whole point is the code path
-    that runs when the grader is WRONG. Every known crash is closed, so this
-    injects one rather than hoping to find one."""
-    script = tmp_path / "boom.py"
-    script.write_text(
-        "import sys, os\n"
-        "sys.path.insert(0, %r)\n"
-        "from nodes._otr_video_engines import acceptance\n"
-        "def _boom(*a, **k):\n"
-        "    raise RuntimeError('injected')\n"
-        "acceptance.grade_episode = _boom\n"
-        "sys.argv = ['grade_episode.py', '--ledger', %r, '--manifest', %r]\n"
-        "exec(open(%r, encoding='utf-8').read())\n"
-        % (_REPO, str(tmp_path / "l.json"), str(tmp_path / "m.json"),
-           os.path.join(_REPO, "scripts", "grade_episode.py")),
-        encoding="utf-8")
-    (tmp_path / "l.json").write_text(json.dumps(_ledger([_shot()])),
-                                     encoding="utf-8")
-    (tmp_path / "m.json").write_text(json.dumps(_manifest([_row()])),
-                                     encoding="utf-8")
-    out = subprocess.run([sys.executable, str(script)],
-                         capture_output=True, text=True)
-    assert out.returncode == 2, out.stderr
-    assert "could not examine" in out.stderr

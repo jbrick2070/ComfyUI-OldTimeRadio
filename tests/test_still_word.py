@@ -500,7 +500,7 @@ def test_era_tail_preserves_authored_world_terms_in_word_mode():
 def test_roles_from_policy_resolves_video_models():
     policy = json.dumps({"video_models": {
         "character_video_model": {"engine_id": "still_word"},
-        "announcer_video_model": {"engine_id": "ltx_video"},
+        "announcer_video_model": {"engine_id": "ltx25_video"},
         "music_video_model": {"engine_id": "still_word"},
     }})
     roles = ip._still_word_roles_from_policy(policy)
@@ -511,13 +511,13 @@ def test_roles_from_policy_empty_when_absent():
     assert ip._still_word_roles_from_policy("{}") == set()
     assert ip._still_word_roles_from_policy(
         json.dumps({"video_models": {"character_video_model":
-                                     {"engine_id": "ltx_video"}}})) == set()
+                                     {"engine_id": "ltx25_video"}}})) == set()
 
 
 def test_force_map_into_still_word_included(monkeypatch):
     # r3 seam: a run that FORCES a role to still_word must mint word cards.
     policy = json.dumps({"video_models": {
-        "character_video_model": {"engine_id": "ltx_video"}}})
+        "character_video_model": {"engine_id": "ltx25_video"}}})
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     assert ip._still_word_roles_from_policy(policy) == set()      # unforced
     monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=still_word")
@@ -529,7 +529,7 @@ def test_force_map_away_from_still_word_excluded(monkeypatch):
         "character_video_model": {"engine_id": "still_word"}}})
     monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
     assert ip._still_word_roles_from_policy(policy) == {"character_video"}
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx_video")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "character_video=ltx25_video")
     assert ip._still_word_roles_from_policy(policy) == set()
 
 

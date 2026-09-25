@@ -36,6 +36,7 @@ from nodes import _otr_workflow_apply as wa
 from nodes.otr_video_director import exact_menu_option_for
 from nodes._otr_shared import capability_profiles as cp
 from nodes._otr_shared.capability_profiles import ProfileError
+from nodes._otr_shared.public_engines import resolve_engine_id
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parent.parent
 MASTER = REPO_ROOT / "workflows" / "otr_canonical.json"
@@ -76,7 +77,7 @@ def _registry_engine_ids():
     # substring) comes in through `eng_cloud_video`.
     from nodes._otr_video_engines import (  # noqa: F401
         cheap_families, eng_cloud_video, eng_humo,
-        eng_ltx_video,
+        eng_ltx25,
     )
     from nodes._otr_audio_engines import registry as areg
     from nodes._otr_audio_engines import (  # noqa: F401
@@ -123,22 +124,22 @@ def test_api_prompt_parity_on_master(schemas, master_copy):
 # Profile application gate
 # ---------------------------------------------------------------------------
 def test_apply_cloud_profile_retargets_canonical(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "otr_cloud_lanes", schemas=schemas)
+    applied = wa.apply_profile(master_copy, "otr_cloud_low", schemas=schemas)
     assert wa.workflow_to_api_prompt(master_copy, schemas) != \
         wa.workflow_to_api_prompt(applied, schemas), (
-        "otr_cloud_lanes should be an explicit profile override, not the saved "
+        "otr_cloud_low should be an explicit profile override, not the saved "
         "canonical baseline"
     )
 
 
 def test_apply_profile_is_pure(schemas, master_copy):
     before = copy.deepcopy(master_copy)
-    wa.apply_profile(master_copy, "8gb_lite", schemas=schemas)
+    wa.apply_profile(master_copy, "otr_8gb_still", schemas=schemas)
     assert master_copy == before, "apply_profile mutated its input workflow"
 
 
 def test_apply_profile_never_touches_node63_path(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "8gb_lite", schemas=schemas)
+    applied = wa.apply_profile(master_copy, "otr_8gb_still", schemas=schemas)
     node63 = [n for n in applied["nodes"] if n["type"] == "OTR_WorkflowValidator"]
     orig63 = [n for n in master_copy["nodes"] if n["type"] == "OTR_WorkflowValidator"]
     assert node63 and node63[0]["widgets_values"] == orig63[0]["widgets_values"], (
@@ -146,15 +147,14 @@ def test_apply_profile_never_touches_node63_path(schemas, master_copy):
     )
 
 
-def test_apply_8gb_lite_lands_its_overrides(schemas, master_copy, mapping):
-    applied = wa.apply_profile(master_copy, "8gb_lite", schemas=schemas)
-    prof = cp.load_profile("8gb_lite")
+def test_apply_otr_16gb_video_lands_its_overrides(schemas, master_copy, mapping):
+    """The one matrix row that states a seed as well as its lanes, so all three
+    managed kinds -- a role, a slot and the seed policy -- are proven to land."""
+    applied = wa.apply_profile(master_copy, "otr_16gb_video", schemas=schemas)
+    prof = cp.load_profile("otr_16gb_video")
     nodes_by_type = {n["type"]: n for n in applied["nodes"]}
     for dotted, value in (
         ("role_overrides.announcer_visual", prof["role_overrides"]["announcer_visual"]),
-        # voice is deliberately NOT overridden any more -- it splices from
-        # the canonical so it can never drift. music_engine is a key this
-        # profile genuinely does set, which is what this test is about.
         ("slot_overrides.music_engine", prof["slot_overrides"]["music_engine"]),
         ("seed_policy.request_seed", prof["seed_policy"]["request_seed"]),
     ):
@@ -164,7 +164,9 @@ def test_apply_8gb_lite_lands_its_overrides(schemas, master_copy, mapping):
             expected = value
             if (node_type == "OTR_VideoDirector"
                     and widget in wa._VIDEO_DIRECTOR_WIDGETS):
-                expected = exact_menu_option_for(value)
+                # The row names the PUBLIC id; the canvas stores the menu label
+                # of the internal engine it resolves to.
+                expected = exact_menu_option_for(resolve_engine_id(value))
             assert node["widgets_values"][slots.index(widget)] == expected, (
                 dotted, node_type)
 
@@ -179,47 +181,12 @@ def _director_video_label(internal_id):
     return exact_menu_option_for(internal_id)
 
 
-def test_apply_otr_cloud_lanes_lands_cloud_only_routes(schemas, master_copy):
-    applied = wa.apply_profile(master_copy, "otr_cloud_lanes", schemas=schemas)
-    nodes_by_type = {n["type"]: n for n in applied["nodes"]}
-
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_CastLock", "cast_voice_policy"
-    ) == "auto_registry"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_CastLock", "char_voice_engine"
-    ) == "cloud_elevenlabs"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_CastLock", "announcer_voice_engine"
-    ) == "cloud_elevenlabs"
-    # 4a/4b have no engine widget; CastLock stamps are the routing.
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_StableAudioTheme", "engine"
-    ) == "sonilo"
-    assert _widget_value(
-        nodes_by_type, schemas, "OTR_VideoRenderBatch", "engine"
-    ) == "cloud_wan_i2v_audio"
-
-    for widget in (
-        "announcer_video_model", "music_video_model", "character_video_model",
-    ):
-        assert _widget_value(
-            nodes_by_type, schemas, "OTR_VideoDirector", widget
-        ) == _director_video_label("cloud_wan_i2v_audio")
-    for widget in (
-        "announcer_image_model", "music_image_model", "character_image_model",
-    ):
-        assert _widget_value(
-            nodes_by_type, schemas, "OTR_VideoDirector", widget
-        ) == "cloud_nano_banana_2"
-
-
 def test_apply_otr_cloud_low_trio_is_cheapest_nodes_length_only(schemas, master_copy):
     """Paid axis is act_count. All three cheap cloud-low graphs share
     Sonnet 5 creative + GPT 5.6 Luna tech on Comfy Credits plus Vidu Q2
     Pro Fast 720p (mute) and the cheapest partner stack so credits scale
-    with length, not model. Deluxe/riches stays Wan audio-in and is not
-    this test."""
+    with length, not model. The deluxe rows ride LTX 2.5 and are the two
+    tests below, not this one."""
     expected_acts = {
         "otr_cloud_low_1act": "1",
         "otr_cloud_low": "3",
@@ -357,8 +324,8 @@ def test_apply_otr_cloud_deluxe_audio_in_3act_is_sonnet_luna_and_ltx25_a2v(
 
 
 def test_apply_profile_rejects_typoed_key(schemas, master_copy):
-    prof = copy.deepcopy(cp.load_profile("otr_cloud_lanes"))
-    prof["role_overrides"]["announcer_visualz"] = "ltx_video"
+    prof = copy.deepcopy(cp.load_profile("otr_cloud_low"))
+    prof["role_overrides"]["announcer_visualz"] = "ltx25_video"
     with pytest.raises(ProfileError, match="no widget-mapping entry"):
         wa.apply_profile(master_copy, prof, schemas=schemas)
 
@@ -370,7 +337,7 @@ def test_apply_profile_rejects_ambiguous_node_type(schemas, master_copy):
     clone["id"] = 9999
     dup["nodes"].append(clone)
     with pytest.raises(ProfileError, match="occurs 2x"):
-        wa.apply_profile(dup, "otr_cloud_lanes", schemas=schemas)
+        wa.apply_profile(dup, "otr_cloud_low", schemas=schemas)
 
 
 # ---------------------------------------------------------------------------
@@ -428,24 +395,17 @@ def test_coverage_direction2_every_engine_combo_is_managed(schemas, master_copy,
                     missing.append((ntype, widget))
     assert not missing, (
         f"engine-valued COMBO widgets not managed by the applier (add to "
-        f"config/profiles/widget_mapping.json or exempt them): {missing}"
+        f"config/widget_map.json or exempt them): {missing}"
     )
 
 
-_ALL_COMMITTED_PROFILES = (
-    "16gb_full", "8gb_lite", "cpu_floor", "otr_cloud_lanes",
-    "google_veo_media", "google_omni_media", "google_veo_all",
-    "google_omni_all",
-)
-
-
-@pytest.mark.parametrize("profile_id", _ALL_COMMITTED_PROFILES)
+@pytest.mark.parametrize("profile_id", cp.known_profile_ids())
 def test_apply_every_committed_profile_patches_clean(
         schemas, master_copy, mapping, profile_id):
-    """S2: every committed v2 profile applies onto the canonical master
+    """S2: every workflow_matrix.json row applies onto the canonical master
     without an unmapped-key or widget-validation refusal -- proves the
-    new llm.* / render.* managed entries end to end (incl. the GGUF
-    dropdown label and the openrouter: admit path)."""
+    llm.* / render.* managed entries end to end (incl. the writer dropdown
+    labels and the comfy: slot admit path)."""
     out = wa.apply_profile(master_copy, profile_id, mapping=mapping,
                            schemas=schemas)
     assert out is not master_copy
@@ -573,9 +533,9 @@ def test_script_patch_creative_refuses_managed_names(schemas, master_copy):
 def test_apply_profile_to_workflow_headless_seam(schemas, master_copy, capsys):
     """The script-lane seam drives the SAME applier and prints the resolved
     profile so a headless mutation is visible in logs."""
-    applied = otr_api.apply_profile_to_workflow(master_copy, "otr_cloud_lanes", schemas)
+    applied = otr_api.apply_profile_to_workflow(master_copy, "otr_cloud_low", schemas)
     out = capsys.readouterr().out
-    assert "RESOLVED PROFILE otr_cloud_lanes" in out
+    assert "RESOLVED PROFILE otr_cloud_low" in out
     assert wa.workflow_to_api_prompt(applied, schemas) != \
         wa.workflow_to_api_prompt(master_copy, schemas)
 

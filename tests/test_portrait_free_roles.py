@@ -74,13 +74,13 @@ def test_humo_KEEPS_its_character_portrait():
     assert "character_video" not in free, "HuMo character portraits must survive"
 
 
-def test_wan_ti2v_is_portrait_free_because_the_scene_still_overrides_it():
-    """`wan_ti2v` is family `image_to_video`, which IS in
+def test_ltx_8gb_is_portrait_free_because_the_scene_still_overrides_it():
+    """`ltx_8gb` is family `image_to_video`, which IS in
     `_SCENE_INIT_FAMILIES`, so render_driver replaces the portrait init with the
     per-beat scene still. Its plan says portrait `never` and that matches what
     the renderer actually does -- the declaration is finer-grained than "i2v
     lanes need a portrait" would suggest."""
-    free = _portrait_free_roles_from_policy(_policy("wan_ti2v", "wan_ti2v", "wan_ti2v"))
+    free = _portrait_free_roles_from_policy(_policy("ltx_8gb", "ltx_8gb", "ltx_8gb"))
     assert free == ALL_ROLES
 
 
@@ -138,7 +138,7 @@ def test_it_reads_the_declaration_rather_than_naming_engines():
                            and isinstance(fn.body[0].value, ast.Constant)
                            and isinstance(fn.body[0].value.value, str)) else fn.body
     code = chr(10).join(ast.unparse(node) for node in body)
-    for engine_id in ("still_word", "still_flat", "wan_ti2v", "humo"):
+    for engine_id in ("still_word", "still_flat", "ltx_8gb", "humo"):
         assert engine_id not in code, f"{engine_id} is hardcoded in the logic"
 
 

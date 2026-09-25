@@ -193,10 +193,10 @@ def test_acceptance_space_docking_host_reads_as_radio_and_grounds():
 
 
 # --------------------------------------------------------------------------- #
-# Talking-radio kibitz r1 (Sub-plan B): the LTX-ONLY mouth-forward style
+# Talking-radio kibitz r1 (Sub-plan B): the mouth-forward style
 # (radio_host_style="ltx_radio_mouth") -- used ONLY by the talking radio face still mint
-# (the init stills the EXISTING ltx_audio_in engine receives; no new video
-# model / path). The HuMo console_face / radio_head_person looks must stay
+# (the wide radio-with-lips init for a bookend whose engine lip-syncs; no new
+# video model / path). The HuMo console_face / radio_head_person looks must stay
 # BYTE-UNCHANGED (goldens below, captured pre-split @ 5cce9c2).
 # --------------------------------------------------------------------------- #
 def test_ltx_radio_mouth_leads_with_prominent_mouth():
@@ -292,12 +292,17 @@ def test_humo_console_face_prompts_preserve_authored_atmosphere():
         {}, "portrait", "console_face") == _GOLDEN_BARE_CONSOLE_PORTRAIT
 
 
-def test_mint_ltx_audio_in_gets_mouth_still(monkeypatch):
+#: The live engine whose ``wants_talking_prompt()`` hook answers True: it
+#: lip-syncs its reference image, so a bookend routed to it is a talking role.
+_TALKING_ENGINE = "cloud_kling_avatar"
+
+
+def test_mint_talking_announcer_gets_mouth_still(monkeypatch):
     # The talking_roles (computed from policy by the director) determines the mouth still.
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={"announcer_visual": True},
-        video_models={"announcer_video_model": {"engine_id": "ltx_audio_in"}})
+        video_models={"announcer_video_model": {"engine_id": _TALKING_ENGINE}})
     objs = {o["object_id"]: o for o in out["objects"]}
     
     # 1) The WIDE still gets the rubbery mouth
@@ -311,15 +316,15 @@ def test_mint_ltx_audio_in_gets_mouth_still(monkeypatch):
         _SPACE_META, "portrait", "radio_object")
 
 
-def test_mint_ltx_audio_in_music_gets_radio_with_lips(monkeypatch):
-    # Music is always a radio. When its selected engine is audio-driven LTX, it
-    # receives the same wide radio-with-lips init as an audio-driven announcer.
+def test_mint_talking_music_gets_radio_with_lips(monkeypatch):
+    # Music is always a radio. When its selected engine lip-syncs, it receives
+    # the same wide radio-with-lips init as a talking announcer.
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={"music_visual": True},
         video_models={
             "announcer_video_model": {"engine_id": "viz_mxc_cpu"},
-            "music_video_model": {"engine_id": "ltx_audio_in"},
+            "music_video_model": {"engine_id": _TALKING_ENGINE},
             "character_video_model": {"engine_id": "viz_camera"},
         })
     objs = {o["object_id"]: o for o in out["objects"]}
@@ -343,33 +348,13 @@ def test_humo_radio_host_uses_announcer_slot_when_music_is_procedural(monkeypatc
     assert "dial" in host["prompt"] and "face" in host["prompt"]
 
 
-def test_redirected_humo_announcer_mints_ltx_mouth_still(monkeypatch):
-    # Render redirects announcer_visual HuMo picks to ltx_audio_in when HuMo hosts
-    # are off. MetaBrief must plan against that effective engine, or the render
-    # driver later fails on the missing still_announcer_visual_radio_face_169 row.
-    monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.delenv("OTR_FORCE_ENGINE_MAP", raising=False)
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
-    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
-    out, _w = mbp.derive_image_prompts(
-        [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
-        talking_roles={},
-        video_models={"announcer_video_model": {"engine_id": "humo"}})
-    objs = {o["object_id"]: o for o in out["objects"]}
-    face = objs["still_announcer_visual_radio_face_169"]
-    assert face["role"] == "announcer_visual"
-    assert face["w"] > face["h"]
-    assert "rubbery mouth" in face["prompt"]
-
-
-def test_force_map_to_ltx_announcer_mints_mouth_still(monkeypatch):
+def test_force_map_to_talking_announcer_mints_mouth_still(monkeypatch):
     # The saved workflow can carry a non-still-consuming announcer slot; a smoke
-    # leg can then force announcer_visual to ltx_audio_in. MetaBrief must honor the
-    # same effective engine as render/dispatcher, not the stale saved slot.
+    # leg can then force announcer_visual to a lip-syncing engine. MetaBrief must
+    # honor the same effective engine as render/dispatcher, not the stale saved slot.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
-    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
+                       "announcer_visual=%s" % _TALKING_ENGINE)
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={},
@@ -378,15 +363,13 @@ def test_force_map_to_ltx_announcer_mints_mouth_still(monkeypatch):
     assert "still_announcer_visual_radio_face_169" in objs
 
 
-def test_force_map_to_single_pass_ltx_does_not_mint_mouth_still(monkeypatch):
-    # The radio-face still is required by the ia2v lip-sync graph only. A forced
-    # single-pass ltx_audio_in smoke keeps the old faceless scene-still contract.
+def test_force_map_to_non_talking_engine_does_not_mint_mouth_still(monkeypatch):
+    # The radio-face still belongs to a lip-syncing engine only. A forced
+    # audio-in lane that conditions the picture on the waveform without
+    # lip-syncing keeps the faceless scene-still contract.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP", "announcer_visual=ltx_audio_in")
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
+    monkeypatch.setenv("OTR_FORCE_ENGINE_MAP",
+                       "announcer_visual=ltx25_native_audio_in_16gb")
     out, _w = mbp.derive_image_prompts(
         [], _SPACE_META, llm_fn=None, lines=_bookend_lines(),
         talking_roles={},
@@ -472,7 +455,7 @@ def test_enforce_radio_is_host_redirects_when_toggle_off(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     shot = _humo_bookend_shot()
     rd._enforce_radio_is_host(shot)
-    assert shot["engine_id"] == "ltx_audio_in"     # today's behavior byte-for-byte
+    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # today's behavior byte-for-byte
 
 
 def test_enforce_radio_is_host_noop_when_toggle_on(monkeypatch):
@@ -482,13 +465,17 @@ def test_enforce_radio_is_host_noop_when_toggle_on(monkeypatch):
     assert shot["engine_id"] == "humo"             # HuMo radio-host allowed
 
 
-def _bookend_ledger(tmp_path, with_face=True):
+def _bookend_ledger(tmp_path, with_face=True, with_scene_still=False):
     imgs = []
     if with_face:
         face = tmp_path / "radio_host.png"
         face.write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 80)
         imgs.append({"object_id": "radio_host_portrait", "kind": "portrait",
                      "path": str(face)})
+    if with_scene_still:
+        imgs.append({"object_id": "still_b000", "beat_id": "b000",
+                     "kind": "scene_beat",
+                     "path": str(tmp_path / "still_b000.png")})
     return {"video": {"video_revision": 1, "shots": []},
             "lines": [{"line_id": "b000", "char_id": "",
                        "start_s": 0.0, "dur_s": 2.0}],
@@ -532,34 +519,30 @@ def test_humo_host_bookend_uses_ambient_master_audio(monkeypatch):
                                              is_char_face=False, role="music_visual")
 
 
-def test_build_request_off_redirects_bookend_to_ltx_audio_in(tmp_path, monkeypatch):
+def test_build_request_off_redirects_bookend_to_audio_in_lane(tmp_path, monkeypatch):
     # Toggle OFF: the announcer bookend is redirected off HuMo so the
-    # radio_host_portrait path never triggers. S4c (2026-07-02): the
-    # redirected ltx bookend now runs the TALKING register (default dev
-    # unet), which REQUIRES the wide radio-face still -- a ledger minted
-    # without one fails LOUD (never a silent faceless bookend again), but
-    # the redirect itself must already be stamped on the shot.
+    # radio_host_portrait path never triggers. The redirect target conditions
+    # on the beat's minted scene still -- a ledger minted without one fails
+    # LOUD (never a silent black bookend), but the redirect itself must
+    # already be stamped on the shot.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     led = _bookend_ledger(tmp_path, with_face=False)
     shot = _humo_bookend_shot(role="announcer_visual")
-    with pytest.raises(rd.RenderError, match="radio-face"):
+    with pytest.raises(rd.RenderError, match="NO scene still"):
         rd.build_request_from_shot(shot, led)
-    assert shot["engine_id"] == "ltx_audio_in"     # redirect happened first
+    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"  # redirect happened first
 
 
-def test_build_request_off_redirect_renders_on_single_pass(tmp_path, monkeypatch):
-    # The pre-S4c contract survives on the single-pass recipes: no talking
-    # register, no face requirement -- the redirected bookend renders from
-    # its scene still exactly as before.
+def test_build_request_off_redirect_renders_from_the_scene_still(tmp_path, monkeypatch):
+    # No face requirement on the redirect target: the redirected bookend
+    # renders from its scene still.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
-    led = _bookend_ledger(tmp_path, with_face=False)
+    led = _bookend_ledger(tmp_path, with_face=False, with_scene_still=True)
     shot = _humo_bookend_shot()
-    rd.build_request_from_shot(shot, led)          # must NOT raise
-    assert shot["engine_id"] == "ltx_audio_in"
+    req = rd.build_request_from_shot(shot, led)    # must NOT raise
+    assert shot["engine_id"] == "ltx25_native_audio_in_16gb"
+    assert req["observability"]["init_source"] == "scene_still"
+    assert req["observability"]["init_image"] == "still_b000.png"
 
 
 # --------------------------------------------------------------------------- #
@@ -702,11 +685,12 @@ def test_render_guard_does_not_treat_character_role_as_radio_host(
 
 def test_render_guard_inert_when_humo_off(tmp_path, monkeypatch):
     # HUMO off: _enforce_radio_is_host redirects the announcer off HuMo before
-    # the guard's family check, so a faceless radio_object never trips it.
+    # the guard's family check, so a faceless radio_object never trips it. The
+    # redirect target renders from the beat's scene still, so the ledger
+    # carries one.
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "distilled_native")
-    monkeypatch.setenv(
-        "OTR_LTX_AV_UNET",
-        r"distilled-1.1\ltx-2.3-22b-distilled-1.1-Q3_K_M.gguf")
     led = _announcer_portrait_ledger(tmp_path, style="radio_object")
+    led["images"]["images"].append(
+        {"object_id": "still_b001", "beat_id": "b001", "kind": "scene_beat",
+         "path": str(tmp_path / "still_b001.png")})
     rd.build_request_from_shot(_announcer_humo_shot(), led)   # must NOT raise

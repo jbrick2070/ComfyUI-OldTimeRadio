@@ -160,8 +160,8 @@ def test_the_registry_walk_actually_covered_the_engines_it_claims_to():
         % (sorted(set(names) - set(reg.CAPABILITIES)),
            sorted(set(reg.CAPABILITIES) - set(names))))
     for required in ("humo", "humo_1.7B", "humo_1.7B_169", "humo_14B_169",
-                     "ltx_video", "ltx_audio_in", "ltx_8gb",
-                     "wan_ti2v", "wan_ti2v", "fastwan_8gb"):
+                     "ltx_8gb", "razzle_ltx_8gb", "ltx25_video",
+                     "ltx25_native_audio_in_16gb"):
         assert required in names, required
     from nodes._otr_shared.public_engines import RETIRED_ENGINE_IDS
     assert not (set(names) & RETIRED_ENGINE_IDS), (

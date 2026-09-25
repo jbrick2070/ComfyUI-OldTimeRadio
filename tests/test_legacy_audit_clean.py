@@ -8,8 +8,7 @@ Scope choice (deviation from plan):
   definition forensic migration commentary; tracked separately in the
   deferred S23.10 "README + reference fixture docs rewrite" task in
   ROADMAP.md.
-- Excludes ``docs/``, ``tests/_reports/`` (test output artifacts),
-  and ``tests/fixtures/`` (data files, not source code).
+- Excludes ``docs/`` and ``tests/_reports/`` (test output artifacts).
 - Uses word-boundary anchors on each pattern token so ``Director``
   does not match ``Directory`` / ``TemporaryDirectory()``.
 
@@ -137,9 +136,6 @@ EXCLUDED_PATH_PREFIXES = (
     # justification: pytest output artifacts (HTML reports, logs);
     # not source the audit can constrain.
     "tests/_reports/",
-    # justification: data files (workflow JSON copies, golden audio),
-    # not source code; legacy strings appear by design.
-    "tests/fixtures/",
 )
 
 

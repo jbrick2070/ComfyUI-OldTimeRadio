@@ -708,13 +708,14 @@ def test_shotlock_end_to_end_stamps_video_section():
     policy = json.dumps({
         "policy_version": 2,
         "video_models": {
-            "announcer_video_model": {"engine_id": "ltx_video", "custom": False},
-            "music_video_model": {"engine_id": "ltx_video", "custom": False},
-            # ltx_video rather than a HuMo: this fixture carries no portrait
+            "announcer_video_model": {"engine_id": "ltx25_video", "custom": False},
+            "music_video_model": {"engine_id": "ltx25_video", "custom": False},
+            # ltx25_video rather than a HuMo: this fixture carries no portrait
             # index and no audio_ref, and the cast-time preflight rightly
             # refuses an audio_driven_face request that cannot be satisfied.
-            # The prompt-only lane is what this structural test needs.
-            "character_video_model": {"engine_id": "ltx_video", "custom": False}},
+            # A silent scene-still lane -- whose missing still defers to the
+            # image phase -- is what this structural test needs.
+            "character_video_model": {"engine_id": "ltx25_video", "custom": False}},
         "canvas": {"w": 832, "h": 480, "fps": 25},
     })
     patched, rev, report, done, episode_id = OTRShotLock().lock(
@@ -941,8 +942,8 @@ def test_engine_non_invocable_preflight_check(monkeypatch):
 def test_preflight_uses_effective_redirected_engine_for_humo_bookend(monkeypatch):
     """A HuMo policy pick for music/announcer bookends is structurally routed
     by build_request_from_shot before render. Cast-time preflight must validate
-    that effective ltx_audio_in request, not the raw HuMo candidate, or it
-    falsely halts on missing HuMo init_image."""
+    that effective audio-in request, not the raw HuMo candidate, or it falsely
+    halts on missing HuMo init_image."""
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b1", "role": "music_visual", "char_id": "",
               "dur_s": 2.0}]
@@ -997,15 +998,15 @@ def test_preflight_keeps_cloud_avatar_bookend_cloud(monkeypatch):
     assert groups[0]["engine_id"] == "cloud_kling_avatar"
     assert shots[0]["engine_id"] == "cloud_kling_avatar"
     assert "cloud_kling_avatar" in seen
-    assert "ltx_audio_in" not in seen
+    assert rd._NEVER_HUMO_REDIRECT_ENGINE not in seen
 
 
-def test_preflight_defers_redirected_announcer_radio_face(monkeypatch):
-    """The redirected ltx_audio_in announcer may require the wide radio-face
-    still, but ShotLock runs before MetaBrief/dispatcher materialize it."""
+def test_preflight_accepts_redirected_announcer_bookend(monkeypatch):
+    """The announcer half of the redirect above: a HuMo announcer pick is
+    validated as the effective audio-in request, whose scene still is present
+    and whose ambient audio RenderBatch supplies later, so ShotLock does not
+    halt on it."""
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
-    monkeypatch.setenv("OTR_LTX_AV_RECIPE", "ia2v_canonical")
-    monkeypatch.setenv("OTR_LTX_AV_UNET", "ltx-2.3-22b-dev-Q3_K_M.gguf")
     beats = [{"beat_id": "b3", "role": "announcer_visual", "char_id": "",
               "dur_s": 2.0}]
     budget = {"total_frames": 50, "per_beat": {"b3": 50}}
@@ -1032,7 +1033,7 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     monkeypatch.delenv("OTR_ENABLE_HUMO_HOSTS", raising=False)
     beats = [{"beat_id": "b6", "role": "music_visual", "char_id": ""}]
     budget = {"total_frames": 50, "per_beat": {"b6": 50}}
-    policy = {"video_models": {"music_video_model": "ltx_audio_in"}}
+    policy = {"video_models": {"music_video_model": "ltx25_native_audio_in_16gb"}}
     ledger = {
         "lines": [{"line_id": "b6", "char_id": ""}],
         "images": {"images": [
@@ -1054,7 +1055,7 @@ def test_preflight_defers_ltx_ambient_audio_to_render_batch(monkeypatch):
     _groups, shots = sl.build_execution_plan(beats, budget, {}, policy,
                                              ledger=ledger)
 
-    assert shots[0]["engine_id"] == "ltx_audio_in"
+    assert shots[0]["engine_id"] == "ltx25_native_audio_in_16gb"
 
 
 def test_preflight_defers_seedance_scene_still_to_image_phase(monkeypatch):

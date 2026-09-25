@@ -21,7 +21,12 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 import build_variants as bv  # noqa: E402
 from nodes import _otr_workflow_apply as wa  # noqa: E402
-from tests.fixtures.writer_slots import value  # noqa: E402
+from nodes._otr_shared import capability_profiles as cp  # noqa: E402
+from tests._support.writer_slots import value  # noqa: E402
+
+#: The cpu-backend row the stamp / self-check / validator tests emit: it names the
+#: `cpu` boot contract, so its recipe and its validator check both exercise `--cpu`.
+CPU_ROW = "otr_cloud_low"
 
 
 @pytest.fixture(scope="module")
@@ -37,6 +42,33 @@ def mapping():
 @pytest.fixture(scope="module")
 def canonical():
     return bv._load_canonical()
+
+
+@pytest.fixture()
+def tmp_rows(tmp_path, monkeypatch):
+    """Route `build_variant` at documents this test writes into `tmp_path`.
+
+    `load_profile` resolves only matrix rows unless it is handed a
+    `profile_dir`; `build_variant` passes none, so its import is pointed at
+    the test's own directory. Each document starts from a REAL matrix row and
+    changes only the key under test.
+    """
+    def write(base_id, new_id, **changes):
+        doc = copy.deepcopy(cp.load_profile(base_id))
+        doc["id"] = new_id
+        for key, val in changes.items():
+            if isinstance(val, dict) and isinstance(doc.get(key), dict):
+                doc[key].update(val)
+            else:
+                doc[key] = val
+        (tmp_path / f"{new_id}.json").write_text(json.dumps(doc),
+                                                 encoding="utf-8")
+        return new_id
+
+    monkeypatch.setattr(
+        bv, "load_profile",
+        lambda pid: cp.load_profile(pid, profile_dir=str(tmp_path)))
+    return write
 
 
 # ---------------------------------------------------------------------------
@@ -66,7 +98,7 @@ def test_semantic_hash_ignores_creative_flags_managed(canonical, schemas,
     # Stamps are excluded: writing them must NOT move the hash.
     st = copy.deepcopy(canonical)
     wa.patch_widget_by_name(st, 63, "master_hash", "deadbeef", schemas)
-    wa.patch_widget_by_name(st, 63, "profile_id", "cpu_floor", schemas)
+    wa.patch_widget_by_name(st, 63, "profile_id", CPU_ROW, schemas)
     assert wa.semantic_master_hash(st, mapping=mapping,
                                    schemas=schemas) == base
 
@@ -75,12 +107,17 @@ def test_semantic_hash_ignores_creative_flags_managed(canonical, schemas,
 # generator
 # ---------------------------------------------------------------------------
 
-def test_build_variant_refuses_ratify_gated(canonical, schemas, mapping):
-    # Lab cloud_lanes stays gated. The five shipping cloud SKUs
-    # (low_1act / low / low_5act / deluxe Foley / deluxe audio-in)
-    # are not this contract.
+def test_build_variant_refuses_ratify_gated(tmp_rows, canonical, schemas,
+                                            mapping):
+    # No matrix row carries the gate today -- the five shipping cloud SKUs
+    # (low_1act / low / low_5act / deluxe Foley / deluxe audio-in) are
+    # ratified -- so the gated document is a cloud row with one decision
+    # still open.
+    gated = tmp_rows(CPU_ROW, "otr_gated_probe", ratify_before_emit=[
+        "openrouter_model_pins: operator ratifies concrete OpenRouter slugs "
+        "for slot-a/slot-b before emission"])
     with pytest.raises(bv.EmitRefused, match="UNRATIFIED"):
-        bv.build_variant("otr_cloud_lanes", schemas=schemas, mapping=mapping,
+        bv.build_variant(gated, schemas=schemas, mapping=mapping,
                          canonical=canonical)
 
 
@@ -124,15 +161,17 @@ def test_build_variant_emits_shipping_cloud_skus(
         assert "OPENROUTER_API_KEY" not in recipe
 
 
-def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
-                                                       mapping):
+def test_build_variant_cpu_row_stamps_and_selfchecks(canonical, schemas,
+                                                     mapping):
     variant, rel, recipe = bv.build_variant(
-        "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
-    assert rel == "workflows/variants/otr_cpu_floor.json"
+        CPU_ROW, schemas=schemas, mapping=mapping, canonical=canonical)
+    assert rel == "workflows/variants/otr_cloud_low.json"
+    # An id that already carries the prefix is not doubled; a bare one gains it.
+    assert bv._variant_stem("probe") == "otr_probe"
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
     assert value(vnode, "workflow_json_path") == rel
-    assert value(vnode, "profile_id") == "cpu_floor"
+    assert value(vnode, "profile_id") == CPU_ROW
     assert value(vnode, "generated_by") == bv.GENERATED_BY
     assert value(vnode, "master_hash") == wa.semantic_master_hash(
         variant, mapping=mapping, schemas=schemas)
@@ -153,22 +192,25 @@ def test_build_variant_cpu_floor_stamps_and_selfchecks(canonical, schemas,
     assert "NEVER stored" in recipe
 
 
-@pytest.mark.parametrize("profile_id", [
-    "otr_4060_h3_nano",
-    "otr_nvidia_8gb_h3",
-])
 def test_8gb_h3_launch_recipe_emits_no_reserve_clamp(
-        profile_id, canonical, schemas, mapping):
+        tmp_rows, canonical, schemas, mapping):
+    """The recipe's argv comes from the NAMED boot contract: the 8 GB H3 lab
+    shape emits no reserve clamp, while the 16 GB H3 contract reserves 12 GiB.
+    No matrix row names either contract, so each is a real row with only its
+    `launch.boot_contract` changed."""
+    lab = tmp_rows("otr_8gb_low", "otr_8gb_h3_lab_probe",
+                   launch={"boot_contract": "h3_8gb_lab"})
     _variant, _rel, recipe = bv.build_variant(
-        profile_id, schemas=schemas, mapping=mapping, canonical=canonical)
+        lab, schemas=schemas, mapping=mapping, canonical=canonical)
     args_line = next(line for line in recipe.splitlines()
                      if line.startswith("- args:"))
     assert args_line == "- args: `--disable-pinned-memory`"
     assert "--reserve-vram" not in args_line
 
+    control = tmp_rows("otr_16gb_low", "otr_16gb_h3_probe",
+                       launch={"boot_contract": "h3"})
     _control, _control_rel, control_recipe = bv.build_variant(
-        "otr_w45_minimax_h3_video", schemas=schemas, mapping=mapping,
-        canonical=canonical)
+        control, schemas=schemas, mapping=mapping, canonical=canonical)
     control_args = next(line for line in control_recipe.splitlines()
                         if line.startswith("- args:"))
     assert control_args == \
@@ -178,7 +220,7 @@ def test_8gb_h3_launch_recipe_emits_no_reserve_clamp(
 def test_build_variant_leaves_canonical_untouched(canonical, schemas,
                                                   mapping):
     before = json.dumps(canonical, sort_keys=True)
-    bv.build_variant("cpu_floor", schemas=schemas, mapping=mapping,
+    bv.build_variant(CPU_ROW, schemas=schemas, mapping=mapping,
                      canonical=canonical)
     assert json.dumps(canonical, sort_keys=True) == before
 
@@ -201,15 +243,15 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
     })
 
     variant, rel, _recipe = bv.build_variant(
-        "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
+        CPU_ROW, schemas=schemas, mapping=mapping, canonical=canonical)
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
     stamped_hash = value(vnode, "master_hash")
 
-    good = tmp_path / "otr_cpu_floor.json"
+    good = tmp_path / "otr_cloud_low.json"
     good.write_text(bv._dump(variant), encoding="utf-8")
     v = WorkflowValidator()
-    msg = v._assert_stamp(str(good), "cpu_floor", stamped_hash,
+    msg = v._assert_stamp(str(good), CPU_ROW, stamped_hash,
                           bv.GENERATED_BY)
     assert "stamp OK" in msg
 
@@ -219,7 +261,7 @@ def test_validator_asserts_master_hash(tmp_path, canonical, schemas,
     bad = tmp_path / "otr_tampered.json"
     bad.write_text(bv._dump(tampered), encoding="utf-8")
     with pytest.raises(ValueError, match="MASTER-HASH MISMATCH"):
-        v._assert_stamp(str(bad), "cpu_floor", stamped_hash,
+        v._assert_stamp(str(bad), CPU_ROW, stamped_hash,
                         bv.GENERATED_BY)
 
 
@@ -229,10 +271,10 @@ def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
     from nodes._otr_shared import boot_contracts as bc
 
     variant, _rel, _recipe = bv.build_variant(
-        "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
+        CPU_ROW, schemas=schemas, mapping=mapping, canonical=canonical)
     vnode = next(n for n in variant["nodes"]
                  if n["type"] == "OTR_WorkflowValidator")
-    path = tmp_path / "otr_cpu_floor.json"
+    path = tmp_path / "otr_cloud_low.json"
     path.write_text(bv._dump(variant), encoding="utf-8")
     monkeypatch.setattr(bc, "running_server_boot_state", lambda: {
         "available": True,
@@ -244,7 +286,7 @@ def test_validator_refuses_cpu_snapshot_on_a_non_cpu_server(
 
     with pytest.raises(ValueError, match="needs --cpu ON"):
         WorkflowValidator()._assert_stamp(
-            str(path), "cpu_floor", value(vnode, "master_hash"),
+            str(path), CPU_ROW, value(vnode, "master_hash"),
             bv.GENERATED_BY,
         )
 
@@ -271,19 +313,19 @@ def test_otr_api_widget_vector_mismatch_hard_fails(schemas):
 def test_check_detects_variant_drift(tmp_path, monkeypatch, canonical,
                                      schemas, mapping):
     variant, rel, recipe = bv.build_variant(
-        "cpu_floor", schemas=schemas, mapping=mapping, canonical=canonical)
+        CPU_ROW, schemas=schemas, mapping=mapping, canonical=canonical)
     vdir = tmp_path / "variants"
     vdir.mkdir()
-    (vdir / "otr_cpu_floor.json").write_text(bv._dump(variant),
+    (vdir / "otr_cloud_low.json").write_text(bv._dump(variant),
                                              encoding="utf-8")
-    (vdir / "otr_cpu_floor.launch.md").write_text(recipe, encoding="utf-8")
+    (vdir / "otr_cloud_low.launch.md").write_text(recipe, encoding="utf-8")
     monkeypatch.setattr(bv, "VARIANTS_DIR", vdir)
     assert bv.cmd_check() == 0
 
     # Hand-edit a managed widget on disk -> drift + stamp disagreement.
     tampered = copy.deepcopy(variant)
     wa.patch_widget_by_name(tampered, 87, "fps", 24, schemas)
-    (vdir / "otr_cpu_floor.json").write_text(bv._dump(tampered),
+    (vdir / "otr_cloud_low.json").write_text(bv._dump(tampered),
                                              encoding="utf-8")
     assert bv.cmd_check() == 1
 
