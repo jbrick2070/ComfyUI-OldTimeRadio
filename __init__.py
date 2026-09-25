@@ -678,9 +678,13 @@ except Exception as _otr_janitor_err:  # noqa: BLE001 -- PD1
 if _otr_dup is None:
     try:
         from .nodes._otr_llm_folder import register_llm_category as _otr_register_llm
-        _otr_llm_root = _otr_register_llm()
-        if _otr_llm_root is not None:
-            log.info("[OldTimeRadio] LLM model folder: %s", _otr_llm_root)
+        _otr_register_llm()
+        from .nodes._otr_llm_folder import llm_roots as _otr_llm_roots
+        _otr_llm_first = (_otr_llm_roots() or [None])[0]
+        if _otr_llm_first is not None:
+            # The FIRST registered path is where downloads go -- a user's
+            # extra_model_paths.yaml entry when there is one, else ours.
+            log.info("[OldTimeRadio] writer LLM folder: %s", _otr_llm_first)
     except Exception as _otr_llm_err:  # noqa: BLE001 -- PD1
         print(f"[OldTimeRadio] LLM folder registration skipped: {_otr_llm_err}")
 

@@ -965,6 +965,77 @@ class _NothingInstalledLtx:
         return None
 
 
+def _refuse_missing_node_packs(engines):
+    """Refuse at QUEUE time a video engine whose ComfyUI node classes are not
+    registered -- before any weight download, writer pass or render.
+
+    PBUG-20260925-02: a fresh Manager install queued otr_8gb_animatediff on a
+    box without ComfyUI-AnimateDiff-Evolved. The gate fetched 3.9 GB of
+    weights, the writer wrote three acts, the base video encoded 4,664
+    frames, and the run failed 18 minutes in on ADE_AnimateDiffLoaderGen1 --
+    the engine's own ``assert_usable`` knew, but only the render driver ever
+    asked it. The same table it reads (``_node_candidates``) is read here, at
+    the one point a refusal is still free.
+
+    NODE CLASSES ONLY, on purpose. Each engine's ``assert_usable`` also checks
+    its weight files, and this gate is about to fetch exactly those, so calling
+    it here would refuse every fresh box for weights it was about to download.
+    Engines without a node table (the procedural visualizers) pass through; an
+    unregistered id is the registry's refusal, not this one's. The message
+    leads with what to do; the class names come after.
+    """
+    # GUARDED, like every other import in this gate: the runtime-bridge tests
+    # fake the package tree and stub only the modules this function needs, so
+    # a bare import here is the isolation break the docstring below warns
+    # about. No engine registry means nothing to check -- the render driver's
+    # own `assert_usable` still stands behind this.
+    try:
+        try:
+            from ._otr_video_engines import registry as _vreg
+            from ._otr_video_engines import wrapper_bridge as _wb
+        except ImportError:  # pragma: no cover -- flat test imports
+            from _otr_video_engines import registry as _vreg  # type: ignore
+            from _otr_video_engines import wrapper_bridge as _wb  # type: ignore
+    except ImportError as exc:
+        log.warning("[OTR.assets] node-class check skipped (no engine registry): %s", exc)
+        return
+    try:
+        mapping = _wb.node_class_mappings()
+    except Exception as exc:  # noqa: BLE001 -- no ComfyUI registry to read
+        log.warning("[OTR.assets] node-class check skipped: %s", exc)
+        return
+    problems = []
+    for name in sorted(engines):
+        try:
+            eng = _vreg.get_engine(name)
+        except Exception:  # noqa: BLE001
+            continue
+        table = getattr(eng, "_node_candidates", None)
+        if not callable(table):
+            continue
+        try:
+            candidates = dict(table())
+        except Exception:  # noqa: BLE001 -- a table that cannot be read is not a miss
+            continue
+        absent = []
+        for _logical, names in candidates.items():
+            try:
+                _wb.resolve_node_class(tuple(names), mapping)
+            except Exception:  # noqa: BLE001 -- collect EVERY miss before raising
+                absent.append("/".join(names))
+        if absent:
+            hint = getattr(eng, "NODE_PACK_HINT", None) or (
+                "Install the ComfyUI node pack that provides these classes "
+                "from ComfyUI Manager, then restart ComfyUI")
+            problems.append("%s -- the video engine '%s' needs node classes "
+                            "that are not registered on this server: %s"
+                            % (hint, name, ", ".join(absent)))
+    if problems:
+        raise VisualAssetError(
+            "%s. Nothing was downloaded or rendered; fix this and press Queue "
+            "again." % "; ".join(problems))
+
+
 def ensure_prompt_visual_assets(prompt, unique_id):
     """Called by the already-wired validator before the writer may execute."""
     from ._otr_shared.public_engines import resolve_engine_id
@@ -985,6 +1056,9 @@ def ensure_prompt_visual_assets(prompt, unique_id):
                        role_video_slots=role_video_slots)
     for note in plan["skipped"]:
         log.warning("[OTR.assets] %s", note)
+    # The node-pack check comes FIRST: a graph that cannot run must not cost
+    # a download (PBUG-20260925-02).
+    _refuse_missing_node_packs(plan["engines"])
     engines = plan["engines"] & _COVERED
     if not engines:
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}

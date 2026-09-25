@@ -112,7 +112,7 @@ def register_llm_category() -> Optional[Path]:
         return None
     try:
         import folder_paths  # ComfyUI's own; absent under bare pytest
-        folder_paths.add_model_folder_path(LLM_CATEGORY, str(root))
+        folder_paths.add_model_folder_path(LLM_CATEGORY, str(root), is_default=False)
     except Exception as exc:  # noqa: BLE001 -- no ComfyUI, nothing to register
         log.debug("[OTR.llm_folder] LLM category not registered: %s", exc)
     return root
@@ -182,36 +182,68 @@ def _receipt(folder: Path) -> Optional[dict]:
     return data
 
 
+def _nonempty(path: Path) -> bool:
+    try:
+        return path.is_file() and path.stat().st_size > 0
+    except OSError:
+        return False
+
+
+def _transfer_in_progress(folder: Path) -> bool:
+    """huggingface_hub keeps a partial file as ``.incomplete`` under
+    ``.cache/huggingface/download/`` until it is whole, then renames it into
+    place. One of those means a download is unfinished."""
+    try:
+        return any((folder / ".cache" / "huggingface" / "download").rglob("*.incomplete"))
+    except OSError:
+        return False
+
+
+def structurally_complete(folder: Path) -> bool:
+    """COMPLETE by the files alone, no receipt: ``config.json`` present, and
+    either a weight index whose every shard is on disk, or transformers'
+    unsharded ``model.safetensors`` with no transfer still in progress.
+
+    This is the rule the receipt is written AGAINST (cursor QA): huggingface_hub
+    1.32 RETURNS an existing non-empty ``local_dir`` when the Hub is
+    unreachable, without proving it whole, so a return is not a proof.
+    A lone first shard of a sharded repo never passes: its index has not
+    landed, and ``model.safetensors`` is not its name.
+    """
+    folder = Path(folder)
+    if not _nonempty(folder / "config.json"):
+        return False
+    declared = _shards_named_by_index(folder)
+    if declared is not None:
+        if not declared:
+            return False
+        return all(_nonempty(folder / shard) for shard in declared)
+    return _nonempty(folder / "model.safetensors") and not _transfer_in_progress(folder)
+
+
 def plain_folder_complete(folder: Path) -> bool:
-    """True only for a folder holding a COMPLETE weight set. Fails closed."""
+    """True only for a folder holding a COMPLETE, loadable model. Fails closed.
+
+    With the pack's receipt: every listed file present at its recorded size,
+    at least one of them a weight, and ``config.json`` among them. Without a
+    receipt (a folder placed by hand): :func:`structurally_complete`.
+    """
     folder = Path(folder)
     if not folder.is_dir():
         return False
     receipt = _receipt(folder)
-    if receipt is not None:
-        weights = 0
-        for rel, size in receipt["files"].items():
-            try:
-                if (folder / rel).stat().st_size != int(size):
-                    return False
-            except (OSError, TypeError, ValueError):
-                return False
-            if Path(rel).suffix.lower() in _WEIGHT_SUFFIXES:
-                weights += 1
-        return weights > 0
-    declared = _shards_named_by_index(folder)
-    if not declared:
-        # No receipt and no readable index: a single-file folder placed by hand
-        # is indistinguishable from a half-finished download, so it is not
-        # trusted. Re-running the download resumes it in place.
-        return False
-    for shard in declared:
+    if receipt is None:
+        return structurally_complete(folder)
+    weights = 0
+    for rel, size in receipt["files"].items():
         try:
-            if (folder / shard).stat().st_size <= 0:
+            if (folder / rel).stat().st_size != int(size):
                 return False
-        except OSError:
+        except (OSError, TypeError, ValueError):
             return False
-    return True
+        if Path(rel).suffix.lower() in _WEIGHT_SUFFIXES:
+            weights += 1
+    return weights > 0 and "config.json" in receipt["files"]
 
 
 def _receipt_files(folder: Path) -> dict:
@@ -220,7 +252,11 @@ def _receipt_files(folder: Path) -> dict:
     out = {}
     for path in sorted(folder.rglob("*")):
         rel = path.relative_to(folder)
-        if not path.is_file() or rel.parts[0] == ".cache" or rel.name == RECEIPT_NAME:
+        # ``.cache`` is huggingface_hub's transfer metadata; the receipt and any
+        # ``.tmp`` a crashed write left behind are ours (agy QA: a listed
+        # ``.tmp`` vanished at os.replace and failed every later check).
+        if (not path.is_file() or rel.parts[0] == ".cache"
+                or rel.name.startswith(RECEIPT_NAME)):
             continue
         out[rel.as_posix()] = path.stat().st_size
     return out
@@ -288,8 +324,10 @@ def find_plain_file(repo_id: str, filename: str,
 def scan_plain_models(roots: Optional[Iterable[Path]] = None) -> List[Tuple[str, Path, bool]]:
     """``(repo_id, folder, complete)`` for every folder of ours in every root.
     First root wins for a repo present in more than one."""
-    seen = set()
-    out = []
+    # First root wins among COMPLETE folders; a partial folder in an earlier
+    # root never hides a complete one in a later root (agy QA: it did, and
+    # the catalog would then have re-downloaded a model the box already had).
+    by_repo: dict = {}
     for root in (llm_roots() if roots is None else roots):
         try:
             children = sorted(p for p in Path(root).iterdir() if p.is_dir())
@@ -297,16 +335,19 @@ def scan_plain_models(roots: Optional[Iterable[Path]] = None) -> List[Tuple[str,
             continue
         for child in children:
             repo_id = repo_id_from_folder(child.name)
-            if repo_id is None or repo_id in seen:
+            if repo_id is None:
                 continue
-            seen.add(repo_id)
-            out.append((repo_id, child, plain_folder_complete(child)))
-    return out
+            complete = plain_folder_complete(child)
+            held = by_repo.get(repo_id)
+            if held is None or (complete and not held[1]):
+                by_repo[repo_id] = (child, complete)
+    return [(repo_id, folder, complete) for repo_id, (folder, complete) in by_repo.items()]
 
 
 __all__ = [
     "LLM_CATEGORY", "RECEIPT_NAME", "folder_name", "repo_id_from_folder",
     "default_llm_root", "register_llm_category", "llm_roots",
-    "download_destination", "plain_folder_complete", "write_receipt",
+    "download_destination", "plain_folder_complete", "structurally_complete",
+    "write_receipt",
     "plain_folders_for", "find_plain_model", "find_plain_file", "scan_plain_models",
 ]

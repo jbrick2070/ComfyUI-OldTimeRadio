@@ -506,9 +506,13 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
     rows = {row.repo_id: row for row in catalog.CURATED_LLM_MODELS}
     cache_dir = os.path.join(os.environ["HF_HOME"], "hub")
     os.makedirs(cache_dir, exist_ok=True)
-    token = os.environ.get("HF_TOKEN") or None
-    if _snapshot_download is None:
-        from huggingface_hub import snapshot_download as _snapshot_download
+    # THROUGH THE CATALOG, NOT AROUND IT (cursor QA on 8f8ccebb). This used
+    # to call snapshot_download(cache_dir=...) itself, so a provisioned box
+    # got its writer in the hub cache -- the layout the LLM folder change
+    # retired -- and the runtime then never created the folder. The catalog
+    # picks the destination (the LLM folder, or the hub when this box has no
+    # models root), checks disk on that drive, writes the receipt, and skips
+    # a model that is already complete in either layout.
 
     for model_id in selected:
         row = rows.get(model_id)
@@ -527,11 +531,11 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
                 row.loader_backend)
             continue
         try:
-            local_path = _snapshot_download(
-                repo_id=model_id,
-                allow_patterns=list(catalog.ALLOW_PATTERNS),
-                cache_dir=cache_dir,
-                token=token,
+            from pathlib import Path as _Path  # stdlib; the catalog wants a Path
+            local_path = catalog.auto_download_if_missing(
+                model_id,
+                hub_root=_Path(cache_dir),
+                _snapshot_download=_snapshot_download,
             )
         except Exception as exc:  # noqa: BLE001 - receipt owns provider detail
             say("FAILED", "writer: %s" % model_id,

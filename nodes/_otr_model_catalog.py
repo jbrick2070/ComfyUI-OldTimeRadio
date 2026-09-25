@@ -2500,9 +2500,24 @@ def auto_download_if_missing(
         kwargs["tqdm_class"] = _make_pbar_tqdm_adapter(progress_pbar)
     result = str(_snapshot_download(**kwargs))  # type: ignore[operator]
     if local_dir is not None:
-        # The receipt is what makes the folder count as COMPLETE: written only
-        # after snapshot_download RETURNED, so a folder interrupted after its
-        # first shard never reads as a finished model (Grok QA, 2026-09-25).
+        # THE RECEIPT FOLLOWS A STRUCTURAL CHECK, NEVER THE RETURN (cursor QA
+        # on 8f8ccebb). huggingface_hub 1.32 returns an existing non-empty
+        # local_dir with only a warning when the Hub is unreachable, so a
+        # return proves nothing; the folder is complete when config.json and
+        # every declared shard (or the unsharded model.safetensors) are
+        # there. A folder that is not is left receipt-less -- the next run
+        # resumes it -- and this call FAILS, because a caller that got a path
+        # back would load it.
+        if not _LLM.structurally_complete(local_dir):
+            raise UnknownModelError(
+                _unknown_recovery_hint(
+                    repo_id,
+                    "the download of %s to %s did not finish (the Hub may be "
+                    "unreachable); press Queue again to resume it"
+                    % (weights_id, local_dir),
+                    hub_root=hub_root,
+                )
+            )
         _LLM.write_receipt(local_dir, weights_id)
         result = str(local_dir)
     # Drive the node's bar to complete explicitly. The mirrored bars only ever

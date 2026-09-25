@@ -298,6 +298,13 @@ NODE_LORA = "lora"
 #: A miss stops the build; it does not activate runtime probing or a fallback
 #: node. Every one of these was confirmed live in the 2026-08-22 Phase-0
 #: object_info capture.
+#: What a person does about a missing class, said first. The queue-time gate
+#: (`_otr_visual_assets._refuse_missing_node_packs`) and `assert_usable` below
+#: both lead with it; the enum and the class names come after.
+GHOST_NODE_PACK_HINT = (
+    "Install ComfyUI-AnimateDiff-Evolved (Kosinkadink) from ComfyUI Manager, "
+    "then restart ComfyUI (apple/DEPENDENCIES.md names the pinned commit)")
+
 GHOST_NODE_CANDIDATES = {
     "checkpoint": ("CheckpointLoaderSimple",),
     "text_encode": ("CLIPTextEncode",),
@@ -984,6 +991,10 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         except Exception:  # noqa: BLE001
             return False
 
+    #: Read by the queue-time gate (`_otr_visual_assets._refuse_missing_node_packs`)
+    #: so its refusal leads with the same fix as `assert_usable` below.
+    NODE_PACK_HINT = GHOST_NODE_PACK_HINT
+
     def _node_candidates(self):
         candidates = dict(GHOST_NODE_CANDIDATES)
         if self.lora_name:
@@ -1061,11 +1072,9 @@ class GhostSignalEngine(_MC.MotionEngineBase):
         if absent:
             raise EngineUnusable(
                 self.name, self.family, EngineUsabilityReason.MISSING_MODEL,
-                "%s missing required ComfyUI node class(es): %s -- Ghost Signal "
-                "needs the canonical Kosinkadink ComfyUI-AnimateDiff-Evolved "
-                "installed (pinned to the recorded 2026-08-22 commit) and a "
-                "server restart"
-                % (self.name, ", ".join(absent)), kind="video")
+                "%s -- %s is missing required ComfyUI node class(es): %s"
+                % (GHOST_NODE_PACK_HINT, self.name, ", ".join(absent)),
+                kind="video")
         return self.name
 
     # ---- residency ------------------------------------------------------ #

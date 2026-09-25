@@ -22,16 +22,19 @@ for the named tests after a catalog edit.
 
 ## On your machine -- no git clone
 
-Put a complete Hugging Face snapshot in the cache this pack actually uses,
-restart ComfyUI, pick `org/name` on both writer slots, set Quant and the VRAM
-ceiling for your hardware.
+Put the model in the pack's writer folder as plain files, restart ComfyUI,
+pick `org/name` on both writer slots, set Quant and the VRAM ceiling for your
+hardware.
 
-1. **Find the real cache.** Default is `ComfyUI/models/huggingface` when
-   `HF_HOME` is unset -- [INSTALL.md](INSTALL.md#hugging-face-login). Setting `HF_HOME`
-   later does not move an existing cache; it adds a second one.
-2. **The snapshot has to be complete.** A config-only folder is not a model.
-   There must be a weight blob (`.safetensors` or `.bin`, or a shard index
-   whose shards are present).
+1. **The folder.** `models/LLM/<org>--<name>/` under your ComfyUI models tree
+   (for example `models/LLM/Qwen--Qwen3.5-4B/`), or wherever an `LLM:` entry
+   in `extra_model_paths.yaml` points. Since 2026-09-25 this is where the
+   pack's own downloads land; a Hugging Face cache snapshot under
+   `models/huggingface` from an earlier version is still found and still
+   loads, so nothing needs moving.
+2. **The folder has to be complete.** A config-only folder is not a model.
+   `config.json` plus the weights: either `model.safetensors`, or a
+   `model.safetensors.index.json` with every shard it names present.
 3. **`config.json` must list an architecture ending in `ForCausalLM`.** The
    cache is shared with FLUX, LTX, depth models and everything else this pack
    fetches. An uncurated folder appears in the writer dropdown only with that
@@ -54,7 +57,7 @@ ceiling for your hardware.
 
 A first Queue that sits still is usually the download. The console prints
 `[OTR] Downloading ...`. Auto-download is designed, not a defect. Disk
-headroom is the model size plus 5 GB on the cache volume.
+headroom is the model size plus 5 GB on the volume the writer folder is on.
 
 ---
 

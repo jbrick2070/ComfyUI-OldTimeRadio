@@ -119,7 +119,6 @@ def main(argv: list[str]) -> int:
             out = snapshot_download(
                 repo_id=repo,
                 local_dir=target,
-                local_dir_use_symlinks=False,
                 token=token,
                 revision=revision,
                 allow_patterns=allow_patterns,
@@ -140,7 +139,6 @@ def main(argv: list[str]) -> int:
                 repo_id=repo,
                 filename=fname,
                 local_dir=target,
-                local_dir_use_symlinks=False,
                 token=token,
                 revision=revision,
             )
