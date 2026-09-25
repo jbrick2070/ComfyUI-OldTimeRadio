@@ -11,7 +11,7 @@ Written for a machine that has never run OTR. If you are on the box that develop
 sudo apt-get install -y libcairo2-dev pkg-config ffmpeg
 
 # 2. the pack and its Python dependencies -- INTO THE PYTHON COMFYUI RUNS
-git clone -b v2.0-alpha https://github.com/jbrick2070/ComfyUI-OldTimeRadio
+git clone https://github.com/jbrick2070/ComfyUI-OldTimeRadio
 <comfyui-python> -m pip install -r ComfyUI-OldTimeRadio/requirements.txt
 
 # 3. model weights for the lane you want
@@ -55,19 +55,24 @@ soundfile>=0.12
 numpy>=1.24
 feedparser>=6.0
 beautifulsoup4>=4.12
-tokenizers>=0.22,<=0.23
+tokenizers>=0.22
 sentencepiece>=0.1.99
-bitsandbytes>=0.42.0
+bitsandbytes>=0.42.0; sys_platform != 'darwin'
 accelerate>=1.1.0
 lm-format-enforcer>=0.11.3,<1.0
 spandrel~=0.4.1
 pydantic>=2.0
 PyYAML>=6.0
-kokoro>=0.7.16
+kokoro>=0.7.16; python_version < "3.13"
+kokoro-onnx>=0.6.1; python_version >= "3.13" and python_version < "3.14"
+unidic-lite>=1.0.8
 pyloudnorm>=0.1.1
-pycairo>=1.24
+pycairo>=1.24; sys_platform == 'win32'
 pillow>=10.0
 aiohttp>=3.9
+imageio-ffmpeg>=0.5
+ffmpeg-downloader>=0.5
+av>=17.0.0
 ```
 
 ## 3. Isolated-venv voice engines
@@ -104,12 +109,11 @@ Each pins torch/transformers versions that would brick ComfyUI's own venv, so th
 
 ## 3b. Other custom node packs
 
-OTR resolves these node CLASSES by name at render time, so a missing pack does not fail at startup -- it fails deep inside an episode, after the script, cast, voices and stills are already done. wan_ti2v died seventeen minutes in with WrapperNodeMissing for exactly this reason.
+OTR resolves these node CLASSES by name at render time, so a missing pack does not fail at startup -- it fails deep inside an episode, after the script, cast, voices and stills are already done. A video lane once died seventeen minutes in with WrapperNodeMissing for exactly this reason.
 
 | pack | who needs it | what breaks without it |
 |---|---|---|
 | [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |
-| [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | `wan_ti2v`, `ltx25` | `UnetLoaderGGUF` / `CLIPLoaderGGUF`. Both lanes default to GGUF weights, so both are dead without it. |
 | [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) | `ltx25` | the advanced LTXV nodes (ImgToVideoInplace, LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, AudioVAEDecode, EmptyLatentAudio, ModalityGuidance). ComfyUI core ships only Conditioning/Scheduler/ImgToVideo -- enough for `ltx_8gb`, not for `ltx25`. |
 
 `scripts/otr_provision.py` clones all three. If you install by hand, clone into `<comfy>/custom_nodes/` and restart ComfyUI -- node classes are registered at startup.

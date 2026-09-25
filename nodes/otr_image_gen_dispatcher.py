@@ -711,15 +711,14 @@ def _effective_video_engine_for_role(role: str, eng_id: str) -> str:
 
     1. ``OTR_FORCE_ENGINE_MAP`` rewrites planned shot engines.
     2. ``render_driver._enforce_radio_is_host`` redirects announcer/music local
-       HuMo-family bookends to ``ltx_audio_in`` when ``OTR_ENABLE_HUMO_HOSTS`` is
+       HuMo-family bookends to the audio-in redirect target when ``OTR_ENABLE_HUMO_HOSTS`` is
        off. Partner/cloud engines stay cloud.
 
     Unknown engines or import failures keep the input id (fail-safe: mint the
     still rather than quietly skipping an asset that render might need).
 
     DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a). It used
-    to hard-code the redirect target as the bare literal ``"ltx_audio_in"``
-    rather than reading ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, so a
+    to hard-code the redirect target as a bare literal rather than reading ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, so a
     rename of that constant would have silently desynced the image phase from
     the render phase. The target now comes from the constant itself."""
     try:

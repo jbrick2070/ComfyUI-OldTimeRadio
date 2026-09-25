@@ -38,7 +38,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from nodes._otr_shared.capability_profiles import (  # noqa: E402
-    PROFILE_DIR, load_profile, shipping_ids,
+    load_profile, shipping_ids,
 )
 from nodes._otr_shared.boot_contracts import (  # noqa: E402
     contract_for_profile, launch_args_for,
@@ -51,43 +51,6 @@ from nodes._otr_workflow_apply import (  # noqa: E402
 CANONICAL = REPO / "workflows" / "otr_canonical.json"
 VARIANTS_DIR = REPO / "workflows" / "variants"
 GENERATED_BY = "scripts/build_variants.py"
-# Lane presets are applied onto a live canonical by the operator, not
-# emitted as standalone platform variants.
-LANE_PRESETS = ("google_veo_media", "google_omni_media",
-                "google_veo_all", "google_omni_all",
-                # SOAK INSTRUMENTS (2026-08-16), not platform targets. They
-                # exist so `scripts/otr_gpu_soak_matrix.py` can rotate the
-                # still/image engines through the SANCTIONED surface -- those
-                # widgets are managed and `patch_creative` refuses them, so a
-                # profile's role_overrides is the only legitimate lever. They
-                # are excluded from emission because nobody installs OTR to
-                # run a soak: shipping ten near-identical variant graphs would
-                # be noise in the user-facing variant set.
-                "otr_soak_still_flat_z_image_turbo",
-                "otr_soak_still_flat_flux_gen1",
-                "otr_soak_still_motion_lumina_image",
-                "otr_soak_still_pan_flux_gen1",
-                "otr_soak_still_pan_ideo",
-                "otr_soak_still_word_z_image_turbo",
-                # LLM x IMAGE x UPSCALE SWEEP (2026-08-25, operator: "one act
-                # test of all seven [LLMs] onboard ... varying image models
-                # ... a variety of upscalers"). Each leg pairs one LLM as
-                # creative with a DIFFERENT one as technical (cyclic, so all
-                # 7 rows play both roles across the 7 legs), THREE distinct
-                # still engines and THREE distinct local image engines (one
-                # per role: announcer/music/character), and alternates the
-                # only two real upscale engines. The llm.* block in each file
-                # is a harmless unused default -- scripts/otr_llm_image_upscale_sweep.py
-                # passes --creative-model/--technical-model on the CLI, which
-                # apply_profile-then-shortcuts ordering makes authoritative.
-                "otr_soak_llmsweep_01",
-                "otr_soak_llmsweep_02",
-                "otr_soak_llmsweep_03",
-                "otr_soak_llmsweep_04",
-                "otr_soak_llmsweep_05",
-                "otr_soak_llmsweep_06",
-                "otr_soak_llmsweep_07")
-
 
 #: THE SHIPPING SET, DERIVED FROM THE MATRIX (2026-09-24). The rows in
 #: `config/workflow_matrix.json` that say `ships` are the only configs that emit a
@@ -96,11 +59,7 @@ LANE_PRESETS = ("google_veo_media", "google_omni_media",
 #:
 #: Still an allow-list, deliberately, exactly as the hand-kept tuple was: a row
 #: has to say `ships` to reach a user, so a new row defaults to NOT shipping --
-#: the safe direction to be wrong in. Nobody installs OTR to run a soak.
-#:
-#: EVERY OTHER CONFIG STILL WORKS. `--profile <id>` loads any of the ~95 lab rigs
-#: from `config/profiles/` exactly as before; they answer "which experiment am I
-#: running" rather than "which workflow ships".
+#: the safe direction to be wrong in.
 #:
 #: Kept as a module attribute because two readers import it by name:
 #: `otr_dropdown_matrix` and `tests/test_shipping_writer_pins`.
@@ -137,18 +96,16 @@ def _variant_stem(profile_id: str) -> str:
 
 
 def _profile_id_from_stem(stem: str) -> str:
-    """Inverse of _variant_stem against the profile FILES on disk.
+    """Inverse of _variant_stem against the matrix rows.
 
-    Resolved against every rig in config/experiments/, not the shipping
-    allow-list: `--check` may be pointed at a directory holding a lab
-    profile's graph (the drift test writes cpu_floor's), and a stem that
-    cannot find its profile must still name the file it came from.
+    A stem that names no row is returned unchanged, so `--check` pointed at a
+    stray graph still names the file it came from.
     """
-    profile_dir = Path(PROFILE_DIR)
-    if (profile_dir / f"{stem}.json").is_file():
+    known = set(shipping_ids())
+    if stem in known:
         return stem
     bare = stem[len("otr_"):] if stem.startswith("otr_") else stem
-    if bare != stem and (profile_dir / f"{bare}.json").is_file():
+    if bare != stem and bare in known:
         return bare
     return stem
 
@@ -253,16 +210,12 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
     if backend == "cuda" and vendor == "amd":
         torch_note = ("torch ROCm build (https://pytorch.org rocm wheels); "
                       "presents as cuda. bnb/fp8/sage lanes are OFF.")
-        llama_note = "llama-cpp-python HIP wheel"
     elif backend == "cuda":
         torch_note = "torch cu128+ build (the nv baseline is 2.10/cu130)"
-        llama_note = "llama-cpp-python CUDA wheel"
     elif backend == "mps":
         torch_note = "default PyPI torch wheels (Metal/MPS included)"
-        llama_note = "llama-cpp-python Metal wheel"
     else:
         torch_note = "CPU torch wheels (--index-url .../cpu)"
-        llama_note = "llama-cpp-python CPU wheel"
 
     lines = [
         f"# Launch recipe: {profile_id}",
@@ -276,13 +229,6 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         f"{backend}/{vendor}",
         f"- master_hash: `{master_hash}`",
     ]
-    if profile_id == "otr_runpod_starter":
-        lines += [
-            "",
-            "This file is a generated profile manifest, not a second RunPod "
-            "guide. Use the single canonical install, launch, qualification, "
-            "and recovery playbook: `docs/RUNPOD_INSTALL.md`.",
-        ]
     lines += [
         "",
         "## ComfyUI launch",
@@ -350,7 +296,6 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         "## Install pointers",
         "",
         f"- {torch_note}",
-        f"- {llama_note}",
         "- ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the "
         "build).",
         # Named ONLY when this profile actually selects the one engine that
@@ -535,7 +480,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--all", action="store_true",
-                   help="emit every committed non-lane-preset profile "
+                   help="emit every shipping matrix row "
                         "(ratify-gated ones are reported + skipped)")
     g.add_argument("--profiles", help="comma-separated profile ids "
                                       "(ratify-gated => exit 1)")
@@ -548,7 +493,7 @@ def main(argv=None) -> int:
     if args.check:
         return cmd_check()
     if args.all:
-        ids = [p for p in _committed_profile_ids() if p not in LANE_PRESETS]
+        ids = _committed_profile_ids()
         rc = cmd_emit(ids, explicit=False)
         if not args.no_docs:
             doc_rc = cmd_regenerate_docs()

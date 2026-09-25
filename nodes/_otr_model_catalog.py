@@ -105,7 +105,6 @@ added to the dropdown."""
 # back to the bare repo id. Do NOT append them to new labels.
 NOT_DOWNLOADED_SUFFIX = " [NOT DOWNLOADED]"
 LOCAL_HF_SUFFIX = " [LOCAL HF]"
-LOCAL_GGUF_SUFFIX = " [LOCAL GGUF]"
 
 # ---------------------------------------------------------------------------
 # CuratedModel dataclass + curated set
@@ -377,8 +376,7 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
         "NF4 measured at 7.15 GiB allocated / 7.29 GiB peak on the 16 GB "
         "RTX 5080, including coherent prose and LMFE-constrained JSON. The "
         "only Gemma 4 12B: NF4 is baked into the pick, not a second Quant "
-        "knob. No GGUF / full / NVFP4 twin. No LoRA, Ollama, llama.cpp, "
-        "sidecar, or port.",
+        "knob. No full / NVFP4 twin. No LoRA, Ollama, sidecar, or port.",
         prompt_profile="modern",
         chat_template_kind="transformers_default",
         stop_tokens=(),
@@ -417,15 +415,14 @@ CURATED_LLM_MODELS: tuple[CuratedModel, ...] = (
     # safetensors "needs quantization or offload to fit 16 GB -- not
     # soak-tested as PASS yet. Available for users with bigger rigs."
     # A dropdown row is a promise the model will load; that one could not
-    # keep it on this hardware. Nothing required Ollama -- the GGUF lane is
-    # in-process llama-cpp-python -- so that half of the sweep had no
-    # targets. See apple/LLM_PREFLIGHT.md for the seven gates a new
+    # keep it on this hardware. Nothing required Ollama, so that half of the
+    # sweep had no targets. See apple/LLM_PREFLIGHT.md for the seven gates a new
     # row must clear. WARN is information, not an automatic rip
     # (operator 2026-09-06); ripping a row is an explicit decision.
     # 2026-05-23: catalog pruned -- the two community WARN-tier 12B
     # rows (Captain-Eris_Violet-V0.420-12B, MN-12B-Mag-Mell-R1) were
     # removed. The curated set now also includes the official Gemma 4 12B HF
-    # row restored in 2026-07. The GGUF writer peer is not a catalog row.
+    # row restored in 2026-07.
     # 2026-05-24: gemma-2-2b-it added as the smallest technical-slot
     # pick (BUG-LOCAL-262). Gemma-2's chat template rejects the system
     # role; the generate path normalizes system messages before
@@ -583,19 +580,6 @@ def _google_api_virtual_rows() -> tuple[CuratedModel, ...]:
     )
 
 
-def _is_gguf_writer_id(model_id: str) -> bool:
-    """Writer GGUF handles are retired. Image/video GGUF artifacts are unrelated."""
-    raw = _strip_label_suffix(model_id).lower() if isinstance(model_id, str) else ""
-    if not raw:
-        return False
-    return (
-        raw.endswith("-gguf")
-        or raw.endswith(".gguf")
-        or "/gguf" in raw
-        or raw.endswith("_gguf")
-    )
-
-
 def _active_curated_models() -> tuple[CuratedModel, ...]:
     """CURATED_LLM_MODELS plus HTTP virtual rows that the writer dropdown
     should list. Comfy Credits and OpenRouter handles are always present
@@ -605,8 +589,7 @@ def _active_curated_models() -> tuple[CuratedModel, ...]:
     builder + validate_model_id Path 1 via _by_repo_id) read THIS.
     Static license/audit tests iterate CURATED_LLM_MODELS directly, so
     the virtual rows never reach them, and GATED_CURATED_MODELS stays
-    keyed off the real gated set. A retired writer GGUF handle is not a
-    catalog row, and this list never injects one."""
+    keyed off the real gated set."""
     return (
         CURATED_LLM_MODELS
         + _openrouter_virtual_rows()
@@ -1034,8 +1017,6 @@ def build_dropdown_choices(
     active = _active_curated_models()
     for m in active:
         provider = getattr(m, "provider", "local")
-        if _is_gguf_writer_id(m.repo_id):
-            continue
         if m.repo_id == DEFAULT_LLM_NF4:
             continue
         if provider != "local":
@@ -1054,8 +1035,6 @@ def build_dropdown_choices(
         if repo_id in curated_ids:
             continue
         if not result.on_disk:
-            continue
-        if _is_gguf_writer_id(repo_id):
             continue
         # The HF cache mixes every model type OTR downloads, so a non-curated
         # cache hit is not necessarily a text-generation LLM. Admit it only if
@@ -1573,10 +1552,10 @@ def _structural_reject(model_id: str) -> str | None:
         return "model_id contains '..' (path traversal)"
     if re.match(r"^[A-Za-z]:", model_id):
         return "model_id starts with a drive letter (Windows absolute path)"
-    if model_id.endswith(".gguf") or model_id.endswith(".bin"):
+    if model_id.endswith(".bin"):
         return (
-            "model_id ends in unsafe weight format (.gguf/.bin); "
-            "OTR ships transformers loader only in S30"
+            "model_id ends in .bin, a pickle weight format; "
+            "OTR loads safetensors through transformers only"
         )
     return None
 
@@ -1589,7 +1568,7 @@ def _strip_label_suffix(model_id: str) -> str:
     front of them (``'google/gemma-4-12b-it (11.9 GB)'`` -> the bare repo id).
     Safe because a Hugging Face repo id cannot contain ``' ('``; this mirrors
     ``public_engines.resolve_engine_id``, which does the same for the video
-    picker's ``'wan_8gb (16:9)'``.
+    picker's ``'ltx098_low_video (16:9)'``.
 
     IDEMPOTENT AND BACKWARD-COMPATIBLE, which is the whole point: a bare id
     from a saved graph, a profile, a CLI flag or an older workflow passes
@@ -1598,13 +1577,11 @@ def _strip_label_suffix(model_id: str) -> str:
     for suffix in (
         NOT_DOWNLOADED_SUFFIX,
         LOCAL_HF_SUFFIX,
-        LOCAL_GGUF_SUFFIX,
     ):
         if s.endswith(suffix):
             s = s[: -len(suffix)].rstrip()
-    for suffix in (LOCAL_HF_SUFFIX, LOCAL_GGUF_SUFFIX):
-        if s.endswith(suffix):
-            s = s[: -len(suffix)].rstrip()
+    if s.endswith(LOCAL_HF_SUFFIX):
+        s = s[: -len(LOCAL_HF_SUFFIX)].rstrip()
     if s.endswith(")") and " (" in s:
         s = s.rsplit(" (", 1)[0].rstrip()
     return s
@@ -1874,11 +1851,6 @@ def validate_model_id(
             _unknown_recovery_hint(repr(model_id), "model_id is not a string", hub_root=hub_root)
         )
     normalized = _canonical_qwen_id(_strip_label_suffix(model_id))
-    if _is_gguf_writer_id(normalized):
-        raise UnknownModelError(
-            f"{normalized!r} is a retired GGUF writer. Use "
-            f"'google/gemma-4-12b-it' (NF4 is baked into that pick)."
-        )
     reason = _structural_reject(normalized)
     if reason is not None:
         raise UnknownModelError(_unknown_recovery_hint(normalized, reason, hub_root=hub_root))
@@ -2262,7 +2234,6 @@ def check_vram_fit(
 
 
 # Conservative weight-file allow-list. Transformers loader path only.
-# Excludes .gguf intentionally (deferred to a future llama.cpp backend).
 ALLOW_PATTERNS = (
     "*.json",
     "*.safetensors",
@@ -2361,11 +2332,13 @@ def auto_download_if_missing(
     _hf_api: object | None = None,
 ) -> str:
     """Resolve `repo_id` to a local snapshot path, downloading on first
-    use. Three pre-flight checks fire BEFORE snapshot_download:
+    use. Four pre-flight checks fire BEFORE snapshot_download:
 
         1. OTR_MODEL_CATALOG_AUTO_DOWNLOAD=0 -> UnknownModelError.
         2. Gated curated repo + no HF_TOKEN     -> GatedModelError.
-        3. Free disk - estimated size - margin <= 0 -> InsufficientDiskSpaceError.
+        3. Uncurated repo with no weight files the loader can open
+           (``estimate_model_size_gb`` finds none)  -> UnknownModelError.
+        4. Free disk - estimated size - margin <= 0 -> InsufficientDiskSpaceError.
 
     Test seams: pass `_snapshot_download` (callable replacing
     huggingface_hub.snapshot_download) and `_hf_api` (object with
@@ -2380,12 +2353,6 @@ def auto_download_if_missing(
 
     # EXECUTION path -- use the Hub-aware resolver so a cached
     # `hf auth login` is honoured, not just env/HKCU (PBUG-20260829-10).
-    if isinstance(repo_id, str) and _is_gguf_writer_id(_strip_label_suffix(repo_id)):
-        raise UnknownModelError(
-            f"{repo_id!r} is a retired GGUF writer. Use "
-            "'google/gemma-4-12b-it' (NF4 is baked into that pick)."
-        )
-
     # B1d: local-cache short-circuit FIRST. If the snapshot is already on
     # disk, return the path immediately. This also makes a cached gated
     # repo (e.g. Mistral-Nemo) usable when HF_TOKEN is unset -- the user
@@ -2412,6 +2379,23 @@ def auto_download_if_missing(
 
     # Pre-flight size estimate + disk-space check.
     size_gb = estimate_model_size_gb(weights_id, _hf_api=_hf_api)
+    # A REPO WITH NOTHING THE LOADER CAN OPEN IS REFUSED HERE, NOT FETCHED.
+    # Auto-download admits any well-formed uncurated repo id, so without this a
+    # stale id in an old saved graph -- a repo carrying some other weight
+    # format -- would pull its configs and tokenizers under ALLOW_PATTERNS and
+    # then fail at load with no weights, after a download that could never
+    # have worked. The estimate already sums exactly the files the loader
+    # reads, so an empty sum is the refusal. Curated rows carry their own
+    # size and never reach this branch.
+    if size_gb <= 0 and weights_id not in _by_repo_id():
+        raise UnknownModelError(
+            _unknown_recovery_hint(
+                repo_id,
+                "the repo has no safetensors weights, and the writer loads "
+                "safetensors through transformers only",
+                hub_root=hub_root,
+            )
+        )
     size_bytes = int(size_gb * 1024**3)
     hub_root_path = hub_root if hub_root is not None else _hf_hub_root()
     if hub_root_path is None:
@@ -2587,7 +2571,6 @@ __all__ = [
     "TEST_OVERSIZED_LLM",
     "NOT_DOWNLOADED_SUFFIX",
     "LOCAL_HF_SUFFIX",
-    "LOCAL_GGUF_SUFFIX",
     "ALLOW_PATTERNS",
     "HARD_VRAM_CONTEXT_LIMIT",
     "CURATED_CONTEXT_OVERRIDES",

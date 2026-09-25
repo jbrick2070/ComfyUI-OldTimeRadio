@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.writer_slots import value as widget_value
+from tests._support.writer_slots import value as widget_value
 
 PACK_ROOT = Path(__file__).resolve().parent.parent
 

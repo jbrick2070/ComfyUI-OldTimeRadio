@@ -323,16 +323,36 @@ def test_auto_download_uncurated_uses_hf_api_for_size(tmp_path, monkeypatch):
     assert out == str(tmp_path / "snap")
 
 
+def test_auto_download_refuses_an_uncurated_repo_with_no_loadable_weights(
+        tmp_path, monkeypatch):
+    """A well-formed id whose repo carries no safetensors is refused BEFORE
+    any transfer -- not fetched for its configs and then failed at load."""
+
+    monkeypatch.setenv("OTR_MODEL_CATALOG_AUTO_DOWNLOAD", "1")
+    monkeypatch.setattr(catalog, "_free_disk_bytes_for", lambda _p: 500 * 1024**3)
+    fake_sibling = MagicMock()
+    fake_sibling.rfilename = "weights.onnx"
+    fake_sibling.size = 3 * 1024**3
+    fake_info = MagicMock()
+    fake_info.siblings = [fake_sibling]
+    fake_api = MagicMock()
+    fake_api.model_info.return_value = fake_info
+
+    snap = MagicMock(return_value=str(tmp_path / "snap"))
+    with pytest.raises(UnknownModelError) as exc:
+        catalog.auto_download_if_missing(
+            "uncurated/no-safetensors",
+            hub_root=tmp_path,
+            _snapshot_download=snap,
+            _hf_api=fake_api,
+        )
+    assert "safetensors" in str(exc.value)
+    snap.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # allow_patterns guard
 # ---------------------------------------------------------------------------
-
-
-def test_allow_patterns_excludes_gguf():
-    """B1a2 ships safetensors-only; GGUF support is a future sprint."""
-    assert "*.gguf" not in catalog.ALLOW_PATTERNS
-    for p in catalog.ALLOW_PATTERNS:
-        assert not p.endswith(".gguf")
 
 
 def test_allow_patterns_includes_safetensors_and_tokenizer():

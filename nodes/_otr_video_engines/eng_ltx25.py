@@ -313,8 +313,7 @@ def _assert_two_stage_execution(records, frame_count, *, two_stage=True):
 #: S1 per-model still plan (G7.4). This lane is I2V and the still is NOT
 #: optional -- ``LTXVImgToVideoInplace`` at strength 1.0 IS the conditioning, so
 #: a beat with no still has no graph. Hence ``required="always"`` on all three
-#: scene rows, where the sibling ``ltx_video`` says ``when_ltx_i2v_enabled``
-#: (that lane can fall back to a text-only path; this one cannot and must not).
+#: scene rows: this lane has no text-only path and must not fall back to one.
 #:
 #: WIDE on every row: the lane renders 832x480 and declares ``render_aspect =
 #: "wide"``, so a portrait still would be centre-cropped by the resize node and
@@ -436,9 +435,9 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
     #: CONTINUITY IS STRICT_FIRST_FRAME, and it is EARNED here rather than
     #: inherited from the siblings. ``LTXVImgToVideoInplace`` runs at strength
     #: **1.0**, a HARD pin of frame 0 to the supplied still, fixed rather than
-    #: recipe-dependent -- which is exactly why ``ltx_audio_in`` declares only
-    #: soft_reference (its strength varies 0.7/0.75/1.0 by recipe, and a
-    #: contract that is only sometimes true is a jump cut).
+    #: recipe-dependent. A lane whose anchor strength varied by recipe could
+    #: only declare soft_reference, because a contract that is only sometimes
+    #: true is a jump cut.
     #:
     #: THE OBJECTION, AND WHY IT DOES NOT LAND. Frame 0 is not byte-identical
     #: to the still handed in -- the image makes a round trip through the video
@@ -948,8 +947,8 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
         model segment 1 loaded.
 
         THE COST OF LEARNING THIS LATE IS ON RECORD, which is why it is here
-        rather than after the first long beat: the sibling ``ltx_video`` lane
-        reached a live render gate without one and refused there, 730 seconds
+        rather than after the first long beat: an earlier LTX lane reached a
+        live render gate without one and refused there, 730 seconds
         into a leg -- the most expensive possible place to find out. The full
         suite caught it here instead, on a lane that had never rendered.
 
@@ -1020,7 +1019,7 @@ class Ltx25VideoEngine(_MC.MotionEngineBase):
 
         A DRAFT OF THIS ADAPTER SPLIT THAT LOADER IN TWO AND IT WAS CUT, which
         is worth recording because the split looks obviously right and is not.
-        The idea, inherited by resemblance from ``eng_ltx_av``, was that a
+        The idea, inherited by resemblance from an earlier LTX audio lane, was that a
         separate encode-side node would let ``free_after_use`` drop the VAE the
         moment the still is planted, before the sampler's activation peak. It
         does not. ``wrapper_bridge._topo_order`` is Kahn's algorithm with ties
@@ -3182,7 +3181,7 @@ class Ltx25NativeAudioInMixin:
     timings.
 
     ``audio_ref`` IS ALREADY A FIRST-CLASS PER-BEAT ASSET -- the render driver
-    supplies it (`render_driver.py`) and ``ltx_audio_in`` / HuMo already
+    supplies it (`render_driver.py`) and HuMo and the H3 audio-in lane already
     require it. Nothing new is plumbed; this lane simply declares that it needs
     it and fails LOUD without one, because a lane that silently fell back to an
     empty latent would be a foley lane wearing an audio-in name.
@@ -3198,8 +3197,8 @@ class Ltx25NativeAudioInMixin:
     #: hard-require `audio_ref`, never be handed one on a lineless beat, and
     #: fail loud on exactly the beats the ambient slice exists to cover.
     #:
-    #: `audio_conditioned_video` is the EXISTING family `ltx_audio_in` uses;
-    #: `eng_minimax_h3` adopted it the same way and says so. It also puts these
+    #: `audio_conditioned_video` is the EXISTING audio-in family;
+    #: `eng_minimax_h3` uses it the same way and says so. It also puts these
     #: lanes into `mouth_policy.AUDIO_IN_FAMILIES`, which is right -- a lane
     #: driven by real speech is a lip-sync lane -- and gives the credits roll
     #: its "audio-in video" wording for free.
@@ -3211,8 +3210,8 @@ class Ltx25NativeAudioInMixin:
     #: RESTRICTED NOTHING: `role_compat.engine_fits_role` is "PURELY
     #: capability -- every token in the engine's required_inputs must be
     #: available in the role", and it ignores this list outright. These lanes
-    #: require exactly what `ltx_audio_in` requires and fit `character_video`
-    #: exactly as it does, so the director could select them there regardless
+    #: require init_image + audio_ref and so fit `character_video`, and the
+    #: director could select them there regardless
     #: and then hit a plan-time refusal. Found by a codex review.
     #:
     #: `roles` is UI-sort / self-description metadata. The real gates are
@@ -3413,8 +3412,8 @@ class Ltx25NativeAudioInMixin:
         # TOP-LEVEL field -- a genuinely missing ref fails there as
         # FamilyInputGap and never gets this far.
         #
-        # This is the read every other audio consumer uses: eng_ltx_av:1442,
-        # eng_humo:1268, eng_minimax_h3:720, eng_visualizer:195, and the cloud
+        # This is the read every other audio consumer uses: eng_humo,
+        # eng_minimax_h3, eng_visualizer, and the cloud
         # adapters. Found by a cursor review after two failed live legs.
         plan["audio_path"] = self._ref_path(get("audio_ref"))
         return plan
@@ -3458,9 +3457,8 @@ class Ltx25NativeAudioInMixin:
         # `sigma * noise + (1 - sigma) * latent_image` contributes exactly
         # NOTHING from the reference. The lane would have carried a
         # correctly sized reference waveform and then thrown it away.
-        # This is the same SolidMask(0) -> SetLatentNoiseMask that the
-        # proven `ltx_audio_in` lane rides its audio latent under
-        # (`eng_ltx_av.py` -- "the audio latent rides FROZEN").
+        # This is the SolidMask(0) -> SetLatentNoiseMask pattern the LTX
+        # audio-in graphs have always used: the audio latent rides FROZEN.
         #
         # It also completes the fit: `fit_audio` appends `ones_like(pad)`
         # to an EXISTING mask, so the supplied span stays frozen at 0 and
@@ -3579,12 +3577,10 @@ class Ltx25NativeMime24gbEngine(Ltx25NativeFoleyWideEngine):
 # appended `No speech, no voices.` to a lane whose entire job is to FOLLOW
 # supplied speech.
 #
-# `ltx_audio_in` made the opposite choice on purpose (eng_ltx_av.py:1693): it
-# binds NO formatter so it keeps the shared driver's P4 talking register, the
-# 240-char budget with the style cue front-loaded, and recipe gating -- three
-# proven, delicate behaviours a fresh formatter "would have to re-implement and
-# initially got wrong". The native audio-in lanes inherit that reasoning whole.
-# Found by a cursor QA pass on the commit that introduced it.
+# The audio-in lanes bind NO formatter on purpose, so they keep the shared
+# driver's composition -- the 240-char budget with the style cue front-loaded
+# -- which a fresh formatter "would have to re-implement and initially got
+# wrong". Found by a cursor QA pass on the commit that introduced it.
 for _tier_cls in (Ltx25NativeFoleyWideEngine,
                   Ltx25NativeFoleyBlackwellEngine,
                   Ltx25NativeFoley16gbEngine):
@@ -3600,8 +3596,8 @@ del _tier_cls
 #: EVERY lane that GENERATES its audio -- and no audio-IN lane, which is the
 #: distinction `finish_joint_av_positive` draws in its own docstring. The
 #: audio-in ids were briefly listed here and that appended a voice prohibition
-#: to lanes conditioned on speech; `ltx_audio_in` and `cloud_ltx25_audio_in`
-#: are correctly absent and always were.
+#: to lanes conditioned on speech; `cloud_ltx25_audio_in` and the native
+#: audio-in lanes are correctly absent.
 _JOINT_AV_ENGINES = _JOINT_AV_ENGINES + (
     "ltx25_native_foley_16gb",
     "ltx25_native_foley_24gb",

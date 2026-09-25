@@ -5,7 +5,6 @@
     "OTR_CaptionBurn": "CaptionBurn (SDH open captions on the silent video; default-OFF)",
     "OTR_CastLock": "Cast Lock (v2 ledger authority)",
     "OTR_CreditsRoll": "CreditsRoll (late unified viewer credits, silent tail)",
-    "OTR_DMDRestartSamplerSelect": "OTR DMD Restart Sampler (predict-x0 + renoise)",
     "OTR_EpisodeAssembler": "Episode Assembler",
     "OTR_ImageDirector": "ImageDirector (per-role image model + granularity)",
     "OTR_ImageGenDispatcher": "Image Gen Dispatcher (cache + ledger + image_done)",

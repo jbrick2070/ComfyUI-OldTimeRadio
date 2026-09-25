@@ -97,12 +97,11 @@ class ShippedTemplateWriterTests(unittest.TestCase):
         at load, so the saved value must be the label verbatim, size suffix and
         all. The availability markers are stripped because they depend on what
         happens to be cached on the machine running the test, not on the graph."""
-        from _otr_model_catalog import (LOCAL_GGUF_SUFFIX, LOCAL_HF_SUFFIX,
+        from _otr_model_catalog import (LOCAL_HF_SUFFIX,
                                         NOT_DOWNLOADED_SUFFIX, dropdown_choices)
 
         def _bare(label):
-            for suffix in (NOT_DOWNLOADED_SUFFIX, LOCAL_HF_SUFFIX,
-                           LOCAL_GGUF_SUFFIX):
+            for suffix in (NOT_DOWNLOADED_SUFFIX, LOCAL_HF_SUFFIX):
                 if suffix and label.endswith(suffix):
                     return label[: -len(suffix)]
             return label

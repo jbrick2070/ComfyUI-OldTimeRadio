@@ -29,7 +29,7 @@ Pins:
   6. Headless surface: source_bank is on both CREATIVE_WHITELISTs and
      patch_widget_by_name lands it on the canonical workflow's own
      source_bank widget -- resolved by NAME from the node's descriptors
-     (tests/fixtures/writer_slots.py), never by a hardcoded index. Four
+     (tests/_support/writer_slots.py), never by a hardcoded index. Four
      migrations have shifted these positions; each one left a stale numbered
      comment behind, and a drifted index mostly lands on a neighbouring ""
      or False and keeps passing while checking nothing.
@@ -57,7 +57,7 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
 from nodes._otr_creative_prompt_router import (  # noqa: E402
     resolve_creative_system_prompt,
 )
-from tests.fixtures.writer_slots import assert_relative_order, value  # noqa: E402
+from tests._support.writer_slots import assert_relative_order, value  # noqa: E402
 
 _CANONICAL_WORKFLOW = _REPO / "workflows" / "otr_canonical.json"
 _PUBLIC_DOMAIN_BANK = "public_domain"

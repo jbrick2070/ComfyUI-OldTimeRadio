@@ -386,9 +386,8 @@ _MAX_NEW_TOKENS = 320
 #: room to write prose, and a tight budget is what keeps a per-row pass cheap.
 _JUDGE_MAX_NEW_TOKENS = 160
 
-#: THE RECIPE KNOBS. Module-level so `scripts/otr_clean_stage_lab.py` can
-#: A/B them against a planted ledger and MEASURE the answer instead of
-#: arguing about it. Operator, 2026-08-14: *"the repair needs to be model
+#: THE RECIPE KNOBS. Module-level so they can be A/B'd against a planted
+#: ledger and the answer MEASURED instead of argued about. Operator, 2026-08-14: *"the repair needs to be model
 #: agnostic -- do a bunch of A/Bs until you get something that works."* The
 #: shipped defaults are whatever won the last A/B; they are not guesses.
 #:

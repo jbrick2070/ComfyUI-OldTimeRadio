@@ -162,15 +162,12 @@ def render() -> str:
     A("## 3b. Other custom node packs\n")
     A("OTR resolves these node CLASSES by name at render time, so a missing "
       "pack does not fail at startup -- it fails deep inside an episode, "
-      "after the script, cast, voices and stills are already done. wan_ti2v "
-      "died seventeen minutes in with WrapperNodeMissing for exactly this "
-      "reason.\n")
+      "after the script, cast, voices and stills are already done. A video "
+      "lane once died seventeen minutes in with WrapperNodeMissing for "
+      "exactly this reason.\n")
     A("| pack | who needs it | what breaks without it |")
     A("|---|---|---|")
     A("| [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved) | the animatediff lane | that lane only |")
-    A("| [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF) | "
-      "`wan_ti2v`, `ltx25` | `UnetLoaderGGUF` / `CLIPLoaderGGUF`. Both "
-      "lanes default to GGUF weights, so both are dead without it. |")
     A("| [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo) "
       "| `ltx25` | the advanced LTXV nodes (ImgToVideoInplace, "
       "LatentUpsampler, DualCFGGuider, Concat/SeparateAVLatent, "

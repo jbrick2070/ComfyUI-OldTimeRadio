@@ -78,11 +78,6 @@ ENGINE_FAMILY = {
     "humo_1.7B": "audio_driven_face",
     "still_motion": "static_motion",
     # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out) -- removed here too.
-    # 2026-08-28: image_to_video, matching the engine class. This map is
-    # consulted BEFORE the live registry (see the wan_i2v note below), so a
-    # stale row here would keep answering "text_to_video" forever and the
-    # scene still would never attach.
-    "ltx_video": "image_to_video",
     # wan_i2v RETIRED 2026-08-26 and removed HERE too: engine_family()
     # consults this static map BEFORE the live registry, so a stale row
     # keeps answering "image_to_video" forever with no error path at all.
@@ -98,9 +93,6 @@ ENGINE_FAMILY = {
     # held flat) -- same static_image_gen family, so it uses the explicit
     # :1044 still-init branch below (NOT _SCENE_INIT_FAMILIES).
     "still_word": "static_image_gen",
-    # LTX-AV audio-input lane: the ONE ltx_audio_in engine (audio_conditioned_video;
-    # the old talk/music split was removed 2026-06-26 -- routing is role-driven).
-    "ltx_audio_in": "audio_conditioned_video",
     "cloud_ltx25_foley_plus": "image_to_video",
     "cloud_ltx25_audio_in": "audio_conditioned_video",
 }
@@ -112,21 +104,15 @@ ENGINE_FAMILY = {
 #: families keep coverage via the extra announcer legs.
 _PROFILES = (
     ("announcer_visual", "humo", "audio_driven_face"),
-    # The text_to_video seat, RE-SEATED 2026-08-28: ltx_video declared its
-    # true family (image_to_video) and left this chair, exactly as wan_i2v
-    # left the image_to_video chair when the 14B retired. The remaining LOCAL
-    # text_to_video engine takes it, so the rotation still walks one engine
-    # per family and the family does not silently drop out of soak coverage.
+    # The text_to_video seat: the local text_to_video engine, so the rotation
+    # walks one engine per family and the family does not silently drop out of
+    # soak coverage.
     ("music_visual", "animatediff15_v3_haunted_video", "text_to_video"),
-    # The image_to_video seat. It was `wan_i2v` until the 14B was retired on
-    # 2026-08-26; `wan_ti2v` (the 5B) takes it rather than the row being
-    # dropped, because dropping it would leave the soak walking NO
-    # image_to_video lane at all -- a live family with several engines
-    # (mesh_stage, ltx_8gb, fastwan_8gb, wan_ti2v, minimax_h3_video) would
-    # have gone unexercised, and the fixture exists precisely to walk one row
-    # per family. The 5B declares character_video and resolves to
-    # image_to_video, so the shape is preserved exactly.
-    ("character_video", "wan_ti2v", "image_to_video"),
+    # The image_to_video seat, held by the cheapest local image_to_video lane.
+    # Dropping the row would leave the soak walking NO image_to_video lane at
+    # all -- a live family with several engines would go unexercised, and the
+    # fixture exists precisely to walk one row per family.
+    ("character_video", "ltx_8gb", "image_to_video"),
     ("character_video", "still_motion", "static_motion"),
     ("music_visual", "still_flat", "static_image_gen"),
     ("announcer_visual", "still_pan", "static_image_gen"),
@@ -185,8 +171,6 @@ _GOOGLE_PROVIDER_PROMPT_ENGINES = _GOOGLE_SILENT_TEXT_PROVIDERS
 #: reason written down rather than being handed a prompt that would violate
 #: their own documented directives.
 BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
-    "ltx_video",
-    "ltx_audio_in",
     "ltx25_video",
     # THE LTX 2.5 TIERS. Same composer as the silent lane: a bookend prompt
     # cannot see which DiT file loads, and these differ from `ltx25_video` in
@@ -204,27 +188,6 @@ BOOKEND_SCENE_PROMPT_ENGINES = frozenset({
     "ltx25_native_audio_in_24gb",
     "cloud_ltx25_foley_plus",
     "cloud_ltx25_audio_in",
-})
-
-#: Engines that DO get a bookend scene prompt, but the COMPACTED one-action form
-#: rather than the five-clause LTX-shaped register above.
-#:
-#: This pays the debt BOOKEND_SCENE_PROMPT_KNOWN_RED called "the top row"
-#: (PBUG-20260903-06). The wan family's own directive is "state ONE subject, ONE
-#: action, ONE speed. Do not restate the set" at cfg 5.0 -- the highest guidance
-#: in the stack -- so handing it the five-clause register (multiple actions, a
-#: camera move AND a set restatement) is worse than silence. But the state it was
-#: left in was not silence either: it fell through to build_request's static seed,
-#: `"a 1940s radio studio, on air sign illuminated, period broadcast set"`, which
-#: contains no verb at all. `bounded_motion_register` drops the framing
-#: constraint and the middle clauses and emits exactly one subject-action plus
-#: the camera move -- precisely the shape KNOWN_RED said was owed.
-#:
-#: This is the operator's own complaint, on the beats he named: "announcer and
-#: music had basically no movement".
-BOOKEND_SCENE_PROMPT_BOUNDED = frozenset({
-    "wan_ti2v",
-    "fastwan_8gb",
 })
 
 #: Engines that compose their OWN bookend prompt and must not be handed one.
@@ -287,23 +250,14 @@ BOOKEND_SCENE_PROMPT_NOT_TEXT_DRIVEN = frozenset({
 #: `docs/2026-08-17-per-engine-prompt-style-guide-RESEARCH.md` and enforced by
 #: `tests/test_prompt_style_directives.py`, which fails if the constant names
 #: appear anywhere outside their owning engine modules. Acting on them is a
-#: separate, measured change gated on `scripts/otr_talking_radio_probe_eval.py`
-#: at a fixed seed, because the still-prompt writer does not know its target
+#: separate, measured change gated on a fixed-seed A/B, because the still-prompt writer does not know its target
 #: engine: binding happens at dispatch and roles drift under OTR_FORCE_ENGINE_MAP.
 #:
 #: SO "give this lane a formatter shaped to its own model" IS NOT A FREE FIX.
 #: It is correct, and it lands behind that probe A/B, not before it.
-#: (`wan_ti2v` and `fastwan_8gb` WERE the top two rows here. The debt this
-#: entry described -- "an engine-appropriate bookend formatter emitting one
-#: subject/action/speed, roughly what `bounded_motion_register` already
-#: produces" -- was PAID on 2026-09-03: both now sit in
-#: BOOKEND_SCENE_PROMPT_BOUNDED and receive the compacted register. They are
-#: removed rather than annotated, because a "PROVEN DEFECT / OWED" note left
-#: standing over a fixed defect is the same reads-as-coverage failure this
-#: file exists to stop.)
 BOOKEND_SCENE_PROMPT_KNOWN_RED = {
     "ltx_8gb": "LTX-family but NOT on the LTX scene branch. OWED: confirm "
-               "whether its prompt contract matches ltx_video's closely enough "
+               "whether its prompt contract matches ltx25_video's closely enough "
                "to join BOOKEND_SCENE_PROMPT_ENGINES directly, or whether the "
                "8gb recipe needs its own shorter form.",
     "minimax_h3_video": "OWED: an engine-appropriate bookend formatter; it is "
@@ -1279,15 +1233,14 @@ def _still_spine_requires_scene(shot, engine_id, family):
     # kept a portrait spine. That was FALSE about the code below it: this
     # function also returns True for any non-face engine that declares
     # `init_image` (and for the whole `audio_conditioned_video` family), so the
-    # H3 audio-in lane takes the scene SPINE exactly like `ltx_audio_in`.
+    # H3 audio-in lane takes the scene SPINE like every other audio-in lane.
     #
     # That is fine and intended -- the spine decides which stills get MINTED,
     # and a per-beat scene still is useful to have. The thing that had to be
     # fixed is one level up, where `_engine_scene_init_required` OVERWRITES
     # init_image with that scene still; both audio-in lanes are excluded there
     # so the reference the model lip-syncs stays a face.
-    if str(engine_id or "") in (
-            "still_pan", "still_flat", "still_word", "ltx_audio_in"):
+    if str(engine_id or "") in ("still_pan", "still_flat", "still_word"):
         return True
     if family in _SCENE_INIT_FAMILIES:
         return True
@@ -1947,44 +1900,6 @@ _LTX_MOTION_PROMPT_BY_ROLE = {
 #: short brief fragment appended AFTER, dropped if it breaks the budget).
 _LTX_MOTION_PROMPT_MAX = 240
 
-#: TALKING register for the ia2v_canonical recipe (lips-dont-talk kibitz,
-#: 2026-07-02). Probe-proven: the ia2v two-stage recipe animates what the
-#: prompt NARRATES; the console-motion register above steers motion into
-#: dials/tubes/dolly and the lips freeze (P4: motion 4.15 -> 1.18). The
-#: ANNOUNCER bookend swaps to this canonical-register talking prompt when the
-#: routed engine's recipe wants it (LtxAudioInEngine.wants_talking_prompt()).
-#: MUSIC bookends deliberately KEEP the console-motion register -- P2 proved
-#: LTX cannot lip-sync to music (motion 0.59); a talking prompt there would
-#: fight physics for nothing.
-#: Canonical token skeleton (probe P8 2026-07-02: a paraphrased register
-#: scored HALF the canonical's articulation at identical params -- 1.72 vs
-#: 3.32). Keep the talking/lips/sync pattern intact; the mouth material can be
-#: style-neutral so packs that forbid "cartoon" do not fight the prompt.
-_IA2V_TALKING_PROMPT_ANNOUNCER = (
-    "A face-forward vintage radio with a large expressive grille-mouth is "
-    "talking to the viewer, its clear grille-cloth lips opening and closing "
-    "naturally in sync with the speech, its round glass tuning-dial eyes "
-    "glancing subtly as it speaks. The radio sits still; static camera, "
-    "warm dramatic lighting.")
-#: Character-beat talking clause (appended to a COMPACT identity fragment;
-#: the 900-char shared prompt drowned the speech tokens). Mirrors the
-#: canonical token pattern ("talking to the viewer ... opening and closing
-#: naturally in sync with the speech") -- that half is P8-proven and is
-#: reproduced VERBATIM; a paraphrase scored 1.72 against 3.32.
-#:
-#: THE TAIL WAS CORRECTED 2026-08-27. It read "subtle head and hand
-#: gestures": "subtle" is the damping word PBUG-20260827-04 banned, and
-#: hand acting is what LIPSYNC_MOTION_ENVELOPE retired for this family
-#: because hands cross the face. It now names the JAW and BLINKS, per the
-#: operator LTX 2.5 lip-sync reference -- a face that never blinks reads as
-#: a still even while the mouth moves. Hands are not mentioned either way;
-#: "no hands" would put hands back in the conditioning.
-_IA2V_TALKING_CLAUSE_CHARACTER = (
-    "is talking to the viewer, lips opening and closing naturally in sync "
-    "with the speech, the jaw moving with the words, small head motion "
-    "and natural blinks. Static camera.")
-
-
 def _style_authority():
     """The shared style-token authority (`_otr_visual_styles`).
 
@@ -2000,18 +1915,6 @@ def _style_authority():
         from _otr_visual_styles import (  # type: ignore
             compact_style_cue, prefix_style_cue)
     return compact_style_cue, prefix_style_cue
-
-
-def _compact_style_talking_cue(vstyle):
-    """Compact pack cue for IA2V character prompts.
-
-    The talking register is deliberately tiny for lip-sync; long style tails
-    drown the speech tokens. Non-default packs still need one blunt cue close
-    to the front of the prompt so the video model does not drift back to a
-    generic cinematic portrait.
-    """
-    compact_style_cue, _ = _style_authority()
-    return compact_style_cue(vstyle)
 
 
 def _prefix_video_style_cue(vstyle, prompt):
@@ -2046,94 +1949,14 @@ def _style_cue_after_pinned_opener(vstyle, prompt):
     return "%s %s" % (H3_REFERENCE_OPENER, cued)
 
 
-def _ia2v_talking_register_active(engine_id):
-    """True iff ``engine_id`` is the ltx_audio_in lane AND its active recipe
-    is the two-stage ia2v_canonical lip-sync graph (engine-owned decision --
-    the driver never parses recipe env strings). Any engine-side misconfig
-    returns False here and still fails LOUD at the engine's own gate."""
-    if str(engine_id or "") != "ltx_audio_in":
-        return False
-    try:
-        from .eng_ltx_av import LtxAudioInEngine
-        return bool(LtxAudioInEngine().wants_talking_prompt())
-    except Exception as exc:  # noqa: BLE001
-        # LOUD (kibitz r2): never silently fall back to the console register
-        # on a misconfig -- the engine's own gate still hard-fails the render,
-        # but the prompt-routing decision must be debuggable from the log.
-        _LOG.warning(
-            "[OTR.render_driver] IA2V talking-register probe failed (%s) -- "
-            "console register kept; the engine gate will surface the real "
-            "misconfig LOUD", exc)
-        return False
-
-
-def _ltx_motion_role_key(shot_role, shot_id, is_synthetic_open):
-    """Map an OTR shot role + beat id to a motion-register key (the pack's
-    ``motion_registers`` / :data:`_MOTION_REGISTER_KEYS`), or ``""`` if the
-    beat is not a radio-console motion beat. Pure."""
-    sid = str(shot_id or "")
-    role = str(shot_role or "")
-    # A SYNTHETIC opening-music beat can carry an announcer_visual role (the
-    # b000_music_open structure is definitive, NOT the role) -- check it first.
-    # `shot_music_opening_001` IS THE SHAPE PRODUCTION MINTS, and it does not
-    # end with `b000_music_open`. Measured 2026-09-03 across every music_visual
-    # shot on disk: 100% are `shot_music_opening_001` / `shot_music_closing_001`
-    # and 0% match the legacy suffix, so this branch had stopped firing entirely
-    # and every cold open fell through to the flat `music_inter` register.
-    #
-    # THAT SILENTLY REVERTED A DECISION THE OPERATOR HAD ALREADY MADE. The note
-    # below records a GPU A/B that restored the dynamic open as the default
-    # ("moves ~9x more", operator: "moving grooving"). A naming drift then
-    # un-restored it without touching the line that expresses the choice --
-    # which is why the drift was invisible: nothing looked wrong, the register
-    # simply never got asked for.
-    if (is_synthetic_open
-            or sid.endswith(_OPENING_MUSIC_SUFFIX)
-            or "music_opening" in sid):
-        # Operator 2026-06-12 had retargeted this to the calm music_inter because
-        # the aggressive music_open verbs (whip-pans / "vibrates aggressively" /
-        # dynamic dolly push) SMEARED on the 2B LTX model. 2026-06-15: that smear
-        # was the 1472x832 OVER-RESOLUTION mush (BUG-412), FIXED at native 832x480
-        # -- a GPU A/B proved music_open now renders SHARP (Laplacian 934 vs 83)
-        # AND moves ~9x more (paired with the ksampler default). So the dynamic
-        # open is RESTORED as the default (operator "moving grooving"). music_inter
-        # stays available via OTR_LTX_OPEN_MOTION_KEY=music_inter.
-        _open_key = otr_env.get("OTR_LTX_OPEN_MOTION_KEY", "music_open")
-        # A2: membership check against the STATIC key set (the values moved
-        # to the style pack; the retired fixture dict is not consulted).
-        return (_open_key if _open_key in _MOTION_REGISTER_KEYS
-                else "music_inter")
-    if role == "announcer_visual":
-        return "announcer"
-    if role == "music_visual":
-        # "closing" DOES NOT CONTAIN "close" -- c-l-o-s-i-n-g. That one missing
-        # letter is why every sign-off in production selected `music_inter`.
-        # Production mints `shot_music_closing_001`; the token list below was
-        # written for an older id shape and matched none of it. Measured
-        # 2026-09-03 across the music_visual shots on disk: 100% are
-        # `shot_music_opening_001` / `shot_music_closing_001`, 0% match the old
-        # tokens. See the opening half above for the same drift.
-        # TOKEN MEMBERSHIP, NOT SUBSTRING. `"tag"` is inside "montage" and
-        # "stage", and substring matching on ids is exactly how `"close"`
-        # silently stopped matching `"closing"` in the first place. Splitting on
-        # "_" tests the id's own segments, so a longer word containing a token
-        # can never fire it. `"closing"` is listed as its own token because that
-        # is what production mints.
-        _tokens = set(sid.split("_"))
-        if _tokens & {"closing", "close", "outro", "end", "tag", "off"}:
-            return "music_close"
-        return "music_inter"
-    return ""
-
-
 #: Deterministic fallback for a CHARACTER face beat whose shot carries no M4
 #: creative prompt. It stays world-neutral; authored prompts are preserved.
 #:
 #: "SUBTLE" REMOVED 2026-09-03. PBUG-20260827-04 root-caused inert renders to
 #: damping adjectives in the authored prompts and named THIS STRING verbatim as
-#: one of the offenders ("a person speaking, subtle facial motion"). Its sibling
-#: `_IA2V_TALKING_CLAUSE_CHARACTER` was rewritten at the time; this one was
-#: missed and the damping word stayed live. Telling a model to be subtle is
+#: one of the offenders ("a person speaking, subtle facial motion"). A sibling
+#: clause was rewritten at the time; this one was missed and the damping word
+#: stayed live. Telling a model to be subtle is
 #: telling it to hold still, which is the defect, not the safety rail.
 _CHAR_FACE_FALLBACK_PROMPT = (
     "close-up cinematic portrait of a person speaking, face centered, one clear "
@@ -2249,8 +2072,7 @@ def ltx_prompt_diversity_status(trace):
 
 
 #: The AUDIO-IN engines that count as a talking head on a `character_video`
-#: beat. A MEMBERSHIP test since lane 20 (2026-08-12); it was an equality test
-#: on `ltx_audio_in` while that was the only such lane.
+#: beat. A MEMBERSHIP test since lane 20 (2026-08-12).
 #:
 #: THIS IS LOAD-BEARING AND IT FAILS AT PLAN TIME, not at render time. An
 #: audio-in beat that is neither a character face nor a cabinet role raises
@@ -2264,18 +2086,18 @@ def ltx_prompt_diversity_status(trace):
 #: clips motion-EXEMPT, so the beat would stop being checked for motion at all
 #: -- trading a loud plan-time refusal for a silent quality hole.
 _AUDIO_IN_CHARACTER_ENGINES = (
-    "ltx_audio_in", "minimax_h3_audio_in", "cloud_ltx25_audio_in",
-    # The NATIVE LTX 2.5 audio-in lanes, added 2026-09-23. They declare exactly
-    # what `ltx_audio_in` declares and therefore fit `character_video` exactly
-    # as it does -- `role_compat.engine_fits_role` is capability-only and
+    "minimax_h3_audio_in", "cloud_ltx25_audio_in",
+    # The LTX 2.5 audio-in lanes, added 2026-09-23. They require
+    # init_image + audio_ref and therefore fit `character_video` --
+    # `role_compat.engine_fits_role` is capability-only and
     # ignores an engine's `roles` list, so a lane cannot opt out of a role by
     # declaring a narrower one. Without membership here a selectable, accepted
     # combination reached a deterministic plan-time refusal at the mouth-owner
     # check: the director allowed it, this table did not recognise it.
     #
     # On a character beat the driver supplies the per-line VOICE wav -- the
-    # character's own clean audio -- which is what a lip-sync lane wants and is
-    # the same thing `ltx_audio_in` gets. The ambient master slice is the
+    # character's own clean audio -- which is what a lip-sync lane wants. The
+    # ambient master slice is the
     # LINELESS-beat path, not the character path.
     "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb")
 
@@ -2285,11 +2107,10 @@ def _is_character_face_beat(shot):
     clean voice + a character prompt, NOT the ambient master slice + scene prompt the
     announcer / music / scene BOOKEND beats get. Role is PRIMARY. announcer_visual /
     music_visual are NEVER character-face. The audio_driven_face family (HuMo) on a
-    non-open beat counts; the unified ``ltx_audio_in`` audio-in lane counts when it
-    drives a CHARACTER beat (it is one engine for bookends AND characters, so the
-    talk-vs-scene split that used to live in ltx_av_talk/ltx_av_music now lives on the
-    ROLE). Other engines (ltx_video / wan_i2v / still_pan) are UNCHANGED -- they are
-    never character-face here, so their audio/prompt routing is untouched. Pure."""
+    non-open beat counts; an audio-in lane in ``_AUDIO_IN_CHARACTER_ENGINES`` counts
+    when it drives a CHARACTER beat (one engine serves bookends AND characters, so the
+    talk-vs-scene split lives on the ROLE). Other engines are never character-face
+    here, so their audio/prompt routing is untouched. Pure."""
     role = str((shot or {}).get("role") or "")
     if not role:
         _gid = str((shot or {}).get("group_id") or "")
@@ -2307,13 +2128,13 @@ def _is_character_face_beat(shot):
 
 def _uses_ambient_master_audio(engine_id, family, is_char_face=False, role=""):
     """Lanes that CONDITION on the ambient master MIX (not a specific voice): the
-    ``audio_conditioned_video`` family (ltx_av_music / ltx_audio_in BOOKEND beats --
-    which HARD-require audio_ref) + the viz_green scopes. These get a bounded master
+    ``audio_conditioned_video`` family (audio-in BOOKEND beats -- which HARD-require
+    audio_ref) + the viz_green scopes. These get a bounded master
     slice when a beat lacks per-line timing. Local ``audio_driven_face`` engines
-    (HuMo / ltx_av_talk) are normally EXCLUDED: they need the character's OWN voice,
+    (HuMo) are normally EXCLUDED: they need the character's OWN voice,
     so a master-mix slice would make them lip-sync to the wrong audio. A
     CHARACTER-FACE beat is excluded for the SAME reason regardless of family --
-    ``ltx_audio_in`` on a character beat must use the character's clean own voice,
+    an audio-in lane on a character beat must use the character's clean own voice,
     never the ambient mix (2026-06-26 role-driven).
 
     OTR_ENABLE_HUMO_HOSTS (2026-07-01 brief-driven radio-host): when the toggle is ON,
@@ -2360,10 +2181,11 @@ def _role_of_shot(shot) -> str:
 #:
 #: The engine every announcer_visual / music_visual beat is redirected to when
 #: it would otherwise dispatch a HuMo-family (audio_driven_face) engine: the
-#: EXISTING, general LTX-2.3 audio-in lane (family audio_conditioned_video,
-#: already the per-role DEFAULT for these two roles -- see eng_ltx_av.py
-#: default_roles) -- reused, not a new engine.
-_NEVER_HUMO_REDIRECT_ENGINE = "ltx_audio_in"
+#: local LTX 2.5 audio-in lane (family audio_conditioned_video), which
+#: conditions the radio picture on the beat's own waveform -- exactly the job
+#: the 8 GB audio-in workflow gives it on these two roles. Reused, not a new
+#: engine.
+_NEVER_HUMO_REDIRECT_ENGINE = "ltx25_native_audio_in_16gb"
 
 #: The brief-driven radio-HOST FACE object minted once per episode by MetaBrief
 #: under OTR_ENABLE_HUMO_HOSTS (must match
@@ -2372,14 +2194,6 @@ _NEVER_HUMO_REDIRECT_ENGINE = "ltx_audio_in"
 #: bookends when the toggle is ON.
 _RADIO_HOST_PORTRAIT_ID = "radio_host_portrait"
 
-
-def _ltx_radio_face_object_id(role: str) -> str:
-    """The object_id of the WIDE radio-FACE still for an ltx_audio_in bookend
-    (ltx talking radio-face). Per-role so announcer/music each carry
-    their own wide face still; must match otr_meta_brief_image_prompt's mint.
-    NOTE: this still is an LTX init asset (ambient motion), NOT a HuMo render --
-    the name reserves 'radio_face', not 'humo'."""
-    return "still_%s_radio_face_169" % str(role or "")
 
 #: Bridges the VIDEO-ENGINE role vocabulary this module dispatches on
 #: (announcer_visual / music_visual / character_video) to the LEDGER
@@ -2567,7 +2381,7 @@ def _enforce_radio_is_host(shot):
     opts the toggle ON, the announcer/music bookends are ALLOWED to render a HuMo
     radio-host FACE (fed the brief-driven radio_host_portrait still downstream),
     so this redirect is a NO-OP. Default OFF = today's behavior byte-for-byte
-    (HuMo on bookends still redirects to the ltx_audio_in animated console)."""
+    (HuMo on bookends still redirects to :data:`_NEVER_HUMO_REDIRECT_ENGINE`)."""
     if otr_env.get("OTR_ENABLE_HUMO_HOSTS", "0") == "1":
         return
     role = _role_of_shot(shot)
@@ -2769,8 +2583,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # scene beat would then show the wrong image). audio_driven_face keeps the
     # portrait by design (not in _SCENE_INIT_FAMILIES); fodder engines are excluded
     # by the guard; text engines are unchanged (LTX text-only by design).
-    # `minimax_h3_audio_in` joins ltx_audio_in's exclusion (lane 20,
-    # 2026-08-12), and it is a CORRECTNESS fix rather than a preference. This
+    # `minimax_h3_audio_in` is EXCLUDED (lane 20, 2026-08-12), and it is a
+    # CORRECTNESS fix rather than a preference. This
     # branch OVERWRITES init_image with the beat's wide scene still. On that
     # lane init_image is the reference the model is asked to lip-sync -- it is
     # presented to the tokenizer as `<Picture 1>` and its own prompt says
@@ -2784,27 +2598,17 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # LEXICAL (it grepped the source instead of calling the function) so it
     # passed against the wrong behaviour.
     #
-    # cloud_ltx25_audio_in does NOT join that exclusion. MOUTH_HUMAN on a
-    # character beat is ShotLock voice/prompt ownership, not "init on a
-    # portrait". LTX 2.5 A2V's first frame is the beat's wide scene still --
-    # the 2.3 analog OUTSIDE the IA2V talking register. That register is
-    # gated to engine_id == "ltx_audio_in" because it is a local 2.3
-    # two-stage graph; the Comfy partner has no such recipe. Putting cloud
-    # A2V on this exclusion list without that graph would leave the portrait
-    # as init_image (the H3 tokenizer path) and skip the dedicated
-    # ltx_audio_in branch at the still_pan tuple, which that engine_id is
-    # not on. The partner image input is optional; we still send the scene.
     _engine_scene_init_required = (
         "init_image" in _required_inputs_for_engine(_eng_id, _family)
         and _family != "audio_driven_face"
-        and _eng_id not in ("ltx_audio_in", "minimax_h3_audio_in")
+        and _eng_id != "minimax_h3_audio_in"
     )
     _engine_scene_init_optional = bool(
         _eng_id and _vreg.is_registered(_eng_id)
         and getattr(_vreg.get_engine(_eng_id), "provider_side", False)
         and getattr(_vreg.get_engine(_eng_id), "accepts_still", False)
         and _family != "audio_driven_face"
-        and _eng_id not in ("ltx_audio_in", "still_pan", "still_flat", "still_word")
+        and _eng_id not in ("still_pan", "still_flat", "still_word")
     )
     if ((_family in _SCENE_INIT_FAMILIES
             or _engine_scene_init_required
@@ -2829,8 +2633,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                     _family, _eng_id, shot.get("shot_id"), _bid)
             )
     # FIX1 / BUG-LOCAL-403 (opener centre BLACK): still_pan is family
-    # "static_image_gen" -- in NEITHER _SCENE_INIT_FAMILIES nor the ltx_video
-    # branch -- so an opener that picks still_pan for the music slot kept
+    # "static_image_gen" -- not in _SCENE_INIT_FAMILIES -- so an opener that picks still_pan for the music slot kept
     # init_image="" (the b000 music-open beat has char_id="") and the cheap
     # family synthesized its dark floor (color=0x0A0E14) => a black centre.
     # Condition still_pan on the beat's SCENE still like the other init-driven
@@ -2840,12 +2643,6 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # still_pan (slow pan) + still_flat (static hold) are the static_image_gen
     # "show the selected still" engines -- both condition on the beat's scene still
     # so the operator's chosen image (e.g. flux2_klein) is what's displayed.
-    # ltx_audio_in (2026-06-26) JOINS them: it is the unified WIDE audio-in LTX lane
-    # (render_aspect="wide") that does I2V on the beat's scene still + the shot audio
-    # -- the SAME per-beat wide still these engines use (scene_open for the
-    # announcer/music BOOKENDS, scene_character for character beats), portrait
-    # cleared so it can never leak into a wide frame. Unlike the cheap families it
-    # has NO floor: a missing required still fails LOUD in render_clip (no fallbacks).
     # still_word (Sprint B, 2026-07-03) JOINS still_pan/still_flat here: it is a
     # static_image_gen flat-hold engine that conditions on the beat's minted scene
     # still (which carries the word/title prompt from compose_still_word_prompt).
@@ -2855,7 +2652,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # still_motion in lane 15 -- both now set _require_still too, so a missing
     # still is a refusal on three of the four -- and lane 17 made it FOUR:
     # still_flat took the refusal too, so no still family paints a dark floor.
-    if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word", "ltx_audio_in"):
+    if str(shot.get("engine_id") or "") in ("still_pan", "still_flat", "still_word"):
         _eng = str(shot.get("engine_id") or "")
         _bid = _visual_beat_id
         _still = _still_index(ledger).get(str(_bid), "")
@@ -2870,49 +2667,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # (+ the 3D lane) -- the render_aspect="portrait" engines -- use the
         # vertical portrait. A missing still degrades to the cheap family's floor;
         # init_image is cleared so the portrait can NEVER leak into a wide frame.
-        # S4 PORTRAIT INIT (2026-07-02, portrait-vs-wide A/B): under the ia2v
-        # TALKING register a CHARACTER speech beat conditions on the cast
-        # member's PORTRAIT, not the wide scene still -- the scene still
-        # leaves the face too small for the audio coupling to articulate
-        # (proof7 speech beats: scene-still chars 0.62/0.32/1.27 vs
-        # face-forward announcers 4.62/5.51; isolation A/B same audio+prompt:
-        # scene 0.57 vs portrait 2.86, lag 0). The 2026-06-20 "wide engines
-        # NEVER condition on the vertical portrait" directive is SUPERSEDED
-        # here ONLY under RECIPE_IA2V: its canvas-independent guide chain
-        # (fixed 1920x1088 center-crop -> longer-edge 1536) COVERS the wide
-        # canvas from a vertical portrait -- no pillarbox, no squash
-        # (eyeballed: docs/2026-07-02-canonical-ia2v/pw_ab_portrait_frame.png).
-        # Single-pass recipes keep the scene still; the directive holds there.
-        _s4_portrait = (
-            _eng == "ltx_audio_in"
-            and _role_of_shot(shot) == "character_video"
-            and _ia2v_talking_register_active(_eng))
-        if _s4_portrait:
-            if not portrait:
-                raise DeferredImageGapError(
-                    "IA2V TALKING register: character beat %s (char %r) has "
-                    "NO portrait in the ledger -- NO FALLBACK to the wide "
-                    "scene still (face too small to lip-sync; proof7 A/B "
-                    "2026-07-02). Confirm the image phase minted the cast "
-                    "portrait." % (_bid, char_id))
-            # LOUD aspect guard: record the vertical still entering the wide
-            # canvas so any future pillarbox/squash regression is traceable.
-            _prow = next(
-                (im for im in (((ledger or {}).get("images") or {}).get("images") or [])
-                 if isinstance(im, dict) and str(im.get("path") or "") == portrait),
-                None)
-            _pw = int((_prow or {}).get("w") or 0)
-            _ph = int((_prow or {}).get("h") or 0)
-            init_image = portrait
-            init_source = "character_portrait_ia2v"
-            _LOG.warning(
-                "[OTR.render_driver] IA2V PORTRAIT INIT (S4): character beat "
-                "%s conditions on portrait %s (%sx%s; vertical enters the "
-                "canvas-independent 1920x1088 center-crop guide chain -- no "
-                "pillarbox under ia2v_canonical; scene still %s NOT used)",
-                _bid, os.path.basename(portrait), _pw or "?", _ph or "?",
-                os.path.basename(_still) if _still else "<absent>")
-        elif _still:
+        if _still:
             init_image = _still
             init_source = "scene_still"
             _LOG.info(
@@ -2931,61 +2686,14 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 _LOG.warning(
                     "[OTR.render_driver] %s MISSING-STILL (LOUD): beat %s has NO "
                     "scene still in the ledger. Every still family (still_motion / "
-                    "still_pan / still_flat / still_word) and ltx_audio_in now "
-                    "FAIL LOUD in render_clip rather than painting a dark floor "
+                    "still_pan / still_flat / still_word) now "
+                    "FAILS LOUD in render_clip rather than painting a dark floor "
                     "(no fallbacks). Investigate the image phase for beat %s.",
                     _eng, _bid, _bid)
-    # LTX audio-in bookends use a WIDE radio-FACE init under the ia2v talking
-    # register. Music remains a radio in every visual mode; when its effective
-    # engine is explicitly audio-driven, it gets the same radio-with-lips asset
-    # as the announcer (operator 2026-07-12). Other music engines retain the
-    # faceless radio scene still resolved above. HuMo is a per-role engine choice,
-    # so its global opt-in must not suppress an explicitly selected LTX role.
-    if (_ia2v_talking_register_active("ltx_audio_in")
-            and str(shot.get("engine_id") or "") == "ltx_audio_in"
-            and _role_of_shot(shot) in ("announcer_visual", "music_visual")):
-        _abrole = _role_of_shot(shot)
-        _fid = _ltx_radio_face_object_id(_abrole)
-        _frow = next(
-            (im for im in (((ledger or {}).get("images") or {}).get("images") or [])
-             if isinstance(im, dict) and str(im.get("object_id") or "") == _fid),
-            None)
-        _fpath = str((_frow or {}).get("path") or "")
-        if not _fpath:
-            raise DeferredImageGapError(
-                "a talking ltx_audio_in %s bookend REQUIRES the minted wide radio-face still "
-                "(MetaBrief mints it when the engine lip-syncs). Missing still %r in the ledger "
-                "for %s bookend shot %s -- NO FALLBACK (never black, never a portrait "
-                "pillarbox). Confirm MetaBrief minted it + the dispatcher rendered it." % (_abrole, _fid,
-                                                          _abrole, shot.get("shot_id")))
-        _fw = int((_frow or {}).get("w") or 0)
-        _fh = int((_frow or {}).get("h") or 0)
-        if _fw and _fh and _fw <= _fh:
-            raise RenderError(
-                "a talking ltx_audio_in %s bookend REQUIRES the minted wide radio-face still. "
-                "radio-face still %r is %dx%d (NOT wide) for "
-                "the wide ltx_audio_in %s bookend -- feeding it would pillarbox. NO "
-                "FALLBACK: mint a WIDE radio-face still (aspect-follows the bookend "
-                "slot)." % (_abrole, _fid, _fw, _fh, _abrole))
-        init_image = _fpath
-        init_source = "ltx_radio_face"
-        _LOG.warning(
-            "[OTR.render_driver] LTX-RADIO-FACE: role=%s shot %s conditioning "
-            "ltx_audio_in on the WIDE radio-face still %s (LIP-SYNC under the "
-            "ia2v_canonical recipe since 2026-07-02)", _abrole, shot.get("shot_id"),
-            os.path.basename(_fpath))
-    # THE BESPOKE ltx_video STILL BLOCK IS GONE (2026-08-28). It existed only
-    # because ltx_video declared `family = "text_to_video"` and so fell outside
-    # `_SCENE_INIT_FAMILIES`, which is how every other scene-init engine gets
-    # its per-beat still. The engine now declares `family = "image_to_video"`
-    # and `required_inputs = ("text_prompt", "init_image")`, so it routes
-    # through the shared path above like its siblings, and the
-    # `OTR_ENABLE_LTX_I2V` switch it was gated on is retired -- operator
-    # ruling: "no switches nor flags, all video models request and ingest
-    # stills".
     # Route-A's local HuMo-radio-face music-bookend workaround (2026-06-28) is
     # RETIRED 2026-06-30 (see _enforce_radio_is_host above): a local HuMo
-    # music_visual beat redirects to ltx_audio_in before _family is computed.
+    # music_visual beat redirects to _NEVER_HUMO_REDIRECT_ENGINE before
+    # _family is computed.
     # Partner/cloud avatar engines may still legitimately reach this point as
     # audio_driven_face; their own declared init_image requirement is honored by
     # the scene-still branch above.
@@ -3291,39 +2999,6 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         except (ValueError, AttributeError):
             _lw, _lh = 1472, 832
         req["canvas"]["w"], req["canvas"]["h"] = _lw, _lh
-    # BUG-LOCAL-412 (operator 2026-06-15, "make it byte-identical to 6/5"): LTX-2B
-    # renders MUSH above its native 480p. The 6/5 openers/bookends rendered at
-    # 832x480 then upscaled to the composite, which is why they animated SHARP;
-    # the 2026-06-10 landscape-canvas change pushed LTX to render NATIVELY at
-    # 1472x832 -> "starts sharp then gets blurry" (the engine's own note: "0.75
-    # re-noises into mush at 1472x832"). Render LTX at its 6/5 native canvas and
-    # let OTR_SilentComposite scale the clip to the 1472x832 deliverable. The
-    # still/floor families (still_pan etc.) KEEP the full landscape canvas above.
-    # Env OTR_LTX_RENDER_CANVAS (default 832x480, the 6/5 value; /32-friendly).
-    if str(shot.get("engine_id") or "") == "ltx_video":
-        _lxc = otr_env.get("OTR_LTX_RENDER_CANVAS", "832x480")
-        try:
-            _lxw, _lxh = (int(x) for x in _lxc.lower().split("x", 1))
-        except (ValueError, AttributeError):
-            _lxw, _lxh = 832, 480
-        req["canvas"]["w"], req["canvas"]["h"] = _lxw, _lxh
-    # THE ltx_audio_in INLINE CANVAS BRANCH WAS DELETED IN LANE 7 (2026-08-11).
-    #
-    # It computed the canvas here, RECIPE-DEPENDENTLY -- 832x480 when
-    # ia2v_canonical was live, 512x288 otherwise, either one overridable by
-    # OTR_LTX_AV_RENDER_CANVAS. That was three channels deciding one number
-    # while `declared_render_canvas` below is applied LAST and overrules all of
-    # them, so at most one of the three could ever have been true. The comment
-    # it carried also asserted the ia2v stage-A base "416x240 (all /32)", which
-    # is false -- 240 % 32 == 16 -- and that was S8b-10.
-    #
-    # The lane now DECLARES (1024, 576) on the adapter (LtxAudioInEngine.
-    # render_canvas), which is where the reasoning lives, and disagreement with
-    # OTR_LTX_AV_RENDER_CANVAS is a NAMED refusal in the adapter rather than a
-    # quiet re-plan here. The live receipts that walked the ladder -- 1280x720
-    # failing the /32 gate (proof5b) and 1280x704 breaching the 14.5 GB ceiling
-    # at 14,716 MB in the full production pipeline (proof6) -- are preserved at
-    # the declaration, because that is now the only place a reader needs to go.
     # A DECLARED RENDER CANVAS WINS (B5, 2026-07-27). LAST in the chain on
     # purpose: every write above is guarded by a mutually exclusive engine id
     # or family, so nothing can clobber this and this clobbers nothing -- and
@@ -3332,16 +3007,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # own declaration rather than the family/aspect logic above, so the two
     # mechanisms cannot disagree if a family mapping ever moves.
     #
-    # Declared today: `ltx_8gb` (512x288); `ltx_video` (832x480) since
-    # 2026-08-02, because its 169-frame decode floor is CANVAS-DEPENDENT, so
-    # leaving the canvas to the env branch above left `OTR_LTX_RENDER_CANVAS`
-    # able to invalidate a STATIC frame contract without touching engine code;
-    # the four HuMo tiers and the three WAN lanes through the 2026-08-11 video
-    # transplant; and `ltx_audio_in` (1024x576) in lane 7, whose inline branch
-    # was DELETED rather than kept -- the sentence that used to sit here saying
-    # it "keeps its env branch until the general resolver lands" is no longer
-    # true, and a comment describing a mechanism that is gone is exactly the
-    # defect lesson L6 is about.
+    # Declared today by every local video lane that owns its canvas: `ltx_8gb`
+    # (512x288), the LTX 2.5 lanes (832x480) and the four HuMo tiers.
     _declared = declared_render_canvas(str(shot.get("engine_id") or ""))
     if _declared is not None:
         req["canvas"]["w"], req["canvas"]["h"] = _declared
@@ -3357,8 +3024,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     text_prompt = str(creative.get("text_prompt") or "")
     # RESOLVED BEFORE CLASSIFIED (2026-08-27). `engine_family` is keyed on
     # INTERNAL ids only, so a shot row carrying a public or legacy spelling
-    # -- `ltx23_low_audio_in`, `ltx23_16gb_audio_in`, both real registered
-    # aliases for `ltx_audio_in` -- fell through to its `"abstract"` default.
+    # fell through to its `"abstract"` default.
     # That was survivable while `_fam` only picked fallback prompts; it is
     # NOT survivable now that the LTX character append keys the lip-sync
     # protection on it, because an audio-in lane misread as `abstract` would
@@ -3371,25 +3037,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         from _otr_shared.public_engines import resolve_engine_id as _fam_rid  # type: ignore
     _fam = engine_family(
         str(_fam_rid(str(shot.get("engine_id") or "")) or ""), "")
-    # ia2v TALKING register decision, computed ONCE per shot (kibitz r2: the
-    # helper instantiates an engine to ask the recipe -- cheap today, but
-    # three call sites x every shot invites a regression if the ctor ever
-    # grows weight; memoize the bool here and reuse it below).
-    _talking_register = _ia2v_talking_register_active(shot.get("engine_id"))
-    # ia2v TALKING register, radio-bookend precedence: an explicitly audio-driven
-    # announcer or music bookend that happens to carry an shared visual prompt would
-    # otherwise take the M4 branch below and the talking swap in the motion
-    # branch would never fire. Under the two-stage lip-sync recipe the
-    # talking register OUTRANKS M4 on radio bookends -- clearing the text here
-    # routes the shot into the matching radio-with-lips motion branch.
-    if (text_prompt and _shot_role in ("announcer_visual", "music_visual")
-            and _talking_register):
-        _LOG.warning(
-            "[OTR.render_driver] IA2V TALKING register: %s bookend %s "
-            "M4 prompt OUTRANKED by the lip-sync register (M4 kept for "
-            "non-ia2v engines)", _shot_role, shot.get("shot_id"))
-        text_prompt = ""
-    # ROLE-driven (2026-06-26): the shared classifier also catches ltx_audio_in
+    # ROLE-driven (2026-06-26): the shared classifier also catches audio-in
     # CHARACTER beats (audio_conditioned_video family), so the character
     # fallback prompt + scene-prompt exclusion apply exactly as they do to an
     # audio_driven_face talking head. Announcer/music bookends stay scenes.
@@ -3841,50 +3489,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
         # non-open person beats (announcer/music opens are radio-set objects, no
         # person). The dominant lever is OTR_LTX_I2V_STRENGTH (0.75 -> ~0.85);
         # this clause is the cheap, low-risk insurance alongside it.
-        # ia2v TALKING register (lips-dont-talk fix, 2026-07-02): a CHARACTER
-        # face beat on the two-stage recipe gets a COMPACT talking-forward
-        # prompt -- the ~900-char M4 identity/scene wall drowned the speech
-        # tokens (probe P4: scene-register prompts collapse articulation and
-        # can hallucinate on-video title text). Keep a short identity
-        # fragment (the M4's own opening clause), lead the motion with the
-        # talking clause, hard-cap at the proven 240-char budget. Every
-        # other engine (HuMo, wan, ltx_video) keeps the full M4 verbatim.
-        if _is_char_face_beat and _talking_register:
-            # fragment = the shared prompt's first sentence; else last full CLAUSE under
-            # the remaining budget (kibitz r2: comma-heavy identity openings
-            # have no period -- never hard-cut mid-word). Non-default visual
-            # packs get a two-word cue first; the fragment shrinks so the
-            # proven IA2V talking clause still stays intact.
-            _style_cue = _compact_style_talking_cue(_vstyle)
-            _cue_prefix = ("%s " % _style_cue) if _style_cue else ""
-            _frag_budget = (
-                _LTX_MOTION_PROMPT_MAX
-                - len(_cue_prefix)
-                - len(_IA2V_TALKING_CLAUSE_CHARACTER)
-                - 1
-            )
-            _frag = text_prompt[:max(40, min(120, _frag_budget))]
-            if "." in _frag:
-                _frag = _frag.rsplit(".", 1)[0]
-            elif "," in _frag and len(text_prompt) > 120:
-                _frag = _frag.rsplit(",", 1)[0]
-            # r3 guard: a degenerate fragment (e.g. a lone separator) must
-            # never yield a leading-period prompt. The clause begins with
-            # "is talking..." so the fragment flows into it grammatically
-            # ("...Lead Astronomer is talking to the viewer, ...").
-            _frag = _frag.strip(" ,.") or "a person"
-            _talk = "%s%s %s" % (
-                _cue_prefix, _frag, _IA2V_TALKING_CLAUSE_CHARACTER)
-            text_prompt = _talk
-            # This sub-path -- and only this one -- capped to 240 and engineered
-            # the talking clause to survive (_frag shrinks above so it does).
-            _prompt_char_budget = _LTX_MOTION_PROMPT_MAX
-            _prompt_protected_clause = _IA2V_TALKING_CLAUSE_CHARACTER
-            _LOG.warning(
-                "[OTR.render_driver] IA2V TALKING register: character beat "
-                "%s shared visual prompt -> compact talking prompt (%d chars, style_cue=%r)",
-                _beat_id_for_shot(shot), len(text_prompt), _style_cue)
-        elif (str(shot.get("engine_id") or "").startswith("ltx")
+        if (str(shot.get("engine_id") or "").startswith("ltx")
                 and _shot_role not in ("announcer_visual", "music_visual")):
             # SPLIT BY WHAT THE LANE SELLS (2026-08-27, motion bake-in). The
             # audio-in LTX lane keeps the steadying clause: its product is
@@ -3935,15 +3540,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
                 "creative prompt (ShotLock seam gap) -- rendering on the "
                 "gear-free character fallback prompt (LOUD)",
                 _beat_id_for_shot(shot))
-            _cf_fallback = _CHAR_FACE_FALLBACK_PROMPT
-            if _talking_register:
-                # kibitz r3 must-fix: under the ia2v lip-sync recipe the
-                # scene-register fallback is exactly the prompt class probe
-                # P4 proved collapses articulation -- the seam-gap fallback
-                # must talk too.
-                _cf_fallback = ("close-up cinematic portrait of a person "
-                                "who %s" % _IA2V_TALKING_CLAUSE_CHARACTER)
-            _cf_fallback = _prefix_video_style_cue(_vstyle, _cf_fallback)
+            _cf_fallback = _prefix_video_style_cue(
+                _vstyle, _CHAR_FACE_FALLBACK_PROMPT)
             req["text_prompt"] = _cf_fallback
             _stamp_prompt_meta(req, "default_character", _cf_fallback,
                                beat=_beat_id_for_shot(shot))
@@ -3986,13 +3584,12 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
     # were added 2026-08-26 with a comment describing the exact silent degrade
     # they had been suffering -- "the beat shipped `build_request`'s hardcoded
     # 'a 1940s radio studio' default with `prompt_source` never stamped" -- and
-    # that reasoning was never carried across to `wan_ti2v`, `ltx_8gb`,
-    # `fastwan_8gb` or either `minimax_h3` lane. It also still carried
+    # that reasoning was never carried across to `ltx_8gb` or either
+    # `minimax_h3` lane. It also still carried
     # `wan_i2v`, retired the same week and absent from the registry, so that
     # entry could not match a shot. `tests/test_bookend_scene_prompt_roster.py`
     # is what stops the fourth occurrence.
     if ((_engine_id in BOOKEND_SCENE_PROMPT_ENGINES
-            or _engine_id in BOOKEND_SCENE_PROMPT_BOUNDED
             or _google_prompt_provider
             or _strict_text_only)
             and not text_prompt and not _is_char_face_beat
@@ -4038,43 +3635,8 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # indexing -- the loader guarantees the 4 console keys, and the
             # old silent `or ...["announcer"]` fallback is RETIRED per r2
             # codex S3: a missing key raises LOUD, never remaps to announcer).
-            # SUBSTITUTION ORDER (r3): pack motion value FIRST, THEN the
-            # _talking_swap override -- the probe-locked IA2V talking prompt
-            # is a VERBATIM Python constant (P8) and always outranks the pack.
             scene_prompt = _vstyle.motion_registers[_motion_key]
             _field_source = "motion_registers:%s" % _motion_key
-            # THE WAN FAMILY GETS THE MOVEMENT, NOT THE FIVE CLAUSES. Its
-            # directive forbids restating the set and asks for one subject, one
-            # action, one speed; the compactor emits exactly that. Applied
-            # BEFORE the talking swap below so the probe-locked IA2V constant,
-            # which outranks the pack verbatim, is never compacted.
-            if _engine_id in BOOKEND_SCENE_PROMPT_BOUNDED:
-                # Imported HERE, not reused from the Ghost block above: that
-                # import lives inside a conditional this path does not enter,
-                # so the name would be unbound on every wan bookend.
-                try:
-                    from .._otr_visual_styles import (  # type: ignore
-                        bounded_motion_register as _bounded_now)
-                except ImportError:  # pragma: no cover -- flat test imports
-                    from _otr_visual_styles import (  # type: ignore
-                        bounded_motion_register as _bounded_now)
-                _bounded = _bounded_now(scene_prompt)
-                if _bounded:
-                    scene_prompt = _bounded
-                    _field_source = "bounded_motion_registers:%s" % _motion_key
-            # ia2v TALKING register: both explicitly audio-driven radio bookends
-            # use the lip-sync prompt and the matching radio-with-lips still.
-            # Single-pass or non-audio-driven music stays on its faceless
-            # console-motion register.
-            _talking_swap = (_shot_role in ("announcer_visual", "music_visual")
-                             and _talking_register)
-            if _talking_swap:
-                scene_prompt = _IA2V_TALKING_PROMPT_ANNOUNCER
-                _field_source = "python:ia2v_talking"
-                _LOG.warning(
-                    "[OTR.render_driver] IA2V TALKING register: %s "
-                    "bookend %s prompt swapped to the lip-sync register",
-                    _shot_role, shot.get("shot_id"))
             _meta = (ledger or {}).get("meta") or {}
             _terms = (_meta.get("story_brief_terms")
                       if isinstance(_meta, dict) else None) or {}
@@ -4084,7 +3646,7 @@ def build_request_from_shot(shot, ledger, *, canvas=None,
             # kibitz r2: the talking register stays PURE -- no atmosphere
             # fragment rides the lip-sync prompt (mood tokens dilute the
             # speech narration the recipe follows).
-            if (_atmo and not _talking_swap
+            if (_atmo
                     and len(scene_prompt) + len(_atmo) + 7
                     <= _LTX_MOTION_PROMPT_MAX):
                 scene_prompt = f"{scene_prompt} {_atmo} mood."
@@ -6556,9 +6118,9 @@ def run_real_episode(ledger, *, canvas=None,
 def parse_engine_override(spec: str) -> dict:
     """Parse ``OTR_FORCE_ENGINE_MAP`` (pure). Grammar: comma-separated
     ``role=engine`` pairs; the role ``*`` means EVERY shot regardless of role.
-    Examples: ``*=ltx_video`` (the all-LTX episode);
-    ``character_video=wan_i2v,announcer_visual=humo``.
-    A PUBLIC menu id (``wan_8gb``) or a LEGACY id resolves to its internal engine id
+    Examples: ``*=ltx25_video`` (the all-LTX episode);
+    ``character_video=ltx_8gb,announcer_visual=humo``.
+    A PUBLIC menu id (``ltx098_low_video``) or a LEGACY id resolves to its internal engine id
     before the registry check, so the map is stored as internal ids (video-tiers
     2026-07-20, boundary 6). Unknown engines raise at parse time (fail-closed)."""
     from .._otr_shared.public_engines import (
@@ -6986,10 +6548,10 @@ def apply_engine_override(ledger):
 
 
 #: Engines that count as a REAL LTX radio-open render (BUG-LOCAL-413 guard):
-#: ltx_video, the native LTX 0.9.8 low-memory lane (manifest ID ltx_8gb),
+#: the native LTX 0.9.8 low-memory lane (manifest ID ltx_8gb),
 #: the LTX 2.5 HQ I2V lane, and the additive LTX-AV audio lane.
 _LTX_OPEN_ENGINES = frozenset(
-    {"ltx_video", "ltx_8gb", "razzle_ltx_8gb", "ltx25_video", "ltx_audio_in",
+    {"ltx_8gb", "razzle_ltx_8gb", "ltx25_video",
      # The foley and mime lanes render the LTX 2.5 picture graph unchanged
      # -- only the audio latent's fate differs -- so an open that renders on
      # one is every bit as real an LTX open as `ltx25_video`. Omitting them
@@ -7780,8 +7342,7 @@ def _clip_summary(clip):
 def _episode_facts(ep):
     # `meta` was accepted and never read (removed 2026-08-28). The report this
     # builds reads its meta at the enclosing layer, where the value is actually
-    # in scope. (scripts/otr_video_soak.py has its own same-named helper that
-    # DOES use meta -- different function, untouched.)
+    # in scope.
     led = ep["ledger"]
     sec = led["video"]
     shots = {s["shot_id"]: s for s in sec["shots"]}

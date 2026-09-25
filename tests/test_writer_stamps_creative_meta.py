@@ -44,7 +44,7 @@ def _meta_assignments(meta_key: str) -> list[ast.AST]:
     Matches both Subscript(value=Name("meta"), slice=Constant(meta_key))
     and the older Index-wrapped variant. Returns the Assign nodes.
     """
-    from tests.fixtures.writer_family import trees
+    from tests._support.writer_family import trees
 
     # order 9 split the writer across three files; a meta stamp may live in
     # any of them, so walk them all.
@@ -127,7 +127,7 @@ def test_meta_stamping_lands_after_story_brief_reflection_pass() -> None:
 
     Source-line ordering check, not runtime ordering.
     """
-    from tests.fixtures.writer_family import source_defining
+    from tests._support.writer_family import source_defining
 
     # The ordering law is WITHIN the function that owns these stamps, so read
     # the one family member that defines the tail -- never a concatenation.

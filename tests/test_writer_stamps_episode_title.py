@@ -20,7 +20,7 @@ WRITER_SOURCE = REPO_ROOT / "nodes" / "OTR_LedgerScriptWriter.py"
 
 def _writer_family_source() -> str:
     """order 9 split the writer across three files; these are text pins."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
     return family_source()
 
 

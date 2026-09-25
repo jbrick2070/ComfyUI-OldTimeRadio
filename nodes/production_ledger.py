@@ -19,10 +19,8 @@ identity in Goal 3 daisy-chain mode (see ROADMAP Goal 3 +
 docs/2026-04-25-humo-continuity-brief.md).
 
 L2 scope:
-  * Write-only on the producing side (FULL pipeline + script-side
-    builders such as build_silent_test_episode.py).
-  * Read by the HuMo orchestrator (render_humo_batch.py) and downstream
-    visualisation (artifacts).
+  * Write-only on the producing side (the FULL pipeline).
+  * Read by downstream visualisation (artifacts).
   * Incremental saves after every stage -- a crash leaves a partial JSON
     showing exactly where the pipeline died.
   * Writes NEVER raise. A ledger failure is logged and the pipeline continues.

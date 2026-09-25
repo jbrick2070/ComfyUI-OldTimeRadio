@@ -2077,12 +2077,6 @@ def request_slot(
         _hub_root = Path(_otr_hf.ensure_hf_home()) / "hub"
         normalized = _otr_catalog.validate_model_id(model_id, hub_root=_hub_root)
 
-    if isinstance(normalized, str) and _otr_catalog._is_gguf_writer_id(normalized):
-        raise ModelLoaderError(
-            f"{normalized!r} is a retired GGUF writer. Use "
-            "'google/gemma-4-12b-it' (NF4 is baked into that pick)."
-        )
-
     _policy = _policy_with_baked_quant(_policy, normalized)
     _mismatch = _otr_catalog.quant_pick_mismatch(
         normalized, getattr(_policy, "quant_policy", "")

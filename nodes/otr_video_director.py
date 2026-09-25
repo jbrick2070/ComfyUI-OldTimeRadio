@@ -135,22 +135,16 @@ def _descriptor_suffix(engine_id) -> str:
 def _label_for(engine_id) -> str:
     """The dropdown LABEL for an INTERNAL engine id:
     ``'<public-or-internal id><aspect suffix><descriptor suffix>'`` (e.g.
-    ``'wan_8gb (16:9)'`` for internal ``wan_ti2v``, ``'humo_1.7B (portrait)'``,
-    or ``'viz_green (16:9) (audio-reactive, no scene image)'``).
+    ``'ltx098_low_video (16:9)'`` for internal ``ltx_8gb``,
+    ``'humo_1.7B (portrait)'``, or
+    ``'viz_green (16:9) (audio-reactive, no scene image)'``).
 
-    Video-tiers (2026-07-20): the visible token is the PUBLIC menu id when the engine
-    has one (``_INTERNAL_TO_PUBLIC``), else the bare internal id. The four
-    original tier rows read ``wan_8gb`` / ``ltx_8gb`` / ``ltx23_16gb_audio_in``
-    / ``ltx23_16gb_video``; ALL FOUR of those ``<vramtier>gb`` spellings were
-    retired one lane at a time by the video transplant build (lanes 5-9,
-    2026-08-11) and now resolve through ``_LEGACY_ENGINE_ALIASES``, so the live
-    menu reads ``wan22_high_video`` / ``ltx098_low_video`` /
-    ``ltx23_low_audio_in`` / ``ltx23_high_video``. Every other engine keeps its
-    id. The suffixes are
+    The visible token is the PUBLIC menu id when the engine has one
+    (``_INTERNAL_TO_PUBLIC``), else the bare internal id. The suffixes are
     still DERIVED from the engine's own ``render_aspect`` / family (passed the
     INTERNAL id). Every suffix starts with ``' ('`` so
     :func:`_engine_id_from_pick`'s resolver strips them all and round-trips the label
-    back to the internal id (``_engine_id_from_pick(_label_for('wan_ti2v'))=='wan_ti2v'``)."""
+    back to the internal id (``_engine_id_from_pick(_label_for('ltx_8gb'))=='ltx_8gb'``)."""
     public = _INTERNAL_TO_PUBLIC.get(engine_id, engine_id)
     return "%s%s%s" % (public, _aspect_suffix(engine_id),
                        _descriptor_suffix(engine_id))
@@ -165,7 +159,7 @@ def _label_for(engine_id) -> str:
 def _engine_id_from_pick(pick) -> str:
     """Parse a dropdown pick back to the concrete internal engine id (the
     saved/looked-up VALUE) via the shared resolver: strip the ' (' suffix, map a
-    PUBLIC menu id (``'wan_8gb (16:9)'`` -> ``'wan_ti2v'``) then a LEGACY id
+    PUBLIC menu id (``'ltx098_low_video (16:9)'`` -> ``'ltx_8gb'``) then a LEGACY id
     (``'visualizer'`` -> ``'viz_green'``) to the current internal id. A bare
     internal value (old saved graphs) and the ADD_CUSTOM sentinel pass through
     unchanged -- fully back-compatible."""
@@ -187,8 +181,8 @@ def _video_model_combo() -> list:
     hard-fail LOUD; validation is the operator's MANUAL process, never a code gate).
     ``+ Add Custom Model`` stays the escape hatch for an explicitly-declared engine.
 
-    Each entry is the engine's PUBLIC-or-internal label (``wan_8gb (16:9)`` for
-    internal ``wan_ti2v``, ``humo (portrait)``, ...) so the tier rows read by their
+    Each entry is the engine's PUBLIC-or-internal label (``ltx098_low_video (16:9)``
+    for internal ``ltx_8gb``, ``humo (portrait)``, ...) so the tier rows read by their
     public name; the SAVED value is that same label (``direct()`` resolves it back
     to the internal id via :func:`_engine_id_from_pick`). Deduped by PUBLIC id so a
     public row can never appear twice (a defensive no-op given the bijection)."""
@@ -207,7 +201,7 @@ def exact_menu_option_for(internal_id) -> str:
     """The UNIQUE live-combo option (menu label) that resolves to ``internal_id``.
 
     Used by the applier + build_variants to write the EXACT string the UI would save
-    for a given internal engine (e.g. ``wan_ti2v`` -> ``'wan_8gb (16:9)'``), so a
+    for a given internal engine (e.g. ``ltx_8gb`` -> ``'ltx098_low_video (16:9)'``), so a
     generated variant stores a real, round-trippable menu value rather than a bare
     internal id. Fails LOUD on 0 or >1 matches (a menu/registry inconsistency)."""
     opts = [o for o in _video_model_combo()
@@ -576,12 +570,10 @@ class OTRVideoDirector:
             # EFFECTIVE, NOT PICKED (2026-07-25, chunk 1b) -- this was a LIVE
             # DEFAULT-ENV BUG, not a latent one. Picking a portrait HuMo for
             # announcer_visual with OTR_ENABLE_HUMO_HOSTS unset redirects the
-            # render to the WIDE ltx_audio_in console, but the aspect map was
+            # render to the WIDE audio-in redirect target, but the aspect map was
             # derived from the PICKED portrait engine -- so a 832x1216 portrait
-            # still was minted and the wide render centre-cropped it. The
-            # consequence is recorded verbatim in eng_ltx_av.py:345-347:
-            # "the director defaulted to a 832x1216 PORTRAIT still that the wide
-            # render then centre-cropped, lopping the subject's head off."
+            # still was minted and the wide render centre-cropped it, lopping
+            # the subject's head off.
             "aspects": self._role_aspects(resolved_video, effective_video),
             # Per-role TALKING flag (S4b 2026-07-02): whether the engine
             # lip-syncs (wants_talking_prompt, the ia2v register), so

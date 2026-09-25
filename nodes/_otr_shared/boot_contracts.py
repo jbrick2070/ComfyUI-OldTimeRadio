@@ -87,29 +87,6 @@ H3 = "h3"
 #: forbidden. This names a lab candidate, not a published OTR H3 episode.
 H3_8GB_LAB = "h3_8gb_lab"
 
-#: The LTX-AV diet (row 7b, operator ruling 2026-08-11). `ltx_audio_in` cleared
-#: the 14.5 GiB gate on the stock boot by **35 MB (0.24%)** at 1024x576x193 --
-#: a property of that minute on a lived-in desktop, not a property of the lane,
-#: since a browser opening moves the idle baseline back over it. The operator
-#: refused to wave that through and ruled: prove the lever.
-#:
-#: `reserve_vram_gb` is deliberately **None**, and that is the whole design
-#: decision here rather than an omission. This adapter already holds its own
-#: reserve in-process: `_ltx_av_vram_reserve` bumps ComfyUI's
-#: `EXTRA_RESERVED_VRAM` to `OTR_LTX_AV_RESERVE_VRAM_GB` (default 4.0) across
-#: the graph run, and it bumps only when its target EXCEEDS the current value.
-#: A boot `--reserve-vram 2.921` would therefore be overwritten by the
-#: adapter's own 4.0 for the entire render window -- a knob that reaches
-#: nothing (L6), while looking in the profile like it did something.
-#:
-#: So the untested lever on THIS lane is the pinned-memory one, which is also
-#: the half of the HuMo diet that could not be reproduced by `--reserve-vram`
-#: alone. Same shape as H3, without the Sage constraint (LTX-AV boots on the
-#: Sage-free LTX token already, but that is the token's business, not this
-#: contract's -- a contract that forbids an unrelated flag is how one lane's
-#: needs become another lane's mystery refusal).
-LTX_AV_DIET = "ltx_av_diet"
-
 #: CPU-only ComfyUI. Several CPU/cloud profiles used to put ``--cpu`` only in
 #: ``launch.extra_args``; that field was rendered into prose but ignored by
 #: every launcher. Naming the process state makes the resolver emit the real
@@ -143,12 +120,6 @@ BOOT_CONTRACTS = {
         "reserve_vram_gb": None,     # generated lab launch emits no reserve
         "disable_pinned_memory": True,
         "sage_attention": False,
-        "cpu": False,
-    },
-    LTX_AV_DIET: {
-        "reserve_vram_gb": None,     # the adapter's own in-process 4.0 dominates
-        "disable_pinned_memory": True,
-        "sage_attention": None,
         "cpu": False,
     },
     CPU: {
@@ -533,7 +504,7 @@ def check_engine_against_profile(engine, profile) -> list:
 
 
 __all__ = [
-    "DEFAULT", "HUMO_DIET", "H3", "H3_8GB_LAB", "LTX_AV_DIET", "CPU",
+    "DEFAULT", "HUMO_DIET", "H3", "H3_8GB_LAB", "CPU",
     "BOOT_CONTRACTS", "CONTRACT_ENV",
     "BootContractError", "known_contract", "contract_spec", "launch_env_for",
     "launch_args_for",

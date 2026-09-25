@@ -12,7 +12,7 @@ from nodes.OTR_LedgerScriptWriter import _build_truncating_generate_fn, _resolve
 from nodes._otr_google_api import client as gclient
 from nodes._otr_google_api import llm as gllm
 from nodes._otr_google_api import models as gmodels
-from tests.fixtures.writer_slots import assert_relative_order
+from tests._support.writer_slots import assert_relative_order
 
 
 class _RequireFullMessages(list):

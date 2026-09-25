@@ -31,10 +31,11 @@ Resolve the models root through `nodes/_otr_models_root.py::_models_root()` rath
 python scripts/otr_fetch_lane_weights.py haunted
 python scripts/otr_fetch_lane_weights.py humo
 python scripts/otr_fetch_lane_weights.py lightning
+python scripts/otr_fetch_lane_weights.py ltx25_native_16gb
+python scripts/otr_fetch_lane_weights.py ltx25_native_24gb
+python scripts/otr_fetch_lane_weights.py ltx25_native_blackwell
 python scripts/otr_fetch_lane_weights.py ltx_8gb
 python scripts/otr_fetch_lane_weights.py stable_audio_3
-python scripts/otr_fetch_lane_weights.py wan_ti2v
-python scripts/otr_fetch_lane_weights.py wan_ti2v_gguf
 python scripts/otr_fetch_lane_weights.py z_image
 python scripts/otr_fetch_lane_weights.py z_image_blackwell
 python scripts/otr_fetch_lane_weights.py z_image_int8
@@ -53,43 +54,39 @@ Anything not listed there is a manual install -- see its row below.
 | engine | needs | how | used by profiles |
 |---|---|---|---|
 | `cloud_video` | nothing on disk | - | - |
-| `fastwan_8gb` | 1 weight file(s) | manual download | 3 profile(s) |
 | `ghost_signal` | 2 weight file(s) | manual download | - |
 | `ghost_signal_lightning` | 4 weight file(s) | manual download | - |
 | `ghost_signal_official` | 5 weight file(s) | manual download | - |
 | `ghost_signal_stillin_lab` | 3 weight file(s) | manual download | - |
-| `google_omni_video` | nothing on disk | - | 2 profile(s) |
-| `google_veo_video` | nothing on disk | - | 4 profile(s) |
-| `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual tier](RUNPOD_INSTALL.md) | 3 profile(s) |
-| `ltx25` | 5 weight file(s) | manual download | - |
-| `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 6 profile(s) |
-| `ltx_av` | 8 weight file(s) | manual download | - |
-| `ltx_video` | 7 weight file(s) | manual download | 4 profile(s) |
-| `mesh_stage` | 3 weight file(s) | manual download | 1 profile(s) |
+| `google_omni_video` | nothing on disk | - | - |
+| `google_veo_video` | nothing on disk | - | - |
+| `humo` | 6 weight file(s) | 14B: `otr_fetch_lane_weights.py humo`; 1.7B: [exact manual download](RUNPOD_INSTALL.md) | - |
+| `ltx25` | 4 weight file(s) | auto at queue time; or `otr_fetch_lane_weights.py ltx25_native_16gb` / `ltx25_native_24gb` / `ltx25_native_blackwell` | - |
+| `ltx_8gb` | 2 weight file(s) | `otr_fetch_lane_weights.py ltx_8gb` | 2 profile(s) |
+| `mesh_stage` | 3 weight file(s) | manual download | - |
 | `minimax_h3` | 5 weight file(s) | explicit operator-local `otr_fetch_lane_weights.py minimax_h3` | - |
-| `razzle_ltx_8gb` | **not declared in code -- verify** | - | 1 profile(s) |
+| `razzle_ltx_8gb` | **not declared in code -- verify** | - | - |
 | `visualizer` | nothing on disk | - | - |
-| `viz_camera` | nothing on disk | - | 7 profile(s) |
+| `viz_camera` | nothing on disk | - | 3 profile(s) |
 | `viz_mandala` | nothing on disk | - | - |
 | `viz_rainbow` | nothing on disk | - | - |
-| `wan_ti2v` | 4 weight file(s) | `otr_fetch_lane_weights.py wan_ti2v` | 9 profile(s) |
 
 ## Audio and voice engines
 
 | engine | needs | how | used by profiles |
 |---|---|---|---|
-| `bark` | **not declared in code -- verify** | - | 1 profile(s) |
-| `chatterbox` | **a SEPARATE project + its own venv** | manual, see below | 2 profile(s) |
-| `cloud_elevenlabs` | nothing on disk | - | 6 profile(s) |
+| `bark` | **not declared in code -- verify** | - | - |
+| `chatterbox` | **a SEPARATE project + its own venv** | manual, see below | - |
+| `cloud_elevenlabs` | nothing on disk | - | 5 profile(s) |
 | `cloud_sonilo` | nothing on disk | - | - |
-| `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | 2 profile(s) |
-| `google_lyria` | nothing on disk | - | 4 profile(s) |
-| `google_tts` | nothing on disk | - | 4 profile(s) |
-| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | 49 profile(s) |
-| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 102 profile(s) |
-| `musicgen` | `facebook/musicgen-small` | auto (HF cache) | 4 profile(s) |
+| `dia` | **a SEPARATE project + its own venv**; `nari-labs/Dia-1.6B-0626` | manual, see below | - |
+| `google_lyria` | nothing on disk | - | - |
+| `google_tts` | nothing on disk | - | - |
+| `indextts2` | **a SEPARATE project + its own venv** | manual, see below | - |
+| `kokoro` | 1 weight file(s) | auto (boot prefetch: voices + ONNX model; torch model via HF cache) | 19 profile(s) |
+| `musicgen` | `facebook/musicgen-small` | auto (HF cache) | - |
 | `stable_audio` | `stabilityai/stable-audio-open-1.0` | auto (HF cache) **(HF_TOKEN)** | - |
-| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 102 profile(s) |
+| `stable_audio_3` | 3 weight file(s) | `otr_fetch_lane_weights.py stable_audio_3` | 19 profile(s) |
 
 ## Image engines (every shipped workflow picks one)
 
@@ -152,10 +149,6 @@ Copied from the engine module and the siblings it imports, so these are the lite
 
 So where a lane appears in the one-command list above, **the fetcher is authoritative** -- it installs a set known to work together. Use the list below to understand a lane, or to install one the fetcher does not cover, and expect to choose among alternatives rather than downloading every line.
 
-**`fastwan_8gb`** -- `nodes/_otr_video_engines/eng_fastwan_8gb.py`
-
-- `Wan2_2_5B_FastWanFullAttn_lora_rank_128_bf16.safetensors`
-
 **`ghost_signal`** -- `nodes/_otr_video_engines/eng_ghost_signal.py`
 
 - `mm-p_0.5.pth`
@@ -193,7 +186,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 
 **`ltx25`** -- `nodes/_otr_video_engines/eng_ltx25.py`
 
-- `LTX-2.5-Distilled-Q5_K_M.gguf`
 - `LTX25-distilled-DiT-comfy-int8.safetensors`
 - `LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors`
 - `LTX25-distilled-DiT-comfy-nvfp4.safetensors`
@@ -203,27 +195,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 
 - `ltxv-2b-0.9.8-distilled.safetensors`
 - `t5xxl_fp16.safetensors`
-
-**`ltx_av`** -- `nodes/_otr_video_engines/eng_ltx_av.py`
-
-- `gemma_3_12B_it_fp4_mixed.safetensors`
-- `ltx-2.3-22b-dev-Q3_K_M.gguf`
-- `ltx-2.3-22b-dev.safetensors`
-- `ltx-2.3-22b-dev_audio_vae.safetensors`
-- `ltx-2.3-22b-dev_video_vae.safetensors`
-- `ltx-2.3-22b-distilled-lora-384-1.1.safetensors`
-- `ltx-2.3-22b-distilled-lora-384.safetensors`
-- `ltx-2.3-spatial-upscaler-x2-1.1.safetensors`
-
-**`ltx_video`** -- `nodes/_otr_video_engines/eng_ltx_video.py`
-
-- `gemma_3_12B_it_fp4_mixed.safetensors`
-- `ltx-2.3-22b-dev-Q3_K_M.gguf`
-- `ltx-2.3-22b-dev.safetensors`
-- `ltx-2.3-22b-dev_video_vae.safetensors`
-- `ltx-2.3-22b-distilled-lora-384-1.1.safetensors`
-- `ltx-2.3-22b-distilled-lora-384.safetensors`
-- `ltx-2.3-spatial-upscaler-x2-1.1.safetensors`
 
 **`mesh_stage`** -- `nodes/_otr_video_engines/eng_mesh_stage.py`
 
@@ -238,13 +209,6 @@ So where a lane appears in the one-command list above, **the fetcher is authorit
 - `minimax_h3_ref2va_pruned_int8_convrot.safetensors`
 - `minimax_h3_video_vae_fp16.safetensors`
 - `qwen3vl_32b_minimax_h3_nvfp4_awq.safetensors`
-
-**`wan_ti2v`** -- `nodes/_otr_video_engines/eng_wan_ti2v.py`
-
-- `Wan2.2-TI2V-5B-Q5_K_M.gguf`
-- `umt5-xxl-encoder-Q5_K_M.gguf`
-- `wan2.2_vae.safetensors`
-- `wan_2.1_vae.safetensors`
 
 **`dia`** -- `nodes/_otr_audio_engines/eng_dia.py`
 

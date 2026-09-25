@@ -129,7 +129,7 @@ def _env_int(name, default):
 #: floor is the change most likely to have over-corrected the music into
 #: formlessness -- the opening cue now renders the first third of a 36 s arc
 #: and may never reach the theme it is told to settle into -- and a constant
-#: cannot be A/B'd by `scripts/otr_music_ab.py`.
+#: cannot be A/B'd without editing the file.
 #:
 #: A RATIO BELOW THE DEFAULT RESTORES THE DEFECT, not merely the old
 #: behaviour (codex, 2026-09-12): at 1.0 the 12 s opening cue is asked for

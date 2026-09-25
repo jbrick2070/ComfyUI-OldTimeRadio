@@ -38,9 +38,9 @@ roster IS the source's cast simply report no superseded identities, so
 ``shakespeare`` and ``public_domain`` are untouched and their fidelity is never
 attacked.
 
-This module is imported by BOTH the runtime guard and the offline archive sweep
-(``scripts/audit_wrong_person_census.py``). One implementation, so the sweep can
-never certify something different from what runtime enforces.
+This module is the ONE implementation the runtime guard imports, so any future
+offline sweep that imports it can never certify something different from what
+runtime enforces.
 
 WHAT THIS COVERS, AND WHAT IT DOES NOT -- stated because a guard whose reach is
 assumed rather than known is how the last census reported a blind spot as a

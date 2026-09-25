@@ -89,7 +89,7 @@ def _make_ctx(tmp_path: Path, monkeypatch, **overrides) -> WriterTailContext:
     from nodes import production_ledger as ledger_module
     from nodes import _otr_canon as canon_module
     from nodes import _otr_model_loader as loader
-    from tests.fixtures.ledger_stub import make_stub_ledger
+    from tests._support.ledger_stub import make_stub_ledger
 
     monkeypatch.setattr(
         loader,

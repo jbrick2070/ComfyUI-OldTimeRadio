@@ -13,7 +13,7 @@ bump (l4) changes ledger shape, the failures land here first instead of
 manifesting deep inside one of the seven shipped consumers.
 
 Hermetic: no GPU, no I/O, no ComfyUI imports. Uses
-`tests/fixtures/ledger_stub.py` for the canonical stub ledger shape.
+`tests/_support/ledger_stub.py` for the canonical stub ledger shape.
 Companion to the seven per-consumer self-tests in `tests/test_*_ledger.py`.
 """
 from __future__ import annotations
@@ -32,7 +32,7 @@ if str(_NODES_DIR) not in sys.path:
 
 import _otr_ledger_consumers as _OTRLC  # noqa: E402
 
-from tests.fixtures.ledger_stub import (  # noqa: E402
+from tests._support.ledger_stub import (  # noqa: E402
     make_stub_ledger,
     make_legacy_list,
 )

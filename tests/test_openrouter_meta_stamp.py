@@ -98,7 +98,7 @@ def test_unbound_slug_falls_back_to_recommended(monkeypatch):
 def test_writer_wires_the_stamp():
     """Source-pin: the writer module must call openrouter_meta_for so a
     future refactor cannot silently drop the remote provenance stamp."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
 
     src = family_source()
     assert "openrouter_meta_for(" in src

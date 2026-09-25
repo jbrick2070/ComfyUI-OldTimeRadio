@@ -1,8 +1,9 @@
 """Pre-writer native visual-weight readiness for the shipped canonical graph.
 
-No model imports or network at module import. Only the ELEVEN allowlisted files
-below can be fetched (three z_image_turbo, two ltx_8gb, three stable_audio_3,
-one sd15, two lumina_image -- the Flux ae VAE is already the z_image row).
+No model imports or network at module import. Only the EIGHTEEN allowlisted
+files below can be fetched (three z_image_turbo, two ltx_8gb, three
+stable_audio_3, one sd15, two lumina_image -- the Flux ae VAE is already the
+z_image row -- and seven for the native LTX 2.5 lanes).
 Existing native loader choices are preserved, not rehash-qualified, and
 readiness is NOT a claim of GPU/render compatibility. Other engines keep
 their existing adapter checks with explicit uncovered logs.
@@ -87,6 +88,30 @@ _SOURCES = (
      "split_files/diffusion_models/lumina_2_model_bf16.safetensors"),  # 5.22 GB
     ("text_encoders", "Comfy-Org/Lumina_Image_2.0_Repackaged",
      "split_files/text_encoders/gemma_2_2b_fp16.safetensors"),        # 5.23 GB
+    # THE NATIVE LTX 2.5 STACK, added 2026-09-25. Operator: the point was
+    # "less friction for the end user, auto download things to work". Every file below is UNGATED and loads
+    # through stock ComfyUI loaders, so a lane that selects LTX 2.5 now fetches
+    # its own weights at queue time exactly like Z-Image and SD 1.5 do.
+    # Lightricks' own LTX-2.5 repo is gated (401 without a token,
+    # PBUG-20260923-03); the VAEs and the upscaler come from a byte-identical
+    # ungated mirror (same SHA-256 as Lightricks' copies). One DiT per card
+    # class; each lane names its own through `_dit_name()`, so a 16 GB lane
+    # never pulls the 24 GB weight.
+    ("diffusion_models", "joeygambino/LTX-2.5-Quantized",
+     "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors"),  # 13,810,250,240 B
+    ("diffusion_models", "joeygambino/LTX-2.5-Quantized",
+     "LTX25-distilled-DiT-comfy-int8.safetensors"),           # 21,504,050,168 B
+    ("diffusion_models", "joeygambino/LTX-2.5-Quantized",
+     "LTX25-distilled-DiT-comfy-nvfp4.safetensors"),          # 12,499,335,336 B
+    ("text_encoders", "joeygambino/LTX-2.5-Quantized",
+     "gemma4-12b-ltx25-comfy-w4a8.safetensors"),              # 10,604,342,914 B
+    ("vae", "vonkaiser/LTX-2.5-FP8-NVFP4",
+     "vae/ltx-2.5-video-vae-bf16.safetensors"),               #  1,472,223,346 B
+    ("vae", "vonkaiser/LTX-2.5-FP8-NVFP4",
+     "vae/ltx-2.5-audio-vae-bf16.safetensors"),               #    364,866,540 B
+    ("latent_upscale_models", "vonkaiser/LTX-2.5-FP8-NVFP4",
+     "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"),
+                                                              #    995,778,752 B
 )
 #: Windows MAX_PATH is 260 including the terminating NUL, so 259 is what a
 #: path may actually occupy. Named here because _scrub_transfer_error reports
@@ -98,9 +123,18 @@ MANIFEST = {(category, filename.rsplit("/", 1)[-1]):
             for category, repo, filename in _SOURCES}
 _VIDEO_SLOTS = ("announcer_video_model", "music_video_model", "character_video_model")
 _IMAGE_SLOTS = ("announcer_image_model", "music_image_model", "character_image_model")
-_COVERED = frozenset({"z_image_turbo", "ltx_8gb", "razzle_ltx_8gb",
-                      "stable_audio_3", "sd15", "lumina_image"})
 _LTX_8GB_WEIGHT_ENGINES = frozenset({"ltx_8gb", "razzle_ltx_8gb"})
+#: Every registered native LTX 2.5 lane. Each one is asked for its own file
+#: names, so this set only says WHICH engines are covered, never what they load.
+_LTX25_WEIGHT_ENGINES = frozenset({
+    "ltx25_video",
+    "ltx25_native_foley_16gb", "ltx25_native_foley_24gb",
+    "ltx25_native_foley_blackwell",
+    "ltx25_native_mime_16gb", "ltx25_native_mime_24gb",
+    "ltx25_native_audio_in_16gb", "ltx25_native_audio_in_24gb",
+})
+_COVERED = frozenset({"z_image_turbo", "stable_audio_3", "sd15", "lumina_image"}
+                     | _LTX_8GB_WEIGHT_ENGINES | _LTX25_WEIGHT_ENGINES)
 #: The music node is scanned alongside OTR_VideoDirector. It is a DIFFERENT
 #: class with a single ``engine`` widget rather than per-role slots, so it gets
 #: its own pass; an absent node is a skip, not a refusal, because a graph
@@ -394,7 +428,7 @@ def _same_file(left, right):
 
 
 def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
-                    sd15=None, lumina=None, env=None):
+                    sd15=None, lumina=None, ltx25=None, env=None):
     """Bind the adapters' exact tokens to native folders; no writes/network.
 
     A missing nondefault choice is a refusal, never a default-weight fallback.
@@ -402,10 +436,16 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
     """
     env = env or {}
     requests = []
+    seen = set()
 
     def add(category, token, *, explicit="", authority=None):
         token = str(token)
         loader_token = os.path.basename(token)
+        # Two lanes of one family share files (every 16 GB LTX 2.5 lane loads
+        # the same DiT), and a duplicate request would download it twice.
+        if (category, loader_token) in seen:
+            return
+        seen.add((category, loader_token))
         path = _native_path(folder_paths, category, loader_token)
         if authority is not None and not _same_file(authority, path):
             raise VisualAssetError("adapter/native loader disagree for %s/%s; "
@@ -511,6 +551,31 @@ def native_requests(engines, *, folder_paths, zimage=None, ltx=None, sa3=None,
         ):
             explicit = str(env.get(key) or "")
             add(category, os.path.basename(explicit or default), explicit=explicit)
+    selected_ltx25 = sorted(engines & _LTX25_WEIGHT_ENGINES)
+    if selected_ltx25:
+        # ASK EACH LANE, same rule as every branch above: `_dit_name()` and its
+        # siblings are what `_weight_paths()` -- the lane's own assert_usable
+        # list -- resolves, so the preflight fetches exactly the files the lane
+        # will open, operator env overrides included. The upscaler is requested
+        # only by a lane that builds its loader, for the reason `_weight_paths`
+        # gives.
+        if not ltx25:
+            raise VisualAssetError("LTX 2.5 adapter resolution is unavailable")
+        for eid in selected_ltx25:
+            lane = ltx25.get(eid)
+            if lane is None:
+                raise VisualAssetError("LTX 2.5 adapter for %s is unavailable" % eid)
+            add("diffusion_models", lane._dit_name(),
+                explicit=str(env.get("OTR_LTX25_NATIVE_DIT") or ""))
+            add("text_encoders", lane._text_encoder_name(),
+                explicit=str(env.get("OTR_LTX25_NATIVE_TE") or ""))
+            add("vae", lane._video_vae_name(),
+                explicit=str(env.get("OTR_LTX25_VIDEO_VAE") or ""))
+            add("vae", lane._audio_vae_name(),
+                explicit=str(env.get("OTR_LTX25_AUDIO_VAE") or ""))
+            if lane._ingraph_upscale:
+                add("latent_upscale_models", lane._upscaler_name(),
+                    explicit=str(env.get("OTR_LTX25_UPSCALER") or ""))
     return requests
 
 
@@ -783,7 +848,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         return {"status": "not-covered", "notes": plan["skipped"], "receipts": []}
     import folder_paths
     from comfy import model_management
-    zimage = ltx = sa3 = sd15 = lumina = None
+    zimage = ltx = sa3 = sd15 = lumina = ltx25 = None
     if "z_image_turbo" in engines:
         from ._otr_image_engines import z_image_turbo as zimage
     if engines & _LTX_8GB_WEIGHT_ENGINES:
@@ -795,11 +860,18 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         from ._otr_image_engines import sd15
     if "lumina_image" in engines:
         from ._otr_image_engines import lumina_image as lumina
+    if engines & _LTX25_WEIGHT_ENGINES:
+        from . import _otr_video_engines  # noqa: F401 -- registers built-ins
+        from ._otr_video_engines import registry as _vreg
+        ltx25 = {}
+        for eid in engines & _LTX25_WEIGHT_ENGINES:
+            engine = _vreg.get_engine(eid)
+            ltx25[eid] = engine() if isinstance(engine, type) else engine
     cancel = model_management.throw_exception_if_processing_interrupted
     cancel()
     requests = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
                                ltx=ltx, sa3=sa3, sd15=sd15, lumina=lumina,
-                               env=otr_env.snapshot())
+                               ltx25=ltx25, env=otr_env.snapshot())
     missing = [r for r in requests if r["path"] is None]
     receipts = []
     gui_progress = None
@@ -876,7 +948,7 @@ def ensure_prompt_visual_assets(prompt, unique_id):
         # Re-resolve adapter picks as well as native token identity after writes.
         after = native_requests(engines, folder_paths=folder_paths, zimage=zimage,
                                 ltx=ltx, sa3=sa3, sd15=sd15, lumina=lumina,
-                                env=otr_env.snapshot())
+                                ltx25=ltx25, env=otr_env.snapshot())
         if ([(r["category"], r["token"]) for r in after]
                 != [(r["category"], r["token"]) for r in requests]
                 or any(r["path"] is None for r in after)):

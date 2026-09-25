@@ -214,7 +214,7 @@ def test_the_tail_can_actually_reach_the_composer():
     calls it through that binding, so the failure cannot silently return.
     """
     # The J.7 block lives in the writer TAIL since lean-mean order 9 slice 2.
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
     writer_src = family_source()
     start = writer_src.index("--- J.7. The announcer's WORK phrase")
     end = writer_src.index("keeping the composed announcer opening", start)

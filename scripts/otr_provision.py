@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 """Install everything a machine needs to render, unattended. THE DOER.
 
-    python scripts/otr_provision.py --profile otr_nvidia_8gb_haunted
-    python scripts/otr_provision.py --profile otr_5080_haunted_12b_overnight --with-indextts2
+    python scripts/otr_provision.py --profile otr_8gb_animatediff
+    python scripts/otr_provision.py --profile otr_16gb_video --with-indextts2
     python scripts/otr_provision.py --list
 
 WHY THIS EXISTS, AND WHY IT IS NOT A CHECKER. Operator, 2026-08-31: *"I need a
@@ -18,7 +18,7 @@ installing everything up front so there is nothing left to discover.**
 
 So this installs first and prints an auditable receipt. A missing required
 dependency, incompatible pinned node pack, failed automatic download, or
-unverified manual tier is an honest nonzero result -- never a false-ready pod.
+unverified manual download is an honest nonzero result -- never a false-ready pod.
 
 MACHINE-AGNOSTIC ON PURPOSE. The five things it does -- locate the tree ComfyUI
 scans, resolve the model roots, install node packs, fetch lane weights, build
@@ -44,14 +44,6 @@ from typing import NamedTuple
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _REPO = os.path.dirname(_HERE)
 
-GGUF_PACK_NAME = "ComfyUI-GGUF"
-GGUF_URL = "https://github.com/city96/ComfyUI-GGUF"
-GGUF_PIN = "6ea2651e7df66d7585f6ffee804b20e92fb38b8a"
-GGUF_CLEAN_SHA256 = "b66b5f39a656b1ada80cc452e18cf1e71323cd52b1a61b6852cf90dbf4842345"
-GGUF_PATCHED_SHA256 = "63f8146be990b557728e5e806547fe6f904b87318ff6c4c87dde3c73f17bdf85"
-GGUF_PATCH_SHA256 = "d9185b7a8129f85b59b4df527488aa396da7c99217d336a3580a4c3d0fd4fa04"
-GGUF_PATCH_PATH = os.path.join(_REPO, "patches", "ComfyUI-GGUF-ltx25-gemma4.patch")
-
 LTXVIDEO_PACK_NAME = "ComfyUI-LTXVideo"
 LTXVIDEO_URL = "https://github.com/Lightricks/ComfyUI-LTXVideo"
 LTXVIDEO_PIN = "3b9c5cde4700917074823d45e25401d81049f8fc"
@@ -73,13 +65,13 @@ INDEXTTS2_URL = "https://github.com/index-tts/index-tts.git"
 INDEXTTS2_PIN = "830f6f8f94a51fea23ab1d639027a86200075a4e"
 INDEXTTS2_PYTHON = "3.10"
 
-# Exact manual tiers for sources that cannot yet be fetched unattended. Every
+# Exact manual downloads for sources that cannot yet be fetched unattended. Every
 # manual file has one reproducible identity and destination. Automatic sources
 # belong only to ``otr_fetch_lane_weights.py``; in particular, HuMo 14B is the
 # receipt-bearing ``humo`` lane there and is not duplicated here. Manual
 # downloads use `<destination>.part`, verification, then rename; see
 # docs/RUNPOD_INSTALL.md.
-MANUAL_TIERS = {
+MANUAL_DOWNLOADS = {
     "humo_1_7b": [
         {
             "role": "1.7B DiT",
@@ -124,7 +116,7 @@ MANUAL_TIERS = {
     ],
 }
 
-OPERATOR_ONLY_TIERS = {
+OPERATOR_ONLY_DOWNLOADS = {
     "h3_operator_only": (
         "H3 is operator-local/offline and is never auto-selected by public "
         "provisioning. After reviewing the H3 operating contract, fetch the "
@@ -289,33 +281,6 @@ def _fetch_exact_repo(url: str, pin: str, dest: str) -> None:
         raise ProvisionFailure("checkout verification failed for %s at %s" % (dest, pin))
 
 
-def _apply_gguf_patch(dest: str) -> None:
-    loader = os.path.join(dest, "loader.py")
-    if not os.path.isfile(GGUF_PATCH_PATH):
-        raise ProvisionFailure("required GGUF patch is missing: %s" % GGUF_PATCH_PATH)
-    if _normalized_sha256(GGUF_PATCH_PATH) != GGUF_PATCH_SHA256:
-        raise ProvisionFailure("GGUF patch identity does not match the pinned SHA-256")
-    if _normalized_sha256(loader) != GGUF_CLEAN_SHA256:
-        raise ProvisionFailure("GGUF loader preimage is not the pinned clean file")
-    r = run(["git", "-C", dest, "apply", "--ignore-space-change",
-             "--ignore-whitespace", os.path.abspath(GGUF_PATCH_PATH)])
-    if r.returncode != 0:
-        raise ProvisionFailure("GGUF LTX 2.5 patch failed: %s" %
-                               ((r.stderr or r.stdout or "unknown error").strip()[:300]))
-
-
-def _verify_patched_gguf_git(dest: str) -> None:
-    loader = os.path.join(dest, "loader.py")
-    if _normalized_sha256(loader) != GGUF_PATCHED_SHA256:
-        raise ProvisionFailure("GGUF patched loader postimage does not match the pinned SHA-256")
-    changed = _git_changed_paths(dest)
-    untracked = _git_untracked_paths(dest)
-    if changed != ["loader.py"] or untracked:
-        raise ProvisionFailure(
-            "GGUF checkout drift: expected only loader.py changed; changed=%s untracked=%s"
-            % (changed, untracked))
-
-
 def _apply_ltxvideo_patch(dest: str) -> None:
     target = os.path.join(dest, "pyramid_blending.py")
     if not os.path.isfile(LTXVIDEO_PATCH_PATH):
@@ -354,55 +319,6 @@ def _verify_patched_ltxvideo_git(dest: str) -> None:
             "LTXVideo checkout drift: expected only pyramid_blending.py changed; "
             "changed=%s untracked=%s" % (changed, untracked)
         )
-
-
-def ensure_gguf_pack(comfy: str) -> None:
-    """Install or verify the one supported GGUF base plus the LTX 2.5 patch."""
-    dest = os.path.join(comfy, "custom_nodes", GGUF_PACK_NAME)
-    fresh = not os.path.isdir(dest) or not os.listdir(dest)
-    if fresh:
-        _fetch_exact_repo(GGUF_URL, GGUF_PIN, dest)
-
-    loader = os.path.join(dest, "loader.py")
-    if not os.path.isfile(loader):
-        raise ProvisionFailure("%s is missing loader.py" % GGUF_PACK_NAME)
-
-    git_dir = os.path.isdir(os.path.join(dest, ".git"))
-    loader_sha = _normalized_sha256(loader)
-    if not git_dir:
-        if loader_sha == GGUF_CLEAN_SHA256:
-            raise ProvisionFailure(
-                "Manager-installed ComfyUI-GGUF is the clean base, not the required patched build; "
-                "move it aside and rerun --packs-only")
-        if loader_sha != GGUF_PATCHED_SHA256:
-            raise ProvisionFailure(
-                "unverifiable non-git ComfyUI-GGUF loader; move the pack aside and rerun --packs-only")
-        install_pack_requirements(GGUF_PACK_NAME, dest, required=True)
-        say("PRESENT", GGUF_PACK_NAME, "verified patched Manager install")
-        return
-
-    head = _git_head(dest)
-    if head != GGUF_PIN:
-        raise ProvisionFailure(
-            "%s is at %s, required %s; move it aside and rerun --packs-only"
-            % (GGUF_PACK_NAME, head, GGUF_PIN))
-    untracked = _git_untracked_paths(dest)
-    changed = _git_changed_paths(dest)
-    if loader_sha == GGUF_CLEAN_SHA256:
-        if changed or untracked:
-            raise ProvisionFailure(
-                "GGUF clean loader sits in a dirty checkout; refusing to overwrite drift")
-        _apply_gguf_patch(dest)
-        _verify_patched_gguf_git(dest)
-        state = "PATCHED"
-    elif loader_sha == GGUF_PATCHED_SHA256:
-        _verify_patched_gguf_git(dest)
-        state = "PRESENT"
-    else:
-        raise ProvisionFailure(
-            "GGUF loader is neither the pinned clean nor pinned patched file; refusing partial drift")
-    install_pack_requirements(GGUF_PACK_NAME, dest, required=True)
-    say(state, GGUF_PACK_NAME, "%s + LTX 2.5 patch" % GGUF_PIN[:12])
 
 
 def ensure_ltxvideo_pack(comfy: str) -> None:
@@ -456,12 +372,12 @@ def ensure_ltxvideo_pack(comfy: str) -> None:
 def ensure_animatediff_pack(comfy: str) -> None:
     """Install or verify the AnimateDiff pack at its pinned commit.
 
-    Same wrong-commit discipline as the GGUF and LTXVideo packs: a fresh install
+    Same wrong-commit discipline as the LTXVideo pack: a fresh install
     is an exact detached checkout of ANIMATEDIFF_PIN, and an existing git checkout
     must be AT that commit (a different commit is named and refused, never reset).
     A Manager install has no .git and cannot be verified, so it is accepted as
-    PRESENT and said so (GGUF accepts one only when its patched loader hashes
-    match; LTXVideo refuses any). This pack carries no patch to hash, and calling
+    PRESENT and said so (LTXVideo refuses any). This pack carries no patch to
+    hash, and calling
     a working Manager install absent used to make the provisioner clone into a
     non-empty directory and report FAILED for it.
     """
@@ -489,12 +405,12 @@ def install_node_packs(comfy: str) -> None:
     cn = os.path.join(comfy, "custom_nodes")
     os.makedirs(cn, exist_ok=True)
     # WITHOUT THESE THE MEATY VIDEO LANES DO NOT RUN. Only AnimateDiff was
-    # listed here, so a provisioned machine could render the AnimateDiff lane
-    # and nothing else: wan_ti2v died 17 minutes in with WrapperNodeMissing,
-    # after writing, casting, voices and stills had all completed. The engines
-    # resolve these node CLASSES by name at render time, which is why the
-    # failure arrives late and looks nothing like a missing install.
-    ensure_gguf_pack(comfy)
+    # listed here once, so a provisioned machine could render the AnimateDiff
+    # lane and nothing else: a video lane died 17 minutes in with
+    # WrapperNodeMissing, after writing, casting, voices and stills had all
+    # completed. The engines resolve these node CLASSES by name at render time,
+    # which is why the failure arrives late and looks nothing like a missing
+    # install.
     ensure_ltxvideo_pack(comfy)
     ensure_animatediff_pack(comfy)
 
@@ -502,10 +418,10 @@ def install_node_packs(comfy: str) -> None:
 def install_pack_requirements(name: str, dest: str, required: bool = False) -> None:
     """A cloned pack whose own dependencies are missing does not load.
 
-    Cloning was treated as installing, and it is not: ComfyUI-GGUF needs the
-    `gguf` wheel, and without it the pack registers nothing -- so
-    UnetLoaderGGUF is absent and wan_ti2v and ltx25 both fail at render time
-    with WrapperNodeMissing, exactly as if the pack had never been cloned.
+    Cloning was treated as installing, and it is not: a pack whose own wheels
+    are missing registers nothing, so its node classes are absent and every
+    lane that needs them fails at render time with WrapperNodeMissing, exactly
+    as if the pack had never been cloned.
 
     Into sys.executable deliberately: this script is run BY the interpreter
     ComfyUI uses, and installing a node pack anywhere else is the same
@@ -574,9 +490,8 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
     """Download the selected local Transformers writer rows before render.
 
     The creative and technical slots commonly select the same model; preserve
-    order and fetch it once. Remote providers have no local payload, and the
-    GGUF-native lane has its own explicitly managed artifact, so both receive
-    an honest receipt rather than an accidental Hub download.
+    order and fetch it once. Remote providers have no local payload, so they
+    receive an honest receipt rather than an accidental Hub download.
     """
     llm = profile.get("llm") or {}
     selected = list(dict.fromkeys(
@@ -598,14 +513,8 @@ def warm_profile_writer_models(profile: dict, _snapshot_download=None) -> None:
     for model_id in selected:
         row = rows.get(model_id)
         if row is None:
-            lowered = model_id.lower()
-            if "gguf" in lowered:
-                say("SKIP", "writer: %s" % model_id,
-                    "retired writer handle; it is not a catalog row and has "
-                    "no local Transformers payload to warm")
-            else:
-                say("SKIP", "writer: %s" % model_id,
-                    "not a static local Transformers catalog row")
+            say("SKIP", "writer: %s" % model_id,
+                "not a static local Transformers catalog row")
             continue
         provider = getattr(row, "provider", "local")
         if provider != "local":
@@ -660,18 +569,18 @@ def _load_fetcher_manifest():
     return module
 
 
-def _verify_operator_fetch_tier(root: str, tier_id: str) -> bool:
+def _verify_operator_fetch_download(root: str, download_id: str) -> bool:
     """Verify a lane that only the operator may explicitly fetch.
 
     The fetcher remains the sole artifact authority. This path never downloads
     anything; it only proves that the exact receipt-bearing final files exist.
     """
-    lane = OPERATOR_ONLY_FETCH_LANES[tier_id]
+    lane = OPERATOR_ONLY_FETCH_LANES[download_id]
     fetcher = _load_fetcher_manifest()
     entries = fetcher.LANES.get(lane)
     if not entries:
         raise ProvisionFailure(
-            "operator tier %r maps to missing fetch lane %r" % (tier_id, lane))
+            "operator download %r maps to missing fetch lane %r" % (download_id, lane))
 
     complete = True
     for entry in entries:
@@ -681,12 +590,12 @@ def _verify_operator_fetch_tier(root: str, tier_id: str) -> bool:
                 "operator lane %r has an unpinned artifact %r" %
                 (lane, artifact.path_in_repo))
         path = fetcher.destination_path(root, artifact)
-        label = "%s: %s" % (tier_id, os.path.basename(path))
+        label = "%s: %s" % (download_id, os.path.basename(path))
         if not os.path.isfile(path):
             part_note = " (.part exists but is not a completed file)" \
                 if os.path.isfile(path + ".part") else ""
             say("MISSING", label, artifact.destination + part_note + "; " +
-                OPERATOR_ONLY_TIERS[tier_id])
+                OPERATOR_ONLY_DOWNLOADS[download_id])
             complete = False
             continue
         actual_size = os.path.getsize(path)
@@ -705,20 +614,20 @@ def _verify_operator_fetch_tier(root: str, tier_id: str) -> bool:
     return complete
 
 
-def verify_manual_tier(root: str, tier_id: str) -> bool:
+def verify_manual_download(root: str, download_id: str) -> bool:
     """Verify every final manual artifact; `.part` files never count."""
-    if tier_id in OPERATOR_ONLY_FETCH_LANES:
-        return _verify_operator_fetch_tier(root, tier_id)
-    if tier_id in OPERATOR_ONLY_TIERS:
-        say("MISSING", "manual tier: %s" % tier_id, OPERATOR_ONLY_TIERS[tier_id])
+    if download_id in OPERATOR_ONLY_FETCH_LANES:
+        return _verify_operator_fetch_download(root, download_id)
+    if download_id in OPERATOR_ONLY_DOWNLOADS:
+        say("MISSING", "manual download: %s" % download_id, OPERATOR_ONLY_DOWNLOADS[download_id])
         return False
-    artifacts = MANUAL_TIERS.get(tier_id)
+    artifacts = MANUAL_DOWNLOADS.get(download_id)
     if artifacts is None:
-        raise ProvisionFailure("unknown manual tier %r" % tier_id)
+        raise ProvisionFailure("unknown manual download %r" % download_id)
     complete = True
     for artifact in artifacts:
         path = manual_artifact_path(root, artifact)
-        label = "%s: %s" % (tier_id, os.path.basename(path))
+        label = "%s: %s" % (download_id, os.path.basename(path))
         if not os.path.isfile(path):
             part_note = " (.part exists but is not a completed file)" \
                 if os.path.isfile(path + ".part") else ""
@@ -1425,7 +1334,6 @@ ISOLATED_VOICES = {
 
 
 _PUBLIC_VIDEO_IDS = {
-    "wan22_high_video": "wan_ti2v",
     "ltx25_high_video": "ltx25_video",
     "humo14_high_audio_in_portrait": "humo",
     "humo14_high_audio_in_wide": "humo_14B_169",
@@ -1434,6 +1342,19 @@ _PUBLIC_VIDEO_IDS = {
     "h3_low_video": "minimax_h3_video",
     "h3_low_audio_in": "minimax_h3_audio_in",
     "ltx098_low_video": "ltx_8gb",
+}
+#: Native LTX 2.5 engine -> the fetcher lane holding the exact files it loads.
+#: Automatic, because the whole stack is ungated and the point of dropping the
+#: quant pack was that these lanes fetch their own weights.
+_LTX25_NATIVE_LANES = {
+    "ltx25_video": "ltx25_native_16gb",
+    "ltx25_native_foley_16gb": "ltx25_native_16gb",
+    "ltx25_native_mime_16gb": "ltx25_native_16gb",
+    "ltx25_native_audio_in_16gb": "ltx25_native_16gb",
+    "ltx25_native_foley_24gb": "ltx25_native_24gb",
+    "ltx25_native_mime_24gb": "ltx25_native_24gb",
+    "ltx25_native_audio_in_24gb": "ltx25_native_24gb",
+    "ltx25_native_foley_blackwell": "ltx25_native_blackwell",
 }
 _HUMO14_ENGINES = {"humo", "humo_14B_169"}
 _HUMO17_ENGINES = {"humo_1.7B", "humo_1.7B_169"}
@@ -1512,25 +1433,19 @@ _PROFILE_ID_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 
 def load_profile(profile_id: str) -> dict:
+    """One row of `config/workflow_matrix.json`, resolved and shape-validated."""
     profile_id = str(profile_id or "")
     if not _PROFILE_ID_RE.fullmatch(profile_id):
         raise ProvisionFailure("invalid profile id: %r" % profile_id)
-    path = os.path.join(_REPO, "config", "experiments", profile_id + ".json")
-    if not os.path.isfile(path):
-        raise ProvisionFailure(
-            "%r does not exist; use an exact config/experiments id, or a row id "
-            "from config/workflow_matrix.json" % profile_id)
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    from nodes._otr_shared.capability_profiles import (
+        ProfileError, load_profile as _load_row)
     try:
-        profile = json.load(io.open(path, encoding="utf-8"))
-    except (OSError, ValueError) as exc:
-        raise ProvisionFailure("cannot load profile %r: %s" % (profile_id, exc))
-    if not isinstance(profile, dict):
-        raise ProvisionFailure("profile %r is not a JSON object" % profile_id)
-    if str(profile.get("id") or "") != profile_id:
+        return _load_row(profile_id)
+    except ProfileError as exc:
         raise ProvisionFailure(
-            "profile filename/id drift: requested %r, document says %r"
-            % (profile_id, profile.get("id")))
-    return profile
+            "%r is not a row of config/workflow_matrix.json: %s" % (profile_id, exc))
 
 
 def load_machine_profile(machine_key: str) -> dict:
@@ -1567,7 +1482,7 @@ UNROUTED = _Unrouted()
 
 
 class Lane(NamedTuple):
-    """One provisioning lane: its fetcher/tier name and how it is obtained."""
+    """One provisioning lane: its fetcher or manual-download name and how it is obtained."""
     lane: str
     manual: bool
 
@@ -1594,28 +1509,6 @@ class Lane(NamedTuple):
 #:                 siblings would be telling a stranger it is ready.
 #:   "builtin"  -- pure code. No weights and no service; nothing to obtain.
 NO_LANE_REASON = {
-    # The LTX 2.5 lanes: each is a 12.5-20 GB deliberate fetch that belongs
-    # to a card class an operator chooses, not something a default install
-    # should pull. All three are ungated on Hugging Face -- int8 and w4a8 from
-    # joeygambino/LTX-2.5-Quantized, nvfp4 from either that repo or
-    # BennyDaBall/LTX-2.5-22b-distilled-nvfp4-comfy-v2 -- so the manual step is
-    # a download, never a licence gate. (Lightricks' own LTX-2.5 repo IS gated
-    # and returns 401 without a token; the mirrors above are byte-comparable
-    # and need none.)
-    "ltx25_video": "manual_doc",
-    "ltx25_native_foley_24gb": "manual_doc",
-    "ltx25_native_foley_16gb": "manual_doc",
-    "ltx25_native_foley_blackwell": "manual_doc",
-    # The mime and audio-in lanes load exactly the same artifacts as the foley
-    # lanes they subclass -- same DiT, same encoder, same VAEs, same upscaler.
-    # They inherit the classification for the same reason and they inherit its
-    # open question too: PBUG-20260923-03 measured every one of those files
-    # ungated, so "manual" is a decision nobody has revisited rather than a
-    # constraint. A real fetch lane would clear all seven at once.
-    "ltx25_native_mime_16gb": "manual_doc",
-    "ltx25_native_mime_24gb": "manual_doc",
-    "ltx25_native_audio_in_16gb": "manual_doc",
-    "ltx25_native_audio_in_24gb": "manual_doc",
     # Voice and music that arrive through the HF cache on first use.
     "kokoro": "hf_cache",
     "bark": "hf_cache",
@@ -1631,7 +1524,7 @@ NO_LANE_REASON = {
     "google_tts": "remote",
     "google_lyria": "remote",
     "sonilo": "remote",
-    # Image models fetched by their own loaders / documented manual tiers.
+    # Image models fetched by their own loaders / documented manual downloads.
     # sd15 IS NOT "hf_cache", and calling it that printed the word "auto" into
     # two shipped documents (2026-09-12). The hf_cache contract above is "the
     # engine's own loader fetches it"; sd15's loader does the opposite --
@@ -1679,9 +1572,6 @@ NO_LANE_REASON = {
     "spandrel_esrgan": "manual_doc",
     # Local video lanes whose weights are documented but have no fetcher lane.
     "mesh_stage": "manual_doc",
-    "fastwan_8gb": "manual_doc",
-    "ltx_video": "manual_doc",
-    "ltx_audio_in": "manual_doc",
 }
 
 
@@ -1703,8 +1593,8 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
             return Lane("humo", False)
         if engine in _HUMO17_ENGINES:
             return Lane("humo_1_7b", True)
-        if engine == "wan_ti2v":
-            return Lane("wan_ti2v_gguf", False)
+        if engine in _LTX25_NATIVE_LANES:
+            return Lane(_LTX25_NATIVE_LANES[engine], False)
         if engine in ("ltx_8gb", "razzle_ltx_8gb"):
             return Lane("ltx_8gb", False)
         if engine == "animatediff15_lightning_video":
@@ -1744,7 +1634,7 @@ def lane_for_engine(engine: str, kind: str, *, low_vram: bool = False):
 
 
 def profile_lanes(profile) -> dict:
-    """Resolve one exact profile dict into automatic lanes and manual tiers."""
+    """Resolve one exact profile dict into automatic lanes and manual downloads."""
     if isinstance(profile, str):
         profile = load_profile(profile)
     if not isinstance(profile, dict):
@@ -1871,7 +1761,8 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     selector = ap.add_mutually_exclusive_group()
     selector.add_argument("--profile",
-                          help="exact id from config/profiles (default: otr_nvidia_8gb_haunted)")
+                          help="exact row id from config/workflow_matrix.json "
+                               "(default: otr_8gb_animatediff)")
     selector.add_argument("--machine",
                           help="exact config/machine_classes.json key")
     ap.add_argument("--with-all-voices", action="store_true",
@@ -1898,7 +1789,7 @@ def main(argv=None) -> int:
             if args.machine:
                 profile = load_machine_profile(args.machine)
             else:
-                profile = load_profile(args.profile or "otr_nvidia_8gb_haunted")
+                profile = load_profile(args.profile or "otr_8gb_animatediff")
             routes = profile_lanes(profile)
         except ProvisionFailure as exc:
             say("FAILED", "profile selection", str(exc))
@@ -1917,7 +1808,7 @@ def main(argv=None) -> int:
             print("  selector     : %s" % profile.get("id", "?"))
             print("  automatic    : %s" %
                   (", ".join(routes["automatic"]) or "none"))
-            print("  manual tiers : %s" % (", ".join(routes["manual"]) or "none"))
+            print("  manual       : %s" % (", ".join(routes["manual"]) or "none"))
             required_keys = list(
                 (profile.get("preflight") or {}).get("required_keys") or [])
             print("  required keys: %s" %
@@ -1927,13 +1818,13 @@ def main(argv=None) -> int:
                    else "not selected by profile"))
             issue = profile_python_issue(profile)
             print("  Python       : %s" % (issue or "compatible"))
-            for tier_id in routes["manual"]:
-                if tier_id in OPERATOR_ONLY_TIERS:
-                    print("\n  %s: %s" % (tier_id, OPERATOR_ONLY_TIERS[tier_id]))
+            for download_id in routes["manual"]:
+                if download_id in OPERATOR_ONLY_DOWNLOADS:
+                    print("\n  %s: %s" % (download_id, OPERATOR_ONLY_DOWNLOADS[download_id]))
                     continue
-                artifacts = MANUAL_TIERS[tier_id]
+                artifacts = MANUAL_DOWNLOADS[download_id]
                 print("\n  %s (%d bytes total):" %
-                      (tier_id, sum(item["bytes"] for item in artifacts)))
+                      (download_id, sum(item["bytes"] for item in artifacts)))
                 for item in artifacts:
                     print("    %s" % item["destination"])
                     print("      %s@%s/%s" %
@@ -1973,7 +1864,7 @@ def main(argv=None) -> int:
     print("  models root : %s" % root)
     print("  selector    : %s" % profile.get("id", "?"))
     print("  automatic   : %s" % (", ".join(routes["automatic"]) or "none"))
-    print("  manual tiers: %s" % (", ".join(routes["manual"]) or "none"))
+    print("  manual      : %s" % (", ".join(routes["manual"]) or "none"))
     print("")
 
     try:
@@ -1984,12 +1875,12 @@ def main(argv=None) -> int:
         fetch_lane_weights(routes["automatic"])
         warm_profile_writer_models(profile)
         manual_results = [
-            verify_manual_tier(root, tier_id) for tier_id in routes["manual"]
+            verify_manual_download(root, download_id) for download_id in routes["manual"]
         ]
         manual_complete = all(manual_results)
         if routes["manual"] and not manual_complete:
             say("MISSING", "MANUAL WEIGHTS REMAIN",
-                "read the named tier receipt above; final .part files never count")
+                "read the named download receipt above; final .part files never count")
         want_indextts2 = args.with_all_voices or args.with_indextts2
         if want_indextts2:
             install_indextts2(comfy, root)

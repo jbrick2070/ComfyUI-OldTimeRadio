@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import unittest
 
-from tests.fixtures.writer_slots import value, widget_names
+from tests._support.writer_slots import value, widget_names
 
 
 REPO = Path(__file__).resolve().parents[1]

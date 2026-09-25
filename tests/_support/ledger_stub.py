@@ -1,4 +1,4 @@
-"""tests/fixtures/ledger_stub.py -- shared stub ledger factory for v2 consumer self-tests.
+"""tests/_support/ledger_stub.py -- shared stub ledger factory for v2 consumer self-tests.
 
 Mirrors the on-wire shape OTR_LedgerScriptWriter emits: a dict with
 ``meta``, ``cast`` (LIST of dicts, each carrying its own ``char_id``),

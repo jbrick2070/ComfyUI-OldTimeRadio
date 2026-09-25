@@ -249,7 +249,7 @@ def test_excerpt_set_short_script_no_crash():
 def test_composition_header_uses_tbd_literal():
     """The writer builds the per-line composer's canon header with the
     literal `EPISODE_TITLE: TBD`, so no provisional title is spoken."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
 
     src = family_source()
     assert "EPISODE_TITLE: TBD" in src, (
@@ -262,7 +262,7 @@ def test_post_hoc_title_substitution_is_removed():
     min-length guard, and the J.6 section are all gone. Needles are
     assembled from fragments so this test file's own strings do not
     self-match if it is ever scanned alongside the writer."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
 
     src = family_source()
     sub_helper_def = "def _substitute" + "_title_in_text"
@@ -302,7 +302,7 @@ def test_title_call_passes_premise_for_grounding():
     # the node by WriterTailMixin. It is still ONE method with the same name and
     # the same body -- so the pin looks it up by name across the writer family
     # rather than by the class that happens to declare it this month.
-    from tests.fixtures.writer_family import find_function
+    from tests._support.writer_family import find_function
 
     tail_fn = find_function("_run_writer_tail")
 

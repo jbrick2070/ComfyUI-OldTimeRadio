@@ -14,9 +14,9 @@ ModelSamplingAuraFlow (sigma shift) -> KSampler -> VAEDecode. No sidecar.
 QWEN3 IS MANDATORY (operator asked): Z-Image's S3-DiT was trained on Qwen3-4B
 text embeddings -- there is no CLIP-only Z-Image. It does NOT break the low-VRAM
 goal: the DEFAULTS here point at the **fp8** diffusion model + **fp8** Qwen3 TE
-(fp8 ~= half size, negligible quality loss; GGUF smaller), and ComfyUI EVICTS the
+(fp8 ~= half size, negligible quality loss), and ComfyUI EVICTS the
 TE before the diffusion sampling peak, so the resident peak is the diffusion
-model, not TE+diffusion co-resident. Point the env knobs at bf16/GGUF to taste.
+model, not TE+diffusion co-resident. Point the env knobs at bf16 to taste.
 
 LOW-VRAM DEFAULTS: 8 steps / cfg 1.0 (the distilled model's own guidance point; the
 negative is INERT here, exactly as it is for Flux@cfg 1.0) / ModelSamplingAuraFlow
@@ -70,7 +70,7 @@ log = logging.getLogger("OTR.image.z_image_turbo")
 ENABLE_FLAG = "OTR_ENABLE_ZIMAGE"
 
 #: Split-file weights. Defaults target the LOW-VRAM fp8 variants (the whole point
-#: of this engine); point them at bf16/GGUF to taste. The loaders take a basename
+#: of this engine); point them at bf16 to taste. The loaders take a basename
 #: (ComfyUI folder_paths resolves it), so an absolute path is reduced to filename.
 MODEL_ENV = "OTR_ZIMAGE_UNET"
 CLIP_ENV = "OTR_ZIMAGE_CLIP"
@@ -289,7 +289,6 @@ class ZImageTurboEngine:
     #: structural compatibility, not that this Turbo checkpoint was trained for
     #: that conditioning.  The dispatcher therefore keeps the proven
     #: portrait-derived identity SEED and never hands this engine a reference.
-    #: Permanent instrument: scripts/otr_zimage_reference_ab.py.
     accepts_reference_image = False
 
     #: DIAGNOSTIC-ONLY map retained for the permanent matched A/B harness; the

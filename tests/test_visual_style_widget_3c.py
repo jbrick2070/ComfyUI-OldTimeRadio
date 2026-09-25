@@ -4,7 +4,7 @@ Multi-modal story schema STAGE 3 CHUNK 3C -- the `visual_style` selector
 widget on OTR_LedgerScriptWriter (the 2C playbook applied per
 STAGE3_SUBPLAN v5 section 4 + the r4 verify-at-build checklist).
 
-Positions are resolved BY NAME through tests/fixtures/writer_slots.py. This
+Positions are resolved BY NAME through tests/_support/writer_slots.py. This
 file used to pin them as bare integers, and every widget added to or removed
 from the writer silently slid those integers onto a neighbour -- the saved
 values around here are mostly "" and a repeated placeholder string, so a
@@ -50,7 +50,7 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     _resolve_inputs,
 )
-from tests.fixtures.writer_slots import (  # noqa: E402
+from tests._support.writer_slots import (  # noqa: E402
     assert_relative_order,
     value,
 )

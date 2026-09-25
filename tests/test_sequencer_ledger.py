@@ -20,7 +20,7 @@ from unittest.mock import patch
 import pytest
 import torch
 
-from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
+from tests._support.ledger_stub import make_legacy_list, make_stub_ledger
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

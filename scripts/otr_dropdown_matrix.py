@@ -15,7 +15,7 @@ claimed the memory verdicts were the ONLY curated input, and that was false. The
 curated file also carries ``size_gb``, and it has to: a lane with a fetch
 manifest gets its size summed from real artifact bytes and the curated figure is
 ignored, but an engine with NO fetch lane (``sd15``, the sidecar voices, the
-documented-manual tiers) has no manifest to sum, and its size is typed. Those
+documented-manual downloads) has no manifest to sum, and its size is typed. Those
 rows are the ones a size drift can still reach.
 
 Collapsing the two is exactly how README came to tell Mac users that
@@ -25,7 +25,7 @@ Mac profile. Both halves were true; the single word was wrong. So the rendered
 table always carries both, and this generator FAILS when a curated receipt
 lands on a cell the code refuses.
 
-The download half comes from the real fetch manifests -- ``MANUAL_TIERS`` and
+The download half comes from the real fetch manifests -- ``MANUAL_DOWNLOADS`` and
 ``LANES`` in the provisioner and the fetcher -- so sizes are artifact bytes and
 "is this a free auto-download?" is read out of the same table that performs the
 download. That column is the one the shipped JSON's whole design turns on, and
@@ -60,30 +60,20 @@ _BEGIN = "<!-- BEGIN GENERATED: dropdown-matrix -->"
 _END = "<!-- END GENERATED: dropdown-matrix -->"
 
 #: The machine classes the table has columns for, in reading order. Each names
-#: a REAL shipped profile -- the availability answer is that profile's, not an
-#: invented one, so a reader can reproduce any cell with `--profile <id>`.
+#: a REAL row of `config/workflow_matrix.json` -- the availability answer is that
+#: row's, not an invented one, and it is also the graph a person on that machine
+#: should open, so every cell is reproducible from the variant it names. The CPU
+#: column reads the no-GPU cloud row: a machine with no GPU runs the hosted lanes.
 MACHINES = (
-    # `profile` is what the COLUMN is computed against, so every cell stays
-    # reproducible with `--profile 8gb_lite`. `graph_profile` is what a PERSON
-    # should open, which is a different question: the lab presets are
-    # drafts, while the shipping set (build_variants.SHIPPING_SET,
-    # 2026-09-13) has one graph per machine and tier. Each machine opens
-    # its video tier -- the best auto-downloading video engine for it --
-    # except AMD (experimental, stills only) and CPU (procedural lanes).
-    {"key": "nv8", "label": "8 GB NVIDIA", "profile": "8gb_lite",
-     "graph_profile": "otr_8gb_video",
+    {"key": "nv8", "label": "8 GB NVIDIA", "profile": "otr_8gb_video",
      "blurb": "RTX 4060 / 3070 / 2080 class"},
-    {"key": "nv16", "label": "16 GB+ NVIDIA", "profile": "16gb_full",
-     "graph_profile": "otr_16gb_video",
+    {"key": "nv16", "label": "16 GB+ NVIDIA", "profile": "otr_16gb_video",
      "blurb": "RTX 5080 / 4080 / 3090 class"},
-    {"key": "mac16", "label": "Mac 16 GB", "profile": "otr_mac_mps",
-     "graph_profile": "otr_mac16_video",
+    {"key": "mac16", "label": "Mac 16 GB", "profile": "otr_mac16_video",
      "blurb": "Apple Silicon, unified memory"},
-    {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd16_rocm",
-     "graph_profile": "otr_amd_still",
+    {"key": "amd", "label": "AMD ROCm", "profile": "otr_amd_still",
      "blurb": "Windows or Linux -- and read \u0022What the words mean\u0022 at the foot of this page before trusting any AMD cell"},
-    {"key": "cpu", "label": "CPU only", "profile": "cpu_floor",
-     "graph_profile": "otr_cpu_low",
+    {"key": "cpu", "label": "CPU only", "profile": "otr_cloud_low",
      "blurb": "no GPU at all"},
 )
 
@@ -143,14 +133,15 @@ def registry_capabilities() -> dict:
 def availability_grid(caps: dict) -> dict:
     """``{(namespace, engine): {machine_key: reason}}`` -- fully derived."""
     profiles = _load("nodes/_otr_shared/capability_profiles.py", "_odm_profiles")
+    # `load_profile` resolves a matrix row through relative imports, which a
+    # module loaded by file path cannot make -- so the row comes from the
+    # package, and `availability` (dependency-free) still from the file.
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    from nodes._otr_shared.capability_profiles import load_profile
     grid = {}
     for machine in MACHINES:
-        # The five machine COLUMNS are computed against experiment rigs, which is
-        # what they have always been -- they moved with the folder, not with the
-        # shipped workflows, which are rows in config/workflow_matrix.json.
-        path = os.path.join(_REPO, "config/experiments/%s.json" % machine["profile"])
-        doc = json.load(io.open(path, encoding="utf-8"))
-        profile = doc.get("capability_profile") or doc
+        profile = load_profile(machine["profile"])
         for namespace, table in caps.items():
             for engine, reason in profiles.availability(profile, table).items():
                 grid.setdefault((namespace, engine), {})[machine["key"]] = reason
@@ -161,7 +152,7 @@ def download_facts() -> dict:
     """``{lane: {"gb": float, "gated": bool, "manual": bool}}``, from the real
     manifests -- never a typed-in size.
 
-    The two lane tables carry their sizes differently. ``MANUAL_TIERS`` states
+    The two lane tables carry their sizes differently. ``MANUAL_DOWNLOADS`` states
     ``bytes`` per artifact, so its total is summed. ``LANES`` predates that on
     several rows -- the legacy entries are bare 3-tuples whose size lives only
     in a trailing comment -- so the authority for a fetcher lane is
@@ -189,9 +180,9 @@ def download_facts() -> dict:
         # Every lane in the fetcher is by definition a no-account, no-manual-step
         # public install -- that is what the fetcher IS -- so none is gated.
         facts[lane] = {"gb": stated or None, "gated": False, "manual": False}
-    for tier, specs in getattr(provision, "MANUAL_TIERS", {}).items():
+    for name, specs in getattr(provision, "MANUAL_DOWNLOADS", {}).items():
         total = sum(int(s.get("bytes", 0) or 0) for s in specs)
-        facts[tier] = {"gb": round(total / 2 ** 30, 1) or None,
+        facts[name] = {"gb": round(total / 2 ** 30, 1) or None,
                        "gated": any(s.get("gated") for s in specs),
                        "manual": True}
     if drift:
@@ -243,10 +234,8 @@ def graph_fetched_engines() -> set:
     ``NO_LANE_REASON["hf_cache"]``, which already says "auto" for that reason.
 
     **ALSO NOT A CONTRADICTION:** ``otr_provision.profile_lanes`` still reports
-    ``humo`` and ``wan_ti2v_gguf`` as "automatic". That answers a DIFFERENT
-    question -- can the dev-tree provisioner fetch it during setup -- and it is
-    right. Do not "reconcile" ``tests/test_otr_provision_humo.py`` with this
-    function; you would break a correct test.
+    ``humo`` as "automatic". That answers a DIFFERENT question -- can the
+    dev-tree provisioner fetch it during setup -- and it is right.
 
     Memoized because ``friction_for`` asks once per engine and ``_load``
     re-executes a module every call. The memo has no invalidation on purpose --
@@ -737,8 +726,8 @@ def render_doc(rows: list) -> str:
          "## The machines\n\n",
          "| column | machine | reproduce with |\n|---|---|---|\n"]
     for machine in MACHINES:
-        L.append("| %s | %s | `config/experiments/%s.json` |\n" % (
-            machine["label"], machine["blurb"], machine["profile"]))
+        L.append("| %s | %s | `%s` |\n" % (
+            machine["label"], machine["blurb"], _variant_for(machine["profile"])))
     L.append("\n## Every dropdown\n")
     L.append(render_table(rows))
     L.append(_LEGEND)
@@ -785,13 +774,12 @@ def _pack_prefixes() -> tuple:
 
 
 def packs_by_engine() -> dict:
-    """``{engine: "ComfyUI-GGUF"}`` -- what to install BEYOND this pack.
+    """``{engine: "ComfyUI-AnimateDiff-Evolved"}`` -- what to install BEYOND this pack.
 
     DERIVED, because the hand-typed equivalent has already drifted. Two passes:
 
     1. A module NEEDS a pack when its own source emits a class whose name
-       starts with one of the bridge's prefixes (``ADE_``, ``VHS_``,
-       ``UnetLoaderGGUF``, ``CLIPLoaderGGUF``).
+       starts with one of the bridge's prefixes (``ADE_``, ``VHS_``, ...).
     2. A module INHERITS that need when it imports a module which has it --
        ``eng_ghost_signal_official`` subclasses ``GhostSignalEngine`` and names
        no ``ADE_`` class of its own, so a source scan alone would report it as
@@ -874,12 +862,11 @@ def packs_by_engine() -> dict:
 
 
 def _variant_for(profile_id: str) -> str:
-    """The saved graph a profile emits, by `build_variants.py`'s own rule.
+    """The saved graph a matrix row emits, by `build_variants.py`'s own rule.
 
-    `build_variants.py:135-148` globs `config/profiles/*.json`, takes each
-    stem, and refuses outright when a bare `X` would collide with an existing
-    `otr_X`. So the mapping is total and unambiguous: prefix unless already
-    prefixed.
+    `build_variants._variant_stem` prefixes `otr_` unless the id already carries
+    it, and `_committed_profile_ids` refuses outright when a bare `X` would
+    collide with an `otr_X`. So the mapping is total and unambiguous.
     """
     stem = profile_id if profile_id.startswith("otr_") else "otr_%s" % profile_id
     return "workflows/variants/%s.json" % stem
@@ -891,7 +878,7 @@ def manual_artifacts(lane: str, provision, fetcher) -> list:
     THREE MANIFESTS, NOT ONE, and reading only the first is what made the
     first cut of section 3 silently omit six of nine manual lanes:
 
-    * ``MANUAL_TIERS`` in the provisioner -- dicts, receipts complete.
+    * ``MANUAL_DOWNLOADS`` in the provisioner -- dicts, receipts complete.
     * ``LANES`` in the fetcher -- ``WeightSpec`` namedtuples, except the lanes
       that predate receipts, which are still bare 3-tuples of
       ``(repo, path_in_repo, destination)``. Both shapes are read; a legacy
@@ -904,9 +891,9 @@ def manual_artifacts(lane: str, provision, fetcher) -> list:
     Returns ``[]`` when no manifest owns the lane -- the caller must SAY so
     rather than print nothing.
     """
-    tiers = getattr(provision, "MANUAL_TIERS", {})
-    if lane in tiers:
-        return [dict(spec) for spec in tiers[lane]]
+    downloads = getattr(provision, "MANUAL_DOWNLOADS", {})
+    if lane in downloads:
+        return [dict(spec) for spec in downloads[lane]]
     alias = getattr(provision, "OPERATOR_ONLY_FETCH_LANES", {}).get(lane, lane)
     out = []
     for spec in getattr(fetcher, "LANES", {}).get(alias, []) or []:
@@ -993,12 +980,8 @@ def recommended_graph(profile_id: str) -> tuple:
     canonical is the answer: it is always present, always runnable, and
     resolves the device at run time.
     """
-    # STATUS COMES FROM THE MATRIX. This used to read config/profiles/<id>.json
-    # directly, so once that file was gone `status` fell back to "" -- not
-    # "shipping" -- and this page told a stranger that every proven row was "in the
-    # shipping set, not yet proven on this hardware". `load_profile` prefers the
-    # matrix and falls back to the folder for a lab rig, so a shipped workflow has
-    # exactly one place its status is written, and promoting a row reaches this page.
+    # STATUS COMES FROM THE MATRIX, which is the only place a workflow's status
+    # is written -- so promoting a row reaches this page.
     if _REPO not in sys.path:
         sys.path.insert(0, _REPO)
     status = ""
@@ -1041,7 +1024,7 @@ def render_apple(rows: list) -> str:
     1. Which graph do I open?  2. Will this engine run here?  3. Where do the
     manual weights come from? The third has never been answered anywhere: the
     document the matrix points at for manual rows lists filenames with no
-    repository and no destination directory, while `MANUAL_TIERS` has carried
+    repository and no destination directory, while `MANUAL_DOWNLOADS` has carried
     `repo`, `revision`, `path`, `destination`, `bytes` and `gated` per artifact
     the whole time.
     """
@@ -1068,8 +1051,7 @@ def render_apple(rows: list) -> str:
              "(Workflow &rarr; Browse Templates &rarr; EXTENSIONS &rarr; "
              "comfyui-old-time-radio) | nothing |\n")
     for machine in MACHINES:
-        graph, caveat = recommended_graph(
-            machine.get("graph_profile") or machine["profile"])
+        graph, caveat = recommended_graph(machine["profile"])
         if caveat:
             # The canonical is the fallback, and its engines are what needs
             # installing -- not the rejected graph's.
@@ -1079,9 +1061,8 @@ def render_apple(rows: list) -> str:
             cell = "`%s` &mdash; %s" % (graph, caveat)
         else:
             needed = sorted({packs[e]
-                             for e in _profile_engines(
-                                 machine.get("graph_profile")
-                                 or machine["profile"]) if e in packs})
+                             for e in _profile_engines(machine["profile"])
+                             if e in packs})
             cell = "`%s`" % graph
         L.append("| %s -- %s | %s | %s |\n" % (
             machine["label"], machine["blurb"], cell,
@@ -1140,7 +1121,7 @@ def render_apple(rows: list) -> str:
         L.append("| File | From | Put it in | Size | Gated |\n")
         L.append("|---|---|---|---|---|\n")
         for spec in specs:
-            # MANUAL_TIERS writes a full relative path
+            # MANUAL_DOWNLOADS writes a full relative path
             # ("vae/ltx-2.5-video-vae-bf16.safetensors"); several fetcher lanes
             # write the destination DIRECTORY alone ("checkpoints",
             # "animatediff_models"). Treating the second as a filename printed

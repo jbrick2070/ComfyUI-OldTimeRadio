@@ -1,27 +1,15 @@
 """Public video-engine name resolver -- ONE dep-free source of truth (video tiers).
 
-The video-tiers build (2026-07-20) gives four engines a stable, user-facing PUBLIC
-id shown in the OTR_VideoDirector menu, decoupled from the ~420 internal id refs that
-stay untouched (additive only -- no rename):
-
-    public id             -> internal engine id
-    ltx_8gb               -> ltx_8gb            (identity; new 8GB LTX 0.9.8 engine)
-    wan_8gb               -> wan_ti2v
-    ltx23_16gb_audio_in   -> ltx_audio_in
-    ltx23_16gb_video      -> ltx_video
-
-All four of those `<vramtier>gb` spellings are RETIRED (lanes 5-9, 2026-08-11)
-and now live in `_LEGACY_ENGINE_ALIASES`; the live table below carries the
-`<model><version>_<low|high>_<capability>` convention instead. The block above
-is kept as the record of what the build started from.
+Public ids follow the ``<model><version>_<low|high>_<capability>`` convention
+(lane 1, 2026-08-11), decoupled from the internal ids that stay untouched.
 
 This module is the SINGLE place that maps a menu/saved/profile string back to the
-concrete internal engine id: it strips the display suffix (`wan_8gb (16:9)`), maps a
+concrete internal engine id: it strips the display suffix (`ltx098_low_video (16:9)`), maps a
 public id to its internal id, THEN maps a renamed engine's legacy id to its current
 id (the `_LEGACY_ENGINE_ALIASES` MOVED here from otr_video_director so both the
 director and every other boundary read ONE table).
 
-The friendly prose labels (`Wan 2.2 TI2V 5B - 8GB`, ...) live in `_PUBLIC_LABEL` for
+The friendly prose labels (`LTX 0.9.8 2B - low VRAM`, ...) live in `_PUBLIC_LABEL` for
 the static widget tooltip + docs ONLY -- they are NEVER the combo value / saved value
 (the menu value = the short public id + the existing aspect suffix).
 
@@ -30,15 +18,13 @@ torch / no registry / no ComfyUI). UTF-8, no BOM, ASCII-only.
 """
 from __future__ import annotations
 
-#: Public menu id -> internal engine id (the four video-tier rows). ltx_8gb maps to
-#: itself (its internal id IS its public id).
+#: Public menu id -> internal engine id.
 _PUBLIC_ENGINES = {
     # --- the low/high naming convention starts here (lane 1, 2026-08-11) ---
     # `<model><version>_<low|high>_<capability>`. The `<vramtier>gb` token above
     # is RETIRED by operator ruling 2026-08-09: it encoded "the card this lane
-    # was built for", which drifted badly from measured usage (`wan_8gb` really
-    # consumes 12.5-13.2 GiB and cannot run on an 8 GB card at production
-    # canvas). `low` / `high` is deliberately COARSE so a user self-selects by
+    # was built for", which drifted badly from measured usage. `low` / `high`
+    # is deliberately COARSE so a user self-selects by
     # their own hardware, and it survives measurement drift.
     #
     # Renamed lanes MOVE their old public id into _LEGACY_ENGINE_ALIASES; they
@@ -64,55 +50,18 @@ _PUBLIC_ENGINES = {
     # Lane 4, 2026-08-11: the last HuMo tier. The 2026-06-09 keystone, and
     # the only one of the four whose id was previously just "humo".
     "humo14_high_audio_in_portrait": "humo",
-    # Lane 5, 2026-08-11 -- the first MOVE rather than an add.
-    # `wan_8gb` left this table for _LEGACY_ENGINE_ALIASES in the
-    # same edit: two public ids on one internal id collapses
-    # _INTERNAL_TO_PUBLIC and trips the bijection assert at IMPORT
-    # time, which empties the ComfyUI menu rather than failing one
-    # lane. MOVE, never ADD.
-    "wan22_high_video": "wan_ti2v",
-    # Lane 6, 2026-08-11. `fastwan_8gb` was an IDENTITY row (its public id
-    # WAS its internal id), so it needs no alias row on the way out --
-    # a bare internal id already passes through resolve_engine_id step 3.
-    # The label sells THROUGHPUT, never quality: same motion, same canvas,
-    # same VRAM as wan22_high_video, about 2.7x sooner.
-    "wan22_high_fast": "fastwan_8gb",
-    # Lane 7, 2026-08-11. `ltx23_16gb_audio_in` MOVED into
-    # _LEGACY_ENGINE_ALIASES in the same edit -- the second MOVE, and the same
-    # bijection reasoning as lane 5. `low` is the measured bucket: 7.2-7.5 GiB
-    # at 832x480x97 and 7.36 GiB at the newly declared 1024x576x193, both lab
-    # warm, against a 14.5 GiB gate -- comfortably the cheapest local video lane
-    # in the roster, which is exactly what the token is for.
-    "ltx23_low_audio_in": "ltx_audio_in",
-    # Lane 8, 2026-08-11. `ltx_8gb` was an IDENTITY row like lane 6's
-    # `fastwan_8gb`, so it needs NO alias on the way out -- a bare internal id
+    # Lane 8, 2026-08-11. `ltx_8gb` was an IDENTITY row, so it needs NO alias
+    # on the way out -- a bare internal id
     # already passes through resolve_engine_id step 3, and adding one would
     # imply an internal rename that never happened. The internal id KEEPS the
     # `8gb` token; only the public surface loses it.
     #
     # `low` is MEASURED here, not inherited from the retired token: 9,106 MB
     # absolute / 6,835 MB net, cold, at 512x288x161 -- the cheapest lane in the
-    # roster and 1.75x cheaper than ltx23_low_audio_in. Until this lane's own
+    # roster. Until this lane's own
     # smoke ran, the marker was provisional in the evidence manifest's own
     # words ("NO measurement of any kind on this box").
     "ltx098_low_video": "ltx_8gb",
-    # Lane 9, 2026-08-11 -- the THIRD move, and the LTX 2.3 family closes with
-    # it. `ltx23_16gb_video` MOVED into _LEGACY_ENGINE_ALIASES in the same edit,
-    # same bijection reasoning as lanes 5 and 7.
-    #
-    # `high` is MEASURED, and it is measured against its own sibling rather than
-    # against a card. This lane and `ltx23_low_audio_in` are the same LTX 2.3
-    # 22B stack at the same 1024x576 canvas, so the comparison is like-for-like:
-    # 13,313 MB NET here (15,916 absolute, cold, VramPeakProbe max, at
-    # 1024x576x169) against the audio-in lane's 11,872 MB net. This is the more
-    # expensive of the two, so `high` states the measured cost -- which is the
-    # whole point of the token, and the discipline lane 8 set when it refused to
-    # let `low` mean "runs on an 8 GB card".
-    #
-    # NOTE the surface, per L7: 15,916 MB ABSOLUTE is over the 14.5 GiB working
-    # ceiling; 13,313 MB NET is not. The cost-row surface is NET by the
-    # 2026-08-11 ruling, and neither number is quotable without saying which.
-    "ltx23_high_video": "ltx_video",
     # Lane 19, 2026-08-12 -- the first NEW ENGINE in the campaign rather than a
     # rename, so this is an ADD with no alias to move.
     #
@@ -131,8 +80,8 @@ _PUBLIC_ENGINES = {
     # only one adapter. Two public ids on ONE internal id collapses
     # _INTERNAL_TO_PUBLIC and trips the bijection assert below at IMPORT time.
     #
-    # `audio_in` states the capability, matching `ltx23_low_audio_in`: this lane
-    # conditions on the beat's own audio through MiniMaxH3ReferenceToVideo. Its
+    # `audio_in` states the capability: this lane conditions on the beat's own
+    # audio through MiniMaxH3ReferenceToVideo. Its
     # `low` is the same measured bucket as its sibling: the controlling REF2VA
     # receipt is 864x480, 124 model / 129 canvas frames, 6,678 MB cold absolute
     # on the 5080. This is not a physical-8-GB support receipt.
@@ -169,29 +118,6 @@ _LEGACY_ENGINE_ALIASES = {
     # those should land on the lane rather than on a not-registered error. It is
     # the cheapest possible way to make a retired typo harmless.
     "wan21_high_i2v": "wan_i2v",
-    # MOVED out of _PUBLIC_ENGINES in lane 5 (2026-08-11). Every
-    # saved graph, profile and variant carrying `wan_8gb` still
-    # resolves through here; it just no longer renders as a menu
-    # option. The token was retired because it encoded the card
-    # the lane was built for, and this lane really consumes
-    # 12.5-13.2 GiB -- it cannot run on an 8 GB card at
-    # production canvas.
-    "wan_8gb": "wan_ti2v",
-    # MOVED out of _PUBLIC_ENGINES in lane 7 (2026-08-11). The `16gb` token
-    # is retired for the same reason `8gb` was: it encoded the card the lane
-    # was built for rather than what it measures, and this is the CHEAPEST
-    # local video lane in the roster -- calling it the 16 GB tier told users
-    # the opposite of the truth. Every saved graph, profile and variant
-    # carrying the old string still resolves through here.
-    "ltx23_16gb_audio_in": "ltx_audio_in",
-    # MOVED out of _PUBLIC_ENGINES in lane 9 (2026-08-11), retiring the last
-    # `16gb` token in the table. Same reason as its audio-in sibling: the token
-    # named the card the lane was built for. It is wrong in the OTHER direction
-    # here -- this lane measures 15,916 MB absolute cold, so "16GB" read as a
-    # comfortable fit for a 16 GB card when the render actually peaks at 97.6%
-    # of one. Every saved graph, profile and variant carrying the old string
-    # still resolves through here.
-    "ltx23_16gb_video": "ltx_video",
 }
 
 #: Internal engine id -> its public menu id (inverse of _PUBLIC_ENGINES; the label
@@ -209,32 +135,11 @@ _PUBLIC_LABEL = {
     "ltx098_low_video": (
         "LTX 0.9.8 2B - low VRAM (6.8 GiB net at 512x288x161; "
         "the cheapest local video lane, ~22 s a beat)"),
-    # "3-step" rather than "fast" or "better": this tier renders the SAME motion at
-    # the SAME canvas for the SAME VRAM as wan_8gb, about 2.7x sooner. Naming it a
-    # quality or longer-clip upgrade would mis-sell it.
-    "wan22_high_fast": (
-        "FastWan 2.2 TI2V 5B 3-step - high VRAM (the SAME motion at the "
-        "SAME canvas for the SAME VRAM as wan22_high_video, ~2.7x sooner)"),
-    # "high" is the measured bucket against its own sibling on the same stack
-    # and canvas, not a quality claim and not a card claim. The rung is named
-    # because f169 is what was measured; the ladder now runs 9..169 step 8 and
-    # the rungs below it are proven to DECODE, not proven to fit a budget.
-    "ltx23_high_video": (
-        "LTX 2.3 22B silent video - high VRAM (13.3 GiB net at 1024x576x169; "
-        "the more expensive of the two LTX 2.3 lanes)"),
-    # "low" is the measured bucket and the label says which rung it came from,
-    # per the lane-1 convention. Audio-conditioned, so the id says `audio_in`.
-    "ltx23_low_audio_in": (
-        "LTX 2.3 22B audio-in - low VRAM (7.36 GiB warm at 1024x576x193; "
-        "the cheapest local video lane)"),
     # "high" is the measured bucket, not a quality claim: 13.93 GiB warm at
     # 832x480x33 against a 14.5 GiB gate. The rung is named because only f33
     # has warm evidence -- the f177 the contract allows is model-legal and not
     # machine-qualified.
     "wan22_high_i2v": "Wan 2.2 I2V 14B fp8 - high VRAM (13.9 GiB warm at f33)",
-    "wan22_high_video": (
-        "Wan 2.2 TI2V 5B Q5 - high VRAM (12.1 GiB warm at 832x480x193; "
-        "the default WAN lane)"),
     "humo14_high_audio_in_wide": (
         "HuMo 14B fp8 16:9 - audio-driven face, high VRAM "
         "(13.06 GiB warm at 832x480x97 on the humo_diet boot)"),
@@ -312,9 +217,9 @@ def resolve_engine_id(value) -> str:
 
     Order (each step idempotent for a value the step does not own):
       1. strip the display suffix -- the token BEFORE the first ' (' (so
-         ``'wan_8gb (16:9)'`` -> ``'wan_8gb'``; a bare id / the ADD_CUSTOM sentinel
-         has no ' (' and passes through);
-      2. PUBLIC -> internal (``'wan_8gb'`` -> ``'wan_ti2v'``);
+         ``'ltx098_low_video (16:9)'`` -> ``'ltx098_low_video'``; a bare id /
+         the ADD_CUSTOM sentinel has no ' (' and passes through);
+      2. PUBLIC -> internal (``'ltx098_low_video'`` -> ``'ltx_8gb'``);
       3. LEGACY -> current (``'visualizer'`` -> ``'viz_green'``).
 
     A bare internal id, an unknown id, and the ``'+ Add Custom Model'`` sentinel all
@@ -370,13 +275,10 @@ RETIRED_ENGINE_IDS = frozenset({
     # wan we don't need"). It did not fit the card and never could: the UNet is
     # 13.31 GiB and its fp8 text encoder another 6.27, so 19.82 GiB of weights
     # against a 14.5 GiB target. It only ran by offloading continuously -- a
-    # measured 120-minute TIMEOUT with the render still alive, against 48.5
-    # minutes for the 5B `wan_ti2v` that replaces it and 24.8 for
-    # `fastwan_8gb`. The lane TYPE survives on-card; only the oversized weights
-    # are gone.
+    # measured 120-minute TIMEOUT with the render still alive.
     #
-    # The PUBLIC alias rows in this module (`wan22_high_i2v` at :50 and the
-    # legacy `wan21_high_i2v` at :192) deliberately STAY pointing at this id --
+    # The PUBLIC alias rows in this module (`wan22_high_i2v` and the legacy
+    # `wan21_high_i2v`) deliberately STAY pointing at this id --
     # they are what routes an old saved graph INTO this named refusal instead
     # of letting it fall through to the generic "no engine named ..." message,
     # which reads as a broken install rather than a retirement.

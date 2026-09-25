@@ -5,10 +5,9 @@ Spec: docs/2026-06-10-switchable-workflow-architecture__decision-and-plan.md
 section 0 (GATE B).
 
 S0 -- profile FOUNDATION:
-  * the committed row/rig shape (a row of ``config/workflow_matrix.json``, or
-    ``config/experiments/<id>.json`` for a lab rig) -- capability
-    POLICY, not creative presets; OVERRIDES only, registry defaults supply the
-    base;
+  * the committed row shape (a row of ``config/workflow_matrix.json``) --
+    capability POLICY, not creative presets; OVERRIDES only, registry defaults
+    supply the base;
   * a fail-closed SHAPE validator (unknown keys rejected, enums enforced);
   * the checked-in widget MAPPING (``config/widget_map.json``)
     loader -- profile key -> ``(node_type, widget_name)`` targets; raw node
@@ -43,7 +42,6 @@ from typing import Any, Optional
 
 __all__ = [
     "ProfileError",
-    "PROFILE_DIR",
     "load_profile",
     "load_widget_mapping",
     "validate_profile_shape",
@@ -54,19 +52,11 @@ __all__ = [
 ]
 
 _REPO_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-#: EXPERIMENT RIGS, not workflows. `otr_soak_*`, `otr_w45_*`, `otr_g4_*` and the
-#: campaign inputs twelve harness scripts drive: they answer "which experiment am I
-#: running", never "which workflow ships". Every SHIPPED workflow is a row in
-#: `config/workflow_matrix.json`; `load_profile` falls through to here only for an id
-#: the matrix does not carry.
-#:
-#: This was `config/profiles/` until 2026-09-24. Operator: "no profile folder, no
-#: tiers, just one workflow matrix ... so I never hear the word profile again."
-EXPERIMENT_DIR = os.path.join(_REPO_ROOT, "config", "experiments")
-
-#: Back-compatible alias. Several tests and scripts import this name; it is the same
-#: directory and exists so the rename did not have to be atomic across every reader.
-PROFILE_DIR = EXPERIMENT_DIR
+#: THERE IS NO PROFILE FOLDER. Every workflow this pack runs is a row in
+#: `config/workflow_matrix.json`, and `load_profile` resolves nothing else. The
+#: experiment rigs that used to sit beside it (`config/experiments/`) were retired
+#: with the harnesses that drove them on 2026-09-25 -- operator: "the only thing we
+#: have is the canonical and 24 variants in the workflows folder."
 
 #: The node-type-to-widget map every applier reads at render time. It is NOT an
 #: experiment rig and never was a profile -- it sat in that folder by accident of
@@ -533,34 +523,22 @@ def profile_from_row(row: dict, defaults: Optional[dict] = None) -> dict:
 
 
 def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
-    """Every id `load_profile` can resolve: matrix rows first, then lab rigs.
+    """Every id `load_profile` can resolve, in matrix order.
 
-    The enumeration a folder glob used to stand in for. Matrix
-    rows lead because they are the shipped surface; the rigs (`otr_soak_*`,
-    `otr_w45_*`, `otr_g4_*`) follow in name order. An id carried by both appears
-    once, from the matrix -- which is what one source of truth has to mean when the
-    two disagree.
+    With an explicit `profile_dir` the answer is that folder's ``*.json`` stems
+    instead -- the one way a test points this at a directory it wrote itself.
     """
+    if profile_dir is not None:
+        try:
+            names = sorted(os.listdir(profile_dir))
+        except OSError:
+            names = []
+        return tuple(n[:-5] for n in names if n.endswith(".json"))
     ordered = []
     seen = set()
-    try:
-        for row in load_matrix()["rows"]:
-            rid = row.get("id")
-            if rid and rid not in seen:
-                seen.add(rid)
-                ordered.append(rid)
-    except ProfileError:
-        pass                       # no matrix: the folder is the whole answer
-    d = profile_dir or PROFILE_DIR
-    try:
-        names = sorted(os.listdir(d))
-    except OSError:
-        names = []
-    for name in names:
-        if not name.endswith(".json") or name == "widget_map.json":
-            continue
-        rid = name[:-5]
-        if rid not in seen:
+    for row in load_matrix()["rows"]:
+        rid = row.get("id")
+        if rid and rid not in seen:
             seen.add(rid)
             ordered.append(rid)
     return tuple(ordered)
@@ -569,51 +547,40 @@ def known_profile_ids(profile_dir: Optional[str] = None) -> tuple:
 def load_profile(profile_id: str, profile_dir: Optional[str] = None) -> dict:
     """Resolve a workflow id to a shape-validated config. Fail closed.
 
-    THE MATRIX IS CONSULTED FIRST for every shipped workflow -- that is what
-    makes `config/workflow_matrix.json` the single source of truth rather than a
-    second copy of one. An id with no row falls through to
-    ``config/experiments/<id>.json``, which keeps the lab rigs (`otr_soak_*`,
-    `otr_w45_*`) working; they answer "which experiment", not "which workflow
-    ships". An explicit `profile_dir` also reads the folder, because that is how
-    tests point this at a fixture directory.
+    THE MATRIX IS THE ONLY SOURCE. `config/workflow_matrix.json` carries every
+    workflow this pack runs; an id with no row is refused by name, with the ids
+    that do exist. An explicit `profile_dir` reads ``<profile_dir>/<id>.json``
+    instead, which is how a test hands this a profile it built in `tmp_path`.
     """
-    d = profile_dir or PROFILE_DIR
-    # A PROFILE ID NAMES A FILE IN THIS DIRECTORY, NEVER A LOCATION
-    # (2026-09-05). `profile_id` reaches here from OTR_WorkflowValidator's free
-    # STRING widget, so a `/prompt` caller could send `..\..\..\somewhere\x` and
-    # this join would stat and open it -- a UNC spelling would authenticate to
-    # the host it named. Ids are `[a-z0-9_-]` by construction, so a separator or
-    # traversal token is refused rather than rewritten: a silently-renamed id
-    # would load the wrong profile, which is worse than a clear failure.
+    # A PROFILE ID NAMES A ROW, NEVER A LOCATION (2026-09-05). `profile_id`
+    # reaches here from OTR_WorkflowValidator's free STRING widget, so a
+    # `/prompt` caller could send `..\..\..\somewhere\x`; with a
+    # directory in play that join would stat and open it -- a UNC spelling would
+    # authenticate to the host it named. Ids are `[a-z0-9_-]` by construction,
+    # so a separator or traversal token is refused rather than rewritten: a
+    # silently-renamed id would load the wrong workflow, which is worse than a
+    # clear failure.
     if any(tok in str(profile_id or "") for tok in ("/", "\\", "..", "\x00")):
         raise ProfileError(
-            f"profile {profile_id!r}: an id names a file in {d!r}, not a path"
+            f"profile {profile_id!r}: an id names a workflow, not a path"
         )
 
-    # THE MATRIX, unless the caller explicitly named a directory. Checked AFTER
-    # the traversal refusal above, so a hostile id cannot reach even this
-    # lookup -- and a matrix hit touches no filesystem path at all.
     if profile_dir is None:
-        try:
-            rows = matrix_rows()
-        except ProfileError:
-            rows = {}                      # no matrix yet: the folder still works
+        rows = matrix_rows()
         row = rows.get(profile_id)
-        if row is not None:
-            return validate_profile_shape(
-                profile_from_row(row), f"workflow_matrix.json:{profile_id}")
-
-    path = os.path.join(d, f"{profile_id}.json")
-    if not os.path.isfile(path):
-        try:
-            known = sorted(
-                f[:-5] for f in os.listdir(d)
-                if f.endswith(".json") and f != "widget_map.json"
+        if row is None:
+            raise ProfileError(
+                f"profile {profile_id!r}: no such row in workflow_matrix.json; "
+                f"known workflows: {sorted(rows)!r}"
             )
-        except OSError:
-            known = []
+        return validate_profile_shape(
+            profile_from_row(row), f"workflow_matrix.json:{profile_id}")
+
+    path = os.path.join(profile_dir, f"{profile_id}.json")
+    if not os.path.isfile(path):
         raise ProfileError(
-            f"profile {profile_id!r}: no such file {path!r}; known profiles: {known!r}"
+            f"profile {profile_id!r}: no such file {path!r}; known profiles: "
+            f"{list(known_profile_ids(profile_dir))!r}"
         )
     with open(path, "r", encoding="utf-8") as f:
         try:

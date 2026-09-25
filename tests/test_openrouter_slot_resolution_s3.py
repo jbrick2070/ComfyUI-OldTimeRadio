@@ -170,7 +170,7 @@ def test_run_meta_stamps_resolved_slugs_and_cache(enabled, monkeypatch, tmp_path
 def test_writer_sets_slot_bindings_and_stamps_run_meta():
     """A refactor must not silently drop the binding wire or the run-meta
     stamp from the writer's run() path."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
 
     text = family_source()
     assert "set_slot_bindings(" in text

@@ -303,7 +303,7 @@ def load_profiles() -> list:
             if "h3_operator_only" in manual:
                 install_recipe = "operator-only files"
             elif manual:
-                install_recipe = "complete; manual tier"
+                install_recipe = "complete; manual download"
             else:
                 install_recipe = "complete"
             if provision.profile_python_issue(d, (3, 14)):
@@ -362,10 +362,6 @@ _EXTRA_INSTALL = {
     "animatediff15_v3_haunted_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_v3_stillin_lab_video": "ComfyUI-AnimateDiff-Evolved",
     "animatediff15_lightning_video": "ComfyUI-AnimateDiff-Evolved",
-    "ltx_video": "ComfyUI-GGUF",
-    "ltx_av": "ComfyUI-GGUF",
-    "wan_ti2v": "ComfyUI-GGUF",
-    "wan22_high_video": "ComfyUI-GGUF",
 }
 
 
@@ -645,10 +641,9 @@ def headline_block() -> str:
     What changed on 2026-09-13 is that README gained a TIER matrix -- one row per
     shipping graph -- and the two tables then answered the hardware question
     differently, because they are answers to different questions. A machine-class
-    row is the PROVISIONER TUPLE (`otr_provision.py --machine 16gb` installs
-    wan22_high_video and gemma-4-12b); a tier row is what the saved graph on disk
-    actually selects (ltx25_high_video, and the same writer under a different
-    label). Side by side and unlabelled, that reads as a contradiction, and two
+    row is the PROVISIONER TUPLE (what `otr_provision.py --machine 16gb`
+    installs); a tier row is what the saved graph on disk actually selects, and
+    the two could name different engines and writer labels. Side by side and unlabelled, that reads as a contradiction, and two
     independent reviewers read it as one.
 
     So README now carries NO copy of this table and links to `apple/MACHINES.md`

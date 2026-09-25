@@ -20,7 +20,7 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-from tests.fixtures.writer_family import WRITER_FAMILY, family_source
+from tests._support.writer_family import WRITER_FAMILY, family_source
 
 
 def _writer_source() -> str:

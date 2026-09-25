@@ -8,11 +8,11 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | column | machine | reproduce with |
 |---|---|---|
-| 8 GB NVIDIA | RTX 4060 / 3070 / 2080 class | `config/experiments/8gb_lite.json` |
-| 16 GB+ NVIDIA | RTX 5080 / 4080 / 3090 class | `config/experiments/16gb_full.json` |
-| Mac 16 GB | Apple Silicon, unified memory | `config/experiments/otr_mac_mps.json` |
-| AMD ROCm | Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `config/experiments/otr_amd16_rocm.json` |
-| CPU only | no GPU at all | `config/experiments/cpu_floor.json` |
+| 8 GB NVIDIA | RTX 4060 / 3070 / 2080 class | `workflows/variants/otr_8gb_video.json` |
+| 16 GB+ NVIDIA | RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` |
+| Mac 16 GB | Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` |
+| AMD ROCm | Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` |
+| CPU only | no GPU at all | `workflows/variants/otr_cloud_low.json` |
 
 ## Every dropdown
 
@@ -47,28 +47,24 @@ You never need all the weights in this workflow. One graph ships; the dropdowns 
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
 | `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
-| `wan22_high_video` | manual | 9.4 GiB | **no** | **proven** | not offered | ? | not offered |
-| `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered | ? | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered | ? | not offered |
-| `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
-| `ltx25_high_video` | manual | 22.7 GiB | measured | measured | not offered | ? | not offered |
+| `ltx25_native_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_high_video` | **auto** | 25.4 GiB | measured | measured | not offered | ? | not offered |
+| `ltx25_native_audio_in_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `ltx25_native_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
 

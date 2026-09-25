@@ -1822,8 +1822,7 @@ def _assert_family_inputs_satisfiable_cast_time(engine_name, beat, ledger,
         """DELEGATES to the ONE route-freeze authority (2026-07-25, chunk 1a).
 
         This was the THIRD independent copy of force-map + radio-host redirect.
-        It hard-coded the redirect target as the bare literal ``"ltx_audio_in"``
-        instead of ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and it
+        It hard-coded the redirect target as a bare literal instead of ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and it
         SWALLOWED a malformed force map with only a warning while the render
         path treats the identical condition as terminal (``57f4983a``) -- so a
         typo'd map passed cast-time preflight against the UNFORCED plan and

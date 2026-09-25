@@ -266,58 +266,18 @@ def can_split(engine) -> bool:
 # ---------------------------------------------------------------------------
 
 #: The ONLY engines whose tier-pinned ``max_render_frames`` is a coverage
-#: PLANNING cap. This is a deliberate allowlist of ONE, not a rollout.
+#: PLANNING cap.
 #:
-#: HISTORY, AND THE REASONING EXPIRED -- read this before trusting the paragraph
-#: that follows it. The original argument was: ``max_render_frames`` is not a
-#: general planning cap because WAN reads 17 from ``config/profiles/
-#: otr_8gb_wan.json``, renders a short native clip and PING-PONGS it up to the
-#: beat's full length (``eng_wan_ti2v._floor_length`` ->
-#: ``wrapper_bridge.extend_frames_to_target``), so narrowing WAN's contract
-#: before ``partition_beat`` would turn every WAN beat into a pile of 17-frame
-#: renders.
-#:
-#: **THAT MECHANISM NO LONGER EXISTS.** ``extend_frames_to_target`` was DELETED
-#: under the operator's no-mirror ruling and ``eng_wan_ti2v`` now REFUSES a beat
-#: it cannot render in one affordable pass rather than padding it. Which is
-#: exactly why ``wan_ti2v`` was ADDED to this list on 2026-08-02: with the mirror
-#: gone the ceiling had to become a PLANNING cap, or the engine would simply
-#: refuse the beats the mirror used to absorb. The comment argued against a
-#: decision the file itself made thirty lines below.
-#:
-#: What survives is the SHAPE of the rule, not its example: membership here is a
-#: per-engine decision because a ceiling that plans and a ceiling that merely
-#: caps a render are different things. ``ltx_8gb`` plans real coverage, so its
-#: ceiling belongs to the PLANNER.
-#:
-#: Adding an id here is a per-engine decision with a live proof attached, never
-#: a convenience. ``tests/test_multiclip_effective_contract.py`` pins WAN's
-#: topology as unmoved by a pinned ceiling.
-#: ``fastwan_8gb`` ADDED 2026-08-01, with the live proof this comment demands.
-#: The WAN reasoning above holds for ``wan_ti2v`` and is deliberately left alone,
-#: but it does NOT survive contact with a COVERAGE-PLANNED beat. Both adapters
-#: declare ``strict_first_frame`` continuity, which makes them CHAINABLE, so
-#: ``partition_beat`` plans multi-clip segments up to the contract max (177) --
-#: and a multi-clip beat never reaches ``_floor_length``, so the ping-pong that
-#: makes the ceiling harmless on the single-clip path never runs.
-#:
-#: THE LIVE PROOF (canonical run, 2026-08-01, this profile): the render refused
-#: by name -- "fastwan_8gb was handed a coverage-planned segment of 177 frame(s)
-#: but this tier pins its render ceiling at 17" -- exactly the contradiction
-#: ``_planned_length`` documents and exactly the remedy it names ("Raise
-#: max_render_frames for this tier or route the beat to a single-clip engine").
-#: The tier now pins 81, the highest rung the four-arm bench MEASURED at this
-#: canvas (6563.1 / 6531.1 / 6563.1 MiB at 17 / 49 / 81 -- flat), and listing the
-#: engine here lets the planner SEE that cap so plan and contract cannot disagree.
-#: Capping the planner at 81 is not the "pile of 17-frame renders" the WAN note
-#: warns about: 81 frames is 3.24 s of real motion per segment.
-#: ``wan_ti2v`` ADDED 2026-08-02. Its adapter-side ping-pong was deleted under
-#: the operator's no-mirror ruling, and that mirror was load-bearing: without
-#: coverage planning the engine simply REFUSES any beat it cannot render in one
-#: VRAM-affordable pass. Listing it lets the planner split those beats into
-#: affordable NATIVE segments, which is what "original video for every second of
-#: audio" requires.
-PLANNING_CAP_ENGINES = ("ltx_8gb", "razzle_ltx_8gb", "fastwan_8gb", "wan_ti2v")
+#: A ceiling that plans and a ceiling that merely caps a render are different
+#: things, so membership here is a per-engine decision with a live proof
+#: attached, never a convenience. ``ltx_8gb`` plans real coverage: its declared
+#: continuity makes it chainable, so ``partition_beat`` plans multi-clip
+#: segments up to the contract max -- and a tier that pins a lower render
+#: ceiling must be visible to the planner, or plan and contract disagree and
+#: the render refuses the segment by name. ``razzle_ltx_8gb`` is the same
+#: substrate. ``tests/test_multiclip_effective_contract.py`` pins the rest of
+#: the roster's topology as unmoved by a pinned ceiling.
+PLANNING_CAP_ENGINES = ("ltx_8gb", "razzle_ltx_8gb")
 
 
 class PlanningCapError(ValueError):

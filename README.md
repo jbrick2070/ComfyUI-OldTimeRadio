@@ -512,8 +512,9 @@ node packs, not Python packages, so `pip` cannot supply them. Install them into
 The AnimateDiff lanes -- the graphs `otr_8gb_animatediff.json`,
 `otr_16gb_animatediff.json` and `otr_mac16_animatediff.json`, each resolving
 the profile of the same name -- want [ComfyUI-AnimateDiff-Evolved](https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved);
-`ltx23_*`, `ltx25_*` and `wan22_*` want [ComfyUI-GGUF](https://github.com/city96/ComfyUI-GGUF)
--- the LTX 2.5 lanes also want the one-file patch described in [patches/README.md](patches/README.md).
+`ltx098_low_video` wants [ComfyUI-LTXVideo](https://github.com/Lightricks/ComfyUI-LTXVideo)
+plus the one-file patch described in [patches/README.md](patches/README.md). The
+LTX 2.5 lanes use nodes that ship with ComfyUI itself.
 If you pick one of these lanes without its pack, the render stops with an error
 that names the pack and its URL.
 
@@ -593,7 +594,7 @@ is in the wrong folder or ComfyUI crashed during startup before any node loaded.
 **One node is missing.** Find that `Skipped` line in the console; it names the
 library. Install it into ComfyUI's own interpreter.
 
-**The render stops naming a missing class** (`ADE_*`, `UnetLoaderGGUF`, `LTXV*`).
+**The render stops naming a missing class** (`ADE_*`, `LTXV*`).
 The lane you picked needs a node pack; the message names it.
 
 **The render stops naming a missing file.** The lane needs weights that do not

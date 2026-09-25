@@ -52,7 +52,7 @@ def test_record_is_best_effort_on_garbage():
 def test_resolved_models_surface_in_treatment(tmp_path):
     """The treatment WRITER/LLM CONFIG block reports the concrete resolved
     model + cost from the backend snapshot."""
-    from tests.fixtures.ledger_stub import make_stub_ledger
+    from tests._support.ledger_stub import make_stub_ledger
     from nodes.video_engine import _write_story_treatment
 
     _reset()

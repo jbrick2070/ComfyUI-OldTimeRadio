@@ -341,7 +341,7 @@ def test_policy_from_meta_roundtrip_and_failure_modes():
 def test_writer_stamps_llm_policy_into_meta_source():
     """The writer must stamp meta['llm_policy'] (the freeze cascade +
     shot-lock derivation read it back). Source-level pin."""
-    from tests.fixtures.writer_family import family_source
+    from tests._support.writer_family import family_source
 
     src = family_source()
     assert 'meta["llm_policy"]' in src

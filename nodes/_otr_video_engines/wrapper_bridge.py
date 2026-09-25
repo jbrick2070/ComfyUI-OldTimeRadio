@@ -99,10 +99,6 @@ _PACK_FOR_PREFIX = (
      "https://github.com/Kosinkadink/ComfyUI-AnimateDiff-Evolved"),
     ("VHS_", "ComfyUI-VideoHelperSuite",
      "https://github.com/Kosinkadink/ComfyUI-VideoHelperSuite"),
-    ("UnetLoaderGGUF", "ComfyUI-GGUF",
-     "https://github.com/city96/ComfyUI-GGUF"),
-    ("CLIPLoaderGGUF", "ComfyUI-GGUF",
-     "https://github.com/city96/ComfyUI-GGUF"),
 )
 
 
@@ -322,8 +318,8 @@ def _evict_dropped_models(node_id, out_tuple):
     ``ModelPatcherDynamic`` keeps its weights in a VBAR owned by the nn.Module, and
     dropping the pack's last reference only cleans the weakref out of
     ``current_loaded_models`` -- the VBAR pages stay allocated until ANOTHER dynamic
-    model applies pressure. A classic (non-dynamic) diffusion model, e.g. a GGUF UNet
-    from ComfyUI-GGUF, never applies that pressure, so it is loaded with
+    model applies pressure. A classic (non-dynamic) diffusion model never applies that
+    pressure, so it is loaded with
     ``0.00 MB usable`` and streamed from host RAM every step (4060 clean room,
     2026-09-02: ~2 min per step, ~42 min per still). ``unload_model_and_clones`` runs
     ``free_memory(1e30, device, keep_loaded=<every OTHER model>)`` -> ``model_unload``

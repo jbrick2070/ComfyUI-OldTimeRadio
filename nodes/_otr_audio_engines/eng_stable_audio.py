@@ -113,9 +113,9 @@ class StableAudioMusicEngine:
                 seed=seed[, generator=<bound torch.Generator>])
         Stereo is preserved (pack_audio_batch downmixes only while the assembly
         chain is still mono). GPU-VALIDATE (F): the plan's target is the
-        ComfyUI-native SA3 sampler; scripts/otr_audio_dep_pilot pins the real
-        entry point + that it binds a ``torch.Generator`` on the box, then flips
-        ``supports_external_generator`` True. Default-off until then.
+        ComfyUI-native SA3 sampler; a GPU check must pin the real entry point
+        and prove it binds a ``torch.Generator`` on the box before
+        ``supports_external_generator`` flips True. Default-off until then.
         """
         import torch
 

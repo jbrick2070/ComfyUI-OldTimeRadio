@@ -15,7 +15,7 @@ Three questions, in the order people ask them.
 | 16 GB+ NVIDIA -- RTX 5080 / 4080 / 3090 class | `workflows/variants/otr_16gb_video.json` | nothing |
 | Mac 16 GB -- Apple Silicon, unified memory | `workflows/variants/otr_mac16_video.json` | nothing |
 | AMD ROCm -- Windows or Linux -- and read "What the words mean" at the foot of this page before trusting any AMD cell | `workflows/variants/otr_amd_still.json` &mdash; in the shipping set, and an outside tester published an episode from it on a Radeon AI PRO R9700 under ROCm 7.2 (commit 0fc0fb90) -- see the AMD note at the foot | nothing |
-| CPU only -- no GPU at all | `workflows/otr_canonical.json` &mdash; no per-machine graph is generated | nothing |
+| CPU only -- no GPU at all | `workflows/variants/otr_cloud_low.json` | nothing |
 
 Every machine needs **ffmpeg and ffprobe** on PATH, and Linux needs one monospace TTF installed for burned captions.
 
@@ -26,10 +26,6 @@ If you change a dropdown yourself, these are the only picks that need anything b
 | `animatediff15_lightning_video` | ComfyUI-AnimateDiff-Evolved |
 | `animatediff15_v3_haunted_video` | ComfyUI-AnimateDiff-Evolved |
 | `animatediff15_v3_stillin_lab_video` | ComfyUI-AnimateDiff-Evolved |
-| `ltx23_high_video` | ComfyUI-GGUF |
-| `ltx23_low_audio_in` | ComfyUI-GGUF |
-| `wan22_high_fast` | ComfyUI-GGUF |
-| `wan22_high_video` | ComfyUI-GGUF |
 
 ## Will this engine run on my machine?
 
@@ -64,28 +60,24 @@ If you change a dropdown yourself, these are the only picks that need anything b
 
 | dropdown | how you get it | size | 8 GB NVIDIA | 16 GB+ NVIDIA | Mac 16 GB | AMD ROCm | CPU only |
 |---|---|---|---|---|---|---|---|
-| `ltx25_native_audio_in_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_audio_in_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_foley_blackwell` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_16gb` | manual | ? | ? | ? | not offered | ? | not offered |
-| `ltx25_native_mime_24gb` | manual | ? | ? | ? | not offered | ? | not offered |
 | `animatediff15_lightning_video` | manual | 3.1 GiB | fits | fits | **proven** | ? | not offered |
 | `animatediff15_v3_haunted_video` | manual | 3.6 GiB | **proven** | **proven** | not offered | ? | not offered |
 | `animatediff15_v3_stillin_lab_video` | manual | 3.6 GiB | fits | fits | not offered | ? | not offered |
 | `mesh_stage` | manual | 4.6 GiB | fits | fits | not offered | ? | not offered |
-| `wan22_high_video` | manual | 9.4 GiB | **no** | **proven** | not offered | ? | not offered |
-| `wan22_high_fast` | manual | 10.0 GiB | **OOM** | fits | not offered | ? | not offered |
 | `humo17_high_audio_in_portrait` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo17_high_audio_in_wide` | manual | 12.6 GiB | **OOM** | **proven** | not offered | ? | not offered |
-| `ltx23_high_video` | manual | 14.8 GiB | **OOM** | **OOM** | not offered | ? | not offered |
-| `ltx23_low_audio_in` | manual | 15.2 GiB | **OOM** | fits | not offered | not offered | not offered |
 | `ltx098_low_video` | **auto** | 16.1 GiB | **proven** | **proven** | **proven** | ? | not offered |
 | `razzle_ltx_8gb` | **auto** | 16.1 GiB | fits | fits | fits | ? | not offered |
-| `ltx25_high_video` | manual | 22.7 GiB | measured | measured | not offered | ? | not offered |
+| `ltx25_native_foley_blackwell` | **auto** | 24.2 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_high_video` | **auto** | 25.4 GiB | measured | measured | not offered | ? | not offered |
+| `ltx25_native_audio_in_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_foley_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_16gb` | **auto** | 25.4 GiB | ? | ? | not offered | ? | not offered |
 | `humo14_high_audio_in_portrait` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `humo14_high_audio_in_wide` | manual | 26.7 GiB | **OOM** | **proven** | not offered | ? | not offered |
+| `ltx25_native_audio_in_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_foley_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
+| `ltx25_native_mime_24gb` | **auto** | 32.5 GiB | ? | ? | not offered | ? | not offered |
 | `h3_low_video` | manual | 41.9 GiB | **OOM** | **proven** | not offered | ? | not offered |
 | `h3_low_audio_in` | manual | 42.5 GiB | **OOM** | fits | not offered | ? | not offered |
 
@@ -214,35 +206,14 @@ Selected by: `animatediff15_lightning_video`
 | `animatediff_lightning_8step_comfyui.safetensors` | [`ByteDance/AnimateDiff-Lightning`](https://huggingface.co/ByteDance/AnimateDiff-Lightning) | `models/animatediff_models/` | 0.85 GiB | no |
 | `vae-ft-mse-840000-ema-pruned.safetensors` | [`stabilityai/sd-vae-ft-mse-original`](https://huggingface.co/stabilityai/sd-vae-ft-mse-original) | `models/vae/` | 0.31 GiB | no |
 
-### wan_ti2v_gguf
-
-Selected by: `wan22_high_video`
-
-| File | From | Put it in | Size | Gated |
-|---|---|---|---|---|
-| `Wan2.2-TI2V-5B-Q5_K_M.gguf` | [`QuantStack/Wan2.2-TI2V-5B-GGUF`](https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF) | `models/diffusion_models/` | -- | no |
-| `umt5-xxl-encoder-Q5_K_M.gguf` | [`city96/umt5-xxl-encoder-gguf`](https://huggingface.co/city96/umt5-xxl-encoder-gguf) | `models/text_encoders/` | -- | no |
-| `wan2.2_vae.safetensors` | [`Comfy-Org/Wan_2.2_ComfyUI_Repackaged`](https://huggingface.co/Comfy-Org/Wan_2.2_ComfyUI_Repackaged) | `models/vae/` | -- | no |
-
 ### No manifest ships for these
 
 This pack cannot fetch them, and no table here can tell you the filename, because the engine chooses it. Select one anyway and it refuses by name before anything else runs -- **that refusal is the install instruction**: it prints the exact file it wants and the folder it expects. It never quietly substitutes another.
 
 * `flux_gen1`
 * `ideogram4_local`
-* `ltx23_high_video`
-* `ltx23_low_audio_in`
-* `ltx25_high_video`
-* `ltx25_native_audio_in_16gb`
-* `ltx25_native_audio_in_24gb`
-* `ltx25_native_foley_16gb`
-* `ltx25_native_foley_24gb`
-* `ltx25_native_foley_blackwell`
-* `ltx25_native_mime_16gb`
-* `ltx25_native_mime_24gb`
 * `mesh_stage`
 * `spandrel_esrgan`
-* `wan22_high_fast`
 
 ## What the words mean
 

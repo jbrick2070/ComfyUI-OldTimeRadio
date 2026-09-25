@@ -20,7 +20,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from nodes import OTR_LedgerScriptWriter as W  # noqa: E402
-from tests.fixtures.writer_slots import assert_relative_order  # noqa: E402
+from tests._support.writer_slots import assert_relative_order  # noqa: E402
 
 _ENV = "OTR_ENABLE_STYLE_GRAMMAR"
 

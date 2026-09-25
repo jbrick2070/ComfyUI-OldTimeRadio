@@ -132,7 +132,7 @@ class VideoEngineRegistry(EngineRegistry):
     CAPABILITY (``role_compat.engine_fits_role``: an engine fits a role iff the role
     can supply every ``required_inputs`` token). The shared base, however, still
     gated ``engines_for_role`` / ``assert_usable`` on the per-engine ``roles``
-    whitelist -- so a capability-fit engine (e.g. ltx_video for character_video) was
+    whitelist -- so a capability-fit engine (e.g. an LTX lane for character_video) was
     rejected by the registry while production accepted it, and the soak filled a
     still instead of the video. These two methods are overridden HERE -- not in
     :class:`EngineRegistry`, which also serves the IMAGE + AUDIO registries -- to
@@ -353,8 +353,8 @@ CAPABILITIES = {
         "model_requirements": []},
     # S0 portability (2026-07-10): the requirement label now names the artifact
     # family the engine DEFAULT resolves (eng_humo._HUMO_DEFAULT_UNET = Kijai's
-    # Wan2_1-HuMo-14B fp8-scaled UNET, fetched by scripts/download_humo_models
-    # .ps1). The old "HuMo-17B" label pointed fresh installs at Comfy-Org's
+    # Wan2_1-HuMo-14B fp8-scaled UNET, fetched by the `humo` lane of
+    # scripts/otr_fetch_lane_weights.py). The old "HuMo-17B" label pointed fresh installs at Comfy-Org's
     # differently-named file the engine never looks for.
     "humo": {
         "required_toolchain": None, "requires_sidecar": False,
@@ -390,20 +390,6 @@ CAPABILITIES = {
         "needs_fp8_te": True, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["HuMo-14B-KJ"]},
-    # GGUF splice (2026-06-15): the production LTX video recipe is the frozen
-    # mini -- 22B GGUF unet + distilled LoRA @0.70 + Gemma-3 encoder + LTX video
-    # VAE + projection ckpt (the 5-artifact tuple). Heavy 22B class. The 2026-06-16
-    # battle adopted Q3_K_M as the default quant: measured per-clip peak ~14.8 GB
-    # (at the 14.5 GB ceiling, 2.2x faster, no decode offload); Q4_K_S was ~15.8 GB
-    # = over. commercial_clean (Apache GGUF + LTX-2 Community model) set True.
-    "ltx_video": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.3-22b-dev-gguf",
-                               "ltx-2.3-distilled-lora", "gemma-3-12b",
-                               "ltx-2.3-video-vae", "ltx-2.3-22b-dev"]},
     # still_parallax UNREGISTERED 2026-06-30 (item 2 rip-out): no CAPABILITIES
     # row while dark -- see nodes/_otr_video_engines/__init__.py.
     # mesh_stage (0-E easy on-ramp): hy3d-2mv core-node mesher (in-process,
@@ -419,40 +405,8 @@ CAPABILITIES = {
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["hunyuan3d-dit-v2-mv",
                                "blender-portable"]},
-    # eng_wan_i2v.render_clip passes free_after_use=True so umt5-fp8 + the 14B
-    # fp8 UNET do not co-reside through the sampler on the 16 GB card; that
-    # mitigation is MANDATORY, not optional. S5: model_requirements is the real
-    # Wan 2.2 I2V asset id (was the stale wan2.1 label). Lane 1, 2026-08-11:
-    # the ckpt default named here used to be wan2.2-i2v.safetensors, which is a
-    # placeholder that exists on no box -- it is now the installed artifact,
-    # eng_wan_i2v._I2V_DEFAULT_UNET, under diffusion_models. The public menu id
-    # states 2.2 for the same reason this row does.
-    # S2 (GO_FORWARD 4A): the 8GB-tier Wan2.2 TI2V-5B sibling. model_requirements
-    # is the real 5B asset id. Apache-2.0 (commercial-clean); built 2026-06-14
-    # after the live /object_info node-class capture (the registry-consistency
-    # invariant forbids a row without a registered engine, so this lands WITH
-    # eng_wan_ti2v).
-    "wan_ti2v": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["wan2.2-ti2v-5b"]},
-    # fastwan_8gb (2026-08-01): the FastWan 2.2 TI2V-5B 3-step DMD distillation.
-    # Same capability shape as wan_ti2v because it is the SAME base weights --
-    # cuda, no vendor gate, no fp8/fp4 (the base is the Q5_K_M GGUF wan_ti2v
-    # already ships). It differs only by the rank-128 LoRA, which is a SEPARATE
-    # model requirement so preflight fails CLOSED when it is absent: without it
-    # the graph would render 3 steps through the UN-distilled base model, which
-    # produces no error -- just ruined output wearing a FastWan receipt.
-    "fastwan_8gb": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"], "requires_vendor": None,
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["wan2.2-ti2v-5b", "fastwan-2.2-5b-lora"]},
     # ltx_8gb (video-tiers, 2026-07-20): the 8GB-tier LTX-Video 0.9.8 distilled 2B
-    # I2V engine. Modeled on wan_ti2v -- cuda, NO vendor gate, NO fp8/fp4 (the 0.9.8
+    # I2V engine. cuda, NO vendor gate, NO fp8/fp4 (the 0.9.8
     # distilled all-in-one is bf16; the LTXQ8Patch quantizer is deliberately NOT
     # adopted). requires_flag None; ordinary asset preflight only. Built after the
     # live /object_info capture + a functional in-process smoke (the
@@ -489,33 +443,12 @@ CAPABILITIES = {
     # registry-consistency invariant forbids a CAPABILITIES row without a
     # registered engine. Restore the row WITH the @register + package import in
     # the SAME change when a real forward ships.
-    # LTX-AV (audio-input) lane -- the LTX-2.3 22B audio-conditioned engines.
-    # Both engines run in-process and are DEFAULT-OFF / dark (OTR_ENABLE_LTX_AV).
-    # SHARP build-out (2026-06-17): the default recipe adds the distilled LoRA +
-    # the projection ckpt (LTXAVTextEncoderLoader reads it) -> listed here + gated
-    # in eng_ltx_av._weight_paths.
-    # ltx_audio_in (2026-06-26): the ONE audio-in lane -- one engine
-    # for music + announcer + character (I2V on whatever still + the shot audio,
-    # music or voice). Same LTX-2.3 22B audio weights / OTR_ENABLE_LTX_AV
-    # gate as the talk/music pair; accepts_still=True so the bookend still is minted.
-    "ltx_audio_in": {
-        "required_toolchain": None, "requires_sidecar": False,
-        "device_backends": ["cuda"],
-        # requires_vendor "nvidia": NVML VRAM-telemetry gate, table-visible now
-        # (eng_ltx_av.assert_usable hard-gates on it).
-        "requires_vendor": "nvidia",
-        "needs_fp8_te": False, "needs_fp4_te": False,
-        "practical_without_gpu": False, "sidecar_conditional": False,
-        "model_requirements": ["ltx-2.3-22b-dev-gguf", "gemma-3-12b",
-                               "ltx-2.3-audio-vae", "ltx-2.3-video-vae",
-                               "ltx-2.3-distilled-lora", "ltx-2.3-22b-dev"]},
     # ltx25_video: LTX 2.5 Distilled I2V rendered SILENT, on the 16 GB mix4x8
-    # DiT through stock loaders. cuda, no vendor gate -- and note the
-    # difference from its LTX 2.3 cousin ltx_audio_in, which DOES carry
-    # requires_vendor "nvidia" because it hard-gates on NVML telemetry in
-    # assert_usable. This lane does not: it SAMPLES a VRAM peak for the receipt
+    # DiT through stock loaders. cuda, no vendor gate: this lane SAMPLES a
+    # VRAM peak for the receipt
     # via VramPeakProbe, which degrades to None when no NVML sample succeeds,
-    # and never refuses on the reading.
+    # and never refuses on the reading -- a vendor gate would advertise an
+    # enforcement that does not run.
     #
     # FIVE model_requirements, and the AUDIO VAE IS ONE OF THEM even though
     # this lane emits no audio. LTXVEmptyLatentAudio mints the audio latent

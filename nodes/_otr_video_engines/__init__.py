@@ -40,8 +40,8 @@ And one more, if you build your lane as a SIBLING of an existing one:
   attribute your sibling can override, never a module-level constant read from
   inside a method. A method reading the module constant means your lane loads
   the PARENT's weights while stamping its own receipt, which is wrong pixels
-  under a confident label. This has now bitten twice here: once on the WAN
-  recipe accessors (see eng_fastwan_8gb) and once on Ghost, where the module
+  under a confident label. This has now bitten twice here: once on a WAN
+  sibling's recipe accessors and once on Ghost, where the module
   name had been made overridable and the byte floor beside it had not -- so a
   byte-perfect 1.67 GB module was refused as "truncated" against a floor sized
   for a 1.82 GB one. When you subclass, ask what ELSE was sized for the PARENT.
@@ -54,39 +54,6 @@ And one more, if you build your lane as a SIBLING of an existing one:
 # packaging quirk never breaks the namespace import.
 try:  # pragma: no cover - trivial guard
     from . import cheap_families as _cheap_families  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-# M2 / A-S5: register the in-process motion engine ltx_video (text->video).
-# This block registered TWO engines until 2026-08-26 -- wan_i2v (image->video)
-# was the other, and its retirement note is below. ltx_video is DEFAULT-OFF /
-# dark (empty default_roles + gated behind OTR_ENABLE_LTX_VIDEO) so it shows in
-# the static per-role dropdown (V-6) but is never a default and fails closed
-# until the operator enables it AND the wrapper + checkpoints are
-# installed/verified on the GPU box. Cold-import clean (lazy LTX wrapper +
-# torch inside
-# load/render_clip, never here), so this import pulls in nothing heavy (invariant
-# V-12, the cold-import test). Guarded so a packaging quirk never breaks the
-# namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_ltx_video as _eng_ltx_video  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-# wan_i2v RETIRED 2026-08-26 -- 19.82 GiB of weights against a 14.5 GiB
-# target; it only ran by offloading (120 min TIMEOUT vs 48.5 for the 5B
-# wan_ti2v that replaces it). Tombstoned in
-# _otr_shared/public_engines.RETIRED_ENGINE_IDS so a saved graph naming it
-# gets a NAMED retirement refusal, not "no such engine".
-
-# GO_FORWARD 4A (2026-06-14): register the Wan2.2 TI2V-5B 8GB-tier engine. Like
-# wan_i2v it is DEFAULT-OFF / dark (empty default_roles + gated behind
-# OTR_ENABLE_WAN_TI2V) and fails closed until the GGUF + the Wan2.2 VAE are on
-# disk. Its 5B core node class (Wan22ImageToVideoLatent) was captured from a live
-# /object_info before coding. Cold-import clean (V-12); guarded so a packaging
-# quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_wan_ti2v as _eng_wan_ti2v  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
 
@@ -109,34 +76,6 @@ try:  # pragma: no cover - trivial guard
     from . import eng_razzle_ltx_8gb as _eng_razzle_ltx_8gb  # noqa: F401
 except Exception:  # noqa: BLE001
     pass
-
-# fastwan_8gb (2026-08-01): the FastWan 2.2 TI2V-5B 3-step DMD distillation --
-# a SUBCLASS of eng_wan_ti2v sharing its whole 5B substrate (beat hoist, teardown,
-# frame ladder, tiled decode) and overriding only the recipe seam, the LoRA route
-# and the sampler chain. ADDITIVE: wan_ti2v keeps its menu row untouched. It is a
-# THROUGHPUT tier -- identical VRAM and identical motion to the incumbent, ~2.7x
-# sooner -- not a quality or longer-clip upgrade. Fails CLOSED (ordinary asset
-# preflight, including the LoRA) until the weights are on disk. Cold-import clean.
-# Guarded so a packaging quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_fastwan_8gb as _eng_fastwan_8gb  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
-
-# 2026-06-15: register the LTX-2.3 AUDIO-INPUT (A2V) lane -- ltx_av_talk
-# (audio_driven_face) + ltx_av_music (audio_conditioned_video). ADDITIVE + DARK:
-# both are DEFAULT-OFF (empty default_roles + gated behind OTR_ENABLE_LTX_AV) so
-# they show in the static per-role dropdown (V-6) but never default and fail
-# closed until the GGUF unet + Gemma-3 encoder + LTX VAEs are on disk AND NVML is
-# available. The golden prompt-only eng_ltx_video is NEVER imported/touched here.
-# Cold-import clean (V-12: lazy LTX/GGUF wrapper + torch inside load/render_clip).
-# Guarded so a packaging quirk never breaks the namespace import.
-try:  # pragma: no cover - trivial guard
-    from . import eng_ltx_av as _eng_ltx_av  # noqa: F401
-except Exception:  # noqa: BLE001
-    pass
-
 
 # M2 / A-S6: register the in-process HuMo audio-driven-face engine -- the
 # heaviest motion engine (loads MODEL+CLIP+VAE+AUDIO_ENCODER internally via

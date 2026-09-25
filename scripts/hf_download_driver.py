@@ -108,7 +108,6 @@ def main(argv: list[str]) -> int:
     # and not the whole eva_clip / facexlib dir).
     allow_patterns = spec.get("allow_patterns")  # list[str] or None
     ignore_patterns = spec.get("ignore_patterns") or [
-        "*.gguf",
         "*.onnx",
         "*_fp4.safetensors",
         "*.msgpack",

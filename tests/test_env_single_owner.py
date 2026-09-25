@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import ast
 
-from tests.fixtures.ratchet import REPO, assert_ratchet, scan
+from tests._support.ratchet import REPO, assert_ratchet, scan
 
 NODES = REPO / "nodes"
 OWNER = NODES / "_otr_shared" / "env.py"

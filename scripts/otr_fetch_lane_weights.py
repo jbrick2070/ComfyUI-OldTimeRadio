@@ -11,9 +11,8 @@ already fetches them at BOOT from `prestartup_script.py`, and duplicating that
 here would write to a second models root the engine does not read.
 
 Every source below is UNGATED (verified against the HF API 2026-08-29): no
-account, no licence click, no token. The one gated video repo, Lightricks/
-LTX-2.5, is deliberately NOT offered here -- it reports gated:"auto" and needs
-the operator's own terms click, which a script must never paper over.
+account, no licence click, no token -- the native LTX 2.5 stack included,
+which comes from ungated mirrors of Lightricks' own gated repo.
 
 Usage:
     python scripts/otr_fetch_lane_weights.py --list
@@ -72,10 +71,13 @@ LANE_INFO = {
     "z_image": (19.26, "IMAGE model, bf16. Any NVIDIA; largest download."),
     "stable_audio_3": (3.46, "THE MUSIC MODEL. Sits on the shared path, so "
                              "without it EVERY profile fails at the music node."),
-    "wan_ti2v_gguf": (9.37, "Wan 2.2 TI2V, quantised. Needs ComfyUI-GGUF."),
-    "wan_ti2v": (0.0, "Wan 2.2 TI2V, safetensors. An ALTERNATIVE to the GGUF "
-                      "set above -- fetch one or the other, never both."),
     "ltx_8gb": (16.13, "LTX 2b distilled + T5 encoder. Real video diffusion."),
+    "ltx25_native_16gb": (25.38, "LTX 2.5, mix4x8 DiT + w4a8 encoder + VAEs + "
+                                 "upscaler. The 16 GB silent, foley, mime and "
+                                 "audio-in lanes all load exactly these."),
+    "ltx25_native_24gb": (32.54, "LTX 2.5, int8 DiT. The 24 GB lanes."),
+    "ltx25_native_blackwell": (24.16, "LTX 2.5, nvfp4 DiT. Blackwell (sm_120) "
+                                      "only."),
     "humo": (26.74, "HuMo 14B talking-face lane. Locally episode-proven on "
                     "a 16 GB Blackwell 5080 at 13.06 GiB VRAM / 27.53 GiB "
                     "host RAM; use at least 32 GiB host RAM. Other NVIDIA "
@@ -276,19 +278,146 @@ LANES = {
             "8e505d95dd1561d47abd43d4238fd40d9bb1ae9e147ed0a4cba778d76ae4db48",
         ),
     ],
-    # ~9 GB. Ungated Comfy-Org repackages.
-    "wan_ti2v": [
-        ("Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-         "split_files/vae/wan_2.1_vae.safetensors", "vae"),
-        ("Comfy-Org/Wan_2.1_ComfyUI_repackaged",
-         "split_files/text_encoders/umt5_xxl_fp8_e4m3fn_scaled.safetensors",
-         "text_encoders"),
+    # THE NATIVE LTX 2.5 STACK, one lane per DiT. Every lane of a card class
+    # loads the same five files -- the 16 GB foley lane's mix4x8 DiT is also
+    # what the silent, mime and audio-in 16 GB lanes open. All UNGATED
+    # (PBUG-20260923-03): the DiT and encoder from joeygambino/LTX-2.5-Quantized,
+    # the VAEs and upscaler from vonkaiser/LTX-2.5-FP8-NVFP4, byte-identical to
+    # Lightricks' own gated copies (same SHA-256). Revisions, sizes and hashes
+    # read off the Hub API on 2026-09-25. `nodes/_otr_visual_assets.py`
+    # allowlists the same files, so a registry install fetches them at queue
+    # time without this script.
+    "ltx25_native_16gb": [
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+            "diffusion_models/LTX25-distilled-DiT-comfy-mix4x8-13.8GB.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            13_810_250_240,
+            "00c0d93a9223a25d78b08dd1828b9846d81b654cf42acb8c209055529d391fba",
+        ),
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "text_encoders/gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            10_604_342_914,
+            "bdd2d205d795b9692d2beea357dd28f3c530cccadcdf88ce64f5d978e3573a68",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            1_472_223_346,
+            "847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            364_866_540,
+            "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            995_778_752,
+            "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+        ),
+    ],
+    "ltx25_native_24gb": [
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "LTX25-distilled-DiT-comfy-int8.safetensors",
+            "diffusion_models/LTX25-distilled-DiT-comfy-int8.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            21_504_050_168,
+            "a9adb1c33604ea90c2023f7855bc5b5300b5156b257a6aa3756a2b34ba8d0326",
+        ),
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "text_encoders/gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            10_604_342_914,
+            "bdd2d205d795b9692d2beea357dd28f3c530cccadcdf88ce64f5d978e3573a68",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            1_472_223_346,
+            "847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            364_866_540,
+            "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            995_778_752,
+            "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+        ),
+    ],
+    "ltx25_native_blackwell": [
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "LTX25-distilled-DiT-comfy-nvfp4.safetensors",
+            "diffusion_models/LTX25-distilled-DiT-comfy-nvfp4.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            12_499_335_336,
+            "a1232b3abfbe8f0ae23f590bd0c07a107c790cf3c8ba0396464027cb1abe8dfc",
+        ),
+        WeightSpec(
+            "joeygambino/LTX-2.5-Quantized",
+            "gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "text_encoders/gemma4-12b-ltx25-comfy-w4a8.safetensors",
+            "00f505424717d526f7b00f51c415de789c3f661c",
+            10_604_342_914,
+            "bdd2d205d795b9692d2beea357dd28f3c530cccadcdf88ce64f5d978e3573a68",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "vae/ltx-2.5-video-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            1_472_223_346,
+            "847e14ca7f3355debca0cea4eaa24ac0fbcdf0061da054ac89ca638a869ddba3",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "vae/ltx-2.5-audio-vae-bf16.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            364_866_540,
+            "c52733d37f6a7fb7949c3dc0fb468c6cb2169e4d836983a73babb9f0d54837a5",
+        ),
+        WeightSpec(
+            "vonkaiser/LTX-2.5-FP8-NVFP4",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "latent_upscale_models/ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors",
+            "05ad0f3298ceee7c64df7cbdc86406ba7872b7d7",
+            995_778_752,
+            "eb5a71fe4068ee87ccdb1c3aa635e547ca76bd2d30ae20ae889f2c325c0677e8",
+        ),
     ],
     # ~16.1 GB. COMPLETE: `eng_ltx_8gb` names exactly these two files, and the
     # destinations are read off its own resolver -- the checkpoint from
     # ("checkpoints",) and the encoder from ("text_encoders", "clip").
     #
-    # This lane, and the GGUF one below, were added 2026-08-30 after the asset
+    # This lane was added 2026-08-30 after the asset
     # index made the real gap visible: OTR's engines name FILES but almost never
     # name SOURCES. Only three lanes had a recorded provenance, so every other
     # weight on the reference machine had been placed there by hand and could
@@ -300,10 +429,6 @@ LANES = {
         ("comfyanonymous/flux_text_encoders",
          "t5xxl_fp16.safetensors", "text_encoders"),                    # 9.79 GB
     ],
-    # ~9.4 GB. The GGUF route for Wan 2.2 TI2V, which `eng_wan_ti2v` also
-    # accepts -- it names both the safetensors set (the `wan_ti2v` lane above)
-    # and these quantized files. They are ALTERNATIVES: fetch one set or the
-    # other, not both.
     # ~3.4 GB. THE MUSIC MODEL, and it blocks far more than a "music lane":
     # OTR_StableAudioTheme runs on the shared path, so a machine without this
     # fails EVERY profile that reaches the music node -- eight consecutive lanes
@@ -407,20 +532,12 @@ LANES = {
          "text_encoders/t5gemma_b_b_ul2.safetensors",
          "text_encoders"),                                               # 1.19 GB
     ],
-    "wan_ti2v_gguf": [
-        ("QuantStack/Wan2.2-TI2V-5B-GGUF",
-         "Wan2.2-TI2V-5B-Q5_K_M.gguf", "diffusion_models"),             # 3.81 GB
-        ("city96/umt5-xxl-encoder-gguf",
-         "umt5-xxl-encoder-Q5_K_M.gguf", "text_encoders"),              # 4.15 GB
-        ("Comfy-Org/Wan_2.2_ComfyUI_Repackaged",
-         "split_files/vae/wan2.2_vae.safetensors", "vae"),              # 1.41 GB
-    ],
 }
 
 #: Convenience bundles: everything a named profile needs that is not already
 #: auto-fetched by transformers (writer, musicgen) on first use.
 BUNDLES = {
-    "otr_nvidia_8gb_haunted": ["haunted"],
+    "otr_8gb_animatediff": ["haunted"],
 }
 
 
@@ -485,7 +602,7 @@ def human(n: float) -> str:
 
 #: Extensions that mark the third manifest element as a full destination PATH
 #: rather than a bare folder.
-_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".gguf", ".pth", ".bin", ".onnx")
+_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".pth", ".bin", ".onnx")
 
 
 def weight_spec(entry) -> WeightSpec:
@@ -642,8 +759,6 @@ def main() -> int:
         print("profile bundles (fetch everything a profile needs):")
         for b, lanes in BUNDLES.items():
             print("  %-24s = %s" % (b, " + ".join(lanes)))
-        print("\nGATED, deliberately not offered: Lightricks/LTX-2.5 "
-              "(accept the terms yourself, then set HF_TOKEN)")
         return 0
 
     if args.lane in BUNDLES:

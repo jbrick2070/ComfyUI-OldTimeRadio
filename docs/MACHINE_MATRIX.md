@@ -19,8 +19,6 @@ Only receipt-backed rows appear here. **PROVEN** means a full OTR episode publis
 | `sd15` (SD 1.5 local still engine) | **PROVEN** | Mac mini M4, 16 GB unified, Apple Silicon (MPS) | full published OTR episodes whose scene stills were minted locally on Metal at 768x432 (long side clamped by OTR_SD15_MAX_SIDE); it is the still supplier for every still_* and ltx_8gb receipt below, so those episodes are its receipts too | otr/obs/ 20260908_005546, 20260908_030426, 20260908_042821; [OTR.image.sd15] minted still lines in logs/sd15_run.log, ltx_sd15.log, chain_stills3.log |
 | `still_motion` (the four still_* lanes (motion / pan / flat / word)) | **PROVEN** | Mac mini M4, 16 GB unified, Apple Silicon (MPS) | full published OTR episodes covering all four still_* lanes across two runs, every still supplied locally by sd15; three video dropdowns exist so no single run can cover four lanes | otr/obs/ 20260908_005546 (arch/stmo) covers still_motion; 20260908_042821 (cart/stwo) covers still_pan + still_flat + still_word; docs/MAC_PORTABILITY_GUIDE.md section 9 |
 | `viz_camera` (procgen visualizer lanes) | **PROVEN** | Mac mini M4, 16 GB unified, Apple Silicon (MPS) | full published OTR episodes on the zero-download press-Run path: viz_mxc_cpu / viz_green / viz_camera video, Qwen3.5-4B writer on Metal, Kokoro voices, Stable Audio 3 music; no image weights invoked | otr/obs/ 20260907_201810 (rfrc/vcam) and 20260907_214731 (cart/vcam); docs/MAC_PORTABILITY_GUIDE.md sections 1-4 |
-| `wan_ti2v` (Wan 2.2 TI2V-5B) | **PROVEN** | RTX 5080 Laptop, 16 GB, Blackwell | full published OTR episode from profile otr_g4_wan_ti2v; 17 Wan clips | signal_lost_the_weeping_valve_20260823_001152; docs/HANDOFF_LOG.md lines 1059-1062; 1920x1080, 25 fps, 166.6 s, obs output |
-| `wan_ti2v` (Wan 2.2 TI2V-5B) | **PROVEN** | RTX A4500, 20 GB, Ampere | full published OTR episode | signal_lost_gleaming_in_ruby_20260901_030818; 1 act; 3949 s; obs_publish OK |
 | `minimax_h3_fl2va_raw_recipe` (MiniMax H3 FL2VA raw ComfyUI recipe with native audio) | **LAB-PROVEN** | RTX 4060 Laptop, 8 GB, Ada | isolated 864x480x90 cold, warm-1, and warm-2 model-family clips below the canonical 124-model-frame floor; not the OTR engine adapter or a canonical episode | vram-recipe-lab cell h3-mime-i2v-action-demo-f90/20260814T012207Z-ff39579c4625; run SHA-256 28beec62e28e372d85ae011a9f789bff7c15cb8ff4f39d1779f11842e2f60501; media and machine gates passed; peaks 7.147/6.788/6.788 GiB; human-approved |
 
 PROVEN episode counts come from `delivered_engine` in the episode ledger for episodes with a final mp4. LAB-PROVEN rows instead cite their immutable runner receipt and exact artifact scope. Recency matters because the code moves -- an engine proven in June is proven against June.
@@ -34,7 +32,7 @@ Do not grep `episode_canon.json` for engine names: it records none, and matches 
 | your machine | writer | video | voice | music | image | extra install | status |
 |---|---|---|---|---|---|---|---|
 | **8 GB NVIDIA (RTX 4060, 3070, 2080)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | ComfyUI-AnimateDiff-Evolved | **EPISODE PATH PROVEN** -- writer/video/voice/music on RTX 4060; shipping-set graphs published 2026-09-13 |
-| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | wan22_high_video | kokoro | musicgen | z_image_turbo | ComfyUI-GGUF | **COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven |
+| **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** | gemma-4-12b | ltx25_high_video | kokoro | musicgen | z_image_turbo | none | **COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven |
 | **10-15 GB NVIDIA (RTX 4070, 3080, 3080 Ti 12 GB)** | gemma-4-E2B | animatediff15_v3_haunted_video | kokoro | musicgen | z_image_turbo | ComfyUI-AnimateDiff-Evolved | `draft`, unproven |
 | **AMD / ROCm (Windows or Linux)** | Qwen3.5-4B | still_motion | kokoro | musicgen | z_image_turbo | none | `draft`, unproven |
 
@@ -63,39 +61,29 @@ Apple Silicon is `otr_mac_mps`, PROVEN on a named physical system -- a Mac mini 
 
 Nothing here is inferred from "it looks like it should fit". A blank is an unknown, recorded as one.
 
-## 8 GB  --  18 experimental profile(s), 8 shipping
+## 8 GB  --  8 experimental profile(s), 7 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
 | `otr_8gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_8gb_ltx25_native_audio_in` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_8gb_ltx25_native_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_8gb_ltx25_native_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_8gb_ltx25_native_audio_in` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_native_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_8gb_ltx25_native_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_8gb_video` | ltx_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_nvidia_8gb_haunted` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>10 draft profile(s) here -- not vouched for</summary>
+<details><summary>1 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `fastwan_8gb`, `ltx_8gb`, `minimax_h3_video`, `still_motion`, `viz_camera`, `wan_ti2v`
+Video engines they select: `still_motion`
 
 | profile | video | voice |
 |---|---|---|
-| `8gb_lite` | still_motion | kokoro |
-| `otr_4060_floor` | viz_camera | kokoro |
-| `otr_4060_h3_nano` | minimax_h3_video | kokoro |
-| `otr_4060_nano` | ltx_8gb | kokoro |
-| `otr_8gb_fastwan` | fastwan_8gb | kokoro |
-| `otr_8gb_ltx` | ltx_8gb | kokoro |
-| `otr_8gb_wan` | wan_ti2v | kokoro |
-| `otr_amd8_rocm` | still_motion | kokoro |
 | `otr_amd_still` | still_motion | kokoro |
-| `otr_nvidia_8gb_h3` | minimax_h3_video | kokoro |
 
 </details>
 
-## 10-15 GB  --  6 experimental profile(s), 5 shipping
+## 10-15 GB  --  4 experimental profile(s), 4 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -103,111 +91,29 @@ Video engines they select: `fastwan_8gb`, `ltx_8gb`, `minimax_h3_video`, `still_
 | `otr_mac16_low` | viz_camera | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
 | `otr_mac16_still` | still_motion | kokoro | stable_audio_3 | sd15 | `shipping` | missing exact owner |
 | `otr_mac16_video` | ltx098_low_video | kokoro | stable_audio_3 | sd15 | `shipping` | missing exact owner |
-| `otr_mac_mps` | viz_camera | kokoro | stable_audio_3 | sd15 | `shipping` | complete; Python <=3.13 |
 
-<details><summary>1 draft profile(s) here -- not vouched for</summary>
-
-Video engines they select: `wan_ti2v`
-
-| profile | video | voice |
-|---|---|---|
-| `otr_nv40_12gb` | wan_ti2v | kokoro |
-
-</details>
-
-## 16 GB+  --  78 experimental profile(s), 38 shipping
+## 16 GB+  --  7 experimental profile(s), 6 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
-| `16gb_full` | viz_camera | kokoro | stable_audio_3 | lumina_image | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_animatediff` | animatediff15_v3_haunted_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_16gb_foley` | ltx25_native_foley_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_low` | viz_camera | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
+| `otr_16gb_mime` | ltx25_native_mime_16gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 | `otr_16gb_still` | still_motion | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_fastwan` | fastwan_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_humo` | humo | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_g4_ltx_8gb` | ltx_8gb | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_g4_ltx_audio_in` | ltx_audio_in | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_ltx_video` | ltx_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_g4_wan_ti2v` | wan_ti2v | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_h3_low_audio_in` | h3_low_audio_in | kokoro | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_h3_low_video` | h3_low_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_ltx25_high_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_upscale_ship` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_animatediff15_v3_haunted_video` | animatediff15_v3_haunted_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_fastwan` | fastwan_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_humo` | humo | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_humo_14b_169` | humo_14B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_humo_1_7b` | humo_1.7B | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_humo_1_7b_169` | humo_1.7B_169 | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; manual tier; Python <=3.13 |
-| `otr_w45_ltx25_video` | ltx25_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_ltx_8gb` | ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_ltx_audio_in` | ltx_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_ltx_video` | ltx_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_mesh_stage` | mesh_stage | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | missing exact owner |
-| `otr_w45_minimax_h3_audio_in` | h3_low_audio_in | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_w45_minimax_h3_video` | h3_low_video | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | operator-only files; Python <=3.13 |
-| `otr_w45_razzle_ltx_8gb` | razzle_ltx_8gb | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_still_flat` | still_flat | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_still_motion` | still_motion | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_still_pan` | still_pan | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_still_word` | still_word | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_viz_camera` | viz_camera | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_viz_green` | viz_green | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
-| `otr_w45_wan_ti2v` | wan_ti2v | indextts2 | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
+| `otr_16gb_video` | ltx25_high_video | kokoro | stable_audio_3 | z_image_turbo | `shipping` | complete; Python <=3.13 |
 
-<details><summary>40 draft profile(s) here -- not vouched for</summary>
+<details><summary>1 draft profile(s) here -- not vouched for</summary>
 
-Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`, `google_veo_video`, `h3_low_video`, `humo`, `ltx25_high_video`, `ltx25_native_foley_24gb`, `ltx25_native_mime_24gb`, `ltx_audio_in`, `ltx_video`, `still_flat`, `still_motion`, `still_pan`, `still_word`, `wan22_high_video`, `wan_ti2v`
+Video engines they select: `ltx25_native_foley_24gb`
 
 | profile | video | voice |
 |---|---|---|
-| `google_omni_all` | google_omni_video | google_tts |
-| `google_omni_media` | google_omni_video | kokoro |
-| `google_veo_all` | google_veo_video | google_tts |
-| `google_veo_media` | google_veo_video | kokoro |
-| `otr_16gb_ltx_audio_in` | ltx_audio_in | kokoro |
-| `otr_16gb_ltx_video` | ltx_video | kokoro |
-| `otr_24gb_native_audio_in` | ltx25_native_foley_24gb | kokoro |
 | `otr_24gb_native_foley` | ltx25_native_foley_24gb | kokoro |
-| `otr_24gb_native_mime` | ltx25_native_mime_24gb | kokoro |
-| `otr_5080_haunted_12b_overnight` | animatediff15_v3_haunted_video | kokoro |
-| `otr_amd16_rocm` | still_motion | kokoro |
-| `otr_ghost_signal_v3_haunted` | animatediff15_v3_haunted_video | indextts2 |
-| `otr_rot_h3_lumina` | h3_low_video | indextts2 |
-| `otr_rot_humo_lumina` | humo | indextts2 |
-| `otr_rot_ltx25_video_lumina` | ltx25_high_video | indextts2 |
-| `otr_rot_tts_ann_chatterbox` | ltx25_high_video | indextts2 |
-| `otr_rot_tts_ann_dia` | ltx25_high_video | indextts2 |
-| `otr_rot_tts_bark` | ltx25_high_video | bark |
-| `otr_rot_tts_chatterbox` | ltx25_high_video | chatterbox |
-| `otr_rot_tts_dia` | ltx25_high_video | dia |
-| `otr_rot_tts_kokoro` | ltx25_high_video | kokoro |
-| `otr_rot_wan_ideogram4` | wan_ti2v | indextts2 |
-| `otr_rot_wan_lumina` | wan_ti2v | indextts2 |
-| `otr_runpod_starter` | wan22_high_video | indextts2 |
-| `otr_sbcov_5` | still_flat | indextts2 |
-| `otr_sd15_stills` | still_flat | indextts2 |
-| `otr_soak_llmsweep_01` | still_pan | indextts2 |
-| `otr_soak_llmsweep_02` | still_motion | indextts2 |
-| `otr_soak_llmsweep_03` | still_flat | indextts2 |
-| `otr_soak_llmsweep_04` | still_word | indextts2 |
-| `otr_soak_llmsweep_05` | still_pan | indextts2 |
-| `otr_soak_llmsweep_06` | still_motion | indextts2 |
-| `otr_soak_llmsweep_07` | still_flat | indextts2 |
-| `otr_soak_still_flat_flux_gen1` | still_flat | indextts2 |
-| `otr_soak_still_flat_z_image_turbo` | still_flat | indextts2 |
-| `otr_soak_still_motion_lumina_image` | still_motion | indextts2 |
-| `otr_soak_still_pan_flux_gen1` | still_pan | indextts2 |
-| `otr_soak_still_pan_ideo` | still_pan | indextts2 |
-| `otr_soak_still_word_z_image_turbo` | still_word | indextts2 |
-| `otr_upscale_ltx_probe` | ltx_video | indextts2 |
 
 </details>
 
-## unstated  --  9 experimental profile(s), 5 shipping
+## unstated  --  5 experimental profile(s), 5 shipping
 
 | profile | video | voice | music | image | confidence | install recipe |
 |---|---|---|---|---|---|---|
@@ -216,19 +122,6 @@ Video engines they select: `animatediff15_v3_haunted_video`, `google_omni_video`
 | `otr_cloud_low` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_1act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
 | `otr_cloud_low_5act` | cloud_vidu_q2_pro_fast_720p | cloud_elevenlabs | sonilo | cloud_luma_photon_flash | `shipping` | missing exact owner |
-
-<details><summary>4 draft profile(s) here -- not vouched for</summary>
-
-Video engines they select: `cloud_wan_i2v_audio`, `google_veo_video`, `still_motion`
-
-| profile | video | voice |
-|---|---|---|
-| `cpu_floor` | still_motion | kokoro |
-| `google_veo_low_1act` | google_veo_video | google_tts |
-| `google_veo_low_3act` | google_veo_video | google_tts |
-| `otr_cloud_lanes` | cloud_wan_i2v_audio | cloud_elevenlabs |
-
-</details>
 
 ## Voice engines
 
@@ -256,10 +149,9 @@ There is currently no separate 24/32 GB machine key or heavy-rental profile. Mor
 
 * **8 GB NVIDIA (RTX 4060, 3070, 2080)** on RTX 4060 8 GB -- 11 episode(s), 2026-09-13. Scope: six episodes through the E2B writer, AnimateDiff video, kokoro voices and musicgen (2026-08-29) plus four more on 2026-09-13, one for each 8 GB graph that ships -- otr_8gb_low, otr_8gb_still, otr_8gb_video and otr_8gb_animatediff, every one an act-count-1 episode published to obs on the physical card. Evidence: docs/4060_DRILL_LOG.md steps 7-19 (five of five banks published); signal_lost_the_ledger_of_shadows_20260902_134447 (obs, 37 min, RESULT SUCCESS + obs_publish OK), docs/ship-audit-2026-09-01/4060_CLEANROOM.md PROOF B; docs/4060_DRILL_LOG.md 2026-09-13 (shipping_set_20260913_045924, three filenames and byte counts verified on disk; the animatediff re-test at 14:04 verified as D:\output\otr\obs\the_strangling_flicker_20260913_140440__rfrc__adhv__none__koko__orig__q354b__mgen_final.mp4)
 * **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX 5080 16 GB -- 45 episode(s), 2026-08-31. Scope: published episodes across multiple engine/profile tuples; not proof of the current row as one exact tuple. Evidence: continuous overnight 5-act loops published to otr/obs
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff haunted-profile episode; not the current Wan tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: LTX-2b episode with the z_image bf16 image path exercised; not the current Wan tuple. Evidence: ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute.
-* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: Wan 2.2 TI2V episode; current video family, but the receipt does not certify every other field of the current row. Evidence: wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here.
+* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-30. Scope: AnimateDiff haunted-profile episode; not the current row tuple. Evidence: 1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK
+* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX PRO 4000 Blackwell 24 GB (rented) -- 1 episode(s), 2026-08-31. Scope: AnimateDiff haunted-profile episode; not the current row tuple. Evidence: animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality.
+* **16 GB or more NVIDIA (RTX 5080, 3090, 4090, A4500)** on RTX A4500 20 GB (rented, Ampere sm_86) -- 1 episode(s), 2026-09-01. Scope: LTX-2b episode with the z_image bf16 image path exercised; not the current row tuple. Evidence: ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute.
 
 ## Measured peaks, with their conditions
 

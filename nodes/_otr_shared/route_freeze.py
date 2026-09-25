@@ -16,7 +16,7 @@ mirrors -- ``otr_meta_brief_image_prompt._effective_prompt_engine_for_role``,
 ``otr_image_gen_dispatcher._effective_video_engine_for_role`` /
 ``_effective_engine_after_force_map``, and ``otr_shot_lock``'s nested
 ``_effective_cast_time_engine``. TWO of the mirrors hard-coded the redirect
-target as the bare literal ``"ltx_audio_in"`` instead of reading
+target as a bare literal instead of reading
 ``render_driver._NEVER_HUMO_REDIRECT_ENGINE``, and TWO of them SWALLOWED a
 malformed force map that the render path treats as terminal. Four copies of one
 routing rule, disagreeing about both the target and the failure policy, is the

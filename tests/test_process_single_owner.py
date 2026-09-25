@@ -21,13 +21,13 @@ catch an error.
 
 It is a shrinking named-set ratchet for the same reason the env guard is: the
 migration runs over several commits across two boxes, so the guard ships first
-and carries the not-yet-migrated files by name. See ``tests/fixtures/ratchet.py``.
+and carries the not-yet-migrated files by name. See ``tests/_support/ratchet.py``.
 """
 from __future__ import annotations
 
 import ast
 
-from tests.fixtures.ratchet import REPO, assert_ratchet, scan
+from tests._support.ratchet import REPO, assert_ratchet, scan
 
 NODES = REPO / "nodes"
 OWNER = NODES / "_otr_shared" / "proc.py"

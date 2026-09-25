@@ -201,13 +201,6 @@ def _effective_canvas(engine, name):
             ("cloud_", "google_")):
         return "n/a -- renders remotely", "see `resolution` column"
 
-    # `ltx_audio_in` resolves its canvas in the driver rather than declaring it
-    # (the O1 judgment scoped it that way until a general resolver lands), and
-    # the value depends on whether the talking register is active.
-    if name == "ltx_audio_in":
-        return ("832x480 talking / 512x288 otherwise",
-                "driver env branch OTR_LTX_AV_RENDER_CANVAS")
-
     # The driver's own family branch: face families keep the portrait default,
     # everything else is given the landscape composite canvas.
     family = str(_get(engine, "family", "") or "")

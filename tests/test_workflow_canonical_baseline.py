@@ -25,7 +25,7 @@ from pathlib import Path
 
 import pytest
 
-from tests.fixtures.writer_slots import value
+from tests._support.writer_slots import value
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -90,7 +90,7 @@ class TestWriterCanonicalModelSlots:
             "may have drifted"
         )
         # Widget order per OTR_LedgerScriptWriter.INPUT_TYPES -- resolved BY
-        # NAME via tests/fixtures/writer_slots.value(), never by a literal
+        # NAME via tests/_support/writer_slots.value(), never by a literal
         # index. The absolute order is pinned once, in
         # tests/test_openrouter_slot_widgets_s2.py::_EXPECTED_INPUT_ORDER;
         # this test only needs that creative_writing_model and

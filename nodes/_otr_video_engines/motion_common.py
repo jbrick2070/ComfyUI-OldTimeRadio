@@ -272,13 +272,14 @@ class VramPeakProbe:
 # render within the live VRAM budget from a ZERO-COST mem_get_info read + a cost
 # model -- NEVER react-to-OOM (a CUDA OOM inside ComfyUI's long-lived process
 # corrupts the caching allocator, so OOM is a bug to AVOID, never a control
-# signal). Replaces the wan_ti2v hard 17-frame "8GB floor" that froze every clip
-# to 0.68s. Pure given its inputs (free VRAM is read by the caller and passed in),
+# signal). Replaced a hard 17-frame "8GB floor" that froze every clip to
+# 0.68s. Pure given its inputs (free VRAM is read by the caller and passed in),
 # so the math is CPU-testable without a GPU.
 # --------------------------------------------------------------------------- #
 
-#: Telemetry reference resolution the per-frame cost is measured at (wan_ti2v
-#: render-phase peak 10277 MB @ 17 frames @ 1472x832 -> 7000 + 185*17 ~= 10145).
+#: Telemetry reference resolution the per-frame cost is measured at (a 5B video
+#: lane's render-phase peak, 10277 MB @ 17 frames @ 1472x832 -> 7000 + 185*17
+#: ~= 10145).
 _FRAME_COST_REF_PIXELS = 1472 * 832
 
 #: Per-engine VRAM cost model SEED: ``vram_mb ~= overhead_mb + per_frame_mb *
@@ -287,48 +288,15 @@ _FRAME_COST_REF_PIXELS = 1472 * 832
 #: ``per_frame`` is the activation/decode cost that scales with pixel area. Refine
 #: from observed peaks; a new engine without a row uses :data:`_DEFAULT_FRAME_COST`.
 #: Globally env-overridable via OTR_VIDEO_COST_OVERHEAD_MB / OTR_VIDEO_COST_PER_FRAME_MB.
-#: FITTED FOR TILED DECODE, AND wan_ti2v NO LONGER DECODES TILED (lane 6,
-#: 2026-08-21). Four points, same fixture and seed, crowd @ 832x480, each on its
-#: own freshly booted server so nothing inherited a cache or residency:
 #:
-#:              17 frames      97 frames     slope
-#:   tiled      12,555 MiB     12,734 MiB    +179  -- FLAT
-#:   untiled    14,699 MiB     14,526 MiB    -173  -- FLAT
-#:
-#: THREE THINGS FOLLOW, and none of them was expected.
-#:
-#: 1. BOTH MODES ARE FLAT WITH CLIP LENGTH. The v1 recipe froze tiling ON citing
-#:    "tiled holds the peak FLAT across clip length where untiled climbs with
-#:    it". That was the ltx tier's measurement -- the v1 comment says so -- and
-#:    on THIS adapter untiled does not climb either. Tiling buys a flat
-#:    ~1.8-2.1 GB at every length, not a slope.
-#:
-#: 2. THE ``per_frame`` TERM IS FICTION HERE. 185 at the reference resolution is
-#:    ~60 MB/frame at 832x480, i.e. +5,849 MB across 97 frames. The measured
-#:    slope is ~0 in BOTH modes. The model's good fit at 97 frames (predicted
-#:    12,849 vs measured 12,734) was arithmetic coincidence: a 7,000 overhead
-#:    plus a fictional slope happened to land on a flat 12,700.
-#:
-#: 3. SO THIS ROW NOW UNDER-PREDICTS THE SHIPPED MODE at long lengths and
-#:    OVER-predicts it at short ones. It is left as-is rather than re-fitted
-#:    because :data:`QUALIFIED_COST_ROWS` is empty, so ``cost_row_may_refuse``
-#:    is False for every engine and this row cannot refuse anything today --
-#:    re-fitting an inert gate on four points at one canvas would be inventing
-#:    precision. A real re-fit wants points across canvases AND the row
-#:    qualified at the same time, which is the "zero-slope hole" note below.
-#:
-#: FOR THE LOW-VRAM PROFILES, stated plainly because it looks alarming and is
-#: not: ``otr_8gb_wan`` / ``otr_nv40_12gb`` / ``otr_amd8_rocm`` all select
-#: wan_ti2v, and untiled needs 14.5 GB. But TILED already needed 12.5 GB, so
-#: none of those envelopes could run this engine before lane 6 either. The bump
-#: makes an already-impossible configuration slightly more impossible; it does
-#: not break a working one. Receipts:
-#: `basline-models/staging/lane6_wan_tiled_decode/VRAM_PROBE.json`.
-FRAME_COST_MODEL = {
-    "wan_ti2v": (7000.0, 185.0),
-}
-#: Fallback cost row for an engine not in :data:`FRAME_COST_MODEL` (use the wan
-#: 5B figure -- the conservative low-VRAM tier the budget mainly guards).
+#: EMPTY, AND THAT CHANGES NOTHING TODAY. :data:`QUALIFIED_COST_ROWS` is empty,
+#: so ``cost_row_may_refuse`` is False for every engine and no row can refuse a
+#: render. The only row this table ever carried belonged to a lane that has been
+#: removed; its figure lives on as :data:`_DEFAULT_FRAME_COST`, which every
+#: engine was already priced at.
+FRAME_COST_MODEL = {}
+#: Fallback cost row for an engine not in :data:`FRAME_COST_MODEL`: a
+#: conservative seed measured on a 5B video lane at the reference resolution.
 _DEFAULT_FRAME_COST = (7000.0, 185.0)
 
 #: Per-engine MOTION floor (4n+1 minimum): the fewest frames of motion a beat may
@@ -352,7 +320,7 @@ _DEFAULT_FRAME_COST = (7000.0, 185.0)
 #: NOTE ``snapped`` CAN fall below the floor: ``quantize_frames_4n1`` applies
 #: ``max_frames`` AFTER the minimum, so a target under the floor stays under it.
 #: LTX has its own decode floor; the generic default is 1.
-FRAME_MOTION_FLOOR = {"wan_ti2v": 17}
+FRAME_MOTION_FLOOR = {}
 _DEFAULT_MOTION_FLOOR = 1
 
 #: Fraction of the usable VRAM the predictor may spend -- head-room for allocator
@@ -434,8 +402,7 @@ def free_vram_mb():
 # UNET loaded cleanly on Metal -- WanTEModel 10835 MB, WanVAE 1344 MB (mps,
 # bf16), then "WAN22 ... loaded completely; 9536.40 MB, full load: True" -- and
 # the machine died at that line. Nothing in the pack objected, because nothing
-# was asking this question. The shipped config for that lane is the 9.37 GB
-# GGUF set (scripts/otr_fetch_lane_weights.py LANE_INFO), not the fp16 one.
+# was asking this question.
 #
 # FAIL-OPEN BY CONSTRUCTION. Every path that cannot get a real number returns
 # None (allow). A false refusal blocks a configuration that works; a false
@@ -821,8 +788,8 @@ def _encoder_is_evicted(engine_name):
         return False
 
     try:
-        # Walk the MRO: fastwan_8gb subclasses wan_ti2v and inherits its graph
-        # runner, so the eviction it relies on is declared in the parent.
+        # Walk the MRO: a subclass inherits its parent's graph runner, so the
+        # eviction it relies on may be declared in the parent.
         for cls in type(eng).__mro__:
             if cls is object:
                 continue
@@ -837,9 +804,9 @@ def _loader_filenames(engine_name):
     """(encoder_basenames, resident_basenames) an adapter will ACTUALLY load.
 
     NOT ``model_requirements``. That field is the S5 wizard's informational
-    asset-id list and its entries are not filenames -- ``wan_ti2v`` declares
-    ``["wan2.2-ti2v-5b"]`` while its loader consumes
-    ``Wan2.2-TI2V-5B-Q5_K_M.gguf``, an umt5 encoder and ``wan2.2_vae.safetensors``.
+    asset-id list and its entries are not filenames -- ``ltx_8gb`` declares
+    ``["ltxv-2b-0.9.8-distilled"]`` while its loader consumes
+    ``ltxv-2b-0.9.8-distilled.safetensors`` and a T5 encoder.
     A cursor review caught the first version of this reading the wizard tokens,
     which meant ``folder_paths`` resolved nothing, which meant the guard
     fail-opened on the ONE engine that had just killed the machine. The tests
@@ -1053,16 +1020,10 @@ class MotionBudgetError(RuntimeError):
 #: difference is not academic -- it is the difference between a guard and a
 #: 268-minute wasted campaign leg.
 #:
-#: ``wan_ti2v`` HAS a row, ``(7000.0, 185.0)``, and that row is DISQUALIFIED in
-#: writing by this repo's own evidence:
-#:   * It refused a real production leg -- "static frame budget 173 ... affordable
-#:     24 frames (free=13481 MB)" -- on an engine that had already shipped.
-#:   * It is wrong in BOTH directions: it under-predicts at 1472x832 (10,145
-#:     predicted vs 12,181-12,614 measured) and over-predicts at 832x480 (11,887
-#:     predicted for 81 frames vs ~6,563 measured).
-#:   * ``_planned_length`` already stopped consulting it for exactly this reason.
-#: At every realistic free-VRAM level it refuses EVERY segment length the
-#: coverage planner produces, including 93 frames at 14,500 MB free.
+#: The seed row this table's lanes were priced with was DISQUALIFIED in writing
+#: by this repo's own evidence: it refused real production legs on an engine
+#: that had already shipped, and it was wrong in BOTH directions -- under-
+#: predicting at 1472x832 and over-predicting at 832x480.
 #:
 #: So an "is there a row?" test admits a row whose own author disqualified it.
 #: The question a refusal must answer is "may this row REFUSE a render?", and
@@ -1071,20 +1032,16 @@ class MotionBudgetError(RuntimeError):
 #: lifecycle -- which the standing ruling requires and no bench may substitute
 #: for.
 #:
-#: This is deliberately a separate, explicit registry rather than deleting the
-#: row: the seed values still document the model's SHAPE for non-enforcing
-#: readers, and a disqualification that is written down teaches more than a
-#: deletion that leaves no trace. DELETING THEM IS ALSO A PROVEN NO-OP --
-#: :data:`_DEFAULT_FRAME_COST` is the byte-identical tuple, so an engine whose
-#: row is removed is priced exactly the same way one second later.
+#: This is deliberately a separate, explicit registry: "may this row refuse?"
+#: and "is there a row?" are different questions, and only the first one is
+#: allowed to stop a render.
 #:
 #: WHAT THIS GATES, PRECISELY (widened 2026-08-13). BOTH refusals, at BOTH
 #: call sites:
 #:   * ``render_driver._assert_beat_affordable`` -- the coverage-planned beat
 #:     boundary, which has asked since it was written;
-#:   * ``compute_real_frame_budget`` -- the STATIC path reached from
-#:     ``eng_wan_ti2v._floor_length``, which did NOT ask until the 45-word
-#:     render gate caught it refusing two live legs on this very row.
+#:   * ``compute_real_frame_budget`` -- the STATIC path, which did NOT ask
+#:     until the 45-word render gate caught it refusing two live legs.
 #: Both the per-frame price and the fixed-overhead floor are enforcement, and
 #: neither is exempt. The overhead half LOOKS defensible -- it is not slope, and
 #: it only bites a card too starved to hold the weights -- but the binding
@@ -1120,15 +1077,6 @@ def cost_row_may_refuse(engine_name) -> bool:
     the borrowed fallback to an enforcing guard, which is the precise failure
     this whole registry exists to prevent. Qualifying a row you have not
     written down is a typo, not a measurement.
-
-    THE ONE HAZARD IN THAT SECOND CONDITION (Sonnet QA, same day), latent while
-    :data:`QUALIFIED_COST_ROWS` is empty and worth knowing before it is not:
-    ``fastwan_8gb``'s row is injected by ``eng_fastwan_8gb`` at IMPORT time, so
-    a caller that imports this module WITHOUT that adapter sees no row and gets
-    False. That direction is fail-OPEN -- no refusal -- which is the current
-    posture anyway, so it cannot surprise a render today. But whoever qualifies
-    ``fastwan_8gb`` must make its row unconditional here, or it will be
-    qualified-but-silent in exactly the isolated runs that would prove it.
     """
     name = str(engine_name or "")
     return name in QUALIFIED_COST_ROWS and name in FRAME_COST_MODEL
@@ -1141,7 +1089,7 @@ def assert_frame_affordable(free_vram_mb_value, frame_count, canvas_w,
     ``_planned_length`` deliberately does not consult the VRAM predictor -- a
     planned segment's length is arithmetic the rest of the beat was built
     around, not a preference. That was survivable while planned segments were
-    rare; with ``wan_ti2v`` now coverage-planned it means the ONLY enforcing
+    rare; once lanes were coverage-planned it meant the ONLY enforcing
     guard was bypassed on the path that does most of the rendering
     (``VramPeakProbe`` samples and never enforces).
 
@@ -1217,21 +1165,18 @@ def compute_real_frame_budget(free_vram_mb_value, target_frame_count,
     # :data:`QUALIFIED_COST_ROWS` disqualifies in writing, and it was the one
     # nobody wired to the authority. ``render_driver._assert_beat_affordable``
     # asks ``cost_row_may_refuse`` and reports "admission NOT enforced"; this
-    # path -- reached from ``eng_wan_ti2v._floor_length`` -- priced frames and
-    # raised anyway. It refused two live 45-word render-gate legs on 2026-08-13,
-    # ``fastwan_8gb`` at 69 frames and ``wan_ti2v`` at 125.
+    # path priced frames and raised anyway. It refused two live 45-word
+    # render-gate legs on 2026-08-13.
     #
-    # WHY NOT SIMPLY DELETE THE TWO SEED ROWS, which is what was asked for
-    # first: deleting them is a PROVEN no-op. ``_cost_model_for`` falls back to
-    # :data:`_DEFAULT_FRAME_COST`, the byte-identical ``(7000.0, 185.0)`` --
-    # ``eng_fastwan_8gb`` says exactly that about its own row. Both legs refuse
-    # identically with the table empty, so the deletion looks like a fix and
-    # changes nothing.
+    # WHY THE TABLE BEING EMPTY IS NOT THE FIX: ``_cost_model_for`` falls back
+    # to :data:`_DEFAULT_FRAME_COST`, the same ``(7000.0, 185.0)``, so an engine
+    # with no row is priced exactly like one with the seed row. Only the
+    # qualification question can stop the refusal.
     #
     # WHY BOTH REFUSALS GO, NOT JUST THE PER-FRAME ONE. The overhead term looks
     # like the defensible half -- it is not slope, and it only bites a card too
     # starved to hold the weights. But the binding NET-NOT-ABSOLUTE provenance
-    # rule (operator 2026-08-11, ``build_video_evidence_manifest.py``) records
+    # rule (operator 2026-08-11) records
     # that ``free_vram_mb()`` reports FREE bytes, which already exclude the
     # resident desktop baseline, while the shipped overhead was derived from an
     # ABSOLUTE peak -- so it double-charges that baseline on every prediction,
@@ -1321,8 +1266,8 @@ class MotionEngineBase:
     **IT MUST BE ON YOUR OWN CLASS.** Dispatch reads
     ``type(engine).__dict__.get("compose_prompt")``, never ``hasattr``. An
     INHERITED formatter is invisible to it, on purpose: these adapters are
-    subclass chains (mime <- foley_plus <- video; h3 silent and h3 audio-in
-    share a base; fastwan subclasses wan), and inheriting a sibling's prompt is
+    subclass chains (the LTX 2.5 tiers <- foley <- video; h3 silent and h3
+    audio-in share a base), and inheriting a sibling's prompt is
     how one lane silently gets another lane's motion. If a variant genuinely
     wants the same words, bind the same function to it explicitly -- sameness
     should be a visible choice, never a default.

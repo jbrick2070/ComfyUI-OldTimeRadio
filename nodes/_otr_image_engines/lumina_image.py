@@ -3,7 +3,7 @@
 A 6th image engine from ``C2_DEP_LICENSE_MATRIX.md`` (the lightweight Apache-2.0
 candidate). It registers EXACTLY like the other image peers, growing the open
 per-role registry. Lumina-Image 2.0 is a NATIVE flow model loaded through
-ComfyUI's own loaders on the protected main venv (not GGUF, not a sidecar): the
+ComfyUI's own loaders on the protected main venv (not a sidecar): the
 split-file recipe is UNETLoader (the 2.6B bf16 diffusion model) + CLIPLoader with
 ``type="lumina2"`` (the Gemma-2 2B text encoder) + VAELoader (the Flux ``ae`` VAE)
 -> ModelSamplingAuraFlow (the AuraFlow/Lumina-2 sigma shift) -> KSampler ->

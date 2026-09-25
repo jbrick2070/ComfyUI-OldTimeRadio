@@ -235,7 +235,7 @@ _HUMO_DEFAULT_UNET = "Wan2_1-HuMo-14B_fp8_e4m3fn_scaled_KJ.safetensors"
 #: DIMENSIONS through ``resolve_row_aspect``. Only the authored layer-2 TEXT
 #: is pinned per file. S2's HuMo cutover is the FOUR hosts-off bookend
 #: role-cells (portrait humo / humo_1.7B x announcer / music, redirected by
-#: ``_enforce_radio_is_host`` to the WIDE ``ltx_audio_in`` that renders them);
+#: ``_enforce_radio_is_host`` to the WIDE audio-in lane that renders them);
 #: with ``OTR_ENABLE_HUMO_HOSTS=1`` a portrait HuMo keeps its portrait still.
 _HUMO_STILL_PLAN = (
     StillPlanRow(kind="scene_open", cardinality="per_beat",
@@ -350,8 +350,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     # docstring); the actual hard gate is render_driver._enforce_radio_is_host,
     # which wires the previously-dormant _otr_speaker_role.is_never_humo_role
     # into real dispatch and redirects any announcer_visual/music_visual +
-    # audio_driven_face pick to ltx_audio_in (the LTX-2.3 audio-in lane already
-    # DEFAULT for those two roles -- see eng_ltx_av.py default_roles).
+    # audio_driven_face pick to render_driver._NEVER_HUMO_REDIRECT_ENGINE.
     roles = ("character_video",)
     default_roles = ()
     required_inputs = ("audio_ref", "init_image")
@@ -453,7 +452,7 @@ class HuMoEngine(_MC.MotionEngineBase):
     def _installed(self):
         """True iff the primary checkpoint exists on disk (no import -- cheap,
         headless-safe). The full MODEL+CLIP+VAE+AUDIO_ENCODER multi-handle load
-        (+ the low/high/gguf tier pick) is the GPU smoke."""
+        (+ the low/high tier pick) is the GPU smoke."""
         return os.path.exists(self._ckpt_path())
 
     # ---- sampler tier (overridable per HuMo tier; the 1.7B downgrade isolates

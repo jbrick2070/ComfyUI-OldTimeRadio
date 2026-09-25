@@ -73,7 +73,6 @@ without that map would play ~4% short.
 | cloud_vidu_q2_pro_fast_720p | provider | image_to_video | wide | 720p (fixed) | 25-250 step 25 | 1-10 s | 25 | soft_reference | yes |
 | cloud_wan_i2v | provider | image_to_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
 | cloud_wan_i2v_audio | provider | audio_conditioned_video | wide | env OTR_CLOUD_WAN_RESOLUTION, default 720P | 50-375 step 25 | 2-15 s | 25 | soft_reference | yes |
-| fastwan_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 17-177 step 4 | 0.68-7.08 s | 25 | strict_first_frame | yes |
 | google_omni_video | provider | text_to_video | wide | 720p (fixed) | 75-250 | 3-10 s | 25 | none | yes |
 | google_veo_video | provider | text_to_video | wide | env OTR_GOOGLE_VEO_RESOLUTION, default 720p | menu: 100, 150, 200 | menu: 4, 6, 8 s | 25 | soft_reference | yes |
 | humo | local | audio_driven_face | portrait | canvas-negotiated (_aspect_plan) | 33-97 step 4 | 1.32-3.88 s | 25 | soft_reference | yes |
@@ -89,8 +88,6 @@ without that map would play ~4% short.
 | ltx25_native_mime_24gb | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx25_video | local | image_to_video | wide | canvas | menu: 97 | menu: 3.88 s | 25 | strict_first_frame | yes |
 | ltx_8gb | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 9-161 step 8 | 0.36-6.44 s | 25 | strict_first_frame | yes |
-| ltx_audio_in | local | audio_conditioned_video | wide | canvas | 9-497 step 8 | 0.36-19.88 s | 25 | soft_reference | yes |
-| ltx_video | local | image_to_video | wide | canvas | 9-169 step 8 | 0.36-6.76 s | 25 | strict_first_frame | yes |
 | mesh_stage | local | image_to_video | wide | canvas | 1.. (no ceiling) | unbounded | canvas | none | yes |
 | minimax_h3_audio_in | local | audio_conditioned_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | soft_reference | yes |
 | minimax_h3_video | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | menu: 129, 146, 164, 182, 200, 217, 235, 253, 270, 288, 306, 323, 341, 359, 377 | menu: 5.16, 5.84, 6.56, 7.28, 8, 8.68, 9.40, 10.12, 10.80, 11.52, 12.24, 12.92, 13.64, 14.36, 15.08 s | 25 | strict_first_frame | yes |
@@ -103,7 +100,6 @@ without that map would play ~4% short.
 | viz_green | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | viz_mxc_cpu | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
 | viz_mxc_mandala | local | abstract | wide | canvas | 1.. (no ceiling) | unbounded | 25 | none | yes |
-| wan_ti2v | local | image_to_video | wide | canvas-negotiated (_aspect_plan) | 17-177 step 4 | 0.68-7.08 s | 25 | strict_first_frame | yes |
 
 ## Inputs and prompt contract
 
@@ -119,7 +115,6 @@ without that map would play ~4% short.
 | cloud_vidu_q2_pro_fast_720p | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v | init_image, text_prompt | text_prompt REQUIRED |
 | cloud_wan_i2v_audio | init_image, audio_ref, text_prompt | text_prompt REQUIRED |
-| fastwan_8gb | init_image | text_prompt OPTIONAL (sent when present) |
 | google_omni_video | text_prompt | text_prompt REQUIRED |
 | google_veo_video | text_prompt | text_prompt REQUIRED |
 | humo | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
@@ -135,8 +130,6 @@ without that map would play ~4% short.
 | ltx25_native_mime_24gb | text_prompt, init_image | text_prompt REQUIRED |
 | ltx25_video | text_prompt, init_image | text_prompt REQUIRED |
 | ltx_8gb | init_image | text_prompt OPTIONAL (sent when present) |
-| ltx_audio_in | text_prompt, audio_ref, init_image | text_prompt REQUIRED |
-| ltx_video | text_prompt, init_image | text_prompt REQUIRED |
 | mesh_stage | init_image | no text input |
 | minimax_h3_audio_in | audio_ref, init_image | text_prompt OPTIONAL (sent when present) |
 | minimax_h3_video | init_image | text_prompt OPTIONAL (sent when present) |
@@ -149,7 +142,6 @@ without that map would play ~4% short.
 | viz_green | audio_ref | no text input |
 | viz_mxc_cpu | - | no text input |
 | viz_mxc_mandala | - | no text input |
-| wan_ti2v | init_image | text_prompt OPTIONAL (sent when present) |
 
 ## Still requirements
 
@@ -169,7 +161,6 @@ the engine's own `aspect` column above.
 | cloud_vidu_q2_pro_fast_720p | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | cloud_wan_i2v_audio | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| fastwan_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_omni_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | google_veo_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | humo | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/always |
@@ -185,8 +176,6 @@ the engine's own `aspect` column above.
 | ltx25_native_mime_24gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx25_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always |
 | ltx_8gb | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
-| ltx_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never; portrait/wide/when_engine_talking; portrait/inherit_engine/when_engine_talking |
-| ltx_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | mesh_stage | mesh_fodder/wide/always; scene_background_plate/wide/always; portrait/inherit_engine/never |
 | minimax_h3_audio_in | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 | minimax_h3_video | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
@@ -199,7 +188,6 @@ the engine's own `aspect` column above.
 | viz_green | none |
 | viz_mxc_cpu | none |
 | viz_mxc_mandala | none |
-| wan_ti2v | scene_open/wide/always; scene_beat/wide/always; scene_character/wide/always; portrait/inherit_engine/never |
 
 ## Effective render canvas
 
@@ -221,7 +209,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | cloud_vidu_q2_pro_fast_720p | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v | n/a -- renders remotely | see `resolution` column |
 | cloud_wan_i2v_audio | n/a -- renders remotely | see `resolution` column |
-| fastwan_8gb | 832x480 | declared |
 | google_omni_video | n/a -- renders remotely | see `resolution` column |
 | google_veo_video | n/a -- renders remotely | see `resolution` column |
 | humo | 480x832 | engine _native_dims |
@@ -237,8 +224,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | ltx25_native_mime_24gb | 832x480 | declared |
 | ltx25_video | 832x480 | declared |
 | ltx_8gb | 512x288 | declared |
-| ltx_audio_in | 1024x576 | declared |
-| ltx_video | 1024x576 | declared |
 | mesh_stage | 1472x832 | declared |
 | minimax_h3_audio_in | 864x480 | declared |
 | minimax_h3_video | 864x480 | declared |
@@ -251,7 +236,6 @@ means the adapter sizes itself and IGNORES the request canvas.
 | viz_green | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_cpu | 1472x832 | shared landscape (by design for this family) |
 | viz_mxc_mandala | 1472x832 | shared landscape (by design for this family) |
-| wan_ti2v | 832x480 | declared |
 
 ## Multi-clip behaviour at a 442-frame beat
 
@@ -277,7 +261,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | cloud_vidu_q2_pro_fast_720p | jump | 2: 250, 200 | 450 | 442 | 1 |
 | cloud_wan_i2v | jump | 2: 375, 75 | 450 | 442 | 1 |
 | cloud_wan_i2v_audio | jump | 2: 375, 75 | 450 | 442 | 1 |
-| fastwan_8gb | chain | 3: 177, 177, 93 | 447 | 442 | 0 |
 | google_omni_video | jump | 2: 250, 192 | 442 | 442 | 1 |
 | google_veo_video | jump | 3: 200, 150, 100 | 450 | 442 | 2 |
 | humo | jump | 5: 97, 97, 97, 97, 57 | 445 | 442 | 0 |
@@ -293,8 +276,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | ltx25_native_mime_24gb | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx25_video | chain | 5: 97, 97, 97, 97, 97 | 485 | 442 | 0 |
 | ltx_8gb | chain | 3: 161, 161, 129 | 451 | 442 | 0 |
-| ltx_audio_in | single | 1: 449 | 449 | 442 | 0 |
-| ltx_video | chain | 3: 169, 169, 113 | 451 | 442 | 0 |
 | mesh_stage | single | 1: 442 | 442 | 442 | 0 |
 | minimax_h3_audio_in | jump | 2: 323, 129 | 452 | 442 | 1 |
 | minimax_h3_video | chain | 2: 323, 129 | 452 | 442 | 0 |
@@ -307,7 +288,6 @@ JUMP plan on a still-consuming lane ever re-mints.
 | viz_green | single | 1: 442 | 442 | 442 | 0 |
 | viz_mxc_cpu | single | 1: 442 | 442 | 442 | 0 |
 | viz_mxc_mandala | single | 1: 442 | 442 | 442 | 0 |
-| wan_ti2v | chain | 3: 177, 177, 93 | 447 | 442 | 0 |
 
 ## Frame caps and the evidence behind them
 
@@ -330,7 +310,6 @@ and it read exactly like a measured number until someone looked.
 | cloud_vidu_q2_pro_fast_720p | - | contract max | none cited |
 | cloud_wan_i2v | - | contract max | none cited |
 | cloud_wan_i2v_audio | - | contract max | none cited |
-| fastwan_8gb | - | contract max | docs/2026-07-31-arm-c-fastwan-BUILD-SPEC.md |
 | google_omni_video | - | contract max | none cited |
 | google_veo_video | - | contract max | none cited |
 | humo | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
@@ -346,8 +325,6 @@ and it read exactly like a measured number until someone looked.
 | ltx25_native_mime_24gb | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx25_video | - | contract max | docs/PROD_BUG_LOG.md |
 | ltx_8gb | - | contract max | docs/2026-07-20-OTR-video-tiers |
-| ltx_audio_in | - | contract max | **MISSING: docs/2026-07-02-canonical-ia2v** |
-| ltx_video | - | contract max | docs/evidence |
 | mesh_stage | - | contract max | **MISSING: docs/2026-06-11-comfy-native-3d-options** |
 | minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | minimax_h3_video | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
@@ -360,11 +337,10 @@ and it read exactly like a measured number until someone looked.
 | viz_green | - | contract max | **MISSING: docs/2026-06-18-coverage-arch-wiring** |
 | viz_mxc_cpu | - | contract max | none cited |
 | viz_mxc_mandala | - | contract max | **MISSING: docs/2026-06-30-viz-rainbow** |
-| wan_ti2v | - | contract max | none cited |
 
 ## Counts
 
-* registered engine names: **41**
+* registered engine names: **37**
 * provider-side: **9**
-* local: **32**
-* can chain (strict_first_frame): **14**
+* local: **28**
+* can chain (strict_first_frame): **11**

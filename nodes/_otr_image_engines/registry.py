@@ -119,7 +119,7 @@ CAPABILITIES = {
         "needs_fp8_te": False, "needs_fp4_te": False,
         "practical_without_gpu": False, "sidecar_conditional": False,
         "model_requirements": ["flux.1-dev"]},
-    # flux2_klein CAPABILITIES row REMOVED 2026-09-17: Klein GGUF stills ripped
+    # flux2_klein CAPABILITIES row REMOVED 2026-09-17: Klein stills ripped
     # from the shipping image surface; the registry-consistency invariant
     # forbids a row without a registered engine.
     # hidream_i1 CAPABILITIES row REMOVED 2026-06-29 (C3): the dark scaffold

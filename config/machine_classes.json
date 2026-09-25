@@ -24,26 +24,6 @@
       "evidence": "docs/4060_DRILL_LOG.md steps 7-19"
     },
     {
-      "engine": "wan_ti2v",
-      "label": "Wan 2.2 TI2V-5B",
-      "level": "PROVEN",
-      "hardware": "RTX A4500, 20 GB, Ampere",
-      "date": "2026-09-01",
-      "episodes": 1,
-      "scope": "full published OTR episode",
-      "evidence": "signal_lost_gleaming_in_ruby_20260901_030818; 1 act; 3949 s; obs_publish OK"
-    },
-    {
-      "engine": "wan_ti2v",
-      "label": "Wan 2.2 TI2V-5B",
-      "level": "PROVEN",
-      "hardware": "RTX 5080 Laptop, 16 GB, Blackwell",
-      "date": "2026-08-23",
-      "episodes": 1,
-      "scope": "full published OTR episode from profile otr_g4_wan_ti2v; 17 Wan clips",
-      "evidence": "signal_lost_the_weeping_valve_20260823_001152; docs/HANDOFF_LOG.md lines 1059-1062; 1920x1080, 25 fps, 166.6 s, obs output"
-    },
-    {
       "engine": "minimax_h3_video",
       "label": "MiniMax H3",
       "level": "PROVEN",
@@ -190,10 +170,10 @@
       "platform": "any",
       "writer": "gemma-4-12b",
       "writer_model": "google/gemma-4-12b-it",
-      "note": "One 16 GB+ class. Wan is the public default because it published on named Blackwell and Ampere hardware; that establishes cross-architecture reach, not proof for every GPU model or for this entire row as one exact tuple. RTX 3090/4090 remain candidates until they have named receipts. LTX 2.5 is separately proven on the RTX 5080 only. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
-      "proof_summary": "**COMPONENTS PROVEN** -- Wan on named Ampere/Blackwell hardware; exact row tuple and unlisted cards unproven",
+      "note": "One 16 GB+ class. The recommended video is LTX 2.5 on the mix4x8 DiT, the same weight the 16 GB foley lane loads (stock ComfyUI loaders, text encoder pinned to the CPU); that weight has rendered clips on the RTX 5080, which is a measurement, not a published episode on this exact row. RTX 3090/4090 remain candidates until they have named receipts. On Python 3.13 the Kokoro voice runs through kokoro-onnx on the CPU (same voices); on 3.12 through the torch package.",
+      "proof_summary": "**COMPONENTS MEASURED** -- LTX 2.5 mix4x8 clips on the RTX 5080; exact row tuple and unlisted cards unproven",
       "key": "16gb",
-      "video": "wan22_high_video",
+      "video": "ltx25_high_video",
       "char_voice": "kokoro",
       "writer_ceiling_gb": 14.5,
       "proven": [
@@ -208,29 +188,22 @@
           "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
           "episodes": 1,
           "date": "2026-08-30",
-          "scope": "AnimateDiff haunted-profile episode; not the current Wan tuple",
+          "scope": "AnimateDiff haunted-profile episode; not the current row tuple",
           "evidence": "1-act, 8 clips, 2058 s, peak 15,990 MB, obs_publish OK"
         },
         {
           "hardware": "RTX PRO 4000 Blackwell 24 GB (rented)",
           "episodes": 1,
           "date": "2026-08-31",
-          "scope": "AnimateDiff haunted-profile episode; not the current Wan tuple",
+          "scope": "AnimateDiff haunted-profile episode; not the current row tuple",
           "evidence": "animatediff + sci_fi_radio + scifi_news_pro, 1-act: 187.6 s, 1920x1080 h264 + aac, 3621 s render, obs_publish OK. DRAM canary tripped at 1.64 GB available and the blend proceeded anyway -- advisory, not a degrade; the published episode is full quality."
         },
         {
           "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
           "episodes": 1,
           "date": "2026-09-01",
-          "scope": "LTX-2b episode with the z_image bf16 image path exercised; not the current Wan tuple",
+          "scope": "LTX-2b episode with the z_image bf16 image path exercised; not the current row tuple",
           "evidence": "ltx_8gb (LTX-2b-0.9.8-distilled): 9 beats -> 1100 frames, 63.8 s 1920x1080 h264 + aac, 1925 s, obs_publish OK. First meaty video-diffusion lane proven on a NON-Blackwell card. Same run confirmed the architecture-aware image lane: compute_cap 86 selected z_image bf16 over nvfp4, which this card cannot execute."
-        },
-        {
-          "hardware": "RTX A4500 20 GB (rented, Ampere sm_86)",
-          "episodes": 1,
-          "date": "2026-09-01",
-          "scope": "Wan 2.2 TI2V episode; current video family, but the receipt does not certify every other field of the current row",
-          "evidence": "wan_ti2v (Wan2.2-TI2V-5B GGUF): RESULT SUCCESS in 3949 s, obs_publish OK. Second meaty video lane on a NON-Blackwell card. Required three installs the provisioner now performs: the ComfyUI-GGUF pack, the gguf wheel, and sentencepiece+protobuf -- the last two listed upstream as '# optional - tokenizer' and not optional here."
         }
       ]
     },

@@ -225,7 +225,7 @@ def _server_visible_model_names(schemas) -> set:
 #: checkable against /object_info; anything else is a logical or repo id and is
 #: not. Deliberately a closed list rather than "contains a dot": `wan2.2-ti2v-5b`
 #: and `ltx-2.3-22b-dev` both contain dots and are ids, not files.
-_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".pth", ".pt", ".bin", ".gguf",
+_WEIGHT_SUFFIXES = (".safetensors", ".ckpt", ".pth", ".pt", ".bin",
                     ".onnx", ".sft")
 
 
@@ -241,9 +241,9 @@ def classify_timeout(running: int, pending: int) -> str:
     them is the defect this exists to prevent (2026-08-23):
 
       ``still_running``  the observation window closed while the render carried
-                         on. `--timeout` defaults to 5400s and a full wan_ti2v
-                         episode on the 16 GB box exceeds it, so this is the
-                         COMMON case for the slowest lane -- and it is not a
+                         on. `--timeout` defaults to 5400s and a full episode
+                         on the slowest video lane can exceed it, so this is
+                         the COMMON case for that lane -- and it is not a
                          failure at all. The episode still publishes.
       ``unknown``        the queue could not be read (``queue_snapshot`` returns
                          -1/-1 best-effort). Absence of evidence, reported as
@@ -426,9 +426,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--run-label", default=None, dest="run_label",
                         help="a name for THIS RUN, echoed to the CONSOLE "
                              "only -- this script writes no receipt; a "
-                             "wrapping harness captures the echo and "
-                             "builds its own, as otr_gpu_soak_matrix.py "
-                             "does. Deliberately does NOT touch "
+                             "wrapping harness can capture the echo and "
+                             "build its own. Deliberately does NOT touch "
                              "episode_title, so the writer still names the "
                              "episode and the title card shows the story's "
                              "name rather than your harness label.")
@@ -533,8 +532,8 @@ def main(argv: list[str] | None = None) -> int:
     if status == "TIMEOUT":
         # A TIMEOUT HERE IS ABOUT THIS PROCESS, NOT ABOUT THE RENDER, and saying
         # so is the whole point of this branch (2026-08-23). `--timeout`
-        # defaults to 5400s; a full wan_ti2v episode on the 16 GB box exceeds
-        # that, so the observation window closes while the server is still at
+        # defaults to 5400s; a full episode on the slowest video lane can
+        # exceed that, so the observation window closes while the server is still at
         # 98% GPU happily rendering beat 34. The old line printed
         # "RESULT TIMEOUT" and exited 1 for BOTH that case and a genuinely dead
         # render -- two opposite situations, one indistinguishable message, and

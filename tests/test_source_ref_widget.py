@@ -5,7 +5,7 @@ fetchers consume it in later chunks; until then blank is byte-stable and
 nonblank is just preserved for downstream fail-loud consumers.
 
 Every position in this file is resolved BY NAME through
-``tests/fixtures/writer_slots``. Nothing here pins an absolute widget index,
+``tests/_support/writer_slots``. Nothing here pins an absolute widget index,
 because the writer's layout has shifted under this file three times and each
 shift was silent: the saved values around `source_ref` are mostly ``""``, so
 an assertion that slid onto its neighbour kept passing and stopped checking.
@@ -25,7 +25,7 @@ from nodes.OTR_LedgerScriptWriter import (  # noqa: E402
     OTR_LedgerScriptWriter,
     _resolve_inputs,
 )
-from tests.fixtures.writer_slots import (  # noqa: E402
+from tests._support.writer_slots import (  # noqa: E402
     assert_relative_order,
     value,
 )

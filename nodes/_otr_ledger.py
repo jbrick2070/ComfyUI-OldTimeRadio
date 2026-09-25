@@ -29,7 +29,6 @@ value.
 """
 from __future__ import annotations
 
-import datetime
 import hashlib
 import json
 import logging
@@ -113,8 +112,8 @@ Lineage:
                      meta.soak_cap                    (dict)
                      meta.process_runs[]              (append-only list of
                                                        {pid, started_at})
-                     meta.audit_verdict               (dict, set by
-                                                       audit_otr_full_run.py)
+                     meta.audit_verdict               (dict, legacy; no
+                                                       live writer)
                    Plus: save_ledger_safe is now ATOMIC via tempfile +
                    os.replace (BUG-LOCAL-127 catch from same round-robin).
                    Soft-deprecated (still written by older producers, do
@@ -129,9 +128,8 @@ Lineage:
   l4-2026-08-07 -- REQUIRED, not additive: a provenance-owned ledger must
                    carry meta.spoken_coda_source, the receipt naming which
                    fact the episode actually SPOKE. l4 is what makes that
-                   requirement enforceable: scripts/audit_spoken_citations.py
-                   demands the receipt on any ledger newer than the legacy
-                   set, and until this bump every live ledger sorted as
+                   requirement enforceable: an audit can demand the receipt
+                   on any ledger newer than the legacy set, and until this bump every live ledger sorted as
                    legacy so the requirement never fired. A dropped receipt
                    was indistinguishable from history, which is how a coda
                    with zero readers survived for months.
@@ -474,9 +472,8 @@ def save_ledger_safe(path: Path, ledger: dict) -> bool:
     try:
         # STAMP THE CURRENT VERSION, OR PRESERVE A FOREIGN ONE. This used to
         # restamp unconditionally, which is only safe while nothing older is
-        # ever written back -- and six post-hoc tools do exactly that over
-        # EXISTING episodes (audit_otr_full_run, audio_enhance,
-        # otr_master_audio_mux, scene_sequencer, otr_video_render_batch,
+        # ever written back -- and post-hoc tools do exactly that over
+        # EXISTING episodes (audio_enhance, otr_master_audio_mux, scene_sequencer, otr_video_render_batch,
         # otr_post_upscale_procgen_blend). A read-only corpus measurement found
         # 43 of 48 provenance-carrying ledgers predating the spoken-coda
         # receipt: one routine write-back would have promoted each of them past
@@ -1053,35 +1050,6 @@ def append_transition(
 
 
 
-def stamp_meta_audit_verdict(
-    ledger: dict,
-    pass_: bool,
-    fail_patterns_hit: Optional[list[str]] = None,
-    ts: Optional[str] = None,
-) -> None:
-    """Stamp ``meta.audit_verdict`` after ``audit_otr_full_run.py``
-    finishes. Schema: ``{pass: bool, ts: str, fail_patterns_hit: list[str]}``.
-
-    Writers should run this LAST, after every other ledger field
-    has been stamped, so the audit reflects the final state of the
-    run. Re-running the audit on a previously-audited ledger
-    overwrites this block (idempotent).
-    """
-    try:
-        if ts is None:
-            ts = datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
-        meta = ledger.setdefault("meta", {})
-        meta["audit_verdict"] = {
-            "pass": bool(pass_),
-            "ts": str(ts),
-            "fail_patterns_hit": list(fail_patterns_hit or []),
-        }
-    except Exception as exc:  # noqa: BLE001
-        log.warning(
-            "[OTR_Ledger] stamp_meta_audit_verdict failed: %s", exc,
-        )
-
-
 # ---------------------------------------------------------------------------
 # l3-2026-05-08: Cast Contract pre-wiring helpers (Phase 0+ §1+§2+§3)
 # ---------------------------------------------------------------------------
@@ -1127,8 +1095,6 @@ __all__ = [
     "set_meta",
     "record_phase_ms",
     "append_transition",
-    # l3-2026-05-08 BUG-126 telemetry
-    "stamp_meta_audit_verdict",
     # l3-2026-05-08 Cast Contract pre-wiring
 ]
 

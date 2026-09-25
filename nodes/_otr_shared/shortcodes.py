@@ -146,7 +146,6 @@ VIDEO_LANE = {
     "cloud_vidu_q2_pro_fast_720p": "cvdu",
     "cloud_wan_i2v": "cwan",
     "cloud_wan_i2v_audio": "cwna",
-    "fastwan_8gb": "fw8g",
     "google_omni_video": "gomn",
     "google_veo_video": "gveo",
     "humo": "humo",
@@ -156,8 +155,6 @@ VIDEO_LANE = {
     "ltx25_video": "l25v",
     "ltx_8gb": "lx8g",
     "razzle_ltx_8gb": "rlx8",
-    "ltx_audio_in": "lxai",
-    "ltx_video": "lxvd",
     "mesh_stage": "mesh",
     "minimax_h3_audio_in": "mh3a",
     "minimax_h3_video": "mh3v",
@@ -169,7 +166,6 @@ VIDEO_LANE = {
     "viz_green": "vgrn",
     "viz_mxc_cpu": "vmcp",
     "viz_mxc_mandala": "vmmn",
-    "wan_ti2v": "wti2",
 }
 
 IMAGE_GEN = {

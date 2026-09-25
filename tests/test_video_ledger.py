@@ -32,7 +32,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from tests.fixtures.ledger_stub import make_legacy_list, make_stub_ledger
+from tests._support.ledger_stub import make_legacy_list, make_stub_ledger
 
 
 # ---------------------------------------------------------------------------

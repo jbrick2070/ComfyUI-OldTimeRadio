@@ -111,15 +111,7 @@ if /i "%2"=="FLOOR" (
 ) else if /i "%2"=="HUMO" (
   echo [launch] HUMO lane token accepted ^(no enable flag exists; profiles route the engine^)
 ) else if /i "%2"=="LTX" (
-  echo [launch] LTX lane token accepted ^(both LTX engines registry-selectable; no enable flags exist^)
-) else if /i "%2"=="WAN" (
-  rem GO_FORWARD 4A (2026-06-14): the 8GB-tier Wan2.2 TI2V-5B engine. The 5B
-  rem REQUIRES the Wan2.2 VAE (M8), not the 2.1 VAE. The 14B i2v half of this
-  rem token is retired (2026-08-26). These two exports are the lane's live
-  rem payload and eng_wan_ti2v reads both.
-  set OTR_WAN_TI2V_CKPT=C:\ComfyUI-Models\diffusion_models\Wan2.2-TI2V-5B-Q5_K_M.gguf
-  set OTR_WAN_TI2V_VAE_NAME=wan2.2_vae.safetensors
-  echo [launch] WAN lane: TI2V-5B ckpt + VAE exports set
+  echo [launch] LTX lane token accepted ^(LTX engines are registry-selectable; no enable flags exist^)
 ) else (
   echo [launch] no lane token ^(engine selection is profile/registry-driven^)
 )
@@ -155,8 +147,8 @@ rem custom_nodes holds ONLY the OldTimeRadio junction -- the wrapper packs
 rem (ComfyUI-LTXVideo, KJNodes, VideoHelperSuite, kokorotts, ...) live in
 rem Documents\ComfyUI\custom_nodes, mapped by the Desktop app's
 rem extra_models_config.yaml. Headless boots MUST pass a yaml or every
-rem ltx_video render falls to the floor (WrapperNodeMissing:
-rem LTXVImgToVideoConditionOnly -- the 3D quick-smoke catch). We pass OUR
+rem LTX render falls to the floor (WrapperNodeMissing on the LTXV wrapper
+rem classes -- the 3D quick-smoke catch). We pass OUR
 rem headless copy (_otr_headless_model_paths.yaml) because the Desktop yaml's
 rem desktop_extensions entry points at the dead v1 install path and crashes
 rem main.py's prestartup scan (FileNotFoundError).

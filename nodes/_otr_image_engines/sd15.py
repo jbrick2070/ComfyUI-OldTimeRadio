@@ -14,7 +14,7 @@ Silicon box. Measured 2026-09-07 on a Mac mini M4, every Z-Image variant failed:
 
 SD 1.5 fp16 is 1.99 GB from the UNGATED ``Comfy-Org/stable-diffusion-v1-5-archive``,
 loads through the ordinary ``CheckpointLoaderSimple`` (MODEL + CLIP + VAE in one
-file -- no split loaders, no GGUF pack, no text-encoder download), and needs no
+file -- no split loaders, no extra node pack, no text-encoder download), and needs no
 licence acceptance. That combination is what makes it installable on the
 press-Run path this pack is built around.
 

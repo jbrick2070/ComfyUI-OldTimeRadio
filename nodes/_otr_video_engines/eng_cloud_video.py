@@ -1258,7 +1258,7 @@ class CloudLtx25FoleyPlusEngine(_CloudVideoBase):
 
 
 class CloudLtx25AudioInEngine(_CloudVideoBase):
-    """Cloud analogue of local ``ltx_audio_in`` on LTX 2.5 Audio-to-Video.
+    """Cloud analogue of the local LTX 2.5 audio-in lanes, on LTX 2.5 Audio-to-Video.
 
     There is no Comfy ``api_ltx2_5_a2v`` template. The live node
     ``LtxApi25AudioToVideo`` is the contract: audio 2-20s SETS duration,

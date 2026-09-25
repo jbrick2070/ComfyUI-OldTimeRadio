@@ -651,9 +651,6 @@ that was on disk all along.** The weights do NOT live under
 exactly what makes the mistake convincing) and they do NOT live under the ComfyUI-Installs tree.
 - **The authority is `nodes/_otr_models_root.py::_models_root()`** -- read it rather than
   guessing: `OTR_COMFYUI_MODELS_ROOT` -> `COMFYUI_MODELS_ROOT` -> default **`C:\ComfyUI-Models`**.
-- **GGUF writers resolve to `<models_root>\LLM\converted\<subdir>\<file>`**, e.g.
-  `C:\ComfyUI-Models\LLM\converted\gemma-4-12b-it\gemma-4-12b-it-Q4_K_M.gguf` (7.12 GB, present).
-  `GEMMA4_12B_GGUF_PATH` is a whole-path escape hatch for the GEMMA row ONLY.
 - **A `find` under the repo or under `Documents\ComfyUI` proves NOTHING about model presence.**
   Before telling the operator a model is missing -- or proposing a multi-GB download -- resolve
   the path through the code above and `Test-Path` THAT. A false "missing" costs him a download
@@ -799,8 +796,8 @@ The pack is published to registry.comfy.org as **`comfyui-old-time-radio`** unde
   resilience). Consequence for debugging: a missing dependency SKIPS the affected node and prints
   `[OldTimeRadio] Skipped '<name>': <reason>` -- it does NOT zero out the pack. Proven by loading
   the real published zip with every requirements.txt dep blocked: all but two nodes still
-  registered. **THE PACK DECLARES 25 NODES, NOT 34** (`node_list.json`, and `__init__.py` prints
-  `All 25 nodes loaded successfully`). The old "32/34" ratio was written here when the count was
+  registered. **THE PACK DECLARES 24 NODES, NOT 34** (`node_list.json`, and `__init__.py` prints
+  `All 24 nodes loaded successfully`). The old "32/34" ratio was written here when the count was
   wrong, and `tests/test_node_list_manifest.py:123` exists because that number kept propagating --
   but it only guards `__init__.py`, so THIS file carried it for weeks and a doc written for
   outside agents inherited it on 2026-09-13. Quote the live count, never a remembered ratio.

@@ -807,8 +807,7 @@ VANISHED_CHECK_EVERY = 6
 
 #: The token both dead-server messages start with, so a log classifier can
 #: tell "the harness could not reach or find the render" from "the render
-#: failed" without parsing prose. `scripts/otr_writer_bank_gate.py` maps it to
-#: HARNESS; a test pins that the two files agree on the spelling.
+#: failed" without parsing prose.
 SERVER_GONE_MARKER = "SERVER-GONE"
 
 

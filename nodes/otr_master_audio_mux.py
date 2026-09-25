@@ -1263,8 +1263,8 @@ def _obs_basename(final: str) -> str:
     keeps its identity; style and video next because those are the axes he
     actually compares, and they survive the truncation on ordinary titles.
 
-    `_final` IS PRESERVED: `scripts/otr_pod_obs_bridge.py` keys on that marker
-    to recognise a published episode, and the archival copy in `otr/episodes/`
+    `_final` IS PRESERVED: readers key on that marker to recognise a published
+    episode, and the archival copy in `otr/episodes/`
     is deliberately UNTOUCHED -- its suffixes carry pipeline provenance and
     `otr_caption_burn` strips those exact spellings.
 
@@ -1548,8 +1548,8 @@ class OTRMasterAudioMux:
         # still reduces to the episode id. That reduction is what every
         # name-bound reader downstream relies on: `_obs_basename` strips
         # `_final` and then `_PIPELINE_SUFFIXES`; `_episode_stem` and the strip
-        # list just above do the same; and `scripts/otr_pod_obs_bridge.py` keys
-        # on the `_final` marker, which is preserved. PBUG-20260904-06 was
+        # list just above do the same; and a published episode is recognised
+        # by the `_final` marker, which is preserved. PBUG-20260904-06 was
         # exactly a name-bound reader refusing a renamed artifact, so the
         # marker and the id-reduction are both deliberately kept.
         return compact_artifact(str(out_dir), stem, "_final", ".mp4")

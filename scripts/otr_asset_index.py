@@ -33,7 +33,7 @@ _REPO = os.path.dirname(_HERE)
 
 #: A weight FILE the engine names literally.
 _WEIGHT_RE = re.compile(
-    r'["\']([A-Za-z0-9_.\-]+\.(?:safetensors|ckpt|pth|gguf|bin|onnx))["\']')
+    r'["\']([A-Za-z0-9_.\-]+\.(?:safetensors|ckpt|pth|bin|onnx))["\']')
 #: A Hugging Face repo id, restricted to publishers this project actually uses
 #: so that arbitrary `a/b` strings in comments do not become install steps.
 _REPO_RE = re.compile(r'["\']([A-Za-z0-9_.\-]+/[A-Za-z0-9_.\-]+)["\']')
@@ -60,8 +60,8 @@ def _public_engine_resolver():
     """Load the dependency-free public-id resolver from its sole owner.
 
     Profiles intentionally save public menu ids (for example
-    ``wan22_high_video``), while asset rows are keyed by the internal engine
-    module (``wan_ti2v``). Counting the raw strings drops those profiles from
+    ``ltx25_high_video``), while asset rows are keyed by the internal engine
+    module (``ltx25_video``). Counting the raw strings drops those profiles from
     the generated index even though they select that exact engine.
     """
     path = os.path.join(_REPO, "nodes", "_otr_shared", "public_engines.py")
@@ -186,19 +186,19 @@ def collect_engines() -> list:
 
 
 def collect_profiles() -> dict:
-    """profile id -> the engines it selects, so a user can start from a profile."""
+    """engine -> the matrix rows that select it, so a user can start from a workflow."""
     by_engine = {}
     resolve_engine_id = _public_engine_resolver()
     video_keys = {
         "character_visual", "announcer_visual", "music_visual",
         "video_render_engine",
     }
-    for path in sorted(glob.glob(os.path.join(_REPO, "config/experiments/*.json"))):
-        try:
-            doc = json.load(io.open(path, encoding="utf-8"))
-        except Exception:
-            continue
-        pid = doc.get("id") or os.path.basename(path)[:-len(".json")]
+    if _REPO not in sys.path:
+        sys.path.insert(0, _REPO)
+    from nodes._otr_shared.capability_profiles import (
+        known_profile_ids, load_profile)
+    for pid in known_profile_ids():
+        doc = load_profile(pid)
         roles = doc.get("role_overrides", {}) or {}
         slots = doc.get("slot_overrides", {}) or {}
         for key in ("character_visual", "announcer_visual", "music_visual",
@@ -299,15 +299,22 @@ def render() -> str:
                     needs.append("**not declared in code -- verify**")
             how = "auto (HF cache)" if row["repos"] and not row["weights"] else ""
             if row["engine"] == "humo":
-                # One module implements both tiers. The automatic lane is the
+                # One module implements both paths. The automatic lane is the
                 # complete 14B recipe only; claiming it installs the 1.7B DiT
                 # would recreate the wrong-artifact fresh-install trap.
                 how = ("14B: `otr_fetch_lane_weights.py humo`; 1.7B: "
-                       "[exact manual tier](RUNPOD_INSTALL.md)")
+                       "[exact manual download](RUNPOD_INSTALL.md)")
             elif row["engine"].startswith("humo"):
-                how = "[exact manual tier](RUNPOD_INSTALL.md)"
+                how = "[exact manual download](RUNPOD_INSTALL.md)"
             elif row["engine"] == "minimax_h3":
                 how = "explicit operator-local `otr_fetch_lane_weights.py minimax_h3`"
+            elif row["engine"] == "ltx25":
+                # One module, three DiTs: each card class has its own complete
+                # lane, and the canonical graph fetches the selected lane's
+                # files itself at queue time (`nodes/_otr_visual_assets.py`).
+                how = ("auto at queue time; or `otr_fetch_lane_weights.py "
+                       "ltx25_native_16gb` / `ltx25_native_24gb` / "
+                       "`ltx25_native_blackwell`")
             elif row["engine"] == "kokoro":
                 # Voices and the ONNX model are fetched by the boot prefetch
                 # (`_otr_kokoro_voice_prefetch`); the torch model rides the HF

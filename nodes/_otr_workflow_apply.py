@@ -228,7 +228,7 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
         from ._otr_video_engines import registry as _vreg
         from ._otr_shared.public_engines import resolve_engine_id
         # The video dropdown DISPLAYS public/aspect-labelled engines
-        # ("wan_8gb (16:9)", "humo (portrait)"), and that label is what a fresh save
+        # ("ltx098_low_video (16:9)", "humo (portrait)"), and that label is what a fresh save
         # stores. Resolve the label / PUBLIC id / LEGACY id back to the concrete
         # internal engine id before the registry check (mirrors
         # OTR_VideoDirector._engine_id_from_pick). A bare internal value passes through.
@@ -242,7 +242,7 @@ def _is_engine_director_admissible(widget_name: str, value: Any) -> bool:
 #: The two LLM picker widgets whose menu options now carry a VRAM badge
 #: (``'google/gemma-4-12b-it (11.9 GB)'``). Profiles, CLI flags and saved graphs
 #: store the BARE repo id, so both the validator and the writer need the same
-#: bare<->badged tolerance the video director already has for ``'wan_8gb (16:9)'``.
+#: bare<->badged tolerance the video director already has for ``'ltx098_low_video (16:9)'``.
 _LLM_MODEL_WIDGETS = frozenset({"creative_writing_model", "technical_model"})
 
 

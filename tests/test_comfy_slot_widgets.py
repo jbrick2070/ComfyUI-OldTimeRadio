@@ -31,7 +31,7 @@ from nodes import _otr_comfy_backend as occ
 from nodes import _otr_model_catalog as cat
 from nodes.OTR_LedgerScriptWriter import OTR_LedgerScriptWriter as W
 from nodes.OTR_LedgerScriptWriter import _resolve_inputs
-from tests.fixtures.writer_slots import assert_relative_order
+from tests._support.writer_slots import assert_relative_order
 
 
 @pytest.fixture(autouse=True)
