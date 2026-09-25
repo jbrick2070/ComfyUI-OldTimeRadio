@@ -12,19 +12,17 @@ this file does not restate them, and does not restate the review or push rules.
 **For what already happened -- commits, measurements, receipts -- read
 [HANDOFF_LOG](HANDOFF_LOG.md), newest entry first.**
 
-## Live box -- 5080, do not reset (2026-09-25)
+## Live box -- 5080 (2026-09-25, afternoon)
 
-ComfyUI is on port 8000. A 1-act chain
-(`C:\Users\jeffr\Documents\ComfyUI\output\otr\yt_chain.ps1`) runs until
-08:00 local on 2026-09-25 or the first failure. At handoff the mime leg
-(prompt `ea876b5c`) was still rendering; AnimateDiff is next. Do not kill
-python, do not interrupt the queue, and do not reboot the server. Receipts
-are the 2026-09-25 RENDER entry in the handoff log; the morning review is
-Part A of [TEST_WAVE](TEST_WAVE.md). The red-test patch that sat uncommitted
-in this tree landed as `004d07ac` (07:52); the tree was clean after it, and the
-operator's rule from that morning is that it stays clean: no unpushed patches.
-With it, `test_g4_admission_honesty` is green; `test_g2_canvas_truth` is the
-one inherited red left for Part A.
+ComfyUI is on port 8000, resident and idle: relaunched at 09:23 by
+`scripts/_otr_soak_server_launch.cmd` (the overnight server predated the
+writer's `asset_cleanup` widget and refused it), then used for the three
+live cleanup legs (off / partial / full, all in `otr/obs`). Nothing is
+queued. It is safe to use; reset per section 4 of CLAUDE.md before any
+headless run. The overnight 1-act chain (`yt_chain.ps1`) ended in the
+morning; its review is Part A of [TEST_WAVE](TEST_WAVE.md) and has NOT been
+done. Full suite at every push today: the same 12 inherited reds as
+`fe17f426`, nothing new. The tree stays clean: no unpushed patches.
 
 ## Operating order (hard)
 
@@ -117,7 +115,7 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   through `v3_data` (`execution.py:196-209`), which the error path never
   serializes. **Codex r2 named this as the pack-side mitigation and it is
   real.** The fork: convert the nine hosts to V3 (schema order must match the
-  saved widget order byte-for-byte across 63 graphs, and the writer alone is
+  saved widget order byte-for-byte across the 25 shipped graphs, and the writer alone is
   ~3,500 lines), OR add one small V3 credential node that stashes the key per
   prompt and is wired into every host's `gate_in` (a canonical-graph change
   plus all variants, and it must return NaN from IS_CHANGED or a cache hit
@@ -131,31 +129,23 @@ Open forks. One word from him closes a row into section 2, or cuts it.
   lands, a pod run that spends Comfy credits should be treated as sharing
   its key with the proxy's audience. One word from him picks the shape.
 
-### The registry push -- one batch, at the bottom, by ruling (operator 2026-09-19)
+### The registry -- his clicks and his word
 
-These ride the same publish and are deliberately last. The floor is
-moving -- graphs are still being regenerated -- and a publish is the one action
-here that reaches strangers and cannot be taken back.
-
-* **Gallery -- built 2026-09-25, rides 2.3.4.** Comfy's scanner globs
-  `*/workflows/*.json` one level deep, so the 24 variants in
-  `workflows/variants/` shipped but never listed. Operator: "we can't store the
-  variants in a subfolder" -- they now sit beside the canonical and the gallery
-  lists all 25. The old worry here was wrong: the 2026-09-01 silent 404 came
-  from a SECOND template-named folder, never from how many graphs one folder
-  holds; `tests/test_workflow_templates_single_folder.py` still keeps it to one
-  folder and now pins the listed set to the canonical plus the shipping rows.
+* **2.3.5, when he says.** 2.3.4 (published 2026-09-25: `asset_cleanup`, the
+  25-entry gallery) is Pending, and the scan replica predicts it will Flag: an
+  internal plan doc shipped in it, fixed on `main` in `5d9c4ee3` and now
+  guarded by `tests/test_registry_scan_oracle_clean.py`. The tree scans clean;
+  a bump publishes a scannable version. His call: now, or after the registry
+  rules on 2.3.4. Everything since (the writer folder, the queue-time gate)
+  rides the same bump.
 * **Delete `v2.0-alpha`.** Unblocked: 2.1.1 is Active and the registry icon
   points at `/main/`. One click, his.
 * **Flagged registry versions.** 2.1.5, 2.1.6, 2.3.0 and 2.3.1 are Flagged;
-  2.3.2 and 2.3.3 are Active (read 2026-09-25). The API gives no reason --
-  there is no `status_reason`, no scan result and no queue position on any
-  endpoint. His Discord, not a code change.
-* **2.3.4 published 2026-09-25** on his word ("find your latest release which
-  will not be the active release"): carries `asset_cleanup` (`3e01b1c6`, proven
-  live off / partial / full on the 5080 before the bump) and the 25-entry
-  gallery (`c0c286be`). Pending until Comfy-Org's scan; the 4060 installs it by
-  picking 2.3.4 explicitly in the Manager's version picker.
+  2.3.2 and 2.3.3 are Active (read 2026-09-25). The API gives no reason. His
+  Discord, not a code change.
+* **Comfy Desktop's registry Install is intermittent** (PBUG-20260925-01: a
+  green "installed" toast and nothing on disk, twice; then fine). Not ours to
+  fix; worth telling Comfy-Org, with the 4060's timeline. His Discord.
 
 ## 2. CODE -- decided, in order
 
@@ -173,14 +163,36 @@ Choose a short root (registry if it fits, then models-adjacent if it
 fits, then `C:\ComfyUI-Models\huggingface` if that tree exists, else
 the huggingface_hub-shaped user cache). Spec:
 [HF_HOME_WINDOWS_PIN](HF_HOME_WINDOWS_PIN.md) (re-grounded 2026-09-25).
-`47703d7a`'s error-message half stays; its decline-to-pin does not.
+`47703d7a`'s error-message half stays; its decline-to-pin does not. The
+writer no longer downloads into this cache (`8f8ccebb`, the `LLM` folder);
+the pin still governs Bark, MusicGen, the visual assets and the provisioner,
+and the 162-character tail it sizes for was always the visual one.
+
+### 0b. Name the node pack for every engine in the queue-time gate (from the 02758478 reviews)
+
+`_otr_visual_assets._refuse_missing_node_packs` (`02758478`) leads with an
+install instruction only for Ghost Signal (`NODE_PACK_HINT`); HuMo, LTX 2.5,
+MiniMax H3 and mesh get the generic "install the node pack that provides
+these classes". `wrapper_bridge._PACK_FOR_PREFIX` / `_pack_hint()` already
+map a class-name prefix to its pack and URL (`ADE_`, `VHS_`) -- extend that
+table for the other engines' wrapper prefixes and have the gate read
+`_pack_hint(absent)` instead of a per-engine constant. One verifiable answer;
+no arc.
 
 ## 3. TEST
 
 Open by his word (2026-09-25). The wave -- the 5080 overnight review, the 4060
 regression on the 8 GB rows, the suite and the Bug Bible -- is
 [TEST_WAVE](TEST_WAVE.md). Do not freeze a head for it: each receipt records
-the HEAD it ran.
+the HEAD it ran. Standing 2026-09-25 afternoon: Part A (the 5080 overnight
+review) not done. Part B on the 4060: B2 PASSED through the GUI on a fresh
+2.3.4 install (`c2f14301`); B3's weight auto-download proof PASSED and the
+leg then FAILED on the missing AnimateDiff-Evolved pack (PBUG-20260925-02,
+fixed `02758478`); the operator is wiping the 4060 for a fresh start, so the
+sequence there is: install, queue `otr_8gb_animatediff` WITHOUT the pack and
+log the t=0 refusal (the live verify), install the pack, B3, B4. Part C: the
+suite has run at every push today (12 inherited reds); the Bug Bible
+regression against the pack has not.
 
 ## Already scoped -- do not build
 
