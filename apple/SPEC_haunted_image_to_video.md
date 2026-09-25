@@ -358,7 +358,7 @@ Verified present in the repo and enforced by tests:
 * `workflows/otr_<row>.json` **and** its section in `apple/LAUNCH_RECIPES.md`
   — generated (in `workflows/variants/` with a per-row `.launch.md` when this
   spec was written; the graphs sit beside the canonical and the recipes are one
-  doc since 2026-09-25) for every committed profile.
+  doc since 2026-09-25) for every matrix row.
 * `apple/ENGINE_MATRIX.md` — regenerate via `tools/engine_matrix.py`; parity is
   enforced.
 * `tests/fixtures/still_plan_head_parity.json` — regenerate the roster.

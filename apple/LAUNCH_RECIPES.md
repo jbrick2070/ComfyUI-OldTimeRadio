@@ -152,7 +152,7 @@ One section per per-machine graph in `workflows/`: the ComfyUI launch arguments,
 
 - torch cu128+ build (the nv baseline is 2.10/cu130)
 - ffmpeg on PATH (mac: ensure libx264 + aac encoders are in the build).
-- minimal Linux: libcairo2-dev + pkg-config, then `pip install pycairo` (this profile selects `viz_mxc_mandala`).
+- minimal Linux: libcairo2-dev + pkg-config, then `pip install pycairo` (this graph selects `viz_mxc_mandala`).
 
 ### Preflight models
 

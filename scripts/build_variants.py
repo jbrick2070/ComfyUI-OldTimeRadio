@@ -317,7 +317,7 @@ def _launch_recipe(profile: dict, profile_id: str, variant_rel: str,
         # including profiles pinned to the cairo-free viz_mxc_cpu -- an
         # install step a tester would have paid for nothing.
         *(["- minimal Linux: libcairo2-dev + pkg-config, then `pip install "
-           "pycairo` (this profile selects `viz_mxc_mandala`)."]
+           "pycairo` (this graph selects `viz_mxc_mandala`)."]
           if "viz_mxc_mandala" in json.dumps(profile.get("role_overrides") or {})
           else []),
         "",
