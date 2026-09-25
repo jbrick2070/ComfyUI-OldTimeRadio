@@ -67,7 +67,7 @@
     },
     {
       "id": "otr_8gb_still",
-      "display_name": "8 GB NVIDIA -- a still image with motion, minted by SD 1.5. Lane still_motion, sd15 stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
+      "display_name": "8 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer Qwen3.5-4B at a 6.8 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -95,7 +95,7 @@
     },
     {
       "id": "otr_8gb_video",
-      "display_name": "8 GB NVIDIA -- real video diffusion on LTX 0.9.8, which downloads itself (16.1 GB at queue time, no account, no licence click) and is the only video engine proven on 8 GB, 16 GB and Mac alike. SD 1.5 stills, Kokoro voices, Stable Audio 3.",
+      "display_name": "8 GB NVIDIA -- real video diffusion on LTX 0.9.8, which downloads itself (16.1 GB at queue time, no account, no licence click) and is the only video engine proven on 8 GB, 16 GB and Mac alike. z_image_turbo stills, Kokoro voices, Stable Audio 3.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -167,7 +167,7 @@
     },
     {
       "id": "otr_16gb_low",
-      "display_name": "16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
+      "display_name": "16 GB NVIDIA -- no video weights at all -- the procedural visualiser lanes. Lane viz_camera, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "allow_sidecars": true,
@@ -196,7 +196,7 @@
     },
     {
       "id": "otr_16gb_still",
-      "display_name": "16 GB NVIDIA -- a still image with motion, minted by Lumina-Image 2.0. Lane still_motion, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
+      "display_name": "16 GB NVIDIA -- a still image with motion, minted by Z-Image Turbo. Lane still_motion, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -348,7 +348,7 @@
     },
     {
       "id": "otr_16gb_animatediff",
-      "display_name": "16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, lumina_image stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
+      "display_name": "16 GB NVIDIA -- AnimateDiff motion over a still. Lane animatediff15_v3_haunted_video, z_image_turbo stills, Kokoro voices, Stable Audio 3. Writer gemma-4-12b-it at a 14.5 GB ceiling. Rebuilt from the canonical 2026-09-13; see config/workflow_matrix.json.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
@@ -797,7 +797,7 @@
     },
     {
       "id": "otr_8gb_ltx25_native_foley",
-      "display_name": "8 GB NVIDIA (Ada or newer) -- video that generates its own sound: lane ltx25_native_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, sd15 stills, Kokoro voices, Stable Audio 3. Every weight here is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately -- a GPU-side encode of it tips even a 16 GB card -- so its 9.88 GB lands in host RAM, not VRAM. MEASURED on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in, ComfyUI RSS 12.95 GB. It passed, with under a gigabyte to spare. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like \"LTX 2.5 is slow on 8 GB\" when it is really \"we ran out of RAM\". VRAM itself was never close: peak 7441 of 8188 MiB with 232 MiB max reserved and no driver spill.",
+      "display_name": "8 GB NVIDIA (Ada or newer) -- video that generates its own sound: lane ltx25_native_foley_16gb (mix4x8, stock ComfyUI loaders), gemma4-12b-ltx25-comfy-w4a8 text encoder. Qwen3.5-4B writer at a 6.8 GB ceiling, z_image_turbo stills, Kokoro voices, Stable Audio 3. Every weight here is ungated and downloads itself at queue time (about 25 GB, no Hugging Face token). The 12.86 GB transformer exceeds 8 GB and therefore streams; that is expected and is the trade this tier makes. THE REAL REQUIREMENT IS 8 GB VRAM **PLUS ABOUT 10 GB OF FREE SYSTEM RAM**, and that second number is the one that will bite. The Gemma-4 12B text encoder is pinned to the CPU on this tier deliberately -- a GPU-side encode of it tips even a 16 GB card -- so its 9.88 GB lands in host RAM, not VRAM. MEASURED on a 4060 with 31.7 GB total: 10.4 GB free at start, 0.92 GB free at 34 minutes in, ComfyUI RSS 12.95 GB. It passed, with under a gigabyte to spare. A box with 16 GB of RAM and a browser open will very likely page instead, and paging looks like \"LTX 2.5 is slow on 8 GB\" when it is really \"we ran out of RAM\". VRAM itself was never close: peak 7441 of 8188 MiB with 232 MiB max reserved and no driver spill.",
       "device_backend": "cuda",
       "gpu_vendor": "nvidia",
       "ships": true,
