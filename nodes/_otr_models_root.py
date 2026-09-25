@@ -48,6 +48,25 @@ class ModelsRootUnresolved(RuntimeError):
     """
 
 
+def _configured_tree() -> "Path | None":
+    """The folder holding the first configured ``checkpoints`` path, or None
+    outside a running ComfyUI (no ``folder_paths``, or one without
+    ``get_folder_paths``, such as the test stub)."""
+    try:
+        import folder_paths  # ComfyUI runtime only
+        first = folder_paths.get_folder_paths("checkpoints")[0]
+    except Exception:  # noqa: BLE001 -- outside ComfyUI, fall through
+        return None
+    return Path(first).expanduser().parent
+
+
+def _has_entries(folder: Path) -> bool:
+    try:
+        return any(folder.iterdir())
+    except OSError:
+        return False
+
+
 def _models_root() -> Path:
     r"""Where the weights live: env, then this box's tree, then ComfyUI's own.
 
@@ -55,11 +74,23 @@ def _models_root() -> Path:
 
     1. The env vars win outright. That is how anyone puts weights wherever
        they like, and how every pod run is pinned.
-    2. Then the legacy literal, BUT ONLY IF IT EXISTS. It is the reference
-       machine's real 55-entry tree and neither env var is set there, so
-       dropping it would relocate that machine's entire model root. Guarding
-       it on existence keeps that box working while making the literal
-       invisible to everybody else.
+    1b. Inside a running ComfyUI, the tree the USER configured: the folder
+       holding the first ``checkpoints`` path, which is where
+       extra_model_paths.yaml (and ComfyUI Desktop's own config) puts a
+       relocated tree first. ADDED 2026-09-25 after the 4060 measured the
+       defect: a leftover, EMPTY ``C:\ComfyUI-Models`` won step 2 on bare
+       existence and sent the writer's LLM folder out of Desktop's
+       ``ComfyUI-Shared\models`` while every other category resolved there.
+       A directory existing is not a configuration. The reference machine is
+       unchanged by this step: its yaml lists ``C:\ComfyUI-Models\checkpoints``
+       first (read from its live ``/internal/folder_paths``), so the answer is
+       the same tree for a better reason.
+    2. Then the legacy literal, BUT ONLY IF IT EXISTS AND HOLDS SOMETHING.
+       Reached outside ComfyUI (fetch scripts, the provisioner), where no
+       configuration can be read. It is the reference machine's real 55-entry
+       tree and neither env var is set there, so dropping it would relocate
+       that machine's script-side root. An empty one is a leftover, not a
+       tree.
     3. Then ComfyUI's own folder_paths -- the USER'S configuration, including
        extra_model_paths.yaml, which is the documented way to relocate
        models. This is the friendly default a fresh install should get, on
@@ -77,8 +108,11 @@ def _models_root() -> Path:
     )
     if raw:
         return Path(raw).expanduser()
+    configured = _configured_tree()
+    if configured is not None:
+        return configured
     legacy = Path(r"C:\ComfyUI-Models")
-    if legacy.is_dir():
+    if legacy.is_dir() and _has_entries(legacy):
         return legacy
     try:
         import folder_paths  # ComfyUI runtime only

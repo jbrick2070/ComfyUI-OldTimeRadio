@@ -15430,3 +15430,30 @@ not promote it to the Bug Bible on this evidence alone.
   the ordering before native_requests, the skips). Live verify: the 4060's
   B3 retry on the fresh 2.3.4 install (pull 02758478 or later, queue
   otr_8gb_animatediff without ADE, expect the refusal at t=0).
+
+## PBUG-20260925-03 -- the writer LLM folder follows a leftover empty C:\ComfyUI-Models instead of the tree ComfyUI is configured with
+- surfaced: live boot log on the 4060, Comfy Desktop with registry 2.3.5,
+  the same boot that verified PBUG-20260925-02's queue-time refusal
+  (apple/FRESH_INSTALL_4060_2026-09-25.md), 2026-09-25
+- symptom: the boot printed `[OldTimeRadio] writer LLM folder:
+  C:\ComfyUI-Models\LLM` while every model category of that instance
+  resolved under Desktop's `ComfyUI-Shared\models` (its own "Adding extra
+  search path" lines). C:\ComfyUI-Models was an EMPTY leftover of earlier
+  headless experiments. No error: a writer download would have landed
+  outside the user's model tree.
+- root cause: `nodes/_otr_models_root._models_root()` returned the legacy
+  literal on bare `is_dir()` BEFORE asking ComfyUI's folder_paths, so a
+  directory merely existing outranked the user's configuration. The writer
+  LLM folder (8f8ccebb) was the first consumer to print its answer at boot;
+  the other 13 callers shared the defect silently.
+- fix (2026-09-25, 5080): new step 1b, inside a running ComfyUI, returns the
+  folder holding the first configured `checkpoints` path (extra_model_paths
+  and Desktop's config put a relocated tree first). The legacy literal,
+  reached only outside ComfyUI, must also hold something. Env pins still
+  win. Measured unchanged on the 5080: both the script side and its live
+  /internal/folder_paths resolve C:\ComfyUI-Models before and after.
+  Coverage: tests/test_models_root_is_one_owner.py
+  TestAConfiguredTreeBeatsAFolderThatMerelyExists (5 tests).
+- promotion: candidate ("a directory existing is not a configuration: ask
+  the host's model-path registry before a hardcoded path"), not yet checked
+  against otr_coverage_index.yaml / BUG_BIBLE.yaml.

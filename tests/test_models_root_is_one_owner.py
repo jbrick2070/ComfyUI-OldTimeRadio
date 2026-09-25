@@ -85,6 +85,69 @@ class TestThePrecedenceSurvivedTheMove:
         assert "OTR_COMFYUI_MODELS_ROOT" in str(exc.value)
 
 
+def _live_comfy(checkpoints_dir):
+    """A folder_paths that answers like a running ComfyUI whose config lists
+    ``checkpoints_dir`` first."""
+    import types
+    fake = types.ModuleType("folder_paths")
+    fake.get_folder_paths = lambda name: [str(checkpoints_dir)]
+    fake.models_dir = r"C:\somewhere\ComfyUI\models"
+    return fake
+
+
+class TestAConfiguredTreeBeatsAFolderThatMerelyExists:
+    r"""The 4060 measured it on 2026-09-25: a leftover, EMPTY
+    ``C:\ComfyUI-Models`` won on bare existence and sent the writer's LLM
+    folder out of ComfyUI Desktop's ``ComfyUI-Shared\models``, while every
+    other category resolved there. A directory existing is not a
+    configuration."""
+
+    def test_inside_comfy_the_configured_tree_wins_over_the_legacy_dir(
+            self, clean_env, tmp_path):
+        shared = tmp_path / "ComfyUI-Shared" / "models"
+        clean_env.setitem(sys.modules, "folder_paths",
+                          _live_comfy(shared / "checkpoints"))
+        clean_env.setattr(pathlib.Path, "is_dir", lambda self: True)
+        assert mr._models_root() == shared
+
+    def test_the_reference_machine_resolves_the_same_tree(self, clean_env):
+        r"""The 5080's live /internal/folder_paths lists
+        ``C:\ComfyUI-Models\checkpoints`` first, so the new step lands on the
+        tree the legacy literal used to find."""
+        clean_env.setitem(sys.modules, "folder_paths",
+                          _live_comfy(r"C:\ComfyUI-Models\checkpoints"))
+        assert mr._models_root() == pathlib.Path(r"C:\ComfyUI-Models")
+
+    def test_an_env_pin_still_beats_the_configured_tree(self, clean_env, tmp_path):
+        clean_env.setenv("OTR_COMFYUI_MODELS_ROOT", str(tmp_path / "pinned"))
+        clean_env.setitem(sys.modules, "folder_paths",
+                          _live_comfy(tmp_path / "shared" / "checkpoints"))
+        assert mr._models_root() == pathlib.Path(str(tmp_path / "pinned"))
+
+    def test_outside_comfy_an_empty_legacy_dir_is_a_leftover(self, clean_env):
+        legacy = pathlib.Path(r"C:\ComfyUI-Models")
+        clean_env.setitem(sys.modules, "folder_paths", None)
+        clean_env.setattr(pathlib.Path, "is_dir",
+                          lambda self: self == legacy)
+        clean_env.setattr(pathlib.Path, "iterdir", lambda self: iter(()))
+        sibling = [None]
+
+        def only_sibling(p):
+            sibling[0] = os.path.normpath(p)
+            return True
+        clean_env.setattr(os.path, "isdir", only_sibling)
+        assert str(mr._models_root()) == sibling[0]
+
+    def test_outside_comfy_a_populated_legacy_dir_still_wins(self, clean_env):
+        legacy = pathlib.Path(r"C:\ComfyUI-Models")
+        clean_env.setitem(sys.modules, "folder_paths", None)
+        clean_env.setattr(pathlib.Path, "is_dir",
+                          lambda self: self == legacy)
+        clean_env.setattr(pathlib.Path, "iterdir",
+                          lambda self: iter([self / "checkpoints"]))
+        assert mr._models_root() == legacy
+
+
 def test_the_module_sits_where_its_file_arithmetic_assumes():
     """This module must live in nodes/, where step 4's walk is counted from.
 
