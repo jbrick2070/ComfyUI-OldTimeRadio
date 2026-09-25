@@ -230,7 +230,7 @@ visual style; and for the writer LLMs, the cloud A/B slots as well
 Mapped: Story Writer (node 1) `act_count`, `creative_writing_model`,
 `technical_model`, `openrouter_slot_a_model`, `openrouter_slot_b_model`,
 `comfy_slot_a_model`, `comfy_slot_b_model`, `google_api_slot_a_model`,
-`google_api_slot_b_model`, `asset_cleanup`, `lemmy_cameo`,
+`google_api_slot_b_model`, `asset_cleanup` (the space saver: off / partial / full), `lemmy_cameo`,
 `episode_language`, `source_bank`, `visual_style`. "The models" means ALL
 of them (operator: "all LLM models, video, voice TTS, music"): Video
 Director (node 87) `announcer_video_model`, `music_video_model`,
