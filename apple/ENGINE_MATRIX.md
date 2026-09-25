@@ -312,10 +312,10 @@ and it read exactly like a measured number until someone looked.
 | cloud_wan_i2v_audio | - | contract max | none cited |
 | google_omni_video | - | contract max | none cited |
 | google_veo_video | - | contract max | none cited |
-| humo | 97 | safe_render_frames | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo) |
-| humo_1.7B | - | contract max | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo) |
-| humo_1.7B_169 | - | contract max | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo) |
-| humo_14B_169 | 97 | safe_render_frames | `vram-recipe-lab/docs/HUMO_BAKEOFF.md` (sibling lab repo) |
+| humo | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_1.7B | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_1.7B_169 | - | contract max | **MISSING: docs/HUMO_BAKEOFF.md** |
+| humo_14B_169 | 97 | safe_render_frames | **MISSING: docs/HUMO_BAKEOFF.md** |
 | ltx25_native_audio_in_16gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_native_audio_in_24gb | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx25_native_foley_16gb | - | contract max | apple/PROD_BUG_LOG.md |
@@ -326,8 +326,8 @@ and it read exactly like a measured number until someone looked.
 | ltx25_video | - | contract max | apple/PROD_BUG_LOG.md |
 | ltx_8gb | - | contract max | none cited |
 | mesh_stage | - | contract max | none cited |
-| minimax_h3_audio_in | - | contract max | `vram-recipe-lab/docs/ENVELOPE_LADDERS.md` (sibling lab repo) |
-| minimax_h3_video | - | contract max | `vram-recipe-lab/docs/ENVELOPE_LADDERS.md` (sibling lab repo) |
+| minimax_h3_audio_in | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
+| minimax_h3_video | - | contract max | **MISSING: docs/ENVELOPE_LADDERS.md** |
 | razzle_ltx_8gb | - | contract max | none cited |
 | still_flat | - | contract max | none cited |
 | still_motion | - | contract max | none cited |

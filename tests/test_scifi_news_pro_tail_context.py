@@ -216,7 +216,7 @@ def _functions_of(module):
     whose globals resolve in dataclasses.py and typing.py rather than here.
     """
     own_file = module.__file__
-    for name, obj in vars(module).items():
+    for name, obj in list(vars(module).items()):
         candidates = []
         if isinstance(obj, types.FunctionType):
             candidates.append((name, obj))
